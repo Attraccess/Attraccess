@@ -1,3 +1,11 @@
+import { PageHeader } from '../../components/pageHeader/index';
+import { Card, Skeleton, Chip } from '@heroui/react';
+import { Button } from '../../components/button/index';
+import { LabeledSwitch } from '../../components/labeledSwitch';
+import { FolderIcon, PlusIcon } from 'lucide-react';
+import { UpsertProjectModal } from './upsertModal/index';
+import { EmptyState } from '../../components/emptyState';
+import { ProjectCard } from './projectCard/index';
 import {
   ApiError,
   ProjectInvitationsServiceAcceptProjectInvitationMutationResult,
@@ -14,20 +22,46 @@ import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
-import { PageHeader } from '../../components/pageHeader';
-import { Card, Chip, Skeleton } from '@heroui/react';
-import { Button } from '../../components/button';
-import { LabeledSwitch } from '../../components/labeledSwitch';
-import { FolderIcon, PlusIcon } from 'lucide-react';
-import { UpsertProjectModal } from './upsertModal';
-import { EmptyState } from '../../components/emptyState';
-import { ProjectCard } from './projectCard';
 import { useToastMessage } from '../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-export function ProjectsListPage() {
+export function useInvitationHighlight(hasInvitations: boolean) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const invitationRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const [highlightedInvitationId, setHighlightedInvitationId] = useState<number | null>(null);
+  useEffect(() => {
+    const target = searchParams.get('invitationId');
+    if (!target) {
+      return;
+    }
+    const invitationId = Number(target);
+    if (!invitationId || Number.isNaN(invitationId) || !hasInvitations) {
+      return;
+    }
+    const ref = invitationRefs.current[invitationId];
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedInvitationId(invitationId);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('invitationId');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [hasInvitations, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightedInvitationId) {
+      return;
+    }
+    const timeout = setTimeout(() => setHighlightedInvitationId(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [highlightedInvitationId]);
+
+  return { invitationRefs, highlightedInvitationId };
+}
+
+export function useProjectsListPageState() {
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const page = 1;
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -42,13 +76,11 @@ export function ProjectsListPage() {
   });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const invitationRefs = useRef<Record<number, HTMLDivElement | null>>({});
-  const [highlightedInvitationId, setHighlightedInvitationId] = useState<number | null>(null);
   const [acceptingInvitationId, setAcceptingInvitationId] = useState<number | null>(null);
   const [decliningInvitationId, setDecliningInvitationId] = useState<number | null>(null);
 
   const hasInvitations = (invitations?.length ?? 0) > 0;
+  const { invitationRefs, highlightedInvitationId } = useInvitationHighlight(hasInvitations);
 
   const invalidateInvitations = useCallback(async () => {
     await Promise.all([
@@ -104,33 +136,6 @@ export function ProjectsListPage() {
     },
     [declineInvitation],
   );
-
-  useEffect(() => {
-    const target = searchParams.get('invitationId');
-    if (!target) {
-      return;
-    }
-    const invitationId = Number(target);
-    if (!invitationId || Number.isNaN(invitationId) || !hasInvitations) {
-      return;
-    }
-    const ref = invitationRefs.current[invitationId];
-    if (ref) {
-      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setHighlightedInvitationId(invitationId);
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('invitationId');
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [hasInvitations, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    if (!highlightedInvitationId) {
-      return;
-    }
-    const timeout = setTimeout(() => setHighlightedInvitationId(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [highlightedInvitationId]);
 
   const invitationContent = useMemo(() => {
     if (isLoadingInvitations && !hasInvitations) {
@@ -195,9 +200,33 @@ export function ProjectsListPage() {
     hasInvitations,
     highlightedInvitationId,
     invitations,
+    invitationRefs,
     isLoadingInvitations,
     t,
   ]);
+  return {
+    includeArchived,
+    setIncludeArchived,
+    projects,
+    isLoading,
+    isLoadingInvitations,
+    t,
+    hasInvitations,
+    invitationContent,
+  } as const;
+}
+
+export function ProjectsListPage() {
+  const {
+    includeArchived,
+    setIncludeArchived,
+    projects,
+    isLoading,
+    isLoadingInvitations,
+    t,
+    hasInvitations,
+    invitationContent,
+  } = useProjectsListPageState();
 
   return (
     <div>

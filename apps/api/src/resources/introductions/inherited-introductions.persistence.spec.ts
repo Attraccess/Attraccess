@@ -8,6 +8,8 @@ import {
   IntroductionHistoryAction,
 } from '@attraccess/database-entities';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
+import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 
 const user = new EntitySchema<User>({ name: 'User', target: User, columns: { id: { type: Number, primary: true } } });
 const resource = new EntitySchema<Resource>({
@@ -84,6 +86,44 @@ describe('inherited introduction query', () => {
   afterEach(async () => {
     await source.destroy();
   });
+  it.each([
+    [100, 'resource'],
+    [10, 'group'],
+  ])('uses the newest event ID when %s %s history timestamps match', async (id, kind) => {
+    const historyRepository = source.getRepository(ResourceIntroductionHistoryItem);
+    const groups = new ResourceGroupsIntroductionsService(
+      source.getRepository(ResourceIntroduction),
+      historyRepository,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const retraining = new RetrainingValidityProbe(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      historyRepository,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    const valid = () =>
+      kind === 'resource'
+        ? service.hasValidIntroduction(2, 1)
+        : groups.hasValidIntroduction({ groupId: 10, userId: 1 });
+    const createdAt = new Date('2026-03-01');
+    await historyRepository.save([
+      { id: 20, introduction: { id }, action: IntroductionHistoryAction.GRANT, createdAt },
+      { id: 21, introduction: { id }, action: IntroductionHistoryAction.REVOKE, createdAt },
+    ]);
+    expect(await valid()).toBe(false);
+    expect(await retraining.hasValidHistory(id)).toBe(false);
+    await historyRepository.save({ id: 22, introduction: { id }, action: IntroductionHistoryAction.GRANT, createdAt });
+    expect(await valid()).toBe(true);
+    expect(await retraining.hasValidHistory(id)).toBe(true);
+  });
   it('keeps the default direct-only and batches introductions from every containing group with history and names', async () => {
     expect((await service.getMany(2)).map((intro) => intro.id)).toEqual([100]);
     const rows = await service.getMany(2, true);
@@ -104,3 +144,9 @@ describe('inherited introduction query', () => {
     expect((await service.getMany(2, true)).map((intro) => intro.id)).toEqual([100]);
   });
 });
+
+class RetrainingValidityProbe extends ResourceRetrainingService {
+  hasValidHistory(id: number) {
+    return this.isValid(id);
+  }
+}

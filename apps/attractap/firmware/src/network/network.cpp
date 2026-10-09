@@ -13,7 +13,7 @@ void Network::loop() {}
 void Network::initSharedComponents() {}
 
 #else
-#include "platform.hpp"
+#include "../platform.hpp"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_sntp.h"

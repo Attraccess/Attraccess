@@ -1,16 +1,15 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, screen, render, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, vi, expect, it } from 'vitest';
 import type { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { NodeEditor } from './index';
-
+import userEvent from '@testing-library/user-event';
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   current: { data: {} as Record<string, unknown> },
   resolveNodeSchema: vi.fn(),
 }));
 vi.mock('@xyflow/react', () => ({ useNodeId: () => 'node', useNodesData: () => mocks.current }));
-vi.mock('../../flowContext', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1 }) }));
+vi.mock('../../context/index', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1 }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
   useResourceFlowsServiceResolveNodeSchema: () => ({
@@ -182,7 +181,10 @@ describe('dynamic node editor', () => {
   it('blocks save when a resolved schema requires a field absent from its properties', async () => {
     render(editor());
     fireEvent.click(screen.getByText('Open'));
-    await respond(0, { ...base, configSchema: { ...base.configSchema, required: ['missingChannel'] } });
+    await respond(0, {
+      ...base,
+      configSchema: { ...base.configSchema, required: ['missingChannel'] },
+    });
     expect(screen.getByText('editor.buttons.save')).toBeDisabled();
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
@@ -191,14 +193,16 @@ describe('dynamic node editor', () => {
   it('allows an optional defaulted numeric field to be cleared before saving', async () => {
     vi.useRealTimers();
     const user = userEvent.setup();
-    render(editor({
-      ...base,
-      configSchema: {
-        ...base.configSchema,
-        dynamic: false,
-        properties: { ...baseProperties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
-      },
-    }));
+    render(
+      editor({
+        ...base,
+        configSchema: {
+          ...base.configSchema,
+          dynamic: false,
+          properties: { ...baseProperties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
+        },
+      }),
+    );
     fireEvent.click(screen.getByText('Open'));
     const timeout = screen.getByRole('textbox', { name: /Optional timeout/ });
     await user.clear(timeout);
@@ -265,7 +269,10 @@ describe('dynamic node editor', () => {
     fireEvent.click(screen.getByText('Open'));
     fireEvent.click(screen.getByText('editor.buttons.cancel'));
     fireEvent.click(screen.getByText('Open'));
-    await respond(0, { ...base, configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } } });
+    await respond(0, {
+      ...base,
+      configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } },
+    });
     expect(screen.queryByLabelText('Stale')).not.toBeInTheDocument();
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
@@ -281,7 +288,10 @@ describe('dynamic node editor', () => {
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'second' } });
     await act(async () => vi.advanceTimersByTime(300));
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'third' } });
-    await respond(1, { ...base, configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } } });
+    await respond(1, {
+      ...base,
+      configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } },
+    });
     expect(screen.queryByLabelText('Stale')).not.toBeInTheDocument();
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
@@ -295,7 +305,10 @@ describe('dynamic node editor', () => {
     fireEvent.click(screen.getByText('Open'));
     const next = { ...base, type: 'next' };
     view.rerender(editor(next));
-    await respond(0, { ...base, configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } } });
+    await respond(0, {
+      ...base,
+      configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } },
+    });
     expect(screen.queryByLabelText('Stale')).not.toBeInTheDocument();
     await respond(1, next);
     submit();

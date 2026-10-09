@@ -1,28 +1,61 @@
 import { useEffect, useMemo, useRef } from 'react';
 import grapesjs from 'grapesjs';
 import type { Component } from 'grapesjs';
-import grapesJSMJMLModule from 'grapesjs-mjml';
-import 'grapesjs/dist/css/grapes.min.css';
-import './MjmlVisualEditor.css';
-import { isFullMjmlDocument } from '@attraccess/shared';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { getBaseUrl } from '../../../api';
+import { getBaseUrl } from '../../../api/index';
 import {
   decodeHtmlOnlyEntities,
-  isWellFormedXml,
-  splitHead,
   unwrapFragment,
   withLogoPlaceholder,
   withPreviewEmailLogo,
+  isWellFormedXml,
+  splitHead,
   wrapFragment,
 } from './mjmlLayout';
+import { isFullMjmlDocument } from '@attraccess/shared';
+import grapesJSMJMLModule from 'grapesjs-mjml';
+import 'grapesjs/dist/css/grapes.min.css';
+import './MjmlVisualEditor.css';
 
-// grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
+function removeScripts(root: Document | DocumentFragment): boolean {
+  let removed = false;
+  for (const element of Array.from(root.querySelectorAll('*'))) {
+    if (element.localName.toLowerCase() === 'script') {
+      element.remove();
+      removed = true;
+    } else if (element instanceof HTMLTemplateElement) {
+      removed = removeScripts(element.content) || removed;
+    }
+  }
+  return removed;
+}
+
+/** Remove executable elements before seeding the unsandboxed GrapesJS canvas. */
+export function stripScripts(mjml: string): string {
+  const xml = isWellFormedXml(mjml);
+  const document = new DOMParser().parseFromString(mjml, xml ? 'application/xml' : 'text/html');
+  if (!removeScripts(document)) return mjml;
+  return xml ? new XMLSerializer().serializeToString(document) : document.body.innerHTML;
+}
+
+export // Pure analysis of the initial value, shared between the mount effect (parser
+// selection) and render (warning banners).
+const analyzeInitialValue = (initialValue: string) => {
+  const raw = decodeHtmlOnlyEntities(initialValue);
+  const { head, body } = isFullMjmlDocument(raw) ? splitHead(raw) : { head: '', body: raw };
+  const wrapped = wrapFragment(body);
+  const initialMjml = stripScripts(wrapped);
+  const scriptsStripped = initialMjml !== wrapped;
+  return { initialMjml, droppedHead: head, useXmlParser: isWellFormedXml(initialMjml), scriptsStripped };
+};
+
+export // grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
 // interop the callable/plain export is either the module itself or `.default`.
 const unwrapDefault = <T,>(mod: T): T => (mod as { default?: T })?.default ?? mod;
-const grapesJSMJML = unwrapDefault(grapesJSMJMLModule);
 
-const warningTranslations = {
+export const grapesJSMJML = unwrapDefault(grapesJSMJMLModule);
+
+export const warningTranslations = {
   en: {
     htmlParserFallback:
       'This template is not well-formed XML, so a lossier parser is used: raw HTML table markup may be reformatted by visual edits. Fix the markup in the code editor to avoid this.',
@@ -40,8 +73,7 @@ const warningTranslations = {
       'Diese Vorlage enthält <script>-Tags, die aus der visuellen Vorschau entfernt wurden. Wechsle zum Code-Editor, um Vorlagen mit Skripten zu bearbeiten.',
   },
 };
-
-interface MjmlVisualEditorProps {
+export interface MjmlVisualEditorProps {
   /** MJML fragment (mj-section...) or full <mjml> document. Read once on mount — remount (key) to reload. */
   initialValue: string;
   onChange: (mjml: string) => void;
@@ -57,23 +89,14 @@ interface MjmlVisualEditorProps {
   exportFullDocument?: boolean;
 }
 
+// grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
+// interop the callable/plain export is either the module itself or `.default`.
 // GrapesJS canvases are unsandboxed iframes; script tags in mj-raw content
 // would execute in the editing admin's browser session. Strip them from the
 // canvas seed so the visual editor is safe regardless of template content.
 // Templates that rely on scripts must use the code editor tab.
-const SCRIPT_TAG_RE = /<script\b[^>]*>[\s\S]*?<\/script>/gi;
-const stripScripts = (mjml: string) => mjml.replace(SCRIPT_TAG_RE, '');
-
 // Pure analysis of the initial value, shared between the mount effect (parser
 // selection) and render (warning banners).
-const analyzeInitialValue = (initialValue: string) => {
-  const raw = decodeHtmlOnlyEntities(initialValue);
-  const { head, body } = isFullMjmlDocument(raw) ? splitHead(raw) : { head: '', body: raw };
-  const wrapped = wrapFragment(body);
-  const initialMjml = stripScripts(wrapped);
-  const scriptsStripped = initialMjml !== wrapped;
-  return { initialMjml, droppedHead: head, useXmlParser: isWellFormedXml(initialMjml), scriptsStripped };
-};
 
 export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
   const { t } = useTranslations(warningTranslations);
@@ -131,89 +154,87 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
         ],
       });
 
-    // grapesjs-mjml merges each component's 'style-default' (MJML spec defaults)
-    // into its attributes on import and strips matching attributes on export.
-    // Our layout overrides those defaults via mj-attributes, so stripping e.g.
-    // font-size="13px" silently changes the rendered email. Empty the
-    // 'style-default' maps so imported attributes round-trip verbatim. The rest
-    // of the type's defaults is spread back in so this stays correct whether
-    // addType merges or replaces the previous defaults object (traits, drag
-    // flags etc. must survive).
-    editor.Components.getTypes().forEach((type) => {
-      const proto = editor.Components.getType(type.id)?.model?.prototype as
-        | { defaults?: Record<string, unknown> }
-        | undefined;
-      if (proto?.defaults?.['style-default']) {
-        editor.Components.addType(type.id, { model: { defaults: { ...proto.defaults, 'style-default': {} } } });
-      }
-    });
-
-    // grapesjs-mjml renders each component by compiling a standalone
-    // "<mjml><mj-body>...</mj-body></mjml>" mini-document, so mj-head styles
-    // (mj-attributes, mj-style) never apply in the canvas. Splice the head
-    // into every mini-document so the canvas matches the final email. For a
-    // legacy full-document template its own head is used, so the canvas shows
-    // the styles the warning banner says will be dropped on save.
-    const headMjml = propsRef.current.headMjml || droppedHead;
-    if (headMjml) {
+      // grapesjs-mjml merges each component's 'style-default' (MJML spec defaults)
+      // into its attributes on import and strips matching attributes on export.
+      // Our layout overrides those defaults via mj-attributes, so stripping e.g.
+      // font-size="13px" silently changes the rendered email. Empty the
+      // 'style-default' maps so imported attributes round-trip verbatim. The rest
+      // of the type's defaults is spread back in so this stays correct whether
+      // addType merges or replaces the previous defaults object (traits, drag
+      // flags etc. must survive).
       editor.Components.getTypes().forEach((type) => {
-        const viewProto = editor.Components.getType(type.id)?.view?.prototype as
-          | { getMjmlTemplate?: () => { start: string; end: string } }
-          | undefined;
-        const original = viewProto?.getMjmlTemplate;
-        if (viewProto && original) {
-          viewProto.getMjmlTemplate = function () {
-            const tpl = original.call(this);
-            return { ...tpl, start: tpl.start.replace('<mjml>', `<mjml>${headMjml}`) };
-          };
+        const proto = editor.Components.getType(type.id)?.model?.prototype as
+          { defaults?: Record<string, unknown> } | undefined;
+        if (proto?.defaults?.['style-default']) {
+          editor.Components.addType(type.id, { model: { defaults: { ...proto.defaults, 'style-default': {} } } });
         }
       });
-    }
 
-    editor.setComponents(withPreviewEmailLogo(initialMjml, previewLogoUrl));
+      // grapesjs-mjml renders each component by compiling a standalone
+      // "<mjml><mj-body>...</mj-body></mjml>" mini-document, so mj-head styles
+      // (mj-attributes, mj-style) never apply in the canvas. Splice the head
+      // into every mini-document so the canvas matches the final email. For a
+      // legacy full-document template its own head is used, so the canvas shows
+      // the styles the warning banner says will be dropped on save.
+      const headMjml = propsRef.current.headMjml || droppedHead;
+      if (headMjml) {
+        editor.Components.getTypes().forEach((type) => {
+          const viewProto = editor.Components.getType(type.id)?.view?.prototype as
+            { getMjmlTemplate?: () => { start: string; end: string } } | undefined;
+          const original = viewProto?.getMjmlTemplate;
+          if (viewProto && original) {
+            viewProto.getMjmlTemplate = function () {
+              const tpl = original.call(this);
+              return { ...tpl, start: tpl.start.replace('<mjml>', `<mjml>${headMjml}`) };
+            };
+          }
+        });
+      }
 
-    const lockClass = propsRef.current.lockClass;
-    if (lockClass) {
-      editor.getWrapper()?.onAll((component) => {
-        const isLocked = (c: Component | undefined): boolean =>
-          !!c && (String(c.getAttributes()['css-class'] ?? '').includes(lockClass) || isLocked(c.parent()));
-        if (isLocked(component)) {
-          component.set({
-            locked: true,
-            selectable: false,
-            hoverable: false,
-            editable: false,
-            draggable: false,
-            droppable: false,
-            copyable: false,
-            removable: false,
-            highlightable: false,
-          });
-        }
-      });
-    }
+      editor.setComponents(withPreviewEmailLogo(initialMjml, previewLogoUrl));
 
-    // Attach inside onReady: grapesjs-mjml fires its initial normalization
-    // 'update' events synchronously during setComponents() — before onReady
-    // signals that the canvas is ready. Any 'update' received here is therefore
-    // from a user edit, not load-time parsing. The 300ms debounce also absorbs
-    // any rare late-firing plugin event without silently overwriting user work.
-    const e = editor;
-    e.onReady(() => {
-      if (cancelled) return;
-      e.on('update', () => {
+      const lockClass = propsRef.current.lockClass;
+      if (lockClass) {
+        editor.getWrapper()?.onAll((component) => {
+          const isLocked = (c: Component | undefined): boolean =>
+            !!c && (String(c.getAttributes()['css-class'] ?? '').includes(lockClass) || isLocked(c.parent()));
+          if (isLocked(component)) {
+            component.set({
+              locked: true,
+              selectable: false,
+              hoverable: false,
+              editable: false,
+              draggable: false,
+              droppable: false,
+              copyable: false,
+              removable: false,
+              highlightable: false,
+            });
+          }
+        });
+      }
+
+      // Attach inside onReady: grapesjs-mjml fires its initial normalization
+      // 'update' events synchronously during setComponents() — before onReady
+      // signals that the canvas is ready. Any 'update' received here is therefore
+      // from a user edit, not load-time parsing. The 300ms debounce also absorbs
+      // any rare late-firing plugin event without silently overwriting user work.
+      const e = editor;
+      e.onReady(() => {
         if (cancelled) return;
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
+        e.on('update', () => {
           if (cancelled) return;
-          const mjml = withLogoPlaceholder(e.getHtml(), previewLogoUrl);
-          propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
-        }, 300);
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            if (cancelled) return;
+            const mjml = withLogoPlaceholder(e.getHtml(), previewLogoUrl);
+            propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
+          }, 300);
+        });
       });
-    });
 
-    // Handle for e2e tests and debugging (the canvas is otherwise unreachable from outside).
-    (container as HTMLDivElement & { __grapesEditor?: unknown }).__grapesEditor = editor;
+      // Handle for e2e tests and debugging (the canvas is otherwise unreachable from outside).
+      (container as HTMLDivElement & { __grapesEditor?: unknown }).__grapesEditor = editor;
     };
 
     void run();

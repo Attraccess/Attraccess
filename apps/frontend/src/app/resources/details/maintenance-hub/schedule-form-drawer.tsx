@@ -24,15 +24,14 @@ export function ScheduleFormDrawer(props: Props) {
     { enabled: isOpen && scheduleId != null },
   );
 
-  const title =
-    scheduleId != null
-      ? t('form.titleEdit', { name: existing?.name ?? '…' })
-      : t('form.titleCreate');
+  const title = scheduleId != null ? t('form.titleEdit', { name: existing?.name ?? '…' }) : t('form.titleCreate');
 
   return (
     <StandardDrawer
       isOpen={isOpen}
-      onOpenChange={(open) => { if (!open) onClose(); }}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
       <DrawerHeader>
         <DrawerHeading className="text-lg font-semibold">{title}</DrawerHeading>

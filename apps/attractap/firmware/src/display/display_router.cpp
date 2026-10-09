@@ -3,7 +3,7 @@
 
 #include <algorithm>
 #include <utility>
-#include "platform.hpp"
+#include "../platform.hpp"
 
 // Screen routing owns the complete transaction, including its deferred
 // retirement. Display::loop only asks this router to advance it.

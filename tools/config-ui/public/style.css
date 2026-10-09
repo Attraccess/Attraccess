@@ -1,0 +1,124 @@
+:root {
+  color-scheme: light;
+  --accent: #256d7b;
+  --accent-hover: #1c5560;
+  --foreground: #202b30;
+  --muted: #536369;
+  --border: #d6dede;
+  --surface: #f4f6f6;
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fff;
+  color: var(--foreground);
+  border-top: 6px solid var(--accent);
+  padding: 1rem;
+}
+h1 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.status-bar.running {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.status-bar.stopped {
+  background: #ffebee;
+  color: #c62828;
+}
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.status-bar.running .status-dot {
+  background: #4caf50;
+}
+.status-bar.stopped .status-dot {
+  background: #f44336;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+button {
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+.btn-danger {
+  background: #d32f2f;
+  color: #fff;
+}
+.btn-danger:hover {
+  background: #c62828;
+}
+.btn-secondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+.btn-secondary:hover {
+  background: #e6ecec;
+}

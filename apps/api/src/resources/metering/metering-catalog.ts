@@ -10,7 +10,7 @@ import {
 } from '@attraccess/database-entities';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
-import { findActiveUsage } from '../usage/active-usage';
+import { findActiveUsage } from '../usage/sessions/active-usage';
 
 export async function requireMeter(manager: EntityManager, resourceId: number, meterId: number) {
   const meter = await manager.findOne(ResourceMeter, { where: { id: meterId, resourceId } });

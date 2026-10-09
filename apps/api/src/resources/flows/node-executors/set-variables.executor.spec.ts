@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ResourceFlowNode, ResourceFlowVariableScope } from '@attraccess/database-entities';
 import { SetVariablesExecutor } from './set-variables.executor';
-import { ResourceFlowVariablesService } from '../resource-flow-variables.service';
+import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { NodeExecutionContext } from './node-executor.interface';
 
 describe('SetVariablesExecutor', () => {
@@ -10,7 +10,7 @@ describe('SetVariablesExecutor', () => {
   let ctx: NodeExecutionContext;
 
   const makeNode = (data: object, resourceId = 7): ResourceFlowNode =>
-    ({ id: 'n1', type: 'processing.variables.set', resourceId, data } as unknown as ResourceFlowNode);
+    ({ id: 'n1', type: 'processing.variables.set', resourceId, data }) as unknown as ResourceFlowNode;
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
@@ -49,9 +49,7 @@ describe('SetVariablesExecutor', () => {
 
   it('compiles key and value templates against the input', async () => {
     const input = { who: 'world' };
-    (ctx.compileTemplate as jest.Mock)
-      .mockImplementationOnce(() => 'note')
-      .mockImplementationOnce(() => 'hello world');
+    (ctx.compileTemplate as jest.Mock).mockImplementationOnce(() => 'note').mockImplementationOnce(() => 'hello world');
 
     await executor.execute(
       makeNode({ variables: [{ key: '{{k}}', value: 'hello {{who}}', scope: 'resource' }] }, 7),
@@ -61,59 +59,38 @@ describe('SetVariablesExecutor', () => {
 
     expect(ctx.compileTemplate).toHaveBeenNthCalledWith(1, '{{k}}', input);
     expect(ctx.compileTemplate).toHaveBeenNthCalledWith(2, 'hello {{who}}', input);
-    expect(variablesService.set).toHaveBeenCalledWith(
-      ResourceFlowVariableScope.RESOURCE,
-      7,
-      'note',
-      'hello world',
-      7,
-    );
+    expect(variablesService.set).toHaveBeenCalledWith(ResourceFlowVariableScope.RESOURCE, 7, 'note', 'hello world', 7);
   });
 
   it('uses node.resourceId as ownerId for RESOURCE scope', async () => {
-    await executor.execute(
-      makeNode({ variables: [{ key: 'note', value: '"x"', scope: 'resource' }] }, 42),
-      {},
-      ctx,
-    );
+    await executor.execute(makeNode({ variables: [{ key: 'note', value: '"x"', scope: 'resource' }] }, 42), {}, ctx);
 
-    expect(variablesService.set).toHaveBeenCalledWith(
-      ResourceFlowVariableScope.RESOURCE,
-      42,
-      'note',
-      'x',
-      42,
-    );
+    expect(variablesService.set).toHaveBeenCalledWith(ResourceFlowVariableScope.RESOURCE, 42, 'note', 'x', 42);
   });
 
   it('uses null ownerId for GLOBAL scope but still passes resourceId as last arg', async () => {
-    await executor.execute(
-      makeNode({ variables: [{ key: 'count', value: '5', scope: 'global' }] }, 9),
-      {},
-      ctx,
-    );
+    await executor.execute(makeNode({ variables: [{ key: 'count', value: '5', scope: 'global' }] }, 9), {}, ctx);
 
     expect(variablesService.set).toHaveBeenCalledWith(ResourceFlowVariableScope.GLOBAL, null, 'count', 5, 9);
   });
 
   it('JSON-parses numeric string values into numbers', async () => {
-    await executor.execute(
-      makeNode({ variables: [{ key: 'n', value: '123', scope: 'global' }] }),
-      {},
-      ctx,
-    );
+    await executor.execute(makeNode({ variables: [{ key: 'n', value: '123', scope: 'global' }] }), {}, ctx);
 
     expect(variablesService.set).toHaveBeenCalledWith(ResourceFlowVariableScope.GLOBAL, null, 'n', 123, 7);
   });
 
   it('JSON-parses object/array JSON strings into structured values', async () => {
     await executor.execute(
-      makeNode({
-        variables: [
-          { key: 'obj', value: '{"a":1,"b":[2,3]}', scope: 'global' },
-          { key: 'arr', value: '[1,2,3]', scope: 'resource' },
-        ],
-      }, 4),
+      makeNode(
+        {
+          variables: [
+            { key: 'obj', value: '{"a":1,"b":[2,3]}', scope: 'global' },
+            { key: 'arr', value: '[1,2,3]', scope: 'resource' },
+          ],
+        },
+        4,
+      ),
       {},
       ctx,
     );
@@ -126,14 +103,7 @@ describe('SetVariablesExecutor', () => {
       { a: 1, b: [2, 3] },
       4,
     );
-    expect(variablesService.set).toHaveBeenNthCalledWith(
-      2,
-      ResourceFlowVariableScope.RESOURCE,
-      4,
-      'arr',
-      [1, 2, 3],
-      4,
-    );
+    expect(variablesService.set).toHaveBeenNthCalledWith(2, ResourceFlowVariableScope.RESOURCE, 4, 'arr', [1, 2, 3], 4);
   });
 
   it('JSON-parses booleans and null literals', async () => {
@@ -170,13 +140,16 @@ describe('SetVariablesExecutor', () => {
 
   it('iterates every variable in order, calling set once per entry', async () => {
     await executor.execute(
-      makeNode({
-        variables: [
-          { key: 'a', value: '1', scope: 'global' },
-          { key: 'b', value: '2', scope: 'resource' },
-          { key: 'c', value: 'raw', scope: 'global' },
-        ],
-      }, 11),
+      makeNode(
+        {
+          variables: [
+            { key: 'a', value: '1', scope: 'global' },
+            { key: 'b', value: '2', scope: 'resource' },
+            { key: 'c', value: 'raw', scope: 'global' },
+          ],
+        },
+        11,
+      ),
       {},
       ctx,
     );
@@ -188,11 +161,7 @@ describe('SetVariablesExecutor', () => {
   });
 
   it('applies the schema default for an omitted value (empty string stays as raw string)', async () => {
-    await executor.execute(
-      makeNode({ variables: [{ key: 'k', scope: 'global' }] }),
-      {},
-      ctx,
-    );
+    await executor.execute(makeNode({ variables: [{ key: 'k', scope: 'global' }] }), {}, ctx);
 
     // default value '' -> compileTemplate('') -> '' -> JSON.parse('') throws -> raw ''
     expect(variablesService.set).toHaveBeenCalledWith(ResourceFlowVariableScope.GLOBAL, null, 'k', '', 7);

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import { type Edge, type Node } from '@xyflow/react';
-import { ResourceFlowEdgeDto, ResourceFlowNodeDto } from '@attraccess/react-query-client';
+import type { Edge, Node } from '@xyflow/react';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { ResourceFlowEdgeDto, ResourceFlowNodeDto } from '@attraccess/react-query-client';
 
 export type FlowExportPayload = {
   version: number;
@@ -10,9 +10,9 @@ export type FlowExportPayload = {
   edges: ResourceFlowEdgeDto[];
 };
 
-type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+export type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
-type FlowImportExportProps = {
+export type FlowImportExportProps = {
   nodes: Node[];
   edges: Edge[];
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -21,14 +21,15 @@ type FlowImportExportProps = {
   t: TranslationFn;
 };
 
-const FLOW_EXPORT_VERSION = 1;
-const INVALID_STRUCTURE_ERROR = 'invalidStructure';
+export const FLOW_EXPORT_VERSION = 1;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export const INVALID_STRUCTURE_ERROR = 'invalidStructure';
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function sanitizeNodes(nodes: Node[]): ResourceFlowNodeDto[] {
+export function sanitizeNodes(nodes: Node[]): ResourceFlowNodeDto[] {
   return nodes.map((node) => ({
     id: node.id,
     type: node.type as ResourceFlowNodeDto['type'],
@@ -40,7 +41,7 @@ function sanitizeNodes(nodes: Node[]): ResourceFlowNodeDto[] {
   }));
 }
 
-function sanitizeEdges(edges: Edge[]): ResourceFlowEdgeDto[] {
+export function sanitizeEdges(edges: Edge[]): ResourceFlowEdgeDto[] {
   return edges.map((edge) => ({
     id: edge.id,
     source: edge.source,
@@ -50,7 +51,7 @@ function sanitizeEdges(edges: Edge[]): ResourceFlowEdgeDto[] {
   }));
 }
 
-function buildFlowExport(nodes: Node[], edges: Edge[]): FlowExportPayload {
+export function buildFlowExport(nodes: Node[], edges: Edge[]): FlowExportPayload {
   return {
     version: FLOW_EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
@@ -59,17 +60,12 @@ function buildFlowExport(nodes: Node[], edges: Edge[]): FlowExportPayload {
   };
 }
 
-function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: ResourceFlowEdgeDto[] } {
+export function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: ResourceFlowEdgeDto[] } {
   if (!isRecord(raw)) {
     throw new Error(INVALID_STRUCTURE_ERROR);
   }
 
-  const flowData =
-    Array.isArray(raw.nodes) && Array.isArray(raw.edges)
-      ? raw
-      : isRecord(raw.flow)
-        ? raw.flow
-        : null;
+  const flowData = Array.isArray(raw.nodes) && Array.isArray(raw.edges) ? raw : isRecord(raw.flow) ? raw.flow : null;
 
   if (!flowData || !Array.isArray(flowData.nodes) || !Array.isArray(flowData.edges)) {
     throw new Error(INVALID_STRUCTURE_ERROR);
@@ -140,14 +136,7 @@ function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; edges: R
   return { nodes, edges };
 }
 
-export function useFlowImportExport({
-  nodes,
-  edges,
-  setNodes,
-  setEdges,
-  resourceId,
-  t,
-}: FlowImportExportProps) {
+export function useFlowImportExport({ nodes, edges, setNodes, setEdges, resourceId, t }: FlowImportExportProps) {
   const toast = useToastMessage();
 
   const exportFileName = useMemo(() => {

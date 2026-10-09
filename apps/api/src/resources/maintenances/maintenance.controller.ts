@@ -1,25 +1,32 @@
-import { Controller, Get, Post, Param, Body, Query, ParseIntPipe, Req, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { ResourceMaintenanceService } from './maintenance.service';
+import { ResourceMaintenance } from '@attraccess/database-entities';
+
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
+import { Controller, Get, NotFoundException, Param, ParseIntPipe, Query, Req, Body, Post } from '@nestjs/common';
+
+import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+import { LicenseModuleType } from '../../license/license.service';
+
+import { RequiresLicense } from '../../license/require-license.decorator';
+
 import {
-  CreateMaintenanceDto,
+  CanManageMaintenanceResponseDto,
   ListMaintenancesDto,
   PaginatedMaintenanceResponse,
-  CanManageMaintenanceResponseDto,
+  CreateMaintenanceDto,
   FinishMaintenanceDto,
-} from './dtos';
-import { ResourceMaintenance } from '@attraccess/database-entities';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+} from './dtos/index';
+
+import { ResourceMaintenanceService } from './maintenance.service';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
-import { LicenseModuleType } from '../../license/license.service';
-import { RequiresLicense } from '../../license/require-license.decorator';
 
 @RequiresLicense(LicenseModuleType.MAINTENANCE)
 @ApiTags('Resource Maintenances')
 @Controller('resources/:resourceId/maintenances')
 @Auth()
 export class ResourceMaintenanceController {
-  constructor(private readonly maintenanceService: ResourceMaintenanceService) { }
+  constructor(protected readonly maintenanceService: ResourceMaintenanceService) {}
 
   @Get('can-manage')
   @ApiOperation({
@@ -47,7 +54,7 @@ export class ResourceMaintenanceController {
   })
   async canManageMaintenance(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Req() request: AuthenticatedRequest
+    @Req() request: AuthenticatedRequest,
   ): Promise<CanManageMaintenanceResponseDto> {
     const canManage = await this.maintenanceService.canManageMaintenance(request.user, resourceId);
 
@@ -55,47 +62,6 @@ export class ResourceMaintenanceController {
       canManage,
       resourceId,
     };
-  }
-
-  @Post()
-  @CanManageMaintenance()
-  @ApiOperation({
-    summary: 'Create a maintenance for a resource',
-    description: 'Create a new maintenance schedule for a specific resource',
-    operationId: 'createMaintenance',
-  })
-  @ApiParam({
-    name: 'resourceId',
-    description: 'The ID of the resource',
-    type: Number,
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Maintenance created successfully',
-    type: ResourceMaintenance,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - invalid maintenance data',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - User is not authenticated',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - User does not have permission to manage maintenances for this resource',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Resource not found',
-  })
-  async createMaintenance(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() dto: CreateMaintenanceDto,
-    @Req() request: AuthenticatedRequest,
-  ): Promise<ResourceMaintenance> {
-    return await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id);
   }
 
   @Get()
@@ -159,7 +125,7 @@ export class ResourceMaintenanceController {
   })
   async getMaintenances(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Query() query: ListMaintenancesDto
+    @Query() query: ListMaintenancesDto,
   ): Promise<PaginatedMaintenanceResponse> {
     return await this.maintenanceService.findMaintenances(resourceId, query);
   }
@@ -195,7 +161,7 @@ export class ResourceMaintenanceController {
   })
   async getMaintenance(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('maintenanceId', ParseIntPipe) maintenanceId: number
+    @Param('maintenanceId', ParseIntPipe) maintenanceId: number,
   ): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceService.getMaintenanceById(maintenanceId);
 
@@ -204,6 +170,47 @@ export class ResourceMaintenanceController {
     }
 
     return maintenance;
+  }
+
+  @Post()
+  @CanManageMaintenance()
+  @ApiOperation({
+    summary: 'Create a maintenance for a resource',
+    description: 'Create a new maintenance schedule for a specific resource',
+    operationId: 'createMaintenance',
+  })
+  @ApiParam({
+    name: 'resourceId',
+    description: 'The ID of the resource',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Maintenance created successfully',
+    type: ResourceMaintenance,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid maintenance data',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - User does not have permission to manage maintenances for this resource',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Resource not found',
+  })
+  async createMaintenance(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Body() dto: CreateMaintenanceDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ResourceMaintenance> {
+    return await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id);
   }
 
   @Post(':maintenanceId/finish')

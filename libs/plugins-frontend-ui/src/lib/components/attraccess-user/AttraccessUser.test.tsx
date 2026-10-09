@@ -23,9 +23,7 @@ describe('AttraccessUser', () => {
     const onStartDirectMessage = vi.fn();
     const user = { id: 42, username: 'supervisor' };
 
-    render(
-      <AttraccessUser user={user} description="Lab manager" onStartDirectMessage={onStartDirectMessage} />,
-    );
+    render(<AttraccessUser user={user} description="Lab manager" onStartDirectMessage={onStartDirectMessage} />);
 
     expect(screen.getByText('supervisor')).toBeInTheDocument();
     expect(screen.getByText('Lab manager')).toBeInTheDocument();

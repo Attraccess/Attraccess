@@ -8,6 +8,11 @@ SAML (Security Assertion Markup Language) is commonly used in enterprise and edu
 - A SAML-capable identity provider
 - **Manage System Configuration** permission
 
+SAML state cookies always use `Secure`, `HttpOnly`, and `SameSite=Lax`. The Attraccess
+site must use HTTPS, including local installations. When TLS terminates at a reverse
+proxy, configure `TRUST_PROXY` for that proxy so Attraccess recognizes secure requests.
+Plain HTTP requests do not receive a SAML state cookie.
+
 ## Creating a Provider
 
 1. Open **Settings** in the sidebar and select the **Single sign-on** section

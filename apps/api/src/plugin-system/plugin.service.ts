@@ -1,350 +1,128 @@
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { basename, isAbsolute, join, relative, resolve } from 'path';
-import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
-import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
-import { PluginSandboxService } from './plugin-sandbox.service';
-import { PluginMigrationService } from './plugin-migration.service';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
-import { FileUpload } from '../common/types/file-upload.types';
-import { rename, rm } from 'fs/promises';
-import decompress from 'decompress';
-import { createHash, randomBytes } from 'crypto';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+
 import { spawn } from 'child_process';
 
-const INTERNAL_PLUGIN_DIRECTORIES = new Set(['.npm-backups', '.plugin-failures.json', '.plugin-boot-guard.json']);
-const PLUGIN_FAILURES_FILE = '.plugin-failures.json';
-const PLUGIN_BOOT_GUARD_FILE = '.plugin-boot-guard.json';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 
-type PluginFailure = { pluginDirectory: string; message: string };
+import { rm, rename } from 'fs/promises';
 
-export class PluginService {
-  private static plugins: LoadedPluginManifest[] | null = null;
-  private static loadedPlugins: Set<string> = new Set();
-  private static pluginLoadErrors: Map<string, Error> = new Map();
-  private static pluginFailures: Map<string, PluginFailure> = new Map();
-  private static bootGuardSignalHandlers: Partial<Record<'SIGINT' | 'SIGTERM', () => void>> = {};
-  private static logger = new Logger(PluginService.name);
-  private static readonly pluginUploadLocks = new Map<string, Promise<void>>();
-  public static PLUGIN_PATH: string;
-  private static RESTART_BY_EXIT_FLAG: boolean;
+import { join, basename, isAbsolute, relative, resolve } from 'path';
 
+import { PluginMigrationService } from './plugin-migration.service';
+
+import { randomBytes, createHash } from 'crypto';
+
+import decompress from 'decompress';
+
+import { FileUpload } from '../common/types/file-upload.types';
+
+import { PluginManifestSchema, LoadedPluginManifest, PluginManifest } from './plugin.manifest';
+
+import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
+
+import { PluginBootGuard } from './runtime/boot-guard';
+
+import { PluginSandboxService } from './plugin-sandbox.service';
+
+import { INTERNAL_PLUGIN_DIRECTORIES } from './runtime/boot-guard';
+
+function getImplementationClass(): typeof PluginService {
+  return require('./plugin.service').PluginService;
+}
+
+export class PluginService extends PluginBootGuard {
   public static configure(config: { PLUGIN_DIR: string; RESTART_BY_EXIT: boolean }): void {
-    PluginService.removeBootGuardSignalHandlers();
-    PluginService.PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
-    PluginService.RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
-    PluginService.plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
-    PluginService.loadedPlugins.clear();
-    PluginService.pluginLoadErrors.clear();
-    PluginService.pluginFailures = new Map(
-      PluginService.readFailures().map((failure) => [failure.pluginDirectory, failure]),
+    getImplementationClass().removeBootGuardSignalHandlers();
+    getImplementationClass().PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
+    getImplementationClass().RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
+    getImplementationClass().plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
+    getImplementationClass().loadedPlugins.clear();
+    getImplementationClass().pluginLoadErrors.clear();
+    getImplementationClass().pluginFailures = new Map(
+      getImplementationClass()
+        .readFailures()
+        .map((failure) => [failure.pluginDirectory, failure]),
     );
-    PluginService.logger.log(
-      `PluginService configured. Path: ${PluginService.PLUGIN_PATH}, RestartByExit: ${PluginService.RESTART_BY_EXIT_FLAG}`,
+    getImplementationClass().logger.log(
+      `PluginService configured. Path: ${getImplementationClass().PLUGIN_PATH}, RestartByExit: ${getImplementationClass().RESTART_BY_EXIT_FLAG}`,
     );
-    if (!PluginService.PLUGIN_PATH) {
-      PluginService.logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
+    if (!getImplementationClass().PLUGIN_PATH) {
+      getImplementationClass().logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
     }
-  }
-
-  public static getPlugins(): LoadedPluginManifest[] {
-    if (!PluginService.plugins) {
-      PluginService.plugins = PluginService.findPluginsInFolder(PluginService.PLUGIN_PATH);
-      PluginService.logger.log(`Found ${PluginService.plugins.length} plugins in ${PluginService.PLUGIN_PATH}`);
-    }
-
-    return PluginService.plugins;
-  }
-
-  public static getManifestById(id: string): LoadedPluginManifest | undefined {
-    return PluginService.getPlugins().find((plugin) => plugin.id === id);
   }
 
   // Returns the discovered plugins enriched with their backend load status so the
   // admin UI can surface plugins that failed to load (e.g. a missing dependency)
   // instead of silently showing them as if everything were fine.
-  public static getPluginsWithLoadStatus(): LoadedPluginManifest[] {
-    return PluginService.getPlugins().map((manifest) => {
-      const key = `${manifest.name}@${manifest.version}`;
-      const error = PluginService.pluginLoadErrors.get(key);
 
-      let status: LoadedPluginManifest['status'] = 'unknown';
-      if (error) {
-        status = 'error';
-      } else if (PluginService.loadedPlugins.has(key)) {
-        status = 'loaded';
-      }
+  protected restartApp() {
+    PluginService.logger.log('Restarting app');
+    if (PluginService.RESTART_BY_EXIT_FLAG) {
+      PluginService.logger.log('Restarting app by exiting');
+      process.exit();
+    }
 
-      return { ...manifest, status, error: error ? error.message : null };
+    // restart app by starting a new process
+    PluginService.logger.log('Restarting app by starting a new process');
+    const subprocess = spawn(process.argv[0], process.argv.slice(1), {
+      detached: true,
+      stdio: 'inherit',
     });
+    subprocess.unref();
+    PluginService.logger.log('New process started, exiting current process');
+    process.exit();
   }
 
-  public static toManifestInfo(manifest: LoadedPluginManifest): PluginManifestInfo {
-    return {
-      id: manifest.id,
-      name: manifest.name,
-      version: manifest.version,
-      pluginDirectory: manifest.pluginDirectory,
-    };
+  public requestRestart(): void {
+    setTimeout(() => this.restartApp(), 1000);
   }
 
-  public static markPluginAsLoaded(pluginName: string): void {
-    PluginService.logger.log(`Marking plugin ${pluginName} as loaded`);
-    PluginService.loadedPlugins.add(pluginName);
-  }
+  public async deletePlugin(pluginId: string, deferRestart = false) {
+    const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
 
-  public static setPluginLoadError(pluginName: string, error: Error): void {
-    PluginService.logger.error(`Error loading plugin ${pluginName}: ${error.message}`);
-    PluginService.pluginLoadErrors.set(pluginName, error);
-  }
-
-  /**
-   * Persist a failed plugin outside its package. A subsequent process must never
-   * retry code which already prevented the host from starting.
-   */
-  public static quarantinePlugin(manifest: LoadedPluginManifest, error: Error): void {
-    const key = `${manifest.name}@${manifest.version}`;
-    PluginService.setPluginLoadError(key, error);
-    try {
-      PluginService.quarantinePluginDirectory(manifest.pluginDirectory, error);
-    } catch (persistenceError) {
-      PluginService.logger.error(`Failed to persist quarantine for ${key}`, persistenceError as Error);
-    }
-  }
-
-  public static quarantinePluginDirectory(pluginDirectory: string, error: Error): void {
-    PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message: error.message });
-    PluginService.writeFailures([...PluginService.pluginFailures.values()]);
-  }
-
-  public static isPluginQuarantined(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {
-    return PluginService.pluginFailures.has(manifest.pluginDirectory);
-  }
-
-  /** Marks active plugins only while Nest is running their lifecycle hooks. */
-  public static beginBootGuard(): void {
-    PluginService.removeBootGuardSignalHandlers();
-    const previous = PluginService.readBootGuard();
-    if (previous.length > 0) {
-      for (const pluginDirectory of previous) {
-        if (!PluginService.pluginFailures.has(pluginDirectory)) {
-          PluginService.pluginFailures.set(pluginDirectory, {
-            pluginDirectory,
-            message: 'Plugin was disabled after an incomplete startup with no attributable stack frame.',
-          });
-        }
-      }
-      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
-      PluginService.logger.error(`Disabled ${previous.length} plugin(s) after an incomplete previous startup.`);
+    if (!plugin) {
+      PluginService.logger.error(`Plugin with id ${pluginId} not found`);
+      throw new NotFoundException('Plugin not found');
     }
 
-    const active = PluginService.getPlugins()
-      .filter((manifest) => !PluginService.pluginFailures.has(manifest.pluginDirectory))
-      .map((manifest) => manifest.pluginDirectory);
-    PluginService.writeBootGuard(active);
-    // A dev watcher or operator may stop the process during migrations or app.init().
-    // That is an intentional shutdown, not evidence that every plugin crashed.
-    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-      const handler = () => {
-        PluginService.clearBootGuard();
-        // Before Nest registers shutdown hooks, removing our listener restores
-        // Node's normal signal termination. Once Nest is listening, let it close.
-        if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
-      };
-      PluginService.bootGuardSignalHandlers[signal] = handler;
-      process.once(signal, handler);
-    }
-  }
+    const pluginFolder = join(PluginService.PLUGIN_PATH, plugin.pluginDirectory);
 
-  /**
-   * Records the error that prevented the guarded startup from completing so the
-   * next process can show the actionable cause rather than a generic warning.
-   */
-  public static recordBootFailure(error: unknown): void {
-    const active = PluginService.readBootGuard();
-    if (active.length === 0) return;
-
-    const message = error instanceof Error ? error.message : String(error);
-    const stack = error instanceof Error ? (error.stack ?? '') : '';
-    const affected = active.filter((pluginDirectory) =>
-      stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)),
-    );
-    if (affected.length === 0) {
-      PluginService.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
-      return;
+    // if folder does not exist, throw error
+    if (!existsSync(pluginFolder)) {
+      PluginService.logger.error(`Plugin folder ${pluginFolder} of plugin ${plugin.name} not found`);
+      throw new NotFoundException('Plugin not found');
     }
 
-    for (const pluginDirectory of affected) {
-      PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message });
-    }
-    PluginService.writeFailures([...PluginService.pluginFailures.values()]);
-  }
-
-  public static clearBootGuard(): void {
-    PluginService.removeBootGuardSignalHandlers();
-    const path = join(PluginService.PLUGIN_PATH, PLUGIN_BOOT_GUARD_FILE);
-    if (existsSync(path)) rmSync(path, { force: true });
-  }
-
-  private static removeBootGuardSignalHandlers(): void {
-    for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-      const handler = PluginService.bootGuardSignalHandlers[signal];
-      if (handler) process.removeListener(signal, handler);
-    }
-    PluginService.bootGuardSignalHandlers = {};
-  }
-
-  public static pluginQuarantineError(pluginDirectory: string): string | undefined {
-    return PluginService.pluginFailures.get(pluginDirectory)?.message;
-  }
-
-  public static clearPluginQuarantine(pluginDirectory: string): void {
-    const failure = PluginService.pluginFailures.get(pluginDirectory);
-    if (!failure) return;
-
-    PluginService.pluginFailures.delete(pluginDirectory);
-    try {
-      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
-    } catch (error) {
-      PluginService.pluginFailures.set(pluginDirectory, failure);
-      throw error;
-    }
-  }
-
-  private static findPluginsInFolder(rootFolder: string): LoadedPluginManifest[] {
-    // if folder does not exist, return empty array
-    if (!existsSync(rootFolder)) {
-      return [];
-    }
-
-    const potentialPluginFolders = readdirSync(rootFolder);
-    // npm packages are active only while their installation is tracked. A failed or
-    // interrupted removal may leave files behind; loading them alongside an uploaded
-    // copy of the same plugin would register its flow nodes and audit domains twice.
-    // A missing state file means "no npm plugins installed" (filter normally); an
-    // existing-but-unreadable one (EACCES, EIO, a bad restore) must not be treated
-    // the same way, or every npm-installed plugin silently disappears from
-    // discovery with no signal beyond "Found N folders in ...".
-    const npmStatePath = join(PluginService.PLUGIN_PATH, '.npm-plugin-state.json');
-    let npmInstalls: Set<string> | null = new Set();
-    if (existsSync(npmStatePath)) {
+    // Revert the plugin's database migrations (drops its tables/data) BEFORE the
+    // files are removed — the migration classes live in the plugin bundle and
+    // must still be on disk to run. A failure here is logged but never blocks the
+    // uninstall: the admin asked for the plugin to be gone.
+    if (PluginMigrationService.hasMigrations(plugin)) {
       try {
-        const records = JSON.parse(readFileSync(npmStatePath, 'utf8')) as unknown;
-        npmInstalls = new Set(
-          (Array.isArray(records) ? records : [])
-            .map((record: { installPath?: unknown }) => record?.installPath)
-            .filter((path): path is string => typeof path === 'string'),
-        );
+        await PluginMigrationService.runDownMigrations(plugin);
       } catch (error) {
         PluginService.logger.error(
-          `Failed to read ${npmStatePath}; not filtering npm-managed plugin folders until it recovers`,
+          `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
           error as Error,
         );
-        npmInstalls = null;
       }
     }
 
-    PluginService.logger.log(`Found ${potentialPluginFolders.length} folders in ${rootFolder}`);
-
-    return potentialPluginFolders
-      .filter(
-        (pluginFolder) =>
-          !pluginFolder.startsWith('.') &&
-          !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder) &&
-          (npmInstalls === null || !/^npm-[A-Za-z0-9_-]+$/.test(pluginFolder) || npmInstalls.has(pluginFolder)),
-      )
-      .map((pluginFolder) => {
-        const manifest = PluginService.findPluginManifestInPluginFolder(
-          rootFolder,
-          pluginFolder,
-        ) as LoadedPluginManifest | null;
-        if (!manifest) {
-          return null;
-        }
-
-        manifest.pluginDirectory = pluginFolder;
-        // The directory is the installation identity. Keeping its derived ID stable
-        // prevents registrations from changing every time the host restarts.
-        manifest.id = createHash('sha256').update(pluginFolder).digest('base64url').slice(0, 21);
-
-        const failure = PluginService.pluginFailures.get(pluginFolder);
-        if (failure) {
-          PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, new Error(failure.message));
-        }
-
-        try {
-          manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
-        } catch (error) {
-          PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
-          return null;
-        }
-
-        return manifest;
-      })
-      .filter((manifest) => manifest !== null);
-  }
-
-  private static findPluginManifestInPluginFolder(rootFolder: string, pluginFolder: string): PluginManifest | null {
-    const manifestPath = join(rootFolder, pluginFolder, 'plugin.json');
-
-    if (!existsSync(manifestPath)) {
-      PluginService.logger.log(`No manifest found at ${manifestPath}`);
-      return null;
-    }
-
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-
-    if (manifest.main.backend?.directory) {
-      manifest.main.backend.directory = join(pluginFolder, manifest.main.backend.directory);
-    }
-
-    if (manifest.main.frontend?.directory) {
-      manifest.main.frontend.directory = join(pluginFolder, manifest.main.frontend.directory);
-    }
-
-    if (manifest.main.migrations?.directory) {
-      manifest.main.migrations.directory = join(pluginFolder, manifest.main.migrations.directory);
-    }
-
-    return manifest;
-  }
-
-  private static readFailures(): PluginFailure[] {
-    return PluginService.readJsonFile<PluginFailure[]>(PLUGIN_FAILURES_FILE, []);
-  }
-
-  private static writeFailures(failures: PluginFailure[]): void {
-    PluginService.writeJsonFile(PLUGIN_FAILURES_FILE, failures);
-  }
-
-  private static readBootGuard(): string[] {
-    return PluginService.readJsonFile<string[]>(PLUGIN_BOOT_GUARD_FILE, []);
-  }
-
-  private static writeBootGuard(pluginDirectories: string[]): void {
-    PluginService.writeJsonFile(PLUGIN_BOOT_GUARD_FILE, pluginDirectories);
-  }
-
-  private static readJsonFile<T>(name: string, fallback: T): T {
+    // delete folder
+    await rm(pluginFolder, { recursive: true });
     try {
-      const value: unknown = JSON.parse(readFileSync(join(PluginService.PLUGIN_PATH, name), 'utf8'));
-      return Array.isArray(fallback) && !Array.isArray(value) ? fallback : (value as T);
-    } catch {
-      return fallback;
-    }
-  }
-
-  private static writeJsonFile(name: string, value: unknown): void {
-    mkdirSync(PluginService.PLUGIN_PATH, { recursive: true });
-    const path = join(PluginService.PLUGIN_PATH, name);
-    const temporary = `${path}.${randomBytes(8).toString('hex')}.tmp`;
-    try {
-      writeFileSync(temporary, JSON.stringify(value));
-      renameSync(temporary, path);
+      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
     } catch (error) {
-      rmSync(temporary, { force: true });
-      throw error;
+      PluginService.logger.error(`Failed to clear quarantine for deleted plugin ${plugin.name}`, error as Error);
     }
+
+    // restart app
+    if (!deferRestart) this.requestRestart();
   }
+
+  // Returns the discovered plugins enriched with their backend load status so the
+  // admin UI can surface plugins that failed to load (e.g. a missing dependency)
+  // instead of silently showing them as if everything were fine.
 
   public async uploadPlugin(zipFile: FileUpload, deferRestart = false) {
     // check if file is a zip file
@@ -427,9 +205,9 @@ export class PluginService {
     }
   }
 
-  private static safePluginName(name: string): string {
+  protected static safePluginName(name: string): string {
     const safeName = basename(name);
-    const root = resolve(PluginService.PLUGIN_PATH);
+    const root = resolve(getImplementationClass().PLUGIN_PATH);
     const target = resolve(root, safeName);
     const targetRelativeToRoot = relative(root, target);
     if (
@@ -448,8 +226,8 @@ export class PluginService {
     return safeName;
   }
 
-  private static async withPluginUploadLock<T>(pluginName: string, action: () => Promise<T>): Promise<T> {
-    const previous = PluginService.pluginUploadLocks.get(pluginName) ?? Promise.resolve();
+  protected static async withPluginUploadLock<T>(pluginName: string, action: () => Promise<T>): Promise<T> {
+    const previous = getImplementationClass().pluginUploadLocks.get(pluginName) ?? Promise.resolve();
     let release!: () => void;
     const current = previous.then(
       () =>
@@ -457,18 +235,18 @@ export class PluginService {
           release = resolve;
         }),
     );
-    PluginService.pluginUploadLocks.set(pluginName, current);
+    getImplementationClass().pluginUploadLocks.set(pluginName, current);
     await previous;
     try {
       return await action();
     } finally {
       release();
-      if (PluginService.pluginUploadLocks.get(pluginName) === current)
-        PluginService.pluginUploadLocks.delete(pluginName);
+      if (getImplementationClass().pluginUploadLocks.get(pluginName) === current)
+        getImplementationClass().pluginUploadLocks.delete(pluginName);
     }
   }
 
-  private static findManifestFolder(tempFolder: string): string {
+  protected static findManifestFolder(tempFolder: string): string {
     if (existsSync(join(tempFolder, 'plugin.json'))) {
       return tempFolder;
     }
@@ -486,68 +264,167 @@ export class PluginService {
     return candidates[0];
   }
 
-  private restartApp() {
-    PluginService.logger.log('Restarting app');
-    if (PluginService.RESTART_BY_EXIT_FLAG) {
-      PluginService.logger.log('Restarting app by exiting');
-      process.exit();
+  public static getPlugins(): LoadedPluginManifest[] {
+    if (!getImplementationClass().plugins) {
+      getImplementationClass().plugins = getImplementationClass().findPluginsInFolder(
+        getImplementationClass().PLUGIN_PATH,
+      );
+      getImplementationClass().logger.log(
+        `Found ${getImplementationClass().plugins.length} plugins in ${getImplementationClass().PLUGIN_PATH}`,
+      );
     }
 
-    // restart app by starting a new process
-    PluginService.logger.log('Restarting app by starting a new process');
-    const subprocess = spawn(process.argv[0], process.argv.slice(1), {
-      detached: true,
-      stdio: 'inherit',
-    });
-    subprocess.unref();
-    PluginService.logger.log('New process started, exiting current process');
-    process.exit();
+    return getImplementationClass().plugins;
   }
 
-  public requestRestart(): void {
-    setTimeout(() => this.restartApp(), 1000);
+  public static getManifestById(id: string): LoadedPluginManifest | undefined {
+    return getImplementationClass()
+      .getPlugins()
+      .find((plugin) => plugin.id === id);
   }
 
-  public async deletePlugin(pluginId: string, deferRestart = false) {
-    const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
+  // Returns the discovered plugins enriched with their backend load status so the
+  // admin UI can surface plugins that failed to load (e.g. a missing dependency)
+  // instead of silently showing them as if everything were fine.
+  public static getPluginsWithLoadStatus(): LoadedPluginManifest[] {
+    return getImplementationClass()
+      .getPlugins()
+      .map((manifest) => {
+        const key = `${manifest.name}@${manifest.version}`;
+        const error = getImplementationClass().pluginLoadErrors.get(key);
 
-    if (!plugin) {
-      PluginService.logger.error(`Plugin with id ${pluginId} not found`);
-      throw new NotFoundException('Plugin not found');
+        let status: LoadedPluginManifest['status'] = 'unknown';
+        if (error) {
+          status = 'error';
+        } else if (getImplementationClass().loadedPlugins.has(key)) {
+          status = 'loaded';
+        }
+
+        return { ...manifest, status, error: error ? error.message : null };
+      });
+  }
+
+  public static toManifestInfo(manifest: LoadedPluginManifest): PluginManifestInfo {
+    return {
+      id: manifest.id,
+      name: manifest.name,
+      version: manifest.version,
+      pluginDirectory: manifest.pluginDirectory,
+    };
+  }
+
+  public static markPluginAsLoaded(pluginName: string): void {
+    getImplementationClass().logger.log(`Marking plugin ${pluginName} as loaded`);
+    getImplementationClass().loadedPlugins.add(pluginName);
+  }
+
+  public static setPluginLoadError(pluginName: string, error: Error): void {
+    getImplementationClass().logger.error(`Error loading plugin ${pluginName}: ${error.message}`);
+    getImplementationClass().pluginLoadErrors.set(pluginName, error);
+  }
+
+  public static isPluginQuarantined(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {
+    return getImplementationClass().pluginFailures.has(manifest.pluginDirectory);
+  }
+
+  protected static findPluginsInFolder(rootFolder: string): LoadedPluginManifest[] {
+    // if folder does not exist, return empty array
+    if (!existsSync(rootFolder)) {
+      return [];
     }
 
-    const pluginFolder = join(PluginService.PLUGIN_PATH, plugin.pluginDirectory);
-
-    // if folder does not exist, throw error
-    if (!existsSync(pluginFolder)) {
-      PluginService.logger.error(`Plugin folder ${pluginFolder} of plugin ${plugin.name} not found`);
-      throw new NotFoundException('Plugin not found');
-    }
-
-    // Revert the plugin's database migrations (drops its tables/data) BEFORE the
-    // files are removed — the migration classes live in the plugin bundle and
-    // must still be on disk to run. A failure here is logged but never blocks the
-    // uninstall: the admin asked for the plugin to be gone.
-    if (PluginMigrationService.hasMigrations(plugin)) {
+    const potentialPluginFolders = readdirSync(rootFolder);
+    // npm packages are active only while their installation is tracked. A failed or
+    // interrupted removal may leave files behind; loading them alongside an uploaded
+    // copy of the same plugin would register its flow nodes and audit domains twice.
+    // A missing state file means "no npm plugins installed" (filter normally); an
+    // existing-but-unreadable one (EACCES, EIO, a bad restore) must not be treated
+    // the same way, or every npm-installed plugin silently disappears from
+    // discovery with no signal beyond "Found N folders in ...".
+    const npmStatePath = join(getImplementationClass().PLUGIN_PATH, '.npm-plugin-state.json');
+    let npmInstalls: Set<string> | null = new Set();
+    if (existsSync(npmStatePath)) {
       try {
-        await PluginMigrationService.runDownMigrations(plugin);
+        const records = JSON.parse(readFileSync(npmStatePath, 'utf8')) as unknown;
+        npmInstalls = new Set(
+          (Array.isArray(records) ? records : [])
+            .map((record: { installPath?: unknown }) => record?.installPath)
+            .filter((path): path is string => typeof path === 'string'),
+        );
       } catch (error) {
-        PluginService.logger.error(
-          `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
+        getImplementationClass().logger.error(
+          `Failed to read ${npmStatePath}; not filtering npm-managed plugin folders until it recovers`,
           error as Error,
         );
+        npmInstalls = null;
       }
     }
 
-    // delete folder
-    await rm(pluginFolder, { recursive: true });
-    try {
-      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
-    } catch (error) {
-      PluginService.logger.error(`Failed to clear quarantine for deleted plugin ${plugin.name}`, error as Error);
+    getImplementationClass().logger.log(`Found ${potentialPluginFolders.length} folders in ${rootFolder}`);
+
+    return potentialPluginFolders
+      .filter(
+        (pluginFolder) =>
+          !pluginFolder.startsWith('.') &&
+          !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder) &&
+          (npmInstalls === null || !/^npm-[A-Za-z0-9_-]+$/.test(pluginFolder) || npmInstalls.has(pluginFolder)),
+      )
+      .map((pluginFolder) => {
+        const manifest = getImplementationClass().findPluginManifestInPluginFolder(
+          rootFolder,
+          pluginFolder,
+        ) as LoadedPluginManifest | null;
+        if (!manifest) {
+          return null;
+        }
+
+        manifest.pluginDirectory = pluginFolder;
+        // The directory is the installation identity. Keeping its derived ID stable
+        // prevents registrations from changing every time the host restarts.
+        manifest.id = createHash('sha256').update(pluginFolder).digest('base64url').slice(0, 21);
+
+        const failure = getImplementationClass().pluginFailures.get(pluginFolder);
+        if (failure) {
+          getImplementationClass().setPluginLoadError(
+            `${manifest.name}@${manifest.version}`,
+            new Error(failure.message),
+          );
+        }
+
+        try {
+          manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
+        } catch (error) {
+          getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
+          return null;
+        }
+
+        return manifest;
+      })
+      .filter((manifest) => manifest !== null);
+  }
+
+  protected static findPluginManifestInPluginFolder(rootFolder: string, pluginFolder: string): PluginManifest | null {
+    const manifestPath = join(rootFolder, pluginFolder, 'plugin.json');
+
+    if (!existsSync(manifestPath)) {
+      getImplementationClass().logger.log(`No manifest found at ${manifestPath}`);
+      return null;
     }
 
-    // restart app
-    if (!deferRestart) this.requestRestart();
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+    if (manifest.main.backend?.directory) {
+      manifest.main.backend.directory = join(pluginFolder, manifest.main.backend.directory);
+    }
+
+    if (manifest.main.frontend?.directory) {
+      manifest.main.frontend.directory = join(pluginFolder, manifest.main.frontend.directory);
+    }
+
+    if (manifest.main.migrations?.directory) {
+      manifest.main.migrations.directory = join(pluginFolder, manifest.main.migrations.directory);
+    }
+
+    return manifest;
   }
 }

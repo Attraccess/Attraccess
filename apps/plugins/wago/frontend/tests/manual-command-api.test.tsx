@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { manualCommand } from '../src/api';
+import { manualCommand } from '../src/api/client';
 
 afterEach(() => vi.unstubAllGlobals());
 

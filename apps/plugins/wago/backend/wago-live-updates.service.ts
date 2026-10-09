@@ -1,12 +1,12 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { createSharedLiveSampler, type AuthenticatedUser, type PluginContext } from '@attraccess/plugins-backend-sdk';
-import { WagoService } from './wago.service';
-import { WagoCommissioningService } from './wago-commissioning.service';
-import { WagoDiagnosticsService } from './diagnostics.service';
-import { WagoManagedRuntimeService } from './wago-managed-runtime.service';
-import { WagoNetworkChangeService } from './wago-network-change.service';
-import { WagoController } from './wago-controller.entity';
-import { WagoCommissioningSession } from './wago-commissioning-session.entity';
+import { WagoService } from './controllers/service';
+import { WagoCommissioningService } from './commissioning/service';
+import { WagoDiagnosticsService } from './diagnostics/service';
+import { WagoManagedRuntimeService } from './runtime/managed/service';
+import { WagoNetworkChangeService } from './network/service';
+import { WagoController } from './controllers/entity';
+import { WagoCommissioningSession } from './commissioning/sessions/session.entity';
 
 /** Sample authoritative services once per active topic, shared across tabs/users. */
 @Injectable()

@@ -1,25 +1,39 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isValidEmail } from '../../utils/email';
-import { ArrowRight, LogInIcon } from 'lucide-react';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, AlertContent, AlertDescription, AlertTitle, Input, Label, Skeleton, TextField } from '@heroui/react';
-import { Button } from '../../components/button';
-import { OneTimeCodeInput } from '../../components/OneTimeCodeInput';
-import { Alert } from '@heroui/react';
+import { LogInIcon, ArrowRight } from 'lucide-react';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionPanel,
+  AccordionBody,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+  Input,
+  Label,
+  Skeleton,
+  TextField,
+  Alert,
+} from '@heroui/react';
+import { Button } from '../../components/button/index';
+import { OneTimeCodeInput } from '../../components/OneTimeCodeInput/index';
 import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../../components/PasswordInput';
-import { useLogin } from '../../hooks/useAuth';
+import { PasswordInput } from '../../components/PasswordInput/index';
 import en from './loginForm.en.json';
 import de from './loginForm.de.json';
 import {
-  ApiError,
   useUsersServiceIsLocalSignupEnabled,
+  ApiError,
   useUsersServiceResendVerificationEmail,
 } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLogin } from '../../hooks/useAuth';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
 
-interface LoginFormProps {
+export interface LoginFormProps {
   onNeedsAccount: (() => void) | null;
   onForgotPassword: () => void;
 }
@@ -29,69 +43,25 @@ function getLoginErrorMessage(error: unknown): string | undefined {
   return typeof body?.message === 'string' ? body.message : undefined;
 }
 
-export function LoginForm(props: LoginFormProps) {
-  const { data: isLocalSignupEnabled, isLoading } = useUsersServiceIsLocalSignupEnabled();
-
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
-    },
-    de: {
-      ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
-    },
-  });
-
-  if (isLoading) {
-    return <Skeleton className="w-full h-10" />;
-  }
-
-  if (isLocalSignupEnabled?.value) {
-    return (
-      <>
-        <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled.value} t={t} />
-        <LoginFormContent {...props} t={t} tExists={tExists} />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
-      <Accordion variant="default" className="w-full">
-        <AccordionItem className="bg-default-100">
-          <AccordionHeading>
-            <AccordionTrigger><LogInIcon className="mr-2" />{t('accordion.title')}</AccordionTrigger>
-          </AccordionHeading>
-          <AccordionPanel><AccordionBody>
-            <LoginFormContent {...props} t={t} tExists={tExists} />
-          </AccordionBody></AccordionPanel>
-        </AccordionItem>
-      </Accordion>
-    </>
-  );
-}
-
-function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean; t: TFunction }) {
+export function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: boolean; t: TFunction }) {
   const { onNeedsAccount, isLocalSignupEnabled, t } = props;
 
   return (
     <div>
       <h2 className="text-3xl font-bold">{t('title')}</h2>
       {isLocalSignupEnabled && onNeedsAccount && (
-          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-600 dark:text-gray-300">
-            <span>{t('noAccount')}</span>
-            <Button variant="secondary" onPress={onNeedsAccount} data-cy="login-form-sign-up-button">
-              {t('signUpButton')}
-            </Button>
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-600 dark:text-gray-300">
+          <span>{t('noAccount')}</span>
+          <Button variant="secondary" onPress={onNeedsAccount} data-cy="login-form-sign-up-button">
+            {t('signUpButton')}
+          </Button>
         </p>
       )}
     </div>
   );
 }
 
-function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
+export function useLoginFormContentState(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
   const { onForgotPassword, t, tExists } = props;
 
   const { mutate: login, isPending, error, reset } = useLogin();
@@ -197,115 +167,223 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       setResendSuccess(false);
       setResendError(null);
       submitting.current = true;
-      login({
-        ...credentials,
-        ...(challengeCredentials ? { twoFactorCode } : {}),
-        tokenLocation: 'cookie',
-      }, {
-        onError: (mutationError) => {
-          const message = getLoginErrorMessage(mutationError);
-          if (message === 'TwoFactorRequired') {
-            setChallengeCredentials(credentials);
-          } else if (['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'].includes(message ?? '')) {
+      login(
+        {
+          ...credentials,
+          ...(challengeCredentials ? { twoFactorCode } : {}),
+          tokenLocation: 'cookie',
+        },
+        {
+          onError: (mutationError) => {
+            const message = getLoginErrorMessage(mutationError);
+            if (message === 'TwoFactorRequired') {
+              setChallengeCredentials(credentials);
+            } else if (
+              [
+                'UnkownUserOrPasswordException',
+                'UserEmailNotVerifiedException',
+                'LOCAL_LOGIN_FOR_SSO_FORBIDDEN',
+              ].includes(message ?? '')
+            ) {
+              setChallengeCredentials(null);
+              setTwoFactorCode('');
+            }
+          },
+          onSuccess: () => {
             setChallengeCredentials(null);
+            setIdentifier('');
+            setPasswordValue('');
             setTwoFactorCode('');
-          }
+          },
+          onSettled: () => {
+            submitting.current = false;
+          },
         },
-        onSuccess: () => {
-          setChallengeCredentials(null);
-          setIdentifier('');
-          setPasswordValue('');
-          setTwoFactorCode('');
-        },
-        onSettled: () => { submitting.current = false; },
-      });
+      );
     },
     [login, isPending, challengeCredentials, twoFactorCode],
   );
 
   const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
 
+  return {
+    onForgotPassword,
+    t,
+    isPending,
+    formRef,
+    identifier,
+    setIdentifier,
+    passwordValue,
+    setPasswordValue,
+    challengeCredentials,
+    changeCredentials,
+    twoFactorCode,
+    setTwoFactorCode,
+    resendEmail,
+    setResendEmail,
+    resendSuccess,
+    resendError,
+    setResendError,
+    isEmailNotVerified,
+    resendVerification,
+    errorTitle,
+    errorDescription,
+    handleSubmit,
+    arrowRight,
+  } as const;
+}
+export function LoginForm(props: LoginFormProps) {
+  const { data: isLocalSignupEnabled, isLoading } = useUsersServiceIsLocalSignupEnabled();
+
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-10" />;
+  }
+
+  if (isLocalSignupEnabled?.value) {
+    return (
+      <>
+        <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled.value} t={t} />
+        <LoginFormContent {...props} t={t} tExists={tExists} />
+      </>
+    );
+  }
+
   return (
-    <form ref={formRef} className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
-      <TextField value={identifier} onChange={setIdentifier} isDisabled={isPending} isReadOnly={!!challengeCredentials}>
-        <Label>{t('username')}</Label>
-        <Input id="username" name="username" type="text" required autoComplete="username" data-cy="login-form-username-input" />
+    <>
+      <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
+      <Accordion variant="default" className="w-full">
+        <AccordionItem className="bg-default-100">
+          <AccordionHeading>
+            <AccordionTrigger>
+              <LogInIcon className="mr-2" />
+              {t('accordion.title')}
+            </AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel>
+            <AccordionBody>
+              <LoginFormContent {...props} t={t} tExists={tExists} />
+            </AccordionBody>
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
+    </>
+  );
+}
+
+function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
+  const model = useLoginFormContentState(props);
+
+  return (
+    <form ref={model.formRef} className="space-y-6" onSubmit={model.handleSubmit} data-cy="login-form">
+      <TextField
+        value={model.identifier}
+        onChange={model.setIdentifier}
+        isDisabled={model.isPending}
+        isReadOnly={!!model.challengeCredentials}
+      >
+        <Label>{model.t('username')}</Label>
+        <Input
+          id="username"
+          name="username"
+          type="text"
+          required
+          autoComplete="username"
+          data-cy="login-form-username-input"
+        />
       </TextField>
       <PasswordInput
         id="password"
         name="password"
-        label={t('password')}
-        value={passwordValue}
-        onChange={setPasswordValue}
+        label={model.t('password')}
+        value={model.passwordValue}
+        onChange={model.setPasswordValue}
         required
-        isDisabled={isPending}
-        isReadOnly={!!challengeCredentials}
+        isDisabled={model.isPending}
+        isReadOnly={!!model.challengeCredentials}
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
-      {challengeCredentials && (
-        <fieldset aria-label={t('twoFactorCode')} className="space-y-2">
-          <p>{t('twoFactorInstruction')}</p>
+      {model.challengeCredentials && (
+        <fieldset aria-label={model.t('twoFactorCode')} className="space-y-2">
+          <p>{model.t('twoFactorInstruction')}</p>
           <OneTimeCodeInput
-            label={t('twoFactorCode')}
+            label={model.t('twoFactorCode')}
             name="twoFactorCode"
-            value={twoFactorCode}
-            onChange={setTwoFactorCode}
-            isDisabled={isPending}
+            value={model.twoFactorCode}
+            onChange={model.setTwoFactorCode}
+            isDisabled={model.isPending}
             autoFocus
             data-cy="login-form-two-factor-input"
           />
-          <Button variant="secondary" onPress={changeCredentials} isDisabled={isPending}>
-            {t('changeCredentials')}
+          <Button variant="secondary" onPress={model.changeCredentials} isDisabled={model.isPending}>
+            {model.t('changeCredentials')}
           </Button>
         </fieldset>
       )}
       <div className="flex items-center justify-between">
-        <Button variant="secondary"
-          onPress={onForgotPassword}
-          isDisabled={isPending}
+        <Button
+          variant="secondary"
+          onPress={model.onForgotPassword}
+          isDisabled={model.isPending}
           data-cy="login-form-forgot-password-button"
         >
-          {t('forgotPassword')}
+          {model.t('forgotPassword')}
         </Button>
       </div>
-      <Button variant="primary"
+      <Button
+        variant="primary"
         type="submit"
         className="w-full"
-        isPending={isPending}
-        isDisabled={isPending || (!!challengeCredentials && !/^\d{6}$/.test(twoFactorCode))}
+        isPending={model.isPending}
+        isDisabled={model.isPending || (!!model.challengeCredentials && !/^\d{6}$/.test(model.twoFactorCode))}
         data-cy="login-form-sign-in-button"
       >
-        {isPending ? t('signingIn') : challengeCredentials ? t('verifyCode') : t('signInButton')}
-        {arrowRight}</Button>
+        {model.isPending
+          ? model.t('signingIn')
+          : model.challengeCredentials
+            ? model.t('verifyCode')
+            : model.t('signInButton')}
+        {model.arrowRight}
+      </Button>
 
-      {errorTitle && (
-        <Alert status="danger" data-cy="login-form-error-alert" >
+      {model.errorTitle && (
+        <Alert status="danger" data-cy="login-form-error-alert">
           <AlertContent>
-            <AlertTitle>{errorTitle}</AlertTitle>
-            <AlertDescription>{errorDescription}</AlertDescription>
+            <AlertTitle>{model.errorTitle}</AlertTitle>
+            <AlertDescription>{model.errorDescription}</AlertDescription>
           </AlertContent>
         </Alert>
       )}
 
-      {isEmailNotVerified && !resendSuccess && (
+      {model.isEmailNotVerified && !model.resendSuccess && (
         <div className="space-y-2" data-testid="resend-verification-section">
-          <p className="text-sm text-gray-600 dark:text-gray-400">{t('resendVerification.prompt')}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{model.t('resendVerification.prompt')}</p>
           <TextField
-            value={resendEmail}
+            value={model.resendEmail}
             onChange={(value) => {
-              setResendEmail(value);
-              setResendError(null);
+              model.setResendEmail(value);
+              model.setResendError(null);
             }}
           >
-            <Label>{t('resendVerification.emailLabel')}</Label>
+            <Label>{model.t('resendVerification.emailLabel')}</Label>
             <Input type="email" data-testid="resend-email-input" />
           </TextField>
-          {resendError && (
+          {model.resendError && (
             <Alert status="danger" data-testid="resend-error-alert">
               <AlertContent>
-                <AlertTitle>{resendError.title}</AlertTitle>
-                <AlertDescription>{resendError.description}</AlertDescription>
+                <AlertTitle>{model.resendError.title}</AlertTitle>
+                <AlertDescription>{model.resendError.description}</AlertDescription>
               </AlertContent>
             </Alert>
           )}
@@ -313,26 +391,26 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
             variant="secondary"
             className="w-full"
             onPress={() => {
-              const trimmed = resendEmail.trim();
+              const trimmed = model.resendEmail.trim();
               if (!isValidEmail(trimmed)) {
                 return;
               }
-              resendVerification.mutate({ requestBody: { email: trimmed } });
+              model.resendVerification.mutate({ requestBody: { email: trimmed } });
             }}
-            isPending={resendVerification.isPending}
-            isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
+            isPending={model.resendVerification.isPending}
+            isDisabled={!isValidEmail(model.resendEmail.trim()) || model.resendVerification.isPending}
             data-testid="resend-verification-button"
           >
-            {t('resendVerification.button')}
+            {model.t('resendVerification.button')}
           </Button>
         </div>
       )}
 
-      {resendSuccess && (
+      {model.resendSuccess && (
         <Alert status="success" data-testid="resend-success-alert">
           <AlertContent>
-            <AlertTitle>{t('resendVerification.successTitle')}</AlertTitle>
-            <AlertDescription>{t('resendVerification.successMessage')}</AlertDescription>
+            <AlertTitle>{model.t('resendVerification.successTitle')}</AlertTitle>
+            <AlertDescription>{model.t('resendVerification.successMessage')}</AlertDescription>
           </AlertContent>
         </Alert>
       )}

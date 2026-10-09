@@ -12,6 +12,7 @@ cd "$REPO_ROOT"
 echo "=== Attraccess Development Environment Setup ==="
 echo ""
 
+# Host dependency checks and installers.
 # --- Docker ---
 check_docker() {
     if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
@@ -159,7 +160,7 @@ install_python() {
         return 1
     fi
 }
-
+# Optional ESP-IDF checks and installation.
 # --- ESP-IDF & esptool (Attractap firmware toolchain) ---
 ESP_IDF_VERSION="v6.0.2"
 ESP_IDF_PATH="$REPO_ROOT/.tools/esp-idf"

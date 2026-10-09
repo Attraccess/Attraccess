@@ -1,4 +1,4 @@
-import { recordAdministrationSafely } from '../audit/audit-administration-policy';
+import { recordAdministrationSafely } from '../audit/policies/administration';
 import { Controller, Get, HttpCode, HttpStatus, Body, Patch, Post, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';

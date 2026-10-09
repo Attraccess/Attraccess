@@ -59,4 +59,4 @@ Measurement faults use the ordinary fault topic and envelope, with `channelId`, 
 
 Malformed wire measurements throw `MeasurementContractError` with code `invalid_measurement_message`; the parser does not coerce strings, booleans, missing kinds, unknown units, fractional values, or unsafe integers. Envelope validation rejects missing/invalid timestamps, empty stream IDs and nonpositive/noninteger sequences.
 
-`backend/measurement-contract.spec.ts` exercises real runtime publication through JSON serialization into the consumer parser, persisted snapshots, restart/interleaving behavior, and simulator-format initial-value/wire fixtures for live and cumulative readings. Broker/device qualification and the runnable simulator's infrastructure remain separate integration checks.
+`backend/commissioning/measurement-contract.spec.ts` exercises real runtime publication through JSON serialization into the consumer parser, persisted snapshots, restart/interleaving behavior, and simulator-format initial-value/wire fixtures for live and cumulative readings. Broker/device qualification and the runnable simulator's infrastructure remain separate integration checks.

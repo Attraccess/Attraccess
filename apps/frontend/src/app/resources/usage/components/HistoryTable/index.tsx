@@ -12,13 +12,13 @@ import {
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { EmptyState } from '../../../../../components/emptyState';
-import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
-import { SimplePagination } from '../../../../../components/simplePagination';
+import { SimplePagination } from '../../../../../components/simplePagination/index';
 import { attributedOperatingDurationForUsage, useOperatingDuration } from '../../../operatingDuration';
+import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
 
-interface HistoryTableProps {
+export interface HistoryTableProps {
   resourceId: number;
   showAllUsers?: boolean;
   canUpdateResources: boolean;
@@ -30,7 +30,7 @@ interface HistoryTableProps {
   canViewOperatingDuration: boolean;
 }
 
-interface ProjectAssignmentCellProps {
+export interface ProjectAssignmentCellProps {
   session: ResourceUsage;
   canEdit: boolean;
   projectId: number | null;
@@ -40,7 +40,7 @@ interface ProjectAssignmentCellProps {
   onChange: (projectId: number | undefined) => void;
 }
 
-const ProjectAssignmentCell = ({
+export const ProjectAssignmentCell = ({
   session,
   canEdit,
   projectId,

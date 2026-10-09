@@ -166,3 +166,24 @@ it('refreshes after one or all group sources are revoked or removed', () => {
   rerender();
   expect(result.current.rows).toEqual([]);
 });
+
+it.each(['resource', 'group'] as const)('uses event IDs to resolve same-second %s grants and revocations', (type) => {
+  const createdAt = '2026-10-07T19:08:43.000Z';
+  const row = {
+    ...introduction(1),
+    history: [
+      { id: 20, action: 'grant', createdAt },
+      { id: 21, action: 'revoke', createdAt },
+    ],
+  };
+  const data = { data: [row] };
+  if (type === 'resource') state.resourceIntroductions = data;
+  else state.groupIntroductions = data;
+  const { result, rerender } = renderHook(() => usePeopleRows({ target: { type, id: 8 } }));
+  expect(result.current.rows[0].hasValidIntroduction).toBe(false);
+  row.history.unshift({ id: 22, action: 'grant', createdAt });
+  if (type === 'resource') state.resourceIntroductions = { data: [row] };
+  else state.groupIntroductions = { data: [row] };
+  rerender();
+  expect(result.current.rows[0].hasValidIntroduction).toBe(true);
+});

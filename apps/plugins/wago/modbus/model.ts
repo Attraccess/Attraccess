@@ -1,91 +1,19 @@
 import ipaddr from 'ipaddr.js';
-import { ENGINEERING_UNITS, type EngineeringUnit } from '../measurement-contract';
+import type {
+  ModbusAction,
+  ModbusConfiguration,
+  ModbusDevice,
+  ModbusMeasurement,
+  ModbusProfile,
+  RegisterFormat,
+} from './model-contracts';
+import { ModbusPoint } from './model-contracts';
+import { validateConnections } from './validate-connections';
+import { validateProfiles } from './validate-profiles';
+import { createModbusValidation } from './validation-context';
 import { wago8793020Measurements } from './wago-879-3020';
 
-/** Persisted engineering units, never wire milli-units. No hardware is qualified by this model. */
-export type ModbusConnection = { id: string; timeoutMs: number; reconnectMs: number; queueLimit: number } & (
-  | { transport: 'tcp'; host: string; port: number }
-  | { transport: 'rtu'; path: string; baudRate: number; parity: 'none' | 'even' | 'odd'; stopBits: 1 | 2 }
-);
-/** Pure numeric normalization, shared by validation and runtime bus ownership. No DNS lookup. */
-export function modbusHostIdentity(host: string): string {
-  if (ipaddr.isValid(host)) {
-    const address = ipaddr.parse(host);
-    if (address.kind() === 'ipv6') {
-      const ipv6 = address as ipaddr.IPv6;
-      if (ipv6.isIPv4MappedAddress() && !ipv6.zoneId) return ipv6.toIPv4Address().toString();
-    }
-    return address.toNormalizedString();
-  }
-  return host.toLowerCase();
-}
-
-export type RegisterFormat = {
-  address: number;
-  addressBase: 0 | 1;
-  dataType: 'uint16' | 'int16' | 'uint32' | 'int32' | 'float32';
-  byteOrder: 'big' | 'little';
-  wordOrder: 'big' | 'little';
-  scale: number;
-  offset: number;
-};
-export type ModbusMeasurement = RegisterFormat & {
-  id: string;
-  name: string;
-  functionCode: 3 | 4;
-  unit: EngineeringUnit;
-  kind: 'live' | 'cumulative';
-  pollIntervalMs: number;
-  /** Explicit rounding in engineering units, before integer MQTT encoding. Absent preserves exact values. */
-  decimalPlaces?: number;
-  /** Packed decimal digits, decoded before register scaling. Read measurements only. */
-  encoding?: 'bcd';
-  /** Explicit raw counter modulus; absent means decreases fault. Never inferred from dtype. */
-  rollover?: number;
-  section?: 'electrical' | 'active-energy' | 'reactive-energy' | 'quadrant-energy' | 'information';
-  display?: 'hex' | 'ascii';
-  valueLabels?: Record<string, string>;
-};
-export type ModbusAction = RegisterFormat & {
-  id: string;
-  name: string;
-  functionCode: 5 | 6 | 16;
-  onValue: number;
-  offValue: number;
-};
-export type ModbusProfile = {
-  id: string;
-  name: string;
-  version: number;
-  measurements: ModbusMeasurement[];
-  actions: ModbusAction[];
-};
-export type ModbusDevice = {
-  id: string;
-  name: string;
-  connectionId: string;
-  unitId: number;
-  profileId: string;
-  profileVersion: number;
-  pollIntervalMs?: number;
-};
-export type ModbusConfiguration = {
-  connections: ModbusConnection[];
-  devices: ModbusDevice[];
-  profiles: ModbusProfile[];
-};
-export type ModbusPoint = { deviceId: string; measurementId?: string; actionId?: string };
-export const registerCount = (format: RegisterFormat): number =>
-  ['uint16', 'int16'].includes(format.dataType) ? 1 : 2;
-export function wireAddress(format: RegisterFormat): number {
-  if (!Number.isSafeInteger(format.address) || ![0, 1].includes(format.addressBase))
-    throw new Error('invalid Modbus register address');
-  const address = format.address - format.addressBase;
-  if (address < 0 || address + registerCount(format) > 65536) throw new Error('invalid Modbus register address');
-  return address;
-}
-
-const base = {
+export const base = {
   addressBase: 0,
   byteOrder: 'big',
   wordOrder: 'big',
@@ -93,7 +21,8 @@ const base = {
   pollIntervalMs: 5000,
   functionCode: 3,
 } as const;
-const legacyProfiles: ModbusProfile[] = ['879-3000', '879-1300'].map((model) => ({
+
+export const legacyProfiles: ModbusProfile[] = ['879-3000', '879-1300'].map((model) => ({
   id: `wago-${model}-unverified`,
   name: `WAGO ${model} — UNQUALIFIED / map unverified`,
   version: 1,
@@ -122,6 +51,7 @@ const legacyProfiles: ModbusProfile[] = ['879-3000', '879-1300'].map((model) => 
     })),
   ],
 }));
+
 // Persisted legacy profiles retain their original IDs, versions and transforms.
 export const BUILTIN_MODBUS_PROFILES: readonly ModbusProfile[] = [
   {
@@ -164,33 +94,102 @@ export const BUILTIN_MODBUS_PROFILES: readonly ModbusProfile[] = [
   },
   ...legacyProfiles,
 ];
-// Freeze nested maps: callers must duplicate before editing. Evidence URLs are documented in README.
+
+export function findProfile(config: ModbusConfiguration, device: ModbusDevice): ModbusProfile | undefined {
+  return [...BUILTIN_MODBUS_PROFILES, ...config.profiles].find(
+    (p) => p.id === device.profileId && p.version === device.profileVersion,
+  );
+}
+
+/** Pure numeric normalization, shared by validation and runtime bus ownership. No DNS lookup. */
+export function modbusHostIdentity(host: string): string {
+  if (ipaddr.isValid(host)) {
+    const address = ipaddr.parse(host);
+    if (address.kind() === 'ipv6') {
+      const ipv6 = address as ipaddr.IPv6;
+      if (ipv6.isIPv4MappedAddress() && !ipv6.zoneId) return ipv6.toIPv4Address().toString();
+    }
+    return address.toNormalizedString();
+  }
+  return host.toLowerCase();
+}
+
+export // Freeze nested maps: callers must duplicate before editing. Evidence URLs are documented in README.
 function freeze(value: object): void {
   Object.values(value).forEach((child) => {
     if (child && typeof child === 'object') freeze(child);
   });
   Object.freeze(value);
 }
-freeze(BUILTIN_MODBUS_PROFILES);
-export function findProfile(config: ModbusConfiguration, device: ModbusDevice): ModbusProfile | undefined {
-  return [...BUILTIN_MODBUS_PROFILES, ...config.profiles].find(
-    (p) => p.id === device.profileId && p.version === device.profileVersion,
-  );
-}
+
 export function duplicateProfile(profile: ModbusProfile, id: string): ModbusProfile {
   return { ...JSON.parse(JSON.stringify(profile)), id, name: `${profile.name} (custom)`, version: 1 };
 }
 
+export const registerCount = (format: RegisterFormat): number =>
+  ['uint16', 'int16'].includes(format.dataType) ? 1 : 2;
+
+export function wireAddress(format: RegisterFormat): number {
+  if (!Number.isSafeInteger(format.address) || ![0, 1].includes(format.addressBase))
+    throw new Error('invalid Modbus register address');
+  const address = format.address - format.addressBase;
+  if (address < 0 || address + registerCount(format) > 65536) throw new Error('invalid Modbus register address');
+  return address;
+}
+
+export /** Validate one logical owner against the selected profile and the shared physical address space. */
+function validateChannelBinding(
+  channel: {
+    capabilities?: unknown;
+    measurement?: { unit?: unknown; kind?: unknown; scale?: unknown; offset?: unknown };
+  },
+  measurement: ModbusMeasurement | undefined,
+  action: ModbusAction | undefined,
+  device: ModbusDevice | undefined,
+  outputOwners: Set<string>,
+  fail: (message: string) => void,
+): void {
+  const capabilities = Array.isArray(channel.capabilities) ? channel.capabilities : [];
+  if (capabilities.includes('output') && action && device) {
+    // Connection endpoints are unique in a valid config. Device/profile/action names
+    // are aliases, while FC06 and FC16 share the same holding-register address space.
+    for (let offset = 0; offset < registerCount(action); offset++) {
+      const key = JSON.stringify([
+        device.connectionId,
+        device.unitId,
+        action.functionCode === 5 ? 'coil' : 'register',
+        wireAddress(action) + offset,
+      ]);
+      if (outputOwners.has(key)) fail('each physical Modbus output must have a single logical owner');
+      outputOwners.add(key);
+    }
+  }
+  if (capabilities.includes('input') && !capabilities.includes('measurement'))
+    fail(
+      measurement
+        ? 'Modbus register inputs require measurement capability and its named measurement transform'
+        : 'input requires named measurement',
+    );
+  if (capabilities.includes('output') && !action) fail('output requires named action');
+  if (
+    capabilities.includes('measurement') &&
+    (!measurement ||
+      channel.measurement?.unit !== measurement.unit ||
+      (channel.measurement?.kind ?? 'live') !== measurement.kind ||
+      channel.measurement?.scale !== 1 ||
+      channel.measurement?.offset !== 0)
+  )
+    fail('measurement channel must match profile unit/kind with identity transform');
+}
+
+// Persisted legacy profiles retain their original IDs, versions and transforms.
+// Freeze nested maps: callers must duplicate before editing. Evidence URLs are documented in README.
+freeze(BUILTIN_MODBUS_PROFILES);
+
 export function validateModbus(value: unknown): Array<{ path: string; code: string; message: string }> {
   const errors: Array<{ path: string; code: string; message: string }> = [];
-  const fail = (path: string, message: string) => errors.push({ path, code: 'invalid_modbus', message });
-  const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
-  const integer = (v: unknown, min: number, max: number) =>
-    Number.isSafeInteger(v) && Number(v) >= min && Number(v) <= max;
-  const name = (v: unknown) => typeof v === 'string' && !!v.trim() && v.length <= 160;
-  const keys = (v: object, allowed: string[], path: string) => {
-    for (const key of Object.keys(v)) if (!allowed.includes(key)) fail(`${path}.${key}`, 'unknown field');
-  };
+  const validation = createModbusValidation(errors);
+  const { fail, object, integer, name, keys } = validation;
   if (!object(value)) {
     fail('modbus', 'must be an object');
     return errors;
@@ -211,174 +210,8 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
     });
   }
   if (errors.length) return errors;
-  const endpoints = new Set<string>();
-  config.connections.forEach((c, i) => {
-    const path = `modbus.connections[${i}]`;
-    keys(
-      c,
-      [
-        'id',
-        'timeoutMs',
-        'reconnectMs',
-        'queueLimit',
-        ...(c.transport === 'tcp'
-          ? ['transport', 'host', 'port']
-          : ['transport', 'path', 'baudRate', 'parity', 'stopBits']),
-      ],
-      path,
-    );
-    if (!integer(c.timeoutMs, 10, 60000) || !integer(c.reconnectMs, 0, 60000) || !integer(c.queueLimit, 1, 128))
-      fail(path, 'timeout 10..60000ms, reconnect 0..60000ms, queue limit 1..128 required');
-    let endpoint: string;
-    if (c.transport === 'tcp') {
-      if (!name(c.host) || /[\s/]/.test(c.host) || !integer(c.port, 1, 65535))
-        return void fail(path, 'TCP host and port 1..65535 required');
-      endpoint = `tcp:${modbusHostIdentity(c.host)}:${c.port}`;
-    } else if (c.transport === 'rtu') {
-      if (
-        typeof c.path !== 'string' ||
-        !/^\/dev\/[a-zA-Z0-9_./-]+$/.test(c.path) ||
-        c.path.includes('..') ||
-        c.path
-          .split('/')
-          .slice(2)
-          .some((segment) => segment === '' || segment === '.') ||
-        ![1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].includes(c.baudRate) ||
-        !['none', 'even', 'odd'].includes(c.parity) ||
-        ![1, 2].includes(c.stopBits)
-      )
-        return void fail(path, 'canonical serial device path, valid baud, parity and stop bits required');
-      endpoint = `rtu:${c.path}`;
-    } else return void fail(path, 'transport must be tcp or rtu');
-    if (endpoints.has(endpoint)) fail(path, 'share one connection for devices on the same endpoint');
-    endpoints.add(endpoint);
-  });
-  const format = (f: RegisterFormat, path: string) => {
-    if (
-      ![0, 1].includes(f.addressBase) ||
-      !Number.isSafeInteger(f.address) ||
-      !integer(f.address - f.addressBase, 0, 65536 - registerCount(f)) ||
-      !['uint16', 'int16', 'uint32', 'int32', 'float32'].includes(f.dataType) ||
-      !['big', 'little'].includes(f.byteOrder) ||
-      !['big', 'little'].includes(f.wordOrder) ||
-      !Number.isFinite(f.scale) ||
-      f.scale === 0 ||
-      !Number.isFinite(f.offset)
-    )
-      fail(path, 'invalid address, dtype, order or transform');
-  };
-  config.profiles.forEach((p, i) => {
-    const path = `modbus.profiles[${i}]`;
-    keys(p, ['id', 'name', 'version', 'measurements', 'actions'], path);
-    if (BUILTIN_MODBUS_PROFILES.some((b) => b.id === p.id) || !name(p.name) || !integer(p.version, 1, 1000000))
-      fail(path, 'custom ID, name and positive version required; built-ins are immutable');
-    if (!Array.isArray(p.measurements) || !Array.isArray(p.actions) || p.measurements.length + p.actions.length > 256) {
-      fail(path, 'measurements/actions arrays required, maximum 256 entries');
-      return;
-    }
-    const ids = new Set<string>();
-    [...p.measurements, ...p.actions].forEach((f, j) => {
-      if (!object(f) || !name(f.id) || !name(f.name) || ids.has(f.id)) {
-        fail(`${path}[${j}]`, 'unique named entry required');
-        return;
-      }
-      ids.add(f.id);
-      format(f, `${path}.${f.id}`);
-      keys(
-        f,
-        [
-          'id',
-          'name',
-          'address',
-          'addressBase',
-          'dataType',
-          'byteOrder',
-          'wordOrder',
-          'scale',
-          'offset',
-          'functionCode',
-          ...(p.measurements.includes(f as ModbusMeasurement)
-            ? [
-                'unit',
-                'kind',
-                'pollIntervalMs',
-                'rollover',
-                'decimalPlaces',
-                'encoding',
-                'section',
-                'display',
-                'valueLabels',
-              ]
-            : ['onValue', 'offValue']),
-        ],
-        `${path}.${f.id}`,
-      );
-    });
-    p.measurements.forEach((m) => {
-      if (
-        !m ||
-        ![3, 4].includes(m.functionCode) ||
-        !ENGINEERING_UNITS.includes(m.unit) ||
-        !['live', 'cumulative'].includes(m.kind) ||
-        (m.decimalPlaces !== undefined && !integer(m.decimalPlaces, 0, 3)) ||
-        !integer(m.pollIntervalMs, 100, 3600000)
-      )
-        fail(path, 'measurement requires FC03/04, physical unit, kind, poll interval 100..3600000ms');
-      if (m?.rollover !== undefined && (m.kind !== 'cumulative' || !Number.isFinite(m.rollover) || m.rollover <= 0))
-        fail(path, 'rollover must be an explicit positive raw modulus on cumulative measurements');
-      if (m?.kind === 'cumulative' && m.scale <= 0) fail(path, 'cumulative measurements require a positive scale');
-      if (m?.encoding !== undefined && (m.encoding !== 'bcd' || !['uint16', 'uint32'].includes(m.dataType)))
-        fail(path, 'BCD encoding requires an unsigned integer measurement');
-      if (
-        m?.section !== undefined &&
-        !['electrical', 'active-energy', 'reactive-energy', 'quadrant-energy', 'information'].includes(m.section)
-      )
-        fail(path, 'unsupported measurement section');
-      if (m?.display !== undefined && !['hex', 'ascii'].includes(m.display))
-        fail(path, 'unsupported measurement display');
-      if (
-        m?.valueLabels !== undefined &&
-        (!object(m.valueLabels) ||
-          Object.keys(m.valueLabels).length > 64 ||
-          Object.entries(m.valueLabels).some(([key, label]) => !/^-?\d+$/.test(key) || !name(label)))
-      )
-        fail(path, 'measurement value labels require at most 64 named integer values');
-    });
-    p.actions.forEach((a) => {
-      if (!a || ![5, 6, 16].includes(a.functionCode) || !Number.isFinite(a.onValue) || !Number.isFinite(a.offValue)) {
-        fail(path, 'action requires FC05/06/16 and finite on/off values');
-        return;
-      }
-      if (
-        a.functionCode === 5 &&
-        (a.dataType !== 'uint16' ||
-          a.scale !== 1 ||
-          a.offset !== 0 ||
-          ![0, 1].includes(a.onValue) ||
-          ![0, 1].includes(a.offValue))
-      )
-        fail(path, 'coil action requires identity uint16 and values 0 or 1');
-      if (a.functionCode === 6 && registerCount(a) !== 1) fail(path, 'FC06 requires a 16-bit dtype');
-      for (const value of [a.onValue, a.offValue]) {
-        const raw = (value - a.offset) / a.scale;
-        const limits = {
-          uint16: [0, 65535],
-          int16: [-32768, 32767],
-          uint32: [0, 4294967295],
-          int32: [-2147483648, 2147483647],
-          float32: [-3.4028234663852886e38, 3.4028234663852886e38],
-        }[a.dataType];
-        if (
-          !limits ||
-          !Number.isFinite(raw) ||
-          raw < limits[0] ||
-          raw > limits[1] ||
-          (a.dataType !== 'float32' && !Number.isSafeInteger(raw))
-        )
-          fail(path, 'action on/off value cannot be represented by dtype and transform');
-      }
-    });
-  });
+  validateConnections(config, validation);
+  validateProfiles(config, validation);
   config.devices.forEach((d, i) => {
     keys(
       d,
@@ -453,47 +286,4 @@ export function validateModbusBindings(snapshot: {
   return errors;
 }
 
-/** Validate one logical owner against the selected profile and the shared physical address space. */
-function validateChannelBinding(
-  channel: {
-    capabilities?: unknown;
-    measurement?: { unit?: unknown; kind?: unknown; scale?: unknown; offset?: unknown };
-  },
-  measurement: ModbusMeasurement | undefined,
-  action: ModbusAction | undefined,
-  device: ModbusDevice | undefined,
-  outputOwners: Set<string>,
-  fail: (message: string) => void,
-): void {
-  const capabilities = Array.isArray(channel.capabilities) ? channel.capabilities : [];
-  if (capabilities.includes('output') && action && device) {
-    // Connection endpoints are unique in a valid config. Device/profile/action names
-    // are aliases, while FC06 and FC16 share the same holding-register address space.
-    for (let offset = 0; offset < registerCount(action); offset++) {
-      const key = JSON.stringify([
-        device.connectionId,
-        device.unitId,
-        action.functionCode === 5 ? 'coil' : 'register',
-        wireAddress(action) + offset,
-      ]);
-      if (outputOwners.has(key)) fail('each physical Modbus output must have a single logical owner');
-      outputOwners.add(key);
-    }
-  }
-  if (capabilities.includes('input') && !capabilities.includes('measurement'))
-    fail(
-      measurement
-        ? 'Modbus register inputs require measurement capability and its named measurement transform'
-        : 'input requires named measurement',
-    );
-  if (capabilities.includes('output') && !action) fail('output requires named action');
-  if (
-    capabilities.includes('measurement') &&
-    (!measurement ||
-      channel.measurement?.unit !== measurement.unit ||
-      (channel.measurement?.kind ?? 'live') !== measurement.kind ||
-      channel.measurement?.scale !== 1 ||
-      channel.measurement?.offset !== 0)
-  )
-    fail('measurement channel must match profile unit/kind with identity transform');
-}
+export * from './model-contracts';

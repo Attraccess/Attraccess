@@ -1,36 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Button, Spinner } from '@heroui/react';
 import { FolderIcon, Gauge, ListChecks, Settings2Icon, StethoscopeIcon, WorkflowIcon, WrenchIcon } from 'lucide-react';
 import {
-  Resource,
   ResourceType,
-  SupervisionMode,
-  UpdateResourceDto,
   UseResourcesServiceGetOneResourceByIdKeyFn,
   useResourcesServiceGetAllResourcesKey,
   useResourcesServiceGetOneResourceById,
   useResourcesServiceUpdateOneResource,
+  Resource,
+  SupervisionMode,
+  UpdateResourceDto,
 } from '@attraccess/react-query-client';
-import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../components/pageHeader';
-import { SettingsDirectory, type SettingsDirectoryGroup } from '../../../components/settingsDirectory';
-import { useToastMessage } from '../../../components/toastProvider';
+import { PageHeader } from '../../../components/pageHeader/index';
+import { SettingsDirectory } from '../../../components/settingsDirectory';
+import type { SettingsDirectoryGroup } from '../../../components/settingsDirectory';
 import { SharedDataTab } from '../editModal/tabs/shared';
 import { MachineTab } from '../editModal/tabs/machine';
 import { DoorTab } from '../editModal/tabs/door';
 import { RetrainingTab } from '../editModal/tabs/retraining';
 import { SupervisionTab } from '../editModal/tabs/supervision';
 import { ResourceMetadataEditor } from '../editModal/resourceMetadataEditor';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useToastMessage } from '../../../components/toastProvider';
 import editorEn from '../editModal/resourceEditModal.en.json';
 import editorDe from '../editModal/resourceEditModal.de.json';
 import en from './en.json';
 import de from './de.json';
 
-type FormData = Omit<UpdateResourceDto, 'metadata'> & { metadata: Record<string, unknown> };
+export type FormData = Omit<UpdateResourceDto, 'metadata'> & { metadata: Record<string, unknown> };
 
-function fromResource(resource: Resource): FormData {
+export function fromResource(resource: Resource): FormData {
   return {
     name: resource.name,
     description: resource.description ?? '',
@@ -48,14 +49,7 @@ function fromResource(resource: Resource): FormData {
   };
 }
 
-export function ResourceSettingsPage() {
-  const { id } = useParams<{ id: string }>();
-  const resourceId = Number(id);
-  if (!Number.isInteger(resourceId) || resourceId <= 0) return <Navigate to="/resources" replace />;
-  return <ResourceSettingsEditor resourceId={resourceId} />;
-}
-
-function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
+export function useResourceSettingsEditorState({ resourceId }: { resourceId: number }) {
   const { t } = useTranslations({ en: { ...editorEn, ...en }, de: { ...editorDe, ...de } });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
@@ -112,48 +106,76 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
       formData: { ...formData, name: formData.name.trim(), image: selectedImage ?? undefined, deleteImage },
     });
   };
+  return {
+    t,
+    resource,
+    isLoading,
+    error,
+    formData,
+    setSelectedImage,
+    setDeleteImage,
+    dirty,
+    setDirty,
+    editRevision,
+    setField,
+    updateResource,
+    save,
+    resourceId,
+  } as const;
+}
 
-  if (isLoading || (!resource && !error))
+export function ResourceSettingsPage() {
+  const { id } = useParams<{ id: string }>();
+  const resourceId = Number(id);
+  if (!Number.isInteger(resourceId) || resourceId <= 0) return <Navigate to="/resources" replace />;
+  return <ResourceSettingsEditor resourceId={resourceId} />;
+}
+
+function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
+  const model = useResourceSettingsEditorState({ resourceId });
+
+  if (model.isLoading || (!model.resource && !model.error))
     return (
       <div className="flex justify-center py-16">
         <Spinner />
       </div>
     );
-  if (error || !resource || !formData) return <div className="py-16 text-center">{t('notFound')}</div>;
+  if (model.error || !model.resource || !model.formData)
+    return <div className="py-16 text-center">{model.t('notFound')}</div>;
 
   const saveButton = (
     <div className="mt-5 flex justify-end">
       <Button
         variant="primary"
-        onPress={save}
-        isPending={updateResource.isPending}
-        isDisabled={!dirty}
+        onPress={model.save}
+        isPending={model.updateResource.isPending}
+        isDisabled={!model.dirty}
         data-cy="resource-settings-save"
       >
-        {t('save')}
+        {model.t('save')}
       </Button>
     </div>
   );
-  const editorProps = { t, formData, setField, resource };
+  const editorProps = { t: model.t, formData: model.formData, setField: model.setField, resource: model.resource };
   const groups: SettingsDirectoryGroup[] = [
     {
       key: 'general',
-      label: t('groups.general'),
+      label: model.t('groups.general'),
       items: [
         {
           key: 'details',
-          title: t('topics.details.title'),
-          description: t('topics.details.description'),
+          title: model.t('topics.details.title'),
+          description: model.t('topics.details.description'),
           icon: <Gauge size={19} />,
           content: (
             <>
               <SharedDataTab
                 {...editorProps}
                 onImageSelected={(file) => {
-                  editRevision.current += 1;
-                  setSelectedImage(file);
-                  setDeleteImage(file === null);
-                  setDirty(true);
+                  model.editRevision.current += 1;
+                  model.setSelectedImage(file);
+                  model.setDeleteImage(file === null);
+                  model.setDirty(true);
                 }}
               />
               {saveButton}
@@ -162,8 +184,8 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'behavior',
-          title: t('topics.behavior.title'),
-          description: t('topics.behavior.description'),
+          title: model.t('topics.behavior.title'),
+          description: model.t('topics.behavior.description'),
           icon: <WrenchIcon size={19} />,
           content: (
             <>
@@ -172,14 +194,18 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
                   {[ResourceType.MACHINE, ResourceType.DOOR].map((type) => (
                     <Button
                       key={type}
-                      variant={formData.type === type ? 'primary' : 'outline'}
-                      onPress={() => setField('type', type)}
+                      variant={model.formData.type === type ? 'primary' : 'outline'}
+                      onPress={() => model.setField('type', type)}
                     >
-                      {t(`inputs.type.options.${type}`)}
+                      {model.t(`inputs.type.options.${type}`)}
                     </Button>
                   ))}
                 </div>
-                {formData.type === ResourceType.DOOR ? <DoorTab {...editorProps} /> : <MachineTab {...editorProps} />}
+                {model.formData.type === ResourceType.DOOR ? (
+                  <DoorTab {...editorProps} />
+                ) : (
+                  <MachineTab {...editorProps} />
+                )}
               </div>
               {saveButton}
             </>
@@ -187,15 +213,15 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'metadata',
-          title: t('topics.metadata.title'),
-          description: t('topics.metadata.description'),
+          title: model.t('topics.metadata.title'),
+          description: model.t('topics.metadata.description'),
           icon: <Settings2Icon size={19} />,
           content: (
             <>
               <ResourceMetadataEditor
-                t={t}
-                value={formData.metadata}
-                onChange={(value) => setField('metadata', value)}
+                t={model.t}
+                value={model.formData.metadata}
+                onChange={(value) => model.setField('metadata', value)}
               />
               {saveButton}
             </>
@@ -205,12 +231,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     },
     {
       key: 'access',
-      label: t('groups.access'),
+      label: model.t('groups.access'),
       items: [
         {
           key: 'retraining',
-          title: t('topics.retraining.title'),
-          description: t('topics.retraining.description'),
+          title: model.t('topics.retraining.title'),
+          description: model.t('topics.retraining.description'),
           content: (
             <>
               <RetrainingTab {...editorProps} />
@@ -220,8 +246,8 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'supervision',
-          title: t('topics.supervision.title'),
-          description: t('topics.supervision.description'),
+          title: model.t('topics.supervision.title'),
+          description: model.t('topics.supervision.description'),
           content: (
             <>
               <SupervisionTab {...editorProps} />
@@ -231,15 +257,15 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         },
         {
           key: 'groups',
-          title: t('topics.groups.title'),
-          description: t('topics.groups.description'),
+          title: model.t('topics.groups.title'),
+          description: model.t('topics.groups.description'),
           icon: <FolderIcon size={19} />,
           to: `/resources/${resourceId}/groups`,
         },
         {
           key: 'forms',
-          title: t('topics.forms.title'),
-          description: t('topics.forms.description'),
+          title: model.t('topics.forms.title'),
+          description: model.t('topics.forms.description'),
           icon: <ListChecks size={19} />,
           to: `/resources/${resourceId}/forms`,
         },
@@ -247,19 +273,19 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     },
     {
       key: 'automation',
-      label: t('groups.automation'),
+      label: model.t('groups.automation'),
       items: [
         {
           key: 'flows',
-          title: t('topics.flows.title'),
-          description: t('topics.flows.description'),
+          title: model.t('topics.flows.title'),
+          description: model.t('topics.flows.description'),
           icon: <WorkflowIcon size={19} />,
           to: `/resources/${resourceId}/flows`,
         },
         {
           key: 'diagnostics',
-          title: t('topics.diagnostics.title'),
-          description: t('topics.diagnostics.description'),
+          title: model.t('topics.diagnostics.title'),
+          description: model.t('topics.diagnostics.description'),
           icon: <StethoscopeIcon size={19} />,
           to: `/resources/${resourceId}/diagnostics`,
         },
@@ -270,12 +296,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
   return (
     <div data-cy="resource-settings-page">
       <PageHeader
-        title={t('title', { name: resource.name })}
-        subtitle={t('subtitle')}
+        title={model.t('title', { name: model.resource.name })}
+        subtitle={model.t('subtitle')}
         icon={<Settings2Icon size={20} />}
         backTo={`/resources/${resourceId}`}
       />
-      <SettingsDirectory groups={groups} searchLabel={t('search')} emptyMessage={t('noResults')} />
+      <SettingsDirectory groups={groups} searchLabel={model.t('search')} emptyMessage={model.t('noResults')} />
     </div>
   );
 }

@@ -24,6 +24,9 @@ public:
     void setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback);
 
 private:
+    void createNetworkRows(lv_obj_t *statesContainer);
+    void createApiRows(lv_obj_t *statesContainer);
+    void createConnectionDetails(lv_obj_t *statesContainer);
     std::function<void()> onOpenSettingsCallback;
     lv_obj_t *screen = nullptr;
     void finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color);

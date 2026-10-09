@@ -1,24 +1,10 @@
-// Maps physical terminals and devices into editable controller configuration snapshots.
-// FEATURE: WAGO front panel configuration preserves applied channel routing identities.
-import { DIGITAL_TERMINALS } from '../../../backend/configuration-digital';
+import { DIGITAL_TERMINALS } from '../../../backend/configuration/digital';
+import type { ModbusDevice, ModbusProfile } from '../../../modbus/model';
+import { BUILTIN_MODBUS_PROFILES, findProfile, type ModbusConnection } from '../../../modbus/model';
 import { CC100_SERIAL_PATH } from '../../../shared/hardware-profile';
-import {
-  BUILTIN_MODBUS_PROFILES,
-  findProfile,
-  type ModbusConnection,
-  type ModbusDevice,
-  type ModbusProfile,
-} from '../../../modbus/model';
-import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../api';
-import { randomUUID } from '../configuration-id';
-import { addModbusChannel, emptyModbus, updateModbusConfiguration } from '../modbus-editor';
-
-export interface PanelConfiguration {
-  snapshot: WagoConfigurationSnapshot;
-  metadata: ConfigurationEditorMetadata;
-}
-export type Terminal = (typeof DIGITAL_TERMINALS)[number];
-export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
+import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../api/client';
+import { randomUUID } from '../configuration/identity';
+import { addModbusChannel, emptyModbus, updateModbusConfiguration } from '../configuration/modbus/modbus-editor';
 
 export const DEFAULT_BUS: ModbusConnection = {
   id: 'cc100-rs485',
@@ -32,110 +18,14 @@ export const DEFAULT_BUS: ModbusConnection = {
   queueLimit: 100,
 };
 
-export function terminalChannel(snapshot: WagoConfigurationSnapshot, terminal: Terminal) {
-  const point = snapshot.physicalPoints.find(
-    (point) => point.hardwareProfile === '751-9301' && point.channel === terminal.channel,
-  );
-  return snapshot.logicalChannels.find((channel) => channel.physicalPointId === point?.id);
+export type Channel = WagoConfigurationSnapshot['logicalChannels'][number];
+
+export interface PanelConfiguration {
+  snapshot: WagoConfigurationSnapshot;
+  metadata: ConfigurationEditorMetadata;
 }
 
-export function terminalName(configuration: PanelConfiguration, terminal: Terminal) {
-  const channel = terminalChannel(configuration.snapshot, terminal);
-  return channel ? (configuration.metadata.names[channel.id] ?? channel.id) : '';
-}
-
-export function updateTerminal(
-  configuration: PanelConfiguration,
-  terminal: Terminal,
-  name: string,
-  settings: Partial<Channel>,
-): PanelConfiguration {
-  const { snapshot, metadata } = configuration;
-  const existing = terminalChannel(snapshot, terminal);
-  if (!name.trim()) {
-    if (!existing) return configuration;
-    const names = { ...metadata.names };
-    delete names[existing.id];
-    delete names[existing.physicalPointId];
-    return {
-      snapshot: {
-        ...snapshot,
-        logicalChannels: snapshot.logicalChannels.filter((channel) => channel.id !== existing.id),
-        physicalPoints: snapshot.physicalPoints.filter((point) => point.id !== existing.physicalPointId),
-      },
-      metadata: { ...metadata, names },
-    };
-  }
-  const point = { id: `point-${randomUUID()}`, hardwareProfile: '751-9301' as const, channel: terminal.channel };
-  const channel: Channel = {
-    ...(existing ?? {
-      id: `channel-${randomUUID()}`,
-      physicalPointId: point.id,
-      profile: terminal.direction === 'output' ? 'generic-digital-output' : 'generic-monitored-input',
-      capabilities: [terminal.direction],
-      disconnectPolicy: { mode: terminal.direction === 'output' ? 'immediate' : 'hold' },
-    }),
-    ...settings,
-  };
-  if (!channel.capabilities.includes('pulse')) delete channel.pulse;
-  return {
-    snapshot: {
-      ...snapshot,
-      physicalPoints: existing ? snapshot.physicalPoints : [...snapshot.physicalPoints, point],
-      logicalChannels: existing
-        ? snapshot.logicalChannels.map((item) => (item.id === existing.id ? channel : item))
-        : [...snapshot.logicalChannels, channel],
-    },
-    metadata: { ...metadata, names: { ...metadata.names, [channel.id]: name.trim() } },
-  };
-}
-
-export function busConnection(snapshot: WagoConfigurationSnapshot) {
-  return snapshot.modbus?.connections.find((connection) => connection.transport === 'rtu') ?? DEFAULT_BUS;
-}
-
-export function updateBus(configuration: PanelConfiguration, bus: ModbusConnection): PanelConfiguration {
-  const modbus = configuration.snapshot.modbus ?? emptyModbus;
-  return {
-    ...configuration,
-    snapshot: {
-      ...configuration.snapshot,
-      modbus: {
-        ...modbus,
-        connections: modbus.connections.some((connection) => connection.id === bus.id)
-          ? modbus.connections.map((connection) =>
-              connection.transport === 'rtu' && bus.transport === 'rtu' && connection.path === bus.path
-                ? { ...bus, id: connection.id }
-                : connection,
-            )
-          : [...modbus.connections, bus],
-      },
-    },
-  };
-}
-
-export function addDevice(
-  configuration: PanelConfiguration,
-  name: string,
-): { configuration: PanelConfiguration; id: string } {
-  const profile = BUILTIN_MODBUS_PROFILES[0];
-  const bus = busConnection(configuration.snapshot);
-  const modbus = configuration.snapshot.modbus ?? emptyModbus;
-  const used = new Set(
-    modbus.devices.filter((device) => device.connectionId === bus.id).map((device) => device.unitId),
-  );
-  const unitId = Array.from({ length: 247 }, (_, i) => i + 1).find((id) => !used.has(id)) ?? 1;
-  const device: ModbusDevice = {
-    id: `device-${randomUUID()}`,
-    name,
-    connectionId: bus.id,
-    unitId,
-    profileId: profile.id,
-    profileVersion: profile.version,
-    pollIntervalMs: 5000,
-  };
-  return { configuration: saveDevice(updateBus(configuration, bus), device, bus, profile), id: device.id };
-}
+export type Terminal = (typeof DIGITAL_TERMINALS)[number];
 
 export function saveDevice(
   configuration: PanelConfiguration,
@@ -219,6 +109,81 @@ export function saveDevice(
   return { snapshot, metadata: { ...configuration.metadata, names } };
 }
 
+export function terminalChannel(snapshot: WagoConfigurationSnapshot, terminal: Terminal) {
+  const point = snapshot.physicalPoints.find(
+    (point) => point.hardwareProfile === '751-9301' && point.channel === terminal.channel,
+  );
+  return snapshot.logicalChannels.find((channel) => channel.physicalPointId === point?.id);
+}
+
+export function terminalName(configuration: PanelConfiguration, terminal: Terminal) {
+  const channel = terminalChannel(configuration.snapshot, terminal);
+  return channel ? (configuration.metadata.names[channel.id] ?? channel.id) : '';
+}
+
+export function updateBus(configuration: PanelConfiguration, bus: ModbusConnection): PanelConfiguration {
+  const modbus = configuration.snapshot.modbus ?? emptyModbus;
+  return {
+    ...configuration,
+    snapshot: {
+      ...configuration.snapshot,
+      modbus: {
+        ...modbus,
+        connections: modbus.connections.some((connection) => connection.id === bus.id)
+          ? modbus.connections.map((connection) =>
+              connection.transport === 'rtu' && bus.transport === 'rtu' && connection.path === bus.path
+                ? { ...bus, id: connection.id }
+                : connection,
+            )
+          : [...modbus.connections, bus],
+      },
+    },
+  };
+}
+
+export function busConnection(snapshot: WagoConfigurationSnapshot) {
+  return snapshot.modbus?.connections.find((connection) => connection.transport === 'rtu') ?? DEFAULT_BUS;
+}
+
+export function addDevice(
+  configuration: PanelConfiguration,
+  name: string,
+): { configuration: PanelConfiguration; id: string } {
+  const profile = BUILTIN_MODBUS_PROFILES[0];
+  const bus = busConnection(configuration.snapshot);
+  const modbus = configuration.snapshot.modbus ?? emptyModbus;
+  const used = new Set(
+    modbus.devices.filter((device) => device.connectionId === bus.id).map((device) => device.unitId),
+  );
+  const unitId = Array.from({ length: 247 }, (_, i) => i + 1).find((id) => !used.has(id)) ?? 1;
+  const device: ModbusDevice = {
+    id: `device-${randomUUID()}`,
+    name,
+    connectionId: bus.id,
+    unitId,
+    profileId: profile.id,
+    profileVersion: profile.version,
+    pollIntervalMs: 5000,
+  };
+  return { configuration: saveDevice(updateBus(configuration, bus), device, bus, profile), id: device.id };
+}
+
+export function deviceProfile(configuration: PanelConfiguration, device: ModbusDevice) {
+  return findProfile(configuration.snapshot.modbus ?? emptyModbus, device);
+}
+
+export function registerChannel(
+  snapshot: WagoConfigurationSnapshot,
+  deviceId: string,
+  registerId: string,
+  kind: 'measurementId' | 'actionId',
+) {
+  const point = snapshot.physicalPoints.find(
+    (point) => point.modbus?.deviceId === deviceId && point.modbus[kind] === registerId,
+  );
+  return snapshot.logicalChannels.find((channel) => channel.physicalPointId === point?.id);
+}
+
 export function removeDevice(configuration: PanelConfiguration, deviceId: string): PanelConfiguration {
   const modbus = configuration.snapshot.modbus ?? emptyModbus;
   const points = new Set(
@@ -245,18 +210,48 @@ export function removeDevice(configuration: PanelConfiguration, deviceId: string
   };
 }
 
-export function deviceProfile(configuration: PanelConfiguration, device: ModbusDevice) {
-  return findProfile(configuration.snapshot.modbus ?? emptyModbus, device);
-}
-
-export function registerChannel(
-  snapshot: WagoConfigurationSnapshot,
-  deviceId: string,
-  registerId: string,
-  kind: 'measurementId' | 'actionId',
-) {
-  const point = snapshot.physicalPoints.find(
-    (point) => point.modbus?.deviceId === deviceId && point.modbus[kind] === registerId,
-  );
-  return snapshot.logicalChannels.find((channel) => channel.physicalPointId === point?.id);
+export function updateTerminal(
+  configuration: PanelConfiguration,
+  terminal: Terminal,
+  name: string,
+  settings: Partial<Channel>,
+): PanelConfiguration {
+  const { snapshot, metadata } = configuration;
+  const existing = terminalChannel(snapshot, terminal);
+  if (!name.trim()) {
+    if (!existing) return configuration;
+    const names = { ...metadata.names };
+    delete names[existing.id];
+    delete names[existing.physicalPointId];
+    return {
+      snapshot: {
+        ...snapshot,
+        logicalChannels: snapshot.logicalChannels.filter((channel) => channel.id !== existing.id),
+        physicalPoints: snapshot.physicalPoints.filter((point) => point.id !== existing.physicalPointId),
+      },
+      metadata: { ...metadata, names },
+    };
+  }
+  const point = { id: `point-${randomUUID()}`, hardwareProfile: '751-9301' as const, channel: terminal.channel };
+  const channel: Channel = {
+    ...(existing ?? {
+      id: `channel-${randomUUID()}`,
+      physicalPointId: point.id,
+      profile: terminal.direction === 'output' ? 'generic-digital-output' : 'generic-monitored-input',
+      capabilities: [terminal.direction],
+      disconnectPolicy: { mode: terminal.direction === 'output' ? 'immediate' : 'hold' },
+    }),
+    ...settings,
+  };
+  if (!channel.capabilities.includes('pulse')) delete channel.pulse;
+  return {
+    snapshot: {
+      ...snapshot,
+      physicalPoints: existing ? snapshot.physicalPoints : [...snapshot.physicalPoints, point],
+      logicalChannels: existing
+        ? snapshot.logicalChannels.map((item) => (item.id === existing.id ? channel : item))
+        : [...snapshot.logicalChannels, channel],
+    },
+    metadata: { ...metadata, names: { ...metadata.names, [channel.id]: name.trim() } },
+  };
 }

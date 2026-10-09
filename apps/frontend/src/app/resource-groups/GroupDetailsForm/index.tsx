@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, HTMLAttributes } from 'react';
+import { HTMLAttributes, useState, useEffect, useCallback } from 'react';
 import { Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
-import { Button } from '../../../components/button';
+import { Button } from '../../../components/button/index';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
+import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal/index';
 import {
   useAccessControlServiceResourceIntroductionsGetPeopleKey,
   useResourcesServiceResourceGroupsGetOne,
@@ -16,14 +17,11 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
 import de from './translations/de.json';
-import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useNavigate } from 'react-router-dom';
 
-interface GroupDetailsFormProps {
-  groupId: number;
-}
-
-export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>) {
+export function useGroupDetailsFormState(
+  props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>,
+) {
   const { groupId, className, ...rest } = props;
 
   const { t } = useTranslations({ en, de });
@@ -100,6 +98,55 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
   }, [deleteGroupMutation, groupId]);
 
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  return {
+    className,
+    rest,
+    t,
+    name,
+    setName,
+    description,
+    setDescription,
+    isHidden,
+    setIsHidden,
+    group,
+    isLoading,
+    error,
+    isUpdating,
+    handleSubmit,
+    isDeleting,
+    handleDelete,
+    showDeleteConfirmation,
+    setShowDeleteConfirmation,
+  } as const;
+}
+
+export interface GroupDetailsFormProps {
+  groupId: number;
+}
+
+export function GroupDetailsForm(
+  props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>,
+) {
+  const {
+    className,
+    rest,
+    t,
+    name,
+    setName,
+    description,
+    setDescription,
+    isHidden,
+    setIsHidden,
+    group,
+    isLoading,
+    error,
+    isUpdating,
+    handleSubmit,
+    isDeleting,
+    handleDelete,
+    showDeleteConfirmation,
+    setShowDeleteConfirmation,
+  } = useGroupDetailsFormState(props);
 
   if (isLoading) {
     return (
@@ -134,10 +181,7 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
 
           <TextField value={name} onChange={setName} isRequired className="w-full">
             <Label>{t('form.fields.name.label')}</Label>
-            <Input
-              placeholder={t('form.fields.name.placeholder')}
-              data-cy="group-details-form-name-input"
-            />
+            <Input placeholder={t('form.fields.name.placeholder')} data-cy="group-details-form-name-input" />
           </TextField>
 
           <TextArea
@@ -149,15 +193,9 @@ export function GroupDetailsForm(props: Readonly<GroupDetailsFormProps & Omit<HT
         </section>
 
         <section className="w-full flex flex-col gap-2">
-          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-            {t('sections.visibility')}
-          </h3>
+          <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.visibility')}</h3>
 
-          <LabeledSwitch
-            isSelected={isHidden}
-            onChange={setIsHidden}
-            data-cy="group-details-form-is-hidden-switch"
-          >
+          <LabeledSwitch isSelected={isHidden} onChange={setIsHidden} data-cy="group-details-form-is-hidden-switch">
             <span className="text-small">{t('form.fields.isHidden.label')}</span>
           </LabeledSwitch>
           <span className="text-tiny text-default-400">{t('form.fields.isHidden.description')}</span>

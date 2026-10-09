@@ -8,19 +8,72 @@ Produces firmware_output/ with, per variant:
 plus firmwares.json — the manifest consumed by the API/frontend. The manifest
 field set must stay stable; the flasher and OTA pipeline depend on it.
 """
+
 import glob
-import json
+
 import os
+
 import re
+
 import shlex
+
 import shutil
+
 import subprocess
+
 import sys
 
-FIRMWARE_DIR = os.path.dirname(os.path.abspath(__file__))
-CHIP = "esp32s3"  # both boards are ESP32-S3
+CHIP = "esp32s3"
+
 BOARD_FAMILY = "ESP32-S3"
 
+def extract_cmake_value(content, variable):
+    """Extract `set(<variable> "<value>")` from a variant .cmake file."""
+    match = re.search(rf'set\(\s*{re.escape(variable)}\s+"([^"]*)"\s*\)', content)
+    return match.group(1) if match else None
+
+def extract_build_id(firmware_bin_path, esptool_cmd):
+    """Best-effort: read app_elf_sha256 from the app image so the server can
+    match the exact ELF to a coredump's build id. Returns lowercase hex or None."""
+    if not os.path.exists(firmware_bin_path):
+        return None
+    # esptool v4 spells it `image_info --version 2`; v5 renamed the command and
+    # dropped the flag. Try both.
+    candidates = [
+        [*esptool_cmd, "--chip", CHIP, "image_info", "--version", "2", firmware_bin_path],
+        [*esptool_cmd, "--chip", CHIP, "image-info", firmware_bin_path],
+    ]
+    for info_cmd in candidates:
+        try:
+            result = subprocess.run(info_cmd, capture_output=True, text=True)
+            output = (result.stdout or "") + "\n" + (result.stderr or "")
+            match = re.search(r"(?:ELF file SHA256|app_elf_sha256)[^0-9a-fA-F]*([0-9a-fA-F]{64})", output)
+            if not match:
+                match = re.search(r"Validation hash[^0-9a-fA-F]*([0-9a-fA-F]{64})", output, re.IGNORECASE)
+            if match:
+                return match.group(1).lower()
+        except Exception as e:
+            print(f"Warning: build id extraction attempt failed: {e}")
+    print(f"Warning: Could not extract build id from {firmware_bin_path}")
+    return None
+
+def run_merge_bin(esptool_cmd, out_path, flash_files):
+    """esptool merge_bin (v4) / merge-bin (v5)."""
+    for subcommand in ("merge_bin", "merge-bin"):
+        merge_cmd = [*esptool_cmd, "--chip", CHIP, subcommand, "-o", out_path]
+        for offset, path in flash_files:
+            merge_cmd.extend([offset, path])
+        print(f"Running: {' '.join(merge_cmd)}")
+        result = subprocess.run(merge_cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return
+        print(f"esptool {subcommand} failed (rc={result.returncode})")
+        print(f"STDOUT: {result.stdout}")
+        print(f"STDERR: {result.stderr}")
+    print(f"Error: Failed to create merged firmware {out_path}")
+    sys.exit(1)
+
+FIRMWARE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def resolve_python_command():
     """Pick a Python executable with fallback."""
@@ -30,7 +83,6 @@ def resolve_python_command():
         if shutil.which(cmd):
             return cmd
     return "python3"
-
 
 def resolve_esptool_command():
     """Find a working esptool invocation without assuming pip-installed
@@ -60,56 +112,6 @@ def resolve_esptool_command():
 
     return [resolve_python_command(), "-m", "esptool"]
 
-
-def extract_cmake_value(content, variable):
-    """Extract `set(<variable> "<value>")` from a variant .cmake file."""
-    match = re.search(rf'set\(\s*{re.escape(variable)}\s+"([^"]*)"\s*\)', content)
-    return match.group(1) if match else None
-
-
-def extract_build_id(firmware_bin_path, esptool_cmd):
-    """Best-effort: read app_elf_sha256 from the app image so the server can
-    match the exact ELF to a coredump's build id. Returns lowercase hex or None."""
-    if not os.path.exists(firmware_bin_path):
-        return None
-    # esptool v4 spells it `image_info --version 2`; v5 renamed the command and
-    # dropped the flag. Try both.
-    candidates = [
-        [*esptool_cmd, "--chip", CHIP, "image_info", "--version", "2", firmware_bin_path],
-        [*esptool_cmd, "--chip", CHIP, "image-info", firmware_bin_path],
-    ]
-    for info_cmd in candidates:
-        try:
-            result = subprocess.run(info_cmd, capture_output=True, text=True)
-            output = (result.stdout or "") + "\n" + (result.stderr or "")
-            match = re.search(r"(?:ELF file SHA256|app_elf_sha256)[^0-9a-fA-F]*([0-9a-fA-F]{64})", output)
-            if not match:
-                match = re.search(r"Validation hash[^0-9a-fA-F]*([0-9a-fA-F]{64})", output, re.IGNORECASE)
-            if match:
-                return match.group(1).lower()
-        except Exception as e:
-            print(f"Warning: build id extraction attempt failed: {e}")
-    print(f"Warning: Could not extract build id from {firmware_bin_path}")
-    return None
-
-
-def run_merge_bin(esptool_cmd, out_path, flash_files):
-    """esptool merge_bin (v4) / merge-bin (v5)."""
-    for subcommand in ("merge_bin", "merge-bin"):
-        merge_cmd = [*esptool_cmd, "--chip", CHIP, subcommand, "-o", out_path]
-        for offset, path in flash_files:
-            merge_cmd.extend([offset, path])
-        print(f"Running: {' '.join(merge_cmd)}")
-        result = subprocess.run(merge_cmd, capture_output=True, text=True)
-        if result.returncode == 0:
-            return
-        print(f"esptool {subcommand} failed (rc={result.returncode})")
-        print(f"STDOUT: {result.stdout}")
-        print(f"STDERR: {result.stderr}")
-    print(f"Error: Failed to create merged firmware {out_path}")
-    sys.exit(1)
-
-
 def generate_certificates(python_cmd):
     """Generate the adaptive-TLS CA certificate headers (src/certs/) before the
     build — the successor of the old PlatformIO `extra_scripts pre:` hook."""
@@ -119,7 +121,6 @@ def generate_certificates(python_cmd):
     if result.returncode != 0:
         print("Error: CA certificate generation failed")
         sys.exit(1)
-
 
 def find_idf_export():
     """Locate ESP-IDF's export.sh so the script can bootstrap the IDF
@@ -135,7 +136,6 @@ def find_idf_export():
         if candidate and os.path.exists(os.path.join(candidate, "export.sh")):
             return os.path.join(candidate, "export.sh")
     return None
-
 
 def run_idf(args):
     """Run idf.py from ESP-IDF's export.sh when it is available.
@@ -163,6 +163,8 @@ def run_idf(args):
     command = source_export + " && " + ensure_tools + " && idf.py " + " ".join(shlex.quote(a) for a in args)
     return subprocess.run(["bash", "-c", command]).returncode
 
+
+import json
 
 def main():
     os.chdir(FIRMWARE_DIR)
@@ -315,7 +317,6 @@ def main():
 
     print(f"\nBuild completed. Output in {output_dir}")
     print(f"Total variants built: {len(firmware_info)}")
-
 
 if __name__ == "__main__":
     main()

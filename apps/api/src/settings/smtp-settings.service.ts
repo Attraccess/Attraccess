@@ -1,9 +1,14 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { createTransport } from 'nodemailer';
+
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+
 import { SmtpServiceType, SmtpSettingsDto } from './dto/smtp-settings.dto';
+
 import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
+
 import { SettingsStoreService } from './settings-store.service';
+import { createTransport } from 'nodemailer';
+
 import { SMTP_KEYS, SMTP_PARENT } from './constants';
 
 export type SmtpSettingsInternal = {
@@ -17,9 +22,9 @@ export type SmtpSettingsInternal = {
   passConfigured: boolean;
 };
 
-const SMTP_VERIFY_TIMEOUT_MS = 10_000;
+export const SMTP_VERIFY_TIMEOUT_MS = 10_000;
 
-const SMTP_ERROR_MESSAGES: Record<string, string> = {
+export const SMTP_ERROR_MESSAGES: Record<string, string> = {
   ECONNREFUSED: 'Could not connect to the SMTP server. Verify the host and port are correct and the server is running.',
   ENOTFOUND: 'DNS lookup failed for the SMTP host. Verify the hostname is correct.',
   ETIMEDOUT: 'Connection to the SMTP server timed out. Verify the host, port, and firewall settings.',
@@ -33,9 +38,9 @@ const SMTP_ERROR_MESSAGES: Record<string, string> = {
 
 @Injectable()
 export class SmtpSettingsService {
-  private readonly logger = new Logger(SmtpSettingsService.name);
+  constructor(protected readonly settingsStore: SettingsStoreService) {}
 
-  constructor(private readonly settingsStore: SettingsStoreService) {}
+  protected readonly logger = new Logger(SmtpSettingsService.name);
 
   async getSettings(): Promise<SmtpSettingsDto> {
     const smtp = await this.getInternalSettings();
@@ -57,9 +62,7 @@ export class SmtpSettingsService {
   }
 
   buildTransportOptions(config: SmtpSettingsInternal): SMTPTransport.Options {
-    const auth = config.user || config.pass
-      ? { user: config.user ?? '', pass: config.pass ?? '' }
-      : undefined;
+    const auth = config.user || config.pass ? { user: config.user ?? '', pass: config.pass ?? '' } : undefined;
 
     if (config.service === SmtpServiceType.Outlook365) {
       return { service: 'Outlook365', auth };
@@ -98,22 +101,25 @@ export class SmtpSettingsService {
     return smtp;
   }
 
-  private async verifySmtpConnection(config: SmtpSettingsInternal): Promise<void> {
+  protected async verifySmtpConnection(config: SmtpSettingsInternal): Promise<void> {
     const transportOptions = this.buildTransportOptions(config);
     const transporter = createTransport(transportOptions);
     let phase: 'verify' | 'sendMail' = 'verify';
 
     try {
       await new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(
-          () => reject(new Error('SMTP verification timed out')),
-          SMTP_VERIFY_TIMEOUT_MS,
-        );
+        const timeoutId = setTimeout(() => reject(new Error('SMTP verification timed out')), SMTP_VERIFY_TIMEOUT_MS);
 
         transporter
           .verify()
-          .then(() => { clearTimeout(timeoutId); resolve(); })
-          .catch((err) => { clearTimeout(timeoutId); reject(err); });
+          .then(() => {
+            clearTimeout(timeoutId);
+            resolve();
+          })
+          .catch((err) => {
+            clearTimeout(timeoutId);
+            reject(err);
+          });
       });
 
       phase = 'sendMail';
@@ -124,9 +130,10 @@ export class SmtpSettingsService {
         text: 'This is an automated test email to verify your SMTP configuration. If you received this email, your SMTP settings are working correctly.',
       });
     } catch (error) {
-      const prefix = phase === 'verify'
-        ? 'SMTP connection verification failed'
-        : 'SMTP verification succeeded but sending a test email failed';
+      const prefix =
+        phase === 'verify'
+          ? 'SMTP connection verification failed'
+          : 'SMTP verification succeeded but sending a test email failed';
       throw this.buildSmtpError(prefix, error);
     } finally {
       if (typeof transporter.close === 'function') {
@@ -135,7 +142,7 @@ export class SmtpSettingsService {
     }
   }
 
-  private buildSmtpError(prefix: string, error: unknown): BadRequestException {
+  protected buildSmtpError(prefix: string, error: unknown): BadRequestException {
     const err = error instanceof Error ? error : new Error(String(error));
     const code = (err as NodeJS.ErrnoException).code;
     const responseCode = (err as { responseCode?: number }).responseCode;
@@ -153,7 +160,7 @@ export class SmtpSettingsService {
     return new BadRequestException(`${prefix}: ${detail}`);
   }
 
-  private async mergeWithCurrentSettings(update: UpdateSmtpSettingsDto): Promise<SmtpSettingsInternal> {
+  protected async mergeWithCurrentSettings(update: UpdateSmtpSettingsDto): Promise<SmtpSettingsInternal> {
     const current = await this.getInternalSettings();
 
     return {
@@ -168,7 +175,7 @@ export class SmtpSettingsService {
     };
   }
 
-  private async persistSettings(update: UpdateSmtpSettingsDto): Promise<void> {
+  protected async persistSettings(update: UpdateSmtpSettingsDto): Promise<void> {
     if (Object.prototype.hasOwnProperty.call(update, 'service')) {
       await this.settingsStore.setPlainSetting(SMTP_PARENT, SMTP_KEYS.service, update.service);
     }
@@ -202,7 +209,7 @@ export class SmtpSettingsService {
     }
   }
 
-  private async getInternalSettings(): Promise<SmtpSettingsInternal> {
+  protected async getInternalSettings(): Promise<SmtpSettingsInternal> {
     const serviceRaw = await this.settingsStore.getPlainSetting(SMTP_PARENT, SMTP_KEYS.service);
     const service = this.normalizeService(serviceRaw);
 
@@ -227,7 +234,7 @@ export class SmtpSettingsService {
     };
   }
 
-  private normalizeService(value: string | null): SmtpServiceType | null {
+  protected normalizeService(value: string | null): SmtpServiceType | null {
     if (!value) {
       return null;
     }
@@ -235,7 +242,7 @@ export class SmtpSettingsService {
     return Object.values(SmtpServiceType).includes(normalized) ? normalized : null;
   }
 
-  private parseBoolean(value: string | null): boolean | null {
+  protected parseBoolean(value: string | null): boolean | null {
     if (value === null) {
       return null;
     }
@@ -249,7 +256,7 @@ export class SmtpSettingsService {
     return null;
   }
 
-  private parseNumber(value: string | null): number | null {
+  protected parseNumber(value: string | null): number | null {
     if (!value) {
       return null;
     }

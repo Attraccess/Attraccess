@@ -57,15 +57,15 @@ file(GLOB_RECURSE ATTRACTAP_FIRMWARE_SOURCES "${FIRMWARE_DIR}/src/*.cpp")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/main\\.cpp$")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/rfid/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/websocket/")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/demo_websocket\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/demo/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/ota/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/display/driver/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/network/(wifi|ethernet)/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/ioexpander/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/led/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/beeper/beeper\\.cpp$")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/serial/serialCommandHandler\\.cpp$")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/utils\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/serial/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/utils[^/]*\\.cpp$")
 
 set(ATTRACTAP_IMAGE_DIR "${FIRMWARE_DIR}/src/display/images")
 configure_file("${ATTRACTAP_IMAGE_DIR}/logos.S.in" "${CMAKE_CURRENT_BINARY_DIR}/logos.S" @ONLY)
@@ -103,8 +103,11 @@ add_library(attractap-desktop-runtime
     src/card_menu.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
+    src/host_websocket_worker.cpp
     src/profile_store.cpp
     src/virtual_rfid.cpp
+    src/virtual_rfid_encoding.cpp
+    src/virtual_rfid_cards.cpp
     src/sdl_display.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/device_shell.S")
 target_include_directories(attractap-desktop-runtime PUBLIC
@@ -134,8 +137,11 @@ add_executable(attractap-desktop-tests
     src/api_endpoint.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
+    src/host_websocket_worker.cpp
     src/profile_store.cpp
-    src/virtual_rfid.cpp)
+    src/virtual_rfid.cpp
+    src/virtual_rfid_encoding.cpp
+    src/virtual_rfid_cards.cpp)
 target_include_directories(attractap-desktop-tests PRIVATE src "${FIRMWARE_DIR}/src")
 target_compile_definitions(attractap-desktop-tests PRIVATE ATTRACTAP_HOST)
 target_link_libraries(attractap-desktop-tests PRIVATE CURL::libcurl Threads::Threads attractap-production-host)
@@ -144,14 +150,15 @@ target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 enable_testing()
 add_test(NAME attractap-desktop-tests COMMAND attractap-desktop-tests)
 
-add_executable(attractap-desktop-display-tests tests/sdl_display.cpp)
+add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
 set_tests_properties(attractap-desktop-display-tests PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
 
-add_executable(attractap-reader-workflow-tests tests/reader_workflow.cpp)
+file(GLOB ATTRACTAP_READER_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/reader/*.cpp")
+add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES})
 target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)

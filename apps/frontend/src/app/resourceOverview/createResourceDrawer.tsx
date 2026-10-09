@@ -138,7 +138,9 @@ export function CreateResourceDrawer({
             selectionMode="single"
             disallowEmptySelection
             selectedKeys={[type]}
-            onSelectionChange={(keys) => setType(keys.has(ResourceType.DOOR) ? ResourceType.DOOR : ResourceType.MACHINE)}
+            onSelectionChange={(keys) =>
+              setType(keys.has(ResourceType.DOOR) ? ResourceType.DOOR : ResourceType.MACHINE)
+            }
             isDisabled={createResource.isPending}
             fullWidth
             isDetached
@@ -146,10 +148,7 @@ export function CreateResourceDrawer({
             {([ResourceType.MACHINE, ResourceType.DOOR] as const).map((option) => {
               const Icon = option === ResourceType.MACHINE ? Shapes : DoorOpen;
               return (
-                <ToggleButton
-                  key={option}
-                  id={option}
-                >
+                <ToggleButton key={option} id={option}>
                   <Icon size={20} />
                   {t(option === ResourceType.MACHINE ? 'machine' : 'door')}
                 </ToggleButton>

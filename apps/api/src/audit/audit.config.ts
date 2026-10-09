@@ -1,7 +1,7 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { z } from 'zod';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { AUDIT_DOMAIN_QUERY_PATTERN, CORE_AUDIT_DOMAINS } from './audit-domains';
+import { AUDIT_DOMAIN_QUERY_PATTERN, CORE_AUDIT_DOMAINS } from './policies/domains';
 
 const fields = {
   enabled: z.boolean(),

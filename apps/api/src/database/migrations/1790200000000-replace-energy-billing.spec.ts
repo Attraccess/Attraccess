@@ -6,7 +6,7 @@ import { readDefaultTemplateBody } from '../../email-template/email-defaults';
 import { GenericMeters1790100000000 } from './1790100000000-generic-meters';
 import { ReplaceEnergyBilling1790200000000 } from './1790200000000-replace-energy-billing';
 import { MeterFlowConversions1790300000000 } from './1790300000000-meter-flow-conversions';
-import { compileFlowTemplate } from '../../resources/flows/flow-template';
+import { compileFlowTemplate } from '../../resources/flows/execution/flow-template';
 
 describe('energy billing replacement', () => {
   let source: DataSource;

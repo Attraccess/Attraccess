@@ -1,5 +1,6 @@
+#include "wifi_mac.hpp"
 #include "wifi.hpp"
-#include "platform.hpp"
+#include "../../platform.hpp"
 
 #include "esp_log.h"
 
@@ -25,99 +26,6 @@ const uint32_t Wifi::WAITING_FOR_IP_TIMEOUT_MS = 15000;
 bool Wifi::is_scanning = false;
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
 uint8_t Wifi::knownWifiNetworksCount = 0;
-
-static std::string formatMac(const uint8_t *mac)
-{
-    char buf[18];
-    snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    return std::string(buf);
-}
-
-const char *Wifi::getStateName(WifiState state)
-{
-    switch (state)
-    {
-    case WIFI_STATE_INIT:
-        return "INIT";
-    case WIFI_STATE_CONNECTING:
-        return "CONNECTING";
-    case WIFI_STATE_CONNECTED_WAITING_FOR_IP:
-        return "CONNECTED_WAITING_FOR_IP";
-    case WIFI_STATE_CONNECTED:
-        return "CONNECTED";
-    case WIFI_STATE_DISCONNECTED:
-        return "DISCONNECTED";
-    case WIFI_STATE_CONNECT_FAILED:
-        return "CONNECT_FAILED";
-    default:
-        return "UNKNOWN";
-    }
-}
-
-const char *Wifi::getDisconnectReasonName(uint8_t reasonCode)
-{
-    switch (reasonCode)
-    {
-    case WIFI_REASON_UNSPECIFIED:
-        return "UNSPECIFIED";
-    case WIFI_REASON_AUTH_EXPIRE:
-        return "AUTH_EXPIRE";
-    case WIFI_REASON_AUTH_LEAVE:
-        return "AUTH_LEAVE";
-    case WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY:
-        return "DISASSOC_DUE_TO_INACTIVITY";
-    case WIFI_REASON_ASSOC_TOOMANY:
-        return "ASSOC_TOOMANY";
-    case WIFI_REASON_CLASS2_FRAME_FROM_NONAUTH_STA:
-        return "CLASS2_FRAME_FROM_NONAUTH_STA";
-    case WIFI_REASON_CLASS3_FRAME_FROM_NONASSOC_STA:
-        return "CLASS3_FRAME_FROM_NONASSOC_STA";
-    case WIFI_REASON_ASSOC_LEAVE:
-        return "ASSOC_LEAVE";
-    case WIFI_REASON_ASSOC_NOT_AUTHED:
-        return "ASSOC_NOT_AUTHED";
-    case WIFI_REASON_DISASSOC_PWRCAP_BAD:
-        return "DISASSOC_PWRCAP_BAD";
-    case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
-        return "DISASSOC_SUPCHAN_BAD";
-    case WIFI_REASON_IE_INVALID:
-        return "IE_INVALID";
-    case WIFI_REASON_MIC_FAILURE:
-        return "MIC_FAILURE";
-    case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
-        return "4WAY_HANDSHAKE_TIMEOUT";
-    case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
-        return "GROUP_KEY_UPDATE_TIMEOUT";
-    case WIFI_REASON_IE_IN_4WAY_DIFFERS:
-        return "IE_IN_4WAY_DIFFERS";
-    case WIFI_REASON_GROUP_CIPHER_INVALID:
-        return "GROUP_CIPHER_INVALID";
-    case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
-        return "PAIRWISE_CIPHER_INVALID";
-    case WIFI_REASON_AKMP_INVALID:
-        return "AKMP_INVALID";
-    case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
-        return "UNSUPP_RSN_IE_VERSION";
-    case WIFI_REASON_INVALID_RSN_IE_CAP:
-        return "INVALID_RSN_IE_CAP";
-    case WIFI_REASON_802_1X_AUTH_FAILED:
-        return "802_1X_AUTH_FAILED";
-    case WIFI_REASON_CIPHER_SUITE_REJECTED:
-        return "CIPHER_SUITE_REJECTED";
-    case WIFI_REASON_BEACON_TIMEOUT:
-        return "BEACON_TIMEOUT";
-    case WIFI_REASON_NO_AP_FOUND:
-        return "NO_AP_FOUND";
-    case WIFI_REASON_AUTH_FAIL:
-        return "AUTH_FAIL";
-    case WIFI_REASON_ASSOC_FAIL:
-        return "ASSOC_FAIL";
-    case WIFI_REASON_HANDSHAKE_TIMEOUT:
-        return "HANDSHAKE_TIMEOUT";
-    default:
-        return "UNKNOWN";
-    }
-}
 
 void Wifi::setup()
 {
@@ -205,77 +113,6 @@ void Wifi::setup()
     }
 
     is_setup = true;
-}
-
-void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    switch (event_id)
-    {
-    case WIFI_EVENT_STA_START:
-        logger.debug("STA start");
-        break;
-
-    case WIFI_EVENT_STA_CONNECTED:
-    {
-        auto *ev = (wifi_event_sta_connected_t *)event_data;
-        std::string ssid(reinterpret_cast<const char *>(ev->ssid), ev->ssid_len);
-        logger.infof("Associated with SSID '%s' BSSID %s on channel %d", ssid.c_str(), formatMac(ev->bssid).c_str(), ev->channel);
-
-        if (_state != WIFI_STATE_CONNECTED)
-        {
-            setState(WIFI_STATE_CONNECTED_WAITING_FOR_IP);
-        }
-        // Reset reconnection attempts on successful connection
-        current_reconnect_attempts_count = 0;
-        break;
-    }
-
-    case WIFI_EVENT_STA_DISCONNECTED:
-    {
-        auto *ev = (wifi_event_sta_disconnected_t *)event_data;
-        logger.errorf("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
-        setState(WIFI_STATE_DISCONNECTED);
-        break;
-    }
-
-    case WIFI_EVENT_SCAN_DONE:
-        logger.info("Scan completed");
-        handleScanComplete();
-        break;
-
-    default:
-        break;
-    }
-}
-
-void Wifi::ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-
-    char ip[16], mask[16], gw[16];
-    snprintf(ip, sizeof(ip), IPSTR, IP2STR(&event->ip_info.ip));
-    snprintf(mask, sizeof(mask), IPSTR, IP2STR(&event->ip_info.netmask));
-    snprintf(gw, sizeof(gw), IPSTR, IP2STR(&event->ip_info.gw));
-    logger.infof("Got IP %s, mask %s, gw %s", ip, mask, gw);
-
-    setState(WIFI_STATE_CONNECTED);
-    // Reset reconnection attempts on successful IP acquisition
-    current_reconnect_attempts_count = 0;
-}
-
-void Wifi::setState(WifiState state)
-{
-    WifiState previous = _state;
-    _state = state;
-    if (state == WIFI_STATE_CONNECTED_WAITING_FOR_IP && previous != WIFI_STATE_CONNECTED_WAITING_FOR_IP)
-    {
-        waiting_for_ip_since_ms = millis();
-    }
-    State::setWifiState(state == WIFI_STATE_CONNECTED, Wifi::getIPAddress(), _lastSSID);
-    if (previous != state)
-    {
-        logger.infof("State: %s -> %s", getStateName(previous), getStateName(state));
-    }
 }
 
 void Wifi::loop()
@@ -446,159 +283,159 @@ esp_ip4_addr_t Wifi::getIPAddress()
     return ip_info.ip;
 }
 
-void Wifi::startScan()
+const char *Wifi::getStateName(WifiState state)
 {
-    if (is_scanning)
+    switch (state)
     {
-        return;
+    case WIFI_STATE_INIT:
+        return "INIT";
+    case WIFI_STATE_CONNECTING:
+        return "CONNECTING";
+    case WIFI_STATE_CONNECTED_WAITING_FOR_IP:
+        return "CONNECTED_WAITING_FOR_IP";
+    case WIFI_STATE_CONNECTED:
+        return "CONNECTED";
+    case WIFI_STATE_DISCONNECTED:
+        return "DISCONNECTED";
+    case WIFI_STATE_CONNECT_FAILED:
+        return "CONNECT_FAILED";
+    default:
+        return "UNKNOWN";
     }
-
-    logger.info("Starting WiFi scan");
-    Wifi::is_scanning = true;
-
-    wifi_scan_config_t scan_config = {};
-    scan_config.ssid = NULL;
-    scan_config.bssid = NULL;
-    scan_config.channel = 0;
-    scan_config.show_hidden = false;
-    scan_config.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-    scan_config.scan_time.active.min = 100;
-    scan_config.scan_time.active.max = 300;
-
-    esp_err_t err = esp_wifi_scan_start(&scan_config, false);
-    if (err != ESP_OK)
-    {
-        logger.error((std::string("Failed to start scan: ") + esp_err_to_name(err)).c_str());
-        Wifi::is_scanning = false;
-    }
-    logger.debug("WiFi scan started");
 }
 
-bool Wifi::isScanning()
+const char *Wifi::getDisconnectReasonName(uint8_t reasonCode)
 {
-    return is_scanning;
+    switch (reasonCode)
+    {
+    case WIFI_REASON_UNSPECIFIED:
+        return "UNSPECIFIED";
+    case WIFI_REASON_AUTH_EXPIRE:
+        return "AUTH_EXPIRE";
+    case WIFI_REASON_AUTH_LEAVE:
+        return "AUTH_LEAVE";
+    case WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY:
+        return "DISASSOC_DUE_TO_INACTIVITY";
+    case WIFI_REASON_ASSOC_TOOMANY:
+        return "ASSOC_TOOMANY";
+    case WIFI_REASON_CLASS2_FRAME_FROM_NONAUTH_STA:
+        return "CLASS2_FRAME_FROM_NONAUTH_STA";
+    case WIFI_REASON_CLASS3_FRAME_FROM_NONASSOC_STA:
+        return "CLASS3_FRAME_FROM_NONASSOC_STA";
+    case WIFI_REASON_ASSOC_LEAVE:
+        return "ASSOC_LEAVE";
+    case WIFI_REASON_ASSOC_NOT_AUTHED:
+        return "ASSOC_NOT_AUTHED";
+    case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+        return "DISASSOC_PWRCAP_BAD";
+    case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+        return "DISASSOC_SUPCHAN_BAD";
+    case WIFI_REASON_IE_INVALID:
+        return "IE_INVALID";
+    case WIFI_REASON_MIC_FAILURE:
+        return "MIC_FAILURE";
+    case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        return "4WAY_HANDSHAKE_TIMEOUT";
+    case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+        return "GROUP_KEY_UPDATE_TIMEOUT";
+    case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+        return "IE_IN_4WAY_DIFFERS";
+    case WIFI_REASON_GROUP_CIPHER_INVALID:
+        return "GROUP_CIPHER_INVALID";
+    case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+        return "PAIRWISE_CIPHER_INVALID";
+    case WIFI_REASON_AKMP_INVALID:
+        return "AKMP_INVALID";
+    case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+        return "UNSUPP_RSN_IE_VERSION";
+    case WIFI_REASON_INVALID_RSN_IE_CAP:
+        return "INVALID_RSN_IE_CAP";
+    case WIFI_REASON_802_1X_AUTH_FAILED:
+        return "802_1X_AUTH_FAILED";
+    case WIFI_REASON_CIPHER_SUITE_REJECTED:
+        return "CIPHER_SUITE_REJECTED";
+    case WIFI_REASON_BEACON_TIMEOUT:
+        return "BEACON_TIMEOUT";
+    case WIFI_REASON_NO_AP_FOUND:
+        return "NO_AP_FOUND";
+    case WIFI_REASON_AUTH_FAIL:
+        return "AUTH_FAIL";
+    case WIFI_REASON_ASSOC_FAIL:
+        return "ASSOC_FAIL";
+    case WIFI_REASON_HANDSHAKE_TIMEOUT:
+        return "HANDSHAKE_TIMEOUT";
+    default:
+        return "UNKNOWN";
+    }
 }
 
-void Wifi::handleScanComplete()
+void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    logger.debug("Scan complete event");
-    uint16_t scan_count = 0;
-    esp_err_t err = esp_wifi_scan_get_ap_num(&scan_count);
-
-    if (err != ESP_OK)
+    switch (event_id)
     {
-        logger.error((std::string("Error getting scan count: ") + esp_err_to_name(err)).c_str());
-        knownWifiNetworksCount = 0;
-        Wifi::is_scanning = false;
-        return;
-    }
+    case WIFI_EVENT_STA_START:
+        logger.debug("STA start");
+        break;
 
-    if (scan_count == 0)
+    case WIFI_EVENT_STA_CONNECTED:
     {
-        logger.info("Scan complete: no networks found");
-        knownWifiNetworksCount = 0;
-        Wifi::is_scanning = false;
-        return;
-    }
+        auto *ev = (wifi_event_sta_connected_t *)event_data;
+        std::string ssid(reinterpret_cast<const char *>(ev->ssid), ev->ssid_len);
+        logger.infof("Associated with SSID '%s' BSSID %s on channel %d", ssid.c_str(), formatMac(ev->bssid).c_str(), ev->channel);
 
-    knownWifiNetworksCount = std::min((int)scan_count, (int)MAX_KNOWN_WIFI_NETWORKS);
-    logger.infof("Scan complete: %u networks", knownWifiNetworksCount);
-
-    wifi_ap_record_t *ap_records = (wifi_ap_record_t *)malloc(scan_count * sizeof(wifi_ap_record_t));
-
-    if (!ap_records)
-    {
-        logger.error("Failed to allocate memory for scan results");
-        knownWifiNetworksCount = 0;
-        Wifi::is_scanning = false;
-        return;
-    }
-
-    logger.debug("Fetching AP records");
-    err = esp_wifi_scan_get_ap_records(&scan_count, ap_records);
-    if (err != ESP_OK)
-    {
-        logger.error((std::string("Error getting scan records: ") + esp_err_to_name(err)).c_str());
-        free(ap_records);
-        knownWifiNetworksCount = 0;
-        Wifi::is_scanning = false;
-        return;
-    }
-
-    // Copy scan results to our network array with safety checks
-    for (uint8_t i = 0; i < knownWifiNetworksCount && i < MAX_KNOWN_WIFI_NETWORKS; i++)
-    {
-        // Skip empty SSIDs
-        if (ap_records[i].ssid[0] == 0)
+        if (_state != WIFI_STATE_CONNECTED)
         {
-            continue;
+            setState(WIFI_STATE_CONNECTED_WAITING_FOR_IP);
         }
-
-        // Ensure SSID is null-terminated by copying to a buffer
-        char ssid_str[33] = {0}; // WiFi SSID max is 32 bytes + null terminator
-        // Copy up to 32 bytes (SSID length might not be null-terminated)
-        size_t ssid_len = strnlen((char *)ap_records[i].ssid, 32);
-        if (ssid_len > 0)
-        {
-            memcpy(ssid_str, ap_records[i].ssid, ssid_len);
-            ssid_str[ssid_len] = '\0'; // Ensure null termination
-
-            knownWifiNetworks[i].ssid = std::string(ssid_str);
-            knownWifiNetworks[i].rssi = ap_records[i].rssi;
-            knownWifiNetworks[i].encryptionType = ap_records[i].authmode;
-            knownWifiNetworks[i].isOpen = (ap_records[i].authmode == WIFI_AUTH_OPEN);
-            knownWifiNetworks[i].channel = ap_records[i].primary;
-        }
+        // Reset reconnection attempts on successful connection
+        current_reconnect_attempts_count = 0;
+        break;
     }
 
-    free(ap_records);
-    Wifi::is_scanning = false;
-
-    logger.debug("WiFi scan results stored");
-
-    // State::pushWifiEventToQueue(State::WIFI_EVENT_SCAN_DONE);
-}
-
-void Wifi::handleTimeout()
-{
-    if (_state == WIFI_STATE_CONNECTED_WAITING_FOR_IP)
+    case WIFI_EVENT_STA_DISCONNECTED:
     {
-        if (millis() - waiting_for_ip_since_ms > WAITING_FOR_IP_TIMEOUT_MS)
-        {
-            logger.error("DHCP timeout - no IP acquired, forcing reconnect");
-            esp_wifi_disconnect();
-            setState(WIFI_STATE_CONNECT_FAILED);
-        }
-        return;
+        auto *ev = (wifi_event_sta_disconnected_t *)event_data;
+        logger.errorf("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
+        setState(WIFI_STATE_DISCONNECTED);
+        break;
     }
 
-    if (isConnected())
-    {
-        return;
-    }
+    case WIFI_EVENT_SCAN_DONE:
+        logger.info("Scan completed");
+        handleScanComplete();
+        break;
 
-    uint32_t currentTime = millis();
-    uint32_t elapsed = currentTime - last_reconnect_attempt_time_ms;
-
-    if (elapsed > 15000)
-    { // 15 second timeout
-        logger.error("Connection timeout - stopping connection attempt");
-        esp_wifi_disconnect();
-        setState(WIFI_STATE_CONNECT_FAILED);
-        return;
+    default:
+        break;
     }
 }
 
-Wifi::WifiScanResult Wifi::getKnownWifiNetworks()
+void Wifi::ipEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    Wifi::WifiScanResult result;
-    result.count = knownWifiNetworksCount;
+    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
 
-    // Copy each network from knownWifiNetworks to result.networks
-    for (uint8_t i = 0; i < knownWifiNetworksCount && i < MAX_KNOWN_WIFI_NETWORKS; i++)
+    char ip[16], mask[16], gw[16];
+    snprintf(ip, sizeof(ip), IPSTR, IP2STR(&event->ip_info.ip));
+    snprintf(mask, sizeof(mask), IPSTR, IP2STR(&event->ip_info.netmask));
+    snprintf(gw, sizeof(gw), IPSTR, IP2STR(&event->ip_info.gw));
+    logger.infof("Got IP %s, mask %s, gw %s", ip, mask, gw);
+
+    setState(WIFI_STATE_CONNECTED);
+    // Reset reconnection attempts on successful IP acquisition
+    current_reconnect_attempts_count = 0;
+}
+
+void Wifi::setState(WifiState state)
+{
+    WifiState previous = _state;
+    _state = state;
+    if (state == WIFI_STATE_CONNECTED_WAITING_FOR_IP && previous != WIFI_STATE_CONNECTED_WAITING_FOR_IP)
     {
-        result.networks[i] = knownWifiNetworks[i];
+        waiting_for_ip_since_ms = millis();
     }
-
-    return result;
+    State::setWifiState(state == WIFI_STATE_CONNECTED, Wifi::getIPAddress(), _lastSSID);
+    if (previous != state)
+    {
+        logger.infof("State: %s -> %s", getStateName(previous), getStateName(state));
+    }
 }

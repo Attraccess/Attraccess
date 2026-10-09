@@ -1,10 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import type { PluginAuditDomainDeclaration, PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import {
-  registerPluginAuditDomains,
-  resetPluginAuditRegistry,
-} from '../plugin-system/plugin-audit-registry';
-import { projectPluginAuditEvent } from './plugin-audit-policy';
+import { randomUUID } from 'node:crypto';
+import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
+import { projectPluginAuditEvent } from './policies/plugins';
 
 const pluginId = 'abcdefghijklmnopqrstu';
 const otherPluginId = 'aaaaaaaaaaaaaaaaaaaaa';

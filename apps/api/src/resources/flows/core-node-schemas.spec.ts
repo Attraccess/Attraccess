@@ -1,5 +1,5 @@
 import { ResourceFlowNodeType as Type, ResourceType } from '@attraccess/database-entities';
-import { getCoreNodeSchemas } from './core-node-schemas';
+import { getCoreNodeSchemas } from './schemas/core-node-schemas';
 
 describe('core flow node catalog', () => {
   it.each([ResourceType.Machine, ResourceType.Door])('covers every node exactly once for %s', (resourceType) => {

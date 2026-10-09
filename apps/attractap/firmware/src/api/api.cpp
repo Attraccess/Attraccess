@@ -4,14 +4,12 @@
 #include "api.hpp"
 #include <functional>
 #include "../utils.hpp"
-#include "platform.hpp"
+#include "../platform.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <cstring>
 #include <memory>
 #include <string>
-
-constexpr size_t API::MAX_PROJECTS_PER_PAGE;
 
 void API::updateSateInfo()
 {
@@ -61,104 +59,106 @@ void API::loop()
     this->firmware.tick();
 }
 
-void API::processIncomingMessage(const char *buf, size_t len)
+void API::setErrorCallback(std::function<void(const char *title, const char *message)> callback)
 {
-    // Parse into persistent inboundDoc to avoid deep stack usage in websocket task (no filter; server sends only needed fields)
-    inboundDoc.clear();
-    auto err = deserializeJson(inboundDoc, buf, len);
-    if (err)
+    this->errorCallback = callback;
+}
+
+void API::setActionResultCallback(std::function<void(const ActionResult &)> callback)
+{
+    this->actionResultCallback = callback;
+}
+
+void API::setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback)
+{
+    this->insufficientBalanceCallback = callback;
+}
+
+void API::sendAck(const char *type)
+{
+    this->sendMessage(("ACK_" + std::string(type)).c_str());
+}
+
+void API::sendMessage(const char *type)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    this->sendMessage(type, payload);
+}
+
+bool API::sendMessage(const char *type, JsonObject payload)
+{
+    JsonDocument event;
+    event["event"] = "EVENT";
+    event["data"]["type"] = type;
+
+    // Create a copy of the payload in the destination document
+    JsonObject eventPayload = event["data"]["payload"].to<JsonObject>();
+    for (JsonPair p : payload)
     {
-        logger.error((std::string("JSON parse error: ") + err.c_str()).c_str());
-        return;
+        eventPayload[p.key()] = p.value();
     }
 
-    const char *topLevelEvent = inboundDoc["event"].as<const char *>();
-    if (topLevelEvent && strcmp(topLevelEvent, "HEARTBEAT") == 0)
+    const size_t requiredBytes = measureJson(event) + 1; // include terminator
+    if (requiredBytes <= JSON_OUTBUF_SMALL)
     {
-        return;
-    }
-
-    const char *eventType = inboundDoc["data"]["type"].as<const char *>();
-    if (!eventType)
-    {
-        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
-        return;
-    }
-
-    const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
-        strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
-        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
-    const bool isActionFormRequest = strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0;
-    const uint32_t requestId = inboundDoc["data"]["payload"]["requestId"] | 0u;
-    // A cancelled/timed-out request must not complete a later action, even on
-    // the same resource. Untagged replies remain compatible with older APIs.
-    if ((isActionResponse || isActionFormRequest) && !isCurrentResourceAction(requestId)) {
-        this->sendAck(eventType);
-        return;
-    }
-
-    // Crash-report responses carry their own error codes (e.g. INVALID_CRASH_REPORT)
-    // that must not surface as a user-facing error dialog; route them to the handler.
-    bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
-
-    // Enrollment key-request errors (e.g. CARD_ALREADY_ENROLLED) must reach the
-    // enrollment handler so it can show the in-screen message and re-arm card
-    // detection. The generic interceptor would otherwise pop a generic dialog
-    // and return before recovery runs, wedging the reader with detection off
-    // until enrollment times out (ATT-503).
-    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
-
-    // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
-    // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
-    // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
-    bool isSupervisionEvent = strcmp(eventType, "SUPERVISION_REQUEST") == 0 ||
-                              strcmp(eventType, "SUPERVISION_START") == 0 ||
-                              strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
-                              strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
-
-    // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    // Background stats failures must not interrupt start/stop controls with a popup.
-    const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
-    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
-        inboundDoc["data"]["payload"].is<JsonObject>())
-    {
-        JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
-        if (payload["error"].is<const char *>())
+        char json[JSON_OUTBUF_SMALL];
+        size_t n = serializeJson(event, json, sizeof(json));
+        if (n == 0)
         {
-            std::string err = payload["error"].as<std::string>();
-            if (err.length() > 0)
-            {
-                if (isActionResponse && this->actionResultCallback) {
-                    this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
-                    this->sendAck(eventType);
-                    return;
-                }
-                // Special-case insufficient balance: propagate sumUpEnabled flag if present
-                if (err == "INSUFFICIENT_BALANCE")
-                {
-                    bool sumUpEnabled = payload["sumUpEnabled"].is<bool>() ? payload["sumUpEnabled"].as<bool>() : false;
-                    if (this->insufficientBalanceCallback)
-                    {
-                        this->insufficientBalanceCallback(sumUpEnabled);
-                    }
-                }
-                else
-                {
-                    if (this->errorCallback)
-                    {
-                        this->errorCallback("Fehler", translateReaderError(err).c_str());
-                    }
-                }
-                // Do not process further
-                this->sendAck(eventType);
-                return;
-            }
+            this->logger.error("Failed to serialize event to buffer (small)");
+            return false;
         }
+        this->logger.info((std::string("Sending reader event: ") + type).c_str());
+        return this->transport.sendMessage(json, n);
     }
 
-    this->sendAck(eventType);
+    std::unique_ptr<char[]> json(new (std::nothrow) char[requiredBytes]);
+    if (!json)
+    {
+        this->logger.error("Failed to allocate buffer for outgoing event");
+        return false;
+    }
+    size_t n = serializeJson(event, json.get(), requiredBytes);
+    if (n == 0)
+    {
+        this->logger.error("Failed to serialize event to dynamically allocated buffer");
+        return false;
+    }
+    this->logger.info((std::string("Sending reader event: ") + type).c_str());
+    return this->transport.sendMessage(json.get(), n);
+}
 
+void API::disableConnectionAttempts()
+{
+    this->transport.disableConnectionAttempts();
+    this->loopIsEnabled = false;
+}
+
+void API::enableConnectionAttempts()
+{
+    this->transport.enableConnectionAttempts();
+}
+
+void API::resetCertificateTrust()
+{
+    this->transport.resetCertificateTrust();
+}
+
+API::API(IReaderTransport &transport) : logger("API"),
+             transport(transport),
+            firmware(
+                logger,
+                [this](const char *type, JsonObject payload)
+                { return this->sendMessage(type, payload); },
+                [this](const char *reason)
+                { this->transport.forceReconnect(reason); },
+                firmwareUpdateProgressCallback,
+                firmwareUpdateMetaCallback,
+                errorCallback) {}
+
+void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
+{
     if (strcmp(eventType, "READER_REGISTER") == 0)
     {
         this->onRegistrationData(inboundDoc["data"].as<JsonObject>());
@@ -299,74 +299,105 @@ void API::processIncomingMessage(const char *buf, size_t len)
     }
 }
 
-void API::setErrorCallback(std::function<void(const char *title, const char *message)> callback)
+void API::processIncomingMessage(const char *buf, size_t len)
 {
-    this->errorCallback = callback;
-}
-
-void API::setActionResultCallback(std::function<void(const ActionResult &)> callback)
-{
-    this->actionResultCallback = callback;
-}
-
-void API::setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback)
-{
-    this->insufficientBalanceCallback = callback;
-}
-
-void API::sendAck(const char *type)
-{
-    this->sendMessage(("ACK_" + std::string(type)).c_str());
-}
-
-void API::sendMessage(const char *type)
-{
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    this->sendMessage(type, payload);
-}
-
-bool API::sendMessage(const char *type, JsonObject payload)
-{
-    JsonDocument event;
-    event["event"] = "EVENT";
-    event["data"]["type"] = type;
-
-    // Create a copy of the payload in the destination document
-    JsonObject eventPayload = event["data"]["payload"].to<JsonObject>();
-    for (JsonPair p : payload)
+    // Parse into persistent inboundDoc to avoid deep stack usage in websocket task (no filter; server sends only needed fields)
+    inboundDoc.clear();
+    auto err = deserializeJson(inboundDoc, buf, len);
+    if (err)
     {
-        eventPayload[p.key()] = p.value();
+        logger.error((std::string("JSON parse error: ") + err.c_str()).c_str());
+        return;
     }
 
-    const size_t requiredBytes = measureJson(event) + 1; // include terminator
-    if (requiredBytes <= JSON_OUTBUF_SMALL)
+    const char *topLevelEvent = inboundDoc["event"].as<const char *>();
+    if (topLevelEvent && strcmp(topLevelEvent, "HEARTBEAT") == 0)
     {
-        char json[JSON_OUTBUF_SMALL];
-        size_t n = serializeJson(event, json, sizeof(json));
-        if (n == 0)
+        return;
+    }
+
+    const char *eventType = inboundDoc["data"]["type"].as<const char *>();
+    if (!eventType)
+    {
+        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
+        return;
+    }
+
+    const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
+        strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
+        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
+    const bool isActionFormRequest = strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0;
+    const uint32_t requestId = inboundDoc["data"]["payload"]["requestId"] | 0u;
+    // A cancelled/timed-out request must not complete a later action, even on
+    // the same resource. Untagged replies remain compatible with older APIs.
+    if ((isActionResponse || isActionFormRequest) && !isCurrentResourceAction(requestId)) {
+        this->sendAck(eventType);
+        return;
+    }
+
+    // Crash-report responses carry their own error codes (e.g. INVALID_CRASH_REPORT)
+    // that must not surface as a user-facing error dialog; route them to the handler.
+    bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
+
+    // Enrollment key-request errors (e.g. CARD_ALREADY_ENROLLED) must reach the
+    // enrollment handler so it can show the in-screen message and re-arm card
+    // detection. The generic interceptor would otherwise pop a generic dialog
+    // and return before recovery runs, wedging the reader with detection off
+    // until enrollment times out (ATT-503).
+    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
+
+    // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
+    // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
+    // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
+    bool isSupervisionEvent = strcmp(eventType, "SUPERVISION_REQUEST") == 0 ||
+                              strcmp(eventType, "SUPERVISION_START") == 0 ||
+                              strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
+                              strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
+
+    // Early error handling: if payload.error is present and non-empty, raise error callback and stop
+    // Background stats failures must not interrupt start/stop controls with a popup.
+    const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
+    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
+        inboundDoc["data"]["payload"].is<JsonObject>())
+    {
+        JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
+        if (payload["error"].is<const char *>())
         {
-            this->logger.error("Failed to serialize event to buffer (small)");
-            return false;
+            std::string err = payload["error"].as<std::string>();
+            if (err.length() > 0)
+            {
+                if (isActionResponse && this->actionResultCallback) {
+                    this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
+                    this->sendAck(eventType);
+                    return;
+                }
+                // Special-case insufficient balance: propagate sumUpEnabled flag if present
+                if (err == "INSUFFICIENT_BALANCE")
+                {
+                    bool sumUpEnabled = payload["sumUpEnabled"].is<bool>() ? payload["sumUpEnabled"].as<bool>() : false;
+                    if (this->insufficientBalanceCallback)
+                    {
+                        this->insufficientBalanceCallback(sumUpEnabled);
+                    }
+                }
+                else
+                {
+                    if (this->errorCallback)
+                    {
+                        this->errorCallback("Fehler", translateReaderError(err).c_str());
+                    }
+                }
+                // Do not process further
+                this->sendAck(eventType);
+                return;
+            }
         }
-        this->logger.info((std::string("Sending reader event: ") + type).c_str());
-        return this->transport.sendMessage(json, n);
     }
 
-    std::unique_ptr<char[]> json(new (std::nothrow) char[requiredBytes]);
-    if (!json)
-    {
-        this->logger.error("Failed to allocate buffer for outgoing event");
-        return false;
-    }
-    size_t n = serializeJson(event, json.get(), requiredBytes);
-    if (n == 0)
-    {
-        this->logger.error("Failed to serialize event to dynamically allocated buffer");
-        return false;
-    }
-    this->logger.info((std::string("Sending reader event: ") + type).c_str());
-    return this->transport.sendMessage(json.get(), n);
+    this->sendAck(eventType);
+
+    dispatchIncomingEvent(eventType, requestId);
 }
 
 void API::sendHeartbeat()
@@ -396,20 +427,4 @@ void API::sendHeartbeat()
     this->transport.sendHeartbeat(json, n);
 
     this->heartbeat_sent_at = millis();
-}
-
-void API::disableConnectionAttempts()
-{
-    this->transport.disableConnectionAttempts();
-    this->loopIsEnabled = false;
-}
-
-void API::enableConnectionAttempts()
-{
-    this->transport.enableConnectionAttempts();
-}
-
-void API::resetCertificateTrust()
-{
-    this->transport.resetCertificateTrust();
 }

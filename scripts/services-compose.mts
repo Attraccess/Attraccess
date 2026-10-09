@@ -1,20 +1,139 @@
 #!/usr/bin/env node
-import React, { useEffect, useMemo, useState } from 'react';
-import { Box, Text, render, useApp, useInput } from 'ink';
 import { execFile } from 'child_process';
 import { existsSync } from 'fs';
+import { Box, Text, render, useApp, useInput } from 'ink';
 import path from 'path';
-import { promisify } from 'util';
+import React, { useEffect, useMemo, useState } from 'react';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { promisify } from 'util';
 
-const execFileAsync = promisify(execFile);
-const h = React.createElement;
+export function ActionPicker({ onSelect }: { onSelect: (action: Action) => void }) {
+  const [index, setIndex] = useState(0);
 
-type Action = 'up' | 'stop' | 'down' | 'status' | 'list';
+  useInput((_input, key) => {
+    if (key.upArrow) {
+      setIndex((prev) => (prev === 0 ? ACTIONS.length - 1 : prev - 1));
+    }
+    if (key.downArrow) {
+      setIndex((prev) => (prev === ACTIONS.length - 1 ? 0 : prev + 1));
+    }
+    if (key.return) {
+      onSelect(ACTIONS[index]);
+    }
+  });
 
-const ACTIONS: Action[] = ['up', 'stop', 'down', 'status', 'list'];
+  return h(
+    Box,
+    { flexDirection: 'column' },
+    h(Text, null, 'Select action:'),
+    ...ACTIONS.map((action, idx) =>
+      h(Text, { key: action, color: idx === index ? 'cyan' : undefined }, `${idx === index ? '> ' : '  '}${action}`),
+    ),
+    h(Text, { dimColor: true }, 'Use Up/Down and Enter'),
+  );
+}
 
-const SETS: Record<string, string[]> = {
+export function SetPicker({
+  defaultSelected,
+  onConfirm,
+}: {
+  defaultSelected: string[];
+  onConfirm: (sets: string[]) => void;
+}) {
+  const setNames = useMemo(() => Object.keys(SETS), []);
+  const [cursor, setCursor] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(defaultSelected));
+
+  useInput((input, key) => {
+    if (key.upArrow) {
+      setCursor((prev) => (prev === 0 ? setNames.length - 1 : prev - 1));
+    }
+    if (key.downArrow) {
+      setCursor((prev) => (prev === setNames.length - 1 ? 0 : prev + 1));
+    }
+    if (key.return) {
+      onConfirm([...selected]);
+    }
+    if (input === ' ') {
+      const current = setNames[cursor];
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(current)) {
+          next.delete(current);
+        } else {
+          next.add(current);
+        }
+        return next;
+      });
+    }
+    if (input === 'a') {
+      setSelected((prev) => {
+        if (prev.size === setNames.length) {
+          return new Set();
+        }
+        return new Set(setNames);
+      });
+    }
+  });
+
+  return h(
+    Box,
+    { flexDirection: 'column' },
+    h(Text, null, 'Select service sets:'),
+    ...setNames.map((name, idx) => {
+      const checked = selected.has(name);
+      const marker = checked ? '[x]' : '[ ]';
+      return h(
+        Text,
+        { key: name, color: idx === cursor ? 'cyan' : undefined },
+        `${idx === cursor ? '> ' : '  '}${marker} ${name}`,
+      );
+    }),
+    h(Text, { dimColor: true }, 'Space toggle, Enter confirm, "a" toggle all'),
+  );
+}
+
+export function OutputScreen({
+  title,
+  output,
+  isError,
+  onBack,
+}: {
+  title: string;
+  output: string;
+  isError?: boolean;
+  onBack: () => void;
+}) {
+  useInput((input, key) => {
+    if (input === 'q') {
+      onBack();
+      return;
+    }
+    if (key.return || key.escape || key.space || input) {
+      onBack();
+    }
+  });
+
+  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
+  const body =
+    lines.length === 0
+      ? [h(Text, { key: 'none' }, '(no output)')]
+      : lines.map((line, idx) => h(Text, { key: `${line}-${idx}` }, line));
+
+  return h(
+    Box,
+    { flexDirection: 'column' },
+    h(Text, { color: isError ? 'red' : 'green' }, title),
+    ...body,
+    h(Text, { dimColor: true }, 'Any key back to menu, q to exit'),
+  );
+}
+
+export type Action = 'up' | 'stop' | 'down' | 'status' | 'list';
+
+export const ACTIONS: Action[] = ['up', 'stop', 'down', 'status', 'list'];
+
+export const SETS: Record<string, string[]> = {
   mailpit: ['mailpit'],
   valkey: ['valkey'],
   authentik: ['authentik-postgresql', 'authentik-redis', 'authentik-server', 'authentik-worker'],
@@ -25,29 +144,19 @@ const SETS: Record<string, string[]> = {
   monitoring: ['prometheus', 'grafana', 'grafana-contactpoints-cleanup'],
 };
 
-const DEFAULT_SETS = ['mailpit'];
+export const DEFAULT_SETS = ['mailpit'];
 
-const scriptPath = fileURLToPath(import.meta.url);
-const scriptDir = path.dirname(scriptPath);
-const repoRoot = path.resolve(scriptDir, '..');
-const composeFile = path.join(repoRoot, 'services.docker-compose.yml');
+export const scriptPath = fileURLToPath(import.meta.url);
 
-function printUsage(): void {
-  console.log(`Usage: pnpm services -- [up|stop|down|status|list] [set|service ...]
+export const scriptDir = path.dirname(scriptPath);
 
-Sets:
-  ${Object.keys(SETS).join(', ')}
+export const repoRoot = path.resolve(scriptDir, '..');
 
-Examples:
-  pnpm services
-  pnpm services -- up mailpit authentik
-  pnpm services -- up all
-  pnpm services -- stop mailpit
-  pnpm services -- down
-`);
-}
+export const composeFile = path.join(repoRoot, 'services.docker-compose.yml');
 
-async function runCompose(args: string[]): Promise<{ stdout: string; stderr: string }> {
+export const execFileAsync = promisify(execFile);
+
+export async function runCompose(args: string[]): Promise<{ stdout: string; stderr: string }> {
   const { stdout, stderr } = await execFileAsync('docker', ['compose', '-f', composeFile, ...args], {
     env: process.env,
     maxBuffer: 1024 * 1024 * 10,
@@ -55,7 +164,7 @@ async function runCompose(args: string[]): Promise<{ stdout: string; stderr: str
   return { stdout, stderr };
 }
 
-async function getComposeServices(): Promise<string[]> {
+export async function getComposeServices(): Promise<string[]> {
   const { stdout } = await runCompose(['config', '--services']);
   return stdout
     .split(/\r?\n/)
@@ -90,7 +199,7 @@ export function resolveSelectedServices(tokens: string[], allServices: string[])
   return [...selected];
 }
 
-function buildStopList(allServices: string[], selectedServices: string[]): string[] {
+export function buildStopList(allServices: string[], selectedServices: string[]): string[] {
   const selected = new Set(selectedServices);
   return allServices.filter((service) => !selected.has(service));
 }
@@ -147,121 +256,22 @@ export async function handleAction(action: Action, tokens: string[]): Promise<st
   throw new Error(`Unknown action: ${action}`);
 }
 
-function ActionPicker({ onSelect }: { onSelect: (action: Action) => void }) {
-  const [index, setIndex] = useState(0);
+export function printUsage(): void {
+  console.log(`Usage: pnpm services -- [up|stop|down|status|list] [set|service ...]
 
-  useInput((_input, key) => {
-    if (key.upArrow) {
-      setIndex((prev) => (prev === 0 ? ACTIONS.length - 1 : prev - 1));
-    }
-    if (key.downArrow) {
-      setIndex((prev) => (prev === ACTIONS.length - 1 ? 0 : prev + 1));
-    }
-    if (key.return) {
-      onSelect(ACTIONS[index]);
-    }
-  });
+Sets:
+  ${Object.keys(SETS).join(', ')}
 
-  return h(
-    Box,
-    { flexDirection: 'column' },
-    h(Text, null, 'Select action:'),
-    ...ACTIONS.map((action, idx) =>
-      h(Text, { key: action, color: idx === index ? 'cyan' : undefined }, `${idx === index ? '> ' : '  '}${action}`),
-    ),
-    h(Text, { dimColor: true }, 'Use Up/Down and Enter'),
-  );
+Examples:
+  pnpm services
+  pnpm services -- up mailpit authentik
+  pnpm services -- up all
+  pnpm services -- stop mailpit
+  pnpm services -- down
+`);
 }
 
-function SetPicker({ defaultSelected, onConfirm }: { defaultSelected: string[]; onConfirm: (sets: string[]) => void }) {
-  const setNames = useMemo(() => Object.keys(SETS), []);
-  const [cursor, setCursor] = useState(0);
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(defaultSelected));
-
-  useInput((input, key) => {
-    if (key.upArrow) {
-      setCursor((prev) => (prev === 0 ? setNames.length - 1 : prev - 1));
-    }
-    if (key.downArrow) {
-      setCursor((prev) => (prev === setNames.length - 1 ? 0 : prev + 1));
-    }
-    if (key.return) {
-      onConfirm([...selected]);
-    }
-    if (input === ' ') {
-      const current = setNames[cursor];
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(current)) {
-          next.delete(current);
-        } else {
-          next.add(current);
-        }
-        return next;
-      });
-    }
-    if (input === 'a') {
-      setSelected((prev) => {
-        if (prev.size === setNames.length) {
-          return new Set();
-        }
-        return new Set(setNames);
-      });
-    }
-  });
-
-  return h(
-    Box,
-    { flexDirection: 'column' },
-    h(Text, null, 'Select service sets:'),
-    ...setNames.map((name, idx) => {
-      const checked = selected.has(name);
-      const marker = checked ? '[x]' : '[ ]';
-      return h(
-        Text,
-        { key: name, color: idx === cursor ? 'cyan' : undefined },
-        `${idx === cursor ? '> ' : '  '}${marker} ${name}`,
-      );
-    }),
-    h(Text, { dimColor: true }, 'Space toggle, Enter confirm, "a" toggle all'),
-  );
-}
-
-function OutputScreen({
-  title,
-  output,
-  isError,
-  onBack,
-}: {
-  title: string;
-  output: string;
-  isError?: boolean;
-  onBack: () => void;
-}) {
-  useInput((input, key) => {
-    if (input === 'q') {
-      onBack();
-      return;
-    }
-    if (key.return || key.escape || key.space || input) {
-      onBack();
-    }
-  });
-
-  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
-  const body =
-    lines.length === 0
-      ? [h(Text, { key: 'none' }, '(no output)')]
-      : lines.map((line, idx) => h(Text, { key: `${line}-${idx}` }, line));
-
-  return h(
-    Box,
-    { flexDirection: 'column' },
-    h(Text, { color: isError ? 'red' : 'green' }, title),
-    ...body,
-    h(Text, { dimColor: true }, 'Any key back to menu, q to exit'),
-  );
-}
+const h = React.createElement;
 
 export function App() {
   const [action, setAction] = useState<Action | null>(null);

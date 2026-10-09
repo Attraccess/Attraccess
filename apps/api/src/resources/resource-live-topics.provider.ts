@@ -9,7 +9,7 @@ import { finalize } from 'rxjs/operators';
 import { LiveTopicProvider } from '../live-updates/live-topic-provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
-import { FlowLogRecorderService } from './flows/flow-log-recorder.service';
+import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
 
 @Injectable()
 export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleInit {
