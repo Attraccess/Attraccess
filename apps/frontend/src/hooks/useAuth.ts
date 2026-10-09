@@ -34,7 +34,7 @@ export function useLogin() {
 
   return {
     ...login,
-    mutate: async (data: LoginCredentials) => {
+    mutate: (data: LoginCredentials, options?: Parameters<typeof login.mutate>[1]) => {
       return login.mutate({
         requestBody: {
           username: data.username,
@@ -42,7 +42,7 @@ export function useLogin() {
           twoFactorCode: data.twoFactorCode,
           tokenLocation: data.tokenLocation,
         },
-      });
+      }, options);
     },
     mutateAsync: async (data: { username: string; password: string }) => {
       return login.mutateAsync({ requestBody: { username: data.username, password: data.password } });

@@ -35,6 +35,7 @@ describe('AuthService', () => {
           provide: UsersService,
           useValue: {
             findOne: jest.fn(),
+            findByLoginIdentifier: jest.fn(),
             updateOne: jest.fn(),
             isSSOUser: jest.fn().mockResolvedValue(false),
           },
@@ -171,7 +172,7 @@ describe('AuthService', () => {
       authenticationDetails: [],
       resourceIntroducerPermissions: [],
     } as User;
-    jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
+    jest.spyOn(usersService, 'findByLoginIdentifier').mockResolvedValue(user);
 
     const authenticationDetail: Partial<AuthenticationDetail> = {
       userId: 1,
@@ -185,12 +186,12 @@ describe('AuthService', () => {
     // Mock bcrypt.compare to return true for correct password
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-    const isAuthenticated = await authService.getUserByUsernameAndAuthenticationDetails('testuser', {
+    const isAuthenticated = await authService.getUserByLoginIdentifierAndAuthenticationDetails('testuser', {
       type: AuthenticationType.LOCAL_PASSWORD,
       details: { password: 'correct-password' },
     });
 
-    expect(isAuthenticated).not.toBeNull();
+    expect(isAuthenticated).toBe(user);
     expect(bcrypt.compare).toHaveBeenCalledWith('correct-password', 'hashed-password');
   });
 
@@ -211,7 +212,7 @@ describe('AuthService', () => {
       authenticationDetails: [],
       resourceIntroducerPermissions: [],
     } as User;
-    jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
+    jest.spyOn(usersService, 'findByLoginIdentifier').mockResolvedValue(user);
 
     jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue({
       id: 1,
@@ -223,7 +224,7 @@ describe('AuthService', () => {
     // Mock bcrypt.compare to return false for incorrect password
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-    const isAuthenticated = await authService.getUserByUsernameAndAuthenticationDetails('testuser', {
+    const isAuthenticated = await authService.getUserByLoginIdentifierAndAuthenticationDetails('testuser', {
       type: AuthenticationType.LOCAL_PASSWORD,
       details: { password: 'wrong-password' },
     });
@@ -233,9 +234,9 @@ describe('AuthService', () => {
   });
 
   it('should not authenticate a non-existent user', async () => {
-    jest.spyOn(usersService, 'findOne').mockResolvedValue(null);
+    jest.spyOn(usersService, 'findByLoginIdentifier').mockResolvedValue(null);
 
-    const isAuthenticated = await authService.getUserByUsernameAndAuthenticationDetails('nonexistentuser', {
+    const isAuthenticated = await authService.getUserByLoginIdentifierAndAuthenticationDetails('nonexistentuser', {
       type: AuthenticationType.LOCAL_PASSWORD,
       details: { password: 'password' },
     });
@@ -244,6 +245,19 @@ describe('AuthService', () => {
     // A login attempt for an unknown username is the dominant brute-force vector
     // and must be counted as a failed login so the HighFailedLoginRate alert fires.
     expect(mockMetricsService.authLoginTotal.inc).toHaveBeenCalledWith({ method: 'local', status: 'fail' });
+  });
+
+  it.each([true, false])('checks the password before rejecting unverified email (valid=%s)', async (valid) => {
+    jest.spyOn(usersService, 'findByLoginIdentifier').mockResolvedValue({ id: 1, isEmailVerified: false } as User);
+    jest.spyOn(authenticationDetailRepository, 'findOne').mockResolvedValue({ password: 'hash' } as AuthenticationDetail);
+    (bcrypt.compare as jest.Mock).mockResolvedValue(valid);
+    const result = authService.getUserByLoginIdentifierAndAuthenticationDetails('user@example.com', {
+      type: AuthenticationType.LOCAL_PASSWORD, details: { password: ' password ' },
+    });
+    if (valid) await expect(result).rejects.toThrow('UserEmailNotVerifiedException');
+    else await expect(result).resolves.toBeNull();
+    expect(bcrypt.compare).toHaveBeenCalledWith(' password ', 'hash');
+    expect(usersService.findByLoginIdentifier).toHaveBeenCalledWith('user@example.com');
   });
 
   describe('findSSOAuthenticationDetail', () => {

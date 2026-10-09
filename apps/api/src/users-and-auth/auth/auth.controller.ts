@@ -28,13 +28,13 @@ export class AuthController {
   })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized - Invalid credentials',
+    description: 'Invalid credentials, or TwoFactorRequired after valid credentials when an authenticator code is needed',
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        username: { type: 'string' },
+        username: { type: 'string', description: 'Email address or username' },
         password: { type: 'string' },
         twoFactorCode: { type: 'string' },
         tokenLocation: { type: 'string', enum: ['cookie', 'body'] },

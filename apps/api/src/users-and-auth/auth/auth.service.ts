@@ -192,25 +192,20 @@ export class AuthService {
     });
   }
 
-  async getUserByUsernameAndAuthenticationDetails(
-    username: string,
+  async getUserByLoginIdentifierAndAuthenticationDetails(
+    identifier: string,
     options: AuthenticationOptions,
   ): Promise<User | null> {
     const method = options.type === AuthenticationType.LOCAL_PASSWORD ? 'local' : 'sso';
 
-    const user = await this.usersService.findOne({ username });
+    const user = await this.usersService.findByLoginIdentifier(identifier);
 
     if (!user) {
-      this.logger.debug(`No user found with username: ${username}`);
+      this.logger.debug('No user found for login identifier');
       // Unknown usernames are the dominant brute-force / credential-stuffing
       // vector, so they must be counted as failed logins for the alert to fire.
       this.metricsService.authLoginTotal.inc({ method, status: 'fail' });
       return null;
-    }
-
-    if (!user.isEmailVerified) {
-      this.logger.debug(`User ${user.id} email not verified`);
-      throw new UserEmailNotVerifiedException();
     }
 
     const isValid = await this.validateAuthenticationDetails(user.id, options);
@@ -218,6 +213,11 @@ export class AuthService {
       this.logger.debug(`Invalid authentication for user ID: ${user.id}`);
       this.metricsService.authLoginTotal.inc({ method, status: 'fail' });
       return null;
+    }
+
+    if (!user.isEmailVerified) {
+      this.logger.debug(`User ${user.id} email not verified`);
+      throw new UserEmailNotVerifiedException();
     }
 
     this.metricsService.authLoginTotal.inc({ method, status: 'success' });
