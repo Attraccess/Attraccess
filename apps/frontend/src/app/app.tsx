@@ -27,6 +27,7 @@ import { NotFound } from './not-found/index';
 import { BootScreen } from '../components/bootScreen/index';
 import { configureApiClient } from '../api/index';
 import { useLocaleSync } from '../hooks/useLocaleSync';
+import { useDateTimePreferencesSync } from '../hooks/useDateTimePreferencesSync';
 import { Unauthorized } from './unauthorized/unauthorized';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { hasRequiredPermissions } from './routes/routeAccess';
@@ -212,6 +213,7 @@ export function AppLayout(props: PropsWithChildren) {
 export function App() {
   const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
   useLocaleSync();
+  useDateTimePreferencesSync();
 
   configureApiClient();
 

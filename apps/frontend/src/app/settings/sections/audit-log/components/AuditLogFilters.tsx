@@ -1,3 +1,4 @@
+import { LocaleDateField } from '../../../../../components/localeDateField';
 import { Button, Input, Label, TextField } from '@heroui/react';
 import { FilterIcon, RefreshCwIcon, SearchIcon } from 'lucide-react';
 import { coreAuditDomains } from '../audit-log-model';
@@ -15,6 +16,11 @@ type Props = Pick<
   | 'pluginDomainEntries'
   | 'advanced'
   | 'filterError'
+  | 'fromDateValid'
+  | 'setFromDateValid'
+  | 'toDateValid'
+  | 'setToDateValid'
+  | 'dateFieldResetCount'
   | 'setAdvanced'
   | 'activeFilterCount'
   | 'clearFilters'
@@ -32,6 +38,11 @@ export function AuditLogFilters({
   pluginDomainEntries,
   advanced,
   filterError,
+  fromDateValid,
+  setFromDateValid,
+  toDateValid,
+  setToDateValid,
+  dateFieldResetCount,
   setAdvanced,
   activeFilterCount,
   clearFilters,
@@ -62,14 +73,26 @@ export function AuditLogFilters({
           <Label>{t('event')}</Label>
           <Input placeholder={t('eventPlaceholder')} />
         </TextField>
-        <TextField value={filters.from} onChange={(value) => updateFilter('from', value)} type="datetime-local">
-          <Label>{t('from')}</Label>
-          <Input />
-        </TextField>
-        <TextField value={filters.to} onChange={(value) => updateFilter('to', value)} type="datetime-local">
-          <Label>{t('to')}</Label>
-          <Input />
-        </TextField>
+        <LocaleDateField
+          key={`from-${dateFieldResetCount}`}
+          label={t('from')}
+          clearLabel={`${t('clearDate')}: ${t('from')}`}
+          value={filters.from}
+          onChange={(value) => updateFilter('from', value)}
+          onValidityChange={setFromDateValid}
+          errorMessage={t('invalidDate')}
+          withTime
+        />
+        <LocaleDateField
+          key={`to-${dateFieldResetCount}`}
+          label={t('to')}
+          clearLabel={`${t('clearDate')}: ${t('to')}`}
+          value={filters.to}
+          onChange={(value) => updateFilter('to', value)}
+          onValidityChange={setToDateValid}
+          errorMessage={t('invalidDate')}
+          withTime
+        />
       </div>
       {advanced && (
         <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
@@ -98,7 +121,7 @@ export function AuditLogFilters({
       )}
       {filterError && <Notice title={filterError} />}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" isDisabled={!fromDateValid || !toDateValid}>
           <SearchIcon size={16} />
           {t('search')}
         </Button>

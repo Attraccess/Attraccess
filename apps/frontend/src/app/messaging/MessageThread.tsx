@@ -13,7 +13,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { applyIncomingMessage } from './messageCache';
@@ -125,6 +125,7 @@ export function useMessageThreadState(props: Props) {
 }
 
 export function MessageThread(props: Props) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const {
     currentUserId,
     t,
@@ -196,7 +197,7 @@ export function MessageThread(props: Props) {
                     <span className="truncate">{message.referenceLabel}</span>
                   </Link>
                 )}
-                <span className="mt-0.5 text-tiny text-muted">{new Date(message.createdAt).toLocaleString()}</span>
+                <span className="mt-0.5 text-tiny text-muted">{formatDateTime(message.createdAt)}</span>
               </div>
             );
           })}

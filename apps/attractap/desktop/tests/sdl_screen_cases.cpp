@@ -32,3 +32,23 @@ void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshot
     Display::loop();
     lv_refr_now(nullptr);
 }
+
+void testSessionSummaryLifecycle()
+{
+    auto &summary = Display::sessionSummaryScreen;
+    summary.setSummary("München", 1440, "2,90 EUR");
+    Display::transitionToScreen(&summary); Display::loop(); lv_refr_now(nullptr);
+    assert(findLabel(lv_screen_active(), "Danke, München!"));
+    assert(findLabel(lv_screen_active(), "00:24:00"));
+    auto *root = summary.getScreen();
+    summary.init(); assert(summary.getScreen() == root);
+    Display::transitionToScreen(&Display::lockscreen); Display::loop();
+    assert(!summary.isLoaded());
+    summary.destroy(); // Safe even after router retirement.
+    summary.setSummary("Alex", UINT32_MAX, "");
+    Display::transitionToScreen(&summary); Display::loop(); lv_refr_now(nullptr);
+    assert(findLabel(lv_screen_active(), "1193046:28:15"));
+    assert(!findLabel(lv_screen_active(), "Abgerechnet"));
+    assert(!findLabel(lv_screen_active(), "2,90 EUR"));
+    Display::transitionToScreen(&Display::lockscreen); Display::loop();
+}

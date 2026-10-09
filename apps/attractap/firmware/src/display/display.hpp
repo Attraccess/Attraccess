@@ -15,6 +15,7 @@
 #include "screens/connectionConfiguration/connectionConfigurationScreen.hpp"
 #include "screens/init/initscreen.hpp"
 #include "screens/lockscreen/lockscreen.hpp"
+#include "screens/sessionSummary/sessionSummaryScreen.hpp"
 #include "screens/noResources/noResourcesScreen.hpp"
 #include "screens/resourceList/resourceListScreen.hpp"
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
@@ -52,6 +53,7 @@ public:
     static InitScreen initScreen;
     static Lockscreen lockscreen;
     static NoResourcesScreen noResourcesScreen;
+    static SessionSummaryScreen sessionSummaryScreen;
     static ResourceListScreen resourceListScreen;
     static ResourceDetailsScreen resourceDetailsScreen;
     static EnrollmentScreen enrollmentScreen;
@@ -68,6 +70,7 @@ public:
 
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
+    static uint32_t touchPressSequence;
 
     // Global error popup helpers
     static void showErrorPopup(const std::string &title, const std::string &message);
@@ -152,6 +155,7 @@ private:
     static void handleGestureSample(int16_t x, int16_t y, bool pressed);
 
     static lv_obj_t *drawerBackdrop;
+    static lv_obj_t *drawerGrabber;
     static lv_obj_t *drawerPanel;
     static lv_obj_t *rebootConfirmOverlay;
     static bool drawerOpen;

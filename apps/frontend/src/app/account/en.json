@@ -14,6 +14,10 @@
     "password": { "title": "Password", "description": "Change your sign-in password" },
     "twoFactor": { "title": "Two-factor authentication", "description": "Add an authenticator app" },
     "passkeys": { "title": "Passkeys", "description": "Manage passwordless sign-in" },
+    "dateTime": {
+      "title": "Date and time",
+      "description": "Choose a date/time locale independently of the app language"
+    },
     "notifications": { "title": "Notifications", "description": "Choose what reaches you and where" },
     "tokens": { "title": "API tokens", "description": "Manage access for integrations" },
     "delete": { "title": "Delete account", "description": "Request permanent account removal" }

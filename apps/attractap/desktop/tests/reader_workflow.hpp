@@ -31,6 +31,7 @@ struct ReaderWorkflow
     std::string longDescription;
     lv_area_t fullDescriptionBounds{};
     lv_obj_t *drawerSettingsBeforeLogin = nullptr;
+    lv_obj_t *networkBadge = nullptr;
     explicit ReaderWorkflow(const std::filesystem::path &output)
       : output(output),
         storage(std::filesystem::temp_directory_path() / ("att-880-reader-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))),
@@ -123,5 +124,6 @@ struct ReaderWorkflow
     void testFormsAndLogout();
     void testSupervisionAndCorrelation();
     void testIdentityAndPendingAuthentication();
+    void testSessionSummary();
     void testTimeouts();
 };

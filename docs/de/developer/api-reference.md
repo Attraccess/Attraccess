@@ -62,6 +62,24 @@ Die API verwendet **Session-Cookies** zur Authentifizierung. Wenn Sie sich über
 | **Billing** | `/api/billing` | Abrechnung und Transaktionen |
 | **Plugins** | `/api/plugins` | Plugin-Verwaltung |
 
+## Attractap-WebSocket: Sitzung beenden
+
+Der authentifizierte Leser sendet ein `EVENT` mit `data.type: "STOP_RESOURCE_USAGE_SESSION"` und `data.payload: { resourceId: number, requestId?: number }`. Die Antwort nutzt denselben Ereignistyp und übernimmt die optionale Anfrage-ID. Pflichtformulare verschieben das Beenden und die Erfolgsantwort bis zum Absenden. Fehler liefern `error: string` statt einer Erfolgsantwort.
+
+Bei Erfolg enthält die Antwort `success: true` und `endedOwnSession: boolean`: Der Eigentümer der beendeten Nutzung wird mit dem authentifizierten Akteur verglichen. `durationSeconds?: number` ist die vergangene Sitzungszeit aus den gespeicherten Start-/Endzeitpunkten, auf ganze Sekunden abgerundet und mindestens null. Ungültige oder fehlende Zeitpunkte lassen das Feld entfallen. Dies ist weder Betriebszeit noch abgerechnete Zeit.
+
+`billingSummary?: { amount: number, total: string }` erscheint nur für eine eigene Gebühr ungleich null. `amount` nutzt die Datenbank-Währungseinheiten; `total` ist der bestehende formatierte Währungs-/Credits-Text und wird unverändert angezeigt. Ein Fehler beim Laden der Gebühr macht das erfolgreiche Beenden nicht zum Fehler und entfernt Dauer/Eigentümer nicht. Neue Firmware akzeptiert ganze Dauern von 0–4294967295 und nutzt die bisherige Rückmeldung bei fehlenden oder ungültigen Zusammenfassungsdaten. Ältere Firmware ignoriert die zusätzlichen Felder.
+
+```json
+{"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":42,"endedOwnSession":true,"durationSeconds":1440,"billingSummary":{"amount":290,"total":"2,90 EUR"}}}}
+```
+
+Antwort ohne Gebühr (einschließlich Nullbeträgen):
+
+```json
+{"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":43,"endedOwnSession":true,"durationSeconds":1440}}}
+```
+
 ## Clients neu generieren
 
 Nach Änderungen an API-Endpunkten müssen die Client-Bibliotheken neu generiert werden, um sie mit dem Backend synchron zu halten. Die genauen Regenerierungsbefehle finden Sie in den Build-Skripten des Projekts.

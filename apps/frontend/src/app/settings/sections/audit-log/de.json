@@ -375,5 +375,6 @@
     "metrics.toggles.external": "Metriken externer Dienste",
     "metrics.toggles.sse": "Metriken der Live-Aktualisierung",
     "metrics.toggles.flow": "Metriken der Ressourcenabläufe"
-  }
+  },
+  "clearDate": "Datum löschen"
 }

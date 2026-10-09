@@ -17,7 +17,7 @@ import {
   AlertTitle,
 } from '@heroui/react';
 import { ChevronRightIcon, ShieldCheckIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   AuditSettingsDto,
   useSettingsServiceSettingsControllerUpdateAuditSettings,
@@ -54,6 +54,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';
 
 export function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const diff = changes(entry);
   const metadata = Object.entries(entry.details).filter(([key]) => !['before', 'after'].includes(key));
   return (
@@ -68,7 +69,7 @@ export function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate 
         <dt className="text-muted">{t('eventType')}</dt>
         <dd className="break-all">{entry.action}</dd>
         <dt className="text-muted">{t('time')}</dt>
-        <dd>{new Date(entry.at).toLocaleString()}</dd>
+        <dd>{formatDateTime(entry.at)}</dd>
         <dt className="text-muted">{t('actor')}</dt>
         <dd className="break-words">
           {actor(entry, t)}
@@ -429,6 +430,9 @@ export function useAuditLogSectionState() {
   const [advanced, setAdvanced] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterError, setFilterError] = useState<string>();
+  const [fromDateValid, setFromDateValid] = useState(true);
+  const [toDateValid, setToDateValid] = useState(true);
+  const [dateFieldResetCount, setDateFieldResetCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
   const [draft, setDraft] = useState<AuditSettingsDto>();
@@ -454,12 +458,14 @@ export function useAuditLogSectionState() {
   const updateFilter = (key: keyof AuditFilters, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
   const clearFilters = () => {
+    setDateFieldResetCount((count) => count + 1);
     setFilters(emptyFilters);
     setApplied(emptyFilters);
     setCursors([undefined]);
     setFilterError(undefined);
   };
   const applyFilters = () => {
+    if (!fromDateValid || !toDateValid) return;
     const result = filterRequest(filters, meta.data?.subjectTypes);
     if (result.error) {
       setFilterError(t(result.error));
@@ -514,6 +520,11 @@ export function useAuditLogSectionState() {
     filtersOpen,
     setFiltersOpen,
     filterError,
+    fromDateValid,
+    setFromDateValid,
+    toDateValid,
+    setToDateValid,
+    dateFieldResetCount,
     exporting,
     exportError,
     setDraft,
@@ -538,6 +549,7 @@ export function useAuditLogSectionState() {
 type Props = Pick<ReturnType<typeof useAuditLogSectionState>, 'items' | 't' | 'domainLabel' | 'setSelected'>;
 
 export function MobileEntries({ items, t, domainLabel, setSelected }: Props) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   return (
     <div className="space-y-3 md:hidden">
       {items.map((entry) => (
@@ -546,7 +558,7 @@ export function MobileEntries({ items, t, domainLabel, setSelected }: Props) {
             <div className="flex justify-between gap-3">
               <Chip size="sm">{domainLabel(entry.domain)}</Chip>
               <time className="text-xs text-muted" dateTime={entry.at}>
-                {new Date(entry.at).toLocaleString()}
+                {formatDateTime(entry.at)}
               </time>
             </div>
             <Card.Title>{auditLabel('events', entry.action, t)}</Card.Title>

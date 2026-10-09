@@ -118,6 +118,10 @@ export class User {
   })
   locale!: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  @ApiProperty({ type: String, nullable: true, description: 'Formatting locale; null follows app language' })
+  dateTimeLocale!: string | null;
+
   @Column({ default: false, type: 'boolean' })
   @ApiProperty({
     description: 'Whether the user has verified their email address',

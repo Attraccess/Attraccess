@@ -173,6 +173,20 @@ bool Application::processConnectionState()
 bool Application::processCardFlowState()
 {
 #ifdef HAS_LVGL_DISPLAY
+  if (this->sessionSummaryActive) {
+    // Late card-auth replies cannot interrupt a member's completed stop.
+    if (this->externalState == EXTERNAL_STATE_AUTHENTICATE_CARD)
+      this->externalState = EXTERNAL_STATE_NONE;
+    if (this->externalState != EXTERNAL_STATE_NONE) {
+      const auto interrupt = this->externalState;
+      this->dismissSessionSummary();
+      this->externalState = interrupt;
+    } else {
+      if (this->sessionSummaryDismissRequested || (this->sessionSummaryVisible &&
+          millis() - this->sessionSummaryShownAt >= 3500)) this->dismissSessionSummary();
+      else return true;
+    }
+  }
   // Enrollment is a sticky, self-contained sub-flow. Once started it owns the
   // screen until success, cancel or timeout — the generic routing below must
   // never run while enrolling, otherwise the enrollment screen gets stolen.

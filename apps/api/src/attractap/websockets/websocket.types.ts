@@ -38,3 +38,12 @@ export interface ResourceUsageStatsPayload {
     }[];
   } | null;
 }
+
+/** Additive stop reply; requestId is copied by the reply helper. */
+export interface StopResourceUsageSessionPayload {
+  success: true;
+  requestId?: number;
+  durationSeconds?: number;
+  endedOwnSession: boolean;
+  billingSummary?: { amount: number; total: string };
+}

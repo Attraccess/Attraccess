@@ -117,56 +117,47 @@ describe('AttractapSessionHandler – session + flow button', () => {
   });
 
   describe('handleStartResourceUsageSession', () => {
-    const handleStartResourceUsageSessionScope = createHandleStartResourceUsageSessionFixture(scope);
+    const fixture = createHandleStartResourceUsageSessionFixture(scope);
 
     it('returns early and does not start a session when the guard rejects the action', async () => {
-      handleStartResourceUsageSessionScope.mockResourceActionGuard.validateResourceAction.mockResolvedValueOnce(false);
+      fixture.mockResourceActionGuard.validateResourceAction.mockResolvedValueOnce(false);
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockResourceActionGuard.validateResourceAction).toHaveBeenCalledWith(
-        handleStartResourceUsageSessionScope.mockSocket,
+      expect(fixture.mockResourceActionGuard.validateResourceAction).toHaveBeenCalledWith(
+        fixture.mockSocket,
         10,
         AttractapEventType.START_RESOURCE_USAGE_SESSION,
         undefined,
       );
-      expect(handleStartResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
-      expect(handleStartResourceUsageSessionScope.mockResourceUsageService.startSession).not.toHaveBeenCalled();
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).not.toHaveBeenCalled();
+      expect(fixture.mockFormsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
+      expect(fixture.mockResourceUsageService.startSession).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).not.toHaveBeenCalled();
     });
 
     it('returns early when forms are not satisfied (ensureFormsSatisfied returns null)', async () => {
-      handleStartResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(null);
+      fixture.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(null);
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith({
-        socket: handleStartResourceUsageSessionScope.mockSocket,
+      expect(fixture.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith({
+        socket: fixture.mockSocket,
         resourceId: 10,
         action: ResourceFormAction.START,
       });
-      expect(handleStartResourceUsageSessionScope.mockUsersService.findOne).not.toHaveBeenCalled();
-      expect(handleStartResourceUsageSessionScope.mockResourceUsageService.startSession).not.toHaveBeenCalled();
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).not.toHaveBeenCalled();
+      expect(fixture.mockUsersService.findOne).not.toHaveBeenCalled();
+      expect(fixture.mockResourceUsageService.startSession).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).not.toHaveBeenCalled();
     });
 
     it('sends USER_NOT_FOUND when the authenticated user does not exist', async () => {
-      handleStartResourceUsageSessionScope.mockUsersService.findOne.mockResolvedValueOnce(null);
+      fixture.mockUsersService.findOne.mockResolvedValueOnce(null);
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockUsersService.findOne).toHaveBeenCalledWith({ id: 1 });
-      expect(handleStartResourceUsageSessionScope.mockResourceUsageService.startSession).not.toHaveBeenCalled();
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockUsersService.findOne).toHaveBeenCalledWith({ id: 1 });
+      expect(fixture.mockResourceUsageService.startSession).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
@@ -178,25 +169,22 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
     it('starts the session, clears the form draft and sends success', async () => {
       const formSubmissions = [{ id: 99 }];
-      handleStartResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(formSubmissions);
+      fixture.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(formSubmissions);
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockResourceUsageService.startSession).toHaveBeenCalledWith(
+      expect(fixture.mockResourceUsageService.startSession).toHaveBeenCalledWith(
         10,
-        handleStartResourceUsageSessionScope.mockUser,
+        fixture.mockUser,
         { projectId: 7, formSubmissions },
         { auditOrigin: { actorId: 1, authenticationMethod: null } },
       );
-      expect(handleStartResourceUsageSessionScope.mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(
-        handleStartResourceUsageSessionScope.mockSocket,
+      expect(fixture.mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(
+        fixture.mockSocket,
         10,
         ResourceFormAction.START,
       );
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
@@ -207,27 +195,24 @@ describe('AttractapSessionHandler – session + flow button', () => {
     });
 
     it('attaches the supervisor and settles the web request for a two-card supervised start', async () => {
-      (handleStartResourceUsageSessionScope.mockSocket.state as any).supervisionFlow = {
+      (fixture.mockSocket.state as any).supervisionFlow = {
         resourceId: 10,
         requesterUserId: 1,
         requestId: 'req-1',
         approvedSupervisorUserId: 2,
       };
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockResourceUsageService.startSession).toHaveBeenCalledWith(
+      expect(fixture.mockResourceUsageService.startSession).toHaveBeenCalledWith(
         10,
-        handleStartResourceUsageSessionScope.mockUser,
+        fixture.mockUser,
         { projectId: 7, formSubmissions: [] },
         { supervisorUserId: 2, auditOrigin: { actorId: 1, authenticationMethod: null } },
       );
-      expect(handleStartResourceUsageSessionScope.mockSupervisionService.settleByCard).toHaveBeenCalledWith('req-1');
-      expect((handleStartResourceUsageSessionScope.mockSocket.state as any).supervisionFlow).toBeNull();
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSupervisionService.settleByCard).toHaveBeenCalledWith('req-1');
+      expect((fixture.mockSocket.state as any).supervisionFlow).toBeNull();
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
@@ -239,35 +224,23 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
     it('echoes the originating request id on success and error', async () => {
       const request = {
-        ...handleStartResourceUsageSessionScope.eventData,
-        payload: { ...handleStartResourceUsageSessionScope.eventData.payload, requestId: 880 },
+        ...fixture.eventData,
+        payload: { ...fixture.eventData.payload, requestId: 880 },
       };
-      await handleStartResourceUsageSessionScope.handler.handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        request,
-      );
-      expect(
-        handleStartResourceUsageSessionScope.mockSocket.sendMessage.mock.calls.at(-1)[0].data.payload,
-      ).toMatchObject({
+      await fixture.handler.handleStartResourceUsageSession(fixture.mockSocket, request);
+      expect(fixture.mockSocket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({
         success: true,
         requestId: 880,
       });
-      expect(handleStartResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith(
+      expect(fixture.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith(
         expect.objectContaining({ requestId: 880 }),
       );
-      handleStartResourceUsageSessionScope.mockResourceUsageService.startSession.mockRejectedValueOnce(
-        new Error('Start failed'),
-      );
-      await handleStartResourceUsageSessionScope.handler.handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        {
-          ...request,
-          payload: { ...request.payload, requestId: 881 },
-        },
-      );
-      expect(
-        handleStartResourceUsageSessionScope.mockSocket.sendMessage.mock.calls.at(-1)[0].data.payload,
-      ).toMatchObject({
+      fixture.mockResourceUsageService.startSession.mockRejectedValueOnce(new Error('Start failed'));
+      await fixture.handler.handleStartResourceUsageSession(fixture.mockSocket, {
+        ...request,
+        payload: { ...request.payload, requestId: 881 },
+      });
+      expect(fixture.mockSocket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({
         error: 'Start failed',
         requestId: 881,
       });
@@ -277,13 +250,13 @@ describe('AttractapSessionHandler – session + flow button', () => {
       const resourceInUseErrorHandlingScope = inheritTestScope(
         {
           get parentScope() {
-            return handleStartResourceUsageSessionScope;
+            return fixture;
           },
           get eventData() {
-            return handleStartResourceUsageSessionScope.eventData;
+            return fixture.eventData;
           },
         },
-        handleStartResourceUsageSessionScope,
+        fixture,
       );
 
       beforeEach(() => {
@@ -322,18 +295,13 @@ describe('AttractapSessionHandler – session + flow button', () => {
     });
 
     it('sends INSUFFICIENT_BALANCE with sumUpEnabled for InsufficientBalanceError', async () => {
-      handleStartResourceUsageSessionScope.mockResourceUsageService.startSession.mockRejectedValueOnce(
-        new InsufficientBalanceError(),
-      );
-      handleStartResourceUsageSessionScope.mockSumUpService.getIsEnabled.mockResolvedValueOnce(true);
+      fixture.mockResourceUsageService.startSession.mockRejectedValueOnce(new InsufficientBalanceError());
+      fixture.mockSumUpService.getIsEnabled.mockResolvedValueOnce(true);
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockSumUpService.getIsEnabled).toHaveBeenCalled();
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSumUpService.getIsEnabled).toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
@@ -344,18 +312,13 @@ describe('AttractapSessionHandler – session + flow button', () => {
     });
 
     it('sends INSUFFICIENT_BALANCE for a plain error whose message is INSUFFICIENT_BALANCE', async () => {
-      handleStartResourceUsageSessionScope.mockResourceUsageService.startSession.mockRejectedValueOnce(
-        new Error('INSUFFICIENT_BALANCE'),
-      );
-      handleStartResourceUsageSessionScope.mockSumUpService.getIsEnabled.mockResolvedValueOnce(false);
+      fixture.mockResourceUsageService.startSession.mockRejectedValueOnce(new Error('INSUFFICIENT_BALANCE'));
+      fixture.mockSumUpService.getIsEnabled.mockResolvedValueOnce(false);
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockSumUpService.getIsEnabled).toHaveBeenCalled();
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSumUpService.getIsEnabled).toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
@@ -366,20 +329,15 @@ describe('AttractapSessionHandler – session + flow button', () => {
     });
 
     it('sends the raw error message and logs for any other error', async () => {
-      handleStartResourceUsageSessionScope.mockResourceUsageService.startSession.mockRejectedValueOnce(
-        new Error('boom'),
-      );
+      fixture.mockResourceUsageService.startSession.mockRejectedValueOnce(new Error('boom'));
 
-      await (handleStartResourceUsageSessionScope.handler as any).handleStartResourceUsageSession(
-        handleStartResourceUsageSessionScope.mockSocket,
-        handleStartResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStartResourceUsageSessionScope.mockSumUpService.getIsEnabled).not.toHaveBeenCalled();
-      expect((handleStartResourceUsageSessionScope.handler as any).logger.error).toHaveBeenCalledWith(
+      expect(fixture.mockSumUpService.getIsEnabled).not.toHaveBeenCalled();
+      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to start resource usage session'),
       );
-      expect(handleStartResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
@@ -391,29 +349,37 @@ describe('AttractapSessionHandler – session + flow button', () => {
   });
 
   describe('handleStopResourceUsageSession', () => {
-    const handleStopResourceUsageSessionScope = createHandleStopResourceUsageSessionFixture(scope);
+    const fixture = createHandleStopResourceUsageSessionFixture(scope);
 
     it('sends the final charge with configured precision and the action request ID', async () => {
-      handleStopResourceUsageSessionScope.mockBillingService.getResourceUsageCharge.mockResolvedValue({
+      fixture.mockResourceUsageService.endSession.mockResolvedValue({
+        id: 99,
+        userId: 1,
+        startTime: new Date(0),
+        endTime: new Date(1426999),
+      });
+      fixture.mockBillingService.getResourceUsageCharge.mockResolvedValue({
         amount: -1234,
       });
-      handleStopResourceUsageSessionScope.mockBillingService.getConfiguration.mockResolvedValue({
+      fixture.mockBillingService.getConfiguration.mockResolvedValue({
         currency: 'KWD',
         minorUnit: 3,
       });
-      await handleStopResourceUsageSessionScope.handler.handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket as any,
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
         {
           payload: { resourceId: 10, requestId: 5 },
         } as AttractapEvent['data'],
       );
-      expect(handleStopResourceUsageSessionScope.mockBillingService.getResourceUsageCharge).toHaveBeenCalledWith(99, 1);
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockBillingService.getResourceUsageCharge).toHaveBeenCalledWith(99, 1);
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             payload: {
               success: true,
               requestId: 5,
+              endedOwnSession: true,
+              durationSeconds: 1426,
               billingSummary: { amount: 1234, total: '1,234 KWD' },
             },
           }),
@@ -422,96 +388,137 @@ describe('AttractapSessionHandler – session + flow button', () => {
     });
 
     it.each([null, { amount: 0 }])('omits the summary for an absent or zero charge (%p)', async (charge) => {
-      handleStopResourceUsageSessionScope.mockBillingService.getResourceUsageCharge.mockResolvedValue(charge);
-      await handleStopResourceUsageSessionScope.handler.handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket as any,
+      fixture.mockBillingService.getResourceUsageCharge.mockResolvedValue(charge);
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
         {
           payload: { resourceId: 10 },
         } as AttractapEvent['data'],
       );
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ payload: { success: true } }),
+          data: expect.objectContaining({ payload: { success: true, endedOwnSession: true } }),
         }),
       );
-      expect(handleStopResourceUsageSessionScope.mockBillingService.getConfiguration).not.toHaveBeenCalled();
+      expect(fixture.mockBillingService.getConfiguration).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [0, 0],
+      [999, 0],
+      [1426999, 1426],
+      [100 * 3600000, 360000],
+      [-1000, 0],
+    ])('uses committed timestamps for elapsed duration (%i ms)', async (elapsed, seconds) => {
+      fixture.mockResourceUsageService.endSession.mockResolvedValue({
+        id: 99,
+        userId: 1,
+        startTime: new Date(0),
+        endTime: new Date(elapsed),
+      });
+      fixture.mockBillingService.getResourceUsageCharge.mockRejectedValue(new Error('billing unavailable'));
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
+        {
+          payload: { resourceId: 10, requestId: 8 },
+        } as AttractapEvent['data'],
+      );
+      expect(fixture.mockSocket.sendMessage.mock.calls[0][0].data.payload).toEqual({
+        success: true,
+        endedOwnSession: true,
+        durationSeconds: seconds,
+        requestId: 8,
+      });
+      expect(fixture.mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    });
+
+    it.each([null, undefined, new Date(NaN)])('omits unavailable duration (%p)', async (endTime) => {
+      fixture.mockResourceUsageService.endSession.mockResolvedValue({
+        id: 99,
+        userId: 1,
+        startTime: new Date(0),
+        endTime,
+      });
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
+        {
+          payload: { resourceId: 10 },
+        } as AttractapEvent['data'],
+      );
+      expect(fixture.mockSocket.sendMessage.mock.calls[0][0].data.payload).toEqual({
+        success: true,
+        endedOwnSession: true,
+      });
     });
 
     it('does not expose another user’s charge when an administrator ends their session', async () => {
-      handleStopResourceUsageSessionScope.mockResourceUsageService.endSession.mockResolvedValue({ id: 99, userId: 2 });
-      await handleStopResourceUsageSessionScope.handler.handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket as any,
+      fixture.mockResourceUsageService.endSession.mockResolvedValue({ id: 99, userId: 2 });
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
         {
           payload: { resourceId: 10 },
         } as AttractapEvent['data'],
       );
-      expect(handleStopResourceUsageSessionScope.mockBillingService.getResourceUsageCharge).not.toHaveBeenCalled();
+      expect(fixture.mockBillingService.getResourceUsageCharge).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage.mock.calls[0][0].data.payload).toEqual({
+        success: true,
+        endedOwnSession: false,
+      });
     });
 
     it('keeps the action successful if the receipt lookup fails after ending the session', async () => {
-      handleStopResourceUsageSessionScope.mockBillingService.getResourceUsageCharge.mockRejectedValue(
-        new Error('billing unavailable'),
-      );
-      await handleStopResourceUsageSessionScope.handler.handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket as any,
+      fixture.mockBillingService.getResourceUsageCharge.mockRejectedValue(new Error('billing unavailable'));
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
         {
           payload: { resourceId: 10 },
         } as AttractapEvent['data'],
       );
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ payload: { success: true } }),
+          data: expect.objectContaining({ payload: { success: true, endedOwnSession: true } }),
         }),
       );
     });
 
     it('returns early and does not end a session when the guard rejects the action', async () => {
-      handleStopResourceUsageSessionScope.mockResourceActionGuard.validateResourceAction.mockResolvedValueOnce(false);
+      fixture.mockResourceActionGuard.validateResourceAction.mockResolvedValueOnce(false);
 
-      await (handleStopResourceUsageSessionScope.handler as any).handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket,
-        handleStopResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStopResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStopResourceUsageSessionScope.mockResourceActionGuard.validateResourceAction).toHaveBeenCalledWith(
-        handleStopResourceUsageSessionScope.mockSocket,
+      expect(fixture.mockResourceActionGuard.validateResourceAction).toHaveBeenCalledWith(
+        fixture.mockSocket,
         10,
         AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
         undefined,
       );
-      expect(handleStopResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
-      expect(handleStopResourceUsageSessionScope.mockResourceUsageService.endSession).not.toHaveBeenCalled();
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).not.toHaveBeenCalled();
+      expect(fixture.mockFormsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
+      expect(fixture.mockResourceUsageService.endSession).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).not.toHaveBeenCalled();
     });
 
     it('returns early when forms are not satisfied (ensureFormsSatisfied returns null)', async () => {
-      handleStopResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(null);
+      fixture.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(null);
 
-      await (handleStopResourceUsageSessionScope.handler as any).handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket,
-        handleStopResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStopResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStopResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith({
-        socket: handleStopResourceUsageSessionScope.mockSocket,
+      expect(fixture.mockFormsHandler.ensureFormsSatisfied).toHaveBeenCalledWith({
+        socket: fixture.mockSocket,
         resourceId: 10,
         action: ResourceFormAction.END,
       });
-      expect(handleStopResourceUsageSessionScope.mockUsersService.findOne).not.toHaveBeenCalled();
-      expect(handleStopResourceUsageSessionScope.mockResourceUsageService.endSession).not.toHaveBeenCalled();
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).not.toHaveBeenCalled();
+      expect(fixture.mockUsersService.findOne).not.toHaveBeenCalled();
+      expect(fixture.mockResourceUsageService.endSession).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).not.toHaveBeenCalled();
     });
 
     it('sends USER_NOT_FOUND when the authenticated user does not exist', async () => {
-      handleStopResourceUsageSessionScope.mockUsersService.findOne.mockResolvedValueOnce(null);
+      fixture.mockUsersService.findOne.mockResolvedValueOnce(null);
 
-      await (handleStopResourceUsageSessionScope.handler as any).handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket,
-        handleStopResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStopResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStopResourceUsageSessionScope.mockResourceUsageService.endSession).not.toHaveBeenCalled();
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockResourceUsageService.endSession).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
@@ -523,51 +530,43 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
     it('ends the session, clears the form draft and sends success', async () => {
       const formSubmissions = [{ id: 5 }];
-      handleStopResourceUsageSessionScope.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(formSubmissions);
+      fixture.mockFormsHandler.ensureFormsSatisfied.mockResolvedValueOnce(formSubmissions);
 
-      await (handleStopResourceUsageSessionScope.handler as any).handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket,
-        handleStopResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStopResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect(handleStopResourceUsageSessionScope.mockResourceUsageService.endSession).toHaveBeenCalledWith(
+      expect(fixture.mockResourceUsageService.endSession).toHaveBeenCalledWith(
         10,
-        handleStopResourceUsageSessionScope.mockUser,
+        fixture.mockUser,
         { formSubmissions },
         {
           auditOrigin: { actorId: 1, authenticationMethod: null },
         },
       );
-      expect(handleStopResourceUsageSessionScope.mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(
-        handleStopResourceUsageSessionScope.mockSocket,
+      expect(fixture.mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(
+        fixture.mockSocket,
         10,
         ResourceFormAction.END,
       );
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
-            payload: { success: true },
+            payload: { success: true, endedOwnSession: true },
           }),
         }),
       );
     });
 
     it('sends the error message and logs when ending the session fails', async () => {
-      handleStopResourceUsageSessionScope.mockResourceUsageService.endSession.mockRejectedValueOnce(
-        new Error('stop failed'),
-      );
+      fixture.mockResourceUsageService.endSession.mockRejectedValueOnce(new Error('stop failed'));
 
-      await (handleStopResourceUsageSessionScope.handler as any).handleStopResourceUsageSession(
-        handleStopResourceUsageSessionScope.mockSocket,
-        handleStopResourceUsageSessionScope.eventData,
-      );
+      await (fixture.handler as any).handleStopResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
-      expect((handleStopResourceUsageSessionScope.handler as any).logger.error).toHaveBeenCalledWith(
+      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
         expect.stringContaining('Failed to stop resource usage session'),
       );
-      expect(handleStopResourceUsageSessionScope.mockFormsHandler.clearFormDraft).not.toHaveBeenCalled();
-      expect(handleStopResourceUsageSessionScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+      expect(fixture.mockFormsHandler.clearFormDraft).not.toHaveBeenCalled();
+      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.STOP_RESOURCE_USAGE_SESSION,

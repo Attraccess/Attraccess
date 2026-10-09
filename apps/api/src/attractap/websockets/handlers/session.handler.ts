@@ -23,6 +23,7 @@ import {
   AttractapEventType,
   AuthenticatedWebSocket,
   ResourceUsageStatsPayload,
+  StopResourceUsageSessionPayload,
 } from '../websocket.types';
 
 import { AttractapFormsHandler } from './forms.handler';
@@ -395,6 +396,10 @@ export class AttractapSessionHandler {
         },
       );
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
+      const start = usage?.startTime ? new Date(usage.startTime).getTime() : NaN;
+      const end = usage?.endTime ? new Date(usage.endTime).getTime() : NaN;
+      const durationSeconds =
+        Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, Math.floor((end - start) / 1000)) : undefined;
       // Billing lookup failures must not turn an already-ended session into a failed action.
       let billingSummary: { amount: number; total: string } | undefined;
       try {
@@ -415,8 +420,10 @@ export class AttractapSessionHandler {
       }
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, {
         success: true,
+        endedOwnSession: usage?.userId === user.id,
+        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
         ...(billingSummary ? { billingSummary } : {}),
-      });
+      } satisfies StopResourceUsageSessionPayload);
     } catch (error) {
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });

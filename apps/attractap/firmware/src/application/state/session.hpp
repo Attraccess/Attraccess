@@ -1,10 +1,19 @@
 #pragma once
 #include "../dependencies.hpp"
 #include "runtime.hpp"
+#include <atomic>
 
 struct ApplicationSessionState : protected ApplicationRuntimeState
 {
 protected:
+#if defined(HAS_LVGL_DISPLAY)
+std::atomic<bool> sessionSummaryActive{false};
+bool sessionSummaryVisible = false;
+std::atomic<bool> sessionSummaryDismissRequested{false};
+uint32_t sessionSummaryShownAt = 0;
+uint32_t sessionSummaryTouchSequence = 0;
+#endif
+
 #if defined(HAS_LVGL_DISPLAY)
 uint32_t timeOfUnlockedMs;
 #endif

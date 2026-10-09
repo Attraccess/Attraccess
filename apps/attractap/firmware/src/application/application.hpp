@@ -86,6 +86,8 @@ private:
     void showReaderActionProgress(const char *title);
     void finishReaderAction(bool success);
     void logoutReader();
+    void beginSessionSummary(const API::ActionResult &result);
+    void dismissSessionSummary();
     void finishCardAuthentication(bool success);
 
 #else

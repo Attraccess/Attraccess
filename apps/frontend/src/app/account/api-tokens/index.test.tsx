@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { ApiTokensCard } from './index';
 const state = vi.hoisted(() => ({
   loading: false,
@@ -20,6 +22,7 @@ const state = vi.hoisted(() => ({
   clipboard: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
+  useDateTimeLocale: () => 'en-GB',
   useTranslations: () => ({
     t: (key: string, params?: { name?: string }) => (params?.name ? `${key}:${params.name}` : key),
   }),
@@ -111,7 +114,15 @@ it('keeps form input after creation fails', async () => {
   state.create.mockRejectedValue(new Error('Unavailable'));
   open();
   fireEvent.change(screen.getByLabelText('nameLabel'), { target: { value: 'Integration' } });
-  fireEvent.change(screen.getByLabelText('expiryLabel'), { target: { value: '2027-01-01' } });
+  const user = userEvent.setup();
+  for (const [segment, value] of [
+    ['day', '01'],
+    ['month', '01'],
+    ['year', '2027'],
+  ]) {
+    await user.click(screen.getByRole('spinbutton', { name: new RegExp(`^${segment},`) }));
+    await user.keyboard(value);
+  }
   fireEvent.click(screen.getByRole('button', { name: 'resources.view' }));
   fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.createFailed', type: 'error' }));
@@ -123,7 +134,56 @@ it('keeps form input after creation fails', async () => {
     },
   });
   expect(screen.getByLabelText('nameLabel')).toHaveValue('Integration');
+  expect(screen.getByRole('spinbutton', { name: /^year,/ })).toHaveTextContent('2027');
   expect(state.refetch).not.toHaveBeenCalled();
+});
+it('blocks token creation with incomplete expiry segments and allows completion or clearing', async () => {
+  state.create.mockRejectedValue(new Error('Unavailable'));
+  const user = userEvent.setup();
+  open();
+  await user.type(screen.getByLabelText('nameLabel'), 'Integration');
+  await user.click(screen.getByRole('button', { name: 'resources.view' }));
+  const create = screen.getByRole('button', { name: 'actions.create' });
+  await user.click(screen.getByRole('spinbutton', { name: /^day,/ }));
+  await user.keyboard('23');
+  expect(create).toBeDisabled();
+  for (const [segment, value] of [
+    ['month', '11'],
+    ['year', '2026'],
+  ]) {
+    await user.click(screen.getByRole('spinbutton', { name: new RegExp(`^${segment},`) }));
+    await user.keyboard(value);
+  }
+  expect(create).toBeEnabled();
+  await user.click(screen.getByRole('spinbutton', { name: /^day,/ }));
+  await user.keyboard('{Backspace}{Backspace}');
+  expect(create).toBeDisabled();
+  expect(screen.getByText('invalidDate')).toBeInTheDocument();
+  await user.click(create);
+  expect(state.create).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('spinbutton', { name: /^day,/ }));
+  await user.keyboard('24');
+  expect(create).toBeEnabled();
+  await user.click(create);
+  await waitFor(() =>
+    expect(state.create).toHaveBeenCalledWith({
+      requestBody: {
+        name: 'Integration',
+        permissionKeys: ['resources.view'],
+        expiresAt: new Date('2026-11-24T00:00:00').toISOString(),
+      },
+    }),
+  );
+  await user.click(screen.getByRole('spinbutton', { name: /^day,/ }));
+  await user.keyboard('{Backspace}{Backspace}');
+  await user.click(screen.getByRole('button', { name: 'clearExpiry' }));
+  expect(create).toBeEnabled();
+  await user.click(create);
+  await waitFor(() =>
+    expect(state.create).toHaveBeenLastCalledWith({
+      requestBody: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
+    }),
+  );
 });
 it('shows token permissions and dates and handles revocation outcomes', async () => {
   state.tokens = [

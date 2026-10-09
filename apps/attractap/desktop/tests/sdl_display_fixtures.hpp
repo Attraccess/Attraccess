@@ -105,6 +105,7 @@ inline void expectReadableOption(lv_obj_t *label)
     assert(ratio >= 4.5);
 }
 
+void testSessionSummaryLifecycle();
 void testFormDrafts();
 void testPaymentPopup();
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots);

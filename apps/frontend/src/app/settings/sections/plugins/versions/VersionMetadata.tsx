@@ -1,3 +1,4 @@
+import { useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import type { usePluginsSectionState } from '../state/usePluginSettings';
 
@@ -14,13 +15,14 @@ export function VersionMetadata({
   majorApproved,
   setMajorApproved,
 }: Props) {
+  const formatDateTime = useDateTimeFormatter({ showTime: false });
   if (!selectedVersion) return null;
   return (
     <>
       {selectedVersion.publishedAt ? (
         <p>
           {t('versionManagement.published', {
-            date: new Date(selectedVersion.publishedAt).toLocaleDateString(),
+            date: formatDateTime(selectedVersion.publishedAt),
           })}
         </p>
       ) : null}

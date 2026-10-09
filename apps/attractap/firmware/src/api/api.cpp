@@ -247,6 +247,11 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
                 summary["amount"].is<int64_t>() && summary["amount"].as<int64_t>() != 0 &&
                 summary["total"].is<const char *>())
                 result.billingTotal = summary["total"].as<std::string>();
+            JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
+            result.hasDuration = payload["durationSeconds"].is<uint32_t>();
+            if (result.hasDuration) result.durationSeconds = payload["durationSeconds"].as<uint32_t>();
+            result.hasOwnership = payload["endedOwnSession"].is<bool>();
+            if (result.hasOwnership) result.endedOwnSession = payload["endedOwnSession"].as<bool>();
             this->actionResultCallback(result);
         }
     }

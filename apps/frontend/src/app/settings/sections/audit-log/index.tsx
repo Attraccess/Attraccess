@@ -1,3 +1,4 @@
+import { useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Button, Tabs, Spinner, Table } from '@heroui/react';
 import { DownloadIcon, ChevronLeftIcon, ChevronRightIcon, FilterIcon, HistoryIcon } from 'lucide-react';
 import {
@@ -26,6 +27,11 @@ type Props = Pick<
   | 'pluginDomainEntries'
   | 'advanced'
   | 'filterError'
+  | 'fromDateValid'
+  | 'setFromDateValid'
+  | 'toDateValid'
+  | 'setToDateValid'
+  | 'dateFieldResetCount'
   | 'setAdvanced'
   | 'clearFilters'
   | 'activity'
@@ -49,6 +55,11 @@ export function AuditLogSectionTabsPanel({
   pluginDomainEntries,
   advanced,
   filterError,
+  fromDateValid,
+  setFromDateValid,
+  toDateValid,
+  setToDateValid,
+  dateFieldResetCount,
   setAdvanced,
   clearFilters,
   activity,
@@ -59,6 +70,8 @@ export function AuditLogSectionTabsPanel({
   setSelected,
   cursors,
 }: Props) {
+  const formatDate = useDateTimeFormatter({ showTime: false });
+  const formatTime = useDateTimeFormatter({ showDate: false, showSeconds: true });
   return (
     <Tabs.Panel id="activity" className="space-y-5 pt-5">
       <Button
@@ -82,6 +95,11 @@ export function AuditLogSectionTabsPanel({
           pluginDomainEntries,
           advanced,
           filterError,
+          fromDateValid,
+          setFromDateValid,
+          toDateValid,
+          setToDateValid,
+          dateFieldResetCount,
           setAdvanced,
           activeFilterCount,
           clearFilters,
@@ -146,9 +164,9 @@ export function AuditLogSectionTabsPanel({
                         </Table.Cell>
                         <Table.Cell>
                           <time className="whitespace-nowrap text-xs text-muted" dateTime={entry.at}>
-                            {new Date(entry.at).toLocaleDateString()}
+                            {formatDate(entry.at)}
                             <br />
-                            {new Date(entry.at).toLocaleTimeString()}
+                            {formatTime(entry.at)}
                           </time>
                         </Table.Cell>
                         <Table.Cell>
@@ -221,6 +239,11 @@ export function AuditLogSection() {
     filtersOpen,
     setFiltersOpen,
     filterError,
+    fromDateValid,
+    setFromDateValid,
+    toDateValid,
+    setToDateValid,
+    dateFieldResetCount,
     exporting,
     exportError,
     setDraft,
@@ -287,6 +310,11 @@ export function AuditLogSection() {
             pluginDomainEntries,
             advanced,
             filterError,
+            fromDateValid,
+            setFromDateValid,
+            toDateValid,
+            setToDateValid,
+            dateFieldResetCount,
             setAdvanced,
             clearFilters,
             activity,

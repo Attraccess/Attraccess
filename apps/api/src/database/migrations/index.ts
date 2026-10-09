@@ -180,3 +180,5 @@ export { RfidCardManagementPermission1791000000000 } from './1791000000000-rfid-
 export { RefreshResponsiveMeterReceipt1791100000000 } from './1791100000000-refresh-responsive-meter-receipt';
 export { RefreshMeterEvidenceReceipt1791200000000 } from './1791200000000-refresh-meter-evidence-receipt';
 export { RefreshMeterReceiptTotals1791300000000 } from './1791300000000-refresh-meter-receipt-totals';
+export { UserDateTimePreferences1791400000000 } from './1791400000000-user-date-time-preferences';
+export { UserDateTimeLocale1791500000000 } from './1791500000000-user-date-time-locale';

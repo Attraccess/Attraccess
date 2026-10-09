@@ -7,6 +7,7 @@ import { renderAttractapDiagnosticsReports } from './Reports';
 export function AttractapDiagnostics(props: Readonly<Props>) {
   const {
     t,
+    formatDateTime,
     expandedReports,
     toggleBacktrace,
     reports,
@@ -64,9 +65,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                   key={report.id}
                   className="flex-1 rounded-t-sm min-w-[6px]"
                   style={{ height: `${heightPct}%`, backgroundColor: 'var(--accent)' }}
-                  title={`${formatBytes(report.heapFreeBytes, fallback)} — ${new Date(
-                    report.createdAt,
-                  ).toLocaleString()}`}
+                  title={`${formatBytes(report.heapFreeBytes, fallback)} — ${formatDateTime(report.createdAt)}`}
                 />
               );
             })}
@@ -80,6 +79,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
           {reports.map((report) =>
             renderAttractapDiagnosticsReports(report, {
               t,
+              formatDateTime,
               fallback,
               toggleBacktrace,
               expandedReports,

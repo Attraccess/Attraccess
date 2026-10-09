@@ -25,7 +25,10 @@ const state = vi.hoisted(() => ({
   success: undefined as undefined | ((value: unknown) => void),
   client: {},
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: (key: string) => key }),
+}));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => state.client }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),

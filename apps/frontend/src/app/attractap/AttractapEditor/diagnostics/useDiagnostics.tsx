@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';
 import { OpenAPI, useAttractapServiceGetReaderCrashReports } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -9,6 +9,7 @@ export interface Props {
 }
 
 export function useAttractapDiagnosticsState(props: Readonly<Props>) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { t } = useTranslations({ de, en });
   const toast = useToastMessage();
   const [expandedReports, setExpandedReports] = useState<Record<number, boolean>>({});
@@ -66,6 +67,7 @@ export function useAttractapDiagnosticsState(props: Readonly<Props>) {
   const fallback = t('notAvailable');
   return {
     t,
+    formatDateTime,
     expandedReports,
     toggleBacktrace,
     reports,

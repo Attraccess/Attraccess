@@ -9,7 +9,7 @@ void ReaderWorkflow::testListAndAuthentication()
            static_cast<int32_t>(bootDeadline - millis()) > 0)
         pump();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    auto *networkBadge = lv_obj_get_parent(label(lv_layer_top(), "OK NET"));
+    networkBadge = lv_obj_get_parent(label(lv_layer_top(), "OK NET"));
     assert(lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
     setQuality(State::NETWORK_QUALITY_DEGRADED); pump();
     assert(label(lv_layer_top(), "! NET") && !lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));

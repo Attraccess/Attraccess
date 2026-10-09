@@ -43,11 +43,14 @@ export function symbolicationChipColor(
 
 type Model = ReturnType<typeof useAttractapDiagnosticsState>;
 
-type Props = Pick<Model, 't' | 'fallback' | 'toggleBacktrace' | 'expandedReports' | 'downloadCoredump'>;
+type Props = Pick<
+  Model,
+  't' | 'formatDateTime' | 'fallback' | 'toggleBacktrace' | 'expandedReports' | 'downloadCoredump'
+>;
 
 export function renderAttractapDiagnosticsReports(
   report: NonNullable<Model['reports']>[number],
-  { t, fallback, toggleBacktrace, expandedReports, downloadCoredump }: Props,
+  { t, formatDateTime, fallback, toggleBacktrace, expandedReports, downloadCoredump }: Props,
 ) {
   return (
     <div
@@ -81,7 +84,7 @@ export function renderAttractapDiagnosticsReports(
             </Chip>
           )}
         </div>
-        <span className="text-xs text-default-400">{new Date(report.createdAt).toLocaleString()}</span>
+        <span className="text-xs text-default-400">{formatDateTime(report.createdAt)}</span>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
         <span className="text-default-500">

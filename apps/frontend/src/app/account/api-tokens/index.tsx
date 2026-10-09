@@ -1,3 +1,4 @@
+import { LocaleDateField } from '../../../components/localeDateField';
 import {
   Input,
   Label,
@@ -61,6 +62,7 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
   const [name, setName] = useState('');
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
   const [expiresAt, setExpiresAt] = useState('');
+  const [expiryValid, setExpiryValid] = useState(true);
   const [secret, setSecret] = useState<string | null>(null);
   const {
     data: tokenPage,
@@ -80,6 +82,7 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
   }, [isTokenListError, showToast, t]);
 
   const createToken = async () => {
+    if (!expiryValid) return;
     try {
       const created = await createApiToken({
         requestBody: {
@@ -129,6 +132,8 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
     setPermissionKeys,
     expiresAt,
     setExpiresAt,
+    expiryValid,
+    setExpiryValid,
     secret,
     setSecret,
     tokenPage,
@@ -156,6 +161,8 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     setPermissionKeys,
     expiresAt,
     setExpiresAt,
+    expiryValid,
+    setExpiryValid,
     secret,
     setSecret,
     tokenPage,
@@ -276,14 +283,19 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
           drawerClearCategoryLabel={t('picker.clearCategory')}
         />
       </div>
-      <TextField value={expiresAt} onChange={setExpiresAt} isDisabled={isCreating}>
-        <Label>{t('expiryLabel')}</Label>
-        <Input type="date" />
-      </TextField>
+      <LocaleDateField
+        clearLabel={t('clearExpiry')}
+        label={t('expiryLabel')}
+        value={expiresAt}
+        onChange={setExpiresAt}
+        onValidityChange={setExpiryValid}
+        errorMessage={t('invalidDate')}
+        isDisabled={isCreating}
+      />
       <Button
         onPress={createToken}
         isPending={isCreating}
-        isDisabled={!name.trim() || permissionKeys.size === 0 || isCreating}
+        isDisabled={!name.trim() || permissionKeys.size === 0 || !expiryValid || isCreating}
         data-cy="api-token-create-button"
       >
         <KeyRound size={16} />

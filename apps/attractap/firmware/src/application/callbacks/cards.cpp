@@ -120,6 +120,12 @@ void Application::setupCardCallbacks()
 void Application::setupNfcCallbacks()
 {
   auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength) {
+#ifdef HAS_LVGL_DISPLAY
+    if (this->sessionSummaryActive) {
+      this->sessionSummaryDismissRequested = true;
+      return; // consume this presentation; do not authenticate the next member
+    }
+#endif
     this->logger.infof("Card detected: %s",
                        hexToString(uid, uidLength).c_str());
 

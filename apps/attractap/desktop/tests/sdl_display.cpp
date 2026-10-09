@@ -25,6 +25,7 @@ int main(int argc, char **argv)
     assert(display.pollEvents());
     screenshot(screenshots, "device.png");
     testLockscreen(display, screenshots);
+    testSessionSummaryLifecycle();
     testFormDrafts();
     testPaymentPopup();
 

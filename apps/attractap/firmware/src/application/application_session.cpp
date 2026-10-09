@@ -114,6 +114,11 @@ void Application::handleProjectSelection(uint32_t projectId,
 }
 
 void Application::handleTouch(int16_t x, int16_t y) {
+  if (this->sessionSummaryActive) {
+    if (this->sessionSummaryVisible && Display::touchPressSequence != this->sessionSummaryTouchSequence)
+      this->sessionSummaryDismissRequested = true;
+    return;
+  }
   if (this->unlocked && this->actionInProgressCount == 0 && this->pendingUiAction.empty() && !this->waitingForResourceRefresh) {
     this->restartSessionTimeout();
   }
@@ -153,6 +158,10 @@ void Application::resetSessionOnDisconnect() {
     return;
   }
 
+  this->sessionSummaryActive = false;
+  this->sessionSummaryVisible = false;
+  this->sessionSummaryDismissRequested = false;
+  Display::sessionSummaryScreen.clearSummary();
   this->logger.info("Connectivity lost; resetting session state");
   Display::hidePopup();
 

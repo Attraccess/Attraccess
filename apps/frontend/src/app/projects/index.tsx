@@ -17,7 +17,7 @@ import {
   useProjectsServiceFindManyProjects,
   useProjectsServiceFindManyProjectsKey,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -62,6 +62,7 @@ export function useInvitationHighlight(hasInvitations: boolean) {
 }
 
 export function useProjectsListPageState() {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const page = 1;
   const [includeArchived, setIncludeArchived] = useState(false);
   const { data: projects, isLoading } = useProjectsServiceFindManyProjects({
@@ -169,7 +170,7 @@ export function useProjectsListPageState() {
           </div>
           <Chip variant="soft">{t(`invitations.roles.${invitation.requestedRole}` as const)}</Chip>
         </div>
-        <div className="text-tiny text-default-400">{new Date(invitation.createdAt).toLocaleString()}</div>
+        <div className="text-tiny text-default-400">{formatDateTime(invitation.createdAt)}</div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             variant="primary"
@@ -195,6 +196,7 @@ export function useProjectsListPageState() {
     decliningInvitationId,
     handleAccept,
     handleDecline,
+    formatDateTime,
     hasInvitations,
     highlightedInvitationId,
     invitations,

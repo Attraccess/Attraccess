@@ -13,6 +13,9 @@ export class CurrentUserDto {
   @ApiProperty()
   locale!: string;
 
+  @ApiProperty({ type: String, nullable: true })
+  dateTimeLocale!: string | null;
+
   @ApiProperty()
   isEmailVerified!: boolean;
 
@@ -34,6 +37,9 @@ export class CurrentUserDto {
   @ApiProperty()
   billingFactor!: number;
 
-  @ApiProperty({ type: [String], description: 'Effective permission keys granted to this user via their assigned roles' })
+  @ApiProperty({
+    type: [String],
+    description: 'Effective permission keys granted to this user via their assigned roles',
+  })
   effectivePermissions!: string[];
 }
