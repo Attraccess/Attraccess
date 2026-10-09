@@ -48,11 +48,11 @@ Two-factor authentication adds an extra layer of security to your account.
 4. Enter your current TOTP code to confirm
 
 > [!WARNING]
-> If you lose access to your authenticator app, you will need to contact your workshop administrator to reset 2FA on your account.
+> If you lose access to your authenticator app, you will need to contact your administrator to reset 2FA on your account.
 
 ## RFID Cards
 
-If your workshop uses Attractap RFID readers, you can view the RFID cards linked to your account.
+If your organization uses Attractap RFID readers, you can view the RFID cards linked to your account.
 
 1. Navigate to **My Account**
 2. Find the **RFID Cards** section
@@ -61,7 +61,7 @@ If your workshop uses Attractap RFID readers, you can view the RFID cards linked
 <!-- TODO: Screenshot of RFID cards section -->
 
 > [!NOTE]
-> RFID cards are typically registered by a workshop administrator or via an Attractap reader. Contact your administrator if you need to register a new card.
+> RFID cards are typically registered by an administrator or via an Attractap reader. Contact your administrator if you need to register a new card.
 
 ## Delete Account
 

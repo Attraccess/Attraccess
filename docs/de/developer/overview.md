@@ -1,6 +1,8 @@
 # Entwickler-Überblick
 
-Diese Anleitung hilft Ihnen beim Einstieg in die Attraccess-Entwicklung. Attraccess ist ein Open-Source-System zur Zugangsverwaltung in Makerspaces, das als moderne Webanwendung aufgebaut ist.
+Diese Anleitung hilft Ihnen beim Einstieg in die Attraccess-Entwicklung. Attraccess ist eine Webanwendung mit öffentlich einsehbarem Quellcode (source-available) für Maschinenzugang und Ressourcenverwaltung in Industrie, Forschung und Hochschulen.
+
+Entwicklung, Weitergabe und kommerzielle Nutzung unterliegen der [modifizierten Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Einen Überblick finden Sie unter [Lizenzierung](getting-started/overview.md#lizenzierung).
 
 ## Technologie-Stack
 

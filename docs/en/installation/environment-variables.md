@@ -18,7 +18,7 @@ All configuration options for Attraccess that can be set via environment variabl
 | `LOG_LEVELS` | `error,warn,log` | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose` |
 | `LOG_DESTINATIONS` | `console` | Comma-separated registered API log drivers: initially `console`, `file`. Names are trimmed, lowercased and deduplicated. |
 | `LOG_FILE_PATH` | `<STORAGE_ROOT>/api.log` | Optional override when selecting `file`; defaults to `api.log` at the storage root (`./storage` when `STORAGE_ROOT` is unset). Explicit overrides must be non-blank; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |
-| `LICENSE_KEY` | – | Attraccess license key |
+| `LICENSE_KEY` | – | Seeds the license key when a new database is initialized. For existing installations, change the stored key under Settings → Application Settings. |
 | `TZ` | – | Time zone, e.g. `Europe/Berlin` |
 | `TRUST_PROXY` | – | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy. |
 

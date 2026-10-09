@@ -13,7 +13,7 @@ This page explains the different ways to log in to Attraccess.
 
 ## Login with SSO
 
-If your workshop has configured a Single Sign-On (SSO) provider, you will see additional buttons on the login page (e.g., "Log in with Google" or "Log in with Keycloak").
+If your organization has configured a Single Sign-On (SSO) provider, you will see additional buttons on the login page for your company or university identity provider (e.g., Microsoft Entra ID or Keycloak).
 
 1. Click the **SSO button** for your provider
 2. You will be redirected to your provider's login page
@@ -44,7 +44,7 @@ If self-registration is enabled, you can create a new account:
 4. You may need to verify your email address before you can log in
 
 > [!NOTE]
-> Some workshops disable self-registration. In that case, ask your administrator to create an account for you.
+> Some organizations disable self-registration. In that case, ask your administrator how to get access.
 
 ## Forgot Password
 
@@ -57,7 +57,7 @@ If you have forgotten your password:
 5. Click the link and set a new password
 
 > [!WARNING]
-> If you do not receive the email, check your spam folder. If the problem persists, contact your workshop administrator.
+> If you do not receive the email, check your spam folder. If the problem persists, contact your administrator.
 
 ## See Also
 

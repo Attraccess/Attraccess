@@ -2,7 +2,7 @@
 
 Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
 
-Sie benötigen eine RFID-Karte, die mit Ihrem Attraccess-Konto verknüpft ist. Wenn Sie noch keine haben, bitten Sie Ihr Werkstattteam, eine Karte für Sie zu registrieren.
+Sie benötigen eine RFID-Karte, die mit Ihrem Attraccess-Konto verknüpft ist. Wenn Sie noch keine haben, bitten Sie Ihre Administration, eine Karte für Sie zu registrieren.
 
 ## Mit der Karte anmelden
 
@@ -63,7 +63,7 @@ Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**
 
 ## Ein erforderliches Formular ausfüllen
 
-Ihre Werkstatt kann vor dem Start oder Ende einer Nutzung Angaben abfragen, zum Beispiel zum Zustand der Maschine oder zum verwendeten Material.
+Ihre Organisation kann vor dem Start oder Ende einer Nutzung Angaben abfragen, zum Beispiel zum Zustand der Maschine oder zum verwendeten Material.
 
 1. Tippen Sie auf das Feld, um eine Antwort einzugeben oder auszuwählen. Mit **\*** markierte Felder sind Pflichtfelder.
 2. Tippen Sie auf **Weiter**, wenn es weitere Fragen gibt.
@@ -92,7 +92,7 @@ Welche Aktion verfügbar ist, hängt von Ihren Berechtigungen und dem aktuellen 
 | **Einweisung** | Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Öffnen Sie die Details für weitere Hinweise und wenden Sie sich an einen berechtigten Einweiser. |
 | **Belegt**     | Eine andere Person nutzt die Maschine. Warten Sie, bis diese ihre Nutzung beendet hat.                                                                                   |
 | **Übernehmen** | Die Übernahme der laufenden Nutzung ist erlaubt. Tippen Sie auf die Schaltfläche, um die Details zu öffnen, und wählen Sie dort die Übernahme aus.                       |
-| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an Ihr Werkstattteam.                                      |
+| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                      |
 | **Laden ...**  | Der Leser prüft, welche Aktionen für Sie verfügbar sind. Warten Sie, bis sich die Schaltfläche aktualisiert.                                                             |
 
 ## Zum Schluss abmelden
@@ -105,8 +105,8 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 
 | Was Sie sehen                              | Was Sie tun können                                                                                                                                                                                                |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihr Werkstattteam zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
-| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an Ihr Werkstattteam.                                               |
+| Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihre Administration zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
+| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                               |
 | Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                              |
 
 ## Weiterführende Anleitungen
