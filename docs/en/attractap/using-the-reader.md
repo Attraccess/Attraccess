@@ -18,6 +18,10 @@ You can also choose a resource **before** signing in. Tap its name, then hold yo
 
 ![Card prompt for a selected resource, with a back arrow in the top-left corner](../../_media/attractap/card-prompt.png)
 
+### Time and date
+
+While nobody is signed in, the reader doubles as a clock. The card prompt shows the current time and date in large type with **RFID-Karte auflegen** (Hold your RFID card here) below it, and the resource list shows them at the top. The reader uses the time zone of your Attraccess server. After a restart, the clock appears once the reader has connected to the server; until then, the reader shows its usual sign-in text. The clock keeps running if the connection drops later.
+
 ## Start a machine or open a door
 
 In the resource list, tap **Start** next to a machine or **Öffnen** (Open) next to a door. Complete any form or supervision step that appears, then wait for the result on the display.

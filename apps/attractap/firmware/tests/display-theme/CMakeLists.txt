@@ -46,6 +46,7 @@ add_executable(display-theme-host
     boot_and_connection.cpp
     card_flows.cpp
     background_and_list.cpp
+    wall_clock.cpp
     resource_details.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"

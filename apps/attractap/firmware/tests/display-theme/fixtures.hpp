@@ -1,6 +1,7 @@
 #pragma once
 
 #include "state/state.hpp"
+#include "clock/wall_clock.hpp"
 
 namespace Fixtures
 {
@@ -12,4 +13,5 @@ inline uint32_t nowMs = 1000;
 inline State::NetworkState network{};
 inline State::WebsocketState websocket{};
 inline State::ApiState api{};
+inline WallClock::LocalTime wallClock{};
 }

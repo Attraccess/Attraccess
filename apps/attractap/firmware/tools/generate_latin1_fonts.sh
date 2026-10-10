@@ -32,4 +32,11 @@ for size in "$@"; do
         --lv-font-name "attractap_font_montserrat_latin1_$size" \
         --output "attractap_font_montserrat_latin1_$size.c"
 done
+# Wall-clock digits only (space, "-./0-9:"), so large sizes stay small in flash.
+for size in 56 88; do
+    lv_font_conv --size "$size" --bpp 4 --no-compress --format lvgl --lv-include lvgl.h \
+        --font Montserrat-Medium.ttf -r 0x20 -r 0x2D-0x3A \
+        --lv-font-name "attractap_font_montserrat_digits_$size" \
+        --output "attractap_font_montserrat_digits_$size.c"
+done
 ' generate-latin1-fonts "$@"
