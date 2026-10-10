@@ -202,6 +202,9 @@ void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool is
     this->isUnderMaintenance = isUnderMaintenance;
 
     this->updateUsageInfo();
+    // Resource details are applied before navigating to this cached screen.
+    // Refresh now so its first frame does not wait for the next loop tick.
+    this->updateWallClock();
 }
 
 void Lockscreen::updateUsageInfo()

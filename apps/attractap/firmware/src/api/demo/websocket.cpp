@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "fixtures.hpp"
+#include "clock.hpp"
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -17,6 +18,7 @@
 
 void DemoWebsocket::setup()
 {
+    DemoClock::initialize();
     // Mark the mock as "connected" so the application state machine can
     // advance past the init screen without any real network.
     esp_ip4_addr_t fakeIp = {0};

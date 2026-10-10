@@ -33,6 +33,8 @@ void ReaderWorkflow::testWallClock()
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     // No server sample yet: the signed-out list keeps its logo, nothing shows a time.
     assert(!WallClock::now().valid);
+    // Reuse an idle lockscreen that was created before synchronization.
+    Display::lockscreen.init();
     for (int weekday = 0; weekday < 7; ++weekday)
         assert(!label(lv_screen_active(), WallClockText::weekday(WallClock::LocalTime{true, 2026, 10, 10, weekday})));
     display.capture(output, "wall-clock-01-unknown");
@@ -60,7 +62,14 @@ void ReaderWorkflow::testWallClock()
     assert(showsClock(lv_screen_active(), -210, before));
 
     // The idle lockscreen becomes the wall clock; the sign-in sentence gives way to a prompt.
-    click("Lasercutter");
+    // A loaded lockscreen must be current on its first frame after selection,
+    // even if a busy loop leaves no time for another screen-loop tick.
+    pump();
+    auto *resourceButton = lv_obj_get_parent(label(lv_screen_active(), "Lasercutter"));
+    assert(!lv_obj_has_state(resourceButton, LV_STATE_DISABLED));
+    lv_obj_send_event(resourceButton, LV_EVENT_CLICKED, nullptr);
+    application.loop();
+    lv_timer_handler();
     assert(lv_screen_active() == Display::lockscreen.getScreen());
     assert(showsClock(lv_screen_active(), -210, before));
     assert(lv_obj_is_visible(label(lv_screen_active(), "RFID-Karte auflegen")));

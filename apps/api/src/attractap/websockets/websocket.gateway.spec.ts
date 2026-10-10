@@ -171,7 +171,8 @@ describe('AttractapGateway', () => {
         const reply = JSON.parse((socket as unknown as { send: jest.Mock }).send.mock.calls[0][0]);
         expect(reply.serverTime).toEqual({
           epochMs: Date.parse('2026-10-10T12:32:00Z'),
-          utcOffsetMinutes: -new Date('2026-10-10T12:32:00Z').getTimezoneOffset(),
+          // JSON represents a UTC offset of -0 as 0.
+          utcOffsetMinutes: -new Date('2026-10-10T12:32:00Z').getTimezoneOffset() || 0,
         });
       } finally {
         jest.useRealTimers();
