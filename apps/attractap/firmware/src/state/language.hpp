@@ -14,9 +14,10 @@ inline std::string supported(std::string locale)
         if (character == '_') character = '-';
         else if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
     }
-    const auto start = locale.find_first_not_of(" \t\r\n");
+    // Match the TypeScript normalizer: ASCII whitespace only, never Unicode padding.
+    const auto start = locale.find_first_not_of(" \t\r\n\v\f");
     if (start == std::string::npos) return "en";
-    locale = locale.substr(start, locale.find_last_not_of(" \t\r\n") - start + 1);
+    locale = locale.substr(start, locale.find_last_not_of(" \t\r\n\v\f") - start + 1);
     if (locale == "de") return "de"; // Normalized wire values need no subtag parsing.
     if (locale.compare(0, 3, "de-") != 0) return "en";
     // Validate the complete de/en locale structure (BCP 47), including script,

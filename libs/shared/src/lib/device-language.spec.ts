@@ -70,3 +70,25 @@ describe('device language locale normalization', () => {
     expect(normalizeDeviceLanguage(locale)).toBe('en');
   });
 });
+
+// Keep this whitespace contract identical to the firmware host fixtures.
+describe('locale whitespace contract', () => {
+  it.each([' ', '\t', '\r', '\n', '\v', '\f'])('trims ASCII whitespace %j', (padding) => {
+    expect(normalizeDeviceLanguage(padding + 'DE_at' + padding)).toBe('de');
+    expect(normalizeDeviceLanguage('de' + padding + '-AT')).toBe('en');
+  });
+  it.each([
+    0x00a0,
+    0x1680,
+    ...Array.from({ length: 11 }, (_, i) => 0x2000 + i),
+    0x2028,
+    0x2029,
+    0x202f,
+    0x205f,
+    0x3000,
+    0xfeff,
+  ])('rejects Unicode whitespace U+%s', (codepoint) => {
+    const padding = String.fromCodePoint(codepoint);
+    expect(normalizeDeviceLanguage(padding + 'de' + padding)).toBe('en');
+  });
+});

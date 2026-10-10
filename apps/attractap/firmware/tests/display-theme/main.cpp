@@ -49,6 +49,15 @@ int main(int argc, char **argv)
                 expect(Language::supported(german) == "de", std::string("Valid locale extension: ") + german);
             for (const auto *invalid : {"de-u-12", "de-u-a1", "de-u-foo-12", "de-u-ca-gregory-12", "de-t-12", "de-t-h0", "de-t-en-h0", "de-t-en-12", "de-t-abcd", "de-t-en-US-ca-gregory", "de-t-en-US-1901-1901", "de-t-h0-abc-12", "de-u-ca-ca-12", "de-u-kn-kn-a1"})
                 expect(Language::supported(invalid) == "en", std::string("Malformed locale extension: ") + invalid);
+            // Same ASCII-only whitespace contract as the shared TypeScript normalizer.
+            for (const auto padding : std::string(" \t\r\n\v\f")) {
+                expect(Language::supported(std::string(1, padding) + "DE_at" + padding) == "de", "ASCII locale padding normalizes");
+                expect(Language::supported("de" + std::string(1, padding) + "-AT") == "en", "Internal whitespace is invalid");
+            }
+            for (const auto *padding : {u8"\u00a0", u8"\u1680", u8"\u2000", u8"\u2001", u8"\u2002", u8"\u2003", u8"\u2004", u8"\u2005", u8"\u2006", u8"\u2007", u8"\u2008", u8"\u2009", u8"\u200a", u8"\u2028", u8"\u2029", u8"\u202f", u8"\u205f", u8"\u3000", u8"\ufeff"}) {
+                const auto whitespace = std::string(reinterpret_cast<const char *>(padding));
+                expect(Language::supported(whitespace + "de" + whitespace) == "en", "Unicode locale padding is rejected");
+            }
             Language::Session session;
             session.setApi(true, "en");
             session.setUser(true, "de-AT");

@@ -13,6 +13,7 @@ export function useLocaleSync() {
   const language = useTranslationState((s) => s.language);
   const initializedUser = useRef<number | null | undefined>(undefined);
   const lastDefault = useRef<string | undefined>(undefined);
+  const lastServerPreference = useRef<string | undefined>(undefined);
   const lastSynced = useRef<string | null>(null);
   const { data: systemLanguage } = useSettingsServiceGetSystemLanguage(undefined, { refetchInterval: 60000 });
   const { data: setup } = useSettingsServiceGetFirstTimeSetupStatus();
@@ -26,6 +27,7 @@ export function useLocaleSync() {
   useEffect(() => {
     if (userId == null) {
       lastSynced.current = null;
+      lastServerPreference.current = undefined;
       const identityChanged = initializedUser.current !== null;
       initializedUser.current = null;
       if (hasSystemLanguage && defaultLanguage && (identityChanged || lastDefault.current !== defaultLanguage)) {
@@ -35,13 +37,14 @@ export function useLocaleSync() {
       }
       return;
     }
-    if (initializedUser.current !== userId) {
-      if (user?.locale == null && !defaultLanguage) return;
-      const initial = user?.locale != null ? normalizeDeviceLanguage(user.locale) : defaultLanguage;
-      if (!initial) return;
+    const preference = user?.locale != null ? normalizeDeviceLanguage(user.locale) : defaultLanguage;
+    if (!preference) return;
+    if (initializedUser.current !== userId || lastServerPreference.current !== preference) {
       initializedUser.current = userId;
-      lastSynced.current = initial;
-      useTranslationState.setState({ language: initial });
+      lastServerPreference.current = preference;
+      lastSynced.current = preference;
+      // Server refreshes and default changes are not personal language selections.
+      useTranslationState.setState({ language: preference });
       return;
     }
     if (language !== useTranslationState.getState().language || lastSynced.current === language) return;

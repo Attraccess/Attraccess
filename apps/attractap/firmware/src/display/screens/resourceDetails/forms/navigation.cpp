@@ -140,6 +140,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
    this->setFormsBusy(false);
    this->clearFormFieldErrors();
    bool shown = false;
+   int unmatched = -1;
    for (uint8_t i = 0; i < result.errorCount; ++i)
    {
       FormFieldWidget *widget = this->findFieldWidget(result.formId, result.errors[i].fieldId);
@@ -148,10 +149,15 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
          FirmwareI18n::setLabel(widget->errorLabel, FirmwareI18n::formError(result.errors[i].code));
          shown = true;
       }
+      else if (unmatched < 0)
+      {
+         unmatched = i;
+      }
    }
    if (this->formsModalErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, shown ? FirmwareI18n::Message::PleaseCorrectYourInput : FirmwareI18n::Message::InvalidInput);
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, unmatched >= 0 ? FirmwareI18n::formError(result.errors[unmatched].code)
+         : shown ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseCorrectYourInput) : FirmwareI18n::formError(""));
    }
 }
 void ResourceDetailsScreen::hideFormsModal()

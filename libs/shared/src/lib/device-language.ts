@@ -1,7 +1,8 @@
 /** Resolve a complete locale to a supported device language, accepting legacy underscores. */
 export function normalizeDeviceLanguage(locale: string | null | undefined): 'en' | 'de' {
   try {
-    const tag = (locale ?? '').trim().replace(/_/g, '-');
+    // Share the firmware's ASCII whitespace policy; reject Unicode padding.
+    const tag = (locale ?? '').replace(/^[ \t\r\n\v\f]+|[ \t\r\n\v\f]+$/g, '').replace(/_/g, '-');
     // Intl.Locale can discard a repeated u-key and its malformed trailing fields
     // before validating them. Check the original extension, excluding private use.
     // https://www.unicode.org/reports/tr35/#Unicode_locale_identifier

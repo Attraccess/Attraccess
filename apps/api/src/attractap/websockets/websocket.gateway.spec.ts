@@ -265,14 +265,53 @@ describe('AttractapGateway', () => {
       wait.mockResolvedValue(undefined);
       await fixture.gateway.handleConnection(client);
       const socket = Array.from(fixture.websocketService.sockets.values())[0];
+      socket.readerId = 42;
+      Object.defineProperty(client, 'readyState', { value: WebSocket.OPEN });
       (client.send as jest.Mock).mockClear();
       wait.mockImplementationOnce(async () => {
-        await fixture.gateway.updateReaderLanguage('en');
+        fixture.websocketService.readerLanguage = 'en';
         throw new Error('Lost acknowledgement');
       });
       await socket.sendMessage(new AttractapEvent(type, { language: 'de', name: 'Reader' }));
       const sent = (client.send as jest.Mock).mock.calls.map(([body]) => JSON.parse(body).data.payload.language);
       expect(sent).toEqual(['de', 'en']);
+    },
+  );
+  it.each(['revoked', 'closed', 'invalid-id', 'reauthenticated'])(
+    'cancels pending language retries for a %s socket while retaining another connection',
+    async (reason) => {
+      const wait = jest
+        .spyOn(fixture.gateway as unknown as { waitForClientResponse: () => Promise<void> }, 'waitForClientResponse')
+        .mockResolvedValue(undefined);
+      const client = fixture.createMockSocket({ readyState: WebSocket.OPEN });
+      await fixture.gateway.handleConnection(client);
+      client.readerId = 42;
+      const other = fixture.createMockSocket({ id: 'other', readerId: 42, readyState: WebSocket.OPEN });
+      fixture.websocketService.sockets.set(other.id, other);
+      (client.send as jest.Mock).mockClear();
+      wait.mockImplementationOnce(async () => {
+        if (reason === 'revoked') {
+          await fixture.gateway.onClientEvent(
+            { type: AttractapEventType.READER_AUTHENTICATE, payload: { id: 42, token: 'revoked' } },
+            client,
+          );
+        } else if (reason === 'closed') {
+          Object.defineProperty(client, 'readyState', { value: WebSocket.CLOSED });
+        } else if (reason === 'invalid-id') {
+          client.readerId = Number.NaN;
+        } else {
+          client.state.readerAuthenticationAttempt = Symbol('new-authentication');
+        }
+        throw new Error('Lost acknowledgement');
+      });
+      await fixture.gateway.updateReaderLanguage('en');
+      const languageSends = (client.send as jest.Mock).mock.calls
+        .map(([body]) => JSON.parse(body))
+        .filter((message) => message.data.type === AttractapEventType.READER_LANGUAGE);
+      expect(languageSends).toHaveLength(1);
+      expect(other.sendMessage).toHaveBeenCalledTimes(1);
+      await fixture.gateway.updateReaderLanguage('de');
+      expect(other.sendMessage).toHaveBeenCalledTimes(2);
     },
   );
 });

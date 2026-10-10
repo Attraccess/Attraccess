@@ -272,6 +272,18 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
             requireObject(lv_layer_top(), &lv_label_class, "Invalid input.");
         }
     }
+    result.errors[0].fieldId = 999; // Not on the displayed page.
+    for (const auto *code : {"FUTURE_ERROR", ""}) {
+        result.errors[0].code = code;
+        details.showFormPageErrors(result);
+        for (const auto *locale : {"de", "en"}) {
+            FirmwareI18n::refreshTree(lv_layer_top(), locale);
+            requireObject(lv_layer_top(), &lv_label_class, "Invalid input.");
+            expect(findObject(lv_layer_top(), &lv_label_class, "Raw diagnostic %s") == nullptr, "Unmatched errors do not leak diagnostics");
+        }
+    }
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
+    renderer.capture("form-unmatched-error-english-fallback");
     click(lv_layer_top(), "Maintenance");
     auto *keyboard = requireObject(lv_layer_top(), &lv_keyboard_class);
     auto *field = lv_keyboard_get_textarea(keyboard);

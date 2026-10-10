@@ -75,3 +75,34 @@ it('uses the system default for a user without a preference without saving it as
   expect(useTranslationState.getState().language).toBe('de');
   expect(state.mutate).not.toHaveBeenCalled();
 });
+
+it('applies refreshed server preferences without writing them back', () => {
+  state.user = { id: 1, locale: 'de-DE' };
+  const { rerender } = renderHook(useLocaleSync);
+  state.user = { id: 1, locale: 'en-US' };
+  rerender();
+  expect(useTranslationState.getState().language).toBe('en');
+  expect(state.mutate).not.toHaveBeenCalled();
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ requestBody: { locale: 'de' } });
+  rerender(); // An unchanged server snapshot must not undo a local selection.
+  expect(useTranslationState.getState().language).toBe('de');
+  state.user = { id: 1, locale: 'de' };
+  rerender();
+  expect(state.mutate).toHaveBeenCalledTimes(1);
+});
+
+it('follows refreshed defaults until the user has a personal preference', () => {
+  state.user = { id: 1 };
+  const { rerender } = renderHook(useLocaleSync);
+  state.defaultLanguage = 'en';
+  rerender();
+  expect(useTranslationState.getState().language).toBe('en');
+  state.user = { id: 1, locale: 'de' };
+  rerender();
+  expect(useTranslationState.getState().language).toBe('de');
+  state.user = { id: 1 };
+  rerender();
+  expect(useTranslationState.getState().language).toBe('en');
+  expect(state.mutate).not.toHaveBeenCalled();
+});
