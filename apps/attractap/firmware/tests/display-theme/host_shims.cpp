@@ -22,12 +22,22 @@ void trimString(std::string &value) {
 
 #include "demo/demo_store.hpp"
 // Supplied demo card data is deterministic; production screen/event code is real.
-static DemoStore::DemoCard demoCards[] = {
+static const std::vector<DemoStore::DemoCard> initialDemoCards = {
     {"01020304", DemoStore::UserRole::NO_PERMISSION, "Maintenance"},
     {"11121314", DemoStore::UserRole::INTRODUCED, "Alex Müller"},
     {"21222324", DemoStore::UserRole::ADMIN, "Robin"},
 };
-uint8_t DemoStore::getCardCount() { return 3; }
-const DemoStore::DemoCard &DemoStore::getCard(uint8_t index) { return demoCards[index]; }
+static auto demoCards = initialDemoCards;
+void Fixtures::resetDemoCards() {
+    demoCards = initialDemoCards;
+    deletedDemoCardIndices.clear();
+}
+uint8_t DemoStore::getCardCount() { return demoCards.size(); }
+const DemoStore::DemoCard &DemoStore::getCard(uint8_t index) { return demoCards.at(index); }
 bool DemoStore::addCard(const char *, UserRole, const char *) { return true; }
-bool DemoStore::deleteCard(uint8_t) { return true; }
+bool DemoStore::deleteCard(uint8_t index) {
+    Fixtures::deletedDemoCardIndices.push_back(index);
+    if (index >= demoCards.size()) return false;
+    demoCards.erase(demoCards.begin() + index);
+    return true;
+}

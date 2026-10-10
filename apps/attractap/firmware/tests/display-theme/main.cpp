@@ -21,6 +21,7 @@ int main(int argc, char **argv)
             Fixtures::network = {};
             Fixtures::websocket = {};
             Fixtures::api = {};
+            Fixtures::resetDemoCards();
             const auto errorsBefore = lvglErrors;
             try {
                 run();
@@ -166,8 +167,6 @@ int main(int argc, char **argv)
                                   english ? "Hold card to reader..." : "Karte ans Lesegerät halten...") == nullptr,
                        "Cancelled scan overlay is removed and Add card is reachable again");
             }
-            // Role selection and direct deletion preserve existing demo behavior;
-            // the base revision has no role-picker Cancel or delete confirmation.
             // Production role-picker callback receives a supplied UID.
             demo.onCardScanned("11223344");
             FirmwareI18n::refreshTree(guard.root, "en");
@@ -178,6 +177,42 @@ int main(int argc, char **argv)
             requireObject(guard.root, &lv_label_class, "Rolle für Karte 11223344");
             requireObject(guard.root, &lv_label_class, "Eingewiesen");
             renderer.capture("demo-role-picker-german");
+        });
+        test("demo/direct-deletion-after-language-refresh", [&] {
+            for (const char *language : {"en", "de"}) {
+                Fixtures::resetDemoCards();
+                Fixtures::activeLanguage = language;
+                DemoSettingsScreen demo;
+                demo.init();
+                ScreenGuard guard(demo.getScreen(), &demo);
+                settle();
+                const bool english = std::string(language) == "en";
+                unsigned deleted = 0;
+                for (const char *name : {"Alex Müller", "Robin", "Maintenance"}) {
+                    // Refresh existing buttons both ways before clicking. After each
+                    // removal, the rebuilt list must target the new card indices.
+                    FirmwareI18n::refreshTree(guard.root, english ? "de" : "en");
+                    FirmwareI18n::refreshTree(guard.root, language);
+                    auto *label = requireObject(guard.root, &lv_label_class, name);
+                    auto *row = lv_obj_get_parent(lv_obj_get_parent(label));
+                    auto *button = lv_obj_get_parent(requireObject(row, &lv_label_class,
+                                                                 english ? "Delete" : "Löschen"));
+                    const uint8_t index = deleted < 2 ? 1 : 0;
+                    lv_obj_send_event(button, LV_EVENT_CLICKED, nullptr);
+                    settle();
+                    ++deleted;
+                    expect(Fixtures::deletedDemoCardIndices.size() == deleted &&
+                               Fixtures::deletedDemoCardIndices.back() == index,
+                           "One click deletes the intended card directly, without confirmation");
+                    expect(DemoStore::getCardCount() == 3 - deleted &&
+                               findObject(guard.root, &lv_label_class, name) == nullptr,
+                           "Deletion rebuilds the production list without the removed card");
+                    if (deleted < 3)
+                        requireObject(guard.root, &lv_label_class, "Maintenance");
+                }
+                requireObject(guard.root, &lv_label_class,
+                              english ? "No cards registered yet." : "Noch keine Karten registriert.");
+            }
         });
         test("demo/fixture-locales", [&] { testDemoFixtureLocales(renderer); });
         test("demo/production-resource-list-locales", [&] { testDemoResourceListLocales(renderer); });

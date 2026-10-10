@@ -1,6 +1,7 @@
 #pragma once
 
 #include "state/state.hpp"
+#include <vector>
 
 namespace Fixtures
 {
@@ -13,4 +14,6 @@ inline State::NetworkState network{};
 inline State::WebsocketState websocket{};
 inline State::ApiState api{};
 inline std::string activeLanguage = "de";
+inline std::vector<uint8_t> deletedDemoCardIndices;
+void resetDemoCards();
 }
