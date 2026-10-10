@@ -150,6 +150,11 @@ target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 enable_testing()
 add_test(NAME attractap-desktop-tests COMMAND attractap-desktop-tests)
 
+add_executable(attractap-demo-clock-tests tests/demo-clock.test.cpp "${FIRMWARE_DIR}/src/clock/wall_clock.cpp")
+target_include_directories(attractap-demo-clock-tests PRIVATE "${FIRMWARE_DIR}/src")
+target_compile_options(attractap-demo-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+add_test(NAME attractap-demo-clock-tests COMMAND attractap-demo-clock-tests)
+
 add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)

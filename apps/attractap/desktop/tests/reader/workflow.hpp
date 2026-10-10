@@ -125,5 +125,6 @@ struct ReaderWorkflow
     void testSupervisionAndCorrelation();
     void testIdentityAndPendingAuthentication();
     void testSessionSummary();
+    void testWallClock();
     void testTimeouts();
 };

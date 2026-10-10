@@ -5,6 +5,7 @@ import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AuditService } from '../../../../audit/audit.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
+import { readerServerTime } from '../../websocket-reader-payloads';
 
 @Injectable()
 export class AttractapAuthHandler {
@@ -74,6 +75,7 @@ export class AttractapAuthHandler {
 
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
       name: reader.name,
+      serverTime: readerServerTime(),
     });
     await socket.sendMessage(authenticatedResponse);
 

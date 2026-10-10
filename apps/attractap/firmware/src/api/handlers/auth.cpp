@@ -2,6 +2,7 @@
 // FEATURE: api-auth
 
 #include "../api.hpp"
+#include "../../clock/wall_clock.hpp"
 #include <functional>
 #include <string>
 
@@ -121,6 +122,7 @@ void API::onReaderAuthenticated(JsonObject data)
     cancelResourceAction();
 
     std::string deviceName = data["payload"]["name"].as<std::string>();
+    this->onServerTime(data["payload"]["serverTime"]);
 
     State::setApiState(true, deviceName);
 
@@ -133,6 +135,18 @@ void API::onReaderAuthenticated(JsonObject data)
 
     this->sendFirmwareInfo();
     this->sendPendingCrashReport();
+}
+
+void API::onServerTime(JsonVariantConst serverTime)
+{
+    // Older servers omit the sample; the clock then stays hidden.
+    if (!serverTime["epochMs"].is<double>() || !serverTime["utcOffsetMinutes"].is<int>())
+    {
+        return;
+    }
+    // ms epochs fit a double exactly; avoids depending on 64-bit JSON integers.
+    WallClock::onServerTime(static_cast<int64_t>(serverTime["epochMs"].as<double>()),
+                            serverTime["utcOffsetMinutes"].as<int32_t>());
 }
 
 void API::onDeviceName(std::function<void(std::string)> callback)

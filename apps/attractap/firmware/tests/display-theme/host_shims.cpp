@@ -8,6 +8,7 @@ int64_t esp_timer_get_time() { return static_cast<int64_t>(Fixtures::nowMs) * 10
 State::NetworkState State::getNetworkState() { return Fixtures::network; }
 State::WebsocketState State::getWebsocketState() { return Fixtures::websocket; }
 State::ApiState State::getApiState() { return Fixtures::api; }
+WallClock::LocalTime WallClock::now() { return Fixtures::wallClock; }
 
 // Deterministic clock formatting for resource detail fixtures.
 std::string timeToTimeString(time_t, int) { return "12:00"; }

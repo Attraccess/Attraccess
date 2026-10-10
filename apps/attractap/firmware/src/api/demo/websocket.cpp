@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "fixtures.hpp"
+#include "clock.hpp"
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -17,6 +18,7 @@
 
 void DemoWebsocket::setup()
 {
+    DemoClock::initialize();
     // Mark the mock as "connected" so the application state machine can
     // advance past the init screen without any real network.
     esp_ip4_addr_t fakeIp = {0};
@@ -194,6 +196,13 @@ void DemoWebsocket::respondAuthenticated()
     doc["event"] = "EVENT";
     doc["data"]["type"] = "READER_AUTHENTICATED";
     doc["data"]["payload"]["name"] = "Demo Gerät";
+    // Demo time is the device's own clock in its configured timezone.
+    const time_t now = time(nullptr);
+    tm utc{};
+    gmtime_r(&now, &utc);
+    utc.tm_isdst = -1;
+    doc["data"]["payload"]["serverTime"]["epochMs"] = static_cast<double>(now) * 1000;
+    doc["data"]["payload"]["serverTime"]["utcOffsetMinutes"] = static_cast<int>(difftime(now, mktime(&utc)) / 60);
 
     char buf[256];
     size_t n = serializeJson(doc, buf, sizeof(buf));

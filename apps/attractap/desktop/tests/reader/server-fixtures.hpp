@@ -1,5 +1,6 @@
 #pragma once
 #include "application/application.hpp"
+#include "clock/wall_clock.hpp"
 #include "profile_store.hpp"
 #include "virtual_rfid.hpp"
 #include <cassert>

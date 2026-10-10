@@ -1,3 +1,17 @@
+/**
+ * Server clock sample for the reader's wall clock. The reader keeps SNTP as its
+ * primary UTC source and only falls back to epochMs until SNTP has synced.
+ * The offset matches startTimeUtcOffsetMinutes (minutes east of UTC).
+ */
+export interface ReaderServerTimePayload {
+  epochMs: number;
+  utcOffsetMinutes: number;
+}
+
+export function readerServerTime(now = new Date()): ReaderServerTimePayload {
+  return { epochMs: now.getTime(), utcOffsetMinutes: -now.getTimezoneOffset() };
+}
+
 export interface ReaderCrashReportPayload {
   resetReason: string;
   rebootReason?: string | null;

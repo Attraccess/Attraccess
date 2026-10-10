@@ -17,6 +17,7 @@ void Network::initSharedComponents() {}
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_sntp.h"
+#include "../clock/wall_clock.hpp"
 #include <string>
 #include <time.h>
 
@@ -47,6 +48,7 @@ void Network::setup()
     esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");
     esp_sntp_setservername(1, "time.nist.gov");
+    esp_sntp_set_time_sync_notification_cb([](struct timeval *) { WallClock::onSntpSynced(); });
     esp_sntp_init();
 
     logger.info("initialization complete");
