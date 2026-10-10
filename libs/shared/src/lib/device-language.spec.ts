@@ -73,6 +73,12 @@ describe('device language locale normalization', () => {
 
 // Keep this whitespace contract identical to the firmware host fixtures.
 describe('locale whitespace contract', () => {
+  it('handles long whitespace runs without regex backtracking', () => {
+    const padding = '\t'.repeat(100_000);
+    expect(normalizeDeviceLanguage(padding + 'de' + padding)).toBe('de');
+    expect(normalizeDeviceLanguage('de' + padding + '!')).toBe('en');
+    expect(normalizeDeviceLanguage(padding)).toBe('en');
+  });
   it.each([' ', '\t', '\r', '\n', '\v', '\f'])('trims ASCII whitespace %j', (padding) => {
     expect(normalizeDeviceLanguage(padding + 'DE_at' + padding)).toBe('de');
     expect(normalizeDeviceLanguage('de' + padding + '-AT')).toBe('en');

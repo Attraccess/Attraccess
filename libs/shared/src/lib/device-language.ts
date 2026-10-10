@@ -2,7 +2,13 @@
 export function normalizeDeviceLanguage(locale: string | null | undefined): 'en' | 'de' {
   try {
     // Share the firmware's ASCII whitespace policy; reject Unicode padding.
-    const tag = (locale ?? '').replace(/^[ \t\r\n\v\f]+|[ \t\r\n\v\f]+$/g, '').replace(/_/g, '-');
+    const input = locale ?? '';
+    let start = 0;
+    let end = input.length;
+    // Scan each edge once, avoiding regex backtracking on untrusted input.
+    while (start < end && ' \t\r\n\v\f'.includes(input[start])) start++;
+    while (end > start && ' \t\r\n\v\f'.includes(input[end - 1])) end--;
+    const tag = input.slice(start, end).replace(/_/g, '-');
     // Intl.Locale can discard a repeated u-key and its malformed trailing fields
     // before validating them. Check the original extension, excluding private use.
     // https://www.unicode.org/reports/tr35/#Unicode_locale_identifier
