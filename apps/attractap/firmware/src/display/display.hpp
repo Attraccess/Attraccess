@@ -73,7 +73,7 @@ public:
     static uint32_t touchPressSequence;
 
     // Global error popup helpers
-    static void showErrorPopup(const std::string &title, const std::string &message);
+    static void showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
     static void showBillingSummary(const std::string &total);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
@@ -95,7 +95,7 @@ public:
 private:
     static void setupFramebuffer();
     static bool touchWarningPending;
-    static void showMessagePopup(const std::string &title, const std::string &message, bool error);
+    static void showMessagePopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool error);
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.
@@ -126,6 +126,7 @@ private:
     static uint8_t reboot_count;
 
     static void advanceScreenRouter();
+    static void refreshVisibleTextForLanguageChange();
 
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);

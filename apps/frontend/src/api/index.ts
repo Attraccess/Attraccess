@@ -1,4 +1,5 @@
 import { OpenAPI } from '@attraccess/react-query-client';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
 function normalizeUrl<TUrl extends string | undefined>(url: TUrl): TUrl {
   if (typeof url !== 'string') {
@@ -31,6 +32,9 @@ export function getBaseUrl() {
 export function configureApiClient() {
   OpenAPI.BASE = getBaseUrl();
   OpenAPI.ENCODE_PATH = encodeURIComponent;
+  // Registration and other translated responses must use the displayed language,
+  // including a system default that differs from the browser's language.
+  OpenAPI.HEADERS = async () => ({ 'Accept-Language': useTranslationState.getState().language });
 }
 
 export function filenameToUrl(name?: string) {

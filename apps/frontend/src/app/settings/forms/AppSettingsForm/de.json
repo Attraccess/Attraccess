@@ -11,6 +11,9 @@
     "licenseKey": {
       "label": "Lizenzschlüssel",
       "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein."
+    },
+    "defaultLanguage": {
+      "label": "Standardsprache des Systems"
     }
   },
   "actions": {

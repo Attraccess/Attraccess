@@ -2,6 +2,7 @@
 // FEATURE: application
 
 #include "application.hpp"
+#include "../state/state.hpp"
 #include "../serial/serialCommandHandler.hpp"
 #include "../platform.hpp"
 #include <cstring>
@@ -169,12 +170,12 @@ void Application::finishReaderAction(bool success) {
   Display::resourceDetailsScreen.hideFormsModal();
   if (this->returnToListAfterAction) this->resourceIsSelected = false;
   this->actionCompletionMessage = success
-      ? type == "START_RESOURCE_USAGE_SESSION" ? "Nutzung gestartet"
-      : type == "STOP_RESOURCE_USAGE_SESSION" ? "Nutzung beendet" : "Aktion bestätigt"
-      : "";
+      ? FirmwareI18n::Text(type == "START_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageStarted
+      : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded : FirmwareI18n::Message::ActionConfirmed)
+      : FirmwareI18n::Text();
   // Keep input blocked until fresh ownership/availability arrives, so a fast
   // second tap cannot act on the row's pre-action state.
-  this->showReaderActionProgress("Status wird geladen");
+  this->showReaderActionProgress(FirmwareI18n::Message::LoadingStatus);
   this->api.cancelResourceAction();
   this->resourceRefreshRequestId = this->api.requestResourceList();
 }
@@ -222,6 +223,7 @@ void Application::dismissSessionSummary() {
 }
 
 void Application::logoutReader() {
+  State::setUserLanguage(false);
   this->sessionSummaryActive = false;
   this->sessionSummaryVisible = false;
   this->sessionSummaryDismissRequested = false;
@@ -255,6 +257,7 @@ void Application::finishCardAuthentication(bool success) {
     this->restartSessionTimeout();
     this->selectedResourceChanged = true;
   } else {
+    State::setUserLanguage(false);
     this->externalState = EXTERNAL_STATE_NONE;
     this->state = APPLICATION_STATE_INIT;
     this->nfc.enableCardDetection();
@@ -285,8 +288,11 @@ void Application::pollUsageStats() {
 
 #endif
 
+
 #ifdef HAS_LVGL_DISPLAY
 void Application::beginEnrollment() {
+  this->unlocked = false;
+  State::setUserLanguage(false);
   // WAIT_FOR_CARD rides the normal card-detection loop, which re-arms the
   // reader reliably across removals/re-presentations. (The earlier poll-only
   // approach wedged the PN532 after the auth performed for an already-enrolled
@@ -318,6 +324,7 @@ void Application::exitEnrollment() {
   this->enrollPhase = ENROLL_PHASE_NONE;
   this->externalState = EXTERNAL_STATE_NONE;
   this->unlocked = false;
+  State::setUserLanguage(false);
   // Hand back to the generic screen routing; next processState() iteration
   // re-evaluates and transitions to the correct idle screen (lock / list /
   // no-resources), re-enabling card detection on the way.
@@ -352,7 +359,7 @@ void Application::processEnrollment() {
     this->enrollErrorPending = false;
     this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-    Display::enrollmentScreen.setStatusMessage(this->enrollErrorMessage);
+    Display::enrollmentScreen.setStatusMessage(FirmwareI18n::readerError(this->enrollErrorMessage));
     this->enrollPhase = ENROLL_PHASE_ERROR;
     this->enrollPhaseChangedMs = now;
     return;
@@ -385,7 +392,7 @@ void Application::processEnrollment() {
       this->beeper.errorBeep();
       Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
       Display::enrollmentScreen.setStatusMessage(
-          "Karte konnte nicht\nvorbereitet werden");
+          FirmwareI18n::Message::CouldNotPrepareCard);
       this->enrollPhase = ENROLL_PHASE_ERROR;
       this->enrollPhaseChangedMs = now;
       this->nfc.resetCardPresence();
@@ -419,7 +426,7 @@ void Application::processEnrollment() {
       this->beeper.errorBeep();
       Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
       Display::enrollmentScreen.setStatusMessage(
-          "Karte konnte nicht\ngeschrieben werden");
+          FirmwareI18n::Message::CouldNotWriteCard);
       this->enrollPhase = ENROLL_PHASE_ERROR;
     }
     this->enrollPhaseChangedMs = now;
@@ -455,7 +462,10 @@ void Application::processEnrollment() {
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
+
 void Application::beginReset() {
+  this->unlocked = false;
+  State::setUserLanguage(false);
   // Mirrors beginEnrollment(): WAIT_FOR_CARD rides the normal card-detection
   // loop (reliable re-arm across removals); detection is disabled only for the
   // authenticate + write once a card is actually picked.
@@ -480,6 +490,7 @@ void Application::exitReset() {
   this->resetPhase = RESET_PHASE_NONE;
   this->externalState = EXTERNAL_STATE_NONE;
   this->unlocked = false;
+  State::setUserLanguage(false);
   // Hand back to the generic screen routing; next processState() iteration
   // re-evaluates and transitions to the correct idle screen.
   this->state = APPLICATION_STATE_INIT;
@@ -541,7 +552,7 @@ void Application::processReset() {
       this->beeper.errorBeep();
       Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
       Display::resetScreen.setStatusMessage(
-          "Karte konnte nicht\nzurückgesetzt werden");
+          FirmwareI18n::Message::CouldNotResetCard);
       this->resetPhase = RESET_PHASE_ERROR;
     }
     this->resetPhaseChangedMs = now;

@@ -71,7 +71,7 @@ void ReaderWorkflow::testUsageStats()
     const auto endingStatsRequest = server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>();
     active = false; list();
     stats(endingStatsRequest, 101, "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"9\"}]");
-    assert(!lv_obj_is_visible(label(lv_screen_active(), "Warte auf Messwert")));
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Warte auf Messwert")));
     active = true; activeUsageId = 99; list();
     stats(server.last("RESOURCE_USAGE_STATS")["data"]["payload"]["requestId"].as<uint32_t>(), 99,
           "\"meters\":[{\"name\":\"Heartbeats\",\"value\":\"0.250\"}],\"operatingDurationMs\":130000,\"isOperating\":false");

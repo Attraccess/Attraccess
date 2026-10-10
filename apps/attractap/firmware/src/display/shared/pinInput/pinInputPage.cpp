@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "pinInputPage.hpp"
 #include "../../theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
@@ -6,7 +7,7 @@
 
 #include <cstring>
 
-lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
+lv_obj_t *PinInputPage::init(const FirmwareI18n::Text &title, lv_obj_t *parent)
 {
     this->screen = lv_obj_create(parent);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
@@ -32,7 +33,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     lv_obj_set_width(this->labelForDevicePin, lv_pct(100));
     lv_obj_set_height(this->labelForDevicePin, LV_SIZE_CONTENT);
     lv_obj_set_align(this->labelForDevicePin, LV_ALIGN_CENTER);
-    lv_label_set_text(this->labelForDevicePin, title);
+    FirmwareI18n::setLabel(this->labelForDevicePin, title);
     lv_obj_set_style_text_align(this->labelForDevicePin, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->labelForDevicePin, &attractap_font_montserrat_latin1_32, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -44,7 +45,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     lv_obj_set_x(this->devicePin, -128);
     lv_obj_set_y(this->devicePin, -157);
     lv_obj_set_align(this->devicePin, LV_ALIGN_CENTER);
-    lv_textarea_set_placeholder_text(this->devicePin, "0000");
+    FirmwareI18n::setDynamicPlaceholder(this->devicePin, "0000");
     lv_textarea_set_one_line(this->devicePin, true);
     lv_textarea_set_accepted_chars(this->devicePin, "0123456789");
     lv_obj_set_style_text_font(this->devicePin, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);

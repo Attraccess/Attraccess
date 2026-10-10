@@ -1,5 +1,6 @@
 #include "sessionSummaryScreen.hpp"
 #include "display/theme.hpp"
+#include "display/i18n.hpp"
 #include "display/fonts/attractap_fonts.hpp"
 #include <cstdio>
 
@@ -20,9 +21,9 @@ void SessionSummaryScreen::init() {
     DisplayTheme::applyScreen(screen);
     lv_obj_set_style_pad_all(screen, 0, 0);
     lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
-    auto label = [&](const char *text, int x, int y, int width, const lv_font_t *font, lv_color_t color) {
+    auto label = [&](const FirmwareI18n::Text &text, int x, int y, int width, const lv_font_t *font, lv_color_t color) {
         auto *obj = lv_label_create(screen);
-        lv_label_set_text(obj, text);
+        FirmwareI18n::setLabel(obj, text);
         lv_obj_set_width(obj, width);
         lv_label_set_long_mode(obj, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, 0);
@@ -46,21 +47,21 @@ void SessionSummaryScreen::init() {
     lv_obj_set_style_line_width(check, 6, 0);
     lv_obj_set_style_line_rounded(check, true, 0);
     lv_obj_set_style_line_color(check, DisplayTheme::success(), 0);
-    label(("Danke, " + name + "!").c_str(), 20, 224, 440, &attractap_font_montserrat_latin1_32, DisplayTheme::text());
+    label(FirmwareI18n::Text::format(FirmwareI18n::Message::SummaryThanks, {FirmwareI18n::Text::literal(name)}), 20, 224, 440, &attractap_font_montserrat_latin1_32, DisplayTheme::text());
     const bool billed = !charge.empty();
     const int durationX = billed ? 50 : 140;
-    label("Dauer", durationX, 286, 200, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
-    label(duration.c_str(), durationX, 313, 200, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
+    label(FirmwareI18n::Message::Duration, durationX, 286, 200, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
+    label(FirmwareI18n::Text::literal(duration), durationX, 313, 200, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
     if (billed) {
-        label("Abgerechnet", 250, 286, 180, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
-        auto *total = label(charge.c_str(), 250, 313, 180, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
+        label(FirmwareI18n::Message::SummaryBilled, 250, 286, 180, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
+        auto *total = label(FirmwareI18n::Text::literal(charge), 250, 313, 180, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
         // Long formatted charges remain fully available without crossing columns.
         lv_label_set_long_mode(total, LV_LABEL_LONG_SCROLL_CIRCULAR);
     }
-    label("Bis bald!", 20, 363, 440, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
-    auto *brand = label("Attractap", 20, 452, 140, &lv_font_montserrat_14, DisplayTheme::muted());
+    label(FirmwareI18n::Message::SummaryFarewell, 20, 363, 440, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
+    auto *brand = label(FirmwareI18n::Text::literal("Attractap"), 20, 452, 140, &lv_font_montserrat_14, DisplayTheme::muted());
     lv_obj_set_style_text_align(brand, LV_TEXT_ALIGN_LEFT, 0);
-    auto *variant = label(FIRMWARE_VARIANT_FRIENDLY_NAME, 240, 452, 220, &lv_font_montserrat_14, DisplayTheme::muted());
+    auto *variant = label(FirmwareI18n::Text::literal(FIRMWARE_VARIANT_FRIENDLY_NAME), 240, 452, 220, &lv_font_montserrat_14, DisplayTheme::muted());
     lv_obj_set_style_text_align(variant, LV_TEXT_ALIGN_RIGHT, 0);
 }
 

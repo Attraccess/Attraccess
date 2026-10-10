@@ -9,15 +9,7 @@
 namespace
 {
     // A handful of fake projects to pick from in the project selector.
-    const char *const DEMO_PROJECTS[] = {
-        "Möbelbau Eiche",
-        "Prototyp Gehäuse",
-        "Reparatur Fahrradrahmen",
-        "Weihnachtsgeschenke",
-        "CNC Schild Gravur",
-        "Ersatzteil Drucker",
-    };
-    constexpr uint32_t DEMO_PROJECT_COUNT = sizeof(DEMO_PROJECTS) / sizeof(DEMO_PROJECTS[0]);
+    constexpr uint32_t DEMO_PROJECT_COUNT = 6;
     constexpr uint32_t DEMO_PROJECT_PAGE_SIZE = 4;
 
     // Start form shown when a session on the CNC (resource id 1) begins.
@@ -32,14 +24,21 @@ namespace
         const char *type; // text | number | boolean | select
         bool required;
     };
-    const CncField CNC_FIELDS[] = {
+    const CncField CNC_FIELDS_DE[] = {
         {101, "Material", "Werkstoff des Werkstücks", "select", true},
         {102, "Auftragsnummer", "Interne Auftrags-ID", "text", true},
         {103, "Geschätzte Laufzeit (Min)", "Optional", "number", false},
         {104, "Absaugung geprüft", "Späneabsaugung aktiv?", "boolean", true},
     };
-    constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS) / sizeof(CNC_FIELDS[0]);
-    const char *const CNC_MATERIALS[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
+    const CncField CNC_FIELDS_EN[] = {
+        {101, "Material", "Workpiece material", "select", true},
+        {102, "Job number", "Internal job ID", "text", true},
+        {103, "Estimated runtime (min)", "Estimated runtime", "number", false},
+        {104, "Extraction checked", "Is chip extraction active?", "boolean", true},
+    };
+    constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS_DE) / sizeof(CNC_FIELDS_DE[0]);
+    const char *const CNC_MATERIALS_DE[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
+    const char *const CNC_MATERIALS_EN[] = {"Aluminium", "Wood", "Plastic", "Brass", "Steel"};
 
     std::string toIso8601(time_t t)
     {

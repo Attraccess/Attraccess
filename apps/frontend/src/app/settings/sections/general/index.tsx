@@ -1,3 +1,4 @@
+import { Select } from '../../../../components/select';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FieldError, Form, Input, Spinner, TextField } from '@heroui/react';
@@ -6,6 +7,7 @@ import {
   ApiError,
   useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetSystemSettingsKeyFn,
+  UseSettingsServiceGetSystemLanguageKeyFn,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
@@ -41,7 +43,9 @@ export function GeneralSection() {
   // and the displayed value falls back to the server's. The alternative — an effect that reassigns
   // the whole draft whenever the query object changes — overwrites edits the operator has not saved
   // yet as soon as a background refetch lands (ATT-868).
-  const [draft, setDraft] = useState<Partial<Record<'url' | 'publicInternetUrl' | 'licenseKey', string>>>({});
+  const [draft, setDraft] = useState<
+    Partial<{ url: string; publicInternetUrl: string; licenseKey: string; defaultLanguage: 'en' | 'de' }>
+  >({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   // Same query/mutation contract as the old AppSettingsForm — only the presentation changed.
@@ -53,6 +57,8 @@ export function GeneralSection() {
   const url = draft.url ?? savedUrl;
   const publicInternetUrl = draft.publicInternetUrl ?? savedPublicUrl;
   const licenseKey = draft.licenseKey ?? '';
+  const savedLanguage = settings?.app.defaultLanguage ?? 'de';
+  const defaultLanguage = draft.defaultLanguage ?? savedLanguage;
 
   const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
     onSuccess(data) {
@@ -63,6 +69,7 @@ export function GeneralSection() {
       // lifetime of the mount — a later change by another operator would then surface as a phantom
       // "unsaved changes" bar whose Save reverts them.
       queryClient.setQueryData(UseSettingsServiceGetSystemSettingsKeyFn(), data);
+      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemLanguageKeyFn() });
       setDraft({});
     },
     onError(error: Error) {
@@ -70,7 +77,11 @@ export function GeneralSection() {
     },
   });
 
-  const isDirty = url !== savedUrl || publicInternetUrl !== savedPublicUrl || licenseKey.trim() !== '';
+  const isDirty =
+    url !== savedUrl ||
+    publicInternetUrl !== savedPublicUrl ||
+    licenseKey.trim() !== '' ||
+    defaultLanguage !== savedLanguage;
 
   const trimmedUrl = url.trim();
   const trimmedPublicUrl = publicInternetUrl.trim();
@@ -104,6 +115,7 @@ export function GeneralSection() {
           // means "unchanged" there and stays undefined.
           publicInternetUrl: trimmedPublicUrl || null,
           licenseKey: licenseKey.trim() || undefined,
+          defaultLanguage,
         },
       },
     });
@@ -150,6 +162,21 @@ export function GeneralSection() {
             <Input type="url" />
             <FieldError>{urlError}</FieldError>
           </TextField>
+        </SettingsRow>
+        <SettingsRow stacked label={t('inputs.defaultLanguage.label')}>
+          <Select
+            aria-label={t('inputs.defaultLanguage.label')}
+            value={defaultLanguage}
+            onChange={(next) => {
+              if (next === 'en' || next === 'de') setDraft((current) => ({ ...current, defaultLanguage: next }));
+            }}
+            items={[
+              { key: 'en', label: 'English' },
+              { key: 'de', label: 'Deutsch' },
+            ]}
+            isDisabled={isSaving}
+            fullWidth
+          />
         </SettingsRow>
 
         <SettingsRow

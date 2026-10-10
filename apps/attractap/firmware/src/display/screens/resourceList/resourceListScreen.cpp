@@ -1,11 +1,12 @@
+#include "display/i18n.hpp"
 #include "resourceListScreen.hpp"
 #include "../../images/logo_40h.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 
 namespace {
-lv_obj_t *text(lv_obj_t *parent, const char *value, const lv_font_t *font, lv_color_t color) {
+lv_obj_t *text(lv_obj_t *parent, const FirmwareI18n::Text &value, const lv_font_t *font, lv_color_t color) {
     auto *label = lv_label_create(parent);
-    lv_label_set_text(label, value);
+    FirmwareI18n::setLabel(label, value);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_width(label, lv_pct(100));
@@ -39,10 +40,10 @@ void ResourceListScreen::init() {
     lv_obj_set_scroll_dir(resourceContainer, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(resourceContainer, LV_SCROLLBAR_MODE_AUTO);
     footerShowsSuccess = false;
-    footer = text(screen, "", &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
+    footer = text(screen, FirmwareI18n::Text(), &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
     lv_obj_set_height(footer, 18);
     renderRows();
-    if (busy) overlay.show(screen, actionTitle.c_str(), actionResource.c_str());
+    if (busy) overlay.show(screen, actionTitle, actionResource);
     loop();
 }
 
@@ -96,16 +97,18 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
         return button;
     };
     auto *details = makeButton(false, DisplayTheme::surfaceSecondary());
-    auto *name = text(details, resource.name, &attractap_font_montserrat_latin1_20, DisplayTheme::text());
+    auto *name = text(details, FirmwareI18n::Text::literal(resource.name), &attractap_font_montserrat_latin1_20, DisplayTheme::text());
     lv_obj_set_height(name, 26);
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
-    std::string status = resource.description;
-    if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser ? "Von dir verwendet" : std::string("In Verwendung: ") + resource.activeUser;
-    else if (resource.isUnderMaintenance) status = "Wartung";
-    else if (!resource.isHealthy) status = "Nicht betriebsbereit";
-    else if (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource) status = "Einweisung fehlt";
-    else if (status.empty()) status = "Verfügbar";
-    auto *description = text(details, status.c_str(), &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
+    FirmwareI18n::Text status = FirmwareI18n::Text::literal(resource.description);
+    if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser
+        ? FirmwareI18n::Text(FirmwareI18n::Message::InUseByYou)
+        : FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(resource.activeUser)});
+    else if (resource.isUnderMaintenance) status = FirmwareI18n::Message::Maintenance;
+    else if (!resource.isHealthy) status = FirmwareI18n::Message::Unavailable;
+    else if (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource) status = FirmwareI18n::Message::IntroductionRequired;
+    else if (status.empty()) status = FirmwareI18n::Message::Available;
+    auto *description = text(details, status, &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
     lv_obj_set_height(description, 18);
     lv_obj_align(description, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     if (!signedIn) {
@@ -116,18 +119,18 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     }
     const bool accessMatches = username == cachedResourceList.authenticatedUsername;
     const auto action = accessMatches ? resourceListAction(resource, username) : ResourceListAction::None;
-    const char *caption = "Einweisung";
+    FirmwareI18n::Text caption = FirmwareI18n::Message::Introduction;
     auto color = DisplayTheme::warning();
     switch (action) {
-    case ResourceListAction::Start: caption = "Start"; color = DisplayTheme::success(); break;
-    case ResourceListAction::Stop: caption = "Stop"; color = DisplayTheme::danger(); break;
-    case ResourceListAction::OpenDoor: caption = "Öffnen"; color = DisplayTheme::primary(); break;
-    case ResourceListAction::Supervision: caption = "Aufsicht"; break;
-    case ResourceListAction::Takeover: caption = "Übernehmen"; break;
+    case ResourceListAction::Start: caption = FirmwareI18n::Message::Start; color = DisplayTheme::success(); break;
+    case ResourceListAction::Stop: caption = FirmwareI18n::Message::Stop; color = DisplayTheme::danger(); break;
+    case ResourceListAction::OpenDoor: caption = FirmwareI18n::Message::Open; color = DisplayTheme::primary(); break;
+    case ResourceListAction::Supervision: caption = FirmwareI18n::Message::Supervision; break;
+    case ResourceListAction::Takeover: caption = FirmwareI18n::Message::TakeOver; break;
     default:
-        if (!accessMatches || !resource.accessKnown) { caption = "Laden ..."; color = DisplayTheme::muted(); }
-        else if (resource.hasActiveUsage) { caption = "Belegt"; color = DisplayTheme::muted(); }
-        else if (resource.isUnderMaintenance || !resource.isHealthy) caption = "Gesperrt";
+        if (!accessMatches || !resource.accessKnown) { caption = FirmwareI18n::Message::LoadingAlt; color = DisplayTheme::muted(); }
+        else if (resource.hasActiveUsage) { caption = FirmwareI18n::Message::InUseAlt; color = DisplayTheme::muted(); }
+        else if (resource.isUnderMaintenance || !resource.isHealthy) caption = FirmwareI18n::Message::UnavailableLocked;
         break;
     }
     auto *primary = makeButton(true, color);
@@ -157,15 +160,15 @@ void ResourceListScreen::onClicked(lv_event_t *event) {
     }
 }
 
-void ResourceListScreen::showActionProgress(const char *title, const char *resource) {
+void ResourceListScreen::showActionProgress(const FirmwareI18n::Text &title, const FirmwareI18n::Text &resource) {
     busy = true;
-    actionTitle = title ? title : "Bitte warten";
-    actionResource = resource ? resource : "";
-    overlay.show(screen, actionTitle.c_str(), actionResource.c_str());
+    actionTitle = title.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseWait) : title;
+    actionResource = resource;
+    overlay.show(screen, actionTitle, actionResource);
 }
 void ResourceListScreen::hideActionProgress() { busy = false; overlay.hide(); }
-void ResourceListScreen::showSuccessToast(const char *message) {
-    successMessage = message ? message : "Erfolgreich";
+void ResourceListScreen::showSuccessToast(const FirmwareI18n::Text &message) {
+    successMessage = message.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::Success) : message;
     successUntil = millis() + 3000;
     loop();
 }
@@ -173,7 +176,7 @@ void ResourceListScreen::loop() {
     sessionHeader.update();
     if (!footer) return;
     if (!successMessage.empty() && static_cast<int32_t>(successUntil - millis()) <= 0) successMessage.clear();
-    setLabelTextIfChanged(footer, !successMessage.empty() ? successMessage.c_str() : username.empty() ? "RFID-Karte auflegen oder Ressource öffnen" : "Ressource links: Details · Aktion rechts");
+    setLabelTextIfChanged(footer, !successMessage.empty() ? successMessage : username.empty() ? FirmwareI18n::Message::TapNfcCardOrOpenAResource : FirmwareI18n::Message::ResourceOnTheLeftDetailsActionOnTheRight);
     if (footerShowsSuccess != !successMessage.empty()) {
         footerShowsSuccess = !successMessage.empty();
         lv_obj_set_style_text_color(footer, footerShowsSuccess ? DisplayTheme::success() : DisplayTheme::muted(), 0);

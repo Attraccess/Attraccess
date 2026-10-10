@@ -1,3 +1,6 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { validate } from 'class-validator';
+import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
@@ -23,14 +26,22 @@ import { METRICS_TOGGLE_INVALIDATOR } from './metrics-toggle-invalidator.token';
 
 describe('SettingsService', () => {
   let service: SettingsService;
-  let store: { getPlainSetting: jest.Mock; setPlainSetting: jest.Mock; setSecretSetting: jest.Mock };
+  let events: { emit: jest.Mock };
+  let store: {
+    getPlainSetting: jest.Mock;
+    getSecretSetting: jest.Mock;
+    setPlainSetting: jest.Mock;
+    setSecretSetting: jest.Mock;
+  };
   let smtpSettings: { getSettings: jest.Mock };
   let userRepository: { count: jest.Mock };
   let invalidator: { refresh: jest.Mock };
 
   beforeEach(async () => {
+    events = { emit: jest.fn() };
     store = {
       getPlainSetting: jest.fn().mockResolvedValue(null),
+      getSecretSetting: jest.fn().mockResolvedValue({ configured: false, value: null }),
       setPlainSetting: jest.fn().mockResolvedValue(undefined),
       setSecretSetting: jest.fn().mockResolvedValue(undefined),
     };
@@ -41,6 +52,7 @@ describe('SettingsService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         SettingsService,
+        { provide: EventEmitter2, useValue: events },
         { provide: SettingsStoreService, useValue: store },
         { provide: SmtpSettingsService, useValue: smtpSettings },
         { provide: getRepositoryToken(User), useValue: userRepository },
@@ -60,6 +72,74 @@ describe('SettingsService', () => {
     expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.url, null);
     expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.publicInternetUrl, null);
     expect(store.setSecretSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.licenseKey, null);
+  });
+
+  it('defaults existing readers to German, persists the selected language, and falls back to English for corrupt values', async () => {
+    expect(await service.getDefaultLanguage()).toBe('de');
+    await service.updateAppSettings({ defaultLanguage: 'en' });
+    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.defaultLanguage, 'en');
+    store.getPlainSetting.mockResolvedValue('unexpected');
+    expect(await service.getDefaultLanguage()).toBe('en');
+  });
+
+  it.each([
+    [null, 'de'],
+    ['', 'en'],
+    ['de-DE', 'de'],
+    [' DE_at ', 'de'],
+    ['de-123', 'de'],
+    ['en-US', 'en'],
+    ['fr-FR', 'en'],
+    ['de-!!!', 'en'],
+    ['de-', 'en'],
+    ['de--DE', 'en'],
+    ['de-Latn-DE', 'de'],
+    ['de-DE-u-co-phonebk', 'de'],
+    ['de-CH-1901', 'de'],
+    ['de_DE_extraextra', 'en'],
+    ['de-u-12', 'en'],
+    ['de-t-12', 'en'],
+    ['de-u-ca-ca-12', 'en'],
+  ])('resolves stored language %s in both read methods', async (stored, expected) => {
+    store.getPlainSetting.mockResolvedValue(stored);
+    expect(await service.getDefaultLanguage()).toBe(expected);
+    expect(await service.getSystemLanguage()).toEqual({ defaultLanguage: expected, configured: stored !== null });
+    expect((await service.getAppSettings()).defaultLanguage).toBe(expected);
+  });
+
+  it('retains the legacy saved choice until a system default is saved, including an empty legacy value', async () => {
+    const values = new Map<string, string>([['attractap_language', 'en']]);
+    store.getPlainSetting.mockImplementation(async (_parent, key) => values.get(key) ?? null);
+    store.setPlainSetting.mockImplementation(async (_parent, key, value) => {
+      values.set(key, value);
+    });
+    expect(await service.getDefaultLanguage()).toBe('en');
+    values.set('attractap_language', '');
+    expect(await service.getDefaultLanguage()).toBe('en');
+    await service.updateAppSettings({ defaultLanguage: 'de' });
+    expect(await service.getDefaultLanguage()).toBe('de');
+    expect((await service.getAppSettings()).defaultLanguage).toBe('de');
+    expect(await service.resolveLanguage(undefined)).toBe('de');
+    expect(await service.resolveLanguage('en-US')).toBe('en-US');
+  });
+
+  it('announces only successfully persisted language changes', async () => {
+    await service.updateAppSettings({ defaultLanguage: 'en' });
+    expect(events.emit).toHaveBeenCalledWith('settings.default-language', 'en');
+    events.emit.mockClear();
+    store.setPlainSetting.mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(service.updateAppSettings({ defaultLanguage: 'de' })).rejects.toThrow('storage unavailable');
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
+  it.each(['de-DE', 'de-', 'fr', '', null])('rejects invalid new language selections %s', async (value) => {
+    const dto = Object.assign(new UpdateAppSettingsDto(), { defaultLanguage: value });
+    expect(await validate(dto)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'defaultLanguage' })]),
+    );
+  });
+  it.each(['de', 'en'])('accepts canonical new language selection %s', async (value) => {
+    expect(await validate(Object.assign(new UpdateAppSettingsDto(), { defaultLanguage: value }))).toEqual([]);
   });
 
   it('persists every authentication rate-limit option and returns the resolved policy', async () => {

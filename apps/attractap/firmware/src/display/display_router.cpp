@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "display/i18n.hpp"
 #include <functional>
 
 #include <algorithm>
@@ -55,6 +56,9 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
         std::remove(Display::pendingDestroyScreens.begin(),
                     Display::pendingDestroyScreens.end(), screen),
         Display::pendingDestroyScreens.end());
+
+    // Reused screens may have been hidden when the locale last changed.
+    FirmwareI18n::refreshTree(targetRoot, State::getActiveLanguage());
 
     IScreen *previousScreen = Display::activeScreen;
     if (previousScreen)

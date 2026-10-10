@@ -241,7 +241,7 @@ bool Application::processCardFlowState()
                        outcome == SupervisionFlow::Outcome::UnlockAndStartSession;
       if (outcome == SupervisionFlow::Outcome::UnlockAndStartSession) {
         this->pendingUiStartedAt = millis();
-        this->showReaderActionProgress("Nutzung wird gestartet");
+        this->showReaderActionProgress(FirmwareI18n::Message::StartingUsage);
         if (this->actionInProgressCount == 0) this->beginActionPause();
         this->pendingActionType = PENDING_ACTION_START_SESSION;
         this->pendingActionResourceId = this->selectedResourceId;
@@ -283,9 +283,10 @@ bool Application::processAuthenticationState()
   // waiting for its key). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
-    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte RFID-Karte erneut auflegen.");
+    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
   }
 #endif
+
 
   // A late or duplicate card-auth response (double-tap on the lockscreen sends
   // two requests; the websocket task sets the trigger asynchronously) must not
@@ -368,14 +369,14 @@ void Application::renderResourceState()
       now - this->pendingUiStartedAt > 60000) {
     this->finishReaderAction(false);
     this->handleFormsCancel();
-    Display::showErrorPopup("Aktion nicht bestätigt", "Der Ressourcenstatus wird neu geladen. Bitte vor einem erneuten Versuch prüfen.");
+    Display::showErrorPopup(FirmwareI18n::Message::ActionNotConfirmed, FirmwareI18n::Message::ResourceStatusIsBeingRefreshedCheckItBeforeTryingAgain);
   }
   // Finishing an action starts a new refresh timer; do not subtract its newer
   // timestamp from the earlier sample and wrap the unsigned elapsed duration.
   now = millis();
   if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
     this->logoutReader();
-    Display::showErrorPopup("Status nicht verfügbar", "Bitte erneut anmelden, um den aktuellen Ressourcenstatus zu laden.");
+    Display::showErrorPopup(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
   }
   if (this->unlocked) {
     uint32_t effectivePause = this->accumulatedPauseMs;

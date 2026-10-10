@@ -11,6 +11,9 @@
     "licenseKey": {
       "label": "License Key",
       "description": "Paste a new license key to update."
+    },
+    "defaultLanguage": {
+      "label": "Default system language"
     }
   },
   "actions": {

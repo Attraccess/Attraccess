@@ -44,7 +44,18 @@ void testSurfaces(Renderer &renderer)
     expect(lv_obj_get_style_border_width(screen.root, LV_PART_MAIN) == 0, "Screen has no border");
     auto *title = label(screen.root, "Production theme: surfaces");
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 24);
-    expect(lv_obj_get_style_text_font(title, LV_PART_MAIN) == &lv_font_montserrat_18, "Inherited 18px font");
+    const auto *bodyFont = lv_obj_get_style_text_font(title, LV_PART_MAIN);
+    expect(bodyFont->dsc == lv_font_montserrat_18.dsc && bodyFont->line_height == lv_font_montserrat_18.line_height &&
+               bodyFont->fallback == &attractap_font_montserrat_latin1_18,
+           "Inherited 18px font retains LVGL metrics and adds Latin-1 fallback");
+    for (uint32_t glyph : {0x00C4, 0x00D6, 0x00DC, 0x00DF, 0x00E4, 0x00F6, 0x00FC}) {
+        lv_font_glyph_dsc_t descriptor{};
+        expect(lv_font_get_glyph_dsc(bodyFont, &descriptor, glyph, 0) && !descriptor.is_placeholder,
+               "Inherited body font renders German glyphs without replacement boxes");
+    }
+    lv_font_glyph_dsc_t symbol{};
+    expect(lv_font_get_glyph_dsc(bodyFont, &symbol, 0xF00D, 0) && !symbol.is_placeholder,
+           "Inherited body font retains the close icon");
     expectColor(lv_obj_get_style_text_color(title, LV_PART_MAIN), DisplayTheme::text(), "Inherited body text");
     auto *surface = lv_obj_create(screen.root);
     lv_obj_set_size(surface, 400, 140);

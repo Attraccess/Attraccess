@@ -20,6 +20,39 @@ name) and the source subtrees excluded for that hardware. The firmware version
 lives in `version.txt` — bump it whenever firmware source changes (CI enforces
 this).
 
+## Language protocol compatibility and rollback
+
+Firmware 1.6.2 adds English/German display localization. The server sends a
+default language in `READER_AUTHENTICATED`, a cardholder language in
+`CARD_AUTHENTICATION_DATA`, and default changes through `READER_LANGUAGE`.
+Form validation replies retain `message` and add a stable `code` for translation.
+Existing event names, credentials and field values keep their meaning.
+
+| Server | Reader firmware | Behavior |
+| --- | --- | --- |
+| With language support | 1.6.2 | The system default applies outside a cardholder session; the user's language applies during the session. Form error identifiers translate in both languages. |
+| Without language support | 1.6.2 | Missing authentication language fields select English. Form errors without a code show the English invalid-input fallback. Resource and card operations retain their existing protocol. |
+| With language support | Pre-localization implementation on main | Additional payload fields are ignored. `READER_LANGUAGE` is acknowledged, then logged as an unknown event; it does not change authentication or resource state. Existing German screens remain unchanged. Form errors still use the retained `message`. |
+
+The predecessor behavior was inspected at main commit
+`721ba7a6891042bf65d356f4dcf276d893ecaa0a`: `src/api/api.cpp` acknowledges events
+before dispatching them and only logs unknown types. `api/handlers/auth.cpp` reads the
+device name without consuming additional fields; `api_cards.cpp` likewise
+ignores the added language field. This is source evidence for that predecessor,
+not verification of every deployed firmware build.
+
+For rollback, restore the previous server release first, then reconnect readers
+so they receive its authentication response. Readers still running 1.6.2 use
+English until their firmware is restored. Restore each reader's previous
+variant-specific firmware image next; the predecessor uses its existing German
+interface. Retained server language settings need no deletion. Confirm reader
+authentication, a card login, a resource action and logout after rollback.
+
+Desktop tests exercise missing reader/card language fields, legacy form errors,
+default changes during sessions and restoring the latest default at logout.
+These checks use the production parser with a simulated server. Deployed-reader
+rollback, physical NFC and live networking remain unverified.
+
 ## Building
 
 Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh`. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.

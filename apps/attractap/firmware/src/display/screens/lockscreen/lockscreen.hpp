@@ -18,7 +18,7 @@ public:
     std::string getName() override;
     void destroy() override;
     void setBackCallback(std::function<void()> callback) { backCallback = std::move(callback); }
-    void showActionProgress() { authenticating = true; overlay.show(screen, "Karte wird geprüft", resourceName); }
+    void showActionProgress() { authenticating = true; overlay.show(screen, FirmwareI18n::Message::CheckingCard, FirmwareI18n::Text::literal(resourceName)); }
     void hideActionProgress() { authenticating = false; overlay.hide(); }
 
     /* The lockscreen is re-entered on every card removal / session end, so
@@ -37,6 +37,8 @@ private:
 
     lv_obj_t *resourceNameLabel = nullptr;
     lv_obj_t *usageInfoLabel = nullptr;
+    lv_obj_t *signInPromptLabel = nullptr;
+    std::string renderedLanguage;
 
     char resourceName[API::MAX_RESOURCE_NAME_LEN];
     char username[API::MAX_USERNAME_LEN];

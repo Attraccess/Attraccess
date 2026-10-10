@@ -45,6 +45,7 @@ describe('AttractapCardHandler', () => {
             payload: expect.objectContaining({
               key: handleCardAuthenticationRequestScope.activeCard.key,
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
+              language: 'en',
             }),
           }),
         }),
@@ -120,6 +121,60 @@ describe('AttractapCardHandler', () => {
       expect(handleCardAuthenticationRequestScope.resourceUsageService.canControllResource).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['de-AT', 'de'],
+      ['de_CH', 'de'],
+      ['de-Latn-DE', 'de'],
+      ['de-DE-u-co-phonebk', 'de'],
+      ['de-CH-1901', 'de'],
+      ['de-u', 'en'],
+      ['de-u-12', 'en'],
+      ['de-t-12', 'en'],
+      ['de-u-ca-ca-12', 'en'],
+      ['de-1901-1901', 'en'],
+      ['en-US', 'en'],
+      ['fr-FR', 'en'],
+      ['de-!!!', 'en'],
+      ['de-', 'en'],
+      ['', 'en'],
+      [undefined, 'en'],
+    ])('delivers the supported user language for %s', async (locale, expected) => {
+      const socket = handleCardAuthenticationRequestScope.createMockSocket();
+      handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID.mockResolvedValueOnce({
+        ...handleCardAuthenticationRequestScope.activeCard,
+        user: { ...handleCardAuthenticationRequestScope.activeCard.user, locale },
+      });
+      await handleCardAuthenticationRequestScope.handler.handleCardAuthenticationRequest(socket, {
+        payload: { uid: 'abc', resourceId: 10 },
+      } as AttractapEvent['data']);
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.CARD_AUTHENTICATION_DATA,
+            payload: expect.objectContaining({ language: expected }),
+          }),
+        }),
+      );
+    });
+    it('reloads the current stored user locale on every tap', async () => {
+      const socket = handleCardAuthenticationRequestScope.createMockSocket();
+      handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID.mockResolvedValueOnce({
+        ...handleCardAuthenticationRequestScope.activeCard,
+        user: { ...handleCardAuthenticationRequestScope.activeCard.user, locale: 'de' },
+      });
+      handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID.mockResolvedValueOnce({
+        ...handleCardAuthenticationRequestScope.activeCard,
+        user: { ...handleCardAuthenticationRequestScope.activeCard.user, locale: 'en' },
+      });
+      const request = { payload: { uid: 'abc', resourceId: 10 } } as AttractapEvent['data'];
+      await handleCardAuthenticationRequestScope.handler.handleCardAuthenticationRequest(socket, request);
+      await handleCardAuthenticationRequestScope.handler.handleCardAuthenticationRequest(socket, request);
+      const languages = socket.sendMessage.mock.calls
+        .filter(([event]) => event.data.type === AttractapEventType.CARD_AUTHENTICATION_DATA)
+        .map(([event]) => event.data.payload.language);
+      expect(languages).toEqual(['de', 'en']);
+      expect(handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID).toHaveBeenCalledTimes(2);
+    });
     it('sets lastAuthenticatedUserId and sends CARD_AUTHENTICATION_DATA on success', async () => {
       const socket = handleCardAuthenticationRequestScope.createMockSocket();
       handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID.mockResolvedValueOnce(
@@ -152,6 +207,7 @@ describe('AttractapCardHandler', () => {
               keyNo: handleCardAuthenticationRequestScope.activeCard.keyNo,
               key: handleCardAuthenticationRequestScope.activeCard.key,
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
+              language: 'en',
               canManageResource: true,
               hasIntroduction: true,
               isIntroducer: true,

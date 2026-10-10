@@ -165,7 +165,8 @@ add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-
 set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
-set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 180)
+# Includes the bilingual reader journey plus four real 30-second expiry windows.
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 240)
 
 # Exercise the production beeper without playing sound on the developer's machine.
 set_property(TEST

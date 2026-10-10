@@ -86,7 +86,7 @@ For reader operation, see the user guide in
 `pnpm nx test attractap-desktop` also runs the reader workflows against a
 deterministic server transport. These cover sign-in, resource actions, forms,
 supervision and recovery. The timeout test uses a real clock and takes about
-134 seconds. The tests exercise the application, API parser, NFC verifier and
+three minutes. The tests exercise the application, API parser, NFC verifier and
 screen router; physical NFC, touch hardware and live-network behavior still
 need a device smoke test.
 

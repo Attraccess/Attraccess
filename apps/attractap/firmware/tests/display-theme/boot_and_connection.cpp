@@ -31,6 +31,11 @@ void testInit(Renderer &renderer)
     auto *search = requireObject(screen.root, &lv_label_class, "suche Zertifikat");
     expectColor(lv_obj_get_style_text_color(search, LV_PART_MAIN), DisplayTheme::warning(), "Certificate search warning");
     renderer.capture("init-cert-search");
+    FirmwareI18n::refreshTree(screen.root, "en");
+    requireObject(screen.root, &lv_label_class, "Wi-Fi  192.0.2.42");
+    requireObject(screen.root, &lv_label_class, "Server: reader.example:443  (SSL)");
+    renderer.capture("init-cert-search-english");
+    FirmwareI18n::refreshTree(screen.root, "de");
     Fixtures::websocket.connected = true;
     Fixtures::websocket.phase = State::WS_CONNECTED;
     Fixtures::api.authenticated = true;

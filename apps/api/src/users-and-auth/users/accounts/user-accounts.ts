@@ -1,3 +1,4 @@
+import { SettingsService } from '../../../settings/settings.service';
 import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
 
 import {
@@ -240,9 +241,7 @@ export abstract class UserAccounts {
     user.email = data.email;
     user.externalIdentifier = data.externalIdentifier;
     user.isEmailVerified = data.isEmailVerified;
-    if (userData.locale) {
-      user.locale = userData.locale.trim() || 'en';
-    }
+    user.locale = userData.locale?.trim() || (await this.settingsService.getDefaultLanguage());
 
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');
@@ -420,6 +419,8 @@ export abstract class UserAccounts {
   protected abstract anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void>;
 
   protected abstract emailService: EmailService;
+
+  protected abstract readonly settingsService: SettingsService;
 
   protected abstract applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void;
 

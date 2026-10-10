@@ -1,8 +1,11 @@
 // Thread-safe global device state guarded by a FreeRTOS mutex
 // FEATURE: Cross-task state synchronization for network and API status
 
+
 #include "state.hpp"
+#include "language.hpp"
 #include <string>
+
 
 #include "state_lock.hpp"
 
@@ -39,6 +42,8 @@ bool State::websocket_cert_locked = false;
 int State::websocket_next_attempt_seconds = 0;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
+static Language::Session language_session;
+
 
 void State::setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL)
 {
@@ -90,11 +95,14 @@ State::WebsocketState State::getWebsocketState()
     return state;
 }
 
-void State::setApiState(bool authenticated, std::string deviceName)
+void State::setApiState(bool authenticated, std::string deviceName, std::string defaultLanguage)
 {
     StateLock lock(state_mutex);
     api_authenticated = authenticated;
     api_device_name = deviceName;
+    // An empty value means a connectivity transition. Keep the last server
+    // setting so the offline/unauthenticated screens do not jump to German.
+    language_session.setApi(authenticated, defaultLanguage);
 }
 
 State::ApiState State::getApiState()
@@ -103,8 +111,29 @@ State::ApiState State::getApiState()
     ApiState state;
     state.authenticated = api_authenticated;
     state.deviceName = api_device_name;
+    state.defaultLanguage = language_session.defaultLanguage;
+    state.userLanguage = language_session.userLanguage;
+    state.userAuthenticated = language_session.userAuthenticated;
 
     return state;
+}
+
+void State::setUserLanguage(bool authenticated, std::string language)
+{
+    StateLock lock(state_mutex);
+    language_session.setUser(authenticated, language);
+}
+
+void State::setDefaultLanguage(std::string language)
+{
+    StateLock lock(state_mutex);
+    language_session.setDefault(language);
+}
+
+std::string State::getActiveLanguage()
+{
+    StateLock lock(state_mutex);
+    return language_session.active();
 }
 
 void State::setEthernetState(bool connected, esp_ip4_addr_t ip)

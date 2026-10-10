@@ -1,3 +1,5 @@
+#include "state/state.hpp"
+#include "display/i18n.hpp"
 #include "lockscreen.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../theme.hpp"
@@ -20,12 +22,14 @@ void Lockscreen::init()
     lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
 
     lv_obj_t *label = lv_label_create(this->screen);
+    this->signInPromptLabel = label;
     lv_obj_set_width(label, LV_SIZE_CONTENT);
     lv_obj_set_height(label, LV_SIZE_CONTENT);
     lv_obj_set_x(label, 12);
     lv_obj_set_y(label, -57);
     lv_obj_set_align(label, LV_ALIGN_CENTER);
-    lv_label_set_text(label, "Bitte mit RFID \n        Karte/Tag anmelden");
+    this->renderedLanguage = State::getActiveLanguage();
+    FirmwareI18n::setLabel(label, FirmwareI18n::Message::TapYourNfcCardTagToSignIn);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -71,16 +75,17 @@ void Lockscreen::init()
     lv_label_set_long_mode(this->resourceNameLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->resourceNameLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(this->resourceNameLabel, "???");
+    FirmwareI18n::setLabel(this->resourceNameLabel, FirmwareI18n::Text::literal("???"));
     lv_obj_set_style_text_color(this->resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->resourceNameLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
     this->usageInfoLabel = lv_label_create(resourceInfo);
     lv_obj_set_width(this->usageInfoLabel, lv_pct(100));
     lv_label_set_long_mode(this->usageInfoLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->usageInfoLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->usageInfoLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(this->usageInfoLabel, "???");
+    FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Text::literal("???"));
     lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_update_layout(this->screen);
@@ -92,8 +97,18 @@ lv_obj_t *Lockscreen::getScreen()
     return this->screen;
 }
 
+
 void Lockscreen::loop()
 {
+    const std::string language = State::getActiveLanguage();
+    if (this->signInPromptLabel && language != this->renderedLanguage)
+    {
+        this->renderedLanguage = language;
+        FirmwareI18n::setLabel(this->signInPromptLabel, FirmwareI18n::Message::TapYourNfcCardTagToSignIn);
+        // This screen remains alive across authentication transitions. Refresh
+        // its status as well as the prompt when the active locale changes.
+        this->updateUsageInfo();
+    }
 }
 
 std::string Lockscreen::getName()
@@ -129,23 +144,26 @@ void Lockscreen::updateUsageInfo()
         return;
     }
 
-    lv_label_set_text(this->resourceNameLabel, this->resourceName);
+    // Resource names come from the server and must not be treated as catalog
+    // keys. The label starts with a localized placeholder, so clear that
+    // registration before replacing it with server supplied text.
+    FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName);
 
     // Status priority mirrors the web resource list: in use > maintenance > available.
     if (this->hasActiveUsage)
     {
-        std::string usageText = std::string("In Verwendung: ") + this->username;
-        lv_label_set_text(this->usageInfoLabel, usageText.c_str());
+        const auto usageText = FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(this->username)});
+        FirmwareI18n::setLabel(this->usageInfoLabel, usageText);
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else if (this->isUnderMaintenance)
     {
-        lv_label_set_text(this->usageInfoLabel, "In Wartung");
+        FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Message::UnderMaintenance);
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else
     {
-        lv_label_set_text(this->usageInfoLabel, "Verfügbar");
+        FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Message::Available);
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }

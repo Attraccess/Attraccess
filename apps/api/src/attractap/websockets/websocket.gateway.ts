@@ -1,3 +1,4 @@
+import { OnEvent } from '@nestjs/event-emitter';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 
 import {
@@ -12,7 +13,7 @@ import {
 
 import { Mutex } from 'async-mutex';
 
-import { Server } from 'ws';
+import { Server, WebSocket } from 'ws';
 
 import { LicenseService, LicenseModuleType } from '../../license/license.service';
 
@@ -183,6 +184,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_LANGUAGE]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
@@ -198,6 +200,26 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   public async sendResourceList(readerId: number) {
     return this.resourceListService.sendResourceList(readerId);
+  }
+
+  @OnEvent('settings.default-language')
+  async updateReaderLanguage(language: 'en' | 'de') {
+    this.websocketService.readerLanguage = language;
+    const readers = Array.from(this.websocketService.sockets.values()).filter((socket) =>
+      this.canReceiveReaderLanguage(socket),
+    );
+    await Promise.all(
+      readers.map((socket) => socket.sendMessage(new AttractapEvent(AttractapEventType.READER_LANGUAGE, { language }))),
+    );
+  }
+
+  private canReceiveReaderLanguage(socket: AuthenticatedWebSocket): boolean {
+    return (
+      typeof socket.readerId === 'number' &&
+      Number.isInteger(socket.readerId) &&
+      socket.readerId > 0 &&
+      socket.readyState === WebSocket.OPEN
+    );
   }
 
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {
@@ -417,14 +439,34 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       message.data.messageId = messageCount;
 
       const RETRY_COUNT = 3;
+      const socket = client as unknown as AuthenticatedWebSocket;
+      const readerId = socket.readerId;
+      const authenticationAttempt = socket.state.readerAuthenticationAttempt;
 
       let lastError: Error | undefined;
 
       for (let i = 0; i < RETRY_COUNT; i++) {
+        // Delivery belongs to this authenticated connection, including retries.
+        // Revocation or reauthentication cancels its old broadcast only.
+        if (
+          message.data.type === AttractapEventType.READER_LANGUAGE &&
+          (!this.canReceiveReaderLanguage(socket) ||
+            socket.readerId !== readerId ||
+            socket.state.readerAuthenticationAttempt !== authenticationAttempt)
+        )
+          return false;
         this.logger.debug(
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
           message.data.payload,
         );
+        // An older auth/update retry must not restore a superseded default.
+        if (
+          (message.data.type === AttractapEventType.READER_AUTHENTICATED ||
+            message.data.type === AttractapEventType.READER_LANGUAGE) &&
+          this.websocketService.readerLanguage !== undefined
+        ) {
+          message.data.payload.language = this.websocketService.readerLanguage;
+        }
         const stringifiedMessage = JSON.stringify(this.sanitizeForLVGL(message));
         client.send(stringifiedMessage);
 

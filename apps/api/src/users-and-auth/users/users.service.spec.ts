@@ -97,6 +97,7 @@ describe('UsersService', () => {
         email: 'test@example.com',
         externalIdentifier: null,
         isEmailVerified: false,
+        locale: 'en',
       });
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, expect.anything());
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
@@ -701,10 +702,11 @@ describe('UsersService', () => {
       expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ZH-Hant-TW' }));
     });
 
-    it('leaves locale at column default when not provided', async () => {
+    it('uses the system default when no personal locale was provided', async () => {
+      fixture.settingsService.getDefaultLanguage.mockResolvedValue('de');
       await fixture.service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null });
       const saved = (fixture.userRepository.save as jest.Mock).mock.calls[0][0] as Partial<User>;
-      expect(saved.locale).toBeUndefined();
+      expect(saved.locale).toBe('de');
     });
   });
 

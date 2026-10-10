@@ -1,3 +1,4 @@
+#include "i18n.hpp"
 #include "display.hpp"
 #include "theme.hpp"
 #include "fonts/attractap_fonts.hpp"
@@ -9,17 +10,17 @@
 // and an insufficient-balance top-up dialog. Both replace any active popup and
 // store the overlay in Display::activePopup so hidePopup can tear it down.
 
-void Display::showErrorPopup(const std::string &title, const std::string &message)
+void Display::showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message)
 {
     Display::showMessagePopup(title, message, true);
 }
 
 void Display::showBillingSummary(const std::string &total)
 {
-    Display::showMessagePopup("Gesamtkosten dieser Sitzung", total, false);
+    Display::showMessagePopup(FirmwareI18n::Message::SessionTotal, FirmwareI18n::Text::literal(total), false);
 }
 
-void Display::showMessagePopup(const std::string &title, const std::string &message, bool error)
+void Display::showMessagePopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool error)
 {
     // Close existing popup if any
     Display::hidePopup();
@@ -52,16 +53,17 @@ void Display::showMessagePopup(const std::string &title, const std::string &mess
     lv_obj_set_flex_flow(dialog, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
 
+
     // Title
     lv_obj_t *titleLbl = lv_label_create(dialog);
-    lv_label_set_text(titleLbl, title.c_str());
+    FirmwareI18n::setLabel(titleLbl, title);
     lv_obj_set_width(titleLbl, lv_pct(100));
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Message
     lv_obj_t *msgLbl = lv_label_create(dialog);
-    lv_label_set_text(msgLbl, message.c_str());
+    FirmwareI18n::setLabel(msgLbl, message);
     lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(msgLbl, error ? &attractap_font_montserrat_latin1_14 : &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
@@ -80,7 +82,7 @@ void Display::showMessagePopup(const std::string &title, const std::string &mess
     DisplayTheme::button(okBtn, error ? DisplayTheme::danger() : DisplayTheme::primary());
 
     lv_obj_t *okLbl = lv_label_create(okBtn);
-    lv_label_set_text(okLbl, "OK");
+    FirmwareI18n::setLabel(okLbl, FirmwareI18n::Message::Ok);
 
     lv_obj_add_event_cb(okBtn, [](lv_event_t *e)
                         {
@@ -108,24 +110,26 @@ void Display::hidePopup()
 
 lv_obj_t *createBalanceAmountInput(lv_obj_t *dialog)
 {
+
     // Title
     lv_obj_t *titleLbl = lv_label_create(dialog);
-    lv_label_set_text(titleLbl, "Unzureichendes Guthaben");
+    FirmwareI18n::setLabel(titleLbl, FirmwareI18n::Message::InsufficientBalance);
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Message
     lv_obj_t *msgLbl = lv_label_create(dialog);
-    lv_label_set_text(msgLbl, "Ihr Guthaben reicht nicht aus, um die Aktion auszuführen. Bitte laden Sie Ihr Guthaben auf.");
+    FirmwareI18n::setLabel(msgLbl, FirmwareI18n::Message::YourBalanceIsTooLowForThisActionPleaseTopUpYourBalance);
     lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(msgLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
     // Amount label
     lv_obj_t *amountLbl = lv_label_create(dialog);
-    lv_label_set_text(amountLbl, "Betrag (EUR)");
+    FirmwareI18n::setLabel(amountLbl, FirmwareI18n::Message::AmountEur);
     lv_obj_set_style_text_color(amountLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(amountLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
     // Amount input
     lv_obj_t *amountTa = lv_textarea_create(dialog);
@@ -176,11 +180,13 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
 
     lv_obj_t *amountTa = createBalanceAmountInput(dialog);
+
     // Inline error label (initially empty)
     lv_obj_t *errorLbl = lv_label_create(dialog);
-    lv_label_set_text(errorLbl, "");
+    FirmwareI18n::setLabel(errorLbl, FirmwareI18n::Text::literal(""));
     lv_obj_set_style_text_color(errorLbl, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(errorLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
     // Footer with buttons
     lv_obj_t *footer = lv_obj_create(dialog);
@@ -249,7 +255,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
     DisplayTheme::secondaryButton(cancelBtn);
     lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
-    lv_label_set_text(cancelLbl, "Abbrechen");
+    FirmwareI18n::setLabel(cancelLbl, FirmwareI18n::Message::Cancel);
 
     // Start button
     lv_obj_t *startBtn = lv_button_create(footer);
@@ -257,7 +263,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_set_width(startBtn, LV_SIZE_CONTENT);
     DisplayTheme::button(startBtn);
     lv_obj_t *startLbl = lv_label_create(startBtn);
-    lv_label_set_text(startLbl, "Aufladen");
+    FirmwareI18n::setLabel(startLbl, FirmwareI18n::Message::TopUp);
 
     // Handlers
     lv_obj_add_event_cb(cancelBtn, [](lv_event_t *e)
@@ -278,12 +284,12 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         bool hasDigits = false;
         for (const char *p = txt; p && *p; ++p) { if (*p >= '0' && *p <= '9') { hasDigits = true; break; } }
         if (!hasDigits) {
-            lv_label_set_text(c->errorLbl, "Bitte Betrag eingeben.");
+            FirmwareI18n::setLabel(c->errorLbl, FirmwareI18n::Message::PleaseEnterAnAmount);
             return;
         }
         long euros = strtol(txt, NULL, 10);
         if (euros <= 0) {
-            lv_label_set_text(c->errorLbl, "Bitte gültigen Betrag eingeben.");
+            FirmwareI18n::setLabel(c->errorLbl, FirmwareI18n::Message::PleaseEnterAValidAmount);
             return;
         }
         uint32_t amountCents = (uint32_t)(euros * 100);
@@ -296,9 +302,10 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         lv_obj_t *dialog = lv_obj_get_parent(footer);
         lv_obj_clean(dialog);
         lv_obj_t *infoLbl = lv_label_create(dialog);
-        lv_label_set_text(infoLbl, "Bitte am Zahlungsterminal fortfahren ...");
+        FirmwareI18n::setLabel(infoLbl, FirmwareI18n::Message::PleaseContinueAtThePaymentTerminal);
         lv_obj_set_style_text_color(infoLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(infoLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
         if (c->onStart) c->onStart(amountCents);
         // Close after short delay

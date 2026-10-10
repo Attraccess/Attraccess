@@ -1,0 +1,100 @@
+import { normalizeDeviceLanguage } from './device-language';
+
+describe('device language locale normalization', () => {
+  it.each([
+    'de',
+    'de-DE',
+    ' DE_at ',
+    'de-123',
+    'de-Latn-DE',
+    'de-DE-u-co-phonebk',
+    'de-CH-1901',
+    'de-Latn-CH-1996-u-ca-gregory',
+    'de-DE-x-reader',
+    'de-a-foo-b-bar',
+    'de-DE-extra',
+    'de-1234',
+    'de-u-foo-ca-gregory-kn',
+    'de-u-1a',
+    'de-u-kn',
+    'de-t-en',
+    'de-t-en-US-h0-hybrid',
+    'de-t-h0-hybrid',
+    'de-t-zh-Hant-TW-m0-ungegn-u-ca-gregory-x-reader',
+    'de-t-en-US-1901',
+    'de-u-ca-gregory-ca-buddhist',
+    'de-t-h0-abc-h0-def',
+    'de-x-u-ca-ca-12',
+    'de-US-u-ca-gregory',
+    'de-US-x-u-ca-ca-12',
+  ])('resolves the complete German locale %s', (locale) => {
+    expect(normalizeDeviceLanguage(locale)).toBe('de');
+  });
+
+  it.each([
+    null,
+    undefined,
+    '',
+    'en-Latn-US',
+    'fr-DE',
+    'x-de',
+    'de-',
+    'de-!!!',
+    'de--DE',
+    'de-Latn-DE-!',
+    'de-DE-Latn',
+    'de-abc',
+    'de-u',
+    'de-u-x-private',
+    'de-x',
+    'de-1901-1901',
+    'de-u-co-phonebk-u-ca-gregory',
+    'de-DE-extraextra',
+    'de-u-12',
+    'de-u-a1',
+    'de-u-foo-12',
+    'de-u-ca-gregory-12',
+    'de-t-12',
+    'de-t-h0',
+    'de-t-en-h0',
+    'de-t-en-12',
+    'de-t-abcd',
+    'de-t-en-US-ca-gregory',
+    'de-t-en-US-1901-1901',
+    'de-t-h0-abc-12',
+    'de-u-ca-ca-12',
+    'de-u-kn-kn-a1',
+    'de-US-u-ca-ca-12',
+    'DE_us_U_kn_kn_A1',
+  ])('uses English for unsupported or malformed locale %s', (locale) => {
+    expect(normalizeDeviceLanguage(locale)).toBe('en');
+  });
+});
+
+// Keep this whitespace contract identical to the firmware host fixtures.
+describe('locale whitespace contract', () => {
+  it('handles long whitespace runs without regex backtracking', () => {
+    const padding = '\t'.repeat(100_000);
+    expect(normalizeDeviceLanguage(padding + 'de' + padding)).toBe('de');
+    expect(normalizeDeviceLanguage('de' + padding + '!')).toBe('en');
+    expect(normalizeDeviceLanguage(padding)).toBe('en');
+  });
+  it.each([' ', '\t', '\r', '\n', '\v', '\f'])('trims ASCII whitespace %j', (padding) => {
+    expect(normalizeDeviceLanguage(padding + 'DE_at' + padding)).toBe('de');
+    expect(normalizeDeviceLanguage('de' + padding + '-AT')).toBe('en');
+  });
+  it.each([
+    0x00a0,
+    0x1680,
+    ...Array.from({ length: 11 }, (_, i) => 0x2000 + i),
+    0x2028,
+    0x2029,
+    0x202f,
+    0x205f,
+    0x3000,
+    0xfeff,
+  ])('rejects Unicode whitespace U+%s', (codepoint) => {
+    const padding = String.fromCodePoint(codepoint);
+    expect(normalizeDeviceLanguage(padding + 'de' + padding)).toBe('en');
+  });
+});

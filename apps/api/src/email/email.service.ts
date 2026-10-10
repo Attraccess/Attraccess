@@ -102,7 +102,10 @@ export class EmailService {
     const secondsFormatOptions = { maximumFractionDigits: 3 };
     let secondsFormatter: Intl.NumberFormat;
     try {
-      secondsFormatter = new Intl.NumberFormat(user.locale ?? 'en', secondsFormatOptions);
+      secondsFormatter = new Intl.NumberFormat(
+        await this.settingsService.resolveLanguage(user.locale),
+        secondsFormatOptions,
+      );
     } catch {
       // Persisted locales are not restricted to valid Intl tags. Match the default email language.
       secondsFormatter = new Intl.NumberFormat('en', secondsFormatOptions);
@@ -493,7 +496,7 @@ export class EmailService {
     manager?: EntityManager,
   ) {
     try {
-      const locale = user.locale ?? 'en';
+      const locale = await this.settingsService.resolveLanguage(user.locale);
       const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
       const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);

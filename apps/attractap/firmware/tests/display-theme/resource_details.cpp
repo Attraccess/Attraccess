@@ -29,6 +29,11 @@ void testUsageStatsExpiry(Renderer &renderer)
     requireObject(guard.root, &lv_label_class, "Energy (kWh): 0.125\n0,30 EUR / Wert\nHeartbeats: 3\n0,00 EUR / Wert");
     requireObject(guard.root, &lv_label_class, "00:01:00 · Läuft");
     renderer.capture("usage-stats-meters");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    requireObject(guard.root, &lv_label_class, "Current usage");
+    requireObject(guard.root, &lv_label_class, "00:01:00 · Running");
+    renderer.capture("usage-stats-meters-english");
+    FirmwareI18n::refreshTree(guard.root, "de");
     Fixtures::nowMs = receivedAt + 25000;
     details.loop();
     requireObject(guard.root, &lv_label_class, "Warte auf Messwert");
@@ -79,7 +84,7 @@ void testIntroducerDetails(Renderer &renderer)
         expect(bounds.y2 < 480 && bounds.y2 > 0, "Last tutor is reachable by scrolling");
         expect(lv_obj_get_width(list) <= lv_obj_get_content_width(panel), "Long names wrap inside the panel");
         renderer.capture(occupied ? "introducers-occupied-bottom" : "introducers-available-bottom");
-        details.showActionProgress("Bitte warten");
+        details.showActionProgress(FirmwareI18n::Message::PleaseWait);
         settle();
         auto *overlay = lv_obj_get_child(guard.root, -1);
         const auto expectOverlayCoverage = [&] {

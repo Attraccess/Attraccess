@@ -105,6 +105,28 @@ describe('administration audit policy', () => {
       expect(projectAdministrationAuditEvent({ ...setting, details })).toBeNull();
   });
 
+  it.each(['en', 'de'])('accepts canonical %s language changes', (after) => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey: 'app.defaultLanguage', before: 'de', after },
+      }),
+    ).not.toBeNull();
+  });
+
+  it.each(['', 'fr', 'de-DE', 'secret-marker'])('rejects noncanonical language audit values %s', (after) => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey: 'app.defaultLanguage', before: 'de', after },
+      }),
+    ).toBeNull();
+  });
+
   it('removes credentials, query data and private paths from registry URLs and custom package specs', () => {
     expect(safeAuditOrigin('https://user:secret@example.com/private?token=secret#fragment')).toBe(
       'https://example.com',

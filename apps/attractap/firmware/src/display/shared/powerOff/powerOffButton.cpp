@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #ifdef HAS_POWER_BUTTON
 
 #include "powerOffButton.hpp"
@@ -9,14 +10,25 @@ namespace
     std::function<void()> g_onConfirm;
     lv_obj_t *g_confirm = nullptr;
 
-    lv_obj_t *makeButton(lv_obj_t *parent, lv_color_t color, const char *text, lv_event_cb_t cb)
+    lv_obj_t *makeButton(lv_obj_t *parent, lv_color_t color, const FirmwareI18n::Text &text, lv_event_cb_t cb,
+                         const char *symbol = nullptr)
     {
         lv_obj_t *btn = lv_button_create(parent);
         DisplayTheme::button(btn, color);
         lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, nullptr);
 
+        if (symbol)
+        {
+            lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_ROW);
+            lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+            lv_obj_set_style_pad_column(btn, 8, LV_PART_MAIN);
+            lv_obj_t *icon = lv_label_create(btn);
+            FirmwareI18n::setDynamicLabel(icon, symbol);
+            lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, LV_PART_MAIN);
+        }
+
         lv_obj_t *lbl = lv_label_create(btn);
-        lv_label_set_text(lbl, text);
+        FirmwareI18n::setLabel(lbl, text);
         lv_obj_set_align(lbl, LV_ALIGN_CENTER);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, LV_PART_MAIN);
         return btn;
@@ -75,7 +87,7 @@ namespace
         lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
         lv_obj_t *lbl = lv_label_create(dialog);
-        lv_label_set_text(lbl, "Gerät ausschalten?");
+        FirmwareI18n::setLabel(lbl, FirmwareI18n::Message::PowerOffDevice);
         lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl, &attractap_font_montserrat_latin1_24, LV_PART_MAIN);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
@@ -89,17 +101,18 @@ namespace
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
         lv_obj_set_style_pad_column(row, 16, LV_PART_MAIN);
 
-        lv_obj_t *cancelBtn = makeButton(row, DisplayTheme::primary(), "Abbrechen", &onCancel);
+        lv_obj_t *cancelBtn = makeButton(row, DisplayTheme::primary(), FirmwareI18n::Message::Cancel, &onCancel);
         DisplayTheme::secondaryButton(cancelBtn);
         lv_obj_set_size(cancelBtn, 180, 52);
-        lv_obj_set_size(makeButton(row, DisplayTheme::danger(), LV_SYMBOL_POWER "  Ausschalten", &onConfirm), 180, 52);
+        lv_obj_set_size(makeButton(row, DisplayTheme::danger(), FirmwareI18n::Message::PowerOff, &onConfirm,
+                                  LV_SYMBOL_POWER), 180, 52);
     }
 }
 
 lv_obj_t *PowerOffButton::create(lv_obj_t *parent, std::function<void()> cb)
 {
     g_onConfirm = cb;
-    lv_obj_t *btn = makeButton(parent, DisplayTheme::danger(), LV_SYMBOL_POWER, &onPowerBtn);
+    lv_obj_t *btn = makeButton(parent, DisplayTheme::danger(), FirmwareI18n::Text::literal(LV_SYMBOL_POWER), &onPowerBtn);
     lv_obj_set_size(btn, 56, 40);
     return btn;
 }

@@ -51,7 +51,7 @@ uint32_t resourceRefreshRequestId = 0;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)
-std::string actionCompletionMessage;
+    FirmwareI18n::Text actionCompletionMessage;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

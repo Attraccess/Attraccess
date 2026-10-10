@@ -1,9 +1,8 @@
 import { Resource, SupervisionMode } from '@attraccess/database-entities';
 
+import { normalizeDeviceLanguage } from '../../../language/device-language';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-
 import { InjectRepository } from '@nestjs/typeorm';
-
 import { Repository } from 'typeorm';
 
 import { AuditService } from '../../../../audit/audit.service';
@@ -120,6 +119,7 @@ export class AttractapCardHandler {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
+        language: normalizeDeviceLanguage(nfcCard.user.locale),
         canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
         hasIntroduction,
         isIntroducer,

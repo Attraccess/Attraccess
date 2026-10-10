@@ -26,6 +26,8 @@ struct ReaderWorkflow
     Framebuffer display;
     unsigned listVersion = 0;
     std::string username = "Alex";
+    std::string userLocale = "de";
+
     bool active = false, supervised = false;
     uint32_t activeUsageId = 99;
     std::string longDescription;
@@ -54,8 +56,15 @@ struct ReaderWorkflow
     }
     void pump(uint32_t duration = 60) {
         const auto end = millis() + duration;
-        do { application.loop(); lv_timer_handler(); std::this_thread::sleep_for(std::chrono::milliseconds(5)); }
-        while (static_cast<int32_t>(end - millis()) > 0);
+        unsigned iterations = 0;
+        // Display refresh precedes API processing in the application loop.
+        // Always allow the following tick to render received state, even if
+        // a loaded host consumed the entire wall-clock interval in one tick.
+        do {
+            application.loop(); lv_timer_handler();
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            ++iterations;
+        } while (iterations < 4 || static_cast<int32_t>(end - millis()) > 0);
     }
     void click(const char *text, bool popup = false) {
         auto *found = label(popup ? lv_layer_top() : lv_screen_active(), text);
@@ -106,18 +115,19 @@ struct ReaderWorkflow
     void login(bool refresh = true) {
         nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
         if (drawerSettingsBeforeLogin) {
-            assert(!lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
+            assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))));
             lv_obj_send_event(drawerSettingsBeforeLogin, LV_EVENT_CLICKED, nullptr);
             pump();
             assert(lv_screen_active() == Display::resourceListScreen.getScreen());
             drawerSettingsBeforeLogin = nullptr;
         }
-        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
+        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\",\"language\":\"" + userLocale + R"(","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
         pump(250); nfc.setPresent(0, false);
         if (refresh) list();
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
         pump();
     }
+    void testLocalization();
     void testListAndAuthentication();
     void testSessionStart();
     void testUsageStats();

@@ -39,15 +39,11 @@ void Application::setupCardCallbacks()
   this->api.setEnrollNewCardErrorCallback([this](std::string error) {
     // Runs on the websocket task. Copy into the fixed buffer, then publish via
     // the volatile flag (set last) so the main loop reads a complete message.
-    if (error == "CARD_ALREADY_ENROLLED") {
-      strlcpy(this->enrollErrorMessage, "Karte ist bereits\nregistriert",
-              sizeof(this->enrollErrorMessage));
-    } else {
-      strlcpy(this->enrollErrorMessage, translateReaderError(error).c_str(),
-              sizeof(this->enrollErrorMessage));
-    }
+    strlcpy(this->enrollErrorMessage, error.c_str(),
+            sizeof(this->enrollErrorMessage));
     this->enrollErrorPending = true;
   });
+
 
   Display::enrollmentScreen.setOnCancelCallback(
       [this]() { this->enrollCancelRequested = true; });
@@ -164,7 +160,7 @@ void Application::setupNfcCallbacks()
       this->resourceListUpdated = true;
       this->selectedResourceChanged = true;
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
-      else Display::resourceListScreen.showActionProgress("Karte wird geprüft", "Einen Moment bitte ...");
+      else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
       lv_unlock();
       this->api.requestCardAuthenticationData(uid, uidLength, this->authenticationResourceId);
 #else

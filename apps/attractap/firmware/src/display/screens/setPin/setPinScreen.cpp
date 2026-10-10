@@ -11,7 +11,7 @@ void SetPinScreen::init()
    }
    this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { this->onPinConfirmed(pin); return true; });
-   this->screen = this->pinInputPage.init("Geräte-PIN");
+   this->screen = this->pinInputPage.init(FirmwareI18n::Message::DevicePin);
 }
 
 void SetPinScreen::setOnPinConfirmedCallback(std::function<void(std::string)> onPinConfirmed)

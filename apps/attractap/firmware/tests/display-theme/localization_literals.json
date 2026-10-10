@@ -1,0 +1,148 @@
+{
+  "display_drawer.cpp": {
+    "FirmwareI18n::setDynamicLabel(icon, symbol)": "Language-neutral LVGL icon glyph."
+  },
+  "display_overlay.cpp": {
+    "FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, (const char *)p)": "Server-supplied reader name; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, Display::deviceNameInitValue.c_str())": "Server-supplied reader name; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + \" v\" + FIRMWARE_VERSION).c_str())": "Build or server firmware name/version data; preserve exact version contents."
+  },
+  "display_popups.cpp": {
+    "FirmwareI18n::Text::literal(\"\")": "Empty control caption; no prose.",
+    "FirmwareI18n::Text::literal(total)": "Server-supplied formatted billing total; preserve exact amount and currency."
+  },
+  "screens/IScreen.hpp": {
+    "FirmwareI18n::setDynamicLabel(label, text)": "Literal-only label helper for supplied display data; never infer a message from its wording.",
+    "setDynamicLabelTextIfChanged(lv_obj_t *label, const char *text)": "Literal-label helper; caller explicitly owns and classifies the supplied data."
+  },
+  "screens/boot/bootscreen.cpp": {
+    "FirmwareI18n::Text::literal(\"Attraccess\")": "Language-neutral product or role name.",
+    "FirmwareI18n::setDynamicLabel(firmware_label, firmware_info.c_str())": "Build or server firmware name/version data; preserve exact version contents."
+  },
+  "screens/connectionConfiguration/connectionConfigurationScreen_wifi.cpp": {
+    "FirmwareI18n::setDynamicDropdownOptions(this->wifiSelectNetwork, options.c_str())": "Scanned Wi-Fi SSIDs joined as dropdown options; preserve network names and selection."
+  },
+  "screens/demoSettings/demoSettingsScreen.cpp": {
+    "FirmwareI18n::Text::literal(\"Admin\")": "Language-neutral product or role name.",
+    "FirmwareI18n::Text::literal(uid)": "Card UID or operator-supplied card label; preserve exact identifier/name.",
+    "FirmwareI18n::setDynamicLabel(nameLbl, displayName)": "Card UID or operator-supplied card label; preserve exact identifier/name."
+  },
+  "screens/enrollment/enrollmentScreen.cpp": {
+    "FirmwareI18n::setDynamicLabel(this->userNameLabel, initialName)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str())": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents."
+  },
+  "screens/firmwareUpdate/firmwareUpdateScreen.cpp": {
+    "FirmwareI18n::setDynamicLabel(this->versionsLabel, placeholder.c_str())": "Build or server firmware name/version data; preserve exact version contents.",
+    "FirmwareI18n::setDynamicLabel(this->versionsLabel, s.c_str())": "Build or server firmware name/version data; preserve exact version contents."
+  },
+  "screens/init/initscreen.cpp": {
+    "FirmwareI18n::Text::literal(\"\")": "Empty control caption; no prose.",
+    "FirmwareI18n::Text::literal(std::to_string(websocketState.certCount))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(std::to_string(websocketState.certIndex + 1))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(std::to_string(websocketState.port))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(std::to_string(websocketState.rememberedRetryCount))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(std::to_string(websocketState.secondsUntilNextAttempt))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(this->formatIp(networkState.ethernet_ip))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(this->formatIp(networkState.wifi_ip))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(websocketState.certName)": "Network hostname or certificate name supplied by connection state; preserve exact contents.",
+    "FirmwareI18n::Text::literal(websocketState.hostname)": "Network hostname or certificate name supplied by connection state; preserve exact contents."
+  },
+  "screens/lockscreen/lockscreen.cpp": {
+    "FirmwareI18n::Text::literal(\"???\")": "Language-neutral numeric placeholder or close-control mark.",
+    "FirmwareI18n::Text::literal(this->username)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents."
+  },
+  "screens/lockscreen/lockscreen.hpp": {
+    "FirmwareI18n::Text::literal(resourceName)": "Server-supplied resource name in the authentication overlay; preserve exact data."
+  },
+  "screens/reset/resetScreen.cpp": {
+    "FirmwareI18n::setDynamicLabel(this->userNameLabel, initialName)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str())": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents."
+  },
+  "screens/resourceDetails/forms/editor.cpp": {
+    "FirmwareI18n::Text::literal(\"\")": "Empty control caption; no prose.",
+    "FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE)": "Language-neutral LVGL icon glyph.",
+    "FirmwareI18n::setDynamicLabel(this->formsEditorTitleLabel, title.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(widget.previewLabel, displayValue.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(widget.previewLabel, hint)": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
+    "FirmwareI18n::setDynamicPlaceholder(this->formsEditorTextarea, placeholder)": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents."
+  },
+  "screens/resourceDetails/forms/fields.cpp": {
+    "FirmwareI18n::Text::literal(\"\")": "Empty control caption; no prose.",
+    "FirmwareI18n::Text::literal(LV_SYMBOL_EDIT)": "Language-neutral LVGL icon glyph.",
+    "FirmwareI18n::setDynamicLabel(desc, field.description.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(fieldLabel, fieldTitle.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(optLabel, displayValue.c_str())": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents."
+  },
+  "screens/resourceDetails/forms/navigation.cpp": {
+    "FirmwareI18n::Text::literal(\"\")": "Empty control caption; no prose.",
+    "FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE)": "Language-neutral LVGL icon glyph.",
+    "FirmwareI18n::Text::literal(scope)": "Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->formsModalProgressLabel, progress.c_str())": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption."
+  },
+  "screens/resourceDetails/layout.cpp": {
+    "FirmwareI18n::Text::literal(\"\")": "Empty control caption; no prose.",
+    "FirmwareI18n::Text::literal(\"00:23:46\")": "Language-neutral numeric placeholder or close-control mark.",
+    "FirmwareI18n::Text::literal(\"??.??. ??:??\")": "Language-neutral numeric placeholder or close-control mark.",
+    "FirmwareI18n::Text::literal(\"???\")": "Language-neutral numeric placeholder or close-control mark.",
+    "FirmwareI18n::Text::literal(\"JappyJan\")": "Initial example username, replaced by the server user without translation.",
+    "FirmwareI18n::Text::literal(\"X\")": "Language-neutral numeric placeholder or close-control mark."
+  },
+  "screens/resourceDetails/resourceDetailsActionFeedback.cpp": {
+    "FirmwareI18n::Text::literal(this->resourceCacheValid ? this->resourceCache.name : \"\")": "Server-supplied resource name in the action overlay; preserve exact contents."
+  },
+  "screens/resourceDetails/resourceDetailsProjects.cpp": {
+    "FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE)": "Language-neutral LVGL icon glyph.",
+    "FirmwareI18n::Text::literal(std::to_string(this->projectsCurrentPage))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(std::to_string(totalPages))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "FirmwareI18n::Text::literal(this->selectedProjectName)": "Server-supplied project name; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(label, project.name.c_str())": "Server-supplied project name; preserve exact contents."
+  },
+  "screens/resourceDetails/resourceDetailsScreen.cpp": {
+    "FirmwareI18n::setDynamicLabel(labelForFlowButton, fb.label)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->currentUser, resource.activeUser)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->healthReasonLabel, resource.healthReason)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->introducersListLabel, introducersText.c_str())": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->maintenanceIntroducersLabel, introducersText.c_str())": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->resourceDescription, resource.description.c_str())": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->resourceName, resource.name)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str())": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption."
+  },
+  "screens/resourceDetails/resourceDetailsSession.cpp": {
+    "FirmwareI18n::Text::literal(meter.formattedRate)": "Server-supplied meter name, reading or formatted billing rate; preserve exact contents.",
+    "FirmwareI18n::Text::literal(meter.name)": "Server-supplied meter name, reading or formatted billing rate; preserve exact contents.",
+    "FirmwareI18n::Text::literal(meter.value)": "Server-supplied meter name, reading or formatted billing rate; preserve exact contents.",
+    "FirmwareI18n::Text::literal(millisToTimeString(this->usageStats.operatingDurationMs))": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "setDynamicLabelTextIfChanged(this->elapsedTime, millisToTimeString(elapsedMillis).c_str())": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption."
+  },
+  "screens/resourceList/resourceListScreen.cpp": {
+    "FirmwareI18n::Text::literal(resource.activeUser)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::Text::literal(resource.description)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::Text::literal(resource.name)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents."
+  },
+  "screens/sessionSummary/sessionSummaryScreen.cpp": {
+    "FirmwareI18n::Text::literal(\"Attractap\")": "Language-neutral product name.",
+    "FirmwareI18n::Text::literal(FIRMWARE_VARIANT_FRIENDLY_NAME)": "Build-provided device variant name; preserve exact contents.",
+    "FirmwareI18n::Text::literal(charge)": "Server-supplied formatted amount and currency; preserve exact value.",
+    "FirmwareI18n::Text::literal(duration)": "Formatted numeric session duration; preserve exact value.",
+    "FirmwareI18n::Text::literal(name)": "Server-supplied cardholder name within the translated greeting; preserve exact contents."
+  },
+  "screens/supervision/supervisionScreen.cpp": {
+    "FirmwareI18n::setDynamicLabel(this->requesterNameLabel, initialName)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(this->requesterNameLabel, this->view.requesterName.c_str())": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents."
+  },
+  "shared/headerButton.hpp": {
+    "FirmwareI18n::Text::literal(LV_SYMBOL_LEFT)": "Language-neutral LVGL icon glyph."
+  },
+  "shared/pinInput/pinInputPage.cpp": {
+    "FirmwareI18n::setDynamicPlaceholder(this->devicePin, \"0000\")": "Language-neutral numeric placeholder or close-control mark."
+  },
+  "shared/powerOff/powerOffButton.cpp": {
+    "FirmwareI18n::Text::literal(LV_SYMBOL_POWER)": "Language-neutral LVGL power icon glyph.",
+    "FirmwareI18n::setDynamicLabel(icon, symbol)": "Language-neutral LVGL icon glyph, separate from the localized action caption."
+  },
+  "shared/sessionHeader.hpp": {
+    "setDynamicLabelTextIfChanged(timeLabel, time.c_str())": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
+    "setDynamicLabelTextIfChanged(userLabel, username.c_str())": "Supplied user/resource/project/card name, form scope, description, flow caption or health reason; preserve exact data."
+  }
+}

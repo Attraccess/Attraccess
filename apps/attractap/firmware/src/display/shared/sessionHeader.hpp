@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #pragma once
 
 #include "../fonts/attractap_fonts.hpp"
@@ -31,7 +32,7 @@ public:
         lv_obj_set_size(button, 104, 46);
         auto *text = lv_label_create(button);
         lv_obj_set_style_text_font(text, &attractap_font_montserrat_latin1_14, 0);
-        lv_label_set_text(text, "Abmelden");
+        FirmwareI18n::setLabel(text, FirmwareI18n::Message::SignOut);
         lv_obj_center(text);
         lv_obj_add_event_cb(button, [](lv_event_t *e) {
             auto *self = static_cast<SessionHeader *>(lv_event_get_user_data(e));
@@ -82,9 +83,13 @@ public:
         if (!root) return;
         const int32_t remaining = static_cast<int32_t>(deadline - (paused ? frozenAt : millis()));
         const int seconds = std::clamp<int32_t>((std::max<int32_t>(remaining, 0) + 999) / 1000, 0, 30);
-        setLabelTextIfChanged(userLabel, username.c_str());
-        const std::string time = paused ? "Pausiert" : std::to_string(seconds) + " s";
-        setLabelTextIfChanged(timeLabel, time.c_str());
+        setDynamicLabelTextIfChanged(userLabel, username.c_str());
+        if (paused) {
+            FirmwareI18n::setLabel(timeLabel, FirmwareI18n::Message::Paused);
+        } else {
+            const std::string time = std::to_string(seconds) + " s";
+            setDynamicLabelTextIfChanged(timeLabel, time.c_str());
+        }
         if (lastSeconds != seconds || lastPaused != paused) {
             lv_bar_set_value(bar, seconds, LV_ANIM_OFF);
             lv_obj_set_style_bg_color(bar, !paused && seconds <= 5 ? DisplayTheme::warning() : DisplayTheme::primary(), LV_PART_INDICATOR);

@@ -1,3 +1,4 @@
+#include "display/i18n.hpp"
 #include "initscreen.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../theme.hpp"
@@ -142,7 +143,7 @@ void InitScreen::createApiRows(lv_obj_t *statesContainer)
    lv_obj_set_width(this->apiConnectionLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->apiConnectionLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->apiConnectionLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->apiConnectionLabel, "verbinde API");
+   FirmwareI18n::setLabel(this->apiConnectionLabel, FirmwareI18n::Message::ConnectingToApi);
    lv_obj_set_style_text_font(this->apiConnectionLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->apiConnectionSpinner, this->apiConnectionLabel);
@@ -169,7 +170,7 @@ void InitScreen::createApiRows(lv_obj_t *statesContainer)
    lv_obj_set_width(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->apiAuthenticationLabel, "authentifiziere an API");
+   FirmwareI18n::setLabel(this->apiAuthenticationLabel, FirmwareI18n::Message::AuthenticatingWithApi);
    lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
@@ -195,24 +196,25 @@ void InitScreen::createConnectionDetails(lv_obj_t *statesContainer)
    this->serverTargetLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->serverTargetLabel, lv_pct(100));
    lv_obj_set_height(this->serverTargetLabel, LV_SIZE_CONTENT);
-   lv_label_set_text(this->serverTargetLabel, "");
-   lv_obj_set_style_text_font(this->serverTargetLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   FirmwareI18n::setLabel(this->serverTargetLabel, FirmwareI18n::Text::literal(""));
+   lv_obj_set_style_text_font(this->serverTargetLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->serverTargetLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->certLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->certLabel, lv_pct(100));
    lv_obj_set_height(this->certLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->certLabel, LV_LABEL_LONG_DOT);
-   lv_label_set_text(this->certLabel, "");
-   lv_obj_set_style_text_font(this->certLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   FirmwareI18n::setLabel(this->certLabel, FirmwareI18n::Text::literal(""));
+   lv_obj_set_style_text_font(this->certLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->certLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->connectionStateLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
    lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
-   lv_label_set_text(this->connectionStateLabel, "");
+   FirmwareI18n::setLabel(this->connectionStateLabel, FirmwareI18n::Text::literal(""));
    lv_obj_set_style_text_font(this->connectionStateLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
    lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
    DisplayTheme::button(openSettingsButton);
@@ -226,9 +228,10 @@ void InitScreen::createConnectionDetails(lv_obj_t *statesContainer)
    lv_obj_set_width(openSettingsButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(openSettingsButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(openSettingsButtonLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(openSettingsButtonLabel, "Einstellungen");
+   FirmwareI18n::setLabel(openSettingsButtonLabel, FirmwareI18n::Message::Settings);
    lv_obj_set_style_text_color(openSettingsButtonLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
    lv_obj_add_event_cb(openSettingsButton, &InitScreen::onOpenSettingsButtonEvent, LV_EVENT_CLICKED, this);
 
@@ -258,7 +261,7 @@ void InitScreen::createNetworkRows(lv_obj_t *statesContainer)
    lv_obj_set_width(this->wifiLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->wifiLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->wifiLabel, "verbinde WLAN");
+   FirmwareI18n::setLabel(this->wifiLabel, FirmwareI18n::Message::ConnectingToWiFi);
    lv_obj_set_style_text_font(this->wifiLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->wifiSpinner, this->wifiLabel);
@@ -290,7 +293,7 @@ void InitScreen::createNetworkRows(lv_obj_t *statesContainer)
    lv_obj_set_width(this->ethernetLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->ethernetLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->ethernetLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->ethernetLabel, "verbinde Ethernet");
+   FirmwareI18n::setLabel(this->ethernetLabel, FirmwareI18n::Message::ConnectingToEthernet);
    lv_obj_set_style_text_font(this->ethernetLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->ethernetSpinner, this->ethernetLabel);
@@ -335,25 +338,26 @@ void InitScreen::loop()
    // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)
    if (networkState.wifi_connected)
    {
-      setLabelTextIfChanged(this->wifiLabel, ("WLAN  " + this->formatIp(networkState.wifi_ip)).c_str());
+      setLabelTextIfChanged(this->wifiLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::WifiAddress, {FirmwareI18n::Text::literal(this->formatIp(networkState.wifi_ip))}));
       this->applyStage(this->wifiSpinner, this->wifiLabel, StageState::SUCCESS, this->wifiStage);
    }
    else
    {
-      setLabelTextIfChanged(this->wifiLabel, "verbinde WLAN");
+      setLabelTextIfChanged(this->wifiLabel, FirmwareI18n::Message::ConnectingToWiFi);
       this->applyStage(this->wifiSpinner, this->wifiLabel, StageState::PENDING, this->wifiStage);
    }
 
    if (networkState.ethernet_connected)
    {
-      setLabelTextIfChanged(this->ethernetLabel, ("Ethernet  " + this->formatIp(networkState.ethernet_ip)).c_str());
+      setLabelTextIfChanged(this->ethernetLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EthernetAddress, {FirmwareI18n::Text::literal(this->formatIp(networkState.ethernet_ip))}));
       this->applyStage(this->ethernetSpinner, this->ethernetLabel, StageState::SUCCESS, this->ethernetStage);
    }
    else
    {
-      setLabelTextIfChanged(this->ethernetLabel, "verbinde Ethernet");
+      setLabelTextIfChanged(this->ethernetLabel, FirmwareI18n::Message::ConnectingToEthernet);
       this->applyStage(this->ethernetSpinner, this->ethernetLabel, StageState::PENDING, this->ethernetStage);
    }
+
 
    State::WebsocketState websocketState = State::getWebsocketState();
    bool networkUp = networkState.wifi_connected || networkState.ethernet_connected;
@@ -362,19 +366,20 @@ void InitScreen::loop()
                    (websocketState.certIndex > 0 || websocketState.rememberedRetryCount > 0);
    if (websocketState.connected)
    {
-      setLabelTextIfChanged(this->apiConnectionLabel, "API verbunden");
+      setLabelTextIfChanged(this->apiConnectionLabel, FirmwareI18n::Message::ApiConnected);
       this->applyStage(this->apiConnectionSpinner, this->apiConnectionLabel, StageState::SUCCESS, this->apiConnectionStage);
    }
    else if (networkUp && sweeping)
    {
-      setLabelTextIfChanged(this->apiConnectionLabel, "suche Zertifikat");
+      setLabelTextIfChanged(this->apiConnectionLabel, FirmwareI18n::Message::SearchingForCertificate);
       this->applyStage(this->apiConnectionSpinner, this->apiConnectionLabel, StageState::WARNING, this->apiConnectionStage);
    }
    else
    {
-      setLabelTextIfChanged(this->apiConnectionLabel, "verbinde API");
+      setLabelTextIfChanged(this->apiConnectionLabel, FirmwareI18n::Message::ConnectingToApi);
       this->applyStage(this->apiConnectionSpinner, this->apiConnectionLabel, StageState::PENDING, this->apiConnectionStage);
    }
+
 
    State::ApiState apiState = State::getApiState();
    this->applyStage(this->apiAuthenticationSpinner, this->apiAuthenticationLabel,
@@ -384,27 +389,24 @@ void InitScreen::loop()
    // Server target line
    if (websocketState.hostname.empty() || websocketState.port == 0)
    {
-      setLabelTextIfChanged(this->serverTargetLabel, "Server: nicht konfiguriert");
+      setLabelTextIfChanged(this->serverTargetLabel, FirmwareI18n::Message::ServerNotConfigured);
    }
    else
    {
-      std::string target = "Server: " + websocketState.hostname + ":" + std::to_string(websocketState.port) +
-                           (websocketState.useSSL ? "  (SSL)" : "  (kein SSL)");
-      setLabelTextIfChanged(this->serverTargetLabel, target.c_str());
+      setLabelTextIfChanged(this->serverTargetLabel, FirmwareI18n::Text::format(
+         websocketState.useSSL ? FirmwareI18n::Message::ServerSsl : FirmwareI18n::Message::ServerNoSsl,
+         {FirmwareI18n::Text::literal(websocketState.hostname), FirmwareI18n::Text::literal(std::to_string(websocketState.port))}));
    }
 
    // Cert evaluation line (only relevant while connecting over SSL)
    if (websocketState.useSSL && !websocketState.connected && websocketState.certCount > 0)
    {
-      std::string cert = "CA: " + websocketState.certName + "  " +
-                         (websocketState.certLocked
-                              ? "(fixiert)"
-                              : "(" + std::to_string(websocketState.certIndex + 1) + "/" + std::to_string(websocketState.certCount) + ")");
-      if (websocketState.rememberedRetryCount > 0)
-      {
-         cert += "  Wdh " + std::to_string(websocketState.rememberedRetryCount);
-      }
-      setLabelTextIfChanged(this->certLabel, cert.c_str());
+      const auto retry = websocketState.rememberedRetryCount > 0
+         ? FirmwareI18n::Text::format(FirmwareI18n::Message::RetryCount, {FirmwareI18n::Text::literal(std::to_string(websocketState.rememberedRetryCount))}) : FirmwareI18n::Text();
+      const auto cert = websocketState.certLocked
+         ? FirmwareI18n::Text::format(FirmwareI18n::Message::CertificateLocked, {FirmwareI18n::Text::literal(websocketState.certName), retry})
+         : FirmwareI18n::Text::format(FirmwareI18n::Message::CertificateAttempt, {FirmwareI18n::Text::literal(websocketState.certName), FirmwareI18n::Text::literal(std::to_string(websocketState.certIndex + 1)), FirmwareI18n::Text::literal(std::to_string(websocketState.certCount)), retry});
+      setLabelTextIfChanged(this->certLabel, cert);
       if (lv_obj_has_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN))
       {
          lv_obj_remove_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN);
@@ -415,31 +417,15 @@ void InitScreen::loop()
       lv_obj_add_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN);
    }
 
+
    // Connection state + countdown line
-   const char *phaseText = "INIT";
-   switch (websocketState.phase)
-   {
-   case State::WS_CONNECTING:
-      phaseText = "CONNECTING";
-      break;
-   case State::WS_CONNECTED:
-      phaseText = "CONNECTED";
-      break;
-   case State::WS_INIT:
-   default:
-      phaseText = "INIT";
-      break;
-   }
-   std::string stateLine = std::string("Status: ") + phaseText;
-   if (!networkUp)
-   {
-      stateLine += "  warte auf Netzwerk";
-   }
+   const auto phase = websocketState.phase == State::WS_CONNECTED ? FirmwareI18n::Message::StatusConnected
+      : websocketState.phase == State::WS_CONNECTING ? FirmwareI18n::Message::StatusConnecting : FirmwareI18n::Message::StatusInit;
+   FirmwareI18n::Text suffix;
+   if (!networkUp) suffix = FirmwareI18n::Message::WaitNetwork;
    else if (!websocketState.connected && websocketState.secondsUntilNextAttempt > 0)
-   {
-      stateLine += "  nächster Versuch in " + std::to_string(websocketState.secondsUntilNextAttempt) + "s";
-   }
-   setLabelTextIfChanged(this->connectionStateLabel, stateLine.c_str());
+      suffix = FirmwareI18n::Text::format(FirmwareI18n::Message::NextAttempt, {FirmwareI18n::Text::literal(std::to_string(websocketState.secondsUntilNextAttempt))});
+   setLabelTextIfChanged(this->connectionStateLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::StatusLine, {phase, suffix}));
 }
 
 void InitScreen::finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color)

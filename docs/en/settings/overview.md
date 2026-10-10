@@ -21,6 +21,7 @@ General settings for the Attraccess instance:
 | **Application URL** | The URL where users access Attraccess (corresponds to `ATTRACCESS_URL`). |
 | **Public Internet URL** | Public URL for external callbacks, such as payment providers. Only needed if it differs from the application URL. |
 | **License Key** | Your Attraccess license key. |
+| **Default system language** | German or English for unauthenticated web pages, Attractap readers, and translated emails and notifications without a user preference. Selected during first-time setup; administrators can change it here. User language choices take precedence. |
 
 > [!TIP]
 > Most settings can also be configured via [environment variables](installation/environment-variables.md). Settings changed in the UI override environment variable defaults.

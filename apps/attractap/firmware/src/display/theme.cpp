@@ -1,9 +1,11 @@
 #include "theme.hpp"
+#include "fonts/attractap_fonts.hpp"
 #include <src/themes/lv_theme_private.h>
 
 namespace
 {
     lv_theme_t theme;
+    lv_font_t bodyFont;
     lv_style_t screenStyle, surfaceStyle, buttonStyle, pressedStyle, disabledStyle;
     lv_style_t fieldStyle, focusStyle, selectionStyle, keyboardStyle, keyStyle, progressStyle, trackStyle;
     bool initialized = false;
@@ -95,7 +97,11 @@ namespace
 void DisplayTheme::init(lv_display_t *display)
 {
     initStyles();
-    lv_theme_t *base = lv_theme_default_init(display, primary(), primary(), true, &lv_font_montserrat_18);
+    // Retain LVGL's existing ASCII metrics and symbol glyphs, with Latin-1
+    // coverage for inherited labels containing German text or supplied names.
+    bodyFont = lv_font_montserrat_18;
+    bodyFont.fallback = &attractap_font_montserrat_latin1_18;
+    lv_theme_t *base = lv_theme_default_init(display, primary(), primary(), true, &bodyFont);
     theme = *base;
     lv_theme_set_parent(&theme, base);
     lv_theme_set_apply_cb(&theme, applyTheme);

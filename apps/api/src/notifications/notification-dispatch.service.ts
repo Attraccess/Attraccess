@@ -5,6 +5,7 @@ import { EmailService } from '../email/email.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationLiveService } from './notification-live.service';
 import { NotificationCategory, NotificationChannel } from './notification-types';
+import { SettingsService } from '../settings/settings.service';
 
 export interface NotificationDispatchRequest {
   category: NotificationCategory;
@@ -29,6 +30,7 @@ export class NotificationDispatchService {
     private readonly pushService: PushService,
     private readonly liveService: NotificationLiveService,
     private readonly emailService: EmailService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   public async dispatch(request: NotificationDispatchRequest): Promise<void> {
@@ -40,6 +42,9 @@ export class NotificationDispatchService {
   }
 
   private async dispatchToRecipient(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+    recipient = Object.assign(Object.create(Object.getPrototypeOf(recipient)), recipient, {
+      locale: await this.settingsService.resolveLanguage(recipient.locale),
+    });
     const channels = request.channels ?? [
       NotificationChannel.EMAIL,
       NotificationChannel.PUSH,

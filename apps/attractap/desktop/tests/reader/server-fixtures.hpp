@@ -86,3 +86,11 @@ inline lv_obj_t *label(lv_obj_t *root, const char *text) {
         if (auto *found = label(lv_obj_get_child(root, i), text)) return found;
     return nullptr;
 }
+
+inline lv_obj_t *requireLabel(lv_obj_t *root, const char *text) {
+    auto *found = label(root, text);
+    if (!found)
+        throw std::runtime_error(std::string("Missing label: ") + text +
+                                 "; active language: " + State::getActiveLanguage());
+    return found;
+}

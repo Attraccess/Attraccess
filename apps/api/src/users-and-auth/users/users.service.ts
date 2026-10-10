@@ -1,3 +1,4 @@
+import { SettingsService } from '../../settings/settings.service';
 import { DateTimePreferences, validateDateTimeLocale } from '@attraccess/shared';
 import { AuthenticationDetail, ResourceUsage, Session, User, Role } from '@attraccess/database-entities';
 
@@ -48,6 +49,7 @@ export class UsersService extends UserDirectory {
     protected readonly tokenHashService: TokenHashService,
     protected readonly metricsService: MetricsService,
     protected readonly rbacService: RbacService,
+    protected readonly settingsService: SettingsService,
   ) {
     super();
   }
@@ -121,6 +123,7 @@ export class UsersService extends UserDirectory {
       roleKey: userData.roleKey,
     }));
 
+    const defaultLanguage = await this.settingsService.getDefaultLanguage();
     const run = async (manager: EntityManager) => {
       const repo = manager.getRepository(User);
       const totalExisting = await repo.count();
@@ -135,9 +138,7 @@ export class UsersService extends UserDirectory {
         user.username = data.username;
         user.email = data.email;
         user.externalIdentifier = null;
-        if (data.locale) {
-          user.locale = data.locale.trim() || 'en';
-        }
+        user.locale = data.locale?.trim() || defaultLanguage;
         return user;
       });
 

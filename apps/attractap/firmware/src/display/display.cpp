@@ -1,5 +1,6 @@
 #include "display.hpp"
 #include "theme.hpp"
+#include "i18n.hpp"
 #include <vector>
 #include <string>
 #include <functional>
@@ -30,6 +31,22 @@
 //   display_input.cpp   - flush + touch input dispatch
 //   display_popups.cpp  - global overlay popups
 //   display_overlay.cpp - persistent device-info overlay
+
+static std::string s_renderedLanguage;
+
+void Display::refreshVisibleTextForLanguageChange()
+{
+    const std::string language = State::getActiveLanguage();
+    if (language == s_renderedLanguage) return;
+    s_renderedLanguage = language;
+    if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
+    FirmwareI18n::refreshTree(Display::activePopup, language);
+    FirmwareI18n::refreshTree(Display::drawerPanel, language);
+    FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
+    // Project and form dialogs live on LVGL's top layer, outside the active
+    // screen tree. Refreshing the layer reaches those open dialogs as well.
+    FirmwareI18n::refreshTree(lv_layer_top(), language);
+}
 
 // Static member definitions
 Logger Display::logger("Display");
@@ -196,6 +213,7 @@ void Display::loop()
 #ifdef ATTRACTAP_HOST
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
     return;
 #endif
@@ -207,13 +225,15 @@ void Display::loop()
     if (Display::touchWarningPending)
     {
         Display::touchWarningPending = false;
-        Display::showErrorPopup("Touch Unavailable",
-                                "Touch panel not detected.\nCheck hardware and reboot.");
+        Display::showErrorPopup(FirmwareI18n::Message::TouchUnavailable,
+                                FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot);
     }
 
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
+
 
     lv_unlock();
 }

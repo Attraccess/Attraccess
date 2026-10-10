@@ -7,8 +7,10 @@ module.exports = {
   testMatch: ['<rootDir>/backend/**/*.spec.ts'],
   // Several backend specs launch many shell processes; cap Jest's workers so
   // the process-heavy fixtures do not exhaust the host during Nx validation.
-  maxWorkers: 2,
   transform: { '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }] },
   moduleFileExtensions: ['ts', 'tsx', 'js'],
+  // Backend fixtures spawn shell and utility subprocesses; avoid multiplying
+  // that fan-out across several Jest workers on constrained validation hosts.
+  maxWorkers: 1,
   moduleNameMapper: { '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts' },
 };

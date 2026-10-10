@@ -19,19 +19,22 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
    if (trimmed.length() == 0)
    {
       // Empty: show the field placeholder (or a generic hint) in muted gray.
-      const char *hint = "Antippen zum Eingeben";
+      const char *hint = "";
+      bool useTranslatedHint = true;
       if (widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
           widget.definition->options.text.hasPlaceholder && widget.definition->options.text.placeholder.length() > 0)
       {
          hint = widget.definition->options.text.placeholder.c_str();
+         useTranslatedHint = false;
       }
-      lv_label_set_text(widget.previewLabel, hint);
+      if (useTranslatedHint) FirmwareI18n::setLabel(widget.previewLabel, FirmwareI18n::Message::TapToEnter);
+      else FirmwareI18n::setDynamicLabel(widget.previewLabel, hint);
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
    {
       const std::string displayValue = makeLVGLDisplayText(widget.textValue);
-      lv_label_set_text(widget.previewLabel, displayValue.c_str());
+      FirmwareI18n::setDynamicLabel(widget.previewLabel, displayValue.c_str());
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 }
@@ -55,7 +58,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
       {
          title += " *";
       }
-      lv_label_set_text(this->formsEditorTitleLabel, title.c_str());
+      FirmwareI18n::setDynamicLabel(this->formsEditorTitleLabel, title.c_str());
    }
 
    bool multiline = widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
@@ -77,7 +80,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
    {
       placeholder = widget.definition->options.text.placeholder.c_str();
    }
-   lv_textarea_set_placeholder_text(this->formsEditorTextarea, placeholder);
+   FirmwareI18n::setDynamicPlaceholder(this->formsEditorTextarea, placeholder);
    this->formsEditorInitialText = makeLVGLDisplayText(widget.textValue);
    lv_textarea_set_text(this->formsEditorTextarea, this->formsEditorInitialText.c_str());
    lv_textarea_set_cursor_pos(this->formsEditorTextarea, LV_TEXTAREA_CURSOR_LAST);
@@ -155,7 +158,7 @@ void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
    lv_obj_set_style_pad_column(editorHeader, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->formsEditorTitleLabel = lv_label_create(editorHeader);
-   lv_label_set_text(this->formsEditorTitleLabel, "");
+   FirmwareI18n::setLabel(this->formsEditorTitleLabel, FirmwareI18n::Text::literal(""));
    lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
    lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(this->formsEditorTitleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -166,9 +169,10 @@ void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
    lv_obj_set_size(editorCancelBtn, 34, 34);
    DisplayTheme::secondaryButton(editorCancelBtn);
    lv_obj_t *editorCancelLabel = lv_label_create(editorCancelBtn);
-   lv_label_set_text(editorCancelLabel, LV_SYMBOL_CLOSE);
+   FirmwareI18n::setLabel(editorCancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE));
    lv_obj_center(editorCancelLabel);
    lv_obj_add_event_cb(editorCancelBtn, &ResourceDetailsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
+
 
    // Textarea fills all space between header and keyboard.
    lv_obj_t *editorTa = lv_textarea_create(editor);

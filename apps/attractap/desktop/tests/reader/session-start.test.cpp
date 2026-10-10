@@ -13,7 +13,7 @@ void ReaderWorkflow::testSessionStart()
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 140, true}; pump();
     display.touch.pressed = false; pump();
-    assert(!lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
+    assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))));
     display.capture(output, "03-pending-start");
     server.push("START_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
     assert(server.count("REQUEST_RESOURCE_LIST") > 0);

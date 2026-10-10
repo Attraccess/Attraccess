@@ -65,19 +65,44 @@ warnings may also appear in a host build.
 | NFC Enrollment / Reset | Waiting, writing, success, error; cached username; phase colors; cancel visibility/callback; deterministic countdown and expiry |
 | Supervision | Waiting, verifying, success, error; public `View` fixture; hint; cancel visibility and time-based cancel guard |
 | PIN | Production field/numeric keyboard, real keyboard value-change callbacks entering `1234`, valid/rejected/short PIN and cancel behavior, per-key state rendering |
+| Localization catalog | Every catalog entry translated and rendered through LVGL in German and English, across paginated 480 x 480 framebuffer captures |
+| Forms and projects | Production project pagination and form validation/editor callbacks; retained names, server hints, entered values and selections when switching languages in both directions |
+| Demo settings | Production registered-card rows and role picker in both languages; supplied names and card identifiers stay literal |
+| Power-off dialog | Production v2 confirmation dialog in both languages, separate power icon, cancel and confirm callbacks; no physical power control |
+| Production screen localization audit | `audit_localization.py` inventories every production display `.cpp` and `.hpp` unit under `src/display`, including shared components and overlays, and rejects raw visible-text writes. Firmware-authored UI text uses stable `Message` identifiers through `FirmwareI18n`; explicit literal writes are classified in `localization_literals.json` as supplied values (project names, form descriptions/options, resource names, form previews/editor placeholders) or the PIN's numeric placeholder. The harness additionally renders production boot, init, enrollment, reset, supervision, PIN, lockscreen, resource-list, no-resources, demo resource-list, and firmware-update screens. |
 
 Production `IScreen::init()` idempotence and normal screen teardown are exercised.
-There are **15 test groups and 51 rendered fixtures**. The reported check count
+The test groups include localization and live usage statistics. The reported check count
 includes individual logo pixels, not just behavioral assertions. Widget gallery
 frames are labeled `widgets-*`; they exercise the production theme but are not
-claimed to be firmware screens. All other screen fixtures use production layouts.
+claimed to be firmware screens. The `demo-*-fixtures` frames similarly check demo
+data in a label fixture. Other screen fixtures use production layouts.
 
-Not covered: physical touch input or NFC, RTOS scheduling, memory pressure on the
-ESP32, display panel/DMA/byte swapping, networking or TLS, the display router,
-drawers/overlays/popups, other screens, every input string/layout edge case, or
-pixel-golden design approval. Nonblank frame checks and repeatability are smoke
-tests, not proof that every label is unclipped. This does not replace the full
-firmware build or on-device validation.
+The inherited 18px font retains LVGL's ASCII metrics and icons, with Latin-1
+fallback for German text. Error fixtures ending in `authored-error` exercise
+catalog error messages. Other error and hint fixtures deliberately contain
+supplied German text, which must remain unchanged in an English interface.
+
+The catalog render verifies both translations for every catalog entry and
+captures them through production LVGL at the supported harness resolution. The
+source audit complements those captures. Run it from the repository root with
+`python3 apps/attractap/firmware/tests/display-theme/audit_localization.py`.
+It derives its inventory from the production source tree, including shared display
+components. It checks catalog identifiers, English fallbacks and formatting
+arguments, rejects raw visible-text setters, and requires every explicit literal
+path to have a current explanation in `localization_literals.json`.
+
+Use `Message` for firmware-authored captions, `Text::format` for a message with
+retained arguments, and `Text::literal` for supplied data. Register textarea
+placeholders, dropdown options and tab captions explicitly. Replacing a binding
+with literal data removes its old localization source; deletion releases it.
+The rendering suite exercises representative production layouts and dynamic
+content paths. It does not claim complete screen-by-screen rendering coverage:
+physical touch or NFC, RTOS scheduling, memory pressure on the ESP32, display panel/DMA/byte
+swapping, networking or TLS, the display router, drawers/overlays/popups, and
+several production screens are not rendered by this harness. Nonblank frame
+checks and repeatability are smoke tests, not proof that every label is
+unclipped. This does not replace the full firmware build or on-device validation.
 
 Framebuffer fill checks intentionally compare the rendered RGB565 pixels to the
 theme's explicit state colors. In LVGL 9.3 the default theme's `recolor` and

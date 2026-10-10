@@ -2,6 +2,7 @@
 // FEATURE: api-core
 
 #include "api.hpp"
+#include "../state/language.hpp"
 #include <functional>
 #include "../utils.hpp"
 #include "../platform.hpp"
@@ -170,6 +171,11 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     else if (strcmp(eventType, "READER_AUTHENTICATED") == 0)
     {
         this->onReaderAuthenticated(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "READER_LANGUAGE") == 0)
+    {
+        const char *language = inboundDoc["data"]["payload"]["language"].as<const char *>();
+        State::setDefaultLanguage(language ? language : "en");
     }
     else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
     {
@@ -368,6 +374,9 @@ void API::processIncomingMessage(const char *buf, size_t len)
             if (err.length() > 0)
             {
                 if (isActionResponse && this->actionResultCallback) {
+                    // Keep the server's original error available in logs; the
+                    // UI may replace it with a safe English fallback below.
+                    this->logger.error((std::string("Reader action reported error: ") + err).c_str());
                     this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
                     this->sendAck(eventType);
                     return;
@@ -383,9 +392,13 @@ void API::processIncomingMessage(const char *buf, size_t len)
                 }
                 else
                 {
+                    // Preserve the raw server value for diagnostics even when
+                    // no UI error callback is currently registered.
+                    this->logger.error((std::string("Reader reported error: ") + err).c_str());
                     if (this->errorCallback)
                     {
-                        this->errorCallback("Fehler", translateReaderError(err).c_str());
+                        // The application owns localization; keep the code intact.
+                        this->errorCallback("Fehler", err.c_str());
                     }
                 }
                 // Do not process further
