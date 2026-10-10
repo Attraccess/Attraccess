@@ -58,6 +58,9 @@ void ReaderWorkflow::testWallClock()
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":1000,"utcOffsetMinutes":60}})");
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)" +
                          std::to_string(static_cast<int64_t>(time(nullptr)) * 1000) + R"(,"utcOffsetMinutes":900}})");
+    server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)" +
+                         std::to_string(static_cast<int64_t>(time(nullptr)) * 1000) +
+                         R"(,"utcOffsetMinutes":-2147483648}})");
     pump();
     assert(showsClock(lv_screen_active(), -210, before));
 

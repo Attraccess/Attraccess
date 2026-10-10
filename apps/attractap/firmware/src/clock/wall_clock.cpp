@@ -32,7 +32,8 @@ void WallClock::onSntpSynced()
 
 void WallClock::onServerTime(int64_t epochMs, int32_t utcOffsetMinutes)
 {
-    if (epochMs / 1000 < EarliestPlausibleUtc || std::abs(utcOffsetMinutes) > MaxUtcOffsetMinutes)
+    if (epochMs / 1000 < EarliestPlausibleUtc ||
+        utcOffsetMinutes < -MaxUtcOffsetMinutes || utcOffsetMinutes > MaxUtcOffsetMinutes)
     {
         return;
     }
