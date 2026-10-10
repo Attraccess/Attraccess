@@ -7,8 +7,8 @@ const urlOptions = { require_tld: false };
 export class UpdateAppSettingsDto {
   @ValidateIf((_object, value) => value !== undefined)
   @IsIn(['en', 'de'])
-  @ApiPropertyOptional({ description: 'Default language used by Attractap devices', enum: ['en', 'de'] })
-  attractapLanguage?: 'en' | 'de';
+  @ApiPropertyOptional({ description: 'Default language used throughout the system', enum: ['en', 'de'] })
+  defaultLanguage?: 'en' | 'de';
 
   @IsOptional()
   @IsUrl(urlOptions)

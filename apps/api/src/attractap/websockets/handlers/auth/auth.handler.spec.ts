@@ -64,7 +64,7 @@ describe('AttractapAuthHandler', () => {
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
-    (handler as any).settingsService = { getAttractapLanguage: jest.fn().mockResolvedValue('de') };
+    (handler as any).settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
     (handler as any).websocketService = new WebsocketService();
   });
 
@@ -141,7 +141,7 @@ describe('AttractapAuthHandler', () => {
       const started = new Promise<void>((resolve) => {
         readStarted = resolve;
       });
-      (handler as any).settingsService.getAttractapLanguage.mockImplementation(() => {
+      (handler as any).settingsService.getDefaultLanguage.mockImplementation(() => {
         readStarted();
         return new Promise((resolve) => {
           finishRead = resolve;

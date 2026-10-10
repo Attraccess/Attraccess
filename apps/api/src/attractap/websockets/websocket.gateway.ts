@@ -202,7 +202,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return this.resourceListService.sendResourceList(readerId);
   }
 
-  @OnEvent('settings.attractap-language')
+  @OnEvent('settings.default-language')
   async updateReaderLanguage(language: 'en' | 'de') {
     this.websocketService.readerLanguage = language;
     const readers = Array.from(this.websocketService.sockets.values()).filter(

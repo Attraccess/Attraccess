@@ -11,6 +11,7 @@ import { GeneralSection } from './index';
 vi.mock('@attraccess/react-query-client', () => ({
   useSettingsServiceGetSystemSettings: vi.fn(),
   UseSettingsServiceGetSystemSettingsKeyFn: () => ['settings'],
+  UseSettingsServiceGetSystemLanguageKeyFn: () => ['system-language'],
   useSettingsServiceUpdateSystemSettings: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
@@ -47,15 +48,15 @@ describe('GeneralSection', () => {
 
   it('saves a language-only edit and protects it during refetches', async () => {
     const view = render(<GeneralSection />);
-    await userEvent.click(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ }));
+    await userEvent.click(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'English' }));
     expect(saveBar(view.container)).toBeInTheDocument();
     vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
-      data: { app: { url: 'https://example.org', publicInternetUrl: '', attractapLanguage: 'de' } },
+      data: { app: { url: 'https://example.org', publicInternetUrl: '', defaultLanguage: 'de' } },
       isLoading: false,
     } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
     view.rerender(<GeneralSection />);
-    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
+    expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
     expect(saveSettings).toHaveBeenCalledWith({
       requestBody: {
@@ -63,17 +64,17 @@ describe('GeneralSection', () => {
           url: 'https://example.org',
           publicInternetUrl: null,
           licenseKey: undefined,
-          attractapLanguage: 'en',
+          defaultLanguage: 'en',
         },
       },
     });
     view.unmount();
     vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
-      data: { app: { url: 'https://example.org', publicInternetUrl: '', attractapLanguage: 'en' } },
+      data: { app: { url: 'https://example.org', publicInternetUrl: '', defaultLanguage: 'en' } },
       isLoading: false,
     } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
     const reloaded = render(<GeneralSection />);
-    expect(screen.getByRole('button', { name: /inputs.attractapLanguage.label$/ })).toHaveTextContent('English');
+    expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
     expect(saveBar(reloaded.container)).toBeNull();
   });
 
@@ -154,7 +155,7 @@ describe('GeneralSection', () => {
           url: 'https://example.org/app',
           publicInternetUrl: null,
           licenseKey: undefined,
-          attractapLanguage: 'de',
+          defaultLanguage: 'de',
         },
       },
     });
@@ -176,7 +177,7 @@ describe('GeneralSection', () => {
 
     expect(saveSettings).toHaveBeenCalledWith({
       requestBody: {
-        app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, attractapLanguage: 'de' },
+        app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, defaultLanguage: 'de' },
       },
     });
   });
@@ -276,7 +277,7 @@ describe('GeneralSection — Enter key', () => {
           url: 'https://example.org/app',
           publicInternetUrl: null,
           licenseKey: undefined,
-          attractapLanguage: 'de',
+          defaultLanguage: 'de',
         },
       },
     });

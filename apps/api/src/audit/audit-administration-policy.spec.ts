@@ -111,7 +111,7 @@ describe('administration audit policy', () => {
         ...event,
         action: 'settings.updated',
         subjectType: 'setting',
-        details: { settingKey: 'app.attractapLanguage', before: 'de', after },
+        details: { settingKey: 'app.defaultLanguage', before: 'de', after },
       }),
     ).not.toBeNull();
   });
@@ -122,7 +122,7 @@ describe('administration audit policy', () => {
         ...event,
         action: 'settings.updated',
         subjectType: 'setting',
-        details: { settingKey: 'app.attractapLanguage', before: 'de', after },
+        details: { settingKey: 'app.defaultLanguage', before: 'de', after },
       }),
     ).toBeNull();
   });

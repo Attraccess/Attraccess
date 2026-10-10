@@ -20,6 +20,7 @@ import { AuditSettingsDto, UpdateAuditSettingsDto } from './dto/audit-settings.d
 import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
 
 import { SystemSettingsDto } from './dto/system-settings.dto';
+import { SystemLanguageDto } from './dto/system-language.dto';
 
 import { UpdateSystemSettingsDto } from './dto/update-system-settings.dto';
 
@@ -50,7 +51,7 @@ export function systemSettingChanges(
       safeAuditOrigin(after.app.publicInternetUrl ?? ''),
     ],
     ['app.licenseKeyConfigured', before.app.licenseKeyConfigured, after.app.licenseKeyConfigured],
-    ['app.attractapLanguage', before.app.attractapLanguage, after.app.attractapLanguage],
+    ['app.defaultLanguage', before.app.defaultLanguage, after.app.defaultLanguage],
     ['smtp.service', before.smtp.service, after.smtp.service],
     ['smtp.host', safeAuditHost(before.smtp.host ?? ''), safeAuditHost(after.smtp.host ?? '')],
     ['smtp.port', before.smtp.port, after.smtp.port],
@@ -76,6 +77,13 @@ export class SettingsController {
     protected readonly settingsService: SettingsService,
     protected readonly audit: AuditService,
   ) {}
+
+  @Get('language')
+  @ApiOperation({ summary: 'Get the public system default language', operationId: 'getSystemLanguage' })
+  @ApiResponse({ status: 200, type: SystemLanguageDto })
+  async getSystemLanguage(): Promise<SystemLanguageDto> {
+    return this.settingsService.getSystemLanguage();
+  }
 
   @Get('audit')
   @Auth('system.settings.manage')

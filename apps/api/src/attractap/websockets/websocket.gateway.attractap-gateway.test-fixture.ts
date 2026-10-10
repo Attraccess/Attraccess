@@ -117,7 +117,7 @@ export function registerAttractapGatewayFixture() {
         { provide: SupervisionService, useValue: {} },
         { provide: RbacService, useValue: {} },
         { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
-        { provide: SettingsService, useValue: { getAttractapLanguage: jest.fn().mockResolvedValue('de') } },
+        { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
         { provide: getRepositoryToken(Resource), useValue: {} },
         ResourceListService,
         ResourceActionGuard,

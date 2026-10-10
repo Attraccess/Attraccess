@@ -25,7 +25,7 @@ The details also show an API token ID, integration ID, IP address, and user agen
 
 Audit records are historical and cannot be edited from the application. An event records the information available at that operation; it does not imply that every field of the underlying object was copied. A changed field without a recorded before or after value is shown as **Not recorded**.
 
-Changes to the server-wide Attractap language use the existing `settings.updated` event in the administration domain. Its details identify `app.attractapLanguage` and record the previous and new canonical values (`de` or `en`). When recording is enabled for this domain, successful language changes appear under that event; a failed settings write does not record a successful change.
+Changes to the system default language use the existing `settings.updated` event in the administration domain. Its details identify `app.defaultLanguage` and record the previous and new canonical values (`de` or `en`). When recording is enabled for this domain, successful language changes appear under that event; a failed settings write does not record a successful change.
 
 ## Export
 

@@ -7,6 +7,7 @@ import {
   ApiError,
   useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetSystemSettingsKeyFn,
+  UseSettingsServiceGetSystemLanguageKeyFn,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
@@ -43,7 +44,7 @@ export function GeneralSection() {
   // the whole draft whenever the query object changes — overwrites edits the operator has not saved
   // yet as soon as a background refetch lands (ATT-868).
   const [draft, setDraft] = useState<
-    Partial<{ url: string; publicInternetUrl: string; licenseKey: string; attractapLanguage: 'en' | 'de' }>
+    Partial<{ url: string; publicInternetUrl: string; licenseKey: string; defaultLanguage: 'en' | 'de' }>
   >({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
@@ -56,8 +57,8 @@ export function GeneralSection() {
   const url = draft.url ?? savedUrl;
   const publicInternetUrl = draft.publicInternetUrl ?? savedPublicUrl;
   const licenseKey = draft.licenseKey ?? '';
-  const savedLanguage = settings?.app.attractapLanguage ?? 'de';
-  const attractapLanguage = draft.attractapLanguage ?? savedLanguage;
+  const savedLanguage = settings?.app.defaultLanguage ?? 'de';
+  const defaultLanguage = draft.defaultLanguage ?? savedLanguage;
 
   const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
     onSuccess(data) {
@@ -68,6 +69,7 @@ export function GeneralSection() {
       // lifetime of the mount — a later change by another operator would then surface as a phantom
       // "unsaved changes" bar whose Save reverts them.
       queryClient.setQueryData(UseSettingsServiceGetSystemSettingsKeyFn(), data);
+      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemLanguageKeyFn() });
       setDraft({});
     },
     onError(error: Error) {
@@ -79,7 +81,7 @@ export function GeneralSection() {
     url !== savedUrl ||
     publicInternetUrl !== savedPublicUrl ||
     licenseKey.trim() !== '' ||
-    attractapLanguage !== savedLanguage;
+    defaultLanguage !== savedLanguage;
 
   const trimmedUrl = url.trim();
   const trimmedPublicUrl = publicInternetUrl.trim();
@@ -113,7 +115,7 @@ export function GeneralSection() {
           // means "unchanged" there and stays undefined.
           publicInternetUrl: trimmedPublicUrl || null,
           licenseKey: licenseKey.trim() || undefined,
-          attractapLanguage,
+          defaultLanguage,
         },
       },
     });
@@ -161,12 +163,12 @@ export function GeneralSection() {
             <FieldError>{urlError}</FieldError>
           </TextField>
         </SettingsRow>
-        <SettingsRow stacked label={t('inputs.attractapLanguage.label')}>
+        <SettingsRow stacked label={t('inputs.defaultLanguage.label')}>
           <Select
-            aria-label={t('inputs.attractapLanguage.label')}
-            value={attractapLanguage}
+            aria-label={t('inputs.defaultLanguage.label')}
+            value={defaultLanguage}
             onChange={(next) => {
-              if (next === 'en' || next === 'de') setDraft((current) => ({ ...current, attractapLanguage: next }));
+              if (next === 'en' || next === 'de') setDraft((current) => ({ ...current, defaultLanguage: next }));
             }}
             items={[
               { key: 'en', label: 'English' },

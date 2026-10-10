@@ -96,7 +96,7 @@ export class AttractapAuthHandler {
       return await socket.sendMessage(unauthorizedResponse);
     }
 
-    const storedLanguage = await this.settingsService.getAttractapLanguage();
+    const storedLanguage = await this.settingsService.getDefaultLanguage();
     if (socket.state.readerAuthenticationAttempt !== attempt) return;
     // A broadcast during the read supersedes its snapshot, even before this
     // socket becomes eligible for language broadcasts.

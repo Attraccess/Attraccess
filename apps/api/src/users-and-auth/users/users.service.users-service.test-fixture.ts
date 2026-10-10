@@ -1,3 +1,4 @@
+import { SettingsService } from '../../settings/settings.service';
 import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -8,6 +9,13 @@ import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { RbacService } from '../rbac/rbac.service';
 import { UsersService } from './users.service';
+
+const settingsService = {
+  getDefaultLanguage: jest.fn().mockResolvedValue('en'),
+  resolveLanguage: jest.fn(
+    async (locale: string | undefined) => locale?.trim() || settingsService.getDefaultLanguage(),
+  ),
+};
 
 const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
@@ -32,6 +40,7 @@ export function registerUsersServiceFixture() {
   let emailService: { sendUsernameChangedEmail: jest.Mock; sendVerificationEmail: jest.Mock };
 
   beforeEach(async () => {
+    settingsService.getDefaultLanguage.mockResolvedValue('en');
     mockRbacService.assignRoleByKey.mockClear();
     mockRbacService.assignDefaultRoles.mockClear();
     mockRbacService.isLastAdministrator.mockClear();
@@ -40,6 +49,7 @@ export function registerUsersServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
+        { provide: SettingsService, useValue: settingsService },
         {
           provide: LicenseService,
           useValue: {
@@ -122,6 +132,9 @@ export function registerUsersServiceFixture() {
     };
   });
   return {
+    get settingsService() {
+      return settingsService;
+    },
     get mockMetricsService() {
       return mockMetricsService;
     },

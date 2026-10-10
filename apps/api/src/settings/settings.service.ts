@@ -1,3 +1,4 @@
+import { SystemLanguageDto } from './dto/system-language.dto';
 import { User } from '@attraccess/database-entities';
 
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
@@ -192,11 +193,11 @@ export class SettingsService {
   }
 
   async getAppSettings(): Promise<AppSettingsDto> {
-    const [url, publicInternetUrl, licenseKey, attractapLanguage] = await Promise.all([
+    const [url, publicInternetUrl, licenseKey, defaultLanguage] = await Promise.all([
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url),
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl),
       this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey),
-      this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage),
+      this.getDefaultLanguage(),
     ]);
 
     return {
@@ -204,7 +205,7 @@ export class SettingsService {
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
       // Missing values preserve the legacy German behavior; malformed stored values use English.
-      attractapLanguage: attractapLanguage === null ? 'de' : normalizeDeviceLanguage(attractapLanguage),
+      defaultLanguage,
     };
   }
 
@@ -222,15 +223,30 @@ export class SettingsService {
     if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
       await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
     }
-    if (update.attractapLanguage !== undefined) {
-      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage, update.attractapLanguage);
-      this.eventEmitter?.emit('settings.attractap-language', update.attractapLanguage);
+    if (update.defaultLanguage !== undefined) {
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage, update.defaultLanguage);
+      this.eventEmitter?.emit('settings.default-language', update.defaultLanguage);
     }
   }
 
-  async getAttractapLanguage(): Promise<'en' | 'de'> {
-    const language = await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.attractapLanguage);
-    return language === null ? 'de' : normalizeDeviceLanguage(language);
+  async getDefaultLanguage(): Promise<'en' | 'de'> {
+    return (await this.getSystemLanguage()).defaultLanguage;
+  }
+
+  async getSystemLanguage(): Promise<SystemLanguageDto> {
+    // Retain choices saved by earlier versions of the Attractap setting.
+    const language =
+      (await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage)) ??
+      (await this.settingsStore.getPlainSetting(APP_PARENT, 'attractap_language'));
+    return {
+      defaultLanguage: language === null ? 'de' : normalizeDeviceLanguage(language),
+      configured: language !== null,
+    };
+  }
+
+  /** Explicit user locales take precedence; an absent preference follows the system. */
+  async resolveLanguage(locale: string | null | undefined): Promise<string> {
+    return locale ?? this.getDefaultLanguage();
   }
 
   async getMetricsApiKey(): Promise<{ value: string | null; configured: boolean }> {

@@ -22,7 +22,9 @@
       "label": "Lizenzschlüssel",
       "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein. Leer lassen, um den aktuellen zu behalten."
     },
-    "attractapLanguage": { "label": "Standardsprache der Attractap-Geräte" }
+    "defaultLanguage": {
+      "label": "Standardsprache des Systems"
+    }
   },
   "success": {
     "title": "Einstellungen gespeichert",

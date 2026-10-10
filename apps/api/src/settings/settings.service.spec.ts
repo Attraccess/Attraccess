@@ -75,11 +75,11 @@ describe('SettingsService', () => {
   });
 
   it('defaults existing readers to German, persists the selected language, and falls back to English for corrupt values', async () => {
-    expect(await service.getAttractapLanguage()).toBe('de');
-    await service.updateAppSettings({ attractapLanguage: 'en' });
-    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.attractapLanguage, 'en');
+    expect(await service.getDefaultLanguage()).toBe('de');
+    await service.updateAppSettings({ defaultLanguage: 'en' });
+    expect(store.setPlainSetting).toHaveBeenCalledWith(APP_PARENT, APP_KEYS.defaultLanguage, 'en');
     store.getPlainSetting.mockResolvedValue('unexpected');
-    expect(await service.getAttractapLanguage()).toBe('en');
+    expect(await service.getDefaultLanguage()).toBe('en');
   });
 
   it.each([
@@ -102,27 +102,44 @@ describe('SettingsService', () => {
     ['de-u-ca-ca-12', 'en'],
   ])('resolves stored language %s in both read methods', async (stored, expected) => {
     store.getPlainSetting.mockResolvedValue(stored);
-    expect(await service.getAttractapLanguage()).toBe(expected);
-    expect((await service.getAppSettings()).attractapLanguage).toBe(expected);
+    expect(await service.getDefaultLanguage()).toBe(expected);
+    expect(await service.getSystemLanguage()).toEqual({ defaultLanguage: expected, configured: stored !== null });
+    expect((await service.getAppSettings()).defaultLanguage).toBe(expected);
+  });
+
+  it('retains the legacy saved choice until a system default is saved, including an empty legacy value', async () => {
+    const values = new Map<string, string>([['attractap_language', 'en']]);
+    store.getPlainSetting.mockImplementation(async (_parent, key) => values.get(key) ?? null);
+    store.setPlainSetting.mockImplementation(async (_parent, key, value) => {
+      values.set(key, value);
+    });
+    expect(await service.getDefaultLanguage()).toBe('en');
+    values.set('attractap_language', '');
+    expect(await service.getDefaultLanguage()).toBe('en');
+    await service.updateAppSettings({ defaultLanguage: 'de' });
+    expect(await service.getDefaultLanguage()).toBe('de');
+    expect((await service.getAppSettings()).defaultLanguage).toBe('de');
+    expect(await service.resolveLanguage(undefined)).toBe('de');
+    expect(await service.resolveLanguage('en-US')).toBe('en-US');
   });
 
   it('announces only successfully persisted language changes', async () => {
-    await service.updateAppSettings({ attractapLanguage: 'en' });
-    expect(events.emit).toHaveBeenCalledWith('settings.attractap-language', 'en');
+    await service.updateAppSettings({ defaultLanguage: 'en' });
+    expect(events.emit).toHaveBeenCalledWith('settings.default-language', 'en');
     events.emit.mockClear();
     store.setPlainSetting.mockRejectedValueOnce(new Error('storage unavailable'));
-    await expect(service.updateAppSettings({ attractapLanguage: 'de' })).rejects.toThrow('storage unavailable');
+    await expect(service.updateAppSettings({ defaultLanguage: 'de' })).rejects.toThrow('storage unavailable');
     expect(events.emit).not.toHaveBeenCalled();
   });
 
   it.each(['de-DE', 'de-', 'fr', '', null])('rejects invalid new language selections %s', async (value) => {
-    const dto = Object.assign(new UpdateAppSettingsDto(), { attractapLanguage: value });
+    const dto = Object.assign(new UpdateAppSettingsDto(), { defaultLanguage: value });
     expect(await validate(dto)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ property: 'attractapLanguage' })]),
+      expect.arrayContaining([expect.objectContaining({ property: 'defaultLanguage' })]),
     );
   });
   it.each(['de', 'en'])('accepts canonical new language selection %s', async (value) => {
-    expect(await validate(Object.assign(new UpdateAppSettingsDto(), { attractapLanguage: value }))).toEqual([]);
+    expect(await validate(Object.assign(new UpdateAppSettingsDto(), { defaultLanguage: value }))).toEqual([]);
   });
 
   it('persists every authentication rate-limit option and returns the resolved policy', async () => {

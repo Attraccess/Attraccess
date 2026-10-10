@@ -12,7 +12,9 @@
       "label": "License Key",
       "description": "Paste a new license key to update."
     },
-    "attractapLanguage": { "label": "Default Attractap device language" }
+    "defaultLanguage": {
+      "label": "Default system language"
+    }
   },
   "actions": {
     "save": "Save",

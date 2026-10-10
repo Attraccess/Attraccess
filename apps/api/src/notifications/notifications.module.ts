@@ -10,6 +10,7 @@ import { MetricsModule } from '../metrics/metrics.module';
 import { EmailModule } from '../email/email.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
 import { NotificationLiveTopicsProvider } from './notification-live-topics.provider';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { NotificationLiveTopicsProvider } from './notification-live-topics.provi
     PushModule,
     MetricsModule,
     EmailModule,
+    SettingsModule,
     LiveTopicsModule,
   ],
   controllers: [NotificationsController],

@@ -53,6 +53,7 @@ describe('EmailService', () => {
     (createTransport as jest.Mock).mockReturnValue({ sendMail, close });
 
     const settingsService = {
+      resolveLanguage: jest.fn(async (locale) => locale ?? 'en'),
       getUrl: jest.fn().mockResolvedValue('https://frontend.example'),
       getSmtpConfiguration: jest.fn().mockResolvedValue({
         service: SmtpServiceType.SMTP,
@@ -838,6 +839,18 @@ describe('EmailService', () => {
       );
       const html = (sendMail as jest.Mock).mock.calls[0][0].html;
       expect(html).toContain('Hello alice!');
+    });
+
+    it('uses the system default for mail without a user locale and keeps explicit user locales', async () => {
+      const { service, sendMail, settingsService, emailTemplateService } = tHandlebarsHelperScope.setupT();
+      settingsService.resolveLanguage.mockImplementation(async (locale) => locale ?? 'de');
+      emailTemplateService.getTranslationsMap.mockImplementation(async (_type, locale) =>
+        locale === 'de' ? { greeting: 'Hallo {name}!' } : {},
+      );
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser(), 'tok');
+      expect(sendMail.mock.calls[0][0].html).toContain('Hallo alice!');
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'en' }), 'tok');
+      expect(sendMail.mock.calls[1][0].html).toContain('Hello alice!');
     });
 
     it('uses DB translation over default and still interpolates {var}', async () => {

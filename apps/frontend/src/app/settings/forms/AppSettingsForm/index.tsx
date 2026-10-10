@@ -7,7 +7,9 @@ import {
   useSettingsServiceApplyFirstTimeSetupSettings,
   UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
   useSettingsServiceGetSystemSettings,
+  useSettingsServiceGetSystemLanguage,
   UseSettingsServiceGetSystemSettingsKeyFn,
+  UseSettingsServiceGetSystemLanguageKeyFn,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
@@ -42,7 +44,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const [url, setUrl] = useState(window.location.origin);
   const [publicInternetUrl, setPublicInternetUrl] = useState(window.location.origin);
   const [licenseKey, setLicenseKey] = useState('');
-  const [attractapLanguage, setAttractapLanguage] = useState<'en' | 'de'>(() =>
+  const [defaultLanguage, setDefaultLanguage] = useState<'en' | 'de'>(() =>
     normalizeDeviceLanguage(navigator.language),
   );
 
@@ -50,12 +52,19 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     enabled: variant === 'standalone',
   });
 
+  const { data: systemLanguage } = useSettingsServiceGetSystemLanguage(undefined, { enabled: variant === 'wizard' });
+  useEffect(() => {
+    if (variant === 'wizard' && systemLanguage?.configured && !hasEditedLanguage.current) {
+      setDefaultLanguage(systemLanguage.defaultLanguage);
+    }
+  }, [variant, systemLanguage]);
+
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;
     setUrl(settings.app.url ?? '');
     setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
     setLicenseKey('');
-    if (!hasEditedLanguage.current) setAttractapLanguage(settings.app.attractapLanguage ?? 'de');
+    if (!hasEditedLanguage.current) setDefaultLanguage(settings.app.defaultLanguage ?? 'de');
   }, [variant, settings]);
 
   const mutateConfig = useMemo(() => {
@@ -66,6 +75,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           description: t('success.description'),
         });
         queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemSettingsKeyFn() });
+        queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemLanguageKeyFn() });
         if (endpoint === 'first-time-setup') {
           queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
         }
@@ -99,7 +109,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           url: url.trim(),
           publicInternetUrl: publicInternetUrl.trim() ? publicInternetUrl.trim() : undefined,
           licenseKey: licenseKey.trim() ? licenseKey.trim() : undefined,
-          attractapLanguage,
+          defaultLanguage,
         },
       },
     };
@@ -109,7 +119,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     } else {
       saveSettings(payload);
     }
-  }, [url, publicInternetUrl, licenseKey, attractapLanguage, saveSettings, saveSettingsFirstTimeSetup, endpoint]);
+  }, [url, publicInternetUrl, licenseKey, defaultLanguage, saveSettings, saveSettingsFirstTimeSetup, endpoint]);
 
   const showLoading = variant === 'standalone' && isLoading;
 
@@ -142,13 +152,13 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         <Description>{t('inputs.publicInternetUrl.description')}</Description>
       </TextField>
       <Select
-        label={t('inputs.attractapLanguage.label')}
+        label={t('inputs.defaultLanguage.label')}
         popoverProps={{ placement: 'top', offset: 32 }}
-        value={attractapLanguage}
+        value={defaultLanguage}
         onChange={(next) => {
           if (next === 'en' || next === 'de') {
             hasEditedLanguage.current = true;
-            setAttractapLanguage(next);
+            setDefaultLanguage(next);
           }
         }}
         items={[
