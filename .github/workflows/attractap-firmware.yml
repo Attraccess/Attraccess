@@ -2,10 +2,6 @@ name: Build and Test Attractap Firmware
 
 on:
   workflow_call:
-    inputs:
-      ref:
-        type: string
-        default: ''
   workflow_dispatch:
 
 env:
@@ -18,8 +14,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref }}
 
       - uses: ./.github/actions/build-attractap-firmware
 

@@ -2,10 +2,6 @@ name: Build Attractap Desktop for macOS
 
 on:
   workflow_call:
-    inputs:
-      ref:
-        type: string
-        default: ''
   workflow_dispatch:
 
 permissions:
@@ -26,8 +22,6 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: '15.0'
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref }}
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'

@@ -5,12 +5,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-const host = path.resolve('scripts/setup-host-dependencies.sh');
-
 function checkHost(functionName, functions) {
   const result = spawnSync(
     'bash',
-    ['-c', '. "$1"; NODE_VERSION=24.19.0; PNPM_VERSION=10.34.6; ' + functions + '; ' + functionName, 'test', host],
+    [
+      '-c',
+      '. scripts/setup-host-dependencies.sh; NODE_VERSION=24.19.0; PNPM_VERSION=10.34.6; ' +
+        functions +
+        '; ' +
+        functionName,
+    ],
     { encoding: 'utf8' },
   );
   assert.ifError(result.error);

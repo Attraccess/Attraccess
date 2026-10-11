@@ -1,1 +1,3 @@
+# Let tests that create fixture repositories discover Git from their own cwd.
+unset $(git rev-parse --local-env-vars)
 pnpm precommit

@@ -7,10 +7,6 @@ name: Build Companion Binaries
 
 on:
   workflow_call:
-    inputs:
-      ref:
-        type: string
-        default: ''
 
 env:
   # Nx remote cache. github.event_name and github.ref here are the caller's, so
@@ -33,8 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref }}
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
@@ -59,8 +53,6 @@ jobs:
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref }}
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
@@ -93,8 +85,6 @@ jobs:
       HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERT_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref }}
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'

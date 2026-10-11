@@ -123,10 +123,24 @@ test('deliverable workflows avoid overlapping automatic PR builds and require do
   );
 });
 
-test('manual Balena builds and tests the same requested ref for every deliverable', () => {
-  const { jobs } = workflow('balena-manual');
+test('manual builds use the dispatch ref without accepting a separate checkout ref', () => {
+  const { jobs, on: events } = workflow('balena-manual');
+  assert.equal(events.workflow_dispatch.inputs.branch, undefined);
+  for (const name of ['attractap-firmware', 'build-attractap-desktop', 'build-companion-binaries']) {
+    const reusable = workflow(name);
+    assert.equal(reusable.on.workflow_call?.inputs?.ref, undefined);
+    for (const job of Object.values(reusable.jobs)) {
+      for (const step of job.steps) {
+        if (step.uses === 'actions/checkout@v7') assert.equal(step.with?.ref, undefined);
+      }
+    }
+  }
+  for (const job of ['test', 'balena']) {
+    const checkout = jobs[job].steps.find((step) => step.uses === 'actions/checkout@v7');
+    assert.equal(checkout.with?.ref, undefined);
+  }
   for (const job of ['build-companion', 'build-attractap-firmware', 'build-attractap-desktop']) {
-    assert.equal(jobs[job].with.ref, '${{ inputs.branch }}');
+    assert.equal(jobs[job].with?.ref, undefined);
     assert.ok(jobs.balena.needs.includes(job));
   }
   assert.ok(jobs.balena.needs.includes('test'));

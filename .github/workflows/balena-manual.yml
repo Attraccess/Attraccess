@@ -1,12 +1,10 @@
 name: Balena Manual Release
 
 on:
+  # Select the branch through GitHub's Run workflow selector (CLI: --ref).
+  # A separate checkout ref would execute that branch in the dispatch ref's cache scope.
   workflow_dispatch:
     inputs:
-      branch:
-        description: Git ref to checkout (e.g., main or feature branch)
-        required: true
-        type: string
       version:
         description: Version to write into balena.yml (replaces {{VERSION_TO_BE_REPLACED}})
         required: true
@@ -30,27 +28,20 @@ env:
 jobs:
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
-    with:
-      ref: ${{ inputs.branch }}
     secrets: inherit
 
   build-attractap-firmware:
     uses: ./.github/workflows/attractap-firmware.yml
-    with:
-      ref: ${{ inputs.branch }}
     secrets: inherit
 
   build-attractap-desktop:
     uses: ./.github/workflows/build-attractap-desktop.yml
-    with:
-      ref: ${{ inputs.branch }}
 
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.branch }}
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/setup-browser-tests
@@ -65,8 +56,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.branch }}
 
       - uses: ./.github/actions/download-attractap-firmware
 
