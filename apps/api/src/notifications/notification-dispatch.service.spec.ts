@@ -94,6 +94,27 @@ describe('NotificationDispatchService', () => {
     expect(guest.locale).toBeUndefined();
   });
 
+  it('uses the system fallback for unsupported locales while preserving the email recipient', async () => {
+    const fallback = Object.assign(Object.create(SettingsService.prototype), {
+      getDefaultLanguage: async () => 'de',
+    });
+    settings.resolveLanguage.mockImplementation((locale) => fallback.resolveLanguage(locale));
+    const unsupported = { id: 3, locale: 'fr', email: 'guest@example.com' } as User;
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    const t = createTranslator({ en: { title: 'Session ended' }, de: { title: 'Sitzung beendet' } });
+    await service.dispatch({
+      category: NotificationCategory.RESOURCE_SESSION_ENDED,
+      recipients: [unsupported, recipient],
+      title: (user) => t(user.locale, 'title'),
+      body: '',
+      sendEmail,
+    });
+    expect(push.sendToUser).toHaveBeenCalledWith(3, expect.objectContaining({ title: 'Sitzung beendet' }));
+    expect(push.sendToUser).toHaveBeenCalledWith(2, expect.objectContaining({ title: 'Session ended' }));
+    expect(sendEmail).toHaveBeenCalledWith(unsupported);
+    expect(unsupported.locale).toBe('fr');
+  });
+
   it('skips disabled channels without affecting enabled channels', async () => {
     preferences.isChannelEnabled.mockImplementation(async (_userId, _category, channel) => {
       return channel !== NotificationChannel.PUSH;

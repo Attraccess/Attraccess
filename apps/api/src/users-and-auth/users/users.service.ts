@@ -123,7 +123,6 @@ export class UsersService extends UserDirectory {
       roleKey: userData.roleKey,
     }));
 
-    const defaultLanguage = await this.settingsService.getDefaultLanguage();
     const run = async (manager: EntityManager) => {
       const repo = manager.getRepository(User);
       const totalExisting = await repo.count();
@@ -138,7 +137,7 @@ export class UsersService extends UserDirectory {
         user.username = data.username;
         user.email = data.email;
         user.externalIdentifier = null;
-        user.locale = data.locale?.trim() || defaultLanguage;
+        user.locale = data.locale?.trim() || 'und';
         return user;
       });
 

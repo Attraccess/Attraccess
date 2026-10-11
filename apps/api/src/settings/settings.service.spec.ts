@@ -120,7 +120,16 @@ describe('SettingsService', () => {
     expect(await service.getDefaultLanguage()).toBe('de');
     expect((await service.getAppSettings()).defaultLanguage).toBe('de');
     expect(await service.resolveLanguage(undefined)).toBe('de');
-    expect(await service.resolveLanguage('en-US')).toBe('en-US');
+    expect(await service.resolveLanguage('en-US')).toBe('en');
+  });
+
+  it.each(['de', 'en'] as const)('uses %s only as the fallback for user translations', async (fallback) => {
+    store.getPlainSetting.mockResolvedValue(fallback);
+    expect(await service.resolveLanguage('en-GB')).toBe('en');
+    expect(await service.resolveLanguage('DE_at')).toBe('de');
+    for (const locale of [undefined, null, '', 'fr-FR', 'de-u-12', 'en-!!!']) {
+      expect(await service.resolveLanguage(locale)).toBe(fallback);
+    }
   });
 
   it('announces only successfully persisted language changes', async () => {

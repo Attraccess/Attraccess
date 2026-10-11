@@ -22,16 +22,19 @@ this).
 
 ## Language protocol compatibility and rollback
 
-Firmware 1.6.2 adds English/German display localization. The server sends a
+Firmware 1.6.4 retains English/German display localization. The server sends a
 default language in `READER_AUTHENTICATED`, a cardholder language in
 `CARD_AUTHENTICATION_DATA`, and default changes through `READER_LANGUAGE`.
+`CARD_AUTHENTICATION_DATA.languageFallback` marks a missing or unsupported
+cardholder preference. The canonical `language` still supplies the current fallback
+to older readers; current firmware follows live default changes during that session.
 Form validation replies retain `message` and add a stable `code` for translation.
 Existing event names, credentials and field values keep their meaning.
 
 | Server | Reader firmware | Behavior |
 | --- | --- | --- |
-| With language support | 1.6.2 | The system default applies outside a cardholder session; the user's language applies during the session. Form error identifiers translate in both languages. |
-| Without language support | 1.6.2 | Missing authentication language fields select English. Form errors without a code show the English invalid-input fallback. Resource and card operations retain their existing protocol. |
+| With language support | 1.6.4 | The system default applies outside a cardholder session; a supported user's language applies during the session, with the system default as fallback for missing or unsupported user languages. Form error identifiers translate in both languages. |
+| Without language support | 1.6.4 | Missing authentication language fields select English. Form errors without a code show the English invalid-input fallback. Resource and card operations retain their existing protocol. |
 | With language support | Pre-localization implementation on main | Additional payload fields are ignored. `READER_LANGUAGE` is acknowledged, then logged as an unknown event; it does not change authentication or resource state. Existing German screens remain unchanged. Form errors still use the retained `message`. |
 
 The predecessor behavior was inspected at main commit
@@ -42,7 +45,7 @@ ignores the added language field. This is source evidence for that predecessor,
 not verification of every deployed firmware build.
 
 For rollback, restore the previous server release first, then reconnect readers
-so they receive its authentication response. Readers still running 1.6.2 use
+so they receive its authentication response. Readers still running 1.6.4 use
 English until their firmware is restored. Restore each reader's previous
 variant-specific firmware image next; the predecessor uses its existing German
 interface. Retained server language settings need no deletion. Confirm reader

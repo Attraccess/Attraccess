@@ -208,6 +208,7 @@ describe('AttractapCardHandler', () => {
               key: handleCardAuthenticationRequestScope.activeCard.key,
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
               language: 'en',
+              languageFallback: true,
               canManageResource: true,
               hasIntroduction: true,
               isIntroducer: true,

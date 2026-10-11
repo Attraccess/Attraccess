@@ -10,7 +10,7 @@ import {
   EmailTemplate,
 } from '@attraccess/database-entities';
 
-import { formatCredits, toExactCredits } from '@attraccess/shared';
+import { formatCredits, toExactCredits, getSupportedDeviceLanguage } from '@attraccess/shared';
 
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -103,7 +103,7 @@ export class EmailService {
     let secondsFormatter: Intl.NumberFormat;
     try {
       secondsFormatter = new Intl.NumberFormat(
-        await this.settingsService.resolveLanguage(user.locale),
+        getSupportedDeviceLanguage(user.locale) ? user.locale : await this.settingsService.resolveLanguage(user.locale),
         secondsFormatOptions,
       );
     } catch {
@@ -468,11 +468,38 @@ export class EmailService {
   }
 
   protected async convertTemplate(template: EmailTemplate, context: Record<string, unknown>, locale: string) {
-    const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
+    const fallback = await this.settingsService.getDefaultLanguage();
+    let requested: string = fallback;
+    let originalLocale: string | undefined;
+    try {
+      const parsed = new Intl.Locale(locale.replace(/_/g, '-'));
+      // Intl can discard malformed repeated extension fields. Keep the shared
+      // validation contract for English/German before accepting its result.
+      const malformedSupportedLocale =
+        (parsed.language === 'en' || parsed.language === 'de') && !getSupportedDeviceLanguage(locale);
+      if (!malformedSupportedLocale) {
+        requested = parsed.toString();
+        originalLocale = locale;
+      }
+    } catch {
+      // A malformed preference cannot identify a translation catalog.
+    }
+    const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, requested);
+    // Existing admin-authored catalogs may retain the user's exact tag spelling.
+    if (originalLocale && originalLocale !== requested) {
+      const exactMap = await this.emailTemplateService.getTranslationsMap(template.type, originalLocale);
+      for (const [key, value] of Object.entries(exactMap)) {
+        if (value) translationsMap[key] = value;
+      }
+    }
+    const useSystemFallback = !getSupportedDeviceLanguage(requested);
+    const fallbackMap = useSystemFallback
+      ? await this.emailTemplateService.getTranslationsMap(template.type, fallback)
+      : {};
 
     const tHelper = (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
       const safeDefault = typeof defaultValue === 'string' ? defaultValue : '';
-      const raw = translationsMap[key] || safeDefault;
+      const raw = translationsMap[key] || fallbackMap[key] || safeDefault;
       const hash = options?.hash ?? {};
       const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
         Object.hasOwn(hash, name) ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
@@ -496,7 +523,7 @@ export class EmailService {
     manager?: EntityManager,
   ) {
     try {
-      const locale = await this.settingsService.resolveLanguage(user.locale);
+      const locale = user.locale || (await this.settingsService.getDefaultLanguage());
       const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
       const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);

@@ -54,6 +54,7 @@ describe('EmailService', () => {
 
     const settingsService = {
       resolveLanguage: jest.fn(async (locale) => locale ?? 'en'),
+      getDefaultLanguage: jest.fn().mockResolvedValue('en'),
       getUrl: jest.fn().mockResolvedValue('https://frontend.example'),
       getSmtpConfiguration: jest.fn().mockResolvedValue({
         service: SmtpServiceType.SMTP,
@@ -417,7 +418,7 @@ describe('EmailService', () => {
         expect(sendMail.mock.calls[0][0].html).toContain('Measured: 61.001 s');
         expect(emailTemplateService.getTranslationsMap).toHaveBeenCalledWith(
           shippedUsageReceiptScope.receiptType,
-          locale,
+          locale === 'en_US' ? 'en-US' : locale === 'de_DE' ? 'de-DE' : 'en',
         );
       },
     );
@@ -844,6 +845,7 @@ describe('EmailService', () => {
     it('uses the system default for mail without a user locale and keeps explicit user locales', async () => {
       const { service, sendMail, settingsService, emailTemplateService } = tHandlebarsHelperScope.setupT();
       settingsService.resolveLanguage.mockImplementation(async (locale) => locale ?? 'de');
+      settingsService.getDefaultLanguage.mockResolvedValue('de');
       emailTemplateService.getTranslationsMap.mockImplementation(async (_type, locale) =>
         locale === 'de' ? { greeting: 'Hallo {name}!' } : {},
       );
@@ -851,6 +853,28 @@ describe('EmailService', () => {
       expect(sendMail.mock.calls[0][0].html).toContain('Hallo alice!');
       await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'en' }), 'tok');
       expect(sendMail.mock.calls[1][0].html).toContain('Hello alice!');
+    });
+
+    it('falls back to the system translation for unsupported locales but keeps custom translations', async () => {
+      const { service, sendMail, settingsService, emailTemplateService } = tHandlebarsHelperScope.setupT();
+      settingsService.getDefaultLanguage.mockResolvedValue('de');
+      emailTemplateService.getTranslationsMap.mockImplementation(async (_type, locale) =>
+        locale === 'de' ? { greeting: 'Hallo {name}!' } :
+        locale === 'it' ? { greeting: 'Ciao {name}!' } :
+        locale === 'it-it' ? { greeting: 'Ciao regionale {name}!' } : {},
+      );
+      for (const locale of ['fr-FR', 'en-!!!', 'it', 'it-it']) {
+        await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale }), 'tok');
+      }
+      expect(sendMail.mock.calls[0][0].html).toContain('Hallo alice!');
+      expect(sendMail.mock.calls[1][0].html).toContain('Hallo alice!');
+      expect(sendMail.mock.calls[2][0].html).toContain('Ciao alice!');
+      expect(sendMail.mock.calls[3][0].html).toContain('Ciao regionale alice!');
+      settingsService.getDefaultLanguage.mockResolvedValue('en');
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'fr' }), 'tok');
+      expect(sendMail.mock.calls[4][0].html).toContain('Hello alice!');
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'de-u-ca-ca-12' }), 'tok');
+      expect(sendMail.mock.calls[5][0].html).toContain('Hello alice!');
     });
 
     it('uses DB translation over default and still interpolates {var}', async () => {

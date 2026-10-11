@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { detectAndSetLanguage, useTranslations, useTranslationState } from './i18n';
+import { detectAndSetLanguage, detectLanguage, useTranslations, useTranslationState } from './i18n';
 
 beforeEach(() => {
   const values = new Map<string, string>();
@@ -58,11 +58,29 @@ it('uses English for an unsupported detected locale so host and plugins can stil
 
 it('preserves names in React text and retranslates retained message descriptors', () => {
   const message = { key: 'saved', data: { name: 'R&D <Workshop>' } };
-  const { result } = renderHook(() => useTranslations({
-    en: { saved: 'Saved {{name}}' }, de: { saved: '{{name}} gespeichert' },
-  }, { escapeValues: false }));
+  const { result } = renderHook(() =>
+    useTranslations(
+      {
+        en: { saved: 'Saved {{name}}' },
+        de: { saved: '{{name}} gespeichert' },
+      },
+      { escapeValues: false },
+    ),
+  );
   expect(result.current.tMessage(message)).toBe('Saved R&D <Workshop>');
   act(() => result.current.setLanguage('de'));
   expect(result.current.tMessage(message)).toBe('R&D <Workshop> gespeichert');
   expect(result.current.tMessage('Literal server error')).toBe('Literal server error');
+});
+
+it('does not persist detected fallbacks, and honors supported browser and stored choices', () => {
+  vi.stubGlobal('navigator', { language: 'fr', languages: ['fr'] });
+  vi.stubGlobal('sessionStorage', { getItem: () => null });
+  detectAndSetLanguage();
+  expect(localStorage.getItem('language')).toBeNull();
+  expect(detectLanguage('de')).toBe('de');
+  vi.stubGlobal('navigator', { language: 'fr', languages: ['fr', 'en-GB'] });
+  expect(detectLanguage('de')).toBe('en');
+  localStorage.setItem('language', 'de');
+  expect(detectLanguage('en')).toBe('de');
 });

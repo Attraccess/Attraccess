@@ -1,5 +1,5 @@
-/** Resolve a complete locale to a supported device language, accepting legacy underscores. */
-export function normalizeDeviceLanguage(locale: string | null | undefined): 'en' | 'de' {
+/** Recognize a complete supported locale without turning an unsupported language into English. */
+export function getSupportedDeviceLanguage(locale: string | null | undefined): 'en' | 'de' | undefined {
   try {
     // Share the firmware's ASCII whitespace policy; reject Unicode padding.
     const input = locale ?? '';
@@ -14,10 +14,16 @@ export function normalizeDeviceLanguage(locale: string | null | undefined): 'en'
     // https://www.unicode.org/reports/tr35/#Unicode_locale_identifier
     const unicodeExtension = tag.split(/-x(?:-|$)/i)[0].match(/-u(?=-|$)((?:-[a-z0-9]{2,8})*)/i)?.[1];
     if (unicodeExtension && !/^(?:-[a-z0-9]{3,8})*(?:-[a-z0-9][a-z](?:-[a-z0-9]{3,8})*)*$/i.test(unicodeExtension)) {
-      return 'en';
+      return undefined;
     }
-    return new Intl.Locale(tag).language === 'de' ? 'de' : 'en';
+    const language = new Intl.Locale(tag).language;
+    return language === 'de' || language === 'en' ? language : undefined;
   } catch {
-    return 'en';
+    return undefined;
   }
+}
+
+/** Resolve a locale, using the supplied fallback only when no translation language matches. */
+export function normalizeDeviceLanguage(locale: string | null | undefined, fallback: 'en' | 'de' = 'en'): 'en' | 'de' {
+  return getSupportedDeviceLanguage(locale) ?? fallback;
 }

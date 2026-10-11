@@ -42,7 +42,7 @@ export class NotificationDispatchService {
   }
 
   private async dispatchToRecipient(request: NotificationDispatchRequest, recipient: User): Promise<void> {
-    recipient = Object.assign(Object.create(Object.getPrototypeOf(recipient)), recipient, {
+    const textRecipient: User = Object.assign(Object.create(Object.getPrototypeOf(recipient)), recipient, {
       locale: await this.settingsService.resolveLanguage(recipient.locale),
     });
     const channels = request.channels ?? [
@@ -62,8 +62,8 @@ export class NotificationDispatchService {
         : Promise.resolve(false),
     ]);
 
-    const title = typeof request.title === 'function' ? request.title(recipient) : request.title;
-    const body = typeof request.body === 'function' ? request.body(recipient) : request.body;
+    const title = typeof request.title === 'function' ? request.title(textRecipient) : request.title;
+    const body = typeof request.body === 'function' ? request.body(textRecipient) : request.body;
 
     await Promise.all([
       emailEnabled && request.sendEmail ? this.tryEmail(request, recipient) : Promise.resolve(),

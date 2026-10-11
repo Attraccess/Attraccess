@@ -4,8 +4,8 @@ import {
   useSettingsServiceGetSystemLanguage,
   useUsersServiceUpdateMyLocale,
 } from '@attraccess/react-query-client';
-import { normalizeDeviceLanguage } from '@attraccess/shared';
-import { useTranslationState } from '@attraccess/plugins-frontend-ui';
+import { getSupportedDeviceLanguage } from '@attraccess/shared';
+import { detectLanguage, detectPreferredLanguage, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from './useAuth';
 
 export function useLocaleSync() {
@@ -20,8 +20,8 @@ export function useLocaleSync() {
   const { mutate } = useUsersServiceUpdateMyLocale();
   const userId = isAuthenticated ? user?.id : null;
   const defaultLanguage = systemLanguage?.defaultLanguage;
-  // Before the first setup choice, keep the browser suggestion. Once saved, all
-  // unauthenticated pages and plugins share the configured system language.
+  // Before setup, detection uses English as its final fallback. Once configured,
+  // the system default applies only when no supported browser language is known.
   const hasSystemLanguage = setup && (!setup.available || systemLanguage?.configured);
 
   useEffect(() => {
@@ -33,11 +33,13 @@ export function useLocaleSync() {
       if (hasSystemLanguage && defaultLanguage && (identityChanged || lastDefault.current !== defaultLanguage)) {
         lastDefault.current = defaultLanguage;
         // Resolving a default is not a personal language selection.
-        useTranslationState.setState({ language: defaultLanguage });
+        useTranslationState.setState({ language: detectLanguage(defaultLanguage) });
       }
       return;
     }
-    const preference = user?.locale != null ? normalizeDeviceLanguage(user.locale) : defaultLanguage;
+    const storedPreference = getSupportedDeviceLanguage(user?.locale);
+    const detectedPreference = detectPreferredLanguage();
+    const preference = storedPreference ?? detectedPreference ?? defaultLanguage;
     if (!preference) return;
     if (initializedUser.current !== userId || lastServerPreference.current !== preference) {
       initializedUser.current = userId;
@@ -45,6 +47,9 @@ export function useLocaleSync() {
       lastSynced.current = preference;
       // Server refreshes and default changes are not personal language selections.
       useTranslationState.setState({ language: preference });
+      // Record a known browser language for the next card tap and messages,
+      // but never turn the system fallback into a personal preference.
+      if (!storedPreference && detectedPreference) mutate({ requestBody: { locale: detectedPreference } });
       return;
     }
     if (language !== useTranslationState.getState().language || lastSynced.current === language) return;

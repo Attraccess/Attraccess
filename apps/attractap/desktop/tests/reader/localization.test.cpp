@@ -127,6 +127,19 @@ void ReaderWorkflow::testLocalization()
         assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "en");
         assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
     }
+    defaultLanguage("de");
+    userLocale = "de"; userLanguageFallback = true; login();
+    assert(State::getActiveLanguage() == "de" && State::getApiState().userAuthenticated);
+    assert(label(lv_screen_active(), "Abmelden"));
+    display.capture(output, "i18n-user-unsupported-default-german");
+    defaultLanguage("en");
+    assert(State::getActiveLanguage() == "en" && label(lv_screen_active(), "Sign out"));
+    click("Sign out");
+    userLanguageFallback = false;
+    defaultLanguage("de");
+    userLocale = "en-!!!"; login();
+    assert(State::getActiveLanguage() == "de");
+    click("Abmelden");
     userLocale = "en-US"; username = "Robin"; login();
     assert(State::getActiveLanguage() == "en");
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
@@ -152,8 +165,8 @@ void ReaderWorkflow::testLocalization()
     click("Sign out");
     assert(State::getActiveLanguage() == "de");
     username = "Alex"; userLocale = ""; login();
-    assert(State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
-    click("Sign out");
+    assert(State::getApiState().userAuthenticated && State::getActiveLanguage() == "de");
+    click("Abmelden");
     // Resource-first authentication uses the verified cardholder locale.
     list(false); click("Lasercutter"); userLocale = "en"; login(false);
     assert(State::getActiveLanguage() == "en" && lv_screen_active() == Display::resourceDetailsScreen.getScreen());

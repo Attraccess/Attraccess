@@ -21,6 +21,9 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 
 beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+  vi.stubGlobal('navigator', { language: 'fr-FR', languages: ['fr-FR'] });
   state.user = null;
   state.defaultLanguage = 'de';
   state.configured = true;
@@ -28,7 +31,10 @@ beforeEach(() => {
   state.mutate.mockClear();
   useTranslationState.setState({ language: 'en' });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 it('uses the system default for anonymous pages and responds to saved default changes', () => {
   const { rerender } = renderHook(useLocaleSync);
@@ -49,7 +55,7 @@ it('preserves the browser suggestion before the first setup choice is saved', ()
   expect(useTranslationState.getState().language).toBe('de');
 });
 
-it('loads each user preference without overwriting it on login, then returns to the latest default on logout', () => {
+it('loads each user preference without overwriting it on login, then retains the explicit browser choice on logout', () => {
   state.user = { id: 1, locale: 'de-DE' };
   const { rerender } = renderHook(useLocaleSync, {
     wrapper: ({ children }: PropsWithChildren) => <StrictMode>{children}</StrictMode>,
@@ -66,7 +72,7 @@ it('loads each user preference without overwriting it on login, then returns to 
   expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ requestBody: { locale: 'de' } });
   state.user = null;
   rerender();
-  expect(useTranslationState.getState().language).toBe('en');
+  expect(useTranslationState.getState().language).toBe('de');
 });
 
 it('uses the system default for a user without a preference without saving it as a personal choice', () => {
@@ -102,6 +108,58 @@ it('follows refreshed defaults until the user has a personal preference', () => 
   rerender();
   expect(useTranslationState.getState().language).toBe('de');
   state.user = { id: 1 };
+  rerender();
+  expect(useTranslationState.getState().language).toBe('en');
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+
+it.each(['en-US', 'de-AT'])('keeps supported browser language %s when the default changes', (locale) => {
+  vi.stubGlobal('navigator', { language: locale, languages: [locale] });
+  const { rerender } = renderHook(useLocaleSync);
+  const expected = locale.startsWith('de') ? 'de' : 'en';
+  expect(useTranslationState.getState().language).toBe(expected);
+  state.defaultLanguage = 'en';
+  rerender();
+  expect(useTranslationState.getState().language).toBe(expected);
+  state.defaultLanguage = 'de';
+  rerender();
+  expect(useTranslationState.getState().language).toBe(expected);
+  expect(localStorage.getItem('language')).toBeNull();
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+
+it('uses the first supported browser language and retains explicit guest selections', () => {
+  vi.stubGlobal('navigator', { language: 'fr-FR', languages: ['fr-FR', 'en-GB', 'de-DE'] });
+  const { rerender } = renderHook(useLocaleSync);
+  expect(useTranslationState.getState().language).toBe('en');
+  act(() => useTranslationState.getState().setLanguage('de'));
+  state.defaultLanguage = 'en';
+  rerender();
+  expect(useTranslationState.getState().language).toBe('de');
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+
+it('uses browser detection for missing or unsupported user languages, then the system fallback', () => {
+  vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US'] });
+  state.user = { id: 1, locale: 'fr' };
+  const { rerender } = renderHook(useLocaleSync);
+  expect(useTranslationState.getState().language).toBe('en');
+  state.user = { id: 2 };
+  rerender();
+  expect(useTranslationState.getState().language).toBe('en');
+  vi.stubGlobal('navigator', { language: 'fr', languages: ['fr'] });
+  state.user = { id: 3, locale: 'en-!!!' };
+  rerender();
+  expect(useTranslationState.getState().language).toBe('de');
+  expect(state.mutate.mock.calls).toEqual([[{ requestBody: { locale: 'en' } }], [{ requestBody: { locale: 'en' } }]]);
+});
+
+it('returns to the browser language on logout when it differs from the user and system languages', () => {
+  vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US'] });
+  state.user = { id: 1, locale: 'de' };
+  const { rerender } = renderHook(useLocaleSync);
+  expect(useTranslationState.getState().language).toBe('de');
+  state.user = null;
   rerender();
   expect(useTranslationState.getState().language).toBe('en');
   expect(state.mutate).not.toHaveBeenCalled();

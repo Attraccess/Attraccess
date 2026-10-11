@@ -27,6 +27,7 @@ struct ReaderWorkflow
     unsigned listVersion = 0;
     std::string username = "Alex";
     std::string userLocale = "de";
+    bool userLanguageFallback = false;
 
     bool active = false, supervised = false;
     uint32_t activeUsageId = 99;
@@ -121,7 +122,7 @@ struct ReaderWorkflow
             assert(lv_screen_active() == Display::resourceListScreen.getScreen());
             drawerSettingsBeforeLogin = nullptr;
         }
-        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\",\"language\":\"" + userLocale + R"(","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
+        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\",\"language\":\"" + userLocale + "\",\"languageFallback\":" + (userLanguageFallback ? "true" : "false") + R"(,"keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
         pump(250); nfc.setPresent(0, false);
         if (refresh) list();
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");

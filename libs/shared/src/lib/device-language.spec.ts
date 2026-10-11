@@ -1,4 +1,4 @@
-import { normalizeDeviceLanguage } from './device-language';
+import { getSupportedDeviceLanguage, normalizeDeviceLanguage } from './device-language';
 
 describe('device language locale normalization', () => {
   it.each([
@@ -98,3 +98,17 @@ describe('locale whitespace contract', () => {
     expect(normalizeDeviceLanguage(padding + 'de' + padding)).toBe('en');
   });
 });
+
+it.each([null, undefined, '', 'fr-FR', 'de-u-12', 'en-u-12', 'en-!!!'])(
+  'distinguishes unsupported %j from English',
+  (locale) => {
+    expect(getSupportedDeviceLanguage(locale)).toBeUndefined();
+    expect(normalizeDeviceLanguage(locale, 'de')).toBe('de');
+  },
+);
+it.each(['en', 'en-GB', 'EN_us', 'en-Latn-US', 'en-u-ca-gregory'])(
+  'keeps supported English %s over a German fallback',
+  (locale) => {
+    expect(normalizeDeviceLanguage(locale, 'de')).toBe('en');
+  },
+);

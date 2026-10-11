@@ -7,7 +7,7 @@
 
 namespace Language
 {
-inline std::string supported(std::string locale)
+inline std::string supported(std::string locale, const std::string &fallback = "en")
 {
     for (char &character : locale)
     {
@@ -16,10 +16,10 @@ inline std::string supported(std::string locale)
     }
     // Match the TypeScript normalizer: ASCII whitespace only, never Unicode padding.
     const auto start = locale.find_first_not_of(" \t\r\n\v\f");
-    if (start == std::string::npos) return "en";
+    if (start == std::string::npos) return fallback;
     locale = locale.substr(start, locale.find_last_not_of(" \t\r\n\v\f") - start + 1);
-    if (locale == "de") return "de"; // Normalized wire values need no subtag parsing.
-    if (locale.compare(0, 3, "de-") != 0) return "en";
+    if (locale == "de" || locale == "en") return locale; // Normalized wire values need no subtag parsing.
+    if (locale.compare(0, 3, "de-") != 0 && locale.compare(0, 3, "en-") != 0) return fallback;
     // Validate the complete de/en locale structure (BCP 47), including script,
     // variants, extensions and private use, before selecting its primary language.
     // No extlang is registered for German or English.
@@ -28,12 +28,11 @@ inline std::string supported(std::string locale)
     for (size_t position = 0; position <= tag.size();) {
         const auto separator = tag.find('-', position);
         const auto part = tag.substr(position, separator == tag.npos ? tag.npos : separator - position);
-        if (part.empty() || part.size() > 8 || part.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789") != part.npos) return "en";
+        if (part.empty() || part.size() > 8 || part.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789") != part.npos) return fallback;
         parts.push_back(part);
         if (separator == tag.npos) break;
         position = separator + 1;
     }
-    if (parts[0] != "de") return "en";
     const auto alpha = [](std::string_view value) { return value.find_first_not_of("abcdefghijklmnopqrstuvwxyz") == value.npos; };
     const auto numeric = [](std::string_view value) { return value.find_first_not_of("0123456789") == value.npos; };
     const auto languageTail = [&](size_t &index, size_t end) {
@@ -47,15 +46,15 @@ inline std::string supported(std::string locale)
         return true;
     };
     size_t index = 1;
-    if (!languageTail(index, parts.size())) return "en";
+    if (!languageTail(index, parts.size())) return fallback;
     std::string extensions;
     while (index < parts.size() && parts[index].size() == 1 && parts[index] != "x") {
         const auto singleton = parts[index++][0];
-        if (extensions.find(singleton) != extensions.npos) return "en";
+        if (extensions.find(singleton) != extensions.npos) return fallback;
         extensions += singleton;
         const auto first = index;
         while (index < parts.size() && parts[index].size() >= 2) ++index;
-        if (index == first) return "en";
+        if (index == first) return fallback;
         // Unicode u/t extensions have stricter syntax than generic BCP 47
         // extensions. Match Intl.Locale, used by setup and the API:
         // https://www.unicode.org/reports/tr35/#Unicode_locale_identifier
@@ -63,7 +62,7 @@ inline std::string supported(std::string locale)
         if (singleton == 'u') {
             while (field < index && parts[field].size() >= 3) ++field; // Attributes.
             while (field < index) {
-                if (parts[field].size() != 2 || !alpha(parts[field].substr(1))) return "en";
+                if (parts[field].size() != 2 || !alpha(parts[field].substr(1))) return fallback;
                 ++field; // A Unicode key may have no value (e.g. u-kn).
                 while (field < index && parts[field].size() >= 3) ++field;
             }
@@ -71,27 +70,28 @@ inline std::string supported(std::string locale)
             const auto language = parts[field];
             if (alpha(language) && (language.size() == 2 || language.size() == 3 || language.size() >= 5)) {
                 ++field;
-                if (!languageTail(field, index)) return "en";
+                if (!languageTail(field, index)) return fallback;
             }
             while (field < index) {
                 const auto key = parts[field++];
-                if (key.size() != 2 || !alpha(key.substr(0, 1)) || !numeric(key.substr(1))) return "en";
+                if (key.size() != 2 || !alpha(key.substr(0, 1)) || !numeric(key.substr(1))) return fallback;
                 const auto value = field;
                 while (field < index && parts[field].size() >= 3) ++field;
-                if (field == value) return "en"; // Transform fields require a value.
+                if (field == value) return fallback; // Transform fields require a value.
             }
         }
     }
     if (index < parts.size() && parts[index] == "x") {
-        if (++index == parts.size()) return "en";
+        if (++index == parts.size()) return fallback;
         index = parts.size(); // Private-use subtags may contain one to eight characters.
     }
-    return index == parts.size() ? "de" : "en";
+    return index == parts.size() ? std::string(parts[0]) : fallback;
 }
 
 inline std::string active(bool userAuthenticated, const std::string &userLanguage, const std::string &defaultLanguage)
 {
-    return userAuthenticated ? supported(userLanguage) : supported(defaultLanguage);
+    const auto fallback = supported(defaultLanguage);
+    return userAuthenticated ? supported(userLanguage, fallback) : fallback;
 }
 
 inline const char *text(const char *english, const char *german, const std::string &locale)
@@ -102,14 +102,14 @@ inline const char *text(const char *english, const char *german, const std::stri
 struct Session
 {
     std::string defaultLanguage = "de";
-    std::string userLanguage = "en";
+    std::string userLanguage;
     bool userAuthenticated = false;
 
     void setDefault(const std::string &locale) { defaultLanguage = supported(locale); }
     void setUser(bool authenticated, const std::string &locale = "")
     {
         userAuthenticated = authenticated;
-        userLanguage = supported(locale);
+        userLanguage = locale;
     }
     void setApi(bool authenticated, const std::string &locale)
     {

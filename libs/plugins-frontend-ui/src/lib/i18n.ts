@@ -1,3 +1,4 @@
+import { getSupportedDeviceLanguage } from '@attraccess/shared';
 import * as Handlebars from 'handlebars';
 import { get } from 'lodash-es';
 import { useCallback, useEffect, useState } from 'react';
@@ -209,14 +210,30 @@ export function useTranslations(
   };
 }
 
-export function detectAndSetLanguage() {
-  const localStorageLanguage = localStorage.getItem(I18N_LANGUAGE_STORAGE_KEY);
-  const sessionStorageLanguage = sessionStorage.getItem(I18N_LANGUAGE_STORAGE_KEY);
-  let navigatorLanguage = navigator.language;
-  if (navigatorLanguage.includes('-')) {
-    navigatorLanguage = navigatorLanguage.split('-')[0];
+/** Explicit browser choices precede supported browser languages, then the system fallback. */
+export function detectPreferredLanguage(): Language | undefined {
+  let stored: Language | undefined;
+  try {
+    stored =
+      getSupportedDeviceLanguage(globalThis.localStorage?.getItem(I18N_LANGUAGE_STORAGE_KEY)) ??
+      getSupportedDeviceLanguage(globalThis.sessionStorage?.getItem(I18N_LANGUAGE_STORAGE_KEY));
+  } catch {
+    // Browser detection still works when storage access is disabled.
   }
+  if (stored) return stored;
+  for (const locale of navigator.languages ?? [navigator.language]) {
+    const language = getSupportedDeviceLanguage(locale);
+    if (language) return language;
+  }
+  return undefined;
+}
 
-  const language = localStorageLanguage || sessionStorageLanguage || navigatorLanguage;
-  useTranslationState.getState().setLanguage(language === 'de' ? 'de' : 'en');
+export function detectLanguage(fallback: Language = 'en'): Language {
+  return detectPreferredLanguage() ?? fallback;
+}
+
+export function detectAndSetLanguage() {
+  // Detection is not a personal choice. Persist only explicit language selections,
+  // so an unsupported browser can follow later system-default changes.
+  useTranslationState.setState({ language: detectLanguage() });
 }

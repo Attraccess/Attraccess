@@ -241,7 +241,8 @@ export abstract class UserAccounts {
     user.email = data.email;
     user.externalIdentifier = data.externalIdentifier;
     user.isEmailVerified = data.isEmailVerified;
-    user.locale = userData.locale?.trim() || (await this.settingsService.getDefaultLanguage());
+    // Keep an unknown preference distinct from the system fallback.
+    user.locale = userData.locale?.trim() || 'und';
 
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');

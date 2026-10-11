@@ -65,7 +65,20 @@ int main(int argc, char **argv)
             session.setDefault("de");
             expect(session.active() == "de", "Active user survives default update");
             session.setUser(true, "");
-            expect(session.active() == "en", "Authenticated user with missing locale uses English");
+            expect(session.active() == "de", "Authenticated user with missing locale uses system fallback");
+            session.setUser(true, "fr-FR");
+            expect(session.active() == "de", "Unsupported user language uses system fallback");
+            session.setDefault("en");
+            expect(session.active() == "en", "Unsupported user language follows default changes");
+            session.setDefault("de");
+            for (const auto *locale : {"en", "en-GB", "EN_us", "en-Latn-US", "en-u-ca-gregory"}) {
+                session.setUser(true, locale);
+                expect(session.active() == "en", "Supported English takes precedence over German default");
+            }
+            for (const auto *locale : {"en-!!!", "en-u-12", "de-u-12", ""}) {
+                session.setUser(true, locale);
+                expect(session.active() == "de", "Invalid user locale uses system fallback");
+            }
             session.setApi(false, "");
             expect(session.active() == "de", "API loss reveals latest retained default");
             expect(std::string(Language::text("English fallback", "", "de")) == "English fallback", "Missing German translation uses English");

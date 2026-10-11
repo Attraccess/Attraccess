@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';
 import { UsersService } from '../../../users-and-auth/users/users.service';
+import { getSupportedDeviceLanguage } from '@attraccess/shared';
+import { SettingsService } from '../../../settings/settings.service';
 import { AttractapService } from '../../attractap.service';
 import { AuthenticatedWebSocket, AttractapEventType } from '../websocket.types';
 import { AttractapCardHandler } from './card/card.handler';
@@ -52,8 +54,13 @@ describe('persisted web UI locale at card authentication', () => {
       nfcCardRepository: cardRepository,
       encryptionService: { decryptIfEncrypted: (value: string) => value },
     });
+    let defaultLanguage = 'de';
+    const settingsService: SettingsService = Object.assign(Object.create(SettingsService.prototype), {
+      getDefaultLanguage: async () => defaultLanguage,
+    });
     const handler: AttractapCardHandler = Object.assign(new AttractapCardHandler(), {
       attractapService,
+      settingsService,
       resourceRepository,
       metricsService: { attractapNfcTapsTotal: { inc: jest.fn() } },
       resourceUsageService: { canControllResource: async () => true },
@@ -68,12 +75,12 @@ describe('persisted web UI locale at card authentication', () => {
         type: AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA,
         payload: { uid: card.uid, resourceId: resource.id },
       });
-    const expectLanguage = (language: string) =>
+    const expectLanguage = (language: string, languageFallback = false) =>
       expect(sendMessage).toHaveBeenLastCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.CARD_AUTHENTICATION_DATA,
-            payload: expect.objectContaining({ username: user.username, language }),
+            payload: expect.objectContaining({ username: user.username, language, languageFallback }),
           }),
         }),
       );
@@ -83,15 +90,19 @@ describe('persisted web UI locale at card authentication', () => {
     for (const [locale, language] of [
       ['de-DE', 'de'],
       ['en-GB', 'en'],
-      ['fr-FR', 'en'],
+      ['fr-FR', 'de'],
+      ['en-!!!', 'de'],
     ]) {
       // The controller used by useLocaleSync receives the same, deliberately stale session user.
       const updated = await profile.updateMyLocale({ user } as never, { locale });
       expect(updated.locale).toBe(locale);
       expect((await userRepository.findOneByOrFail({ id: user.id })).locale).toBe(locale);
       await tap();
-      expectLanguage(language);
+      expectLanguage(language, !getSupportedDeviceLanguage(locale));
     }
+    defaultLanguage = 'en';
+    await tap();
+    expectLanguage('en', true);
     expect(user.locale).toBe('en');
     expect((await userRepository.findOneByOrFail({ id: otherUser.id })).locale).toBe('en');
     expect(await cardRepository.count()).toBe(1);

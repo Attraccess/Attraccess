@@ -244,9 +244,9 @@ export class SettingsService {
     };
   }
 
-  /** Explicit user locales take precedence; an absent preference follows the system. */
-  async resolveLanguage(locale: string | null | undefined): Promise<string> {
-    return locale ?? this.getDefaultLanguage();
+  /** Supported user locales take precedence; missing or unsupported preferences follow the system. */
+  async resolveLanguage(locale: string | null | undefined): Promise<'en' | 'de'> {
+    return normalizeDeviceLanguage(locale, await this.getDefaultLanguage());
   }
 
   async getMetricsApiKey(): Promise<{ value: string | null; configured: boolean }> {
