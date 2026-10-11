@@ -18,7 +18,8 @@ export interface NotificationDispatchRequest {
   actorId?: number;
   severity?: 'info' | 'warning';
   dedupeKey?: string;
-  sendEmail?: (recipient: User) => Promise<void>;
+  /** Keep the original recipient locale for custom catalogs; use language for code-defined translations. */
+  sendEmail?: (recipient: User, language: 'en' | 'de') => Promise<void>;
 }
 
 @Injectable()
@@ -42,8 +43,9 @@ export class NotificationDispatchService {
   }
 
   private async dispatchToRecipient(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+    const language = await this.settingsService.resolveLanguage(recipient.locale);
     const textRecipient: User = Object.assign(Object.create(Object.getPrototypeOf(recipient)), recipient, {
-      locale: await this.settingsService.resolveLanguage(recipient.locale),
+      locale: language,
     });
     const channels = request.channels ?? [
       NotificationChannel.EMAIL,
@@ -66,15 +68,15 @@ export class NotificationDispatchService {
     const body = typeof request.body === 'function' ? request.body(textRecipient) : request.body;
 
     await Promise.all([
-      emailEnabled && request.sendEmail ? this.tryEmail(request, recipient) : Promise.resolve(),
+      emailEnabled && request.sendEmail ? this.tryEmail(request, recipient, language) : Promise.resolve(),
       pushEnabled ? this.tryPush(request, recipient, title, body) : Promise.resolve(),
       toastEnabled ? this.tryToast(request, recipient, title, body) : Promise.resolve(),
     ]);
   }
 
-  private async tryEmail(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+  private async tryEmail(request: NotificationDispatchRequest, recipient: User, language: 'en' | 'de'): Promise<void> {
     try {
-      await request.sendEmail?.(recipient);
+      await request.sendEmail?.(recipient, language);
     } catch (error) {
       this.logger.error(
         `Failed to send ${request.category} email to user ${recipient.id}: ${(error as Error).message}`,

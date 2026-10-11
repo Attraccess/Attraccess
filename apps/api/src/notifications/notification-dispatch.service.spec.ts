@@ -63,7 +63,7 @@ describe('NotificationDispatchService', () => {
       sendEmail,
     });
 
-    expect(sendEmail).toHaveBeenCalledWith(recipient);
+    expect(sendEmail).toHaveBeenCalledWith(recipient, 'en');
     expect(push.sendToUser).toHaveBeenCalledWith(2, {
       title: 'Maintenance requested',
       body: 'Laser cutter needs help',
@@ -111,7 +111,7 @@ describe('NotificationDispatchService', () => {
     });
     expect(push.sendToUser).toHaveBeenCalledWith(3, expect.objectContaining({ title: 'Sitzung beendet' }));
     expect(push.sendToUser).toHaveBeenCalledWith(2, expect.objectContaining({ title: 'Session ended' }));
-    expect(sendEmail).toHaveBeenCalledWith(unsupported);
+    expect(sendEmail).toHaveBeenCalledWith(unsupported, 'de');
     expect(unsupported.locale).toBe('fr');
   });
 
@@ -258,7 +258,7 @@ describe('NotificationDispatchService', () => {
       sendEmail,
     });
 
-    expect(sendEmail).toHaveBeenCalledWith(recipient);
+    expect(sendEmail).toHaveBeenCalledWith(recipient, 'en');
   });
 
   it('does not send resource takeover email when email channel is disabled', async () => {
