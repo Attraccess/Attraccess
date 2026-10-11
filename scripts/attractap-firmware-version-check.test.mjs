@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { fixtureGitEnv } from './test-utils/git-env.mjs';
 
 const script = fileURLToPath(new URL('./check-attractap-firmware-version.sh', import.meta.url));
 const versionFile = 'apps/attractap/firmware/version.txt';
@@ -33,7 +34,8 @@ for (const [name, changedPath, version, passes] of [
   test(name, (t) => {
     const cwd = mkdtempSync(path.join(os.tmpdir(), 'firmware-version-'));
     t.after(() => rmSync(cwd, { recursive: true, force: true }));
-    const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+    const env = fixtureGitEnv();
+    const git = (...args) => execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
     const write = (file, contents) => {
       mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
       writeFileSync(path.join(cwd, file), contents);
@@ -51,7 +53,7 @@ for (const [name, changedPath, version, passes] of [
     write(versionFile, `${version}\n`);
     git('add', '.');
     git('commit', '--quiet', '-m', 'change');
-    const result = spawnSync('sh', [script, base], { cwd, encoding: 'utf8' });
+    const result = spawnSync('sh', [script, base], { cwd, env, encoding: 'utf8' });
     assert.ifError(result.error);
     assert.equal(result.status, passes ? 0 : 1, result.stdout + result.stderr);
     if (passes) assert.match(result.stdout, /increased|No Attractap/);
