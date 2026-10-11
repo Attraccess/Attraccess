@@ -23,5 +23,7 @@ namespace WallClock
 
     void onSntpSynced();
     void onServerTime(int64_t epochMs, int32_t utcOffsetMinutes);
+    // Offline demo setup trusts the preset system timeline, including old dates.
+    void onDemoTime(int32_t utcOffsetMinutes);
     LocalTime now();
 }

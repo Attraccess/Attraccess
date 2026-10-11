@@ -57,4 +57,29 @@ int main()
     demo.sendMessage(R"({"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
     demo.loop();
     assert(last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["durationSeconds"].as<int>() == 0);
+
+    // A pre-2025 preset survives setup and drives the display, authentication
+    // sample and session timestamps on the same timeline.
+    TestClock::set(1704067200); // 2024-01-01T00:00:00Z
+    demo.setup();
+    assert(time(nullptr) == 1704067200);
+    demo.sendMessage(R"({"event":"EVENT","data":{"type":"READER_AUTHENTICATE"}})");
+    demo.loop();
+    const auto presetAuth = last("READER_AUTHENTICATED");
+    const auto presetSample = presetAuth["data"]["payload"]["serverTime"];
+    assert(presetSample["epochMs"].as<int64_t>() == 1704067200000);
+    WallClock::onServerTime(presetSample["epochMs"].as<int64_t>(), 0);
+    const auto preset = WallClock::now();
+    assert(preset.valid && preset.year == 2024 && preset.month == 1 && preset.day == 1);
+    assert(preset.hour == 0 && preset.minute == 0);
+    demo.sendMessage(R"({"event":"EVENT","data":{"type":"START_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
+    demo.loop();
+    const auto presetList = last("RESOURCE_LIST");
+    const auto presetSession = presetList["data"]["payload"]["resources"][1]["activeUsageSession"];
+    assert(presetSession["startTime"].as<std::string>() == "2024-01-01T00:00:00");
+    TestClock::set(1704067260);
+    assert(WallClock::now().minute == 1);
+    demo.sendMessage(R"({"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
+    demo.loop();
+    assert(last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["durationSeconds"].as<int>() == 60);
 }

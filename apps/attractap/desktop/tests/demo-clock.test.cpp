@@ -1,6 +1,7 @@
 #include "api/demo/clock.hpp"
 #include "clock/wall_clock.hpp"
 #include <cassert>
+#include <cstdlib>
 #include <limits>
 
 namespace
@@ -38,6 +39,8 @@ extern "C" int gettimeofday(timeval *value, void *) CLOCK_NOEXCEPT
 
 int main()
 {
+    setenv("TZ", "UTC", 1);
+    tzset();
     WallClock::onServerTime(0, 0);
     assert(!WallClock::now().valid);
     constexpr int32_t invalidOffsets[] = {std::numeric_limits<int32_t>::min(),
@@ -106,4 +109,21 @@ int main()
     DemoClock::initialize();
     assert(utc == 1791635520);
     assert(clockSets == 2);
+
+    // A deliberate historical preset is not an uninitialized clock.
+    utc = 1704067200; // 2024-01-01T00:00:00Z
+    DemoClock::initialize();
+    assert(utc == 1704067200 && clockSets == 2);
+    local = WallClock::now();
+    assert(local.valid && local.year == 2024 && local.month == 1 && local.day == 1);
+    assert(local.hour == 0 && local.minute == 0);
+
+    // Startup can happen several seconds after reset: an unset clock still
+    // matches uptime and must receive the demonstration date.
+    timespec uptime{};
+    assert(clock_gettime(CLOCK_MONOTONIC, &uptime) == 0);
+    utc = uptime.tv_sec;
+    DemoClock::initialize();
+    assert(utc == 1767268800 && clockSets == 3);
+    assert(WallClock::now().valid && WallClock::now().year == 2026);
 }

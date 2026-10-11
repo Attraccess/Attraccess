@@ -1,4 +1,5 @@
 #include "workflow.hpp"
+#include "api/demo/clock.hpp"
 #include "display/shared/wallClockText.hpp"
 #include "../controlled-clock.hpp"
 
@@ -106,6 +107,20 @@ void ReaderWorkflow::testWallClock()
     display.capture(output, "wall-clock-03-lockscreen");
     click(LV_SYMBOL_LEFT);
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+
+    // Demo setup also makes a deliberate historical preset visible on the
+    // production idle screen, without passing the network plausibility gate.
+    const auto restoredUtc = time(nullptr);
+    TestClock::set(1704067200); // 2024-01-01T00:00:00Z
+    DemoClock::initialize();
+    pump();
+    assert(WallClock::now().valid && WallClock::now().year == 2024);
+    assert(label(lv_screen_active(), WallClockText::clock(WallClock::now()).c_str()));
+    assert(label(lv_screen_active(), "1. Januar 2024"));
+    display.capture(output, "wall-clock-04-demo-preset-2024");
+    TestClock::set(restoredUtc);
+    WallClock::onServerTime(static_cast<int64_t>(restoredUtc) * 1000, 60);
+    pump();
     username = "Alex";
     login();
 }

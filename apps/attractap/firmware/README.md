@@ -15,8 +15,9 @@ One firmware per hardware flavor, defined by a file in `variants/`:
 | `attractap-touch-demo` | V3 display hardware | Offline demo API and demo settings |
 | `attractap-touch-v2-demo` | V4 display hardware | Offline demo API, demo settings and power button |
 
-Offline demos preserve an already set device clock. On a cold boot with unset
-time, they start at 1 January 2026, 12:00 UTC, so the demo clock and session
+Offline demos preserve an already set device clock, including dates before 2025.
+An unset clock is at zero or still counting uptime from the Unix epoch. On a cold
+boot with unset time, demos start at 1 January 2026, 12:00 UTC, so the clock and session
 timestamps share a plausible timeline. This is a demonstration date, not the
 actual current time; demo firmware does not start SNTP.
 

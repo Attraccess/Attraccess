@@ -13,13 +13,14 @@ namespace
 #else
     constexpr bool systemClockPreset = false;
 #endif
-    // Anything earlier means the system clock was never set (boots at 1970).
+    // Network samples must be contemporary; demo presets are trusted separately.
     constexpr time_t EarliestPlausibleUtc = 1735689600; // 2025-01-01T00:00:00Z
     constexpr int64_t MaxFallbackDriftMs = 2000;
     constexpr int32_t MaxUtcOffsetMinutes = 14 * 60;
 
     std::atomic<bool> sntpSynced{systemClockPreset};
     std::atomic<bool> utcKnown{systemClockPreset};
+    std::atomic<bool> demoTimeKnown{false};
     std::atomic<bool> offsetKnown{false};
     std::atomic<int32_t> offsetMinutes{0};
 }
@@ -28,6 +29,18 @@ void WallClock::onSntpSynced()
 {
     sntpSynced = true;
     utcKnown = true;
+}
+
+void WallClock::onDemoTime(int32_t utcOffsetMinutes)
+{
+    if (utcOffsetMinutes < -MaxUtcOffsetMinutes || utcOffsetMinutes > MaxUtcOffsetMinutes)
+    {
+        return;
+    }
+    offsetMinutes = utcOffsetMinutes;
+    offsetKnown = true;
+    utcKnown = true;
+    demoTimeKnown = true;
 }
 
 void WallClock::onServerTime(int64_t epochMs, int32_t utcOffsetMinutes)
@@ -59,7 +72,7 @@ WallClock::LocalTime WallClock::now()
 {
     LocalTime result;
     const time_t utc = time(nullptr);
-    if (!utcKnown || !offsetKnown || utc < EarliestPlausibleUtc)
+    if (!utcKnown || !offsetKnown || (!demoTimeKnown && utc < EarliestPlausibleUtc))
     {
         return result;
     }
