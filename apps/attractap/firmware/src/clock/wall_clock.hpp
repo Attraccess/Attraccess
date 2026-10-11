@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <sys/time.h>
 
 // Local wall-clock time for the display.
 //
@@ -21,7 +22,9 @@ namespace WallClock
         int minute = 0;
     };
 
-    void onSntpSynced();
+    // Apply SNTP UTC and claim priority in the same operation as API fallback
+    // writes. Returns false without claiming synchronization if setting fails.
+    bool onSntpTime(const timeval &sample);
     // Network UTC must be in [2025-01-01, 2100-01-01), with an offset in
     // [-840, 840] minutes. Rejected samples leave UTC and offset unchanged.
     void onServerTime(int64_t epochMs, int32_t utcOffsetMinutes);

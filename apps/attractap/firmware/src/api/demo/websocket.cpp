@@ -18,7 +18,7 @@
 
 void DemoWebsocket::setup()
 {
-    DemoClock::initialize();
+    _clockInitialized = DemoClock::initialize();
     // Mark the mock as "connected" so the application state machine can
     // advance past the init screen without any real network.
     esp_ip4_addr_t fakeIp = {0};
@@ -29,6 +29,9 @@ void DemoWebsocket::setup()
 
 void DemoWebsocket::loop()
 {
+    // Local demo timezone rules may change at DST boundaries while running.
+    // Only publish updates after the demo clock was initialized successfully.
+    if (_clockInitialized) DemoClock::refresh();
     if (!_initDone)
     {
         _initDone = true;
@@ -264,7 +267,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
             JsonObject aus = obj["activeUsageSession"].to<JsonObject>();
             aus["user"]["username"] = session.user;
             aus["startTime"] = toIso8601(session.startEpoch);
-            aus["startTimeUtcOffsetMinutes"] = 0;
+            aus["startTimeUtcOffsetMinutes"] = DemoClock::utcOffsetMinutes(session.startEpoch);
         }
     }
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "clock/wall_clock.hpp"
+#include <cerrno>
+#include <cstdio>
 #include <ctime>
 #include <sys/time.h>
 
@@ -17,7 +19,12 @@ namespace DemoClock
         return days * 1440 + (local.tm_hour - utc.tm_hour) * 60 + local.tm_min - utc.tm_min;
     }
 
-    inline void initialize()
+    inline void refresh()
+    {
+        WallClock::onDemoTime(utcOffsetMinutes(std::time(nullptr)));
+    }
+
+    inline bool initialize()
     {
         // An unset ESP clock counts elapsed time from the Unix epoch. Compare
         // it with uptime rather than rejecting deliberately preset dates.
@@ -29,12 +36,16 @@ namespace DemoClock
         if (unset)
         {
             const timeval start{1767268800, 0}; // 2026-01-01T12:00:00Z
-            settimeofday(&start, nullptr);
+            if (settimeofday(&start, nullptr) != 0)
+            {
+                std::fprintf(stderr, "DemoClock: initialization failed (errno %d)\n", errno);
+                return false;
+            }
         }
 
         // Demo dates are trusted local presets, not network time samples.
         // Publish their timezone directly so historical presets remain visible.
-        const time_t demoUtc = std::time(nullptr);
-        WallClock::onDemoTime(utcOffsetMinutes(demoUtc));
+        refresh();
+        return true;
     }
 }

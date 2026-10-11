@@ -1,8 +1,11 @@
 #include "wall_clock.hpp"
 
 #include <atomic>
+#include <cerrno>
+#include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <mutex>
 #include <sys/time.h>
 
 namespace
@@ -26,12 +29,20 @@ namespace
     std::atomic<bool> demoTimeKnown{false};
     std::atomic<bool> offsetKnown{false};
     std::atomic<int32_t> offsetMinutes{0};
+    std::mutex clockUpdateMutex;
 }
 
-void WallClock::onSntpSynced()
+bool WallClock::onSntpTime(const timeval &sample)
 {
+    const std::lock_guard<std::mutex> lock(clockUpdateMutex);
+    if (settimeofday(&sample, nullptr) != 0)
+    {
+        std::fprintf(stderr, "WallClock: SNTP clock update failed (errno %d)\n", errno);
+        return false;
+    }
     sntpSynced = true;
     utcKnown = true;
+    return true;
 }
 
 void WallClock::onDemoTime(int32_t utcOffsetMinutes)
@@ -55,18 +66,27 @@ void WallClock::onServerTime(int64_t epochMs, int32_t utcOffsetMinutes)
     }
     offsetMinutes = utcOffsetMinutes;
     offsetKnown = true;
+    const std::lock_guard<std::mutex> lock(clockUpdateMutex);
     if (sntpSynced)
     {
         return;
     }
 
     timeval current{};
-    gettimeofday(&current, nullptr);
+    if (gettimeofday(&current, nullptr) != 0)
+    {
+        std::fprintf(stderr, "WallClock: reading UTC failed (errno %d)\n", errno);
+        return;
+    }
     const int64_t currentMs = static_cast<int64_t>(current.tv_sec) * 1000 + current.tv_usec / 1000;
     if (std::llabs(currentMs - epochMs) > MaxFallbackDriftMs)
     {
         const timeval server{static_cast<time_t>(epochMs / 1000), static_cast<suseconds_t>((epochMs % 1000) * 1000)};
-        settimeofday(&server, nullptr);
+        if (settimeofday(&server, nullptr) != 0)
+        {
+            std::fprintf(stderr, "WallClock: API clock update failed (errno %d)\n", errno);
+            return;
+        }
     }
     utcKnown = true;
 }

@@ -129,5 +129,30 @@ int main()
         assert(sample["utcOffsetMinutes"].as<int>() == preset.offset);
         WallClock::onServerTime(sample["epochMs"].as<int64_t>(), sample["utcOffsetMinutes"].as<int>());
         assertLocalClock();
+        demo.sendMessage(R"({"event":"EVENT","data":{"type":"START_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
+        demo.loop();
+        const auto list = last("RESOURCE_LIST");
+        const auto session = list["data"]["payload"]["resources"][1]["activeUsageSession"];
+        assert(session["startTimeUtcOffsetMinutes"].as<int>() == preset.offset);
+        demo.sendMessage(R"({"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
+        demo.loop();
+    }
+
+    // Keep the same demo instance running across each DST boundary, without
+    // setup or authentication publishing a new offset.
+    for (const auto &preset : presets)
+    {
+        if (preset.timezone == std::string("UTC") || preset.instant % 60 != 59) continue;
+        setenv("TZ", preset.timezone, 1);
+        tzset();
+        TestClock::set(preset.instant);
+        demo.setup();
+        TestClock::set(preset.instant + 1);
+        demo.loop();
+        const time_t after = preset.instant + 1;
+        tm expected{};
+        assert(localtime_r(&after, &expected));
+        const auto local = WallClock::now();
+        assert(local.valid && local.hour == expected.tm_hour && local.minute == expected.tm_min);
     }
 }

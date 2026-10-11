@@ -20,7 +20,7 @@ Sie können eine Ressource auch **vor der Anmeldung** auswählen. Tippen Sie auf
 
 ### Uhrzeit und Datum
 
-Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser verwendet die Zeitzone Ihres Attraccess-Servers. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr weiter.
+Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser verwendet die Zeitzone Ihres Attraccess-Servers. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr intern weiter. Das Display zeigt jedoch bis zur erneuten Verbindung den Initialisierungsbildschirm.
 
 Die Kartenaufforderung zeigt die Uhr auch dann, wenn die ausgewählte Ressource bereits verwendet wird und niemand am Leser angemeldet ist. Die Kopfzeile zeigt weiterhin den Namen der Person, die die Ressource verwendet. Nach der Anmeldung öffnen sich die gewohnten Ressourcendetails und Bedienelemente für die Sitzung.
 

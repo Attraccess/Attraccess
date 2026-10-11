@@ -25,6 +25,15 @@ void Network::initSharedComponents() {}
 bool Network::_sharedComponentsInitialized = false;
 Logger Network::logger("Network");
 
+// ESP-IDF's weak SNTP hook normally writes UTC before notifying the app.
+// Own the write so it shares the lock with the API fallback and cannot be
+// overwritten by an API sample that was checked before SNTP synchronized.
+extern "C" void sntp_sync_time(struct timeval *sample)
+{
+    esp_sntp_set_sync_status(WallClock::onSntpTime(*sample)
+        ? SNTP_SYNC_STATUS_COMPLETED : SNTP_SYNC_STATUS_RESET);
+}
+
 void Network::setup()
 {
     logger.info("Initializing");
@@ -48,7 +57,6 @@ void Network::setup()
     esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");
     esp_sntp_setservername(1, "time.nist.gov");
-    esp_sntp_set_time_sync_notification_cb([](struct timeval *) { WallClock::onSntpSynced(); });
     esp_sntp_init();
 
     logger.info("initialization complete");

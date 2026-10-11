@@ -3,11 +3,14 @@
 #include <cassert>
 #include <cstdlib>
 #include <limits>
+#include <cerrno>
+#include <cstring>
 
 namespace
 {
     time_t utc = 0;
     unsigned clockSets = 0;
+    bool failClockSet = false;
 }
 
 // This standalone test substitutes the POSIX clock; it never sets host time.
@@ -25,6 +28,11 @@ extern "C" time_t time(time_t *result) CLOCK_NOEXCEPT
 
 extern "C" int settimeofday(const timeval *value, const struct timezone *) CLOCK_NOEXCEPT
 {
+    if (failClockSet)
+    {
+        errno = EPERM;
+        return -1;
+    }
     utc = value->tv_sec;
     ++clockSets;
     return 0;
@@ -37,10 +45,33 @@ extern "C" int gettimeofday(timeval *value, void *) CLOCK_NOEXCEPT
     return 0;
 }
 
-int main()
+int main(int argc, char **argv)
 {
     setenv("TZ", "UTC", 1);
     tzset();
+    if (argc > 1)
+    {
+        // A failed initial set must not publish an unset clock as valid.
+        failClockSet = true;
+        if (strcmp(argv[1], "sntp-set-failure") == 0)
+        {
+            const timeval sample{1767355200, 0};
+            assert(!WallClock::onSntpTime(sample));
+        }
+        else if (strcmp(argv[1], "demo-set-failure") == 0)
+            DemoClock::initialize();
+        else
+        {
+            utc = 1767268800; // Plausible but stale device time.
+            WallClock::onServerTime(1767355200000, 120);
+        }
+        assert(clockSets == 0);
+        assert(!WallClock::now().valid);
+        failClockSet = false;
+        WallClock::onServerTime(1767355200000, 120);
+        assert(WallClock::now().valid && WallClock::now().hour == 14);
+        return 0;
+    }
     WallClock::onServerTime(0, 0);
     assert(!WallClock::now().valid);
     constexpr int32_t invalidOffsets[] = {std::numeric_limits<int32_t>::min(),
@@ -89,13 +120,14 @@ int main()
     assert(local.hour == 22 && local.minute == 0);
 
     // Rejected samples preserve a valid clock before and after SNTP sync.
+    unsigned expectedClockSets = 2;
     const auto assertRejectedOffsets = [&]()
     {
         for (const auto offset : invalidOffsets)
         {
             WallClock::onServerTime(static_cast<int64_t>(utc + 86400) * 1000, offset);
             const auto retained = WallClock::now();
-            assert(utc == 1767268800 && clockSets == 2);
+            assert(utc == 1767268800 && clockSets == expectedClockSets);
             assert(retained.valid && retained.year == local.year && retained.month == local.month);
             assert(retained.day == local.day && retained.weekday == local.weekday);
             assert(retained.hour == local.hour && retained.minute == local.minute);
@@ -107,7 +139,7 @@ int main()
         {
             WallClock::onServerTime(epoch, 60);
             const auto retained = WallClock::now();
-            assert(utc == 1767268800 && clockSets == 2);
+            assert(utc == 1767268800 && clockSets == expectedClockSets);
             assert(retained.valid && retained.year == local.year && retained.month == local.month);
             assert(retained.day == local.day && retained.weekday == local.weekday);
             assert(retained.hour == local.hour && retained.minute == local.minute);
@@ -115,13 +147,14 @@ int main()
     };
     assertRejectedOffsets();
     assertRejectedEpochs();
-    WallClock::onSntpSynced();
+    assert(WallClock::onSntpTime(timeval{utc, 0}));
+    ++expectedClockSets;
     assertRejectedOffsets();
     assertRejectedEpochs();
 
     // Valid samples after SNTP update only the timezone, even with different UTC.
     WallClock::onServerTime(1767355200000, -210);
-    assert(utc == 1767268800 && clockSets == 2);
+    assert(utc == 1767268800 && clockSets == expectedClockSets);
     local = WallClock::now();
     assert(local.valid && local.day == 1 && local.hour == 8 && local.minute == 30);
     assertRejectedOffsets();
@@ -134,22 +167,22 @@ int main()
     WallClock::onServerTime(endSupportedEpochMs - 1, -210);
     local = WallClock::now();
     assert(local.valid && local.hour == 8 && local.minute == 30);
-    assert(utc == 1767268800 && clockSets == 2);
+    assert(utc == 1767268800 && clockSets == expectedClockSets);
 
     // Repeated setup and a preset device/host clock retain their timeline.
     utc += 60;
     DemoClock::initialize();
     assert(utc == 1767268860);
-    assert(clockSets == 2);
+    assert(clockSets == expectedClockSets);
     utc = 1791635520;
     DemoClock::initialize();
     assert(utc == 1791635520);
-    assert(clockSets == 2);
+    assert(clockSets == expectedClockSets);
 
     // A deliberate historical preset is not an uninitialized clock.
     utc = 1704067200; // 2024-01-01T00:00:00Z
     DemoClock::initialize();
-    assert(utc == 1704067200 && clockSets == 2);
+    assert(utc == 1704067200 && clockSets == expectedClockSets);
     local = WallClock::now();
     assert(local.valid && local.year == 2024 && local.month == 1 && local.day == 1);
     assert(local.hour == 0 && local.minute == 0);
@@ -160,6 +193,6 @@ int main()
     assert(clock_gettime(CLOCK_MONOTONIC, &uptime) == 0);
     utc = uptime.tv_sec;
     DemoClock::initialize();
-    assert(utc == 1767268800 && clockSets == 3);
+    assert(utc == 1767268800 && clockSets == expectedClockSets + 1);
     assert(WallClock::now().valid && WallClock::now().year == 2026);
 }

@@ -20,7 +20,7 @@ You can also choose a resource **before** signing in. Tap its name, then hold yo
 
 ### Time and date
 
-While nobody is signed in, the reader doubles as a clock. The card prompt shows the current time and date in large type with **RFID-Karte auflegen** (Hold your RFID card here) below it, and the resource list shows them at the top. The reader uses the time zone of your Attraccess server. After a restart, the clock appears once the reader has connected to the server; until then, the reader shows its usual sign-in text. The clock keeps running if the connection drops later.
+While nobody is signed in, the reader doubles as a clock. The card prompt shows the current time and date in large type with **RFID-Karte auflegen** (Hold your RFID card here) below it, and the resource list shows them at the top. The reader uses the time zone of your Attraccess server. After a restart, the clock appears once the reader has connected to the server; until then, the reader shows its usual sign-in text. If the connection drops later, the clock continues advancing internally, but the display shows the initialization screen until the reader reconnects.
 
 The signed-out card prompt keeps showing the clock when the selected resource is in use. Its header still shows the current user's name. Signing in opens the existing resource details and session controls.
 

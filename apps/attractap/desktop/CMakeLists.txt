@@ -153,7 +153,17 @@ add_test(NAME attractap-desktop-tests COMMAND attractap-desktop-tests)
 add_executable(attractap-demo-clock-tests tests/demo-clock.test.cpp "${FIRMWARE_DIR}/src/clock/wall_clock.cpp")
 target_include_directories(attractap-demo-clock-tests PRIVATE "${FIRMWARE_DIR}/src")
 target_compile_options(attractap-demo-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+target_link_libraries(attractap-demo-clock-tests PRIVATE Threads::Threads)
 add_test(NAME attractap-demo-clock-tests COMMAND attractap-demo-clock-tests)
+add_test(NAME attractap-api-clock-set-failure COMMAND attractap-demo-clock-tests api-set-failure)
+add_test(NAME attractap-demo-clock-set-failure COMMAND attractap-demo-clock-tests demo-set-failure)
+add_test(NAME attractap-sntp-clock-set-failure COMMAND attractap-demo-clock-tests sntp-set-failure)
+
+add_executable(attractap-clock-race-tests tests/clock-race.test.cpp "${FIRMWARE_DIR}/src/clock/wall_clock.cpp")
+target_include_directories(attractap-clock-race-tests PRIVATE "${FIRMWARE_DIR}/src")
+target_compile_options(attractap-clock-race-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+target_link_libraries(attractap-clock-race-tests PRIVATE Threads::Threads)
+add_test(NAME attractap-clock-race-tests COMMAND attractap-clock-race-tests)
 
 add_executable(attractap-demo-session-clock-tests
     tests/demo-session-clock.test.cpp tests/controlled-clock.cpp src/profile_store.cpp
