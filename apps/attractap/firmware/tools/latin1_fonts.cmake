@@ -10,12 +10,15 @@ function(attractap_latin1_fonts output_variable)
     foreach(size IN LISTS sizes)
         list(APPEND sources "${output_dir}/attractap_font_montserrat_latin1_${size}.c")
     endforeach()
+    foreach(size IN ITEMS 56 88)
+        list(APPEND sources "${output_dir}/attractap_font_montserrat_digits_${size}.c")
+    endforeach()
     set(generator "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_latin1_fonts.sh")
     add_custom_command(
         OUTPUT ${sources}
         COMMAND "${ATTRACTAP_BASH}" "${generator}" "${output_dir}" ${sizes}
         DEPENDS "${generator}" "${CMAKE_CURRENT_FUNCTION_LIST_FILE}"
-        COMMENT "Generating ASCII and Latin-1 Montserrat fonts at original UI sizes"
+        COMMENT "Generating ASCII and Latin-1 Montserrat fonts at original UI sizes and wall-clock digits"
         VERBATIM)
     set(${output_variable} ${sources} PARENT_SCOPE)
 endfunction()

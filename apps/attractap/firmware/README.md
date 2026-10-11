@@ -15,6 +15,20 @@ One firmware per hardware flavor, defined by a file in `variants/`:
 | `attractap-touch-demo` | V3 display hardware | Offline demo API and demo settings |
 | `attractap-touch-v2-demo` | V4 display hardware | Offline demo API, demo settings and power button |
 
+Offline demos preserve an already set device clock, including dates before 2025.
+An unset clock is at zero or still counting uptime from the Unix epoch. On a cold
+boot with unset time, demos start at 1 January 2026, 12:00 UTC, so the clock and session
+timestamps share a plausible timeline. This is a demonstration date, not the
+actual current time; demo firmware does not start SNTP.
+Demo presets are trusted local time and may display without a server sample.
+
+Network clock samples support UTC dates from 1 January 2025 (inclusive) to
+1 January 2100 (exclusive), with timezone offsets from -840 to +840 minutes.
+This range covers the reader's intended operating lifetime while rejecting
+corrupted future timestamps that still fit a signed 64-bit integer. A rejected
+sample leaves both UTC and the timezone offset unchanged, before and after
+SNTP synchronization. Trusted offline demo presets use their separate path.
+
 Each variant file sets the compile definitions (pins, feature flags, firmware
 name) and the source subtrees excluded for that hardware. The firmware version
 lives in `version.txt` — bump it whenever firmware source changes (CI enforces
@@ -107,7 +121,8 @@ hardware before deployment.
 
 CMake generates uncompressed Montserrat fonts in each build directory for sizes
 10, 14, 16, 18, 20, 24, 26, 28, 32, and 36. The original configured sizes remain
-unchanged. Firmware, desktop, and host rendering tests share
+unchanged. The wall clock adds digit-only fonts at 56 and 88 px. Firmware,
+desktop, and host rendering tests share
 `tools/latin1_fonts.cmake`. Builds require Node.js/npm (`npx`) and curl; the first
 build downloads the pinned LVGL 9.3.0 font source (SHA-256 verified) and
 `lv_font_conv@1.5.3`. Subsequent builds reuse their generated files. Do not commit

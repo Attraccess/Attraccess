@@ -313,6 +313,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     const char *topLevelEvent = inboundDoc["event"].as<const char *>();
     if (topLevelEvent && strcmp(topLevelEvent, "HEARTBEAT") == 0)
     {
+        this->onServerTime(inboundDoc["serverTime"]);
         return;
     }
 

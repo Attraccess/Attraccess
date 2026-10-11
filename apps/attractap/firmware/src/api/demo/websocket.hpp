@@ -38,6 +38,7 @@ private:
     std::function<void(const char *, size_t)> _messageCallback;
 
     bool _initDone = false;
+    bool _clockInitialized = false;
     // Messages queued to be delivered to the API on the next loop() call.
     std::queue<std::string> _inbound;
 

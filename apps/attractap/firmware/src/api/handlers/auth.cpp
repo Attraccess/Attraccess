@@ -2,7 +2,10 @@
 // FEATURE: api-auth
 
 #include "../api.hpp"
+#include "../../clock/wall_clock.hpp"
+#include <cmath>
 #include <functional>
+#include <limits>
 #include <string>
 
 void API::onRegistrationData(JsonObject data)
@@ -121,6 +124,7 @@ void API::onReaderAuthenticated(JsonObject data)
     cancelResourceAction();
 
     std::string deviceName = data["payload"]["name"].as<std::string>();
+    this->onServerTime(data["payload"]["serverTime"]);
 
     State::setApiState(true, deviceName);
 
@@ -133,6 +137,24 @@ void API::onReaderAuthenticated(JsonObject data)
 
     this->sendFirmwareInfo();
     this->sendPendingCrashReport();
+}
+
+void API::onServerTime(JsonVariantConst serverTime)
+{
+    // Older servers omit the sample; the clock then stays hidden.
+    if (!serverTime["epochMs"].is<double>() || !serverTime["utcOffsetMinutes"].is<int>())
+    {
+        return;
+    }
+    const double epochMs = serverTime["epochMs"].as<double>();
+    // INT64_MAX rounds up to 2^63 as a double, so the upper bound is exclusive.
+    constexpr double minEpoch = static_cast<double>(std::numeric_limits<int64_t>::min());
+    if (!std::isfinite(epochMs) || epochMs < minEpoch || epochMs >= -minEpoch)
+    {
+        return;
+    }
+    WallClock::onServerTime(static_cast<int64_t>(epochMs),
+                            serverTime["utcOffsetMinutes"].as<int32_t>());
 }
 
 void API::onDeviceName(std::function<void(std::string)> callback)

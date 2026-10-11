@@ -18,6 +18,14 @@ You can also choose a resource **before** signing in. Tap its name, then hold yo
 
 ![Card prompt for a selected resource, with a back arrow in the top-left corner](../../_media/attractap/card-prompt.png)
 
+### Time and date
+
+While nobody is signed in, the reader doubles as a clock. The card prompt shows the current time and date in large type with **RFID-Karte auflegen** (Hold your RFID card here) below it, and the resource list shows them at the top. The reader uses the time zone of your Attraccess server. After a restart, the clock appears once the reader has connected to the server; until then, the reader shows its usual sign-in text. If the connection drops later, the clock continues advancing internally, but the display shows the initialization screen until the reader reconnects.
+
+During an outage, UTC continues advancing with the last server timezone offset. That offset stays fixed: daylight-saving changes or a change to the server's timezone take effect only after another valid server time sample arrives.
+
+The signed-out card prompt keeps showing the clock when the selected resource is in use. Its header still shows the current user's name. Signing in opens the existing resource details and session controls.
+
 ## Start a machine or open a door
 
 In the resource list, tap **Start** next to a machine or **Öffnen** (Open) next to a door. Complete any form or supervision step that appears, then wait for the result on the display.
