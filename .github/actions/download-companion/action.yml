@@ -9,21 +9,18 @@ runs:
   steps:
     - name: Download Linux companion binaries
       uses: actions/download-artifact@v4
-      continue-on-error: true
       with:
         name: companion-linux-${{ github.run_id }}
         path: apps/companion/dist
 
     - name: Download macOS companion binary
       uses: actions/download-artifact@v4
-      continue-on-error: true
       with:
         name: companion-macos-${{ github.run_id }}
         path: apps/companion/dist
 
     - name: Download Windows companion binary
       uses: actions/download-artifact@v4
-      continue-on-error: true
       with:
         name: companion-windows-${{ github.run_id }}
         path: apps/companion/dist

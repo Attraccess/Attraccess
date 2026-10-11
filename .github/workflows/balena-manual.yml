@@ -30,10 +30,37 @@ env:
 jobs:
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
+    with:
+      ref: ${{ inputs.branch }}
     secrets: inherit
 
+  build-attractap-firmware:
+    uses: ./.github/workflows/attractap-firmware.yml
+    with:
+      ref: ${{ inputs.branch }}
+    secrets: inherit
+
+  build-attractap-desktop:
+    uses: ./.github/workflows/build-attractap-desktop.yml
+    with:
+      ref: ${{ inputs.branch }}
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup-browser-tests
+      - name: Test all core projects and plugins
+        run: node scripts/ci-test-projects.mjs --group=software
+      - name: Test packed Hello World fixture
+        run: pnpm --dir examples/plugin-hello-world run pack-test
+
   balena:
-    needs: build-companion
+    needs: [build-companion, build-attractap-firmware, build-attractap-desktop, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -41,9 +68,7 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
 
-      # Balena's remote builder has no ESP-IDF; pre-build the firmware so
-      # `balena push` uploads firmware_output/ with the build context.
-      - uses: ./.github/actions/build-attractap-firmware
+      - uses: ./.github/actions/download-attractap-firmware
 
       - uses: ./.github/actions/build-cc100-runtime
 
