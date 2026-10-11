@@ -64,6 +64,8 @@
   - [Firmware-Updates](attractap/firmware-updates.md)
 
 - **MQTT & IoT**
+  - [Matter-Architektur](devices/matter-architecture.md)
+  - [Matter-Sidecar betreiben](devices/matter-operations.md)
   - [Überblick](mqtt/overview.md)
   - [Server einrichten](mqtt/server-setup.md)
   - [Beispiele](mqtt/examples.md)

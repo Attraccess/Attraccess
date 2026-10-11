@@ -65,6 +65,8 @@
   - [LED Guide (Lite)](attractap/led-guide.md)
 
 - **Devices**
+  - [Matter Architecture](devices/matter-architecture.md)
+  - [Matter Sidecar Operations](devices/matter-operations.md)
   - [MQTT](devices/mqtt/overview.md)
   - [MQTT Server Setup](devices/mqtt/server-setup.md)
   - [MQTT Examples](devices/mqtt/examples.md)

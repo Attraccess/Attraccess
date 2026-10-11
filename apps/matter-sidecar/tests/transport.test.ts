@@ -1,0 +1,322 @@
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { once } from 'node:events';
+import { request } from 'node:http';
+import { createConnection } from 'node:net';
+import { WebSocket } from 'ws';
+import { routes, ErrorEnvelope, INITIAL_CAPABILITIES, SUPPORTED_RELEASE } from '@attraccess/matter-contract';
+import { fixtures, fixtureId, versionFixture } from '@attraccess/matter-contract/testing';
+import { createApplication } from '../src/application.js';
+import { checkCompatibility } from '../src/errors.js';
+import { attachClient } from '../src/websocket.js';
+import { EventStream } from '../src/stream.js';
+import { Config } from '../src/config.js';
+
+const headers = fixtures.CompatibilityHeaders as Record<string, string>;
+const apps: ReturnType<typeof createApplication>[] = [];
+afterEach(async () => {
+  await Promise.all(apps.splice(0).map((app) => app.shutdown()));
+});
+async function start(config = {}) {
+  const platform = { initialize: vi.fn(async () => undefined), dispose: vi.fn(async () => undefined) };
+  const app = createApplication({ platform, version: versionFixture, config: { port: 0, shutdownMs: 100, ...config } });
+  apps.push(app);
+  return { app, platform, ...(await app.start()) };
+}
+async function waitFor(predicate: () => boolean) {
+  const until = Date.now() + 2000;
+  while (!predicate()) {
+    if (Date.now() > until) throw new Error('Transport did not reach expected state');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+async function connect(url: string) {
+  const ws = new WebSocket(url.replace('http:', 'ws:') + '/v1/events', { headers });
+  const messages: { type?: string; error?: { code: string }; [key: string]: unknown }[] = [];
+  ws.on('message', (data) => messages.push(JSON.parse(data.toString())));
+  await once(ws, 'open');
+  return { ws, messages };
+}
+describe('real local HTTP and WebSocket transport with a simulated platform', () => {
+  it('reports ready without a fabric, validates requests and advertises unavailable features', async () => {
+    const { app, platform, url } = await start();
+    expect(await (await fetch(url + '/health/live')).json()).toEqual({ schemaVersion: 1, live: true });
+    expect(await (await fetch(url + '/health/ready')).json()).toEqual({
+      schemaVersion: 1,
+      ready: true,
+      fabricInitialized: false,
+      reason: null,
+    });
+    expect(await (await fetch(url + '/version')).json()).toEqual(versionFixture);
+    expect(await (await fetch(url + '/v1/capabilities', { headers })).json()).toEqual(INITIAL_CAPABILITIES);
+    for (const route of routes.filter((route) => 'capability' in route)) {
+      const body = 'request' in route ? JSON.stringify(fixtures[route.request]) : undefined;
+      const response = await fetch(url + route.path, {
+        method: route.method,
+        headers: { ...headers, 'content-type': 'application/json' },
+        body,
+      });
+      expect(response.status, route.path).toBe(501);
+      const result = ErrorEnvelope.parse(await response.json());
+      expect(result.error.details.capability).toBe(route.capability);
+      if ('request' in route)
+        expect(
+          (
+            await fetch(url + route.path, {
+              method: 'POST',
+              headers: { ...headers, 'content-type': 'application/json' },
+              body: '{"password":"do-not-echo"}',
+            })
+          ).status,
+        ).toBe(400);
+    }
+    await app.shutdown();
+    expect(app.ready).toBe(false);
+    expect(platform.dispose).toHaveBeenCalledOnce();
+    await app.shutdown();
+    expect(platform.dispose).toHaveBeenCalledOnce();
+  });
+  it('rejects each release mismatch, absent metadata, unknown wire routes and browser Origins', async () => {
+    const { url } = await start();
+    for (const key of ['x-attraccess-version', 'x-matter-plugin-version']) {
+      for (const value of ['999.0.0', 'bad version', undefined]) {
+        const invalid = { ...headers };
+        if (value === undefined) delete invalid[key];
+        else invalid[key] = value;
+        const response = await fetch(url + '/v1/capabilities', { headers: invalid });
+        expect(response.status).toBe(409);
+        const result = ErrorEnvelope.parse(await response.json());
+        expect(result.error.details.supported).toEqual([SUPPORTED_RELEASE]);
+        expect(result.error.message).toMatch('Upgrade or downgrade');
+      }
+    }
+    expect(() => checkCompatibility(headers, '999.0.0')).toThrow('Upgrade or downgrade');
+    expect(() => checkCompatibility(headers, 'not-a-version')).toThrow('Upgrade or downgrade');
+    expect(
+      (await fetch(url + '/v1/capabilities', { headers: { ...headers, 'x-matter-wire-version': '2' } })).status,
+    ).toBe(426);
+    expect((await fetch(url + '/v2/capabilities', { headers })).status).toBe(426);
+    expect((await fetch(url + '/health/live', { headers: { Origin: 'http://example.org' } })).status).toBe(403);
+    const missing = { ...headers };
+    delete missing['x-request-id'];
+    expect((await fetch(url + '/v1/capabilities', { headers: missing })).status).toBe(400);
+    expect((await fetch(url + '/health/live')).status).toBe(200);
+    for (const invalid of [
+      { ...headers, 'x-matter-plugin-version': '999.0.0' },
+      { ...headers, 'x-matter-wire-version': '2' },
+      { ...headers, Origin: 'http://example.org' },
+    ]) {
+      const ws = new WebSocket(url.replace('http:', 'ws:') + '/v1/events', { headers: invalid });
+      const response = new Promise<number>((resolve) =>
+        ws.once('unexpected-response', (_, res) => {
+          res.resume();
+          ws.terminate();
+          resolve(res.statusCode ?? 0);
+        }),
+      );
+      ws.on('error', () => undefined);
+      expect(await response).toBe(
+        'Origin' in invalid
+          ? 403
+          : 'x-matter-wire-version' in invalid && invalid['x-matter-wire-version'] === '2'
+            ? 426
+            : 409,
+      );
+    }
+  });
+  it('replays stable events, switches to live delivery, and repeats reconnect cursors safely', async () => {
+    const { app, url } = await start();
+    const cursor = app.stream.watermark;
+    const first = app.stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });
+    const { ws, messages } = await connect(url);
+    ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor }));
+    await waitFor(() => messages.length === 2);
+    const live = app.stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });
+    await waitFor(() => messages.length === 3);
+    expect(messages[0]).toEqual(first);
+    expect(messages[1].type).toBe('stream.ready');
+    expect(messages[2]).toEqual(live);
+    ws.close();
+    await once(ws, 'close');
+    const again = await connect(url);
+    again.ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor }));
+    await waitFor(() => again.messages.length === 3);
+    expect(again.messages.slice(0, 2)).toEqual([first, live]);
+    again.ws.close();
+  });
+  it('sends initial lifecycle/capability events through the standard envelope and rejects stream gaps', async () => {
+    const { app, url } = await start();
+    const initial = await connect(url);
+    initial.ws.send(
+      JSON.stringify({
+        schemaVersion: 1,
+        type: 'resume',
+        requestId: fixtureId,
+        cursor: { streamInstanceId: app.stream.instanceId, sequence: 0 },
+      }),
+    );
+    await waitFor(() => initial.messages.length === 3);
+    expect(initial.messages.map((m) => m.type)).toEqual(['lifecycle', 'capabilities', 'stream.ready']);
+    initial.ws.close();
+    for (const value of [
+      { schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor: { streamInstanceId: fixtureId, sequence: 0 } },
+      { schemaVersion: 2, type: 'resume', requestId: fixtureId, cursor: null },
+      { schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor: 'bad' },
+      'invalid-json',
+    ]) {
+      const client = await connect(url);
+      client.ws.send(typeof value === 'string' ? value : JSON.stringify(value));
+      await once(client.ws, 'close');
+      expect(client.messages[0].error).toBeDefined();
+      expect([409, 426, 400]).toContain(
+        { RECONCILIATION_REQUIRED: 409, UNSUPPORTED_WIRE_VERSION: 426, VALIDATION_ERROR: 400 }[
+          client.messages[0].error?.code as 'VALIDATION_ERROR'
+        ],
+      );
+    }
+  });
+  it('validates message versions after initial subscription and closes idle streams', async () => {
+    const { url } = await start({ resumeTimeoutMs: 50 });
+    const client = await connect(url);
+    client.ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor: null }));
+    await waitFor(() => client.messages.length === 1);
+    client.ws.send(JSON.stringify({ schemaVersion: 2, type: 'resume', requestId: fixtureId, cursor: null }));
+    await once(client.ws, 'close');
+    expect(client.messages[1].error?.code).toBe('UNSUPPORTED_WIRE_VERSION');
+    const idle = await connect(url);
+    await once(idle.ws, 'close');
+    expect(idle.messages[0].error?.code).toBe('TIMEOUT');
+  });
+  it('bounds slow clients using the real connection writer with deterministic queue pressure', () => {
+    const stream = new EventStream();
+    const handlers: Record<string, (...args: unknown[]) => void> = {};
+    const ws = {
+      readyState: WebSocket.OPEN,
+      bufferedAmount: 10000,
+      on: (name: string, fn: (...args: unknown[]) => void) => (handlers[name] = fn),
+      once: (name: string, fn: (...args: unknown[]) => void) => {
+        const previous = handlers[name];
+        handlers[name] = (...args) => {
+          previous?.(...args);
+          fn(...args);
+        };
+      },
+      send: vi.fn(),
+      close: vi.fn(),
+      terminate: vi.fn(),
+    };
+    attachClient(ws as unknown as WebSocket, fixtureId, stream, Config.parse({ clientQueueBytes: 128 }));
+    handlers.message(
+      Buffer.from(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor: null })),
+      false,
+    );
+    expect(ws.close).toHaveBeenCalledWith(4009, expect.stringContaining('Reconciliation'));
+    expect(ws.send).not.toHaveBeenCalled();
+    handlers.close();
+  });
+  it('bounds WebSocket messages and rejects chunked oversized REST uploads', async () => {
+    const { url } = await start({ payloadBytes: 512 });
+    const client = await connect(url);
+    client.ws.send('x'.repeat(1024));
+    const [code] = await once(client.ws, 'close');
+    expect(code).toBe(1009);
+    const oversized = await new Promise<number>((resolve, reject) => {
+      const req = request(
+        url + '/v1/commissioning/start',
+        { method: 'POST', headers: { ...headers, 'content-type': 'application/json', 'transfer-encoding': 'chunked' } },
+        (res) => {
+          res.resume();
+          res.on('end', () => {
+            req.destroy();
+            resolve(res.statusCode ?? 0);
+          });
+        },
+      );
+      req.on('error', reject);
+      req.write('x'.repeat(1024));
+    });
+    expect(oversized).toBe(413);
+    expect((await fetch(url + '/health/live')).status).toBe(200);
+  });
+  it('marks readiness false while draining an in-flight HTTP upload', async () => {
+    const { app, port } = await start({ shutdownMs: 500 });
+    const socket = createConnection({ host: '127.0.0.1', port });
+    await once(socket, 'connect');
+    let output = '';
+    socket.on('data', (data) => (output += data.toString()));
+    const closed = once(socket, 'close');
+    const received = once(app.server, 'request');
+    socket.write(
+      `POST /v1/commands HTTP/1.1\r\nHost: localhost\r\n${Object.entries(headers)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\r\n')}\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{`,
+    );
+    await received;
+    const shutdown = app.shutdown();
+    expect(app.ready).toBe(false);
+    socket.write('}GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+    await closed;
+    await shutdown;
+    expect(output).toContain('503');
+    expect(output).toContain('"ready":false');
+    expect(output).toContain('"fabricInitialized":false');
+  });
+  it('contains initialization failures, rejects remote bind, and bounds disposal', async () => {
+    expect(() => Config.parse({ host: '0.0.0.0' })).toThrow();
+    const platform = {
+      initialize: vi.fn(async () => {
+        throw new Error('simulated initialization failure');
+      }),
+      dispose: vi.fn(async () => undefined),
+    };
+    const app = createApplication({ platform, version: versionFixture, config: { port: 0, shutdownMs: 30 } });
+    await expect(app.start()).rejects.toThrow('simulated initialization failure');
+    expect(app.ready).toBe(false);
+    expect(platform.dispose).toHaveBeenCalledOnce();
+    const bounded = await start({ shutdownMs: 30 });
+    bounded.platform.dispose.mockImplementation(() => new Promise(() => undefined));
+    const before = Date.now();
+    await bounded.app.shutdown();
+    expect(Date.now() - before).toBeLessThan(200);
+  });
+  it('returns deadlines and bounded-payload errors without echoing sensitive requests', async () => {
+    const { url } = await start({ payloadBytes: 512, requestTimeoutMs: 100 });
+    const body = { ...(fixtures.CommandRequest as object), deadline: '2000-01-01T00:00:00.000Z' };
+    const response = await fetch(url + '/v1/commands', {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    expect(response.status).toBe(504);
+    const invalid = await fetch(url + '/v1/commissioning/start', {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: '{"password":"never-echo-this"}',
+    });
+    expect(await invalid.text()).not.toContain('never-echo-this');
+    const oversize = await fetch(url + '/v1/commissioning/start', {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'a'.repeat(1024) }),
+    });
+    expect(oversize.status).toBe(413);
+    const stalled = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const req = request(
+        url + '/v1/commands',
+        { method: 'POST', headers: { ...headers, 'content-type': 'application/json', 'transfer-encoding': 'chunked' } },
+        (res) => {
+          let text = '';
+          res.on('data', (data) => (text += data));
+          res.on('end', () => {
+            req.destroy();
+            resolve({ status: res.statusCode ?? 0, body: text });
+          });
+        },
+      );
+      req.on('error', reject);
+      req.write('{');
+    });
+    expect(stalled.status).toBe(504);
+    expect(JSON.parse(stalled.body).error.code).toBe('TIMEOUT');
+    expect((await fetch(url + '/health/live')).status).toBe(200);
+  });
+});
