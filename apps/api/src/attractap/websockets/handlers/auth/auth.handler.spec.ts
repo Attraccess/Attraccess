@@ -4,6 +4,7 @@ import { WebsocketService } from '../../websocket.service';
 import { AttractapAuthHandler } from './auth.handler';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { verifyToken } from '../../websocket.utils';
+import { WebSocket } from 'ws';
 
 jest.mock('../../websocket.utils', () => ({
   verifyToken: jest.fn(),
@@ -17,6 +18,7 @@ describe('AttractapAuthHandler', () => {
     id: string;
     readerId: number | null;
     readerName: string | null;
+    readyState: number;
     state: Record<string, unknown>;
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
@@ -41,6 +43,7 @@ describe('AttractapAuthHandler', () => {
       id: 'socket-1',
       readerId: null,
       readerName: null,
+      readyState: WebSocket.OPEN,
       state: {},
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
@@ -132,6 +135,26 @@ describe('AttractapAuthHandler', () => {
 
   describe('handleAuthentication', () => {
     const data = { payload: { id: 42, token: 'client-token' } } as AttractapEvent['data'];
+
+    it.each(['lookup', 'token', 'language'])('does not authenticate after closure during %s', async (stage) => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      mockVerifyToken.mockResolvedValue(true);
+      const pending =
+        stage === 'lookup'
+          ? mockAttractapService.findReaderById
+          : stage === 'token'
+            ? mockVerifyToken
+            : (handler as any).settingsService.getDefaultLanguage;
+      pending.mockImplementationOnce(async () => {
+        mockSocket.readyState = WebSocket.CLOSED;
+        return stage === 'lookup' ? { id: 42, name: 'Reader', apiTokenHash: 'hash' } : stage === 'token' ? true : 'de';
+      });
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+      expect(mockMetricsService.attractapReaderConnected.set).not.toHaveBeenCalled();
+    });
 
     it('delivers a default changed while the initial language read is pending', async () => {
       mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', apiTokenHash: 'hash' });

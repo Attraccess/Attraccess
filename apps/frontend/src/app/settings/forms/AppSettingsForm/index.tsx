@@ -40,6 +40,8 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const hasEditedLanguage = useRef(false);
+  const hasEditedUrl = useRef(false);
+  const hasEditedPublicInternetUrl = useRef(false);
 
   const [url, setUrl] = useState(window.location.origin);
   const [publicInternetUrl, setPublicInternetUrl] = useState(window.location.origin);
@@ -61,9 +63,8 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
 
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;
-    setUrl(settings.app.url ?? '');
-    setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
-    setLicenseKey('');
+    if (!hasEditedUrl.current) setUrl(settings.app.url ?? '');
+    if (!hasEditedPublicInternetUrl.current) setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
     if (!hasEditedLanguage.current) setDefaultLanguage(settings.app.defaultLanguage ?? 'de');
   }, [variant, settings]);
 
@@ -80,6 +81,8 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
         }
         hasEditedLanguage.current = false;
+        hasEditedUrl.current = false;
+        hasEditedPublicInternetUrl.current = false;
         setLicenseKey('');
         if (variant === 'wizard') onNext?.();
       },
@@ -141,12 +144,25 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
       }}
       className="flex flex-col gap-4"
     >
-      <TextField isRequired value={url} onChange={setUrl}>
+      <TextField
+        isRequired
+        value={url}
+        onChange={(value) => {
+          hasEditedUrl.current = true;
+          setUrl(value);
+        }}
+      >
         <Label>{t('inputs.url.label')}</Label>
         <Input type="url" />
         <Description>{t('inputs.url.description')}</Description>
       </TextField>
-      <TextField value={publicInternetUrl} onChange={setPublicInternetUrl}>
+      <TextField
+        value={publicInternetUrl}
+        onChange={(value) => {
+          hasEditedPublicInternetUrl.current = true;
+          setPublicInternetUrl(value);
+        }}
+      >
         <Label>{t('inputs.publicInternetUrl.label')}</Label>
         <Input type="url" />
         <Description>{t('inputs.publicInternetUrl.description')}</Description>

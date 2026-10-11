@@ -487,7 +487,7 @@ export class EmailService {
     const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, requested);
     // Existing admin-authored catalogs may retain the user's exact tag spelling.
     if (originalLocale && originalLocale !== requested) {
-      const exactMap = await this.emailTemplateService.getTranslationsMap(template.type, originalLocale);
+      const exactMap = await this.emailTemplateService.getExactTranslationsMap(template.type, originalLocale);
       for (const [key, value] of Object.entries(exactMap)) {
         if (value) translationsMap[key] = value;
       }

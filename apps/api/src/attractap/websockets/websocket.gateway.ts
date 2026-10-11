@@ -446,10 +446,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       let lastError: Error | undefined;
 
       for (let i = 0; i < RETRY_COUNT; i++) {
-        // Delivery belongs to this authenticated connection, including retries.
-        // Revocation or reauthentication cancels its old broadcast only.
+        // Authentication success and language retries belong to the current open reader connection.
         if (
-          message.data.type === AttractapEventType.READER_LANGUAGE &&
+          (message.data.type === AttractapEventType.READER_LANGUAGE ||
+            message.data.type === AttractapEventType.READER_AUTHENTICATED) &&
           (!this.canReceiveReaderLanguage(socket) ||
             socket.readerId !== readerId ||
             socket.state.readerAuthenticationAttempt !== authenticationAttempt)
@@ -539,6 +539,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
+    // Invalidate asynchronous authentication before waiting on cleanup locks.
+    const readerId = socket.readerId;
+    const readerName = socket.readerName;
+    socket.state.readerAuthenticationAttempt = Symbol('reader-disconnected');
+    socket.readerId = null;
+    socket.readerName = null;
     const connectedAt = this.connectedAt.get(socket as unknown as object);
     this.connectedAt.delete(socket as unknown as object);
     if (connectedAt !== undefined && this.metricsToggle.isEnabledCached('ws')) {
@@ -552,8 +558,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== socket.id);
     });
 
-    const readerId = socket.readerId;
-    const readerName = socket.readerName;
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
       // ponytail: only zero gauge when no other socket for this reader exists —

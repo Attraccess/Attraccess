@@ -143,6 +143,49 @@ it('keeps an unsaved language choice during background refetches', async () => {
     expect.objectContaining({ requestBody: { app: expect.objectContaining({ defaultLanguage: 'en' }) } }),
   );
 });
+it('keeps all edited fields through refetch and a failed save, then accepts persisted values after success', async () => {
+  const view = render(<AppSettingsForm variant="standalone" endpoint="settings" />);
+  fireEvent.change(screen.getByLabelText('inputs.url.label'), { target: { value: 'https://draft.example' } });
+  fireEvent.change(screen.getByLabelText('inputs.publicInternetUrl.label'), {
+    target: { value: 'https://draft-public.example' },
+  });
+  fireEvent.change(screen.getByLabelText('inputs.licenseKey.label'), { target: { value: 'draft-license' } });
+  fireEvent.click(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ }));
+  fireEvent.click(await screen.findByRole('option', { name: 'English' }));
+  state.settings = {
+    app: {
+      url: 'https://refetched.example',
+      publicInternetUrl: 'https://refetched-public.example',
+      defaultLanguage: 'de',
+    },
+  };
+  view.rerender(<AppSettingsForm variant="standalone" endpoint="settings" />);
+  fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
+  expect(state.save).toHaveBeenLastCalledWith({
+    requestBody: {
+      app: {
+        url: 'https://draft.example',
+        publicInternetUrl: 'https://draft-public.example',
+        licenseKey: 'draft-license',
+        defaultLanguage: 'en',
+      },
+    },
+  });
+  act(() => state.options.onError(new Error('failed')));
+  state.settings = { app: { ...state.settings.app } };
+  view.rerender(<AppSettingsForm variant="standalone" endpoint="settings" />);
+  expect(screen.getByLabelText('inputs.url.label')).toHaveValue('https://draft.example');
+  expect(screen.getByLabelText('inputs.publicInternetUrl.label')).toHaveValue('https://draft-public.example');
+  expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('draft-license');
+  act(() => state.options.onSuccess());
+  state.settings = {
+    app: { url: 'https://saved.example', publicInternetUrl: 'https://saved-public.example', defaultLanguage: 'en' },
+  };
+  view.rerender(<AppSettingsForm variant="standalone" endpoint="settings" />);
+  expect(screen.getByLabelText('inputs.url.label')).toHaveValue('https://saved.example');
+  expect(screen.getByLabelText('inputs.publicInternetUrl.label')).toHaveValue('https://saved-public.example');
+  expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('');
+});
 it.each(['en-US', 'fr-CA', 'de-!!!', 'de-', 'de-u', 'de-1901-1901', 'de-u-12', 'de-t-12', 'de-u-ca-ca-12'])(
   'suggests English for setup browser locale %s',
   (locale) => {

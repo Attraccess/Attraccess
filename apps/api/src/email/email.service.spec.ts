@@ -148,6 +148,7 @@ describe('EmailService', () => {
         throw new Error('Unexpected template type');
       }),
       getTranslationsMap: jest.fn().mockResolvedValue({}),
+      getExactTranslationsMap: jest.fn().mockResolvedValue({}),
     };
     const emailLayoutService = {
       renderWithTemplate: jest.fn().mockImplementation((template: { body: string }) => Promise.resolve(template.body)),
@@ -859,8 +860,9 @@ describe('EmailService', () => {
       const { service, sendMail, settingsService, emailTemplateService } = tHandlebarsHelperScope.setupT();
       settingsService.getDefaultLanguage.mockResolvedValue('de');
       emailTemplateService.getTranslationsMap.mockImplementation(async (_type, locale) =>
-        locale === 'de' ? { greeting: 'Hallo {name}!' } :
-        locale === 'it' ? { greeting: 'Ciao {name}!' } :
+        locale === 'de' ? { greeting: 'Hallo {name}!' } : locale === 'it' ? { greeting: 'Ciao {name}!' } : {},
+      );
+      emailTemplateService.getExactTranslationsMap.mockImplementation(async (_type, locale) =>
         locale === 'it-it' ? { greeting: 'Ciao regionale {name}!' } : {},
       );
       for (const locale of ['fr-FR', 'en-!!!', 'it', 'it-it']) {
@@ -887,6 +889,37 @@ describe('EmailService', () => {
       expect(html).toContain('Hallo alice!');
       expect(html).not.toContain('Hello alice!');
     });
+
+    it.each([undefined, '', 'Hoi {name}!'])(
+      'preserves canonical regional translations with exact-tag override %s',
+      async (exactGreeting) => {
+        const { service, sendMail, emailTemplateService } = tHandlebarsHelperScope.setupT();
+        const rows = [
+          { locale: 'de', key: 'greeting', value: 'Hallo {name}!' },
+          { locale: 'de', key: 'footer', value: 'Basis' },
+          { locale: 'de-CH', key: 'greeting', value: 'Grüezi {name}!' },
+          { locale: 'de-CH', key: 'footer', value: 'Schweiz' },
+          ...(exactGreeting === undefined ? [] : [{ locale: 'de-ch', key: 'greeting', value: exactGreeting }]),
+        ];
+        const translations = new EmailTemplateService(
+          {} as never,
+          { findBy: jest.fn(async ({ locale }) => rows.filter((row) => row.locale === locale)) } as never,
+          {} as never,
+        );
+        emailTemplateService.getTranslationsMap.mockImplementation(translations.getTranslationsMap.bind(translations));
+        emailTemplateService.getExactTranslationsMap.mockImplementation(
+          translations.getExactTranslationsMap.bind(translations),
+        );
+        emailTemplateService.findOne.mockResolvedValue({
+          type: EmailTemplateType.VERIFY_EMAIL,
+          subject: "{{t 'greeting' 'Hello {name}!' name=user.username}}",
+          body: "{{t 'footer' 'Footer'}}",
+        });
+        await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'de-ch' }), 'tok');
+        expect(sendMail.mock.calls[0][0].subject).toBe(exactGreeting ? 'Hoi alice!' : 'Grüezi alice!');
+        expect(sendMail.mock.calls[0][0].html).toBe('Schweiz');
+      },
+    );
 
     it('leaves unresolved {var} literals intact when hash arg is missing', async () => {
       const { service, sendMail } = tHandlebarsHelperScope.setupT(
@@ -949,7 +982,7 @@ export type EmailServiceTestScope = {
     sendMail: any;
     close: any;
     settingsService: { getUrl: any; getSmtpConfiguration: any; buildSmtpTransportOptions: any };
-    emailTemplateService: { findOne: any; getTranslationsMap: any };
+    emailTemplateService: { findOne: any; getTranslationsMap: any; getExactTranslationsMap: any };
     emailLayoutService: { renderWithTemplate: any };
     userRepository: { findOne: any };
   };
