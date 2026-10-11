@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 import sqlite3pkg from 'sqlite3';
 import { assertUsageIntegrity } from './usage-integrity.mjs';
 import bcrypt from 'bcrypt';
+import { loadEnvFile } from 'node:process';
+import { pathToFileURL } from 'node:url';
+import { resolveDatabasePath, resolveStorageRoot } from '../src/config/storage-path.ts';
 
 export function run(db, sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -260,27 +263,34 @@ function parseArgs(argv) {
   return out;
 }
 
-function localDatabasePath(repoRoot, requestedPath) {
-  const storageDir = path.resolve(repoRoot, 'storage');
-  const dbPath = path.resolve(requestedPath || path.join(storageDir, 'attraccess.sqlite'));
-  return { dbPath, isLocal: dbPath === storageDir || dbPath.startsWith(`${storageDir}${path.sep}`) };
+function within(directory, file) {
+  const relative = path.relative(directory, file);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
-async function main() {
-  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const args = parseArgs(process.argv.slice(2));
-  const { dbPath, isLocal } = localDatabasePath(repoRoot, args.db || process.env.SEED_DB_PATH);
+export async function main(
+  argv = process.argv.slice(2),
+  repoRoot = fileURLToPath(new URL('../../../', import.meta.url)),
+) {
+  repoRoot = path.resolve(repoRoot);
+  const envFile = path.join(repoRoot, '.env');
+  if (existsSync(envFile)) loadEnvFile(envFile);
+  const args = parseArgs(argv);
+  const storageDir = resolveStorageRoot(process.env, repoRoot);
+  const requestedPath = args.db || process.env.SEED_DB_PATH;
+  const dbPath = requestedPath ? path.resolve(requestedPath) : resolveDatabasePath(process.env, repoRoot);
+  const isLocal = within(repoRoot, storageDir) && within(storageDir, dbPath);
   if (!isLocal && !args['allow-external-db']) {
     throw new Error(
-      'Refusing to seed a database outside storage/. Use --allow-external-db only for an isolated local database.',
+      'Refusing to seed a database outside configured local storage. Use --allow-external-db only for an isolated local database.',
     );
   }
   if (!existsSync(dbPath)) throw new Error(`DB not found at ${dbPath}. Start the API once so migrations create it.`);
   if (isLocal) {
-    const storageDir = realpathSync(path.resolve(repoRoot, 'storage'));
+    const resolvedStorageDir = realpathSync(storageDir);
     const resolvedDbPath = realpathSync(dbPath);
-    if (resolvedDbPath !== storageDir && !resolvedDbPath.startsWith(`${storageDir}${path.sep}`)) {
-      throw new Error('Refusing to follow a database symlink outside storage/.');
+    if (!within(realpathSync(repoRoot), resolvedStorageDir) || !within(resolvedStorageDir, resolvedDbPath)) {
+      throw new Error('Refusing to follow a database symlink outside configured local storage.');
     }
   }
 
@@ -318,7 +328,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

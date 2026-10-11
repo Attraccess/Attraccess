@@ -57,7 +57,7 @@ jobs:
         with:
           esp-idf: 'false'
       - name: Test all projects
-        run: pnpm nx run-many --target=test,e2e --parallel=5 --exclude=tag:scope:hardware,tag:type:plugin
+        run: node scripts/ci-test-projects.mjs --group=core
 
   build:
     runs-on: ubuntu-latest
@@ -83,10 +83,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      - uses: ./.github/actions/setup-browser-tests
       - name: Test and pack official plugin apps
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=test,pack-test --parallel=3 --projects=tag:type:plugin
+        run: node scripts/ci-test-projects.mjs --group=plugins
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
 
@@ -103,6 +104,10 @@ jobs:
 
   build-attractap-desktop:
     uses: ./.github/workflows/build-attractap-desktop.yml
+
+  build-attractap-firmware:
+    uses: ./.github/workflows/attractap-firmware.yml
+    secrets: inherit
 
   publish-attractap-desktop:
     needs: build-attractap-desktop
@@ -127,20 +132,20 @@ jobs:
           gh release upload "$RELEASE_TAG" simulator-packages/*.dmg --clobber
 
   containerize:
-    needs: [build, plugins, build-companion]
+    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop]
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - uses: ./.github/actions/build-attractap-firmware
+      - uses: ./.github/actions/download-attractap-firmware
 
       - uses: ./.github/actions/download-companion
 
       - name: Get short SHA
         id: vars
-        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Compute Docker tags
         id: docker-tags
@@ -155,7 +160,7 @@ jobs:
             TAGS="${TAGS},ghcr.io/${{ env.GHCR_IMAGE_NAME }}:latest"
             TAGS="${TAGS},${{ env.DOCKERHUB_IMAGE_NAME }}:latest"
           fi
-          echo "TAGS=${TAGS}" >> $GITHUB_OUTPUT
+          echo "TAGS=${TAGS}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: ./.github/actions/docker-build-push
@@ -195,13 +200,13 @@ jobs:
           append_body: true
 
   balena:
-    needs: [build, plugins, build-companion]
+    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - uses: ./.github/actions/build-attractap-firmware
+      - uses: ./.github/actions/download-attractap-firmware
 
       - uses: ./.github/actions/build-cc100-runtime
 

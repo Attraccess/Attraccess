@@ -1,12 +1,7 @@
 name: Companion App
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-    paths:
-      - 'apps/companion/**'
-      - '.github/workflows/companion.yml'
-      - '.github/workflows/build-companion-binaries.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,6 +13,7 @@ jobs:
     secrets: inherit
 
   pr-comment:
+    if: github.event_name == 'pull_request'
     needs: [build-companion]
     runs-on: ubuntu-latest
     steps:

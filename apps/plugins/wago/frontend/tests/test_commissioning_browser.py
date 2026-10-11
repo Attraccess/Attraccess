@@ -68,9 +68,9 @@ class CommissioningFixture(WagoFixture):
                 return
             route.continue_()
             return
-        if path == "/api/wago/controllers/91058/diagnostics":
+        if request.method == "GET" and path in ("/api/wago/controllers/91058/diagnostics", "/api/wago/controllers/91058/runtime-update"):
             self.network.append({"method": request.method, "url": request.url, "action": "fixture"})
-            route.fulfill(status=503, json={"message": "Diagnostics transport outside commissioning acceptance"})
+            route.fulfill(status=503, json={"message": "Controller status transport outside commissioning acceptance"})
             return
         if path.startswith("/api/wago/controllers/91058/configuration/") or path == "/api/wago/configuration/presets":
             self.network.append({"method": request.method, "url": request.url, "action": "fixture"})
@@ -151,10 +151,15 @@ class CommissioningDesktop(unittest.TestCase):
         self.page.get_by_text(re.compile(pattern)).click()
         expect(self.page.get_by_role("checkbox", name=re.compile(pattern))).to_be_checked()
 
+    def open_saved_session(self):
+        self.button("Details for Workshop fixture").click()
+        details = self.page.get_by_role("dialog", name="Details for Workshop fixture", exact=True)
+        details.get_by_role("button", name="Setup progress", exact=True).click()
+        expect(self.page.get_by_role("dialog", name="Commission a controller")).to_be_visible()
+
     def resume(self):
         self.button("Close").click()
-        self.page.get_by_role("button", name=re.compile(r"^(Resume|View progress)$")).first.click()
-        expect(self.page.get_by_role("dialog", name="Commission a controller")).to_be_visible()
+        self.open_saved_session()
 
     def open_runtime_step(self):
         self.button("Commission controller").click()
@@ -229,6 +234,10 @@ class CommissioningDesktop(unittest.TestCase):
         expect(self.page.get_by_text("Waiting for controller connection", exact=True)).to_be_visible()
         self.capture("progress-resumed")
         self.assertEqual(self.fixture.api("/fixture/discover")[0], 200)
+        # Discovery normally arrives through the host live-update stream, which
+        # this loopback harness does not mount. Reload to read the saved state.
+        self.page.reload()
+        self.open_saved_session()
         expect(self.button("Configure inputs and outputs")).to_be_visible(timeout=10000)
         security = self.page.get_by_role("region", name="Management security", exact=True)
         self.credentials("Temporary SSH", security)
@@ -288,8 +297,7 @@ class CommissioningDesktop(unittest.TestCase):
         self.assertEqual(editor.locator("textarea").count(), 0)
         self.capture("configuration-navigation")
         self.button("WAGO controllers").click()
-        self.page.get_by_role("button", name=re.compile(r"^(Resume|View progress)$")).first.click()
-        expect(self.page.get_by_role("dialog", name="Commission a controller")).to_be_visible()
+        self.open_saved_session()
         expect(self.button("Clean up failed installation")).to_be_enabled()
         expect(self.page.get_by_text("Verifying commissioned controller", exact=True)).to_be_visible()
         expect(self.page.get_by_text(re.compile("Physical qualification: required"))).to_be_visible()

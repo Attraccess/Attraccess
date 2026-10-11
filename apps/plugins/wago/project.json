@@ -193,12 +193,14 @@
     },
     "typecheck-frontend-tests": {
       "executor": "nx:run-commands",
+      "dependsOn": ["react-query-client:generate"],
       "options": {
         "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json"
       }
     },
     "test-typecheck-frontend-gate": {
       "executor": "nx:run-commands",
+      "dependsOn": ["react-query-client:generate"],
       "options": {
         "commands": [
           "node --test apps/plugins/wago/scripts/typecheck-frontend-tests.test.mjs",

@@ -21,9 +21,74 @@
       "options": {
         "command": "node scripts/crap-score/run.mjs ."
       },
-      "outputs": [
-        "{workspaceRoot}/coverage/crap/@attraccess__source"
-      ]
+      "outputs": ["{workspaceRoot}/coverage/crap/@attraccess__source"]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        {
+          "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "commands": [
+          "node --test scripts/*.test.mjs scripts/crap-score/*.test.mjs",
+          "vitest run --config scripts/vitest.config.mts"
+        ],
+        "parallel": false
+      }
+    },
+    "lint-files": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node scripts/check-file-size.mjs"
+      }
+    },
+    "check-balena-compose": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "command": "node scripts/check-balena-compose.mjs"
+      },
+      "inputs": ["default", "{workspaceRoot}/pnpm-lock.yaml"],
+      "outputs": []
+    },
+    "check-brand-assets": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "command": "node scripts/generate-brand-assets.mjs --check"
+      },
+      "inputs": ["default", "{workspaceRoot}/pnpm-lock.yaml"],
+      "outputs": []
+    },
+    "generate-brand-assets": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node scripts/generate-brand-assets.mjs"
+      }
+    },
+    "setup-workspace": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash scripts/setup-workspace.sh"
+      }
+    },
+    "services": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node scripts/services-compose.mts"
+      }
     }
   }
 }

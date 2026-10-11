@@ -1,12 +1,10 @@
 name: Balena Manual Release
 
 on:
+  # Select the branch through GitHub's Run workflow selector (CLI: --ref).
+  # A separate checkout ref would execute that branch in the dispatch ref's cache scope.
   workflow_dispatch:
     inputs:
-      branch:
-        description: Git ref to checkout (e.g., main or feature branch)
-        required: true
-        type: string
       version:
         description: Version to write into balena.yml (replaces {{VERSION_TO_BE_REPLACED}})
         required: true
@@ -32,18 +30,34 @@ jobs:
     uses: ./.github/workflows/build-companion-binaries.yml
     secrets: inherit
 
+  build-attractap-firmware:
+    uses: ./.github/workflows/attractap-firmware.yml
+    secrets: inherit
+
+  build-attractap-desktop:
+    uses: ./.github/workflows/build-attractap-desktop.yml
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup-browser-tests
+      - name: Test all core projects and plugins
+        run: node scripts/ci-test-projects.mjs --group=software
+      - name: Test packed Hello World fixture
+        run: pnpm --dir examples/plugin-hello-world run pack-test
+
   balena:
-    needs: build-companion
+    needs: [build-companion, build-attractap-firmware, build-attractap-desktop, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.branch }}
 
-      # Balena's remote builder has no ESP-IDF; pre-build the firmware so
-      # `balena push` uploads firmware_output/ with the build context.
-      - uses: ./.github/actions/build-attractap-firmware
+      - uses: ./.github/actions/download-attractap-firmware
 
       - uses: ./.github/actions/build-cc100-runtime
 

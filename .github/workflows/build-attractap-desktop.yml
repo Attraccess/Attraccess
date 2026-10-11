@@ -3,11 +3,6 @@ name: Build Attractap Desktop for macOS
 on:
   workflow_call:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'apps/attractap/desktop/**'
-      - 'apps/attractap/firmware/src/**'
-      - '.github/workflows/build-attractap-desktop.yml'
 
 permissions:
   contents: read
