@@ -17,6 +17,8 @@ export class EventStream {
   private discardedReason: 'expired' | 'evicted' = 'evicted';
   private buffer: { event: MatterEvent; publishedAt: number }[] = [];
   private listeners = new Set<Listener>();
+  private expirationTimer: ReturnType<typeof setTimeout> | undefined;
+  private disposed = false;
   constructor(
     private readonly count = 1000,
     private readonly ageMs = 300000,
@@ -29,6 +31,7 @@ export class EventStream {
     input: NewEvent,
     correlation = { requestId: null as string | null, operationId: null as string | null },
   ): MatterEvent {
+    if (this.disposed) throw new Error('Event stream is disposed.');
     EventPayload.parse(input);
     if (this.sequence >= Number.MAX_SAFE_INTEGER)
       throw new Error('Event sequence exhausted; restart with a new stream instance.');
@@ -49,6 +52,8 @@ export class EventStream {
     return structuredClone(event);
   }
   private prune(): void {
+    clearTimeout(this.expirationTimer);
+    this.expirationTimer = undefined;
     while (
       this.buffer.length &&
       (this.buffer.length > this.count || this.now() - this.buffer[0].publishedAt >= this.ageMs)
@@ -57,6 +62,18 @@ export class EventStream {
       this.discardedThrough = this.buffer[0].event.sequence;
       this.buffer.shift();
     }
+    if (this.buffer.length) {
+      const remainingMs = this.ageMs - (this.now() - this.buffer[0].publishedAt);
+      this.expirationTimer = setTimeout(() => this.prune(), Math.max(1, remainingMs));
+      this.expirationTimer.unref();
+    }
+  }
+  dispose(): void {
+    this.disposed = true;
+    clearTimeout(this.expirationTimer);
+    this.expirationTimer = undefined;
+    this.buffer = [];
+    this.listeners.clear();
   }
   reconcile(
     reason: 'malformed' | 'expired' | 'evicted' | 'future' | 'different_instance' | 'slow_client',
@@ -79,6 +96,7 @@ export class EventStream {
     cursor: ResumeCursor | null,
     listener: Listener,
   ): { replay: MatterEvent[]; watermark: ResumeCursor; unsubscribe: () => void } {
+    if (this.disposed) throw new Error('Event stream is disposed.');
     this.prune();
     let after = this.sequence;
     if (cursor !== null) {

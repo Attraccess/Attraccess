@@ -164,6 +164,13 @@
         "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
       ],
       "outputs": ["{workspaceRoot}/dist/contracts/matter"]
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/matter-sidecar"
+      }
     }
   }
 }

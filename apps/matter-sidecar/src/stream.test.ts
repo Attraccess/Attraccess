@@ -1,8 +1,34 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { EventStream } from './stream.js';
 
 const event = { type: 'lifecycle', payload: { state: 'ready' } } as const;
 describe('bounded event resume', () => {
+  it('removes expired events while idle and cancels cleanup on disposal', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const stream = new EventStream(10, 100);
+    try {
+      stream.publish(event);
+      vi.advanceTimersByTime(50);
+      stream.publish(event);
+      vi.advanceTimersByTime(50);
+      // Inspect physical retention before any publish/resume can prune it.
+      expect(Reflect.get(stream, 'buffer')).toHaveLength(1);
+      vi.advanceTimersByTime(50);
+      expect(Reflect.get(stream, 'buffer')).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+      stream.publish(event);
+      expect(vi.getTimerCount()).toBe(1);
+      stream.dispose();
+      stream.dispose();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(Reflect.get(stream, 'buffer')).toHaveLength(0);
+      expect(() => stream.publish(event)).toThrow('disposed');
+      expect(() => stream.resume(null, () => undefined)).toThrow('disposed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('preserves IDs, metadata and order across repeated replay and live subscription', () => {
     const stream = new EventStream();
     const start = stream.watermark;

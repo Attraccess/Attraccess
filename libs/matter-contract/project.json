@@ -137,6 +137,13 @@
         "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
         "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
       ]
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["export-contract"],
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/matter-contract"
+      }
     }
   }
 }

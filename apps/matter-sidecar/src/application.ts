@@ -225,6 +225,7 @@ export function createApplication(options: ApplicationOptions) {
     ready = false;
     shutdownPromise = (async () => {
       stream.publish({ type: 'lifecycle', payload: { state: 'draining' } });
+      stream.dispose();
       const websocketClosed = [...wss.clients].map(
         (ws) =>
           new Promise<void>((resolve) => {

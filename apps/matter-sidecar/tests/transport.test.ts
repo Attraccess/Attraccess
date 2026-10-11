@@ -406,6 +406,8 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     await received;
     const shutdown = app.shutdown();
     expect(app.ready).toBe(false);
+    expect(Reflect.get(app.stream, 'expirationTimer')).toBeUndefined();
+    expect(Reflect.get(app.stream, 'buffer')).toHaveLength(0);
     socket.write('}GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
     await closed;
     await shutdown;
