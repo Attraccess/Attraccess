@@ -12,6 +12,38 @@ lv_area_t bounds(lv_obj_t *obj)
     lv_obj_get_coords(obj, &area);
     return area;
 }
+
+// Feed LVGL's pointer driver so hit testing and event dispatch are exercised.
+struct Pointer
+{
+    lv_indev_t *device = lv_indev_create();
+    lv_indev_data_t sample{};
+
+    explicit Pointer(lv_display_t *display)
+    {
+        lv_indev_set_type(device, LV_INDEV_TYPE_POINTER);
+        lv_indev_set_display(device, display);
+        lv_indev_set_mode(device, LV_INDEV_MODE_EVENT);
+        lv_indev_set_user_data(device, this);
+        lv_indev_set_read_cb(device, [](lv_indev_t *device, lv_indev_data_t *data) {
+            *data = static_cast<Pointer *>(lv_indev_get_user_data(device))->sample;
+        });
+    }
+
+    ~Pointer() { lv_indev_delete(device); }
+
+    void click(lv_obj_t *target, lv_obj_t *expectedHit)
+    {
+        const auto area = bounds(target);
+        sample.point = {(area.x1 + area.x2) / 2, (area.y1 + area.y2) / 2};
+        expect(lv_indev_search_obj(lv_screen_active(), &sample.point) == expectedHit,
+               "Pointer hit test reaches only the intended input surface");
+        sample.state = LV_INDEV_STATE_PRESSED;
+        lv_indev_read(device);
+        sample.state = LV_INDEV_STATE_RELEASED;
+        lv_indev_read(device);
+    }
+};
 }
 
 void testWallClock(Renderer &renderer)
@@ -72,6 +104,7 @@ void testWallClock(Renderer &renderer)
         Fixtures::wallClock = saturday;
         list.init();
         ScreenGuard guard(list.getScreen(), &list);
+        Pointer pointer(renderer.display);
         auto *logo = requireObject(guard.root, &lv_image_class);
         auto *time = requireObject(guard.root, &lv_label_class, "14:32");
         requireObject(guard.root, &lv_label_class, "Samstag");
@@ -82,8 +115,33 @@ void testWallClock(Renderer &renderer)
         expect(header.y2 < firstRow.y1, "Clock header stays above the resource rows");
         renderer.capture("wall-clock-resource-list");
 
+        unsigned clockClicks = 0, selections = 0, actions = 0;
+        for (auto *container : {lv_obj_get_parent(time),
+                               lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Samstag"))}) {
+            expect(!lv_obj_has_flag(container, LV_OBJ_FLAG_SCROLLABLE), "Clock containers cannot scroll");
+            lv_obj_add_event_cb(container, [](lv_event_t *event) {
+                ++*static_cast<unsigned *>(lv_event_get_user_data(event));
+            }, LV_EVENT_CLICKED, &clockClicks);
+        }
+        list.setResourceSelectionCallback([&](const auto &) { ++selections; });
+        list.setActionCallback([&](const auto &, auto) { ++actions; });
+        pointer.click(time, guard.root);
+        auto *date = requireObject(guard.root, &lv_label_class, "10. Oktober 2026");
+        pointer.click(date, guard.root);
+        expect(clockClicks == 0 && selections == 0 && actions == 0, "Clock touches neither capture clicks nor invoke resource callbacks");
+        auto *resource = requireObject(guard.root, &lv_label_class, "Lasercutter");
+        pointer.click(resource, lv_obj_get_parent(resource));
+        expect(selections == 1 && actions == 0, "Resource selection still works beside the clock");
+
+        std::strcpy(resources.authenticatedUsername, "Alex Example");
+        resources.items[0].accessKnown = true;
+        resources.items[0].hasIntroduction = true;
+        list.setResourceList(resources);
         list.setAuthenticatedUser("Alex Example");
         expect(lv_obj_has_flag(logo, LV_OBJ_FLAG_HIDDEN) && !lv_obj_is_visible(time), "Signed in, the session header takes the row");
+        auto *start = requireObject(guard.root, &lv_label_class, "Start");
+        pointer.click(start, lv_obj_get_parent(start));
+        expect(selections == 1 && actions == 1, "Signed-in resource action still receives pointer input");
         list.setAuthenticatedUser("");
         expect(lv_obj_is_visible(time), "Clock returns after sign-out");
 

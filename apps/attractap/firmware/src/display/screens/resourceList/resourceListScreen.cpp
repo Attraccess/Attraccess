@@ -182,6 +182,7 @@ void ResourceListScreen::createClockHeader() {
     clockHeader = lv_obj_create(screen);
     lv_obj_remove_style_all(clockHeader);
     lv_obj_set_size(clockHeader, lv_pct(100), 46);
+    lv_obj_remove_flag(clockHeader, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(clockHeader, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(clockHeader, LV_OBJ_FLAG_HIDDEN);
     clockTime = lv_label_create(clockHeader);
@@ -190,6 +191,8 @@ void ResourceListScreen::createClockHeader() {
     lv_obj_align(clockTime, LV_ALIGN_LEFT_MID, 0, 2);
     auto *date = lv_obj_create(clockHeader);
     lv_obj_remove_style_all(date);
+    lv_obj_remove_flag(date, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(date, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(date, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_align(date, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_set_flex_flow(date, LV_FLEX_FLOW_COLUMN);
