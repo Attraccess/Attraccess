@@ -137,7 +137,7 @@ export function nodeCoverage(files, tests, output) {
 }
 
 export const vitestSuites = {
-  '.': [{ cwd: workspace, args: ['--config', 'scripts/crap-score/vitest.config.mts'] }],
+  '.': [{ cwd: workspace, args: ['--config', 'scripts/vitest.config.mts'] }],
   'apps/matter-sidecar': [{ cwd: workspace, args: ['--config', 'apps/matter-sidecar/vitest.config.mts'] }],
   'libs/matter-contract': [
     { cwd: workspace, args: ['--config', 'libs/matter-contract/vitest.config.mts'] },

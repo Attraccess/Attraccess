@@ -32,15 +32,16 @@ RUN corepack enable && pnpm install --frozen-lockfile
 # Copy the rest of the application
 COPY . .
 
-# Build the application. The Attractap firmware is NOT built here (no ESP-IDF
-# in this image — build_firmwares.py skips itself); CI pre-builds it into
-# apps/attractap/firmware/firmware_output/ before invoking docker build, and
-# the api build bundles it into its assets.
-RUN pnpm nx run-many -t build --projects=api,frontend
+# CI supplies tested installers and firmware. Bundle and validate them without
+# recompiling either deliverable inside the server image.
+RUN node apps/api/copy-companion-into-assets.js && \
+    node apps/api/copy-attractap-firmware-into-assets.js && \
+    node scripts/validate-api-assets.mjs --companion=all --attractap && \
+    pnpm nx run-many -t build --projects=api,frontend
 
 # Fail loudly if the image would ship without any firmware — an empty manifest
 # breaks OTA updates and the /api/attractap/firmwares endpoint (ATT-715).
-RUN node -e "const f = require('/app/dist/apps/api/assets/attractap-firmwares/firmwares.json'); if (!f.firmwares.length) { console.error('No Attractap firmwares bundled. Build them first: cd apps/attractap/firmware && python3 build_firmwares.py (requires ESP-IDF v5.5)'); process.exit(1); }"
+RUN node scripts/validate-api-assets.mjs --assets-dir=dist/apps/api/assets --companion=all --attractap --compare-to=apps/api/src/assets
 
 # Strip stray pnpm config Nx copies into generated dist package.json files;
 # pnpm 10 only respects pnpm.overrides / pnpm.onlyBuiltDependencies at the workspace root.

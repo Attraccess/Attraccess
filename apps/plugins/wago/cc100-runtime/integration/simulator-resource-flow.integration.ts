@@ -16,7 +16,6 @@ import { outputCommand } from './simulator-fixtures.test-utils';
 import { snapshot } from './simulator-fixtures.test-utils';
 import { eventually } from './simulator-fixtures.test-utils';
 
-import { dirnameOf } from './simulator-fixtures.test-utils';
 import { SimulatorFixture } from './simulator-harness.test-utils';
 const flowTest = process.env.WAGO_INTEGRATION_LIFECYCLE_ONLY === '1' ? it.skip : it;
 describe('isolated broker / executable simulator', () => {
@@ -35,7 +34,7 @@ describe('isolated broker / executable simulator', () => {
       // This intentionally fails when ATT-978 is absent or the producer contract
       // is incompatible. Never synthesize timestamp/sequence/measurement fields.
       const { WagoFlowService } = require(source);
-      const { parseOperationalMessage } = require(join(dirnameOf(source), 'protocol.ts'));
+      const { parseOperationalMessage } = require(process.env.WAGO_INTEGRATION_PROTOCOL_SOURCE!);
       const statePath = join(temporary, 'flow.json');
       const username = `wago-controller-${hardwareId}`;
       fixture.identities.set(username, {

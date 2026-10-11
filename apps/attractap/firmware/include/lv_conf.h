@@ -27,11 +27,16 @@
    MEMORY SETTINGS
  *=========================*/
 
-/*The fullscreen form keyboard needs more than the base UI's 64 KiB pool for
- *its button-label draw tasks. Keep this internal pool large enough to render
- *the editor without tripping LVGL's out-of-memory assertion.*/
+/*The fullscreen form keyboard needs a 128 KiB pool. Keep it in PSRAM on
+ *the reader: a static internal pool starves Wi-Fi/TCP during OTA and prevents
+ *allocation of the 16 KiB WebSocket task when reconnecting. LVGL objects do
+ *not require DMA-capable memory. Host builds retain LVGL's normal pool.*/
 #define LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN
 #define LV_MEM_SIZE (128 * 1024U)
+#ifdef ESP_PLATFORM
+    #define LV_MEM_POOL_INCLUDE "esp_heap_caps.h"
+    #define LV_MEM_POOL_ALLOC(size) heap_caps_malloc((size), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+#endif
 
 /*====================
    HAL SETTINGS

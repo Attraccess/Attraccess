@@ -1,0 +1,9 @@
+name: Download Tested Attractap Firmware
+description: 'Reuse firmware built earlier in this workflow run in Docker and Balena build contexts.'
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: attractap-firmware-${{ github.run_id }}
+        path: apps/attractap/firmware/firmware_output

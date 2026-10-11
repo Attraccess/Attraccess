@@ -34,6 +34,8 @@ jobs:
           esp-idf: 'false'
       - name: Install Linux packaging dependencies
         run: sudo apt-get install -y fakeroot rpm
+      - name: Test Companion and renderer
+        run: pnpm nx run-many -t test,test-renderer --projects=companion
       - name: Build Linux companion (x64 + arm64)
         run: pnpm nx run companion:build
       - name: Upload Linux artifacts

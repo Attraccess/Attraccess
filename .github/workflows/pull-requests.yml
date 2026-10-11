@@ -33,7 +33,7 @@ permissions:
 jobs:
   precommit-check:
     # Lint/typecheck/test/e2e already run as dedicated jobs below. This job is a
-    # gate, not a runner: re-running the same affected graph here would double
+    # gate, not a runner: re-running the same graph here would double
     # the work (the remote cache turns the repeat into restores, not into
     # nothing — a gate should not be walking the task graph). `pnpm precommit`
     # remains the local hook, where `--uncommitted` is the right selector; on CI
@@ -57,9 +57,9 @@ jobs:
     #   `containerize` — required already, and its Docker build would serialize
     #                    a 3-second gate behind ~45 minutes. It covers `pnpm
     #                    precommit`'s `build` step. Note it is
-    #                    `needs: [build-companion]` + `if: ... && !failure()`,
-    #                    so a companion failure *skips* it and it reports
-    #                    Success — which is why `build-companion` is gated here.
+    #                    deliverable/test dependencies + `if: ... && !failure()`,
+    #                    so upstream failures *skip* it and it reports Success
+    #                    — which is why those jobs are gated here too.
     #
     # Every gated job runs unconditionally under both `pull_request` and
     # `merge_group`, so a strict `== success` cannot trip over a legitimately
@@ -70,6 +70,8 @@ jobs:
         test,
         crap-score,
         build-companion,
+        build-attractap-firmware,
+        build-attractap-desktop,
         plugins,
         attractap-firmware-version,
         wago-runtime-version,
@@ -138,8 +140,6 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Test file size enforcement
-        run: node --test scripts/check-file-size.test.mjs
       - name: Enforce file size limits
         run: pnpm lint:files
       - name: Lint affected projects
@@ -157,10 +157,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Test services CLI
-        run: node --test scripts/services-compose.test.mjs
-      - name: Test affected projects
-        run: pnpm nx affected --target=test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
+      - name: Test all core projects
+        run: node scripts/ci-test-projects.mjs --group=core
 
   crap-score:
     runs-on: ubuntu-latest
@@ -171,8 +169,6 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Test CRAP reporting integration
-        run: node --test scripts/crap-score/run.test.mjs
       - name: Report change risk for affected JS/TS projects
         run: pnpm crap-score:affected --base=${{ env.NX_AFFECTED_BASE }}
       - name: Upload CRAP reports
@@ -202,13 +198,12 @@ jobs:
           pnpm exec vitest run --config apps/plugins/scripts/vitest.config.mts
           node --test apps/plugins/scripts/*.test.mjs
 
-      # Only affected plugins are linted, tested, and npm-packed. The `*,!tag:type:plugin`
-      # exclude keeps the affected set restricted to plugin apps, so a PR that
-      # touches no plugin (or shared global) runs nothing here.
+      # Lint the affected set, but test and pack every plugin on every CI run.
       - name: Lint affected plugin apps
         run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
-      - name: Test and pack affected plugin apps
-        run: pnpm nx affected --target=test,e2e,pack-test --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
+      - uses: ./.github/actions/setup-browser-tests
+      - name: Test and pack all plugin apps
+        run: node scripts/ci-test-projects.mjs --group=plugins
       # The cross-project HeroUI guard (generators:no-fields-in-cards) also scans plugin
       # sources, but `generators` deliberately does not list plugin projects as implicit
       # dependencies (core tooling must not know plugin names). Run it here whenever any
@@ -256,29 +251,36 @@ jobs:
         with:
           esp-idf: 'false'
       - name: Validate docker-compose.balena.yml with balena's parser
-        run: node scripts/check-balena-compose.mjs
+        run: pnpm nx run @attraccess/source:check-balena-compose
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
     secrets: inherit
 
+  build-attractap-firmware:
+    uses: ./.github/workflows/attractap-firmware.yml
+    secrets: inherit
+
+  build-attractap-desktop:
+    uses: ./.github/workflows/build-attractap-desktop.yml
+
   containerize:
-    needs: [build-companion]
+    # Build the preview image while core/plugin/simulator checks run. The
+    # precommit gate above still requires every deliverable's tests to pass.
+    needs: [build-companion, build-attractap-firmware]
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      # Pre-build the Attractap firmware on the runner: the Dockerfile has no
-      # ESP-IDF and fails loudly if no firmware is bundled (ATT-715).
-      - uses: ./.github/actions/build-attractap-firmware
+      - uses: ./.github/actions/download-attractap-firmware
 
       - uses: ./.github/actions/download-companion
 
       - name: Get short SHA
         id: vars
-        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Set image tag suffix
         id: image-tag

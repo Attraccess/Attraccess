@@ -3,7 +3,9 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/attractap/firmware",
   "projectType": "application",
-  "tags": ["scope:hardware"],
+  "tags": [
+    "scope:hardware"
+  ],
   "targets": {
     "build": {
       "executor": "nx:run-commands",
@@ -11,7 +13,9 @@
         "command": "cd apps/attractap/firmware && python3 build_firmwares.py",
         "cwd": "."
       },
-      "outputs": ["{projectRoot}/firmware_output"],
+      "outputs": [
+        "{projectRoot}/firmware_output"
+      ],
       "inputs": [
         "{projectRoot}/CMakeLists.txt",
         "{projectRoot}/main/**/*",
@@ -22,7 +26,8 @@
         "{projectRoot}/include/**/*",
         "{projectRoot}/*.py",
         "{projectRoot}/tools/**/*",
-        "{projectRoot}/src/**/*"
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/esp-idf-version.txt"
       ],
       "cache": true
     },
@@ -35,7 +40,13 @@
           "ctest --test-dir apps/attractap/firmware/tests/supervision/build --output-on-failure",
           "cmake -S apps/attractap/firmware/tests/display-theme -B apps/attractap/firmware/tests/display-theme/build",
           "cmake --build apps/attractap/firmware/tests/display-theme/build --parallel 2",
-          "ctest --test-dir apps/attractap/firmware/tests/display-theme/build --output-on-failure"
+          "ctest --test-dir apps/attractap/firmware/tests/display-theme/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/lvgl-memory -B apps/attractap/firmware/tests/lvgl-memory/build",
+          "cmake --build apps/attractap/firmware/tests/lvgl-memory/build --parallel 2",
+          "ctest --test-dir apps/attractap/firmware/tests/lvgl-memory/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/websocket -B apps/attractap/firmware/tests/websocket/build",
+          "cmake --build apps/attractap/firmware/tests/websocket/build",
+          "ctest --test-dir apps/attractap/firmware/tests/websocket/build --output-on-failure"
         ],
         "parallel": false,
         "cwd": "."
@@ -49,6 +60,20 @@
         "cwd": "."
       },
       "cache": false
+    },
+    "setup-toolchain": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash apps/attractap/firmware/tools/setup-esp-idf.sh"
+      }
+    },
+    "check-version": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node apps/attractap/firmware/tools/check-version.mjs"
+      }
     }
   }
 }

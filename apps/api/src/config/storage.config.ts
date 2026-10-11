@@ -1,6 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import * as path from 'path';
 import { z } from 'zod';
+import { resolveStorageRoot } from './storage-path';
 
 export const DEFAULT_STORAGE_ROOT = path.join(process.cwd(), 'storage');
 
@@ -29,16 +30,17 @@ export interface StorageConfigType {
 
 const storageConfigFactory = (): StorageConfigType => {
   const validatedEnv = StorageEnvSchema.parse(process.env);
+  const storageRoot = resolveStorageRoot({ STORAGE_ROOT: validatedEnv.STORAGE_ROOT });
 
   return {
-    root: validatedEnv.STORAGE_ROOT,
+    root: storageRoot,
     maxFileSize: validatedEnv.MAX_FILE_SIZE_BYTES,
     allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'] as const,
     cache: {
       maxAgeDays: validatedEnv.CACHE_MAX_AGE_DAYS,
-      directory: path.join(validatedEnv.STORAGE_ROOT, 'cache'),
+      directory: path.join(storageRoot, 'cache'),
     },
-    cdn: { serveRoot: '/cdn', root: path.join(validatedEnv.STORAGE_ROOT, 'cdn') },
+    cdn: { serveRoot: '/cdn', root: path.join(storageRoot, 'cdn') },
   };
 };
 

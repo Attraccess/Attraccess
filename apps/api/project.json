@@ -32,14 +32,40 @@
         "command": "node {projectRoot}/copy-companion-into-assets.js"
       }
     },
+    "prepare-kiosk-assets": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion:build"],
+      "cache": false,
+      "options": {
+        "command": "node {projectRoot}/copy-companion-into-assets.js && node scripts/validate-api-assets.mjs --companion=local"
+      }
+    },
+    "prepare-attractap-assets": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["attractap-firmware:build"],
+      "cache": false,
+      "options": {
+        "command": "node {projectRoot}/copy-attractap-firmware-into-assets.js && node scripts/validate-api-assets.mjs --attractap"
+      }
+    },
+    "prepare-all-assets": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["companion:build", "attractap-firmware:build"],
+      "cache": false,
+      "options": {
+        "command": "node {projectRoot}/copy-companion-into-assets.js && node {projectRoot}/copy-attractap-firmware-into-assets.js && node scripts/validate-api-assets.mjs --companion=local --attractap"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["copy-companion-into-assets"],
+      "dependsOn": [],
       "inputs": [
         "production",
         "^production",
-        "{workspaceRoot}/apps/attractap/firmware/firmware_output/**/*",
+        {
+          "runtime": "node scripts/validate-api-assets.mjs --hash"
+        },
         {
           "externalDependencies": ["webpack-cli"]
         }
@@ -74,7 +100,7 @@
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
       "continuous": true,
-      "dependsOn": ["copy-companion-into-assets"],
+      "dependsOn": [],
       "options": {
         "buildTarget": "api:build",
         "watch": true
@@ -126,7 +152,7 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "dependsOn": ["plugin-matter:build"],
+      "dependsOn": ["plugin-matter:build", "test-scripts"],
       "cache": true,
       "inputs": [
         "default",
@@ -178,12 +204,13 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "docker compose -f docker-compose.dev.yml up -d --remove-orphans"
-      }
+      },
+      "cache": false
     },
     "build-migration-datasource": {
       "executor": "@nx/webpack:webpack",
       "cache": true,
-      "inputs": ["typeorm"],
+      "inputs": ["typeorm", "{projectRoot}/src/config/storage-path.ts"],
       "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/apps/migrations",
@@ -196,11 +223,10 @@
       "executor": "nx:run-commands",
       "cache": false,
       "dependsOn": ["build-migration-datasource"],
-      "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
         "commands": [
-          "typeorm -d dist/apps/migrations/main.js migration:generate ./apps/api/src/database/migrations/{args.name}"
+          "node --env-file-if-exists=.env node_modules/typeorm/cli.js -d dist/apps/migrations/main.js migration:generate ./apps/api/src/database/migrations/{args.name}"
         ]
       }
     },
@@ -208,20 +234,22 @@
       "executor": "nx:run-commands",
       "cache": false,
       "dependsOn": ["build-migration-datasource"],
-      "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
-        "commands": ["typeorm -d dist/apps/migrations/main.js migration:run"]
+        "commands": [
+          "node --env-file-if-exists=.env node_modules/typeorm/cli.js -d dist/apps/migrations/main.js migration:run"
+        ]
       }
     },
     "migration-revert": {
       "executor": "nx:run-commands",
       "cache": false,
       "dependsOn": ["build-migration-datasource"],
-      "outputs": ["{options.outputPath}"],
       "options": {
         "cwd": ".",
-        "commands": ["typeorm -d dist/apps/migrations/main.js migration:revert"]
+        "commands": [
+          "node --env-file-if-exists=.env node_modules/typeorm/cli.js -d dist/apps/migrations/main.js migration:revert"
+        ]
       }
     },
     "lint": {
@@ -248,6 +276,29 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/api"
+      }
+    },
+    "seed-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node apps/api/scripts/seed-dev-user.mjs"
+      }
+    },
+    "test-scripts": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        {
+          "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "command": "node --test apps/api/scripts/*.test.mjs"
       }
     }
   }

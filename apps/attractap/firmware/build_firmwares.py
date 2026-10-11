@@ -170,11 +170,10 @@ def main():
     os.chdir(FIRMWARE_DIR)
 
     if not shutil.which("idf.py") and not find_idf_export():
-        # Parity with the old platformio-missing branch: local environments
-        # without the toolchain skip the firmware build instead of failing
-        # the whole monorepo build.
-        print("Warning: ESP-IDF not found (idf.py not on PATH, no export.sh located), skipping firmware build")
-        sys.exit(0)
+        print("Error: ESP-IDF not found (idf.py not on PATH, no export.sh located). "
+              "Install it with: INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh",
+              file=sys.stderr)
+        sys.exit(1)
 
     python_cmd = resolve_python_command()
     esptool_cmd = resolve_esptool_command()

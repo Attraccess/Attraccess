@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- Release gate diagnostics are intentional. */
 // Like the Attractap firmware gate, compare the PR/merge queue with its base.
-import { execFileSync } from 'node:child_process';
+import { checkReleaseVersion } from './lib/release-version.mjs';
 import { fileURLToPath } from 'node:url';
 
 const manifestPath = 'apps/plugins/wago/cc100-runtime/manifest.json';
@@ -40,28 +41,14 @@ export function isRuntimeSource(path) {
   );
 }
 
-function version(manifest) {
-  const value = JSON.parse(manifest).runtimeVersion;
-  if (typeof value !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value))
-    throw new Error(`${manifestPath} must contain a stable major.minor.patch runtimeVersion`);
-  return value.split('.').map(BigInt);
-}
-
 export function checkRuntimeVersion(base = process.env.NX_AFFECTED_BASE ?? 'origin/main') {
-  const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  const ancestor = git('merge-base', base, 'HEAD');
-  const changed = git('diff', '--name-only', `${ancestor}...HEAD`, '--').split('\n').filter(isRuntimeSource);
-  const current = version(git('show', `HEAD:${manifestPath}`));
-  if (!changed.length) return 'No WAGO CC100 runtime source changes detected.';
-  // The first addition of a runtime manifest establishes the initial version.
-  if (!git('ls-tree', '--name-only', ancestor, '--', manifestPath)) return 'Initial CC100 runtime version established.';
-  const previous = version(git('show', `${ancestor}:${manifestPath}`));
-  const firstDifference = current.findIndex((part, index) => part !== previous[index]);
-  if (firstDifference < 0 || current[firstDifference] < previous[firstDifference])
-    throw new Error(
-      `CC100 runtime source changed without increasing runtimeVersion in ${manifestPath}.\n${changed.join('\n')}`,
-    );
-  return 'WAGO CC100 runtime source changed and runtimeVersion was increased.';
+  return checkReleaseVersion({
+    base,
+    versionFile: manifestPath,
+    isSource: isRuntimeSource,
+    readVersion: (manifest) => JSON.parse(manifest).runtimeVersion,
+    label: 'WAGO CC100 runtime',
+  });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@attraccess/plugins-frontend-sdk': fileURLToPath(
-        new URL('../../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),
+        new URL('../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),
       ),
     },
   },

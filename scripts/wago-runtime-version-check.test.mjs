@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { fixtureGitEnv } from './test-utils/git-env.mjs';
 import { isRuntimeSource } from './check-wago-runtime-version.mjs';
 
 const script = fileURLToPath(new URL('./check-wago-runtime-version.mjs', import.meta.url));
@@ -60,7 +61,8 @@ for (const [name, path, next, pass] of [
 ]) {
   test(name, () => {
     const directory = mkdtempSync(join(tmpdir(), 'cc100-version-check-'));
-    const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+    const env = fixtureGitEnv();
+    const git = (...args) => execFileSync('git', args, { cwd: directory, env, encoding: 'utf8' }).trim();
     const file = (path, content) => {
       mkdirSync(join(directory, path, '..'), { recursive: true });
       writeFileSync(join(directory, path), content);
@@ -81,10 +83,10 @@ for (const [name, path, next, pass] of [
       git('commit', '--quiet', '--allow-empty', '-m', 'change');
       if (pass)
         assert.match(
-          execFileSync(process.execPath, [script, base], { cwd: directory, encoding: 'utf8' }),
+          execFileSync(process.execPath, [script, base], { cwd: directory, env, encoding: 'utf8' }),
           /increased|No WAGO/,
         );
-      else assert.throws(() => execFileSync(process.execPath, [script, base], { cwd: directory, stdio: 'pipe' }));
+      else assert.throws(() => execFileSync(process.execPath, [script, base], { cwd: directory, env, stdio: 'pipe' }));
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
