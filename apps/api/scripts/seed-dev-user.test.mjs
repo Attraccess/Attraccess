@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import sqlite3 from 'sqlite3';
@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { execFileSync, spawnSync } from 'node:child_process';
 import bcrypt from 'bcrypt';
 
-const script = path.resolve('scripts/seed-dev-user.mjs');
+const script = path.resolve('apps/api/scripts/seed-dev-user.mjs');
 
 const execute = (db, sql) =>
   new Promise((resolve, reject) => db.exec(sql, (error) => (error ? reject(error) : resolve())));
@@ -309,5 +309,93 @@ test('refuses external databases without an explicit isolated-database override'
     encoding: 'utf8',
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Refusing to seed a database outside storage/);
+  assert.match(result.stderr, /Refusing to seed a database outside configured local storage/);
+});
+
+// Invoke the actual seed transaction with an isolated repository and .env.
+function seedInRepository(repoRoot, args = [], extraEnv = {}) {
+  const env = { ...process.env, ...extraEnv };
+  delete env.SEED_DB_PATH;
+  if (!Object.hasOwn(extraEnv, 'STORAGE_ROOT')) delete env.STORAGE_ROOT;
+  const harness = `import { main } from ${JSON.stringify(script)};
+    main(process.argv.slice(1), ${JSON.stringify(repoRoot)}).catch(error => {
+      console.error(error.message); process.exitCode = 1;
+    });`;
+  return spawnSync(process.execPath, ['--input-type=module', '-e', harness, ...args], { encoding: 'utf8', env });
+}
+
+test('loads relative STORAGE_ROOT from .env and seeds the API database without an external override', async () => {
+  const { directory, file, db } = await database();
+  try {
+    writeFileSync(path.join(directory, '.env'), 'STORAGE_ROOT=.\n');
+    // The API always calls its SQLite database attraccess.sqlite.
+    symlinkSync(file, path.join(directory, 'attraccess.sqlite'));
+    const result = seedInRepository(directory);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal((await rows(db, 'SELECT * FROM user')).length, 1);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('process STORAGE_ROOT takes precedence over .env', async () => {
+  const { directory, file, db } = await database();
+  try {
+    writeFileSync(path.join(directory, '.env'), 'STORAGE_ROOT=missing\n');
+    symlinkSync(file, path.join(directory, 'attraccess.sqlite'));
+    const result = seedInRepository(directory, [], { STORAGE_ROOT: directory });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal((await rows(db, 'SELECT * FROM user')).length, 1);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('configured external storage still requires an explicit override', async () => {
+  const { directory, db } = await database();
+  const repoRoot = path.join(directory, 'repo');
+  try {
+    mkdirSync(repoRoot);
+    const result = seedInRepository(repoRoot, [], { STORAGE_ROOT: directory });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /outside configured local storage/);
+    assert.deepEqual(await rows(db, 'SELECT * FROM user'), []);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('rejects a configured storage directory symlink escaping the repository', async () => {
+  const { directory, db } = await database();
+  const repoRoot = path.join(directory, 'repo');
+  try {
+    mkdirSync(repoRoot);
+    symlinkSync(directory, path.join(repoRoot, 'storage'));
+    symlinkSync(path.join(directory, 'test.sqlite'), path.join(directory, 'attraccess.sqlite'));
+    const result = seedInRepository(repoRoot);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /symlink outside configured local storage/);
+    assert.deepEqual(await rows(db, 'SELECT * FROM user'), []);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('rejects a database symlink escaping the configured storage directory', async () => {
+  const { directory, file, db } = await database();
+  try {
+    mkdirSync(path.join(directory, 'storage'));
+    symlinkSync(file, path.join(directory, 'storage/attraccess.sqlite'));
+    const result = seedInRepository(directory);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /symlink outside configured local storage/);
+    assert.deepEqual(await rows(db, 'SELECT * FROM user'), []);
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

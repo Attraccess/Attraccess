@@ -9,6 +9,14 @@ import { findFreePort, isPortFree } from './lib/find-free-port.mts';
 
 type Target = 'api' | 'frontend' | 'both';
 
+interface LaunchOptions {
+  only: Target;
+  tui: boolean;
+  kiosk: boolean;
+  attractap: boolean;
+  passthroughArgs: string[];
+}
+
 interface Resolved {
   apiPort?: number;
   frontendPort?: number;
@@ -35,9 +43,11 @@ function removePortsFile(): void {
   rmSync(PORTS_FILE, { force: true });
 }
 
-export function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArgs: string[] } {
+export function parseArgs(argv: string[]): LaunchOptions {
   let only: Target = 'both';
   let tui = false;
+  let kiosk = false;
+  let attractap = false;
   const passthroughArgs: string[] = [];
   const args = argv.slice(2);
   let sawDelimiter = false;
@@ -54,6 +64,14 @@ export function parseArgs(argv: string[]): { only: Target; tui: boolean; passthr
       tui = true;
       continue;
     }
+    if (arg === '--with-kiosk' || arg === '--with-companion') {
+      kiosk = true;
+      continue;
+    }
+    if (arg === '--with-attractap') {
+      attractap = true;
+      continue;
+    }
     const m = arg.match(/^--only=(.+)$/);
     if (m) {
       if (m[1] === 'api' || m[1] === 'frontend' || m[1] === 'both') {
@@ -67,7 +85,10 @@ export function parseArgs(argv: string[]): { only: Target; tui: boolean; passthr
       passthroughArgs.push(arg);
     }
   }
-  return { only, tui, passthroughArgs };
+  if (only === 'frontend' && (kiosk || attractap)) {
+    throw new Error('Asset build flags require the API. Use --only=api or omit --only=frontend.');
+  }
+  return { only, tui, kiosk, attractap, passthroughArgs };
 }
 
 export async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
@@ -97,7 +118,7 @@ function banner(r: Resolved): string {
 }
 
 export async function main() {
-  const { only, tui, passthroughArgs } = parseArgs(process.argv);
+  const { only, tui, kiosk, attractap, passthroughArgs } = parseArgs(process.argv);
   const resolved: Resolved = {};
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
 
@@ -129,15 +150,38 @@ export async function main() {
     // NX_TUI=true forces it on. The terminal is still a real TTY, so it renders.
     childEnv.NX_TUI = 'true';
   }
-  const nxArgs = ['run-many', '-t', 'serve', `--projects=${projects}`, ...outputArgs, ...passthroughArgs];
-  const child = spawn('pnpm', ['nx', ...nxArgs], { stdio: 'inherit', env: childEnv });
-
+  let child: ReturnType<typeof spawn> | undefined;
   const forward = (sig: NodeJS.Signals) => {
-    if (!child.killed) child.kill(sig);
+    if (child && !child.killed) child.kill(sig);
   };
   process.on('SIGINT', () => forward('SIGINT'));
   process.on('SIGTERM', () => forward('SIGTERM'));
 
+  const assetTarget =
+    kiosk && attractap
+      ? 'prepare-all-assets'
+      : kiosk
+        ? 'prepare-kiosk-assets'
+        : attractap
+          ? 'prepare-attractap-assets'
+          : undefined;
+  if (assetTarget) {
+    const preparation = spawn('pnpm', ['nx', 'run-many', '-t', assetTarget, '--projects=api', ...outputArgs], {
+      stdio: 'inherit',
+      env: childEnv,
+    });
+    child = preparation;
+    await new Promise<void>((resolveBuild, rejectBuild) => {
+      preparation.once('error', rejectBuild);
+      preparation.once('exit', (code, signal) => {
+        if (code === 0 && !signal) resolveBuild();
+        else rejectBuild(new Error(`Asset build failed (${signal ?? code ?? 'unknown exit'}).`));
+      });
+    });
+  }
+
+  const nxArgs = ['run-many', '-t', 'serve', `--projects=${projects}`, ...outputArgs, ...passthroughArgs];
+  child = spawn('pnpm', ['nx', ...nxArgs], { stdio: 'inherit', env: childEnv });
   child.on('exit', (code, signal) => {
     if (signal) {
       removePortsFile();

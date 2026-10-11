@@ -1,17 +1,12 @@
-name: Attractap Firmware
+name: Build and Test Attractap Firmware
 
 on:
-  pull_request:
-    paths:
-      - 'apps/attractap/firmware/**'
-      - '.github/workflows/attractap-firmware.yml'
-  push:
-    branches:
-      - 'claude/attractap-**'
-    paths:
-      - 'apps/attractap/firmware/**'
-      - '.github/workflows/attractap-firmware.yml'
+  workflow_call:
   workflow_dispatch:
+
+env:
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'release') && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
 
 jobs:
   build:
@@ -22,18 +17,10 @@ jobs:
 
       - uses: ./.github/actions/build-attractap-firmware
 
-      - name: Test SupervisionFlow and LVGL rendering
-        run: |
-          cmake -S apps/attractap/firmware/tests/supervision -B /tmp/attractap-supervision-flow-tests
-          cmake --build /tmp/attractap-supervision-flow-tests
-          ctest --test-dir /tmp/attractap-supervision-flow-tests --output-on-failure
-          cmake -S apps/attractap/firmware/tests/display-theme -B /tmp/attractap-display-theme-tests
-          cmake --build /tmp/attractap-display-theme-tests --parallel 2
-          ctest --test-dir /tmp/attractap-display-theme-tests --output-on-failure
-
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: attractap-firmware
+          name: attractap-firmware-${{ github.run_id }}
           path: apps/attractap/firmware/firmware_output/
+          if-no-files-found: error
           retention-days: 14

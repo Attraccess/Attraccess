@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { fixtureGitEnv } from './test-utils/git-env.mjs';
 import { fileURLToPath } from 'node:url';
 
 const script = fileURLToPath(new URL('./check-file-size.mjs', import.meta.url));
@@ -13,7 +14,9 @@ const lines = (count, newline = '\n', trailing = true) =>
 function repository(t, initial = {}) {
   const cwd = mkdtempSync(path.join(os.tmpdir(), 'file-size-'));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  const env = fixtureGitEnv();
+  const git = (...args) =>
+    execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   const write = (file, content) => {
     mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true });
     writeFileSync(path.join(cwd, file), content);
@@ -21,6 +24,7 @@ function repository(t, initial = {}) {
   git('init', '--quiet');
   git('config', 'user.email', 'test@example.com');
   git('config', 'user.name', 'Test');
+  git('config', 'commit.gpgsign', 'false');
   write('README.md', 'Fixture\n');
   for (const [file, content] of Object.entries(initial)) write(file, content);
   const commit = () => {
@@ -33,7 +37,7 @@ function repository(t, initial = {}) {
     const result = spawnSync(process.execPath, [script, ...args], {
       cwd,
       encoding: 'utf8',
-      env: { ...process.env, NX_AFFECTED_BASE: base },
+      env: { ...env, NX_AFFECTED_BASE: base },
     });
     assert.ifError(result.error);
     return { status: result.status, output: result.stdout + result.stderr };

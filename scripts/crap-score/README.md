@@ -77,7 +77,11 @@ hook through `NODE_OPTIONS`. Tests that deliberately replace their environment
 forward only the coverage variables when this mode is active. Copied CLI scripts
 are attributed to their maintained source only when their complete contents
 match exactly one source file; fixture executables do not contribute coverage.
-The root Vitest suite also includes the port-allocation tests in `scripts/`.
+The root target reuses `scripts/vitest.config.mts`, the ordinary tooling-test
+configuration, including port-allocation, launcher, interactive service and example
+plugin tests. Run the complete tooling suite without coverage using `pnpm test:tooling`.
+API seeding tests live in `apps/api/scripts/` and run in `api:test-scripts` as well
+as the API's coverage report.
 
 Original source function ranges canonicalize transformed function identities
 before deduplication. Missing functions receive zero counts without adding a

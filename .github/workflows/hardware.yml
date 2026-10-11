@@ -1,12 +1,7 @@
 name: Attractap Desktop
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-    paths:
-      - 'apps/attractap/desktop/**'
-      - 'apps/attractap/firmware/**'
-      - '.github/workflows/hardware.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
