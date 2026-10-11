@@ -59,6 +59,12 @@ Abgleich bedeutet: maßgeblichen Inventar-Snapshot mit Stream-Sequenzstand abruf
 
 Angefragt, angenommen, abgeschlossen, fehlgeschlagen und ungewiss bleiben getrennte Ergebnisse. Angenommen bedeutet nicht, dass das Gerät Erfolg gemeldet hat. Eine Zeitüberschreitung oder verlorene Verbindung kann den Befehlsausgang ungewiss lassen; mehrdeutige physische Befehle niemals automatisch wiederholen.
 
+Ein generisches Matter-`On` ist keine Berechtigung zum Betrieb einer Maschine. Maschinenverriegelungen und Attraccess-Sicherheitsprüfungen bleiben maßgeblich. Direkte Befehle zum Entriegeln/Entsperren oder Einschalten erfordern vor der Ausführung eine eigene Berechtigung und eine ausdrückliche Bestätigung.
+
+Extern beobachtete Geräteänderungen dürfen keinem erfundenen Attraccess-Akteur zugeordnet werden. Ihr externer Ursprung und die null-Zuordnung bleiben erhalten; sie werden nicht dem letzten Benutzer zugeschrieben, der einen Befehl gesendet hat. Nicht zugeordnete Geräte und getrennte Fabric-Mitgliedschaften bleiben als Abweichungen für einen ausdrücklichen Abgleich sichtbar; sie dürfen weder stillschweigend zu verwalteten Geräten werden noch aus den Aufzeichnungen gelöscht werden.
+
+Diese Vorgaben gelten für die späteren Geräte-, Berechtigungs-/Audit- und Befehls-Tickets. Berechtigungsdurchsetzung, Registry-Abgleich und physisches Geräteverhalten werden in diesem Fundament noch nicht implementiert.
+
 Setup-Codes, WLAN-Zugangsdaten und Thread-Datasets sind ausschließlich Anfragedaten. Normale Statuswerte, Ereignisse, Diagnose und Logs enthalten keine Inbetriebnahme-/Fabric-Geheimnisse oder Dataset-Bytes. Validierungsfehler geben weder Anfragekörper noch ungültige Werte aus. Geräteadapter dürfen nur definierte öffentliche Berichtswerte senden und keine Geheimnisse in Namen oder Textberichten verstecken.
 
 ## Nächste Schritte

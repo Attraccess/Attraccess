@@ -152,12 +152,6 @@ export function createApplication(options: ApplicationOptions) {
               'TIMEOUT',
               'Operation deadline has elapsed. Physical commands must not be automatically retried.',
             );
-          if (
-            'minIntervalSeconds' in (parsed.data as object) &&
-            (parsed.data as { minIntervalSeconds: number }).minIntervalSeconds >
-              (parsed.data as { maxIntervalSeconds: number }).maxIntervalSeconds
-          )
-            throw new ProtocolError('VALIDATION_ERROR', 'Minimum subscription interval must not exceed the maximum.');
         } else if (req.headers['transfer-encoding'] || Number(req.headers['content-length'] ?? 0) > 0)
           throw new ProtocolError('VALIDATION_ERROR', 'This route does not accept a request body.');
         if ('capability' in route)
@@ -200,6 +194,9 @@ export function createApplication(options: ApplicationOptions) {
   });
   const wss = createWebSocketServer(config);
   server.on('upgrade', (req, socket, head) => {
+    // Upgrade sockets are no longer covered by HTTP's error handling. A client
+    // reset, including while we write a rejection, must stay local to its socket.
+    socket.on('error', () => socket.destroy());
     const requestId = correlationId(req.headers);
     try {
       const path = new URL(req.url ?? '/', 'http://localhost').pathname;

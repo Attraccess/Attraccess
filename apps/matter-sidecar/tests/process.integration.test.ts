@@ -1,6 +1,7 @@
 import { afterEach, it, expect } from 'vitest';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
+import { createConnection } from 'node:net';
 import { WebSocket } from 'ws';
 import { fixtures } from '@attraccess/matter-contract/testing';
 import { MATTER_JS_RELEASE, SUPPORTED_RELEASE, VersionResponse } from '@attraccess/matter-contract';
@@ -39,7 +40,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const)
     const version = VersionResponse.parse(await (await fetch(process.url + '/version')).json());
     expect(version.matterJsRelease).toBe(MATTER_JS_RELEASE);
     expect(version.sidecarRelease).toBe(SUPPORTED_RELEASE.sidecar);
-    expect(version.build.revision).toMatch(/^[0-9a-f]{40}$/);
+    expect(version.build.revision).toBe(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim());
     expect(await (await fetch(process.url + '/health/ready')).json()).toMatchObject({
       ready: true,
       fabricInitialized: false,
@@ -66,4 +67,23 @@ it('invalid configuration exits only the sidecar with an actionable safe diagnos
   expect(process.stderr()).toMatch(/initialization failed.*MATTER_HOST/);
   const healthy = await launch();
   expect((await fetch(healthy.url + '/health/live')).status).toBe(200);
+});
+it('stays alive after real TCP resets during rejected WebSocket upgrades', async () => {
+  const sidecar = await launch();
+  if (!sidecar.url) throw new Error(sidecar.stderr());
+  const port = Number(new URL(sidecar.url).port);
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const client = createConnection({ host: '127.0.0.1', port });
+    client.on('error', () => undefined);
+    const closed = new Promise<void>((resolve) => client.once('close', () => resolve()));
+    await once(client, 'connect');
+    client.write(
+      'GET /v2/events HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n',
+      () => client.resetAndDestroy(),
+    );
+    await closed;
+  }
+  expect((await fetch(sidecar.url + '/health/live')).status).toBe(200);
+  expect(sidecar.child.exitCode).toBeNull();
+  expect(sidecar.stderr()).toBe('');
 });

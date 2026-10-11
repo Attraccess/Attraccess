@@ -44,7 +44,12 @@
         "{workspaceRoot}/apps/plugins/matter/package.json",
         "{workspaceRoot}/apps/plugins/matter/plugin.json",
         "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
-        "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs",
+        "{workspaceRoot}/eslint.config.cjs",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        "{workspaceRoot}/.prettierrc",
+        "{workspaceRoot}/.prettierignore",
+        "{workspaceRoot}/.gitignore"
       ]
     },
     "test": {
@@ -108,7 +113,8 @@
         "{workspaceRoot}/apps/plugins/matter/package.json",
         "{workspaceRoot}/apps/plugins/matter/plugin.json",
         "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
-        "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/verify-packed-plugin.mjs"
       ]
     }
   }

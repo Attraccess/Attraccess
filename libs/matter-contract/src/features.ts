@@ -73,6 +73,9 @@ export const SubscriptionRequest = Operation.extend({
   attributes: z.array(AttributeAddress).min(1).max(256),
   minIntervalSeconds: z.number().int().min(0).max(3600),
   maxIntervalSeconds: z.number().int().min(1).max(3600),
+}).refine((request) => request.minIntervalSeconds <= request.maxIntervalSeconds, {
+  message: 'Minimum subscription interval must not exceed the maximum.',
+  path: ['minIntervalSeconds'],
 });
 export const SubscriptionQuery = z.strictObject({ subscriptionId: Id });
 export const SubscriptionCancel = SubscriptionQuery.extend({ cancellationId: Id });

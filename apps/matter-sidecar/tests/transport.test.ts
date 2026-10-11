@@ -37,6 +37,44 @@ async function connect(url: string) {
   return { ws, messages };
 }
 describe('real local HTTP and WebSocket transport with a simulated platform', () => {
+  it('contains a rejected upgrade socket reset and continues serving HTTP and WebSocket clients', async () => {
+    const { app, port, url } = await start();
+    const resetHandled = new Promise<void>((resolve) => {
+      app.server.once('upgrade', (_, socket) => {
+        // Deterministic fault injection after the real HTTP parser dispatches a
+        // rejected upgrade. Before the fix this emit throws an unhandled error.
+        socket.emit('error', Object.assign(new Error('Connection reset'), { code: 'ECONNRESET' }));
+        expect(socket.destroyed).toBe(true);
+        resolve();
+      });
+    });
+    const client = createConnection({ port, host: '127.0.0.1' });
+    client.on('error', () => undefined);
+    client.resume();
+    const closed = once(client, 'close');
+    await once(client, 'connect');
+    client.write('GET /v2/events HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n');
+    await resetHandled;
+    await closed;
+    expect((await fetch(url + '/health/live')).status).toBe(200);
+    const { ws } = await connect(url);
+    ws.close();
+    await once(ws, 'close');
+  });
+  it('uses the shared subscription interval validation before capability checks', async () => {
+    const { url } = await start();
+    for (const [minIntervalSeconds, maxIntervalSeconds, status] of [
+      [100, 1, 400],
+      [100, 100, 501],
+    ]) {
+      const response = await fetch(url + '/v1/subscriptions', {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ ...(fixtures.SubscriptionRequest as object), minIntervalSeconds, maxIntervalSeconds }),
+      });
+      expect(response.status).toBe(status);
+    }
+  });
   it('reports ready without a fabric, validates requests and advertises unavailable features', async () => {
     const { app, platform, url } = await start();
     expect(await (await fetch(url + '/health/live')).json()).toEqual({ schemaVersion: 1, live: true });

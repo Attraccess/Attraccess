@@ -59,6 +59,12 @@ Reconciliation means obtaining an authoritative inventory snapshot containing a 
 
 Requested, accepted, completed, failed and uncertain operation outcomes remain distinct. Accepted does not mean the physical device reported success. A timeout or lost connection can leave a command's outcome uncertain; never automatically retry an ambiguous physical command.
 
+Generic Matter `On` is not authorization to operate a machine. Machine interlocks and Attraccess safety checks must remain authoritative. Direct unlock/unbolt and power-on commands require dedicated permission and explicit confirmation before execution.
+
+Externally observed device changes have no fabricated Attraccess actor. Preserve their external origin and null initiating correlation; do not attribute them to the last user who issued a command. Unclaimed devices and detached fabric memberships must remain visible as discrepancies for explicit reconciliation; never silently promote them into managed devices or delete their records.
+
+These are constraints for the later device, permissions/audit and command feature tickets. Permission enforcement, registry reconciliation and physical device behavior are not implemented in this foundation.
+
 Setup codes, Wi-Fi credentials and Thread datasets are request-only. Normal statuses, events, diagnostics and logs contain no commissioning/fabric secrets or dataset bytes. Validation errors do not echo request bodies or offending values. Feature adapters must emit only the declared public report values and must not place secrets in labels or text reports.
 
 ## Next slices

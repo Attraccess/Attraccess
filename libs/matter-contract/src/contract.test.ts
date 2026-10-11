@@ -21,6 +21,23 @@ describe('one authoritative Matter contract', () => {
     }
     expect(new Set(routes.filter((r) => 'capability' in r).map((r) => r.capability)).size).toBe(7);
   });
+  it('rejects inverted subscription intervals and accepts equal and boundary intervals', () => {
+    for (const [minIntervalSeconds, maxIntervalSeconds, valid] of [
+      [100, 1, false],
+      [3600, 1, false],
+      [0, 1, true],
+      [100, 100, true],
+      [3600, 3600, true],
+    ]) {
+      expect(
+        schemas.SubscriptionRequest.safeParse({
+          ...(fixtures.SubscriptionRequest as object),
+          minIntervalSeconds,
+          maxIntervalSeconds,
+        }).success,
+      ).toBe(valid);
+    }
+  });
   it('rejects unsafe identifiers, numbers, timestamps, versions, deadlines and missing correlation', () => {
     for (const [name, values] of Object.entries({
       UInt64: [1, Number('18446744073709551615'), '0x123', 'FFFFFFFFFFFFFFFF', '123'],

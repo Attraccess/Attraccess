@@ -3,12 +3,38 @@ import { z } from 'zod';
 import { schemas, routes } from './registry.js';
 import { ERROR_STATUS } from './primitives.js';
 import { SUPPORTED_RELEASE } from './release.js';
+import { SubscriptionRequest } from './features.js';
 
 const output = 'dist/contracts/matter';
+function intervalOrder(minimum: number, maximum: number): z.core.JSONSchema.JSONSchema {
+  if (minimum === maximum) return {};
+  const middle = Math.ceil((minimum + maximum) / 2);
+  return {
+    if: { properties: { minIntervalSeconds: { minimum: middle } } },
+    then: { properties: { maxIntervalSeconds: { minimum: middle } }, ...intervalOrder(middle, maximum) },
+    else: intervalOrder(minimum, middle - 1),
+  };
+}
 const definitions = Object.fromEntries(
   Object.entries(schemas)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, schema]) => [name, z.toJSONSchema(schema, { target: 'draft-2020-12' })]),
+    .map(([name, schema]) => [
+      name,
+      z.toJSONSchema(schema, {
+        target: 'draft-2020-12',
+        override: ({ zodSchema, jsonSchema }) => {
+          if (zodSchema !== SubscriptionRequest) return;
+          // Standard JSON Schema cannot compare sibling numbers. Project the
+          // runtime invariant over its finite integer domain with if/then rules,
+          // so ordinary JSON Schema/OpenAPI validators need no custom keywords.
+          const interval = jsonSchema.properties?.minIntervalSeconds;
+          const maximum = typeof interval === 'object' ? interval.maximum : undefined;
+          if (typeof maximum !== 'number') throw new Error('Subscription interval bound is missing.');
+          // A balanced tree keeps validator nesting logarithmic in the bound.
+          Object.assign(jsonSchema, intervalOrder(0, maximum));
+        },
+      }),
+    ]),
 );
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
 const json = (name: string) => ({ 'application/json': { schema: ref(name) } });
