@@ -18,6 +18,7 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
   );
   expect(api.openapi).toBe('3.1.0');
   expect(Object.keys(doc.$defs).sort()).toEqual(Object.keys(schemas).sort());
+  expect(api.components.schemas).toEqual(doc.$defs);
   function checkRefs(value: unknown, root: unknown) {
     if (!value || typeof value !== 'object') return;
     for (const [key, child] of Object.entries(value)) {
@@ -42,21 +43,20 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
   checkRefs(doc, doc);
   const ajv = new Ajv2020({ strict: false });
   addFormats(ajv);
-  for (const exported of [doc.$defs.SubscriptionRequest, api.components.schemas.SubscriptionRequest]) {
-    const validate = ajv.compile(exported);
-    for (const [minIntervalSeconds, maxIntervalSeconds] of [
-      [100, 1],
-      [3600, 1],
-      [0, 1],
-      [100, 100],
-      [3600, 3600],
-    ]) {
-      const request = { ...(fixtures.SubscriptionRequest as object), minIntervalSeconds, maxIntervalSeconds };
-      expect(validate(request)).toBe(schemas.SubscriptionRequest.safeParse(request).success);
-    }
-  }
   for (const [name, schema] of Object.entries(doc.$defs)) {
     const validate = ajv.compile(schema as object);
+    if (name === 'SubscriptionRequest') {
+      for (const [minIntervalSeconds, maxIntervalSeconds] of [
+        [100, 1],
+        [3600, 1],
+        [0, 1],
+        [100, 100],
+        [3600, 3600],
+      ]) {
+        const request = { ...(fixtures.SubscriptionRequest as object), minIntervalSeconds, maxIntervalSeconds };
+        expect(validate(request)).toBe(schemas.SubscriptionRequest.safeParse(request).success);
+      }
+    }
     expect(validate(fixtures[name]), `${name}: ${JSON.stringify(validate.errors)}`).toBe(true);
     expect(validate({ invalid: true }), name).toBe(false);
     const value = fixtures[name];

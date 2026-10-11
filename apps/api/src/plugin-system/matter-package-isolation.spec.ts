@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { DynamicModule, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -28,9 +29,26 @@ type Installer = ServiceInternals & {
 describe('extracted Matter package host isolation', () => {
   const fixture = setupNpmPluginFixture();
   const apps: INestApplication[] = [];
+  const packageDir = resolve('apps/plugins/matter/package');
+  const pkg = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'));
+  let tarball: Buffer;
+  // Both Nx test targets depend on plugin-matter:build. Consume that artifact
+  // without rebuilding shared staging files while other package checks run.
   beforeAll(() => {
-    execFileSync(process.execPath, ['apps/plugins/matter/build.mjs'], { cwd: resolve('.') });
-  });
+    const destination = mkdtempSync(join(tmpdir(), 'matter-isolation-package-'));
+    try {
+      const packed = JSON.parse(
+        execFileSync('npm', ['pack', '--offline', '--ignore-scripts', '--json', '--pack-destination', destination], {
+          cwd: packageDir,
+          encoding: 'utf8',
+          timeout: 60000,
+        }),
+      )[0];
+      tarball = readFileSync(join(destination, packed.filename));
+    } finally {
+      rmSync(destination, { recursive: true, force: true });
+    }
+  }, 60000);
   afterEach(async () => {
     await Promise.all(apps.splice(0).map((app) => app.close()));
   });
@@ -96,19 +114,8 @@ describe('extracted Matter package host isolation', () => {
       const before = await coreAndPlugins();
       await available(before);
 
-      // Pack the real built plugin. The host installer verifies integrity and
-      // extracts this tarball itself; only registry transport and host version are simulated.
-      const packageDir = resolve('apps/plugins/matter/package');
-      const packed = JSON.parse(
-        execFileSync('npm', ['pack', '--json', '--pack-destination', fixture.root], {
-          cwd: packageDir,
-          encoding: 'utf8',
-        }),
-      )[0];
-      const archive = join(fixture.root, packed.filename);
-      const tarball = readFileSync(archive);
-      rmSync(archive);
-      const pkg = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'));
+      // The host installer verifies integrity and extracts the real packed
+      // plugin; only registry transport and host version are simulated.
       const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
       const installer = service as unknown as Installer;
       jest.spyOn(installer, 'hostVersion').mockReturnValue(compatible ? pkg.attraccess.host : '999.0.0');
