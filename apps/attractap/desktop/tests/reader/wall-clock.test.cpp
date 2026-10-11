@@ -56,10 +56,15 @@ void ReaderWorkflow::testWallClock()
     list(false);
     assert(showsClock(lv_screen_active(), -210, before));
 
-    // Implausible samples (old clocks, impossible offsets) are ignored.
+    // Implausible samples (old/future clocks, impossible offsets) are ignored.
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":1000,"utcOffsetMinutes":60}})");
     // JSON numbers can exceed int64_t, including the rounded upper boundary.
     for (const char *epoch : {"1e30", "-1e30", "9223372036854775808", "-9223372036854777856", "1e999"})
+        server.incoming.push(std::string(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)") + epoch +
+                             R"(,"utcOffsetMinutes":60}})");
+    // These future epochs fit int64_t; the wall-clock range must reject them
+    // before changing the existing timezone, even though the host has synced.
+    for (const char *epoch : {"4102444800000", "4102444800001", "9000000000000000000"})
         server.incoming.push(std::string(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)") + epoch +
                              R"(,"utcOffsetMinutes":60}})");
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)" +

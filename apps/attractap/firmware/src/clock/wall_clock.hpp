@@ -22,6 +22,8 @@ namespace WallClock
     };
 
     void onSntpSynced();
+    // Network UTC must be in [2025-01-01, 2100-01-01), with an offset in
+    // [-840, 840] minutes. Rejected samples leave UTC and offset unchanged.
     void onServerTime(int64_t epochMs, int32_t utcOffsetMinutes);
     // Offline demo setup trusts the preset system timeline, including old dates.
     void onDemoTime(int32_t utcOffsetMinutes);

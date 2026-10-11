@@ -45,6 +45,18 @@ int main()
     assert(!WallClock::now().valid);
     constexpr int32_t invalidOffsets[] = {std::numeric_limits<int32_t>::min(),
                                          std::numeric_limits<int32_t>::max(), -841, 841};
+    constexpr int64_t firstSupportedEpochMs = 1735689600000LL; // 2025-01-01T00:00Z
+    constexpr int64_t endSupportedEpochMs = 4102444800000LL;   // 2100-01-01T00:00Z, exclusive
+    constexpr int64_t invalidEpochs[] = {firstSupportedEpochMs - 1, endSupportedEpochMs,
+                                       endSupportedEpochMs + 1, 9000000000000000000LL,
+                                       std::numeric_limits<int64_t>::max()};
+    // Finite, representable but implausible epochs must not initialize state.
+    for (const auto epoch : invalidEpochs)
+    {
+        WallClock::onServerTime(epoch, 60);
+        assert(utc == 0 && clockSets == 0);
+        assert(!WallClock::now().valid);
+    }
     // Invalid offsets must not initialize either UTC or the displayed timezone.
     for (const auto offset : invalidOffsets)
     {
@@ -89,9 +101,23 @@ int main()
             assert(retained.hour == local.hour && retained.minute == local.minute);
         }
     };
+    const auto assertRejectedEpochs = [&]()
+    {
+        for (const auto epoch : invalidEpochs)
+        {
+            WallClock::onServerTime(epoch, 60);
+            const auto retained = WallClock::now();
+            assert(utc == 1767268800 && clockSets == 2);
+            assert(retained.valid && retained.year == local.year && retained.month == local.month);
+            assert(retained.day == local.day && retained.weekday == local.weekday);
+            assert(retained.hour == local.hour && retained.minute == local.minute);
+        }
+    };
     assertRejectedOffsets();
+    assertRejectedEpochs();
     WallClock::onSntpSynced();
     assertRejectedOffsets();
+    assertRejectedEpochs();
 
     // Valid samples after SNTP update only the timezone, even with different UTC.
     WallClock::onServerTime(1767355200000, -210);
@@ -99,6 +125,16 @@ int main()
     local = WallClock::now();
     assert(local.valid && local.day == 1 && local.hour == 8 && local.minute == 30);
     assertRejectedOffsets();
+    assertRejectedEpochs();
+
+    // Exact supported epoch boundaries still apply timezone updates after SNTP.
+    WallClock::onServerTime(firstSupportedEpochMs, 345);
+    local = WallClock::now();
+    assert(local.valid && local.hour == 17 && local.minute == 45);
+    WallClock::onServerTime(endSupportedEpochMs - 1, -210);
+    local = WallClock::now();
+    assert(local.valid && local.hour == 8 && local.minute == 30);
+    assert(utc == 1767268800 && clockSets == 2);
 
     // Repeated setup and a preset device/host clock retain their timeline.
     utc += 60;

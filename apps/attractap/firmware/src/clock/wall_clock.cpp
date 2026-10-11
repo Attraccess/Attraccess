@@ -15,6 +15,9 @@ namespace
 #endif
     // Network samples must be contemporary; demo presets are trusted separately.
     constexpr time_t EarliestPlausibleUtc = 1735689600; // 2025-01-01T00:00:00Z
+    // Support network dates through 2099, rejecting corrupted future samples
+    // before they can alter either UTC or the API-provided timezone.
+    constexpr int64_t EndSupportedEpochMs = 4102444800000LL; // 2100-01-01T00:00:00Z, exclusive
     constexpr int64_t MaxFallbackDriftMs = 2000;
     constexpr int32_t MaxUtcOffsetMinutes = 14 * 60;
 
@@ -45,7 +48,7 @@ void WallClock::onDemoTime(int32_t utcOffsetMinutes)
 
 void WallClock::onServerTime(int64_t epochMs, int32_t utcOffsetMinutes)
 {
-    if (epochMs / 1000 < EarliestPlausibleUtc ||
+    if (epochMs / 1000 < EarliestPlausibleUtc || epochMs >= EndSupportedEpochMs ||
         utcOffsetMinutes < -MaxUtcOffsetMinutes || utcOffsetMinutes > MaxUtcOffsetMinutes)
     {
         return;

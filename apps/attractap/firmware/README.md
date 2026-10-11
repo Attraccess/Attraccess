@@ -22,6 +22,13 @@ timestamps share a plausible timeline. This is a demonstration date, not the
 actual current time; demo firmware does not start SNTP.
 Demo presets are trusted local time and may display without a server sample.
 
+Network clock samples support UTC dates from 1 January 2025 (inclusive) to
+1 January 2100 (exclusive), with timezone offsets from -840 to +840 minutes.
+This range covers the reader's intended operating lifetime while rejecting
+corrupted future timestamps that still fit a signed 64-bit integer. A rejected
+sample leaves both UTC and the timezone offset unchanged, before and after
+SNTP synchronization. Trusted offline demo presets use their separate path.
+
 Each variant file sets the compile definitions (pins, feature flags, firmware
 name) and the source subtrees excluded for that hardware. The firmware version
 lives in `version.txt` — bump it whenever firmware source changes (CI enforces
