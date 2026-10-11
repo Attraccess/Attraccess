@@ -542,7 +542,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // Invalidate asynchronous authentication before waiting on cleanup locks.
     const readerId = socket.readerId;
     const readerName = socket.readerName;
-    socket.state.readerAuthenticationAttempt = Symbol('reader-disconnected');
+    if (socket.state) socket.state.readerAuthenticationAttempt = Symbol('reader-disconnected');
     socket.readerId = null;
     socket.readerName = null;
     const connectedAt = this.connectedAt.get(socket as unknown as object);

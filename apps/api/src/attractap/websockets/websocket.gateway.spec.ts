@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
-import { AttractapEvent, AttractapEventType } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
   const fixture = registerAttractapGatewayFixture();
@@ -101,6 +101,42 @@ describe('AttractapGateway', () => {
   });
 
   describe('handleDisconnect', () => {
+    it('cleans up a connection rejected before socket initialization', async () => {
+      fixture.licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
+      const client = { close: jest.fn(), send: jest.fn() } as unknown as AuthenticatedWebSocket;
+      const connectedAt = (fixture.gateway as unknown as { connectedAt: WeakMap<object, bigint> }).connectedAt;
+
+      await fixture.gateway.handleConnection(client);
+      expect(client.close).toHaveBeenCalledTimes(1);
+      expect(client.state).toBeUndefined();
+      expect(connectedAt.has(client)).toBe(true);
+
+      await expect(fixture.gateway.handleDisconnect(client)).resolves.toBeUndefined();
+
+      expect(connectedAt.has(client)).toBe(false);
+      expect(fixture.mockWsMetrics.connectionDuration.observe).toHaveBeenCalledWith(
+        { gateway: 'attractap' },
+        expect.any(Number),
+      );
+      expect(fixture.websocketService.sockets.size).toBe(0);
+    });
+
+    it('invalidates pending authentication before waiting for cleanup', async () => {
+      const attempt = Symbol('pending-authentication');
+      const socket = fixture.createMockSocket({ readerId: 42, readerName: 'Reader' });
+      socket.state.readerAuthenticationAttempt = attempt;
+      const release = await fixture.gateway['clientResponseAwaitersMutex'].acquire();
+
+      const disconnect = fixture.gateway.handleDisconnect(socket);
+      const identity = { readerId: socket.readerId, readerName: socket.readerName };
+      const invalidated = socket.state.readerAuthenticationAttempt !== attempt;
+      release();
+      await disconnect;
+
+      expect(identity).toEqual({ readerId: null, readerName: null });
+      expect(invalidated).toBe(true);
+    });
+
     it('removes the socket from websocketService', async () => {
       const socket = fixture.createMockSocket({ id: 'disc-1' });
       fixture.websocketService.sockets.set('disc-1', socket);

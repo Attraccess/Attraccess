@@ -43,6 +43,7 @@ import { AuthenticatedWebSocket } from './websocket.types';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  attractapReaderConnected: { set: jest.fn() },
   attractapNfcTapsTotal: { inc: jest.fn() },
   attractapFirmwareUpdatesTotal: { inc: jest.fn() },
 };
