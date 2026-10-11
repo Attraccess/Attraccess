@@ -86,6 +86,11 @@ void Lockscreen::init()
     lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->initWallClock();
+    // Cached screens can return without resource updates or a loop tick.
+    // Refresh at activation so the first rendered frame has the current time.
+    lv_obj_add_event_cb(this->screen, [](lv_event_t *event) {
+        static_cast<Lockscreen *>(lv_event_get_user_data(event))->updateWallClock();
+    }, LV_EVENT_SCREEN_LOAD_START, this);
 
     lv_obj_update_layout(this->screen);
     this->updateUsageInfo();

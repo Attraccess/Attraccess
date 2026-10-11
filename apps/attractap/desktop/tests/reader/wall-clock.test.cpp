@@ -130,6 +130,19 @@ void ReaderWorkflow::testWallClock()
     assert(lv_screen_active() == cachedList);
     assert(showsClock(lv_screen_active(), 60, before));
     display.capture(output, "wall-clock-03b-cached-list-first-frame");
+
+    // Reactivate the cached lockscreen without resource setters or a loop tick.
+    // Its first frame must reflect the time that elapsed while it was hidden.
+    auto *cachedLockscreen = Display::lockscreen.getScreen();
+    assert(cachedLockscreen);
+    TestClock::set(time(nullptr) + 120);
+    before = expectedClock(60);
+    Display::transitionToScreen(&Display::lockscreen);
+    lv_refr_now(nullptr);
+    assert(lv_screen_active() == cachedLockscreen);
+    assert(showsClock(lv_screen_active(), 60, before));
+    display.capture(output, "wall-clock-03c-cached-lockscreen-first-frame");
+    Display::transitionToScreen(&Display::resourceListScreen);
     application.loop();
 
     // Demo setup also makes a deliberate historical preset visible on the
