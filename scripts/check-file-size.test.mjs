@@ -21,6 +21,7 @@ function repository(t, initial = {}) {
   git('init', '--quiet');
   git('config', 'user.email', 'test@example.com');
   git('config', 'user.name', 'Test');
+  git('config', 'commit.gpgsign', 'false');
   write('README.md', 'Fixture\n');
   for (const [file, content] of Object.entries(initial)) write(file, content);
   const commit = () => {

@@ -30,15 +30,72 @@ afterEach(() => {
 
 describe('development server launcher', () => {
   it('parses targets, TUI, and passthrough arguments including a delimiter', () => {
-    expect(parseArgs(['node', 'script'])).toEqual({ only: 'both', tui: false, passthroughArgs: [] });
+    expect(parseArgs(['node', 'script'])).toEqual({
+      only: 'both',
+      tui: false,
+      kiosk: false,
+      attractap: false,
+      passthroughArgs: [],
+    });
     for (const only of ['api', 'frontend', 'both'])
       expect(parseArgs(['node', 'script', `--only=${only}`, '--tui', '--verbose', '--', '--only=unchanged'])).toEqual({
         only,
         tui: true,
+        kiosk: false,
+        attractap: false,
         passthroughArgs: ['--verbose', '--only=unchanged'],
       });
     expect(() => parseArgs(['node', 'script', '--only'])).toThrow('requires a value');
     expect(() => parseArgs(['node', 'script', '--only=other'])).toThrow('Invalid value');
+  });
+  it.each([
+    [[], false, false],
+    [['--with-kiosk'], true, false],
+    [['--with-companion'], true, false],
+    [['--with-attractap'], false, true],
+    [['--with-kiosk', '--with-attractap'], true, true],
+  ])('selects requested assets with %j', (flags, kiosk, attractap) => {
+    expect(parseArgs(['node', 'script', ...flags])).toMatchObject({ kiosk, attractap });
+  });
+  it('rejects asset preparation for a frontend-only launch', () => {
+    expect(() => parseArgs(['node', 'script', '--only=frontend', '--with-kiosk'])).toThrow('require the API');
+    expect(() => parseArgs(['node', 'script', '--with-attractap', '--only=frontend'])).toThrow('require the API');
+  });
+  it.each([
+    [['--with-kiosk'], 'prepare-kiosk-assets'],
+    [['--with-attractap'], 'prepare-attractap-assets'],
+    [['--with-kiosk', '--with-attractap'], 'prepare-all-assets'],
+  ])('finishes asset preparation before launching with %j', async (flags, targets) => {
+    vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'script', ...flags]);
+    const preparation = Object.assign(new EventEmitter(), { killed: false, kill: vi.fn() });
+    state.spawn.mockReturnValueOnce(preparation);
+    const startup = main();
+    await vi.waitFor(() => expect(state.spawn).toHaveBeenCalledTimes(1));
+    expect(state.spawn.mock.calls[0][1]).toEqual([
+      'nx',
+      'run-many',
+      '-t',
+      targets,
+      '--projects=api',
+      '--outputStyle=stream',
+    ]);
+    preparation.emit('exit', 0, null);
+    await startup;
+    expect(state.spawn).toHaveBeenCalledTimes(2);
+    expect(state.spawn.mock.calls[1][1]).toContain('serve');
+  });
+  it.each([
+    ['exit', 1],
+    ['exit', null, 'SIGTERM'],
+    ['error', new Error('spawn failed')],
+  ])('does not launch after asset preparation fails: %j', async (...failure) => {
+    vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'script', '--with-attractap']);
+    const startup = main();
+    const rejected = expect(startup).rejects.toThrow();
+    await vi.waitFor(() => expect(state.spawn).toHaveBeenCalledTimes(1));
+    child.emit(failure[0] as string, ...failure.slice(1));
+    await rejected;
+    expect(state.spawn).toHaveBeenCalledTimes(1);
   });
   it('finds a free port unless an explicit valid port is requested', async () => {
     expect(await resolvePort('ATT_TEST_PORT', 5000, 'Test')).toBe(5002);
