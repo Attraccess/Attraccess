@@ -37,8 +37,8 @@ namespace
         {104, "Extraction checked", "Is chip extraction active?", "boolean", true},
     };
     constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS_DE) / sizeof(CNC_FIELDS_DE[0]);
-    // The form protocol uses these strings as submitted values, without a
-    // separate display label. Keep them stable across language changes.
+    // Stable submitted values. The demo-only display mapping in
+    // display/demoFormOptions.hpp gives them bilingual, refreshable captions.
     const char *const CNC_MATERIALS[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
 
     std::string toIso8601(time_t t)

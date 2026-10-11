@@ -240,6 +240,11 @@ enum class Message {
     MeterRate,
     OperatingState,
     Lines,
+    DemoMaterialAluminium,
+    DemoMaterialWood,
+    DemoMaterialPlastic,
+    DemoMaterialBrass,
+    DemoMaterialSteel,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -477,6 +482,11 @@ inline constexpr Entry catalog[] = {
     {Message::MeterRate, "\n{0} / Wert", "\n{0} / unit"},
     {Message::OperatingState, "{0} · {1}", "{0} · {1}"},
     {Message::Lines, "{0}\n{1}", "{0}\n{1}"},
+    {Message::DemoMaterialAluminium, "Aluminium", "Aluminium"},
+    {Message::DemoMaterialWood, "Holz", "Wood"},
+    {Message::DemoMaterialPlastic, "Kunststoff", "Plastic"},
+    {Message::DemoMaterialBrass, "Messing", "Brass"},
+    {Message::DemoMaterialSteel, "Stahl", "Steel"},
 };
 
 inline const char *messageText(Message id, const std::string &locale) {

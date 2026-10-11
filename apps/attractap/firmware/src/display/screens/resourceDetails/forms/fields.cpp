@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <cstdlib>
 #include "text.hpp"
+#ifdef DEMO_MODE
+#include "display/demoFormOptions.hpp"
+#endif
 
 void ResourceDetailsScreen::buildCurrentFormField()
 {
@@ -301,6 +304,14 @@ void ResourceDetailsScreen::createSelectField(lv_obj_t *fieldContainer, FormFiel
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
+#ifdef DEMO_MODE
+                  const auto caption = FirmwareI18n::demoMaterialCaption(
+                      this->formsModalPage->resourceId, this->formsModalPage->formId, field.id,
+                      field.options.select.values[optIndex]);
+                  if (caption)
+                     FirmwareI18n::setLabel(optLabel, *caption);
+                  else
+#endif
                   FirmwareI18n::setDynamicLabel(optLabel, displayValue.c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);

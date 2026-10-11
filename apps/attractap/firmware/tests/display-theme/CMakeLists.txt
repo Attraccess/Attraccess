@@ -47,6 +47,7 @@ add_executable(display-theme-host
     card_flows.cpp
     background_and_list.cpp
     resource_details.cpp
+    demo_form_options.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"
     "${FIRMWARE_DIR}/src/display/theme.cpp"

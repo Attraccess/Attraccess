@@ -241,4 +241,5 @@ void testDemoResourceListLocales(Renderer &renderer);
 void testCatalogLocales(Renderer &renderer);
 void testPowerOffLocales(Renderer &renderer);
 void testFormAndProjectLocaleRefresh(Renderer &renderer);
+void testDemoMaterialCaptions(Renderer &renderer);
 void testFirmwareUpdateLocales(Renderer &renderer);

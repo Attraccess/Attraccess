@@ -1,6 +1,7 @@
 #include "api/demo/websocket.hpp"
 #include "profile_store.hpp"
 #include "state/state.hpp"
+#include "display/demoFormOptions.hpp"
 
 #include <cassert>
 #include <filesystem>
@@ -48,6 +49,15 @@ int main()
     assert(refreshedOptions == initialOptions);
     assert(refreshedField["value"] == "Holz");
     assert(refreshedField["description"] == "Workpiece material");
+    const char *captions[] = {"Aluminium", "Wood", "Plastic", "Brass", "Steel"};
+    assert(refreshedField["options"].size() == 5);
+    for (uint8_t i = 0; i < 5; ++i) {
+        const auto caption = FirmwareI18n::demoMaterialCaption(
+            received["data"]["payload"]["resourceId"].as<uint32_t>(),
+            received["data"]["payload"]["formId"].as<uint32_t>(),
+            refreshedField["id"].as<uint32_t>(), refreshedField["options"][i].as<std::string>());
+        assert(caption && FirmwareI18n::Text(*caption).render("en") == captions[i]);
+    }
     exchange(submit);
     assert(received["data"]["payload"]["valid"] == true);
     exchange(getFields);
