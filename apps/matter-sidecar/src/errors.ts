@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ERROR_STATUS, ErrorEnvelope, SUPPORTED_RELEASE, type MatterError } from '@attraccess/matter-contract';
 import type { IncomingHttpHeaders } from 'node:http';
-import { CompatibilityHeaders, Id } from '@attraccess/matter-contract';
+import { CompatibilityHeaders, Id, Release } from '@attraccess/matter-contract';
 
 type Details = MatterError['error']['details'];
 export class ProtocolError extends Error {
@@ -45,7 +45,10 @@ export function checkCompatibility(headers: IncomingHttpHeaders, ownRelease = SU
   if (!Id.safeParse(headers['x-request-id']).success)
     throw new ProtocolError('VALIDATION_ERROR', 'A UUID x-request-id header is required.');
   if (!CompatibilityHeaders.safeParse(selected).success || ownRelease !== SUPPORTED_RELEASE.sidecar) {
-    const safeVersion = (value: unknown) => (typeof value === 'string' ? value.slice(0, 100) : null);
+    const safeVersion = (value: unknown) => {
+      const parsed = Release.safeParse(value);
+      return parsed.success ? parsed.data : null;
+    };
     throw new ProtocolError(
       'INCOMPATIBLE_RELEASE',
       'Unsupported Attraccess/plugin/sidecar release combination. Upgrade or downgrade each component to the supported combination.',

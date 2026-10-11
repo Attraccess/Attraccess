@@ -24,9 +24,16 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
     if (closing) return;
     closing = true;
     unsubscribe?.();
-    // Do not add an error message to an already overflowing queue.
-    if (ws.readyState === WebSocket.OPEN && ws.bufferedAmount < config.clientQueueBytes)
-      ws.send(JSON.stringify(error.envelope(requestId)));
+    if (ws.readyState === WebSocket.OPEN) {
+      const data = JSON.stringify(error.envelope(requestId));
+      if (ws.bufferedAmount + Buffer.byteLength(data) <= config.clientQueueBytes) {
+        ws.send(data);
+      } else {
+        // The envelope cannot fit; keep reconciliation guidance in the close frame.
+        error = stream.reconcile('slow_client');
+        code = 4009;
+      }
+    }
     ws.close(
       code,
       error.code === 'RECONCILIATION_REQUIRED' ? 'Reconciliation required: obtain a snapshot' : error.code,

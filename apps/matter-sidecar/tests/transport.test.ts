@@ -6,7 +6,7 @@ import { WebSocket } from 'ws';
 import { routes, ErrorEnvelope, INITIAL_CAPABILITIES, SUPPORTED_RELEASE } from '@attraccess/matter-contract';
 import { fixtures, fixtureId, versionFixture } from '@attraccess/matter-contract/testing';
 import { createApplication } from '../src/application.js';
-import { checkCompatibility } from '../src/errors.js';
+import { checkCompatibility, ProtocolError } from '../src/errors.js';
 import { attachClient } from '../src/websocket.js';
 import { EventStream } from '../src/stream.js';
 import { Config } from '../src/config.js';
@@ -161,6 +161,56 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
       );
     }
   });
+  it('redacts malformed releases in HTTP and rejected upgrade errors while preserving valid mismatches', async () => {
+    const { url } = await start();
+    for (const [header, component] of [
+      ['x-attraccess-version', 'attraccess'],
+      ['x-matter-plugin-version', 'plugin'],
+    ]) {
+      for (const value of ['password=review-only-secret', '999.0.0', '999.0.0-rc.1', '1'.repeat(101), undefined]) {
+        const invalid = { ...headers };
+        if (value === undefined) delete invalid[header];
+        else invalid[header] = value;
+        const expected = value?.startsWith('999.') ? value : null;
+        const http = await fetch(url + '/v1/capabilities', { headers: invalid });
+        expect(http.status).toBe(409);
+        const httpBody = await http.text();
+        const ws = new WebSocket(url.replace('http:', 'ws:') + '/v1/events', { headers: invalid });
+        ws.on('error', () => undefined);
+        const upgradeBody = await new Promise<string>((resolve) => {
+          ws.once('unexpected-response', (_, response) => {
+            expect(response.statusCode).toBe(409);
+            let body = '';
+            response.on('data', (bytes) => (body += bytes.toString()));
+            response.on('end', () => {
+              ws.terminate();
+              resolve(body);
+            });
+          });
+        });
+        for (const body of [httpBody, upgradeBody]) {
+          const result = ErrorEnvelope.parse(JSON.parse(body));
+          expect(result.error.code).toBe('INCOMPATIBLE_RELEASE');
+          expect(result.error.details.received).toEqual({ ...SUPPORTED_RELEASE, [component]: expected });
+          expect(result.error.details.supported).toEqual([SUPPORTED_RELEASE]);
+          expect(result.error.message).toContain('Upgrade or downgrade');
+          expect(body).not.toContain('review-only-secret');
+        }
+      }
+    }
+    for (const [release, expected] of [
+      ['password=review-only-secret', null],
+      ['999.0.0', '999.0.0'],
+    ] as const) {
+      try {
+        checkCompatibility(headers, release);
+        throw new Error('Expected a release rejection');
+      } catch (error) {
+        if (!(error instanceof ProtocolError)) throw error;
+        expect(error.envelope(fixtureId).error.details.received).toEqual({ ...SUPPORTED_RELEASE, sidecar: expected });
+      }
+    }
+  });
   it('replays stable events, switches to live delivery, and repeats reconnect cursors safely', async () => {
     const { app, url } = await start();
     const cursor = app.stream.watermark;
@@ -250,6 +300,71 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     expect(ws.close).toHaveBeenCalledWith(4009, expect.stringContaining('Reconciliation'));
     expect(ws.send).not.toHaveBeenCalled();
     handlers.close();
+  });
+  it.each([
+    { bufferedAmount: 0, clientQueueBytes: 128, overflow: true },
+    { bufferedAmount: 400, clientQueueBytes: 512, overflow: true },
+    { bufferedAmount: 100, clientQueueBytes: 512, overflow: false },
+    { bufferedAmount: 100, clientQueueBytes: 'exact', overflow: false },
+  ] as const)('bounds error delivery with queue pressure $bufferedAmount/$clientQueueBytes', (testCase) => {
+    vi.useFakeTimers();
+    try {
+      const handlers: Record<string, (...args: unknown[]) => void> = {};
+      const ws = {
+        readyState: WebSocket.OPEN,
+        bufferedAmount: testCase.bufferedAmount,
+        on: (name: string, fn: (...args: unknown[]) => void) => (handlers[name] = fn),
+        once: (name: string, fn: (...args: unknown[]) => void) => {
+          const previous = handlers[name];
+          handlers[name] = (...args) => {
+            previous?.(...args);
+            fn(...args);
+          };
+        },
+        send: vi.fn((data: string) => (ws.bufferedAmount += Buffer.byteLength(data))),
+        close: vi.fn(),
+        terminate: vi.fn(),
+      };
+      const errorBytes = Buffer.byteLength(
+        JSON.stringify(new ProtocolError('VALIDATION_ERROR', 'Malformed JSON WebSocket message.').envelope(fixtureId)),
+      );
+      const clientQueueBytes =
+        testCase.clientQueueBytes === 'exact' ? testCase.bufferedAmount + errorBytes : testCase.clientQueueBytes;
+      attachClient(
+        ws as unknown as WebSocket,
+        fixtureId,
+        new EventStream(),
+        Config.parse({ clientQueueBytes, shutdownMs: 100 }),
+      );
+      handlers.message(Buffer.from('invalid-json'), false);
+      expect(ws.bufferedAmount).toBeLessThanOrEqual(clientQueueBytes);
+      if (testCase.overflow) {
+        expect(ws.send).not.toHaveBeenCalled();
+        expect(ws.close).toHaveBeenCalledWith(4009, 'Reconciliation required: obtain a snapshot');
+      } else {
+        expect(ws.send).toHaveBeenCalledOnce();
+        expect(ErrorEnvelope.parse(JSON.parse(ws.send.mock.calls[0][0])).error.code).toBe('VALIDATION_ERROR');
+        expect(ws.close).toHaveBeenCalledWith(4009, 'VALIDATION_ERROR');
+      }
+      handlers.message(Buffer.from('invalid-json'), false);
+      expect(ws.close).toHaveBeenCalledOnce();
+      vi.advanceTimersByTime(100);
+      expect(ws.terminate).toHaveBeenCalledOnce();
+      handlers.close();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('closes a real WebSocket with reconciliation guidance when its error cannot fit', async () => {
+    const { url } = await start({ clientQueueBytes: 128 });
+    const { ws, messages } = await connect(url);
+    const closed = once(ws, 'close');
+    ws.send('invalid-json');
+    const [code, reason] = await closed;
+    expect(code).toBe(4009);
+    expect(reason.toString()).toBe('Reconciliation required: obtain a snapshot');
+    expect(messages).toEqual([]);
   });
   it('bounds WebSocket messages and rejects chunked oversized REST uploads', async () => {
     const { url } = await start({ payloadBytes: 512 });
