@@ -488,6 +488,7 @@ private:
     void onUnauthorized(JsonObject data);
     void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
+    void onServerTime(JsonVariantConst serverTime);
     void sendFirmwareInfo();
 
     // Persisted crash/boot diagnostics upload (ATT-474). On a successful

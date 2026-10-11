@@ -227,6 +227,7 @@ void testCard(Renderer &renderer, const std::string &name, const char *writing, 
 void testSupervision(Renderer &renderer);
 void testPin(Renderer &renderer);
 void testBackgroundScreens(Renderer &renderer);
+void testWallClock(Renderer &renderer);
 void testAuthenticatedList(Renderer &renderer);
 void testUsageStatsExpiry(Renderer &renderer);
 void testIntroducerDetails(Renderer &renderer);

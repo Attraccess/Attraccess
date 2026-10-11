@@ -156,9 +156,49 @@ describe('AttractapGateway', () => {
 
       await fixture.gateway.onHeartbeat(socket);
 
-      expect((socket as unknown as { send: jest.Mock }).send).toHaveBeenCalledWith(
-        JSON.stringify({ event: 'HEARTBEAT' }),
+      const send = (socket as unknown as { send: jest.Mock }).send;
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(send.mock.calls[0][0])).toMatchObject({ event: 'HEARTBEAT' });
+    });
+
+    it('includes the server clock for the reader wall clock', async () => {
+      jest.useFakeTimers({ now: new Date('2026-10-10T12:32:00Z') });
+      try {
+        const socket = fixture.createMockSocket({ id: 'hb-4', readerId: 7 });
+
+        await fixture.gateway.onHeartbeat(socket);
+
+        const reply = JSON.parse((socket as unknown as { send: jest.Mock }).send.mock.calls[0][0]);
+        expect(reply.serverTime).toEqual({
+          epochMs: Date.parse('2026-10-10T12:32:00Z'),
+          // JSON represents a UTC offset of -0 as 0.
+          utcOffsetMinutes: -new Date('2026-10-10T12:32:00Z').getTimezoneOffset() || 0,
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('returns public clock metadata without authenticating the reader or granting resource access', async () => {
+      const socket = fixture.createMockSocket({ id: 'hb-public', readerId: null });
+      const stateBefore = { ...socket.state };
+      const resources = jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket');
+
+      await fixture.gateway.onHeartbeat(socket);
+
+      const send = (socket as unknown as { send: jest.Mock }).send;
+      const reply = JSON.parse(send.mock.calls[0][0]);
+      expect(reply).toMatchObject({ event: 'HEARTBEAT', serverTime: { epochMs: expect.any(Number) } });
+      expect(socket.readerId).toBeNull();
+      expect(socket.state).toEqual(stateBefore);
+      expect(fixture.attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
+      expect(resources).not.toHaveBeenCalled();
+      await fixture.gateway.onClientEvent(
+        new AttractapEvent(AttractapEventType.REQUEST_RESOURCE_LIST, {}).data,
+        socket,
       );
+      expect(resources).not.toHaveBeenCalled();
+      expect(send).toHaveBeenCalledTimes(1);
     });
   });
 

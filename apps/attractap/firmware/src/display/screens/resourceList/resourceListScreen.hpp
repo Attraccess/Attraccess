@@ -28,6 +28,8 @@ public:
     void showSuccessToast(const char *message);
 private:
     lv_obj_t *screen = nullptr, *logo = nullptr, *loginContainer = nullptr, *resourceContainer = nullptr, *footer = nullptr;
+    lv_obj_t *clockHeader = nullptr, *clockTime = nullptr, *clockWeekday = nullptr, *clockDate = nullptr;
+    int64_t shownClockMinute = -2;
     SessionHeader sessionHeader;
     ActionOverlay overlay;
     API::ResourceList cachedResourceList{};
@@ -39,6 +41,8 @@ private:
     std::function<void(const API::ResourceBrief &, ResourceListAction)> actionCallback;
     std::function<void()> logoutCallback;
     void renderRows();
+    void createClockHeader();
+    void updateClockHeader();
     void addResourceListItem(const API::ResourceBrief &resource);
     struct EventData { ResourceListScreen *self; uint32_t id; bool action; };
     static void onClicked(lv_event_t *event);

@@ -192,7 +192,10 @@ describe('AttractapAuthHandler', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.READER_AUTHENTICATED,
-            payload: { name: 'Reader A' },
+            payload: {
+              name: 'Reader A',
+              serverTime: { epochMs: expect.any(Number), utcOffsetMinutes: expect.any(Number) },
+            },
           }),
         }),
       );

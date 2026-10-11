@@ -20,6 +20,7 @@ int main(int argc, char **argv)
             Fixtures::network = {};
             Fixtures::websocket = {};
             Fixtures::api = {};
+            Fixtures::wallClock = {};
             const auto errorsBefore = lvglErrors;
             try {
                 run();
@@ -39,6 +40,7 @@ int main(int argc, char **argv)
         test("render/production-logo-bytes", [&] { testLogos(renderer); });
         test("screen/att-880-authenticated-list", [&] { testAuthenticatedList(renderer); });
         test("screen/restored-backgrounds", [&] { testBackgroundScreens(renderer); });
+        test("screen/wall-clock", [&] { testWallClock(renderer); });
         test("screen/boot", [&] { testBoot(renderer); });
         test("screen/init", [&] { testInit(renderer); });
         test("screen/enrollment", [&] { testCard<EnrollmentScreen>(renderer, "enrollment", "Karte wird beschrieben...\nbitte nicht bewegen", "Karte registriert!"); });

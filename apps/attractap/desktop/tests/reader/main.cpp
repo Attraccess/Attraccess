@@ -11,6 +11,7 @@ int main(int argc, char **argv)
     workflow.testSupervisionAndCorrelation();
     workflow.testIdentityAndPendingAuthentication();
     workflow.testSessionSummary();
+    workflow.testWallClock();
     if (timeouts) workflow.testTimeouts();
     std::filesystem::remove_all(workflow.storage);
     std::cout << "PASS ATT-880 production application journeys\n";
