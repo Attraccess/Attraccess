@@ -245,6 +245,10 @@ enum class Message {
     DemoMaterialPlastic,
     DemoMaterialBrass,
     DemoMaterialSteel,
+    Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday,
+    January, February, March, April, May, June,
+    July, August, September, October, November, December,
+    ClockDate, ClockDateWithYear, ClockDayDate, TapRfidCard,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -487,6 +491,29 @@ inline constexpr Entry catalog[] = {
     {Message::DemoMaterialPlastic, "Kunststoff", "Plastic"},
     {Message::DemoMaterialBrass, "Messing", "Brass"},
     {Message::DemoMaterialSteel, "Stahl", "Steel"},
+    {Message::Sunday, "Sonntag", "Sunday"},
+    {Message::Monday, "Montag", "Monday"},
+    {Message::Tuesday, "Dienstag", "Tuesday"},
+    {Message::Wednesday, "Mittwoch", "Wednesday"},
+    {Message::Thursday, "Donnerstag", "Thursday"},
+    {Message::Friday, "Freitag", "Friday"},
+    {Message::Saturday, "Samstag", "Saturday"},
+    {Message::January, "Januar", "January"},
+    {Message::February, "Februar", "February"},
+    {Message::March, "März", "March"},
+    {Message::April, "April", "April"},
+    {Message::May, "Mai", "May"},
+    {Message::June, "Juni", "June"},
+    {Message::July, "Juli", "July"},
+    {Message::August, "August", "August"},
+    {Message::September, "September", "September"},
+    {Message::October, "Oktober", "October"},
+    {Message::November, "November", "November"},
+    {Message::December, "Dezember", "December"},
+    {Message::ClockDate, "{0}. {1}", "{0} {1}"},
+    {Message::ClockDateWithYear, "{0} {1}", "{0} {1}"},
+    {Message::ClockDayDate, "{0}, {1}", "{0}, {1}"},
+    {Message::TapRfidCard, "RFID-Karte auflegen", "Tap RFID card"},
 };
 
 inline const char *messageText(Message id, const std::string &locale) {

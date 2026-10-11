@@ -50,7 +50,7 @@ import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 
 import { WebsocketService } from './websocket.service';
-
+import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
 
 import { randomBytes } from 'crypto';
@@ -373,7 +373,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
     try {
-      (socket as unknown as { send: (data: string) => void }).send(JSON.stringify({ event: 'HEARTBEAT' }));
+      (socket as unknown as { send: (data: string) => void }).send(readerHeartbeat());
     } catch (error) {
       this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
     }

@@ -1,4 +1,5 @@
 #include "api/demo/websocket.hpp"
+#include "display/fixtures.hpp"
 #include "profile_store.hpp"
 #include "state/state.hpp"
 #include "display/demoFormOptions.hpp"
@@ -17,16 +18,40 @@ int main()
     DemoStore::setup();
     State::setUserLanguage(false);
     State::setDefaultLanguage("de");
+    SdlDisplay display;
+    Display::setup(display);
     DemoWebsocket transport;
     JsonDocument received;
+    JsonDocument authenticated;
     transport.setMessageCallbackRaw([&](const char *message, size_t length) {
         assert(deserializeJson(received, message, length) == DeserializationError::Ok);
+        if (received["data"]["type"] == "READER_AUTHENTICATED") {
+            authenticated.set(received);
+            Display::setDeviceName(received["data"]["payload"]["name"].as<std::string>());
+        }
     });
     transport.loop(); // Consume the initial authentication request before form traffic.
     auto exchange = [&](const char *message) {
         transport.sendMessage(std::string(message));
         transport.loop();
     };
+    exchange(R"({"data":{"type":"READER_AUTHENTICATE","payload":{}}})");
+    assert(received["data"]["payload"]["readerName"] == "Demo Device");
+    assert(received["data"]["payload"]["resources"][0]["name"] == "CNC Router");
+    assert(authenticated["data"]["payload"]["language"] == "en");
+    assert(authenticated["data"]["payload"]["name"] == "Demo Device");
+    Display::loop(); lv_timer_handler();
+    assert(findLabel(lv_layer_top(), "Demo Device"));
+    for (const char *language : {"de", "en"}) {
+        State::setDefaultLanguage(language);
+        exchange(R"({"data":{"type":"REQUEST_RESOURCE_LIST","payload":{}}})");
+        const char *expectedName = std::string(language) == "en" ? "Demo Device" : "Demo Gerät";
+        assert(received["data"]["payload"]["readerName"] == expectedName);
+        Display::setDeviceName(received["data"]["payload"]["readerName"].as<std::string>());
+        Display::loop(); lv_timer_handler();
+        assert(findLabel(lv_layer_top(), expectedName));
+    }
+    State::setDefaultLanguage("de");
     constexpr const char *getFields = R"({"data":{"type":"RESOURCE_USAGE_FORM_GET_FIELDS","payload":{"resourceId":1,"action":"start","formId":10,"offset":0}}})";
     constexpr const char *submit = R"({"data":{"type":"RESOURCE_USAGE_FORM_SUBMIT_PAGE","payload":{"resourceId":1,"action":"start","formId":10,"offset":0,"answers":[{"fieldId":101,"value":"Holz"}]}}})";
 
@@ -63,6 +88,10 @@ int main()
     exchange(getFields);
     assert(received["data"]["payload"]["fields"][0]["value"] == "Holz");
 
+    Display::setDeviceName("Operator Gerät");
+    State::setDefaultLanguage("de"); Display::loop(); lv_timer_handler();
+    State::setDefaultLanguage("en"); Display::loop(); lv_timer_handler();
+    assert(findLabel(lv_layer_top(), "Operator Gerät"));
     KVStore::setHostProfile(nullptr);
     std::filesystem::remove_all(root);
 }

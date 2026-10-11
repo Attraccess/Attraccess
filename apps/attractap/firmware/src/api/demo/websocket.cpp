@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "fixtures.hpp"
+#include "clock.hpp"
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -18,6 +19,7 @@
 
 void DemoWebsocket::setup()
 {
+    _clockInitialized = DemoClock::initialize();
     // Mark the mock as "connected" so the application state machine can
     // advance past the init screen without any real network.
     esp_ip4_addr_t fakeIp = {0};
@@ -28,6 +30,9 @@ void DemoWebsocket::setup()
 
 void DemoWebsocket::loop()
 {
+    // Local demo timezone rules may change at DST boundaries while running.
+    // Only publish updates after the demo clock was initialized successfully.
+    if (_clockInitialized) DemoClock::refresh();
     if (!_initDone)
     {
         _initDone = true;
@@ -194,20 +199,26 @@ void DemoWebsocket::respondAuthenticated()
     StaticJsonDocument<256> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "READER_AUTHENTICATED";
-    doc["data"]["payload"]["name"] = "Demo Gerät";
+    doc["data"]["payload"]["name"] = DemoLocalization::readerName(true);
     // Keep the standalone demo's unauthenticated screens in English by default.
     doc["data"]["payload"]["language"] = "en";
+    // Demo time is the device's own clock in its configured timezone.
+    const time_t now = time(nullptr);
+    doc["data"]["payload"]["serverTime"]["epochMs"] = static_cast<int64_t>(now) * 1000;
+    doc["data"]["payload"]["serverTime"]["utcOffsetMinutes"] = DemoClock::utcOffsetMinutes(now);
 
     char buf[256];
     size_t n = serializeJson(doc, buf, sizeof(buf));
     if (n > 0)
         enqueue(std::string(buf, n));
 
-    respondResourceList();
+    // These responses are queued before the API applies the authentication locale.
+    respondResourceList(0, "en");
 }
 
-void DemoWebsocket::respondResourceList(uint32_t requestId)
+void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language)
 {
+    const bool english = language ? std::string(language) == "en" : State::getActiveLanguage() == "en";
     StaticJsonDocument<3072> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_LIST";
@@ -215,7 +226,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
     doc["data"]["payload"]["revision"] = _resourceListMsgId;
     doc["data"]["payload"]["requestId"] = requestId;
     doc["data"]["payload"]["authenticatedUsername"] = _currentUser;
-    doc["data"]["payload"]["readerName"] = "Demo Gerät";
+    doc["data"]["payload"]["readerName"] = DemoLocalization::readerName(english);
 
     // Introducers = enrolled admin cards (they can introduce others). Shown in
     // the "not introduced" panel when a no-permission card taps a resource.
@@ -237,8 +248,8 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
         obj["id"] = r.id;
         // DemoStore's immutable resources are authored examples, not supplied
         // server names. Real reader resource names remain literal in the API.
-        obj["name"] = DemoLocalization::resourceName(r.id, State::getActiveLanguage() == "en");
-        obj["description"] = State::getActiveLanguage() == "en" ? "Demo resource" : "Demo Ressource";
+        obj["name"] = DemoLocalization::resourceName(r.id, english);
+        obj["description"] = english ? "Demo resource" : "Demo Ressource";
         obj["type"] = (r.type == 1) ? "door" : "machine";
         if (!_currentUser.empty()) {
             obj["hasIntroduction"] = _currentHasIntroduction;
@@ -263,7 +274,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
             JsonObject aus = obj["activeUsageSession"].to<JsonObject>();
             aus["user"]["username"] = session.user;
             aus["startTime"] = toIso8601(session.startEpoch);
-            aus["startTimeUtcOffsetMinutes"] = 0;
+            aus["startTimeUtcOffsetMinutes"] = DemoClock::utcOffsetMinutes(session.startEpoch);
         }
     }
 

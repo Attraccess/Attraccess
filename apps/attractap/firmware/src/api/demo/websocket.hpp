@@ -38,6 +38,7 @@ private:
     std::function<void(const char *, size_t)> _messageCallback;
 
     bool _initDone = false;
+    bool _clockInitialized = false;
     // Messages queued to be delivered to the API on the next loop() call.
     std::queue<std::string> _inbound;
 
@@ -68,7 +69,7 @@ private:
     void enqueue(const std::string &msg);
     void processOutbound(const char *data, size_t len);
     void respondAuthenticated();
-    void respondResourceList(uint32_t requestId = 0);
+    void respondResourceList(uint32_t requestId = 0, const char *language = nullptr);
     void respondCardAuth(const std::string &uidHex, uint32_t resourceId);
     void respondActionSuccess(const std::string &type);
 

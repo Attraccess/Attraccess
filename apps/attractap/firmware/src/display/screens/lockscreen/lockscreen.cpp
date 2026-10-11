@@ -4,6 +4,7 @@
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../theme.hpp"
 #include "../../shared/headerButton.hpp"
+#include "../../shared/wallClockText.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 #include <string>
 
@@ -88,8 +89,92 @@ void Lockscreen::init()
     FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Text::literal("???"));
     lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    this->initWallClock();
+    // Cached screens can return without resource updates or a loop tick.
+    // Refresh at activation so the first rendered frame has the current time.
+    lv_obj_add_event_cb(this->screen, [](lv_event_t *event) {
+        static_cast<Lockscreen *>(lv_event_get_user_data(event))->updateWallClock();
+    }, LV_EVENT_SCREEN_LOAD_START, this);
+
     lv_obj_update_layout(this->screen);
     this->updateUsageInfo();
+    this->updateWallClock();
+}
+
+// Once the time is known, the idle lockscreen doubles as a wall clock and the
+// sign-in sentence shrinks to a prompt at the bottom. Until then it stays as is.
+void Lockscreen::initWallClock()
+{
+    this->clockContainer = lv_obj_create(this->screen);
+    lv_obj_remove_style_all(this->clockContainer);
+    lv_obj_set_size(this->clockContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_align(this->clockContainer, LV_ALIGN_TOP_MID, 0, 52);
+    lv_obj_set_flex_flow(this->clockContainer, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(this->clockContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(this->clockContainer, -4, 0);
+    lv_obj_remove_flag(this->clockContainer, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(this->clockContainer, LV_OBJ_FLAG_SCROLLABLE);
+
+    this->clockTimeLabel = lv_label_create(this->clockContainer);
+    lv_obj_set_style_text_font(this->clockTimeLabel, &attractap_font_montserrat_digits_88, 0);
+    lv_obj_set_style_text_color(this->clockTimeLabel, DisplayTheme::text(), 0);
+
+    this->clockDateLabel = lv_label_create(this->clockContainer);
+    lv_obj_set_style_text_font(this->clockDateLabel, &attractap_font_montserrat_latin1_20, 0);
+    lv_obj_set_style_text_color(this->clockDateLabel, DisplayTheme::muted(), 0);
+
+    this->cardPrompt = lv_obj_create(this->screen);
+    lv_obj_remove_style_all(this->cardPrompt);
+    lv_obj_set_size(this->cardPrompt, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_align(this->cardPrompt, LV_ALIGN_BOTTOM_MID, 0, -14);
+    lv_obj_set_flex_flow(this->cardPrompt, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(this->cardPrompt, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(this->cardPrompt, 10, 0);
+    lv_obj_set_style_pad_ver(this->cardPrompt, 12, 0);
+    lv_obj_set_style_pad_hor(this->cardPrompt, 18, 0);
+    lv_obj_set_style_radius(this->cardPrompt, DisplayTheme::Radius, 0);
+    lv_obj_set_style_bg_color(this->cardPrompt, DisplayTheme::surface(), 0);
+    lv_obj_set_style_bg_opa(this->cardPrompt, LV_OPA_90, 0);
+    lv_obj_remove_flag(this->cardPrompt, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(this->cardPrompt, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *arrow = lv_label_create(this->cardPrompt);
+    FirmwareI18n::setLabel(arrow, FirmwareI18n::Text::literal(LV_SYMBOL_RIGHT));
+    lv_obj_set_style_text_font(arrow, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(arrow, DisplayTheme::primary(), 0);
+
+    lv_obj_t *promptText = lv_label_create(this->cardPrompt);
+    FirmwareI18n::setLabel(promptText, FirmwareI18n::Message::TapRfidCard);
+    lv_obj_set_style_text_font(promptText, &attractap_font_montserrat_latin1_20, 0);
+    lv_obj_set_style_text_color(promptText, DisplayTheme::text(), 0);
+
+    this->shownClockMinute = -2;
+}
+
+void Lockscreen::updateWallClock()
+{
+    if (!this->clockContainer)
+    {
+        return;
+    }
+    const auto now = WallClock::now();
+    const auto minute = WallClockText::minuteKey(now);
+    if (minute == this->shownClockMinute)
+    {
+        return;
+    }
+    this->shownClockMinute = minute;
+
+    lv_obj_set_flag(this->signInPromptLabel, LV_OBJ_FLAG_HIDDEN, now.valid);
+    lv_obj_set_flag(this->clockContainer, LV_OBJ_FLAG_HIDDEN, !now.valid);
+    lv_obj_set_flag(this->cardPrompt, LV_OBJ_FLAG_HIDDEN, !now.valid);
+    if (!now.valid)
+    {
+        return;
+    }
+    FirmwareI18n::setDynamicLabel(this->clockTimeLabel, WallClockText::clock(now).c_str());
+    FirmwareI18n::setLabel(this->clockDateLabel, FirmwareI18n::Text::format(
+        FirmwareI18n::Message::ClockDayDate, {WallClockText::weekday(now), WallClockText::date(now, false)}));
 }
 
 lv_obj_t *Lockscreen::getScreen()
@@ -109,6 +194,7 @@ void Lockscreen::loop()
         // its status as well as the prompt when the active locale changes.
         this->updateUsageInfo();
     }
+    this->updateWallClock();
 }
 
 std::string Lockscreen::getName()
@@ -135,6 +221,9 @@ void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool is
     this->isUnderMaintenance = isUnderMaintenance;
 
     this->updateUsageInfo();
+    // Resource details are applied before navigating to this cached screen.
+    // Refresh now so its first frame does not wait for the next loop tick.
+    this->updateWallClock();
 }
 
 void Lockscreen::updateUsageInfo()
@@ -184,4 +273,9 @@ void Lockscreen::destroy()
     overlay.detach();
     this->resourceNameLabel = nullptr;
     this->usageInfoLabel = nullptr;
+    this->signInPromptLabel = nullptr;
+    this->clockContainer = nullptr;
+    this->clockTimeLabel = nullptr;
+    this->clockDateLabel = nullptr;
+    this->cardPrompt = nullptr;
 }

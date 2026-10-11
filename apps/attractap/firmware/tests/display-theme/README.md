@@ -60,6 +60,7 @@ warnings may also appear in a host build.
 | Keyboard | Real LVGL keyboard and button matrix, automatic and helper styles, pressed/checked/disabled item styles; real per-key controls and framebuffer fill samples |
 | Logos | Both production descriptors and embedded RGB565+A8 files, word alignment, byte counts, no recolor, every fully opaque/transparent pixel against the rendered framebuffer |
 | Restored backgrounds | RAL5020 RGB565 artwork on production lockscreen (available/in-use/maintenance), resource list and no-resources screens; alignment, byte count, unrecolored framebuffer samples and resource selection callback |
+| Wall clock | Lockscreen clock/date and card prompt versus unknown time, minute and month updates, signed-out resource list header replacing the logo |
 | Boot | Production title and deterministic firmware info |
 | Init | Pending network, connected WLAN/certificate search warning, authenticated API state, settings event callback |
 | NFC Enrollment / Reset | Waiting, writing, success, error; cached username; phase colors; cancel visibility/callback; deterministic countdown and expiry |

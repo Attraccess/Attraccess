@@ -2,6 +2,7 @@
 #include "resourceListScreen.hpp"
 #include "../../images/logo_40h.hpp"
 #include "../../images/lockscreen_background_image.hpp"
+#include "../../shared/wallClockText.hpp"
 
 namespace {
 lv_obj_t *text(lv_obj_t *parent, const FirmwareI18n::Text &value, const lv_font_t *font, lv_color_t color) {
@@ -27,6 +28,12 @@ void ResourceListScreen::init() {
     logo = lv_image_create(screen);
     lv_image_set_src(logo, &logo_40h);
     lv_obj_set_size(logo, lv_pct(100), 46);
+    createClockHeader();
+    // Cached screens may return without any resource or user changes. Refresh
+    // at activation, before LVGL renders, rather than waiting for loop().
+    lv_obj_add_event_cb(screen, [](lv_event_t *event) {
+        static_cast<ResourceListScreen *>(lv_event_get_user_data(event))->updateClockHeader();
+    }, LV_EVENT_SCREEN_LOAD_START, this);
     loginContainer = sessionHeader.create(screen, [this] {
         if (!busy && logoutCallback) logoutCallback();
     });
@@ -63,8 +70,9 @@ void ResourceListScreen::setAuthenticatedUser(const std::string &value) {
 
 void ResourceListScreen::renderRows() {
     if (!screen) return;
-    lv_obj_set_flag(logo, LV_OBJ_FLAG_HIDDEN, !username.empty());
     lv_obj_set_flag(loginContainer, LV_OBJ_FLAG_HIDDEN, username.empty());
+    shownClockMinute = -2;
+    updateClockHeader();
     const auto scroll = lv_obj_get_scroll_y(resourceContainer);
     lv_obj_clean(resourceContainer);
     for (uint16_t i = 0; i < cachedResourceList.count; ++i) addResourceListItem(cachedResourceList.items[i]);
@@ -172,8 +180,52 @@ void ResourceListScreen::showSuccessToast(const FirmwareI18n::Text &message) {
     successUntil = millis() + 3000;
     loop();
 }
+// Signed out, the logo row becomes a wall clock once the time is known.
+void ResourceListScreen::createClockHeader() {
+    clockHeader = lv_obj_create(screen);
+    lv_obj_remove_style_all(clockHeader);
+    lv_obj_set_size(clockHeader, lv_pct(100), 46);
+    lv_obj_remove_flag(clockHeader, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(clockHeader, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(clockHeader, LV_OBJ_FLAG_HIDDEN);
+    clockTime = lv_label_create(clockHeader);
+    lv_obj_set_style_text_font(clockTime, &attractap_font_montserrat_digits_56, 0);
+    lv_obj_set_style_text_color(clockTime, DisplayTheme::text(), 0);
+    lv_obj_align(clockTime, LV_ALIGN_LEFT_MID, 0, 2);
+    auto *date = lv_obj_create(clockHeader);
+    lv_obj_remove_style_all(date);
+    lv_obj_remove_flag(date, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(date, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(date, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_align(date, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_set_flex_flow(date, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(date, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+    clockWeekday = lv_label_create(date);
+    lv_obj_set_style_text_font(clockWeekday, &attractap_font_montserrat_latin1_18, 0);
+    lv_obj_set_style_text_color(clockWeekday, DisplayTheme::text(), 0);
+    clockDate = lv_label_create(date);
+    lv_obj_set_style_text_font(clockDate, &attractap_font_montserrat_latin1_14, 0);
+    lv_obj_set_style_text_color(clockDate, DisplayTheme::muted(), 0);
+}
+
+void ResourceListScreen::updateClockHeader() {
+    if (!clockHeader) return;
+    const auto now = WallClock::now();
+    const auto minute = WallClockText::minuteKey(now);
+    if (minute == shownClockMinute) return;
+    shownClockMinute = minute;
+    const bool showClock = username.empty() && now.valid;
+    lv_obj_set_flag(logo, LV_OBJ_FLAG_HIDDEN, !username.empty() || showClock);
+    lv_obj_set_flag(clockHeader, LV_OBJ_FLAG_HIDDEN, !showClock);
+    if (!showClock) return;
+    FirmwareI18n::setDynamicLabel(clockTime, WallClockText::clock(now).c_str());
+    FirmwareI18n::setLabel(clockWeekday, WallClockText::weekday(now));
+    FirmwareI18n::setLabel(clockDate, WallClockText::date(now, true));
+}
+
 void ResourceListScreen::loop() {
     sessionHeader.update();
+    updateClockHeader();
     if (!footer) return;
     if (!successMessage.empty() && static_cast<int32_t>(successUntil - millis()) <= 0) successMessage.clear();
     setLabelTextIfChanged(footer, !successMessage.empty() ? successMessage : username.empty() ? FirmwareI18n::Message::TapNfcCardOrOpenAResource : FirmwareI18n::Message::ResourceOnTheLeftDetailsActionOnTheRight);
@@ -186,6 +238,7 @@ void ResourceListScreen::onScreenLeave() { overlay.hide(); }
 void ResourceListScreen::destroy() {
     if (screen) lv_obj_delete(screen);
     screen = logo = loginContainer = resourceContainer = footer = nullptr;
+    clockHeader = clockTime = clockWeekday = clockDate = nullptr;
     sessionHeader.detach();
     overlay.detach();
 }

@@ -50,7 +50,9 @@
   "screens/lockscreen/lockscreen.cpp": {
     "FirmwareI18n::Text::literal(\"???\")": "Language-neutral numeric placeholder or close-control mark.",
     "FirmwareI18n::Text::literal(this->username)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents.",
-    "FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents."
+    "FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName)": "Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents.",
+    "FirmwareI18n::Text::literal(LV_SYMBOL_RIGHT)": "Language-neutral arrow icon.",
+    "FirmwareI18n::setDynamicLabel(this->clockTimeLabel, WallClockText::clock(now).c_str())": "Numeric wall-clock time; date words and prompt use catalog messages."
   },
   "screens/lockscreen/lockscreen.hpp": {
     "FirmwareI18n::Text::literal(resourceName)": "Server-supplied resource name in the authentication overlay; preserve exact data."
@@ -118,7 +120,8 @@
   "screens/resourceList/resourceListScreen.cpp": {
     "FirmwareI18n::Text::literal(resource.activeUser)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
     "FirmwareI18n::Text::literal(resource.description)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
-    "FirmwareI18n::Text::literal(resource.name)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents."
+    "FirmwareI18n::Text::literal(resource.name)": "Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents.",
+    "FirmwareI18n::setDynamicLabel(clockTime, WallClockText::clock(now).c_str())": "Numeric wall-clock time; date words use catalog messages."
   },
   "screens/sessionSummary/sessionSummaryScreen.cpp": {
     "FirmwareI18n::Text::literal(\"Attractap\")": "Language-neutral product name.",
@@ -144,5 +147,9 @@
   "shared/sessionHeader.hpp": {
     "setDynamicLabelTextIfChanged(timeLabel, time.c_str())": "Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption.",
     "setDynamicLabelTextIfChanged(userLabel, username.c_str())": "Supplied user/resource/project/card name, form scope, description, flow caption or health reason; preserve exact data."
+  },
+  "shared/wallClockText.hpp": {
+    "FirmwareI18n::Text::literal(std::to_string(time.day))": "Calendar day number within a localized date caption.",
+    "FirmwareI18n::Text::literal(std::to_string(time.year))": "Calendar year number within a localized date caption."
   }
 }

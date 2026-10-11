@@ -2,6 +2,7 @@
 
 #include "state/state.hpp"
 #include <vector>
+#include "clock/wall_clock.hpp"
 
 namespace Fixtures
 {
@@ -16,4 +17,5 @@ inline State::ApiState api{};
 inline std::string activeLanguage = "de";
 inline std::vector<uint8_t> deletedDemoCardIndices;
 void resetDemoCards();
+inline WallClock::LocalTime wallClock{};
 }

@@ -184,7 +184,11 @@ describe('AttractapAuthHandler', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.READER_AUTHENTICATED,
-            payload: { name: 'Reader', language: 'en' },
+            payload: {
+              name: 'Reader',
+              language: 'en',
+              serverTime: { epochMs: expect.any(Number), utcOffsetMinutes: expect.any(Number) },
+            },
           }),
         }),
       );
@@ -296,7 +300,11 @@ describe('AttractapAuthHandler', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.READER_AUTHENTICATED,
-            payload: { name: 'Reader A', language: 'de' },
+            payload: {
+              name: 'Reader A',
+              language: 'de',
+              serverTime: { epochMs: expect.any(Number), utcOffsetMinutes: expect.any(Number) },
+            },
           }),
         }),
       );

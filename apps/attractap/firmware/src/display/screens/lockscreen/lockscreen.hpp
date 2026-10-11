@@ -39,6 +39,11 @@ private:
     lv_obj_t *usageInfoLabel = nullptr;
     lv_obj_t *signInPromptLabel = nullptr;
     std::string renderedLanguage;
+    lv_obj_t *clockContainer = nullptr;
+    lv_obj_t *clockTimeLabel = nullptr;
+    lv_obj_t *clockDateLabel = nullptr;
+    lv_obj_t *cardPrompt = nullptr;
+    int64_t shownClockMinute = -2;
 
     char resourceName[API::MAX_RESOURCE_NAME_LEN];
     char username[API::MAX_USERNAME_LEN];
@@ -46,4 +51,6 @@ private:
     bool isUnderMaintenance;
 
     void updateUsageInfo();
+    void initWallClock();
+    void updateWallClock();
 };

@@ -4,6 +4,11 @@
 
 namespace DemoLocalization
 {
+inline const char *readerName(bool english)
+{
+    return english ? "Demo Device" : "Demo Gerät";
+}
+
 inline const char *resourceName(unsigned id, bool english)
 {
     static constexpr const char *german[] = {"", "CNC Fraese", "3D Drucker", "Haupteingang"};
