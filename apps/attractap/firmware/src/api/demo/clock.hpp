@@ -6,6 +6,17 @@
 
 namespace DemoClock
 {
+    inline int32_t utcOffsetMinutes(time_t instant)
+    {
+        tm local{}, utc{};
+        if (!localtime_r(&instant, &local) || !gmtime_r(&instant, &utc)) return 0;
+        // Compare calendar fields for the same instant. Reinterpreting UTC
+        // with mktime can choose DST from the wrong side of a transition.
+        const int days = local.tm_year == utc.tm_year ? local.tm_yday - utc.tm_yday
+            : (local.tm_year < utc.tm_year ? -1 : 1);
+        return days * 1440 + (local.tm_hour - utc.tm_hour) * 60 + local.tm_min - utc.tm_min;
+    }
+
     inline void initialize()
     {
         // An unset ESP clock counts elapsed time from the Unix epoch. Compare
@@ -24,9 +35,6 @@ namespace DemoClock
         // Demo dates are trusted local presets, not network time samples.
         // Publish their timezone directly so historical presets remain visible.
         const time_t demoUtc = std::time(nullptr);
-        tm utc{};
-        gmtime_r(&demoUtc, &utc);
-        utc.tm_isdst = -1;
-        WallClock::onDemoTime(static_cast<int32_t>(difftime(demoUtc, mktime(&utc)) / 60));
+        WallClock::onDemoTime(utcOffsetMinutes(demoUtc));
     }
 }

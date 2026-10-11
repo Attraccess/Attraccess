@@ -198,11 +198,8 @@ void DemoWebsocket::respondAuthenticated()
     doc["data"]["payload"]["name"] = "Demo Gerät";
     // Demo time is the device's own clock in its configured timezone.
     const time_t now = time(nullptr);
-    tm utc{};
-    gmtime_r(&now, &utc);
-    utc.tm_isdst = -1;
-    doc["data"]["payload"]["serverTime"]["epochMs"] = static_cast<double>(now) * 1000;
-    doc["data"]["payload"]["serverTime"]["utcOffsetMinutes"] = static_cast<int>(difftime(now, mktime(&utc)) / 60);
+    doc["data"]["payload"]["serverTime"]["epochMs"] = static_cast<int64_t>(now) * 1000;
+    doc["data"]["payload"]["serverTime"]["utcOffsetMinutes"] = DemoClock::utcOffsetMinutes(now);
 
     char buf[256];
     size_t n = serializeJson(doc, buf, sizeof(buf));

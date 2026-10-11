@@ -82,4 +82,52 @@ int main()
     demo.sendMessage(R"({"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
     demo.loop();
     assert(last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["durationSeconds"].as<int>() == 60);
+
+    // Derive demo offsets from the original instant, including both sides of
+    // DST transitions, repeated local hours, and year rollover.
+    const struct
+    {
+        const char *timezone;
+        time_t instant;
+        int offset;
+    } presets[] = {
+        {"America/New_York", 1772953199, -300}, // Before spring forward
+        {"America/New_York", 1772953200, -240}, // After spring forward
+        {"America/New_York", 1793512799, -240}, // Before fall back
+        {"America/New_York", 1793512800, -300}, // After fall back
+        {"Europe/Berlin", 1774745999, 60},
+        {"Europe/Berlin", 1774746000, 120},
+        {"Europe/Berlin", 1792889999, 120},
+        {"Europe/Berlin", 1792890000, 60},
+        {"America/New_York", 1767225600, -300}, // Local date is in previous year
+        {"Asia/Kathmandu", 1767222000, 345},    // Local date is in next year
+        {"UTC", 1767225600, 0},
+    };
+    for (const auto &preset : presets)
+    {
+        setenv("TZ", preset.timezone, 1);
+        tzset();
+        TestClock::set(preset.instant);
+        tm expected{};
+        assert(localtime_r(&preset.instant, &expected));
+        const auto assertLocalClock = [&]()
+        {
+            const auto local = WallClock::now();
+            assert(local.valid && local.year == expected.tm_year + 1900);
+            assert(local.month == expected.tm_mon + 1 && local.day == expected.tm_mday);
+            assert(local.weekday == expected.tm_wday);
+            assert(local.hour == expected.tm_hour && local.minute == expected.tm_min);
+        };
+        demo.setup();
+        assert(time(nullptr) == preset.instant);
+        assertLocalClock();
+        demo.sendMessage(R"({"event":"EVENT","data":{"type":"READER_AUTHENTICATE"}})");
+        demo.loop();
+        const auto auth = last("READER_AUTHENTICATED");
+        const auto sample = auth["data"]["payload"]["serverTime"];
+        assert(sample["epochMs"].as<int64_t>() == preset.instant * 1000);
+        assert(sample["utcOffsetMinutes"].as<int>() == preset.offset);
+        WallClock::onServerTime(sample["epochMs"].as<int64_t>(), sample["utcOffsetMinutes"].as<int>());
+        assertLocalClock();
+    }
 }
