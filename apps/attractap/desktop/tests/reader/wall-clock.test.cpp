@@ -1,5 +1,6 @@
 #include "workflow.hpp"
 #include "display/shared/wallClockText.hpp"
+#include "../controlled-clock.hpp"
 
 namespace
 {
@@ -56,6 +57,10 @@ void ReaderWorkflow::testWallClock()
 
     // Implausible samples (old clocks, impossible offsets) are ignored.
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":1000,"utcOffsetMinutes":60}})");
+    // JSON numbers can exceed int64_t, including the rounded upper boundary.
+    for (const char *epoch : {"1e30", "-1e30", "9223372036854775808", "-9223372036854777856", "1e999"})
+        server.incoming.push(std::string(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)") + epoch +
+                             R"(,"utcOffsetMinutes":60}})");
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)" +
                          std::to_string(static_cast<int64_t>(time(nullptr)) * 1000) + R"(,"utcOffsetMinutes":900}})");
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":{"epochMs":)" +
@@ -63,6 +68,27 @@ void ReaderWorkflow::testWallClock()
                          R"(,"utcOffsetMinutes":-2147483648}})");
     pump();
     assert(showsClock(lv_screen_active(), -210, before));
+
+    // A powered outage keeps ticking with the last server offset. Reconnection
+    // changes the offset on the first online heartbeat, without changing UTC.
+    State::setWebsocketState(false, "reader.test", 80, false);
+    pump();
+    const auto disconnectedUtc = time(nullptr);
+    TestClock::set(disconnectedUtc + 3600);
+    before = expectedClock(-210);
+    pump();
+    assert(!State::getApiState().authenticated);
+    // The existing router shows InitScreen offline; clock state still advances.
+    assert(WallClock::now().valid);
+    assert(WallClockText::clock(WallClock::now()) == expectedClock(-210));
+    State::setWebsocketState(true, "reader.test", 80, false);
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader"})");
+    server.incoming.push(R"({"event":"HEARTBEAT","serverTime":)" + serverTime(60) + "}");
+    before = expectedClock(60);
+    list(false);
+    assert(State::getApiState().authenticated);
+    assert(time(nullptr) >= disconnectedUtc + 3600 && time(nullptr) < disconnectedUtc + 3605);
+    assert(showsClock(lv_screen_active(), 60, before));
 
     // The idle lockscreen becomes the wall clock; the sign-in sentence gives way to a prompt.
     // A loaded lockscreen must be current on its first frame after selection,
@@ -74,7 +100,7 @@ void ReaderWorkflow::testWallClock()
     application.loop();
     lv_timer_handler();
     assert(lv_screen_active() == Display::lockscreen.getScreen());
-    assert(showsClock(lv_screen_active(), -210, before));
+    assert(showsClock(lv_screen_active(), 60, before));
     assert(lv_obj_is_visible(label(lv_screen_active(), "RFID-Karte auflegen")));
     assert(!lv_obj_is_visible(label(lv_screen_active(), "Bitte mit RFID \n        Karte/Tag anmelden")));
     display.capture(output, "wall-clock-03-lockscreen");

@@ -50,9 +50,15 @@ int main()
         assert(clockSets == 0);
         assert(!WallClock::now().valid);
     }
+    // A real API fallback sets a previously unset UTC clock before SNTP.
+    WallClock::onServerTime(1767355200000, 120); // 2026-01-02T12:00Z
+    assert(utc == 1767355200 && clockSets == 1);
+    auto fallback = WallClock::now();
+    assert(fallback.valid && fallback.day == 2 && fallback.hour == 14);
+    utc = 0;
     DemoClock::initialize();
     assert(utc == 1767268800);
-    assert(clockSets == 1);
+    assert(clockSets == 2);
     WallClock::onServerTime(static_cast<int64_t>(utc) * 1000, 0);
     assert(WallClock::now().valid);
     assert(WallClock::now().year == 2026);
@@ -74,7 +80,7 @@ int main()
         {
             WallClock::onServerTime(static_cast<int64_t>(utc + 86400) * 1000, offset);
             const auto retained = WallClock::now();
-            assert(utc == 1767268800 && clockSets == 1);
+            assert(utc == 1767268800 && clockSets == 2);
             assert(retained.valid && retained.year == local.year && retained.month == local.month);
             assert(retained.day == local.day && retained.weekday == local.weekday);
             assert(retained.hour == local.hour && retained.minute == local.minute);
@@ -84,13 +90,20 @@ int main()
     WallClock::onSntpSynced();
     assertRejectedOffsets();
 
+    // Valid samples after SNTP update only the timezone, even with different UTC.
+    WallClock::onServerTime(1767355200000, -210);
+    assert(utc == 1767268800 && clockSets == 2);
+    local = WallClock::now();
+    assert(local.valid && local.day == 1 && local.hour == 8 && local.minute == 30);
+    assertRejectedOffsets();
+
     // Repeated setup and a preset device/host clock retain their timeline.
     utc += 60;
     DemoClock::initialize();
     assert(utc == 1767268860);
-    assert(clockSets == 1);
+    assert(clockSets == 2);
     utc = 1791635520;
     DemoClock::initialize();
     assert(utc == 1791635520);
-    assert(clockSets == 1);
+    assert(clockSets == 2);
 }

@@ -1,9 +1,15 @@
 #include "workflow.hpp"
+#include "../controlled-clock.hpp"
 
 void ReaderWorkflow::testTimeouts()
 {
         login();
         const auto stopsBeforeTimeout = server.count("STOP_RESOURCE_USAGE_SESSION");
+        const auto loginUtc = time(nullptr);
+        TestClock::set(loginUtc + 86400); // SNTP-style forward correction
+        pump();
+        assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        TestClock::set(loginUtc - 86400); // backward correction must not extend expiry
         pump(31050);
         assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
         assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeTimeout);

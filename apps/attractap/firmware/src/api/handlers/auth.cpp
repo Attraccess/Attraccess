@@ -3,7 +3,9 @@
 
 #include "../api.hpp"
 #include "../../clock/wall_clock.hpp"
+#include <cmath>
 #include <functional>
+#include <limits>
 #include <string>
 
 void API::onRegistrationData(JsonObject data)
@@ -144,8 +146,14 @@ void API::onServerTime(JsonVariantConst serverTime)
     {
         return;
     }
-    // ms epochs fit a double exactly; avoids depending on 64-bit JSON integers.
-    WallClock::onServerTime(static_cast<int64_t>(serverTime["epochMs"].as<double>()),
+    const double epochMs = serverTime["epochMs"].as<double>();
+    // INT64_MAX rounds up to 2^63 as a double, so the upper bound is exclusive.
+    constexpr double minEpoch = static_cast<double>(std::numeric_limits<int64_t>::min());
+    if (!std::isfinite(epochMs) || epochMs < minEpoch || epochMs >= -minEpoch)
+    {
+        return;
+    }
+    WallClock::onServerTime(static_cast<int64_t>(epochMs),
                             serverTime["utcOffsetMinutes"].as<int32_t>());
 }
 

@@ -155,6 +155,16 @@ target_include_directories(attractap-demo-clock-tests PRIVATE "${FIRMWARE_DIR}/s
 target_compile_options(attractap-demo-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-demo-clock-tests COMMAND attractap-demo-clock-tests)
 
+add_executable(attractap-demo-session-clock-tests
+    tests/demo-session-clock.test.cpp tests/controlled-clock.cpp src/profile_store.cpp
+    "${FIRMWARE_DIR}/src/api/demo/websocket.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/sessions.cpp"
+    "${FIRMWARE_DIR}/src/demo/demo_store.cpp")
+target_compile_definitions(attractap-demo-session-clock-tests PRIVATE DEMO_MODE)
+target_compile_options(attractap-demo-session-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+target_link_libraries(attractap-demo-session-clock-tests PRIVATE attractap-production-host)
+add_test(NAME attractap-demo-session-clock-tests COMMAND attractap-demo-session-clock-tests)
+
 add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
@@ -163,7 +173,7 @@ set_tests_properties(attractap-desktop-display-tests PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
 
 file(GLOB ATTRACTAP_READER_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/reader/*.cpp")
-add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES})
+add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES} tests/controlled-clock.cpp)
 target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
