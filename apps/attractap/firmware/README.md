@@ -20,6 +20,7 @@ An unset clock is at zero or still counting uptime from the Unix epoch. On a col
 boot with unset time, demos start at 1 January 2026, 12:00 UTC, so the clock and session
 timestamps share a plausible timeline. This is a demonstration date, not the
 actual current time; demo firmware does not start SNTP.
+Demo presets are trusted local time and may display without a server sample.
 
 Each variant file sets the compile definitions (pins, feature flags, firmware
 name) and the source subtrees excluded for that hardware. The firmware version

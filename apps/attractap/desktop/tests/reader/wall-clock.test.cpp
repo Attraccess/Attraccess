@@ -105,18 +105,49 @@ void ReaderWorkflow::testWallClock()
     assert(lv_obj_is_visible(label(lv_screen_active(), "RFID-Karte auflegen")));
     assert(!lv_obj_is_visible(label(lv_screen_active(), "Bitte mit RFID \n        Karte/Tag anmelden")));
     display.capture(output, "wall-clock-03-lockscreen");
-    click(LV_SYMBOL_LEFT);
-    assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+
+    // This is a signed-out sign-in screen even when the resource is in use.
+    // Updating its status within the same minute keeps the clock and RFID prompt.
+    Display::lockscreen.setUsageInfo(true, "Müller", false);
+    lv_refr_now(nullptr);
+    assert(lv_obj_is_visible(label(lv_screen_active(), "In Verwendung: Müller")));
+    assert(showsClock(lv_screen_active(), 60, before));
+    assert(lv_obj_is_visible(label(lv_screen_active(), "RFID-Karte auflegen")));
+    display.capture(output, "wall-clock-03a-in-use-lockscreen");
+    Display::lockscreen.setUsageInfo(false, "", false);
+
+    // Returning without resource/user updates must refresh the cached list's
+    // first frame, before another Display::loop() can tick its clock.
+    auto *cachedList = Display::resourceListScreen.getScreen();
+    assert(cachedList);
+    TestClock::set(time(nullptr) + 120);
+    before = expectedClock(60);
+    auto *backButton = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
+    lv_obj_send_event(backButton, LV_EVENT_CLICKED, nullptr);
+    // Activate before the router retires the old list. No setter or loop runs.
+    Display::transitionToScreen(&Display::resourceListScreen);
+    lv_refr_now(nullptr);
+    assert(lv_screen_active() == cachedList);
+    assert(showsClock(lv_screen_active(), 60, before));
+    display.capture(output, "wall-clock-03b-cached-list-first-frame");
+    application.loop();
 
     // Demo setup also makes a deliberate historical preset visible on the
     // production idle screen, without passing the network plausibility gate.
     const auto restoredUtc = time(nullptr);
     TestClock::set(1704067200); // 2024-01-01T00:00:00Z
+    const auto presetUtc = time(nullptr);
+    tm presetLocal{};
+    localtime_r(&presetUtc, &presetLocal);
+    const WallClock::LocalTime expectedPreset{true, presetLocal.tm_year + 1900,
+        presetLocal.tm_mon + 1, presetLocal.tm_mday, presetLocal.tm_wday,
+        presetLocal.tm_hour, presetLocal.tm_min};
     DemoClock::initialize();
     pump();
-    assert(WallClock::now().valid && WallClock::now().year == 2024);
-    assert(label(lv_screen_active(), WallClockText::clock(WallClock::now()).c_str()));
-    assert(label(lv_screen_active(), "1. Januar 2024"));
+    assert(time(nullptr) >= presetUtc && time(nullptr) < presetUtc + 5);
+    assert(WallClock::now().valid && WallClock::now().year == expectedPreset.year);
+    assert(label(lv_screen_active(), WallClockText::clock(expectedPreset).c_str()));
+    assert(label(lv_screen_active(), WallClockText::date(expectedPreset, true).c_str()));
     display.capture(output, "wall-clock-04-demo-preset-2024");
     TestClock::set(restoredUtc);
     WallClock::onServerTime(static_cast<int64_t>(restoredUtc) * 1000, 60);

@@ -28,6 +28,11 @@ void ResourceListScreen::init() {
     lv_image_set_src(logo, &logo_40h);
     lv_obj_set_size(logo, lv_pct(100), 46);
     createClockHeader();
+    // Cached screens may return without any resource or user changes. Refresh
+    // at activation, before LVGL renders, rather than waiting for loop().
+    lv_obj_add_event_cb(screen, [](lv_event_t *event) {
+        static_cast<ResourceListScreen *>(lv_event_get_user_data(event))->updateClockHeader();
+    }, LV_EVENT_SCREEN_LOAD_START, this);
     loginContainer = sessionHeader.create(screen, [this] {
         if (!busy && logoutCallback) logoutCallback();
     });
