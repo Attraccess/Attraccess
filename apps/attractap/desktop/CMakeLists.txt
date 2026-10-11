@@ -150,6 +150,16 @@ target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 enable_testing()
 add_test(NAME attractap-desktop-tests COMMAND attractap-desktop-tests)
 
+add_executable(attractap-demo-protocol-tests
+    tests/demo-protocol.test.cpp
+    "${FIRMWARE_DIR}/src/api/demo/websocket.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/sessions.cpp"
+    "${FIRMWARE_DIR}/src/demo/demo_store.cpp")
+target_compile_definitions(attractap-demo-protocol-tests PRIVATE DEMO_MODE)
+target_compile_options(attractap-demo-protocol-tests PRIVATE -UNDEBUG)
+target_link_libraries(attractap-demo-protocol-tests PRIVATE attractap-desktop-runtime)
+add_test(NAME attractap-demo-protocol-tests COMMAND attractap-demo-protocol-tests)
+
 add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
@@ -171,6 +181,7 @@ set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 240)
 # Exercise the production beeper without playing sound on the developer's machine.
 set_property(TEST
     attractap-desktop-tests
+    attractap-demo-protocol-tests
     attractap-desktop-display-tests
     attractap-reader-workflow-tests
     attractap-reader-timeout-tests

@@ -37,8 +37,9 @@ namespace
         {104, "Extraction checked", "Is chip extraction active?", "boolean", true},
     };
     constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS_DE) / sizeof(CNC_FIELDS_DE[0]);
-    const char *const CNC_MATERIALS_DE[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
-    const char *const CNC_MATERIALS_EN[] = {"Aluminium", "Wood", "Plastic", "Brass", "Steel"};
+    // The form protocol uses these strings as submitted values, without a
+    // separate display label. Keep them stable across language changes.
+    const char *const CNC_MATERIALS[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
 
     std::string toIso8601(time_t t)
     {

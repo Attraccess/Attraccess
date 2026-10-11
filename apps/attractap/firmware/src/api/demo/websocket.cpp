@@ -235,6 +235,8 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
         const DemoStore::DemoResource &r = DemoStore::getResource(i);
         JsonObject obj = resources.createNestedObject();
         obj["id"] = r.id;
+        // DemoStore's immutable resources are authored examples, not supplied
+        // server names. Real reader resource names remain literal in the API.
         obj["name"] = DemoLocalization::resourceName(r.id, State::getActiveLanguage() == "en");
         obj["description"] = State::getActiveLanguage() == "en" ? "Demo resource" : "Demo Ressource";
         obj["type"] = (r.type == 1) ? "door" : "machine";
@@ -410,7 +412,7 @@ void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, u
         if (strcmp(f.type, "select") == 0)
         {
             JsonArray options = obj["options"].to<JsonArray>();
-            for (const char *material : (english ? CNC_MATERIALS_EN : CNC_MATERIALS_DE))
+            for (const char *material : CNC_MATERIALS)
                 options.add(material);
         }
         else if (strcmp(f.type, "number") == 0)

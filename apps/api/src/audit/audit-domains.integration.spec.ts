@@ -1,6 +1,7 @@
 import { AuditLog, entities, Setting } from '@attraccess/database-entities';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import cookieParser from 'cookie-parser';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -40,6 +41,8 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
   let audit: AuditService;
   let store: SettingsStoreService;
   let app: INestApplication;
+  let settings: SettingsService;
+  const events = new EventEmitter2();
   const ownerPermissions = new Set(['system.audit.read', 'system.settings.manage', 'users.api-tokens.manage']);
   const coreDomains = [...CORE_AUDIT_DOMAINS];
   const read = (query: Record<string, string | number> = {}, token = 'audit-reader') =>
@@ -77,6 +80,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     await source.runMigrations();
     store = new SettingsStoreService(source.getRepository(Setting), null);
     audit = new AuditService(source, store);
+    settings = new SettingsService(null, store, { getSettings: async () => ({}) } as never, null, events);
     const module = await Test.createTestingModule({
       controllers: [AuditController, SettingsController],
       providers: [
@@ -84,7 +88,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
         { provide: AuditService, useValue: audit },
         {
           provide: SettingsService,
-          useValue: new SettingsService(null, store, { getSettings: async () => ({}) } as never),
+          useValue: settings,
         },
         { provide: SessionService, useValue: { authenticateSession: async () => null } },
         { provide: TwoFactorService, useValue: { getStatus: async () => ({ required: false }) } },
@@ -195,13 +199,17 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
 
   it('exposes only the default language publicly while keeping settings writes restricted', async () => {
     await store.setPlainSetting('app', 'default_language', 'en');
-    await request(app.getHttpServer()).get('/api/settings/language').expect(200, { defaultLanguage: 'en', configured: true });
+    await request(app.getHttpServer())
+      .get('/api/settings/language')
+      .expect(200, { defaultLanguage: 'en', configured: true });
     await request(app.getHttpServer()).get('/api/settings').expect(401);
     await request(app.getHttpServer())
       .patch('/api/settings')
       .send({ app: { defaultLanguage: 'de' } })
       .expect(401);
-    await request(app.getHttpServer()).get('/api/settings/language').expect(200, { defaultLanguage: 'en', configured: true });
+    await request(app.getHttpServer())
+      .get('/api/settings/language')
+      .expect(200, { defaultLanguage: 'en', configured: true });
   });
 
   it('persists settings.updated with canonical language deltas for successful HTTP changes', async () => {
@@ -222,6 +230,62 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     await read({ action: 'settings.updated' })
       .expect(200)
       .expect(({ body }) => expect(body.items).toHaveLength(2));
+  });
+
+  it('keeps a persisted language save and reader notification successful when auditing fails', async () => {
+    await store.setPlainSetting('app', 'default_language', 'de');
+    const notified = jest.fn();
+    events.on('settings.default-language', notified);
+    const failure = jest
+      .spyOn(audit, 'recordAdministration')
+      .mockRejectedValueOnce(new Error('Injected audit failure'));
+    try {
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-manager')
+        .send({ app: { defaultLanguage: 'en' } })
+        .expect(200)
+        .expect(({ body }) => expect(body.app.defaultLanguage).toBe('en'));
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(await store.getPlainSetting('app', 'default_language')).toBe('en');
+      expect(
+        await source.getRepository(Setting).findOneByOrFail({ parent: 'app', key: 'default_language' }),
+      ).toMatchObject({ value: 'en' });
+      expect(notified).toHaveBeenCalledTimes(1);
+      expect(notified).toHaveBeenCalledWith('en');
+      expect(await source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      failure.mockRestore();
+      events.off('settings.default-language', notified);
+    }
+  });
+
+  it('rejects a user without settings permission and setup writes after closure without effects', async () => {
+    await store.setPlainSetting('app', 'default_language', 'de');
+    const notified = jest.fn();
+    events.on('settings.default-language', notified);
+    const closed = jest.spyOn(settings, 'isFirstTimeSetupAvailable').mockResolvedValue(false);
+    ownerPermissions.delete('system.settings.manage');
+    try {
+      await request(app.getHttpServer()).get('/api/settings').set('Authorization', 'Bearer audit-reader').expect(403);
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-reader')
+        .send({ app: { defaultLanguage: 'en' } })
+        .expect(403);
+      await request(app.getHttpServer())
+        .post('/api/settings/first-time-setup')
+        .send({ app: { defaultLanguage: 'en' } })
+        .expect(403);
+      expect(closed).toHaveBeenCalledTimes(1);
+      expect(await store.getPlainSetting('app', 'default_language')).toBe('de');
+      expect(notified).not.toHaveBeenCalled();
+      expect(await source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      closed.mockRestore();
+      ownerPermissions.add('system.settings.manage');
+      events.off('settings.default-language', notified);
+    }
   });
 
   it('records no successful language audit change when HTTP persistence fails', async () => {

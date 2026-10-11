@@ -164,3 +164,14 @@ it('returns to the browser language on logout when it differs from the user and 
   expect(useTranslationState.getState().language).toBe('en');
   expect(state.mutate).not.toHaveBeenCalled();
 });
+
+it('keeps a newly registered undetermined preference following changing defaults', () => {
+  vi.stubGlobal('navigator', { language: 'fr-FR', languages: ['fr-FR'] });
+  state.user = { id: 4, locale: 'und' };
+  const { rerender } = renderHook(useLocaleSync);
+  expect(useTranslationState.getState().language).toBe('de');
+  state.defaultLanguage = 'en';
+  rerender();
+  expect(useTranslationState.getState().language).toBe('en');
+  expect(state.mutate).not.toHaveBeenCalled();
+});
