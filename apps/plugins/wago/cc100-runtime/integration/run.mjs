@@ -115,6 +115,7 @@ try {
       ...process.env,
       WAGO_INTEGRATION_TEMP: temporary,
       WAGO_INTEGRATION_FLOW_SOURCE: backendSource(flowRoot, 'flow/service.ts', 'wago-flow.service.ts'),
+      WAGO_INTEGRATION_PROTOCOL_SOURCE: backendSource(flowRoot, 'protocol/index.ts', 'protocol.ts'),
       WAGO_INTEGRATION_MAIN_SOURCE: backendSource(mainRoot, 'controllers/service.ts', 'wago.service.ts'),
       WAGO_INTEGRATION_LIFECYCLE_ONLY: process.argv.includes('--lifecycle-only') ? '1' : '0',
     },

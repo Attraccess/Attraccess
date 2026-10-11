@@ -17,6 +17,8 @@ for (const file of [
   'apps/companion/project.json',
   'libs/companion-ws-client/project.json',
   'apps/attractap/firmware/project.json',
+  'apps/plugins/wago/project.json',
+  'libs/react-query-client/project.json',
 ]) {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   data.root = path.dirname(file);
@@ -164,4 +166,18 @@ test('CI discovers specialized tests and avoids repeating shared dependencies', 
   });
   assert.deepEqual(selectTests(fixtures, 'software').projects, ['api', 'first', 'second']);
   assert.throws(() => selectTests(fixtures, 'unknown'), /Unknown test group/);
+});
+
+test('WAGO frontend typechecks generate the API client before compiling shared plugin UI', () => {
+  const selected = createTaskGraph(
+    graph,
+    {},
+    ['plugin-wago'],
+    ['typecheck-frontend-tests', 'test-typecheck-frontend-gate'],
+    undefined,
+    {},
+  );
+  for (const target of ['typecheck-frontend-tests', 'test-typecheck-frontend-gate']) {
+    assert.ok(selected.dependencies[`plugin-wago:${target}`].includes('react-query-client:generate'));
+  }
 });
