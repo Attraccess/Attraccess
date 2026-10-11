@@ -23,8 +23,10 @@ int main()
     DemoWebsocket transport;
     JsonDocument received;
     JsonDocument authenticated;
+    JsonDocument resourceList;
     transport.setMessageCallbackRaw([&](const char *message, size_t length) {
         assert(deserializeJson(received, message, length) == DeserializationError::Ok);
+        if (received["data"]["type"] == "RESOURCE_LIST") resourceList.set(received);
         if (received["data"]["type"] == "READER_AUTHENTICATED") {
             authenticated.set(received);
             Display::setDeviceName(received["data"]["payload"]["name"].as<std::string>());
@@ -88,6 +90,14 @@ int main()
     exchange(getFields);
     assert(received["data"]["payload"]["fields"][0]["value"] == "Holz");
 
+    // The first card response is queued while the previous default is still active.
+    State::setDefaultLanguage("de");
+    assert(DemoStore::addCard("11223344", DemoStore::UserRole::INTRODUCED, "Literal Müller"));
+    exchange(R"({"data":{"type":"REQUEST_CARD_AUTHENTICATION_DATA","payload":{"uid":"11223344","resourceId":1}}})");
+    assert(received["data"]["payload"]["language"] == "en");
+    assert(resourceList["data"]["payload"]["readerName"] == "Demo Device");
+    assert(resourceList["data"]["payload"]["resources"][0]["name"] == "CNC Router");
+    assert(resourceList["data"]["payload"]["authenticatedUsername"] == "Literal Müller");
     Display::setDeviceName("Operator Gerät");
     State::setDefaultLanguage("de"); Display::loop(); lv_timer_handler();
     State::setDefaultLanguage("en"); Display::loop(); lv_timer_handler();

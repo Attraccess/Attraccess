@@ -310,7 +310,8 @@ void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resource
     _currentUser = DemoStore::displayName(card);
     _currentCanManage = (card.role == DemoStore::UserRole::ADMIN);
     _currentHasIntroduction = (card.role != DemoStore::UserRole::NO_PERMISSION);
-    respondResourceList();
+    // Demo cardholders use English; publish examples in that locale before the API applies it.
+    respondResourceList(0, "en");
 
     // Always return the factory key (all zeros) — demo cards are never physically enrolled.
     doc["data"]["payload"]["keyNo"] = 0;
