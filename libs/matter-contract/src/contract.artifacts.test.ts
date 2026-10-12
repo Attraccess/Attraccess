@@ -70,4 +70,9 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
       api.paths[route.path][route.method.toLowerCase()].responses['501'].content['application/json'].schema.$ref,
     ).toBe('#/components/schemas/ErrorEnvelope');
   expect(api.paths['/v1/events'].get['x-websocket'].client.$ref).toBe('#/components/schemas/ClientMessage');
+  expect(api.paths['/v1/events'].get['x-websocket'].errors.application.$ref).toBe('#/components/schemas/ErrorEnvelope');
+  expect(api.paths['/v1/events'].get['x-websocket'].errors.payloadLimit).toMatchObject({
+    closeCode: 1009,
+    envelope: false,
+  });
 });

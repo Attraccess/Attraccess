@@ -39,6 +39,8 @@ The route registry declares fabric metadata/lifecycle, commissioning start/statu
 
 Errors use `schemaVersion: 1`, code, safe message, request/operation correlation, retryability and typed safe details. HTTP mappings are validation `400`, wire mismatch `426`, release mismatch `409`, unavailable service `503`, unavailable capability `501`, timeout `504`, reconciliation required `409`, browser Origin `403`, unknown route `404`, payload limit `413` and internal error `500`. An unsupported `/vN` never falls back to `/v1`.
 
+Application-level WebSocket failures use `ErrorEnvelope` when the outgoing queue has room. Oversized messages are rejected by the WebSocket parser before application validation, including when individually bounded fragments exceed the limit together. This transport failure sends only close code `1009` with an empty reason, without a JSON envelope or echoed request values. The parser has already started closing the socket when it reports the error; application data cannot be sent then. Keep the parser limit enabled. A message at the exact limit still reaches application validation. After a `1009` close, reduce the message size before reconnecting.
+
 ## Events, resume and reconciliation
 
 Every application event has a stable UUID `eventId`, literal `schemaVersion: 1`, UTC timestamp, typed event/payload, nullable initiating request/operation IDs, UUID `streamInstanceId` and increasing safe integer sequence. Autonomous events explicitly carry null correlation. Ping/pong frames are transport frames, not application events. Initial lifecycle and capability events use the same envelope.

@@ -97,6 +97,8 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
     }
   });
   ws.on('error', () => {
+    // Parser failures (including maxPayload) have already started closing the
+    // socket. They use WebSocket close codes, not application error envelopes.
     unsubscribe?.();
   });
   ws.once('close', () => {

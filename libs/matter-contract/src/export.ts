@@ -92,6 +92,15 @@ paths['/v1/events'] = {
       event: ref('EventEnvelope'),
       delivery: 'at_least_once',
       reconciliation: ref('Reconciliation'),
+      errors: {
+        application: ref('ErrorEnvelope'),
+        payloadLimit: {
+          closeCode: 1009,
+          envelope: false,
+          description:
+            'The parser rejects oversized messages, including fragmented messages, before application validation. Only a close frame is sent; request values are never echoed.',
+        },
+      },
     },
   },
 };

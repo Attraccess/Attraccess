@@ -366,12 +366,39 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     expect(reason.toString()).toBe('Reconciliation required: obtain a snapshot');
     expect(messages).toEqual([]);
   });
-  it('bounds WebSocket messages and rejects chunked oversized REST uploads', async () => {
+  it.each(['text', 'binary', 'fragmented'])(
+    'rejects oversized %s WebSocket messages with a safe parser close',
+    async (kind) => {
+      const { url } = await start({ payloadBytes: 512 });
+      const client = await connect(url);
+      const closed = once(client.ws, 'close');
+      const sensitive = 'request-only-secret-'.repeat(40);
+      if (kind === 'fragmented') {
+        // Both fragments fit individually; the aggregate message must still be bounded.
+        client.ws.send(sensitive.slice(0, 400), { fin: false });
+        client.ws.send(sensitive.slice(400), { fin: true });
+      } else client.ws.send(kind === 'binary' ? Buffer.from(sensitive) : sensitive);
+      const [code, reason] = await closed;
+      expect(code).toBe(1009);
+      expect(reason.toString()).toBe('');
+      expect(client.messages).toEqual([]);
+      expect((await fetch(url + '/health/live')).status).toBe(200);
+    },
+  );
+  it('validates a WebSocket message at the exact payload limit with a structured application error', async () => {
     const { url } = await start({ payloadBytes: 512 });
     const client = await connect(url);
-    client.ws.send('x'.repeat(1024));
-    const [code] = await once(client.ws, 'close');
-    expect(code).toBe(1009);
+    const closed = once(client.ws, 'close');
+    client.ws.send('x'.repeat(512));
+    const [code] = await closed;
+    expect(code).toBe(4009);
+    expect(client.messages).toHaveLength(1);
+    const error = ErrorEnvelope.parse(client.messages[0]);
+    expect(error.error.code).toBe('VALIDATION_ERROR');
+    expect(JSON.stringify(error)).not.toContain('x'.repeat(512));
+  });
+  it('rejects chunked oversized REST uploads', async () => {
+    const { url } = await start({ payloadBytes: 512 });
     const oversized = await new Promise<number>((resolve, reject) => {
       const req = request(
         url + '/v1/commissioning/start',
