@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   CurrentUserDto,
+  User,
   UseUsersServiceGetCurrentKeyFn,
   useSettingsServiceGetFirstTimeSetupStatus,
   useSettingsServiceGetSystemLanguage,
@@ -10,6 +11,8 @@ import {
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
 import { detectLanguage, detectPreferredLanguage, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from './useAuth';
+
+type LocaleSaveContext = { userId: number | null | undefined; generation: number };
 
 export function useLocaleSync() {
   const { user, isAuthenticated } = useAuth();
@@ -22,20 +25,33 @@ export function useLocaleSync() {
   const lastSynced = useRef<string | null>(null);
   const { data: systemLanguage } = useSettingsServiceGetSystemLanguage(undefined, { refetchInterval: 60000 });
   const { data: setup } = useSettingsServiceGetFirstTimeSetupStatus();
-  const { mutate } = useUsersServiceUpdateMyLocale({
-    onSuccess(savedUser) {
+  const userId = isAuthenticated ? user?.id : null;
+  const latestSave = useRef(0);
+  const { mutate } = useUsersServiceUpdateMyLocale<User, unknown, LocaleSaveContext>({
+    onMutate() {
+      return { userId, generation: ++latestSave.current };
+    },
+    onSuccess(savedUser, _variables, context) {
+      if (
+        !context ||
+        context.generation !== latestSave.current ||
+        context.userId !== initializedUser.current ||
+        savedUser.id !== context.userId
+      )
+        return;
       queryClient.setQueryData<CurrentUserDto>(UseUsersServiceGetCurrentKeyFn(), (current) =>
         current?.id === savedUser.id ? { ...current, locale: savedUser.locale } : current,
       );
     },
   });
-  const userId = isAuthenticated ? user?.id : null;
   const defaultLanguage = systemLanguage?.defaultLanguage;
   // Before setup, detection uses English as its final fallback. Once configured,
   // the system default applies only when no supported browser language is known.
   const hasSystemLanguage = setup && (!setup.available || systemLanguage?.configured);
 
   useEffect(() => {
+    // Logout and account changes invalidate pending responses, including a later login as the same user.
+    if (initializedUser.current !== userId) latestSave.current++;
     if (userId == null) {
       lastSynced.current = null;
       lastServerPreference.current = undefined;

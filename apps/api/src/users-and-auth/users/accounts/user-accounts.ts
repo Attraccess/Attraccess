@@ -1,3 +1,4 @@
+import { getSupportedDeviceLanguage } from '@attraccess/shared';
 import { SettingsService } from '../../../settings/settings.service';
 import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
 
@@ -242,7 +243,7 @@ export abstract class UserAccounts {
     user.externalIdentifier = data.externalIdentifier;
     user.isEmailVerified = data.isEmailVerified;
     // Keep an unknown preference distinct from the system fallback.
-    user.locale = userData.locale?.trim() || 'und';
+    user.locale = getSupportedDeviceLanguage(userData.locale) ? userData.locale.trim() : 'und';
 
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');

@@ -1,5 +1,5 @@
 import { SettingsService } from '../../settings/settings.service';
-import { DateTimePreferences, validateDateTimeLocale } from '@attraccess/shared';
+import { DateTimePreferences, getSupportedDeviceLanguage, validateDateTimeLocale } from '@attraccess/shared';
 import { AuthenticationDetail, ResourceUsage, Session, User, Role } from '@attraccess/database-entities';
 
 import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
@@ -137,7 +137,7 @@ export class UsersService extends UserDirectory {
         user.username = data.username;
         user.email = data.email;
         user.externalIdentifier = null;
-        user.locale = data.locale?.trim() || 'und';
+        user.locale = getSupportedDeviceLanguage(data.locale) ? data.locale.trim() : 'und';
         return user;
       });
 

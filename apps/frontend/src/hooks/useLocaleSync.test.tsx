@@ -5,13 +5,26 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useLocaleSync } from './useLocaleSync';
 
+type LocaleSaveContext = { userId: number | null | undefined; generation: number };
+type LocaleVariables = { requestBody: { locale: string } };
+type SavedUser = { id: number; locale: string };
+type MutationOptions = {
+  onMutate?: () => LocaleSaveContext;
+  onSuccess?: (user: SavedUser, variables: LocaleVariables, context: LocaleSaveContext | undefined) => void;
+};
+
 const state = vi.hoisted(() => ({
   user: null as { id: number; locale?: string } | null,
   defaultLanguage: 'de' as 'en' | 'de',
   configured: true,
   setup: { available: false, stepsCompleted: { app: true } },
   mutate: vi.fn(),
-  mutationOptions: undefined as { onSuccess?: (user: { id: number; locale: string }) => void } | undefined,
+  mutationOptions: undefined as MutationOptions | undefined,
+  pending: [] as Array<{
+    variables: LocaleVariables;
+    context: LocaleSaveContext | undefined;
+    options: MutationOptions | undefined;
+  }>,
 }));
 vi.mock('./useAuth', () => ({ useAuth: () => ({ user: state.user, isAuthenticated: !!state.user }) }));
 vi.mock('@attraccess/react-query-client', () => ({
@@ -40,7 +53,10 @@ beforeEach(() => {
   state.defaultLanguage = 'de';
   state.configured = true;
   state.setup = { available: false, stepsCompleted: { app: true } };
-  state.mutate.mockClear();
+  state.pending = [];
+  state.mutate.mockReset().mockImplementation((variables: LocaleVariables) => {
+    state.pending.push({ variables, context: state.mutationOptions?.onMutate?.(), options: state.mutationOptions });
+  });
   queryClient = new QueryClient();
   useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
 });
@@ -220,10 +236,54 @@ it('updates only the matching cached user locale after a successful save', () =>
   queryClient.setQueryData(['current-user'], cachedUser);
   renderLocaleSync();
   act(() => useTranslationState.getState().setLanguage('en'));
-  act(() => state.mutationOptions?.onSuccess?.({ id: 1, locale: 'en' }));
+  act(() => completeSave(0, { id: 1, locale: 'en' }));
   expect(queryClient.getQueryData(['current-user'])).toEqual({ ...cachedUser, locale: 'en' });
   const otherUser = { id: 2, locale: 'de' };
   queryClient.setQueryData(['current-user'], otherUser);
-  act(() => state.mutationOptions?.onSuccess?.({ id: 1, locale: 'en' }));
+  act(() => completeSave(0, { id: 1, locale: 'en' }));
   expect(queryClient.getQueryData(['current-user'])).toEqual(otherUser);
+});
+
+function completeSave(index: number, user: SavedUser) {
+  const pending = state.pending[index];
+  pending.options?.onSuccess?.(user, pending.variables, pending.context);
+}
+
+it('ignores older saves that complete before or after the latest explicit choice', () => {
+  state.user = { id: 1, locale: 'und' };
+  queryClient.setQueryData(['current-user'], state.user);
+  renderLocaleSync();
+  act(() => useTranslationState.getState().setLanguage('de'));
+  act(() => useTranslationState.getState().setLanguage('en'));
+  act(() => completeSave(0, { id: 1, locale: 'de' }));
+  expect(queryClient.getQueryData(['current-user'])).toEqual({ id: 1, locale: 'und' });
+  act(() => completeSave(1, { id: 1, locale: 'en' }));
+  act(() => completeSave(0, { id: 1, locale: 'de' }));
+  expect(queryClient.getQueryData(['current-user'])).toEqual({ id: 1, locale: 'en' });
+  expect(useTranslationState.getState().language).toBe('en');
+});
+
+it('ignores a detected browser preference superseded by an explicit choice', () => {
+  vi.stubGlobal('navigator', { language: 'de-DE', languages: ['de-DE'] });
+  state.user = { id: 1, locale: 'und' };
+  queryClient.setQueryData(['current-user'], state.user);
+  renderLocaleSync();
+  act(() => useTranslationState.getState().setLanguage('en'));
+  act(() => completeSave(1, { id: 1, locale: 'en' }));
+  act(() => completeSave(0, { id: 1, locale: 'de' }));
+  expect(queryClient.getQueryData(['current-user'])).toEqual({ id: 1, locale: 'en' });
+});
+
+it('ignores a previous session save even after the same user logs back in', () => {
+  state.user = { id: 1, locale: 'und' };
+  queryClient.setQueryData(['current-user'], state.user);
+  const { rerender } = renderLocaleSync();
+  act(() => useTranslationState.getState().setLanguage('de'));
+  state.user = null;
+  rerender();
+  state.user = { id: 1, locale: 'en' };
+  queryClient.setQueryData(['current-user'], state.user);
+  rerender();
+  act(() => completeSave(0, { id: 1, locale: 'de' }));
+  expect(queryClient.getQueryData(['current-user'])).toEqual({ id: 1, locale: 'en' });
 });

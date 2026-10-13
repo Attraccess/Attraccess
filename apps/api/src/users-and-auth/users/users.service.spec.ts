@@ -692,15 +692,29 @@ describe('UsersService', () => {
       expect(fixture.mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
     });
 
-    it('stores the full BCP 47 locale tag without lowercasing or truncating', async () => {
+    it('stores a supported full BCP 47 locale tag without lowercasing or truncating', async () => {
       await fixture.service.createOne({
         username: 'usr',
         email: 'u@x.com',
         externalIdentifier: null,
-        locale: 'ZH-Hant-TW',
+        locale: 'EN-Latn-GB',
       });
-      expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ZH-Hant-TW' }));
+      expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'EN-Latn-GB' }));
     });
+
+    it.each(['fr-FR', 'en-!!!', 'de-u-12', '', ' '])(
+      'stores unsupported preference %s as undetermined',
+      async (locale) => {
+        const user = await fixture.service.createOne({
+          username: 'usr',
+          email: 'u@x.com',
+          externalIdentifier: null,
+          locale,
+        });
+        expect(user.locale).toBe('und');
+        expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'und' }));
+      },
+    );
 
     it('leaves the personal locale undetermined when none was provided', async () => {
       fixture.settingsService.getDefaultLanguage.mockResolvedValue('de');
@@ -933,6 +947,13 @@ describe('UsersService', () => {
       expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', manager);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledTimes(1);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(2, manager);
+    });
+    it.each(['fr-FR', 'en-!!!', 'de-u-12'])('keeps unsupported imported preference %s undetermined', async (locale) => {
+      const { manager } = managerForImport(3);
+      const [user] = await fixture.service.createMany([{ username: 'member', email: 'member@example.com', locale }], {
+        manager,
+      });
+      expect(user.locale).toBe('und');
     });
     it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
       const { manager } = managerForImport(3);
