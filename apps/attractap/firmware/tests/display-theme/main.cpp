@@ -42,27 +42,14 @@ int main(int argc, char **argv)
         test("i18n/explicit-bindings-and-data-ownership", [&] {
             using FirmwareI18n::Message;
             using FirmwareI18n::Text;
-            expect(Language::supported(" DE_at ") == "de", "Legacy regional locale normalizes");
-            for (const auto *german : {"de-Latn-DE", "de-DE-u-co-phonebk", "de-CH-1901", "de-Latn-CH-1996-u-ca-gregory", "de-DE-x-reader", "de-a-foo-b-bar", "de-DE-extra", "de-1234"})
-                expect(Language::supported(german) == "de", "Complete German locales normalize");
-            for (const auto *invalid : {"de-", "de-!!!", "de--DE", "de_DE_extraextra", "de-Latn-DE-!", "de-DE-Latn", "de-abc", "de-u", "de-u-x-private", "de-x", "de-1901-1901", "de-u-co-phonebk-u-ca-gregory", "", "fr-CA"})
-                expect(Language::supported(invalid) == "en", "Invalid or unsupported locales fall back to English");
-            for (const auto *german : {"de-u-foo-ca-gregory-kn", "de-u-1a", "de-u-kn", "de-t-en", "de-t-en-US-h0-hybrid", "de-t-h0-hybrid", "de-t-zh-Hant-TW-m0-ungegn-u-ca-gregory-x-reader", "de-t-en-US-1901", "de-u-ca-gregory-ca-buddhist", "de-t-h0-abc-h0-def", "de-x-u-ca-ca-12"})
-                expect(Language::supported(german) == "de", std::string("Valid locale extension: ") + german);
-            for (const auto *invalid : {"de-u-12", "de-u-a1", "de-u-foo-12", "de-u-ca-gregory-12", "de-t-12", "de-t-h0", "de-t-en-h0", "de-t-en-12", "de-t-abcd", "de-t-en-US-ca-gregory", "de-t-en-US-1901-1901", "de-t-h0-abc-12", "de-u-ca-ca-12", "de-u-kn-kn-a1"})
-                expect(Language::supported(invalid) == "en", std::string("Malformed locale extension: ") + invalid);
-            // Same ASCII-only whitespace contract as the shared TypeScript normalizer.
-            for (const auto padding : std::string(" \t\r\n\v\f")) {
-                expect(Language::supported(std::string(1, padding) + "DE_at" + padding) == "de", "ASCII locale padding normalizes");
-                expect(Language::supported("de" + std::string(1, padding) + "-AT") == "en", "Internal whitespace is invalid");
-            }
-            for (const auto *padding : {u8"\u00a0", u8"\u1680", u8"\u2000", u8"\u2001", u8"\u2002", u8"\u2003", u8"\u2004", u8"\u2005", u8"\u2006", u8"\u2007", u8"\u2008", u8"\u2009", u8"\u200a", u8"\u2028", u8"\u2029", u8"\u202f", u8"\u205f", u8"\u3000", u8"\ufeff"}) {
-                const auto whitespace = std::string(reinterpret_cast<const char *>(padding));
-                expect(Language::supported(whitespace + "de" + whitespace) == "en", "Unicode locale padding is rejected");
-            }
+            expect(Language::supported("de") == "de", "Canonical German wire language is supported");
+            expect(Language::supported("en") == "en", "Canonical English wire language is supported");
+            for (const auto *invalid : {"de-AT", "de-u-ca-gregory", "DE", " de ", "de-!!!", "", "fr"})
+                expect(Language::supported(invalid) == "en", "Noncanonical wire language uses English");
             Language::Session session;
+            expect(session.active() == "en", "An offline reader starts in English before learning an API default");
             session.setApi(true, "en");
-            session.setUser(true, "de-AT");
+            session.setUser(true, "de");
             session.setDefault("de");
             expect(session.active() == "de", "Active user survives default update");
             session.setUser(true, "");
@@ -72,11 +59,11 @@ int main(int argc, char **argv)
             session.setDefault("en");
             expect(session.active() == "en", "Unsupported user language follows default changes");
             session.setDefault("de");
-            for (const auto *locale : {"en", "en-GB", "EN_us", "en-Latn-US", "en-u-ca-gregory"}) {
+            for (const auto *locale : {"en"}) {
                 session.setUser(true, locale);
                 expect(session.active() == "en", "Supported English takes precedence over German default");
             }
-            for (const auto *locale : {"en-!!!", "en-u-12", "de-u-12", ""}) {
+            for (const auto *locale : {"en-US", "DE_at", "fr", ""}) {
                 session.setUser(true, locale);
                 expect(session.active() == "de", "Invalid user locale uses system fallback");
             }

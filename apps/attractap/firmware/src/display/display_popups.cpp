@@ -17,7 +17,7 @@ void Display::showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n
 
 void Display::showBillingSummary(const std::string &total)
 {
-    Display::showMessagePopup(FirmwareI18n::Message::SessionTotal, FirmwareI18n::Text::literal(total), false);
+    Display::showMessagePopup(FirmwareI18n::Message::SessionTotal, FirmwareI18n::Text::literal(total) /* i18n-data: Server-supplied formatted billing total; preserve exact amount and currency. */, false);
 }
 
 void Display::showMessagePopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool error)
@@ -183,7 +183,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
 
     // Inline error label (initially empty)
     lv_obj_t *errorLbl = lv_label_create(dialog);
-    FirmwareI18n::setLabel(errorLbl, FirmwareI18n::Text::literal(""));
+    FirmwareI18n::setLabel(errorLbl, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
     lv_obj_set_style_text_color(errorLbl, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(errorLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 

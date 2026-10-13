@@ -204,14 +204,14 @@ void DemoSettingsScreen::rebuildCardList()
         lv_obj_t *nameLbl = lv_label_create(nameCol);
         lv_obj_set_width(nameLbl, lv_pct(100));
         const char *displayName = (card.label[0] != '\0') ? card.label : uidShort;
-        FirmwareI18n::setDynamicLabel(nameLbl, displayName);
+        FirmwareI18n::setDynamicLabel(nameLbl, displayName) /* i18n-data: Card UID or operator-supplied card label; preserve exact identifier/name. */;
         lv_label_set_long_mode(nameLbl, LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_color(nameLbl, DisplayTheme::text(), LV_PART_MAIN);
         lv_obj_set_style_text_font(nameLbl, &attractap_font_montserrat_latin1_20, LV_PART_MAIN);
 
         lv_obj_t *roleLbl = lv_label_create(nameCol);
         lv_obj_set_width(roleLbl, lv_pct(100));
-        FirmwareI18n::setLabel(roleLbl, card.role == DemoStore::UserRole::NO_PERMISSION ? FirmwareI18n::Text(FirmwareI18n::Message::NoAccess) : card.role == DemoStore::UserRole::INTRODUCED ? FirmwareI18n::Text(FirmwareI18n::Message::Introduced) : FirmwareI18n::Text::literal("Admin"));
+        FirmwareI18n::setLabel(roleLbl, card.role == DemoStore::UserRole::NO_PERMISSION ? FirmwareI18n::Text(FirmwareI18n::Message::NoAccess) : card.role == DemoStore::UserRole::INTRODUCED ? FirmwareI18n::Text(FirmwareI18n::Message::Introduced) : FirmwareI18n::Text::literal("Admin") /* i18n-data: Language-neutral product or role name. */);
         lv_color_t roleColor = DisplayTheme::muted();
         switch (card.role) {
         case DemoStore::UserRole::INTRODUCED: roleColor = DisplayTheme::success(); break;
@@ -401,7 +401,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     lv_obj_set_style_pad_row(_rolePicker, 14, LV_PART_MAIN);
 
     lv_obj_t *titleLbl = lv_label_create(_rolePicker);
-    FirmwareI18n::setLabel(titleLbl, FirmwareI18n::Text::format(FirmwareI18n::Message::RoleForCard, {FirmwareI18n::Text::literal(uid)}));
+    FirmwareI18n::setLabel(titleLbl, FirmwareI18n::Text::format(FirmwareI18n::Message::RoleForCard, {FirmwareI18n::Text::literal(uid) /* i18n-data: Card UID or operator-supplied card label; preserve exact identifier/name. */}));
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN);
     lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_20, LV_PART_MAIN);
     lv_label_set_long_mode(titleLbl, LV_LABEL_LONG_WRAP);
@@ -411,7 +411,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     static const RoleEntry roles[] = {
         { FirmwareI18n::Message::NoAccessAlt,  DemoStore::UserRole::NO_PERMISSION, DisplayTheme::danger()  },
         { FirmwareI18n::Message::IntroducedAlt,  DemoStore::UserRole::INTRODUCED,    DisplayTheme::success() },
-        { FirmwareI18n::Text::literal("Admin"),        DemoStore::UserRole::ADMIN,        DisplayTheme::warning() },
+        { FirmwareI18n::Text::literal("Admin") /* i18n-data: Language-neutral product or role name. */,        DemoStore::UserRole::ADMIN,        DisplayTheme::warning() },
     };
 
     for (uint8_t j = 0; j < 3; j++)

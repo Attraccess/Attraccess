@@ -8,6 +8,8 @@ int main(int argc, char **argv)
     SdlDisplay display;
     display.setCardPresenceCallback([&](size_t card, bool present) { presence.emplace_back(card, present); });
     display.setClearCardCallback([&](size_t card) { cleared.push_back(card); });
+    // These fixtures verify German captions and umlaut glyphs explicitly.
+    State::setDefaultLanguage("de");
     Display::setup(display);
     Display::transitionToScreen(&Display::initScreen);
     lv_refr_now(nullptr);

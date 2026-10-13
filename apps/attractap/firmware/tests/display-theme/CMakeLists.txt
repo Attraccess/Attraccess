@@ -91,6 +91,7 @@ endif()
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 enable_testing()
 add_test(NAME localization-audit COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/audit_localization.py")
+add_test(NAME localization-audit-tests COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_localization_audit.py")
 add_test(NAME display-theme-host COMMAND display-theme-host)
 add_test(NAME display-theme-repeatability COMMAND "${CMAKE_COMMAND}"
     "-DHARNESS=$<TARGET_FILE:display-theme-host>"

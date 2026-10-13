@@ -53,7 +53,7 @@ void SupervisionScreen::init()
    lv_obj_set_height(this->requesterNameLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->requesterNameLabel, LV_LABEL_LONG_WRAP);
    const char *initialName = this->view.requesterName.length() > 0 ? this->view.requesterName.c_str() : "...";
-   FirmwareI18n::setDynamicLabel(this->requesterNameLabel, initialName);
+   FirmwareI18n::setDynamicLabel(this->requesterNameLabel, initialName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
    lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->requesterNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->requesterNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -114,7 +114,7 @@ void SupervisionScreen::render(const View &view)
    }
    if (this->requesterNameLabel)
    {
-       FirmwareI18n::setDynamicLabel(this->requesterNameLabel, this->view.requesterName.c_str());
+       FirmwareI18n::setDynamicLabel(this->requesterNameLabel, this->view.requesterName.c_str()) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
    }
    this->updateTimeoutBar();
    this->applyStatus();

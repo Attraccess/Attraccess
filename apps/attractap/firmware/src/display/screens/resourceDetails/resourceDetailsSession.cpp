@@ -21,7 +21,7 @@ void ResourceDetailsScreen::updateElapsedTimeDisplay()
    double elapsedMillis = elapsedSeconds * 1000.0;
    // The formatted value only changes once per second; raw lv_label_set_text from
    // loop() would invalidate (re-render) the label every tick (ATT-554 item 5).
-   setDynamicLabelTextIfChanged(this->elapsedTime, millisToTimeString(elapsedMillis).c_str());
+   setDynamicLabelTextIfChanged(this->elapsedTime, millisToTimeString(elapsedMillis).c_str()) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
 }
 void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t value) { sessionHeader.setDeadline(value); }
 void ResourceDetailsScreen::setSessionTimeoutPaused(bool value) { sessionHeader.setPaused(value); }
@@ -49,10 +49,10 @@ void ResourceDetailsScreen::updateUsageStatsDisplay()
    FirmwareI18n::Text consumption;
    if (fresh) {
       for (const auto &meter : this->usageStats.meters) {
-         const auto reading = meter.value.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::WaitForReading) : FirmwareI18n::Text::literal(meter.value);
+         const auto reading = meter.value.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::WaitForReading) : FirmwareI18n::Text::literal(meter.value) /* i18n-data: Server-supplied meter name, reading or formatted billing rate; preserve exact contents. */;
          const auto rate = meter.creditsPerUnit >= 0 && !meter.formattedRate.empty()
-            ? FirmwareI18n::Text::format(FirmwareI18n::Message::MeterRate, {FirmwareI18n::Text::literal(meter.formattedRate)}) : FirmwareI18n::Text();
-         const auto line = FirmwareI18n::Text::format(FirmwareI18n::Message::MeterReading, {FirmwareI18n::Text::literal(meter.name), reading, rate});
+            ? FirmwareI18n::Text::format(FirmwareI18n::Message::MeterRate, {FirmwareI18n::Text::literal(meter.formattedRate) /* i18n-data: Server-supplied meter name, reading or formatted billing rate; preserve exact contents. */}) : FirmwareI18n::Text();
+         const auto line = FirmwareI18n::Text::format(FirmwareI18n::Message::MeterReading, {FirmwareI18n::Text::literal(meter.name) /* i18n-data: Server-supplied meter name, reading or formatted billing rate; preserve exact contents. */, reading, rate});
          consumption = consumption.empty() ? line : FirmwareI18n::Text::format(FirmwareI18n::Message::Lines, {consumption, line});
       }
    }
@@ -60,7 +60,7 @@ void ResourceDetailsScreen::updateUsageStatsDisplay()
    setLabelTextIfChanged(this->meterValue, consumption);
    FirmwareI18n::Text operating = FirmwareI18n::Message::NoData;
    if (fresh && this->usageStats.operatingDurationMs >= 0) {
-      operating = FirmwareI18n::Text::literal(millisToTimeString(this->usageStats.operatingDurationMs));
+      operating = FirmwareI18n::Text::literal(millisToTimeString(this->usageStats.operatingDurationMs)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
       if (this->usageStats.isOperating >= 0)
          operating = FirmwareI18n::Text::format(FirmwareI18n::Message::OperatingState, {operating, this->usageStats.isOperating ? FirmwareI18n::Message::Running : FirmwareI18n::Message::Idle});
    }

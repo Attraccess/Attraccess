@@ -105,13 +105,13 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
         return button;
     };
     auto *details = makeButton(false, DisplayTheme::surfaceSecondary());
-    auto *name = text(details, FirmwareI18n::Text::literal(resource.name), &attractap_font_montserrat_latin1_20, DisplayTheme::text());
+    auto *name = text(details, FirmwareI18n::Text::literal(resource.name) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */, &attractap_font_montserrat_latin1_20, DisplayTheme::text());
     lv_obj_set_height(name, 26);
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
-    FirmwareI18n::Text status = FirmwareI18n::Text::literal(resource.description);
+    FirmwareI18n::Text status = FirmwareI18n::Text::literal(resource.description) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
     if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser
         ? FirmwareI18n::Text(FirmwareI18n::Message::InUseByYou)
-        : FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(resource.activeUser)});
+        : FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(resource.activeUser) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */});
     else if (resource.isUnderMaintenance) status = FirmwareI18n::Message::Maintenance;
     else if (!resource.isHealthy) status = FirmwareI18n::Message::Unavailable;
     else if (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource) status = FirmwareI18n::Message::IntroductionRequired;
@@ -218,7 +218,7 @@ void ResourceListScreen::updateClockHeader() {
     lv_obj_set_flag(logo, LV_OBJ_FLAG_HIDDEN, !username.empty() || showClock);
     lv_obj_set_flag(clockHeader, LV_OBJ_FLAG_HIDDEN, !showClock);
     if (!showClock) return;
-    FirmwareI18n::setDynamicLabel(clockTime, WallClockText::clock(now).c_str());
+    FirmwareI18n::setDynamicLabel(clockTime, WallClockText::clock(now).c_str()) /* i18n-data: Numeric wall-clock time; date words use catalog messages. */;
     FirmwareI18n::setLabel(clockWeekday, WallClockText::weekday(now));
     FirmwareI18n::setLabel(clockDate, WallClockText::date(now, true));
 }

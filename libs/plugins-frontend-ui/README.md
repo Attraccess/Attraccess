@@ -37,6 +37,10 @@ take precedence over the configured system default. The system default is the
 fallback when neither has an English or German translation. Detection does not
 persist a fallback as a personal choice.
 
+Explicit selections are retained in memory when browser storage is unavailable.
+Detection and system fallback resolution update the displayed language without
+marking it as an explicit preference.
+
 ## Running unit tests
 
 Run `nx test plugins-frontend-ui` to execute the unit tests via [Vitest](https://vitest.dev/).

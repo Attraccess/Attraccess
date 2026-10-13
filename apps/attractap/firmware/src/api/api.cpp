@@ -176,6 +176,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     {
         const char *language = inboundDoc["data"]["payload"]["language"].as<const char *>();
         State::setDefaultLanguage(language ? language : "en");
+        if (language) Settings::saveDefaultLanguage(language);
     }
     else if (strcmp(eventType, "READER_REQUEST_AUTHENTICATION") == 0)
     {

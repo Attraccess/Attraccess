@@ -196,7 +196,7 @@ void InitScreen::createConnectionDetails(lv_obj_t *statesContainer)
    this->serverTargetLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->serverTargetLabel, lv_pct(100));
    lv_obj_set_height(this->serverTargetLabel, LV_SIZE_CONTENT);
-   FirmwareI18n::setLabel(this->serverTargetLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->serverTargetLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    lv_obj_set_style_text_font(this->serverTargetLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->serverTargetLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -204,14 +204,14 @@ void InitScreen::createConnectionDetails(lv_obj_t *statesContainer)
    lv_obj_set_width(this->certLabel, lv_pct(100));
    lv_obj_set_height(this->certLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->certLabel, LV_LABEL_LONG_DOT);
-   FirmwareI18n::setLabel(this->certLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->certLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    lv_obj_set_style_text_font(this->certLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->certLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->connectionStateLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
    lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
-   FirmwareI18n::setLabel(this->connectionStateLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->connectionStateLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    lv_obj_set_style_text_font(this->connectionStateLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -338,7 +338,7 @@ void InitScreen::loop()
    // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)
    if (networkState.wifi_connected)
    {
-      setLabelTextIfChanged(this->wifiLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::WifiAddress, {FirmwareI18n::Text::literal(this->formatIp(networkState.wifi_ip))}));
+      setLabelTextIfChanged(this->wifiLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::WifiAddress, {FirmwareI18n::Text::literal(this->formatIp(networkState.wifi_ip)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
       this->applyStage(this->wifiSpinner, this->wifiLabel, StageState::SUCCESS, this->wifiStage);
    }
    else
@@ -349,7 +349,7 @@ void InitScreen::loop()
 
    if (networkState.ethernet_connected)
    {
-      setLabelTextIfChanged(this->ethernetLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EthernetAddress, {FirmwareI18n::Text::literal(this->formatIp(networkState.ethernet_ip))}));
+      setLabelTextIfChanged(this->ethernetLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EthernetAddress, {FirmwareI18n::Text::literal(this->formatIp(networkState.ethernet_ip)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
       this->applyStage(this->ethernetSpinner, this->ethernetLabel, StageState::SUCCESS, this->ethernetStage);
    }
    else
@@ -395,17 +395,17 @@ void InitScreen::loop()
    {
       setLabelTextIfChanged(this->serverTargetLabel, FirmwareI18n::Text::format(
          websocketState.useSSL ? FirmwareI18n::Message::ServerSsl : FirmwareI18n::Message::ServerNoSsl,
-         {FirmwareI18n::Text::literal(websocketState.hostname), FirmwareI18n::Text::literal(std::to_string(websocketState.port))}));
+         {FirmwareI18n::Text::literal(websocketState.hostname) /* i18n-data: Network hostname or certificate name supplied by connection state; preserve exact contents. */, FirmwareI18n::Text::literal(std::to_string(websocketState.port)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
    }
 
    // Cert evaluation line (only relevant while connecting over SSL)
    if (websocketState.useSSL && !websocketState.connected && websocketState.certCount > 0)
    {
       const auto retry = websocketState.rememberedRetryCount > 0
-         ? FirmwareI18n::Text::format(FirmwareI18n::Message::RetryCount, {FirmwareI18n::Text::literal(std::to_string(websocketState.rememberedRetryCount))}) : FirmwareI18n::Text();
+         ? FirmwareI18n::Text::format(FirmwareI18n::Message::RetryCount, {FirmwareI18n::Text::literal(std::to_string(websocketState.rememberedRetryCount)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}) : FirmwareI18n::Text();
       const auto cert = websocketState.certLocked
-         ? FirmwareI18n::Text::format(FirmwareI18n::Message::CertificateLocked, {FirmwareI18n::Text::literal(websocketState.certName), retry})
-         : FirmwareI18n::Text::format(FirmwareI18n::Message::CertificateAttempt, {FirmwareI18n::Text::literal(websocketState.certName), FirmwareI18n::Text::literal(std::to_string(websocketState.certIndex + 1)), FirmwareI18n::Text::literal(std::to_string(websocketState.certCount)), retry});
+         ? FirmwareI18n::Text::format(FirmwareI18n::Message::CertificateLocked, {FirmwareI18n::Text::literal(websocketState.certName) /* i18n-data: Network hostname or certificate name supplied by connection state; preserve exact contents. */, retry})
+         : FirmwareI18n::Text::format(FirmwareI18n::Message::CertificateAttempt, {FirmwareI18n::Text::literal(websocketState.certName) /* i18n-data: Network hostname or certificate name supplied by connection state; preserve exact contents. */, FirmwareI18n::Text::literal(std::to_string(websocketState.certIndex + 1)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */, FirmwareI18n::Text::literal(std::to_string(websocketState.certCount)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */, retry});
       setLabelTextIfChanged(this->certLabel, cert);
       if (lv_obj_has_flag(this->certLabel, LV_OBJ_FLAG_HIDDEN))
       {
@@ -424,7 +424,7 @@ void InitScreen::loop()
    FirmwareI18n::Text suffix;
    if (!networkUp) suffix = FirmwareI18n::Message::WaitNetwork;
    else if (!websocketState.connected && websocketState.secondsUntilNextAttempt > 0)
-      suffix = FirmwareI18n::Text::format(FirmwareI18n::Message::NextAttempt, {FirmwareI18n::Text::literal(std::to_string(websocketState.secondsUntilNextAttempt))});
+      suffix = FirmwareI18n::Text::format(FirmwareI18n::Message::NextAttempt, {FirmwareI18n::Text::literal(std::to_string(websocketState.secondsUntilNextAttempt)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */});
    setLabelTextIfChanged(this->connectionStateLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::StatusLine, {phase, suffix}));
 }
 

@@ -1,7 +1,7 @@
 /** Recognize a complete supported locale without turning an unsupported language into English. */
 export function getSupportedDeviceLanguage(locale: string | null | undefined): 'en' | 'de' | undefined {
   try {
-    // Share the firmware's ASCII whitespace policy; reject Unicode padding.
+    // Normalize legacy locale spellings at the server/browser boundary; reject Unicode padding.
     const input = locale ?? '';
     let start = 0;
     let end = input.length;

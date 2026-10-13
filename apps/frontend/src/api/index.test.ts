@@ -7,7 +7,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   localStorage.clear();
   sessionStorage.clear();
-  useTranslationState.setState({ language: 'en' });
+  useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
 });
 
 it.each([
@@ -49,6 +49,34 @@ it('sends the current interface language, including changes after client configu
   useTranslationState.setState({ language: 'en' });
   await SettingsService.getSystemLanguage();
   expect(new Headers(fetchMock.mock.calls[1][1].headers).get('Accept-Language')).toBe('en');
+});
+
+it.each([
+  { browser: 'fr-FR', choice: 'en' as const },
+  { browser: 'en-US', choice: 'de' as const },
+])('registers an explicit $choice choice when browser storage is blocked', async ({ browser, choice }) => {
+  localStorage.clear();
+  sessionStorage.clear();
+  vi.stubGlobal('navigator', { language: browser, languages: [browser] });
+  vi.stubGlobal('localStorage', {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('Storage unavailable');
+    },
+  });
+  const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+  vi.stubGlobal('fetch', fetchMock);
+  configureApiClient();
+  useTranslationState.getState().setLanguage(choice);
+  await UsersService.createOneUser({
+    requestBody: {
+      username: 'registration-fixture',
+      email: 'registration@example.com',
+      password: 'fixture-password',
+      strategy: AuthenticationType.LOCAL_PASSWORD,
+    },
+  });
+  expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Accept-Language')).toBe(choice);
 });
 
 it('keeps a scoped npm package name in one API path segment', async () => {

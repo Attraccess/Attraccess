@@ -44,7 +44,7 @@ struct ReaderWorkflow
     application.setup();
     State::setWifiState(true, {}, "Test");
     State::setWebsocketState(true, "reader.test", 80, false);
-    State::setApiState(true, "Test reader");
+    State::setApiState(true, "Test reader", "de");
     longDescription =
         "RFI 5-2 · Angstrom Engineering · Åmod · evaporation tool with a long description that must remain readable in details. ";
     while (longDescription.size() < 600)

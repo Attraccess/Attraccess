@@ -57,7 +57,7 @@ void EnrollmentScreen::init()
    lv_obj_set_height(this->userNameLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->userNameLabel, LV_LABEL_LONG_WRAP);
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
-   FirmwareI18n::setDynamicLabel(this->userNameLabel, initialName);
+   FirmwareI18n::setDynamicLabel(this->userNameLabel, initialName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -106,7 +106,7 @@ void EnrollmentScreen::setUserName(std::string userName)
    this->userNameCache = userName;
    if (this->userNameLabel)
    {
-      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str());
+      FirmwareI18n::setDynamicLabel(this->userNameLabel, userName.c_str()) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
    }
 }
 

@@ -28,13 +28,13 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
          useTranslatedHint = false;
       }
       if (useTranslatedHint) FirmwareI18n::setLabel(widget.previewLabel, FirmwareI18n::Message::TapToEnter);
-      else FirmwareI18n::setDynamicLabel(widget.previewLabel, hint);
+      else FirmwareI18n::setDynamicLabel(widget.previewLabel, hint) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */;
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
    {
       const std::string displayValue = makeLVGLDisplayText(widget.textValue);
-      FirmwareI18n::setDynamicLabel(widget.previewLabel, displayValue.c_str());
+      FirmwareI18n::setDynamicLabel(widget.previewLabel, displayValue.c_str()) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */;
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 }
@@ -58,7 +58,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
       {
          title += " *";
       }
-      FirmwareI18n::setDynamicLabel(this->formsEditorTitleLabel, title.c_str());
+      FirmwareI18n::setDynamicLabel(this->formsEditorTitleLabel, title.c_str()) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */;
    }
 
    bool multiline = widget.definition && widget.type == API::ResourceUsageFormFieldType::TEXT &&
@@ -80,7 +80,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
    {
       placeholder = widget.definition->options.text.placeholder.c_str();
    }
-   FirmwareI18n::setDynamicPlaceholder(this->formsEditorTextarea, placeholder);
+   FirmwareI18n::setDynamicPlaceholder(this->formsEditorTextarea, placeholder) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */;
    this->formsEditorInitialText = makeLVGLDisplayText(widget.textValue);
    lv_textarea_set_text(this->formsEditorTextarea, this->formsEditorInitialText.c_str());
    lv_textarea_set_cursor_pos(this->formsEditorTextarea, LV_TEXTAREA_CURSOR_LAST);
@@ -158,7 +158,7 @@ void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
    lv_obj_set_style_pad_column(editorHeader, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->formsEditorTitleLabel = lv_label_create(editorHeader);
-   FirmwareI18n::setLabel(this->formsEditorTitleLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->formsEditorTitleLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
    lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(this->formsEditorTitleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -169,7 +169,7 @@ void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
    lv_obj_set_size(editorCancelBtn, 34, 34);
    DisplayTheme::secondaryButton(editorCancelBtn);
    lv_obj_t *editorCancelLabel = lv_label_create(editorCancelBtn);
-   FirmwareI18n::setLabel(editorCancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE));
+   FirmwareI18n::setLabel(editorCancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE) /* i18n-data: Language-neutral LVGL icon glyph. */);
    lv_obj_center(editorCancelLabel);
    lv_obj_add_event_cb(editorCancelBtn, &ResourceDetailsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
 

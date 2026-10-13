@@ -100,13 +100,16 @@ export type Language = keyof TranslationModules;
 
 interface TranslationState {
   language: Language;
+  /** A personal choice survives disabled browser storage; resolved fallbacks do not set it. */
+  explicitLanguage: Language | undefined;
   setLanguage: (language: Language) => void;
 }
 export const useTranslationState = create<TranslationState>((set) => ({
   language: 'en',
+  explicitLanguage: undefined,
   setLanguage: (language) => {
     const supportedLanguage = language === 'de' ? 'de' : 'en';
-    set({ language: supportedLanguage });
+    set({ language: supportedLanguage, explicitLanguage: supportedLanguage });
     try {
       globalThis.localStorage?.setItem(I18N_LANGUAGE_STORAGE_KEY, supportedLanguage);
     } catch {
@@ -212,6 +215,8 @@ export function useTranslations(
 
 /** Explicit browser choices precede supported browser languages, then the system fallback. */
 export function detectPreferredLanguage(): Language | undefined {
+  const explicit = useTranslationState.getState().explicitLanguage;
+  if (explicit) return explicit;
   let stored: Language | undefined;
   try {
     stored =

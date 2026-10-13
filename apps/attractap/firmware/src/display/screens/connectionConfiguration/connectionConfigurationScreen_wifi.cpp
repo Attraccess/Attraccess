@@ -117,7 +117,7 @@ void ConnectionConfigurationScreen::populateWifiDropdown()
    }
 
    this->wifiDropdownHasNetworks = true;
-   FirmwareI18n::setDynamicDropdownOptions(this->wifiSelectNetwork, options.c_str());
+   FirmwareI18n::setDynamicDropdownOptions(this->wifiSelectNetwork, options.c_str()) /* i18n-data: Scanned Wi-Fi SSIDs joined as dropdown options; preserve network names and selection. */;
    if (selectedFound)
    {
       lv_dropdown_set_selected(this->wifiSelectNetwork, selectedIndex);

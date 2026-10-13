@@ -47,21 +47,21 @@ void SessionSummaryScreen::init() {
     lv_obj_set_style_line_width(check, 6, 0);
     lv_obj_set_style_line_rounded(check, true, 0);
     lv_obj_set_style_line_color(check, DisplayTheme::success(), 0);
-    label(FirmwareI18n::Text::format(FirmwareI18n::Message::SummaryThanks, {FirmwareI18n::Text::literal(name)}), 20, 224, 440, &attractap_font_montserrat_latin1_32, DisplayTheme::text());
+    label(FirmwareI18n::Text::format(FirmwareI18n::Message::SummaryThanks, {FirmwareI18n::Text::literal(name) /* i18n-data: Server-supplied cardholder name within the translated greeting; preserve exact contents. */}), 20, 224, 440, &attractap_font_montserrat_latin1_32, DisplayTheme::text());
     const bool billed = !charge.empty();
     const int durationX = billed ? 50 : 140;
     label(FirmwareI18n::Message::Duration, durationX, 286, 200, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
-    label(FirmwareI18n::Text::literal(duration), durationX, 313, 200, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
+    label(FirmwareI18n::Text::literal(duration) /* i18n-data: Formatted numeric session duration; preserve exact value. */, durationX, 313, 200, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
     if (billed) {
         label(FirmwareI18n::Message::SummaryBilled, 250, 286, 180, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
-        auto *total = label(FirmwareI18n::Text::literal(charge), 250, 313, 180, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
+        auto *total = label(FirmwareI18n::Text::literal(charge) /* i18n-data: Server-supplied formatted amount and currency; preserve exact value. */, 250, 313, 180, &attractap_font_montserrat_latin1_18, DisplayTheme::text());
         // Long formatted charges remain fully available without crossing columns.
         lv_label_set_long_mode(total, LV_LABEL_LONG_SCROLL_CIRCULAR);
     }
     label(FirmwareI18n::Message::SummaryFarewell, 20, 363, 440, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
-    auto *brand = label(FirmwareI18n::Text::literal("Attractap"), 20, 452, 140, &lv_font_montserrat_14, DisplayTheme::muted());
+    auto *brand = label(FirmwareI18n::Text::literal("Attractap") /* i18n-data: Language-neutral product name. */, 20, 452, 140, &lv_font_montserrat_14, DisplayTheme::muted());
     lv_obj_set_style_text_align(brand, LV_TEXT_ALIGN_LEFT, 0);
-    auto *variant = label(FirmwareI18n::Text::literal(FIRMWARE_VARIANT_FRIENDLY_NAME), 240, 452, 220, &lv_font_montserrat_14, DisplayTheme::muted());
+    auto *variant = label(FirmwareI18n::Text::literal(FIRMWARE_VARIANT_FRIENDLY_NAME) /* i18n-data: Build-provided device variant name; preserve exact contents. */, 240, 452, 220, &lv_font_montserrat_14, DisplayTheme::muted());
     lv_obj_set_style_text_align(variant, LV_TEXT_ALIGN_RIGHT, 0);
 }
 

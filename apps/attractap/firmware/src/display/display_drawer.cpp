@@ -35,7 +35,7 @@ namespace
         lv_obj_set_style_pad_row(btn, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_t *icon = lv_label_create(btn);
-        FirmwareI18n::setDynamicLabel(icon, symbol);
+        FirmwareI18n::setDynamicLabel(icon, symbol) /* i18n-data: Language-neutral LVGL icon glyph. */;
         lv_obj_set_style_text_font(icon, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_t *lbl = lv_label_create(btn);

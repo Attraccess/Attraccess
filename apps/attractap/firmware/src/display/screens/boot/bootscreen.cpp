@@ -14,7 +14,7 @@ void BootScreen::init()
 
     // Main title
     lv_obj_t *title_label = lv_label_create(this->screen);
-    FirmwareI18n::setLabel(title_label, FirmwareI18n::Text::literal("Attraccess"));
+    FirmwareI18n::setLabel(title_label, FirmwareI18n::Text::literal("Attraccess") /* i18n-data: Language-neutral product or role name. */);
     lv_obj_set_style_text_font(title_label, &lv_font_montserrat_48, 0);
     lv_obj_set_style_text_color(title_label, DisplayTheme::text(), 0);
     lv_obj_align(title_label, LV_ALIGN_CENTER, 0, -60);
@@ -22,7 +22,7 @@ void BootScreen::init()
     // Firmware info
     lv_obj_t *firmware_label = lv_label_create(this->screen);
     std::string firmware_info = std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION;
-    FirmwareI18n::setDynamicLabel(firmware_label, firmware_info.c_str());
+    FirmwareI18n::setDynamicLabel(firmware_label, firmware_info.c_str()) /* i18n-data: Build or server firmware name/version data; preserve exact version contents. */;
     lv_obj_set_style_text_font(firmware_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(firmware_label, DisplayTheme::muted(), 0);
     lv_obj_align(firmware_label, LV_ALIGN_CENTER, 0, 20);

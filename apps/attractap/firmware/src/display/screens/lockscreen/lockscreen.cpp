@@ -76,7 +76,7 @@ void Lockscreen::init()
     lv_label_set_long_mode(this->resourceNameLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->resourceNameLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setLabel(this->resourceNameLabel, FirmwareI18n::Text::literal("???"));
+    FirmwareI18n::setLabel(this->resourceNameLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
     lv_obj_set_style_text_color(this->resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->resourceNameLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -86,7 +86,7 @@ void Lockscreen::init()
     lv_label_set_long_mode(this->usageInfoLabel, LV_LABEL_LONG_DOT);
     lv_obj_set_height(this->usageInfoLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->usageInfoLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Text::literal("???"));
+    FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
     lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->initWallClock();
@@ -139,7 +139,7 @@ void Lockscreen::initWallClock()
     lv_obj_remove_flag(this->cardPrompt, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *arrow = lv_label_create(this->cardPrompt);
-    FirmwareI18n::setLabel(arrow, FirmwareI18n::Text::literal(LV_SYMBOL_RIGHT));
+    FirmwareI18n::setLabel(arrow, FirmwareI18n::Text::literal(LV_SYMBOL_RIGHT) /* i18n-data: Language-neutral arrow icon. */);
     lv_obj_set_style_text_font(arrow, &lv_font_montserrat_20, 0);
     lv_obj_set_style_text_color(arrow, DisplayTheme::primary(), 0);
 
@@ -172,7 +172,7 @@ void Lockscreen::updateWallClock()
     {
         return;
     }
-    FirmwareI18n::setDynamicLabel(this->clockTimeLabel, WallClockText::clock(now).c_str());
+    FirmwareI18n::setDynamicLabel(this->clockTimeLabel, WallClockText::clock(now).c_str()) /* i18n-data: Numeric wall-clock time; date words and prompt use catalog messages. */;
     FirmwareI18n::setLabel(this->clockDateLabel, FirmwareI18n::Text::format(
         FirmwareI18n::Message::ClockDayDate, {WallClockText::weekday(now), WallClockText::date(now, false)}));
 }
@@ -236,12 +236,12 @@ void Lockscreen::updateUsageInfo()
     // Resource names come from the server and must not be treated as catalog
     // keys. The label starts with a localized placeholder, so clear that
     // registration before replacing it with server supplied text.
-    FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName);
+    FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
 
     // Status priority mirrors the web resource list: in use > maintenance > available.
     if (this->hasActiveUsage)
     {
-        const auto usageText = FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(this->username)});
+        const auto usageText = FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(this->username) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */});
         FirmwareI18n::setLabel(this->usageInfoLabel, usageText);
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }

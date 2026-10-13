@@ -40,7 +40,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_x(Display::deviceNameLabel, -75);
     lv_obj_set_y(Display::deviceNameLabel, -18);
     lv_obj_set_align(Display::deviceNameLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, Display::deviceNameInitValue.c_str());
+    FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, Display::deviceNameInitValue.c_str()) /* i18n-data: Server-supplied reader name; preserve exact contents. */;
 
     lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -50,7 +50,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_width(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_height(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(firmwareLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setDynamicLabel(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str());
+    FirmwareI18n::setDynamicLabel(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str()) /* i18n-data: Build or server firmware name/version data; preserve exact version contents. */;
     lv_obj_set_style_text_color(firmwareLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(firmwareLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(firmwareLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -142,7 +142,7 @@ void Display::setDeviceName(std::string deviceName)
         {
             if (Display::deviceNameLabel)
             {
-                FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, (const char *)p);
+                FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, (const char *)p) /* i18n-data: Server-supplied reader name; preserve exact contents. */;
             }
             free(p);
         },

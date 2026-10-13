@@ -173,7 +173,7 @@ void ResourceDetailsScreen::createSessionControls()
    lv_obj_add_event_cb(this->clearProjectButton, &ResourceDetailsScreen::onClearProjectSelectionClick, LV_EVENT_CLICKED, this);
 
    lv_obj_t *clearProjectLabel = lv_label_create(this->clearProjectButton);
-   FirmwareI18n::setLabel(clearProjectLabel, FirmwareI18n::Text::literal("X"));
+   FirmwareI18n::setLabel(clearProjectLabel, FirmwareI18n::Text::literal("X") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
    lv_obj_set_align(clearProjectLabel, LV_ALIGN_CENTER);
    lv_obj_set_style_text_align(clearProjectLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    this->updateClearProjectButtonState();
@@ -258,7 +258,7 @@ void ResourceDetailsScreen::createSessionDetails()
    lv_obj_set_width(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->sessionStartTimeLabel, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->sessionStartTimeLabel, FirmwareI18n::Text::literal("??.??. ??:??"));
+   FirmwareI18n::setLabel(this->sessionStartTimeLabel, FirmwareI18n::Text::literal("??.??. ??:??") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
    lv_obj_set_style_text_font(this->sessionStartTimeLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->sessionStartTimeLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -292,7 +292,7 @@ void ResourceDetailsScreen::createSessionDetails()
    lv_obj_set_align(this->currentUser, LV_ALIGN_CENTER);
    lv_label_set_long_mode(this->currentUser, LV_LABEL_LONG_SCROLL_CIRCULAR);
    lv_obj_set_style_text_align(this->currentUser, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   FirmwareI18n::setLabel(this->currentUser, FirmwareI18n::Text::literal("JappyJan"));
+   FirmwareI18n::setLabel(this->currentUser, FirmwareI18n::Text::literal("JappyJan") /* i18n-data: Initial example username, replaced by the server user without translation. */);
     lv_obj_set_style_text_font(this->currentUser, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->currentUser, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -320,7 +320,7 @@ void ResourceDetailsScreen::createSessionDetails()
    lv_obj_set_width(this->elapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_height(this->elapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_align(this->elapsedTime, LV_ALIGN_CENTER);
-   FirmwareI18n::setLabel(this->elapsedTime, FirmwareI18n::Text::literal("00:23:46"));
+   FirmwareI18n::setLabel(this->elapsedTime, FirmwareI18n::Text::literal("00:23:46") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
    lv_obj_set_style_text_font(this->elapsedTime, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->elapsedTime, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -388,7 +388,7 @@ void ResourceDetailsScreen::createStatusPanels()
    lv_label_set_long_mode(this->introducersListLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_height(this->introducersListLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setLabel(this->introducersListLabel, FirmwareI18n::Text::literal("???"));
+    FirmwareI18n::setLabel(this->introducersListLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
     lv_obj_set_style_text_font(this->introducersListLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->maintenancePanel = lv_obj_create(this->screen);
@@ -417,7 +417,7 @@ void ResourceDetailsScreen::createStatusPanels()
    lv_obj_set_width(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->maintenanceIntroducersLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, FirmwareI18n::Text::literal("???"));
+    FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
     lv_obj_set_style_text_font(this->maintenanceIntroducersLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->healthPanel = lv_obj_create(this->screen);
@@ -447,7 +447,7 @@ void ResourceDetailsScreen::createStatusPanels()
    lv_obj_set_height(this->healthReasonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->healthReasonLabel, LV_ALIGN_CENTER);
    lv_label_set_long_mode(this->healthReasonLabel, LV_LABEL_LONG_WRAP);
-   FirmwareI18n::setLabel(this->healthReasonLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->healthReasonLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
     lv_obj_set_style_text_color(this->healthReasonLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->healthReasonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);

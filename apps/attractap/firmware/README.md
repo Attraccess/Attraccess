@@ -36,7 +36,7 @@ this).
 
 ## Language protocol compatibility and rollback
 
-Firmware 1.6.4 retains English/German display localization. The server sends a
+Firmware 1.6.5 adds English/German display localization. The server sends a
 default language in `READER_AUTHENTICATED`, a cardholder language in
 `CARD_AUTHENTICATION_DATA`, and default changes through `READER_LANGUAGE`.
 `CARD_AUTHENTICATION_DATA.languageFallback` marks a missing or unsupported
@@ -45,10 +45,19 @@ to older readers; current firmware follows live default changes during that sess
 Form validation replies retain `message` and add a stable `code` for translation.
 Existing event names, credentials and field values keep their meaning.
 
+A reader without a cached API default starts in English, including offline setup
+and connection screens. Valid `en`/`de` defaults received from the API are saved
+in the existing settings store and restored on reboot. Disconnects clear the
+personal language while retaining this system default. Cardholder languages are
+never saved as the device default. Repeated unchanged defaults do not rewrite
+flash; missing or malformed fields do not overwrite the persisted choice.
+Locale variants are normalized by the server; firmware accepts canonical
+`en`/`de` wire values and uses English for a noncanonical default.
+
 | Server | Reader firmware | Behavior |
 | --- | --- | --- |
-| With language support | 1.6.4 | The system default applies outside a cardholder session; a supported user's language applies during the session, with the system default as fallback for missing or unsupported user languages. Form error identifiers translate in both languages. |
-| Without language support | 1.6.4 | Missing authentication language fields select English. Form errors without a code show the English invalid-input fallback. Resource and card operations retain their existing protocol. |
+| With language support | 1.6.5 | The system default applies outside a cardholder session; a supported user's language applies during the session, with the system default as fallback for missing or unsupported user languages. Form error identifiers translate in both languages. |
+| Without language support | 1.6.5 | Missing authentication language fields select English. Form errors without a code show the English invalid-input fallback. Resource and card operations retain their existing protocol. |
 | With language support | Pre-localization implementation on main | Additional payload fields are ignored. `READER_LANGUAGE` is acknowledged, then logged as an unknown event; it does not change authentication or resource state. Existing German screens remain unchanged. Form errors still use the retained `message`. |
 
 The predecessor behavior was inspected at main commit
@@ -59,14 +68,15 @@ ignores the added language field. This is source evidence for that predecessor,
 not verification of every deployed firmware build.
 
 For rollback, restore the previous server release first, then reconnect readers
-so they receive its authentication response. Readers still running 1.6.4 use
+so they receive its authentication response. Readers still running 1.6.5 use
 English until their firmware is restored. Restore each reader's previous
 variant-specific firmware image next; the predecessor uses its existing German
 interface. Retained server language settings need no deletion. Confirm reader
 authentication, a card login, a resource action and logout after rollback.
 
 Desktop tests exercise missing reader/card language fields, legacy form errors,
-default changes during sessions and restoring the latest default at logout.
+default changes during sessions, restoring the latest default at logout, and
+loading the cached default after an offline reboot.
 These checks use the production parser with a simulated server. Deployed-reader
 rollback, physical NFC and live networking remain unverified.
 
@@ -76,7 +86,7 @@ Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v
 
 NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
-Build the active `attractap-touch` and `attractap-touch-v2` variants (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
+Build the four active variants: `attractap-touch`, `attractap-touch-v2`, `attractap-touch-demo` and `attractap-touch-v2-demo` (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
 
 ```bash
 python3 build_firmwares.py

@@ -45,7 +45,7 @@ lv_obj_t *PinInputPage::init(const FirmwareI18n::Text &title, lv_obj_t *parent)
     lv_obj_set_x(this->devicePin, -128);
     lv_obj_set_y(this->devicePin, -157);
     lv_obj_set_align(this->devicePin, LV_ALIGN_CENTER);
-    FirmwareI18n::setDynamicPlaceholder(this->devicePin, "0000");
+    FirmwareI18n::setDynamicPlaceholder(this->devicePin, "0000") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */;
     lv_textarea_set_one_line(this->devicePin, true);
     lv_textarea_set_accepted_chars(this->devicePin, "0123456789");
     lv_obj_set_style_text_font(this->devicePin, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);

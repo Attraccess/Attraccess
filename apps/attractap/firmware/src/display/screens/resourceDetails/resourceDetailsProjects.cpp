@@ -68,7 +68,7 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
    }
 
    const auto caption = this->selectedProjectId != 0 && !this->selectedProjectName.empty()
-      ? FirmwareI18n::Text::format(FirmwareI18n::Message::ProjectName, {FirmwareI18n::Text::literal(this->selectedProjectName)})
+      ? FirmwareI18n::Text::format(FirmwareI18n::Message::ProjectName, {FirmwareI18n::Text::literal(this->selectedProjectName) /* i18n-data: Server-supplied project name; preserve exact contents. */})
       : FirmwareI18n::Text(FirmwareI18n::Message::ChooseProject);
    FirmwareI18n::setLabel(this->projectsButtonLabel, caption);
 }
@@ -156,7 +156,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_pad_all(closeButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(closeButton, &ResourceDetailsScreen::onProjectsModalClose, LV_EVENT_CLICKED, this);
    lv_obj_t *closeLabel = lv_label_create(closeButton);
-   FirmwareI18n::setLabel(closeLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE));
+   FirmwareI18n::setLabel(closeLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE) /* i18n-data: Language-neutral LVGL icon glyph. */);
    lv_obj_center(closeLabel);
 
    this->projectsListContainer = lv_obj_create(panel);
@@ -400,7 +400,7 @@ void ResourceDetailsScreen::rebuildProjectsList()
       lv_obj_t *label = lv_label_create(btn);
       if (project.name.length() > 0)
       {
-      FirmwareI18n::setDynamicLabel(label, project.name.c_str());
+      FirmwareI18n::setDynamicLabel(label, project.name.c_str()) /* i18n-data: Server-supplied project name; preserve exact contents. */;
       }
       else
       {
@@ -426,7 +426,7 @@ void ResourceDetailsScreen::updateProjectsPaginationControls()
 
    if (this->projectsPaginationLabel)
    {
-      FirmwareI18n::setLabel(this->projectsPaginationLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::Pagination, {FirmwareI18n::Text::literal(std::to_string(this->projectsCurrentPage)), FirmwareI18n::Text::literal(std::to_string(totalPages))}));
+      FirmwareI18n::setLabel(this->projectsPaginationLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::Pagination, {FirmwareI18n::Text::literal(std::to_string(this->projectsCurrentPage)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */, FirmwareI18n::Text::literal(std::to_string(totalPages)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
    }
 
    if (this->projectsPrevButton)

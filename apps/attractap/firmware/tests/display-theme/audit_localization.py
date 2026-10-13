@@ -2,8 +2,8 @@
 """Enforce explicit localization ownership, alongside the source inventory.
 
 Typed setters reject accidental string-based UI messages at compile time. This
-check adds English fallback/catalog checks and a reviewed allowlist for every
-literal data path, so a new unclassified visible write fails the host tests.
+check adds English fallback/catalog checks and requires a local explanation for
+literal data paths, so a new unclassified visible write fails the host tests.
 """
 
 import json
@@ -12,7 +12,6 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2] / "src" / "display"
-CLASSIFICATIONS = Path(__file__).with_name("localization_literals.json")
 RAW_WRITE = re.compile(
     r"\b(?:lv_label_set_text(?:_fmt|_static)?|lv_textarea_set_placeholder_text|"
     r"lv_dropdown_(?:set_options|add_option|set_text)|lv_roller_set_options|"
@@ -20,6 +19,7 @@ RAW_WRITE = re.compile(
 )
 LITERAL = re.compile(r"\b(?:FirmwareI18n::(?:setDynamic(?:Label|DropdownOptions|Placeholder)|Text::literal)|setDynamicLabelTextIfChanged)\s*\(")
 MESSAGE = re.compile(r"FirmwareI18n::Message::(\w+)")
+OWNERSHIP = re.compile(r"\s*/\*\s*i18n-data:\s*(.*?)\*/", re.S)
 
 
 def calls(source: str, pattern: re.Pattern):
@@ -44,7 +44,7 @@ def calls(source: str, pattern: re.Pattern):
             elif char == ")":
                 depth -= 1
             pos += 1
-        yield " ".join(source[match.start():pos].split())
+        yield " ".join(source[match.start():pos].split()), pos
 
 
 def literal_inventory():
@@ -52,7 +52,11 @@ def literal_inventory():
     for source in sorted(ROOT.rglob("*")):
         if source.suffix not in {".cpp", ".hpp"} or source.name in {"i18n.hpp", "messages.hpp"}:
             continue
-        writes = sorted(set(calls(source.read_text(), LITERAL)))
+        content = source.read_text()
+        writes = []
+        for write, end in calls(content, LITERAL):
+            explanation = OWNERSHIP.match(content, end)
+            writes.append((write, explanation[1].strip() if explanation else ""))
         if writes:
             result[str(source.relative_to(ROOT))] = writes
     return result
@@ -77,18 +81,16 @@ def main() -> int:
         if source.name in {"i18n.hpp", "messages.hpp"}:
             continue
         content = source.read_text()
-        for write in calls(content, RAW_WRITE):
+        for write, _end in calls(content, RAW_WRITE):
             errors.append(f"{source.relative_to(ROOT)}: raw text write needs an explicit ownership setter: {write}")
         for identifier in MESSAGE.findall(content):
             if identifier not in ids:
                 errors.append(f"{source.relative_to(ROOT)}: unknown message {identifier}")
-    reviewed = json.loads(CLASSIFICATIONS.read_text())
     actual = literal_inventory()
-    for source in sorted(set(actual) | set(reviewed)):
-        expected = reviewed.get(source, {})
-        for write in set(actual.get(source, [])) | set(expected):
-            if write not in actual.get(source, []) or not expected.get(write):
-                errors.append(f"{source}: unreviewed or obsolete literal classification: {write}")
+    for source, writes in actual.items():
+        for write, explanation in writes:
+            if not explanation:
+                errors.append(f"{source}: literal write needs an i18n-data ownership comment: {write}")
     print(f"Inspected {len(units)} display units, {len(entries)} messages, {sum(map(len, actual.values()))} explicitly classified literal paths")
     for source, writes in actual.items():
         print(f"{source}: {len(writes)} reviewed data/neutral paths")

@@ -230,27 +230,27 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    {
       return;
    }
-   FirmwareI18n::setDynamicLabel(this->resourceName, resource.name);
-   FirmwareI18n::setDynamicLabel(this->resourceDescription, resource.description.c_str());
+   FirmwareI18n::setDynamicLabel(this->resourceName, resource.name) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
+   FirmwareI18n::setDynamicLabel(this->resourceDescription, resource.description.c_str()) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
 
    // Update introducer/maintainer panel lists (same set of allowed users)
    std::string introducersText = this->buildIntroducersText(resource);
    if (this->introducersListLabel)
    {
       if (resource.introducers.empty()) FirmwareI18n::setLabel(this->introducersListLabel, FirmwareI18n::Message::NoIntroducerAvailable);
-      else FirmwareI18n::setDynamicLabel(this->introducersListLabel, introducersText.c_str());
+      else FirmwareI18n::setDynamicLabel(this->introducersListLabel, introducersText.c_str()) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
    }
    if (this->maintenanceIntroducersLabel)
    {
       if (resource.introducers.empty()) FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, FirmwareI18n::Message::NoIntroducerAvailable);
-      else FirmwareI18n::setDynamicLabel(this->maintenanceIntroducersLabel, introducersText.c_str());
+      else FirmwareI18n::setDynamicLabel(this->maintenanceIntroducersLabel, introducersText.c_str()) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
    }
 
    // Update health banner reason text
    if (this->healthReasonLabel)
    {
       if (resource.healthReason[0] != '\0')
-         FirmwareI18n::setDynamicLabel(this->healthReasonLabel, resource.healthReason);
+         FirmwareI18n::setDynamicLabel(this->healthReasonLabel, resource.healthReason) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
       else
          FirmwareI18n::setLabel(this->healthReasonLabel, FirmwareI18n::Message::NoReasonProvided);
    }
@@ -262,8 +262,8 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    {
       // Persist the session start time so periodic updates can compute elapsed time correctly
       this->sessionStartTime = (time_t)resource.activeStartEpoch;
-      FirmwareI18n::setDynamicLabel(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str());
-      FirmwareI18n::setDynamicLabel(this->currentUser, resource.activeUser);
+      FirmwareI18n::setDynamicLabel(this->sessionStartTimeLabel, timeToTimeString(this->sessionStartTime, resource.activeStartUtcOffsetMinutes).c_str()) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
+      FirmwareI18n::setDynamicLabel(this->currentUser, resource.activeUser) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
    }
 
    lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
@@ -318,7 +318,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
       lv_obj_set_height(labelForFlowButton, LV_SIZE_CONTENT);
        lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
-       FirmwareI18n::setDynamicLabel(labelForFlowButton, fb.label);
+       FirmwareI18n::setDynamicLabel(labelForFlowButton, fb.label) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
        lv_obj_set_style_text_font(labelForFlowButton, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 

@@ -1,9 +1,17 @@
 #include "workflow.hpp"
 void ReaderWorkflow::testLocalization()
 {
+    const auto cachedLanguage = [] {
+        KVStore settings;
+        settings.begin("settings", true);
+        const auto language = settings.getString("api.language");
+        settings.end();
+        return language;
+    };
     // Real API parser, NFC verification, application callbacks and display loop.
-    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"en-US"})"); pump();
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"en"})"); pump();
     assert(State::getActiveLanguage() == "en" && !State::getApiState().userAuthenticated);
+    assert(cachedLanguage() == "en");
     assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
     assert(label(lv_layer_top(), "Attractap vdesktop"));
     // Finish the preceding journey's screen retirement before testing new
@@ -115,16 +123,19 @@ void ReaderWorkflow::testLocalization()
         pump(1100); // Retire the fixture through the production screen router.
         dialogs.destroy();
     }
-    userLocale = "de_AT"; login();
+    userLocale = "de"; login();
     assert(State::getActiveLanguage() == "de" && State::getApiState().userAuthenticated);
+    defaultLanguage("de");
     server.push("READER_LANGUAGE", R"({"language":"de-!!!"})"); pump();
     assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "de");
+    assert(cachedLanguage() == "de");
     click("Abmelden");
     assert(State::getActiveLanguage() == "en" && label(lv_screen_active(), "Tap RFID card or open a resource"));
     for (const auto *malformed : {"de-u-12", "de-t-12", "de-US-u-ca-ca-12"}) {
         defaultLanguage("de");
         defaultLanguage(malformed);
         assert(State::getApiState().defaultLanguage == "en" && State::getActiveLanguage() == "en");
+        assert(cachedLanguage() == "de");
         assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
     }
     defaultLanguage("de");
@@ -140,7 +151,7 @@ void ReaderWorkflow::testLocalization()
     userLocale = "en-!!!"; login();
     assert(State::getActiveLanguage() == "de");
     click("Abmelden");
-    userLocale = "en-US"; username = "Robin"; login();
+    userLocale = "en"; username = "Robin"; login();
     assert(State::getActiveLanguage() == "en");
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
     assert(State::getActiveLanguage() == "en");
@@ -193,8 +204,10 @@ void ReaderWorkflow::testLocalization()
     server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":""})"); list(false); pump();
     assert(State::getActiveLanguage() == "en");
     // A rolled-back server omits the additive language field entirely.
+    const auto cachedBeforeLegacy = cachedLanguage();
     server.push("READER_AUTHENTICATED", R"({"name":"Legacy server"})"); list(false); pump();
     assert(State::getApiState().authenticated && State::getActiveLanguage() == "en");
+    assert(cachedLanguage() == cachedBeforeLegacy);
     Settings::saveNetworkConfig("Maintenance %s", "test-password");
     Display::transitionToScreen(&Display::connectionConfigurationScreen);
     Display::loop();
@@ -216,16 +229,34 @@ void ReaderWorkflow::testLocalization()
     captureConfiguration("english");
     assert(lv_tabview_get_tab_active(configurationTabs) == 2);
     server.push("READER_LANGUAGE", R"({"language":"de"})"); api.loop(); Display::loop();
+    assert(cachedLanguage() == "de");
     assert(label(lv_screen_active(), "Gerät"));
     assert(label(lv_screen_active(), "Maintenance %s"));
     assert(lv_tabview_get_tab_active(configurationTabs) == 2);
     captureConfiguration("german");
     server.push("READER_LANGUAGE", R"({"language":"en"})"); api.loop(); Display::loop();
+    assert(cachedLanguage() == "en");
     assert(label(lv_screen_active(), "Device"));
     assert(label(lv_screen_active(), "Maintenance %s"));
     assert(lv_tabview_get_tab_active(configurationTabs) == 2);
     captureConfiguration("english");
     server.push("READER_LANGUAGE", R"({"language":"de"})"); api.loop(); Display::loop();
+    State::setUserLanguage(true, "en");
+    assert(cachedLanguage() == "de");
+    State::setApiState(false, "");
+    // Reopen the on-disk profile to simulate an offline reboot.
+    ProfileStore rebooted("http://reader.test", 880, storage);
+    KVStore::setHostProfile(&rebooted);
+    Settings::setup();
+    Display::loop();
+    assert(State::getActiveLanguage() == "de" && !State::getApiState().userAuthenticated);
+    assert(label(lv_screen_active(), "Gerät"));
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"en"})"); api.loop(); Display::loop();
+    assert(State::getActiveLanguage() == "en");
+    assert(cachedLanguage() == "en");
+    KVStore::setHostProfile(&profile);
+    Settings::setup();
+    State::setApiState(true, "Test reader");
     Display::transitionToScreen(&Display::resourceListScreen); pump();
     userLocale = "de"; username = "Alex"; list(false);
 }

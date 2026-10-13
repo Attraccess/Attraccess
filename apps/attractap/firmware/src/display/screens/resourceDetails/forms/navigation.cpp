@@ -73,11 +73,11 @@ void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &
    }
    if (this->formsModalErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal(""));
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
    if (this->formsModalProgressLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal(""));
+      FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
    if (this->formsBackButton)
    {
@@ -105,7 +105,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
    if (this->formsModalProgressLabel)
    {
       std::string progress = std::to_string(fieldNumber) + " / " + std::to_string(totalFields);
-      FirmwareI18n::setDynamicLabel(this->formsModalProgressLabel, progress.c_str());
+      FirmwareI18n::setDynamicLabel(this->formsModalProgressLabel, progress.c_str()) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
    }
 
    if (this->formsProgressBar && totalFields > 0)
@@ -211,7 +211,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
    this->formsModalProgressLabel = lv_label_create(header);
-   FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    lv_obj_set_style_text_color(this->formsModalProgressLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -222,7 +222,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_size(cancelBtn, 34, 34);
    DisplayTheme::secondaryButton(cancelBtn);
    lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
-   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE));
+   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE) /* i18n-data: Language-neutral LVGL icon glyph. */);
    lv_obj_center(cancelLabel);
    lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
 
@@ -257,14 +257,14 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(content, 1);
 
    this->formsBreadcrumbLabel = lv_label_create(content);
-   FirmwareI18n::setLabel(this->formsBreadcrumbLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->formsBreadcrumbLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
     lv_obj_set_style_text_color(this->formsBreadcrumbLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsModalErrorLabel = lv_label_create(content);
-   FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal(""));
+   FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
     lv_obj_set_style_text_color(this->formsModalErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->formsModalErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -387,7 +387,7 @@ void ResourceDetailsScreen::updateFormBreadcrumb()
       }
       if (scope.length() > 0)
       {
-         pageTitle = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {pageTitle, FirmwareI18n::Text::literal(scope)});
+         pageTitle = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {pageTitle, FirmwareI18n::Text::literal(scope) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */});
       }
       FirmwareI18n::setLabel(this->formsBreadcrumbLabel, pageTitle);
    }

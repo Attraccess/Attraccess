@@ -101,7 +101,7 @@ void State::setApiState(bool authenticated, std::string deviceName, std::string 
     api_authenticated = authenticated;
     api_device_name = deviceName;
     // An empty value means a connectivity transition. Keep the last server
-    // setting so the offline/unauthenticated screens do not jump to German.
+    // setting for offline and unauthenticated screens.
     language_session.setApi(authenticated, defaultLanguage);
 }
 

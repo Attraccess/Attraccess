@@ -23,7 +23,7 @@ namespace
             lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
             lv_obj_set_style_pad_column(btn, 8, LV_PART_MAIN);
             lv_obj_t *icon = lv_label_create(btn);
-            FirmwareI18n::setDynamicLabel(icon, symbol);
+            FirmwareI18n::setDynamicLabel(icon, symbol) /* i18n-data: Language-neutral LVGL icon glyph, separate from the localized action caption. */;
             lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, LV_PART_MAIN);
         }
 
@@ -112,7 +112,7 @@ namespace
 lv_obj_t *PowerOffButton::create(lv_obj_t *parent, std::function<void()> cb)
 {
     g_onConfirm = cb;
-    lv_obj_t *btn = makeButton(parent, DisplayTheme::danger(), FirmwareI18n::Text::literal(LV_SYMBOL_POWER), &onPowerBtn);
+    lv_obj_t *btn = makeButton(parent, DisplayTheme::danger(), FirmwareI18n::Text::literal(LV_SYMBOL_POWER) /* i18n-data: Language-neutral LVGL power icon glyph. */, &onPowerBtn);
     lv_obj_set_size(btn, 56, 40);
     return btn;
 }

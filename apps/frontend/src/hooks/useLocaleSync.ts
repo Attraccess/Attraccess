@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  CurrentUserDto,
+  UseUsersServiceGetCurrentKeyFn,
   useSettingsServiceGetFirstTimeSetupStatus,
   useSettingsServiceGetSystemLanguage,
   useUsersServiceUpdateMyLocale,
@@ -11,13 +14,21 @@ import { useAuth } from './useAuth';
 export function useLocaleSync() {
   const { user, isAuthenticated } = useAuth();
   const language = useTranslationState((s) => s.language);
+  const explicitLanguage = useTranslationState((s) => s.explicitLanguage);
+  const queryClient = useQueryClient();
   const initializedUser = useRef<number | null | undefined>(undefined);
   const lastDefault = useRef<string | undefined>(undefined);
   const lastServerPreference = useRef<string | undefined>(undefined);
   const lastSynced = useRef<string | null>(null);
   const { data: systemLanguage } = useSettingsServiceGetSystemLanguage(undefined, { refetchInterval: 60000 });
   const { data: setup } = useSettingsServiceGetFirstTimeSetupStatus();
-  const { mutate } = useUsersServiceUpdateMyLocale();
+  const { mutate } = useUsersServiceUpdateMyLocale({
+    onSuccess(savedUser) {
+      queryClient.setQueryData<CurrentUserDto>(UseUsersServiceGetCurrentKeyFn(), (current) =>
+        current?.id === savedUser.id ? { ...current, locale: savedUser.locale } : current,
+      );
+    },
+  });
   const userId = isAuthenticated ? user?.id : null;
   const defaultLanguage = systemLanguage?.defaultLanguage;
   // Before setup, detection uses English as its final fallback. Once configured,
@@ -44,7 +55,7 @@ export function useLocaleSync() {
     if (initializedUser.current !== userId || lastServerPreference.current !== preference) {
       initializedUser.current = userId;
       lastServerPreference.current = preference;
-      lastSynced.current = preference;
+      lastSynced.current = storedPreference ?? detectedPreference ?? null;
       // Server refreshes and default changes are not personal language selections.
       useTranslationState.setState({ language: preference });
       // Record a known browser language for the next card tap and messages,
@@ -52,8 +63,14 @@ export function useLocaleSync() {
       if (!storedPreference && detectedPreference) mutate({ requestBody: { locale: detectedPreference } });
       return;
     }
-    if (language !== useTranslationState.getState().language || lastSynced.current === language) return;
-    lastSynced.current = language;
-    mutate({ requestBody: { locale: language } });
-  }, [userId, user?.locale, language, defaultLanguage, hasSystemLanguage, mutate]);
+    if (
+      !explicitLanguage ||
+      language !== explicitLanguage ||
+      language !== useTranslationState.getState().language ||
+      lastSynced.current === explicitLanguage
+    )
+      return;
+    lastSynced.current = explicitLanguage;
+    mutate({ requestBody: { locale: explicitLanguage } });
+  }, [userId, user?.locale, language, explicitLanguage, defaultLanguage, hasSystemLanguage, mutate]);
 }

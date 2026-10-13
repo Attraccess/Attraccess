@@ -37,9 +37,9 @@ namespace WallClockText
     {
         using namespace FirmwareI18n;
         const auto caption = Text::format(Message::ClockDate,
-            {FirmwareI18n::Text::literal(std::to_string(time.day)), month(time)});
+            {FirmwareI18n::Text::literal(std::to_string(time.day)) /* i18n-data: Calendar day number within a localized date caption. */, month(time)});
         return withYear ? Text::format(Message::ClockDateWithYear,
-            {caption, FirmwareI18n::Text::literal(std::to_string(time.year))}) : caption;
+            {caption, FirmwareI18n::Text::literal(std::to_string(time.year)) /* i18n-data: Calendar year number within a localized date caption. */}) : caption;
     }
 
     // Changes once per minute; -1 while the time is unknown.

@@ -83,12 +83,12 @@ public:
         if (!root) return;
         const int32_t remaining = static_cast<int32_t>(deadline - (paused ? frozenAt : millis()));
         const int seconds = std::clamp<int32_t>((std::max<int32_t>(remaining, 0) + 999) / 1000, 0, 30);
-        setDynamicLabelTextIfChanged(userLabel, username.c_str());
+        setDynamicLabelTextIfChanged(userLabel, username.c_str()) /* i18n-data: Supplied user/resource/project/card name, form scope, description, flow caption or health reason; preserve exact data. */;
         if (paused) {
             FirmwareI18n::setLabel(timeLabel, FirmwareI18n::Message::Paused);
         } else {
             const std::string time = std::to_string(seconds) + " s";
-            setDynamicLabelTextIfChanged(timeLabel, time.c_str());
+            setDynamicLabelTextIfChanged(timeLabel, time.c_str()) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
         }
         if (lastSeconds != seconds || lastPaused != paused) {
             lv_bar_set_value(bar, seconds, LV_ANIM_OFF);

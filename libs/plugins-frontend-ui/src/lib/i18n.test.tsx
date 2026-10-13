@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { detectAndSetLanguage, detectLanguage, useTranslations, useTranslationState } from './i18n';
 
 beforeEach(() => {
+  useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
   const values = new Map<string, string>();
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => values.get(key) ?? null,
@@ -14,7 +15,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  useTranslationState.setState({ language: 'en' });
+  useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
 });
 it('reports missing nested translation leaves without treating plural objects or arrays as branches', () => {
   vi.stubEnv('NODE_ENV', 'development');
@@ -82,5 +83,21 @@ it('does not persist detected fallbacks, and honors supported browser and stored
   vi.stubGlobal('navigator', { language: 'fr', languages: ['fr', 'en-GB'] });
   expect(detectLanguage('de')).toBe('en');
   localStorage.setItem('language', 'de');
+  expect(detectLanguage('en')).toBe('de');
+});
+
+it('retains an explicit choice in memory when both browser stores are inaccessible', () => {
+  vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US'] });
+  const blocked = {
+    getItem: () => {
+      throw new Error('Storage unavailable');
+    },
+    setItem: () => {
+      throw new Error('Storage unavailable');
+    },
+  };
+  vi.stubGlobal('localStorage', blocked);
+  vi.stubGlobal('sessionStorage', blocked);
+  useTranslationState.getState().setLanguage('de');
   expect(detectLanguage('en')).toBe('de');
 });
