@@ -249,6 +249,7 @@ enum class Message {
     January, February, March, April, May, June,
     July, August, September, October, November, December,
     ClockDate, ClockDateWithYear, ClockDayDate, TapRfidCard,
+    DemoDeviceName,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -514,6 +515,7 @@ inline constexpr Entry catalog[] = {
     {Message::ClockDateWithYear, "{0} {1}", "{0} {1}"},
     {Message::ClockDayDate, "{0}, {1}", "{0}, {1}"},
     {Message::TapRfidCard, "RFID-Karte auflegen", "Tap RFID card"},
+    {Message::DemoDeviceName, "Demo Gerät", "Demo Device"},
 };
 
 inline const char *messageText(Message id, const std::string &locale) {

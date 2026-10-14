@@ -3,9 +3,9 @@
 #include "fonts/attractap_fonts.hpp"
 #include "theme.hpp"
 
-#include <cstdlib>
-#include <cstring>
+#include <new>
 #include <string>
+#include <utility>
 
 // Persistent device-info overlay drawn on the LVGL top layer: a bottom bar
 // showing the device name and firmware version, present across all screens.
@@ -40,7 +40,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_x(Display::deviceNameLabel, -75);
     lv_obj_set_y(Display::deviceNameLabel, -18);
     lv_obj_set_align(Display::deviceNameLabel, LV_ALIGN_CENTER);
-    FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, Display::deviceNameInitValue.c_str()) /* i18n-data: Server-supplied reader name; preserve exact contents. */;
+    FirmwareI18n::setLabel(Display::deviceNameLabel, Display::deviceNameInitValue);
 
     lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -124,6 +124,16 @@ void Display::updateNetworkQualityOverlay()
 
 void Display::setDeviceName(std::string deviceName)
 {
+    setDeviceNameText(FirmwareI18n::Text::literal(std::move(deviceName)) /* i18n-data: Operator-supplied reader name; preserve exact contents. */);
+}
+
+void Display::setDemoDeviceName()
+{
+    setDeviceNameText(FirmwareI18n::Message::DemoDeviceName);
+}
+
+void Display::setDeviceNameText(const FirmwareI18n::Text &deviceName)
+{
     if (!Display::deviceNameLabel)
     {
         Display::deviceNameInitValue = deviceName;
@@ -131,20 +141,19 @@ void Display::setDeviceName(std::string deviceName)
     }
 
     // Schedule label update on LVGL thread to avoid cross-thread access
-    char *text = (char *)malloc(deviceName.length() + 1);
+    auto *text = new (std::nothrow) FirmwareI18n::Text(deviceName);
     if (!text)
     {
         return;
     }
-    strcpy(text, deviceName.c_str());
     Display::asyncCall(
         [](void *p)
         {
             if (Display::deviceNameLabel)
             {
-                FirmwareI18n::setDynamicLabel(Display::deviceNameLabel, (const char *)p) /* i18n-data: Server-supplied reader name; preserve exact contents. */;
+                FirmwareI18n::setLabel(Display::deviceNameLabel, *static_cast<FirmwareI18n::Text *>(p));
             }
-            free(p);
+            delete static_cast<FirmwareI18n::Text *>(p);
         },
         text);
 }

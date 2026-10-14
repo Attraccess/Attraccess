@@ -9,8 +9,10 @@
 #include <string>
 #include <unistd.h>
 
-int main()
+int main(int argc, char **argv)
 {
+    const std::filesystem::path screenshots = argc > 1 ? argv[1] : "";
+    if (!screenshots.empty()) std::filesystem::create_directories(screenshots);
     const auto root = std::filesystem::temp_directory_path() /
                       ("attractap-demo-protocol-" + std::to_string(getpid()));
     ProfileStore profile("https://demo-protocol.test", 1, root);
@@ -18,8 +20,16 @@ int main()
     DemoStore::setup();
     State::setUserLanguage(false);
     State::setDefaultLanguage("de");
+    Display::setDemoDeviceName();
     SdlDisplay display;
     Display::setup(display);
+    assert(findLabel(lv_layer_top(), "Demo Gerät"));
+    int windowCount = 0;
+    SDL_Window **windows = SDL_GetWindows(&windowCount);
+    assert(windows && windowCount == 1);
+    window = windows[0];
+    SDL_free(windows);
+    renderer = SDL_GetRenderer(window);
     DemoWebsocket transport;
     JsonDocument received;
     JsonDocument authenticated;
@@ -29,7 +39,8 @@ int main()
         if (received["data"]["type"] == "RESOURCE_LIST") resourceList.set(received);
         if (received["data"]["type"] == "READER_AUTHENTICATED") {
             authenticated.set(received);
-            Display::setDeviceName(received["data"]["payload"]["name"].as<std::string>());
+            State::setDefaultLanguage(received["data"]["payload"]["language"].as<std::string>());
+            Display::setDemoDeviceName();
         }
     });
     transport.loop(); // Consume the initial authentication request before form traffic.
@@ -44,12 +55,30 @@ int main()
     assert(authenticated["data"]["payload"]["name"] == "Demo Device");
     Display::loop(); lv_timer_handler();
     assert(findLabel(lv_layer_top(), "Demo Device"));
+    // Refresh the existing overlay without a new response or name setter.
+    State::setDefaultLanguage("de");
+    Display::loop(); lv_timer_handler();
+    assert(findLabel(lv_layer_top(), "Demo Gerät"));
+    lv_obj_update_layout(lv_layer_top());
+    lv_refr_now(nullptr);
+    screenshot(screenshots, "demo-name-de.png");
+    State::setDefaultLanguage("en");
+    Display::loop(); lv_timer_handler();
+    assert(findLabel(lv_layer_top(), "Demo Device"));
+    lv_refr_now(nullptr);
+    screenshot(screenshots, "demo-name-en.png");
+    State::setUserLanguage(true, "de");
+    Display::loop(); lv_timer_handler();
+    assert(findLabel(lv_layer_top(), "Demo Gerät"));
+    State::setUserLanguage(false);
+    Display::loop(); lv_timer_handler();
+    assert(findLabel(lv_layer_top(), "Demo Device"));
     for (const char *language : {"de", "en"}) {
         State::setDefaultLanguage(language);
         exchange(R"({"data":{"type":"REQUEST_RESOURCE_LIST","payload":{}}})");
         const char *expectedName = std::string(language) == "en" ? "Demo Device" : "Demo Gerät";
         assert(received["data"]["payload"]["readerName"] == expectedName);
-        Display::setDeviceName(received["data"]["payload"]["readerName"].as<std::string>());
+        Display::setDemoDeviceName();
         Display::loop(); lv_timer_handler();
         assert(findLabel(lv_layer_top(), expectedName));
     }
@@ -102,6 +131,14 @@ int main()
     State::setDefaultLanguage("de"); Display::loop(); lv_timer_handler();
     State::setDefaultLanguage("en"); Display::loop(); lv_timer_handler();
     assert(findLabel(lv_layer_top(), "Operator Gerät"));
+    // Even identical operator-supplied words must never imply demo ownership.
+    for (const char *name : {"Demo Device", "Demo Gerät"}) {
+        Display::setDeviceName(name);
+        for (const char *language : {"de", "en"}) {
+            State::setDefaultLanguage(language); Display::loop(); lv_timer_handler();
+            assert(findLabel(lv_layer_top(), name));
+        }
+    }
     KVStore::setHostProfile(nullptr);
     std::filesystem::remove_all(root);
 }

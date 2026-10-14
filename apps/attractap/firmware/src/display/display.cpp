@@ -55,7 +55,7 @@ uint32_t Display::screenHeight = 0;
 IDisplayDriver *Display::driver = nullptr;
 lv_display_t *Display::disp = NULL;
 lv_indev_t *Display::indev = NULL;
-std::string Display::deviceNameInitValue = "Attractap";
+FirmwareI18n::Text Display::deviceNameInitValue = FirmwareI18n::Text::literal("Attractap") /* i18n-data: Product name before reader authentication. */;
 
 lv_obj_t *Display::deviceNameLabel = NULL;
 lv_obj_t *Display::networkQualityContainer = NULL;

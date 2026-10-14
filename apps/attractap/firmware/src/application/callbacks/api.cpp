@@ -18,7 +18,14 @@ void Application::setupApiCallbacks()
 #ifdef HAS_LVGL_DISPLAY
   this->supervision.setup();
   this->api.onDeviceName(
-      [this](std::string deviceName) { Display::setDeviceName(deviceName); });
+      [this](std::string deviceName) {
+#ifdef DEMO_MODE
+        // The demo transport owns its built-in name; supplied names stay literal.
+        Display::setDemoDeviceName();
+#else
+        Display::setDeviceName(deviceName);
+#endif
+      });
 #endif
 #ifdef HAS_LVGL_DISPLAY
   this->api.setUsageStatsCallback([this](const API::UsageStats &stats) {

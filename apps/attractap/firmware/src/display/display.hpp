@@ -66,6 +66,7 @@ public:
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
     static void setDeviceName(std::string deviceName);
+    static void setDemoDeviceName();
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
     // Returns false if the display driver reported that touch hardware was not found at init.
@@ -135,7 +136,8 @@ private:
     static void initDeviceOverlay();
     static void updateNetworkQualityOverlay();
     static lv_obj_t *deviceNameLabel;
-    static std::string deviceNameInitValue;
+    static FirmwareI18n::Text deviceNameInitValue;
+    static void setDeviceNameText(const FirmwareI18n::Text &deviceName);
     static lv_obj_t *networkQualityContainer;
     static lv_obj_t *networkQualityLabel;
     static State::NetworkQuality networkQualityOverlayValue;
