@@ -72,6 +72,14 @@
   - [MQTT Examples](devices/mqtt/examples.md)
   - [Guided WAGO CC100 Commissioning](devices/wago-cc100-commissioning.md)
   - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
+  - [WAGO Commissioning Platform](devices/wago-commissioning-platform.md)
+  - [WAGO FW31 Support Boundaries](devices/wago-fw31-support.md)
+  - [WAGO 879-3020 Modbus RTU](devices/wago-879-3020-modbus-rtu.md)
+  - [WAGO Measurement Contract](devices/wago-measurement-contract.md)
+  - [WAGO Diagnostics](devices/wago-diagnostics.md)
+  - [WAGO Credential Rotation](devices/wago-credential-rotation.md)
+  - [WAGO Audit Integration](devices/wago-audit-integration.md)
+  - [WAGO Acceptance Evidence](devices/wago-acceptance-evidence.md)
 
 - **Billing**
   - [Overview](billing/overview.md)

@@ -133,13 +133,13 @@ Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, u
 
 Typ: `input.resource.metering.collect` · Maschinen
 
-| Einstellung | Bereich / Standard |
-| --- | --- |
-| **Zähler** | Vordefinierten Zähler auswählen oder einen erstellen |
-| **Zeitlimit (Sekunden)** | 1–600 / **30** |
-| **Zwischenintervall (Minuten)** | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
-| **Versuche für den Endwert** | 1–10 / **3** |
-| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5** |
+| Einstellung                                     | Bereich / Standard                                   |
+| ----------------------------------------------- | ---------------------------------------------------- |
+| **Zähler**                                      | Vordefinierten Zähler auswählen oder einen erstellen |
+| **Zeitlimit (Sekunden)**                        | 1–600 / **30**                                       |
+| **Zwischenintervall (Minuten)**                 | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
+| **Versuche für den Endwert**                    | 1–10 / **3**                                         |
+| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5**                                        |
 
 Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"` oder `"final"`. Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
 
@@ -357,11 +357,11 @@ Wählen Sie ein festes **Companion-Gerät**. Sendet einen Entsperrbefehl und spe
 
 Typ: `output.resource.metering.ready` · Maschinen
 
-| Einstellung | Beschreibung |
-| --- | --- |
-| **Zähler** | Den Zähler der Start-Anfrage auswählen |
+| Einstellung   | Beschreibung                                                              |
+| ------------- | ------------------------------------------------------------------------- |
+| **Zähler**    | Den Zähler der Start-Anfrage auswählen                                    |
 | **Basiswert** | Optionale Vorlage für den aktuellen Gesamtstand eines kumulierten Zählers |
-| **Quelle** | Optionale Vorlage mit dem Namen des physischen Zählers |
+| **Quelle**    | Optionale Vorlage mit dem Namen des physischen Zählers                    |
 
 Schließt eine **Messung starten**-Operation ab. Schlägt außerhalb eines Startzweigs fehl. Nach einem Reset auf null den Basiswert leer lassen; ein konfigurierter Basiswert, der leer gerendert wird, führt zum Fehler. Der Katalog bietet keinen ausgehenden Anschluss.
 
@@ -371,13 +371,13 @@ Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Ein
 
 Typ: `output.resource.metering.report`
 
-| Einstellung | Beschreibung |
-| --- | --- |
-| **Zähler** | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen |
-| **Modus** | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
-| **Wert** | Erforderlicher nichtnegativer Zahlenwert oder Vorlage |
-| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt |
-| **Quelle** | Optionale Vorlage mit dem Namen des Zählers |
+| Einstellung  | Beschreibung                                                           |
+| ------------ | ---------------------------------------------------------------------- |
+| **Zähler**   | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen   |
+| **Modus**    | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
+| **Wert**     | Erforderlicher nichtnegativer Zahlenwert oder Vorlage                  |
+| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt     |
+| **Quelle**   | Optionale Vorlage mit dem Namen des Zählers                            |
 
 Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine Antwort im Abfragezweig muss zum angefragten Zähler passen. Eine Einheit ist nicht erforderlich. Der erste unaufgeforderte Gesamtstand legt einen Basiswert fest; spätere Zuwächse erhöhen den Gesamtverbrauch. Inkremente erhöhen den Verbrauch direkt. Während einer laufenden Sitzung aktualisieren akzeptierte Zuwächse auch deren Verbrauch. Eine konfigurierte Messzeit-Vorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
 
@@ -387,6 +387,6 @@ Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **
 
 - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) — Datenpfade und vollständige Beispiele
 - [Flow-Editor](flows/flow-editor.md) — Knoten hinzufügen und verbinden
-- [MQTT & IoT](mqtt/overview.md) — MQTT-Server konfigurieren
+- [MQTT & IoT](devices/mqtt/overview.md) — MQTT-Server konfigurieren
 - [Zähler](flows/energy-metering.md) — Beliebigen Verbrauch erfassen und abrechnen
 - [Abrechnung](billing/overview.md) — Details zum Abrechnungssystem

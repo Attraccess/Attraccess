@@ -12,7 +12,7 @@ Record the starting controller state and the explicit destructive-install approv
 
 A nontechnical or lightly technical participant other than the implementer must perform the journey. Record obstacles, failed attempts and any developer intervention rather than correcting them silently. A terminal, JSON editor, API client or manual secret-copy step is a failure of the required no-code journey, even if an engineer can make the hardware work afterwards.
 
-Use only controls present in the exact tested build. The existing [commissioning walkthrough](wago-cc100-commissioning.md) documents its source baseline; its limitations must be reconciled after integrating commissioning, visual configuration, diagnostics and hardware changes. Do not use screenshots or instructions for unmerged or absent screens as acceptance evidence.
+Use only controls present in the exact tested build. The existing [commissioning walkthrough](devices/wago-cc100-commissioning.md) documents its source baseline; its limitations must be reconciled after integrating commissioning, visual configuration, diagnostics and hardware changes. Do not use screenshots or instructions for unmerged or absent screens as acceptance evidence.
 
 For each required check, record the observed behavior and link a timestamped recording, screenshot, test report or reviewer-approved artifact. Include both desktop and mobile. Explain how the selected input, output and physical Modbus measurement were independently observed. An output acknowledgement alone is not physical feedback.
 
@@ -30,21 +30,21 @@ behavior. These details supplement the existing checks, not a new evidence schem
 
 Retain one JSON evidence record outside the source tree with these fields:
 
-| Field | Required content |
-| --- | --- |
-| `schemaVersion` | `1` |
-| `environment` | `physical`; simulator-only evidence is rejected |
-| `controller` | `model: "751-9301"`, `firmware: "31"`, `hardwareId`, `startingState`, `wiringEvidence` |
-| `build` | Full 40-character `pluginCommit` and `runtimeCommit`; `frontendDigest`, `backendDigest`, `runtimeDigest` in `sha256:<64 hex>` form; `protocolVersion`, `bundleChecksumEvidence`, `visualArtifactProvisioningEvidence` |
-| `modbus` | Actual `model`, `transport`, `profileVersion`, `qualificationEvidence`; do not substitute an unqualified reference assembly |
-| `participant` | Non-secret participant `id` and `experience` (`nontechnical` or `lightly-technical`) |
-| `implementerId` | Distinct from participant |
-| `noCodeJourney` | `true` only if the entire required journey needed no terminal/code/JSON/API/manual secrets |
-| `developerIntervention` | `false` for acceptance |
-| `safeFixtureConfirmed` | `true` after the fixture and safety boundary are verified |
-| `obstacles` | Array of observed participant obstacles, including an explicit empty array if none |
-| `blockers` | Array; must be explicitly empty before completeness passes |
-| `checks` | One entry per exported check ID with `id`, `result`, `observed`, `evidenceRef`, `recordedAt` |
+| Field                   | Required content                                                                                                                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`         | `1`                                                                                                                                                                                                                   |
+| `environment`           | `physical`; simulator-only evidence is rejected                                                                                                                                                                       |
+| `controller`            | `model: "751-9301"`, `firmware: "31"`, `hardwareId`, `startingState`, `wiringEvidence`                                                                                                                                |
+| `build`                 | Full 40-character `pluginCommit` and `runtimeCommit`; `frontendDigest`, `backendDigest`, `runtimeDigest` in `sha256:<64 hex>` form; `protocolVersion`, `bundleChecksumEvidence`, `visualArtifactProvisioningEvidence` |
+| `modbus`                | Actual `model`, `transport`, `profileVersion`, `qualificationEvidence`; do not substitute an unqualified reference assembly                                                                                           |
+| `participant`           | Non-secret participant `id` and `experience` (`nontechnical` or `lightly-technical`)                                                                                                                                  |
+| `implementerId`         | Distinct from participant                                                                                                                                                                                             |
+| `noCodeJourney`         | `true` only if the entire required journey needed no terminal/code/JSON/API/manual secrets                                                                                                                            |
+| `developerIntervention` | `false` for acceptance                                                                                                                                                                                                |
+| `safeFixtureConfirmed`  | `true` after the fixture and safety boundary are verified                                                                                                                                                             |
+| `obstacles`             | Array of observed participant obstacles, including an explicit empty array if none                                                                                                                                    |
+| `blockers`              | Array; must be explicitly empty before completeness passes                                                                                                                                                            |
+| `checks`                | One entry per exported check ID with `id`, `result`, `observed`, `evidenceRef`, `recordedAt`                                                                                                                          |
 
 `result` must be `pass` for every required check. Use `fail` or `not-run` honestly for unfinished work; the checker exits unsuccessfully. `evidenceRef` is a reference to reviewable evidence, not a credential or raw payload. References are not fetched or authenticated by the checker. The file should remain small and contain summaries, not recordings or telemetry.
 

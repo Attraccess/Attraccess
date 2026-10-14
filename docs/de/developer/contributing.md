@@ -87,6 +87,10 @@ Feature-Anfragen sind willkommen. Erstellen Sie ein GitHub-Issue mit dem Label "
 - Ihre vorgeschlagene Lösung
 - Mögliche Alternativen, die Sie in Betracht gezogen haben
 
+## Dokumentationsübersetzungen
+
+Englische und deutsche Dokumentation sind in jedem Bereich übersetzte Repliken. Aktualisieren Sie beim Ergänzen oder Ändern einer Seite den passenden Pfad in `docs/en/` und `docs/de/` gemeinsam. Halten Sie Abschnittsreihenfolge, Beispiele, Links und Navigation abgesehen von übersetztem Text identisch. Führen Sie vor Commit `pnpm docs:check` aus; es prüft Seitenabdeckung, Navigation, Links und Inhaltsstruktur. Prüfen Sie Übersetzungsgenauigkeit und gerenderte Seiten separat.
+
 ## Siehe auch
 
 - [Entwickler-Überblick](developer/overview.md) – Erste Schritte in der Entwicklung

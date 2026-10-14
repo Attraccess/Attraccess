@@ -4,8 +4,22 @@
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint",
+      "dependsOn": ["check-docs-parity"],
       "options": {
         "lintFilePatterns": ["*.{js,ts}", "docs/**/*.md"]
+      }
+    },
+    "check-docs-parity": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/docs/en/**/*.md",
+        "{workspaceRoot}/docs/de/**/*.md",
+        "{workspaceRoot}/scripts/check-docs-parity.mjs"
+      ],
+      "outputs": [],
+      "options": {
+        "command": "node scripts/check-docs-parity.mjs"
       }
     },
     "local-registry": {

@@ -62,13 +62,24 @@
   - [Einrichtung](attractap/setup.md)
   - [RFID-Karten](attractap/rfid-cards.md)
   - [Firmware-Updates](attractap/firmware-updates.md)
+  - [LED-Leitfaden (Lite)](attractap/led-guide.md)
 
-- **MQTT & IoT**
+- **Geräte**
   - [Matter-Architektur](devices/matter-architecture.md)
   - [Matter-Sidecar betreiben](devices/matter-operations.md)
-  - [Überblick](mqtt/overview.md)
-  - [Server einrichten](mqtt/server-setup.md)
-  - [Beispiele](mqtt/examples.md)
+  - [MQTT](devices/mqtt/overview.md)
+  - [MQTT-Server einrichten](devices/mqtt/server-setup.md)
+  - [MQTT-Beispiele](devices/mqtt/examples.md)
+  - [Geführte WAGO-CC100-Inbetriebnahme](devices/wago-cc100-commissioning.md)
+  - [WAGO CC100 Docker-Runtime](devices/wago-cc100-runtime.md)
+  - [WAGO-Inbetriebnahmeplattform](devices/wago-commissioning-platform.md)
+  - [WAGO FW31-Unterstützungsgrenzen](devices/wago-fw31-support.md)
+  - [WAGO 879-3020 Modbus RTU](devices/wago-879-3020-modbus-rtu.md)
+  - [WAGO-Messwertvertrag](devices/wago-measurement-contract.md)
+  - [WAGO-Diagnose](devices/wago-diagnostics.md)
+  - [WAGO-Zugangsdatenrotation](devices/wago-credential-rotation.md)
+  - [WAGO-Audit-Integration](devices/wago-audit-integration.md)
+  - [WAGO-Abnahmenachweise](devices/wago-acceptance-evidence.md)
 
 - **Abrechnung**
   - [Überblick](billing/overview.md)
@@ -79,6 +90,7 @@
   - [Überblick](plugins/overview.md)
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
+  - [Datenbankmigrationen](plugins/database-migrations.md)
 
 - **Monitoring & Metriken**
   - [Überblick](monitoring/overview.md)

@@ -87,9 +87,7 @@ Declare plugin dependencies in `package.json` under `attraccess.dependencies`:
 ```json
 {
   "attraccess": {
-    "dependencies": [
-      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
-    ]
+    "dependencies": [{ "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }]
   }
 }
 ```
@@ -179,19 +177,19 @@ export default plugin;
 
 `register(context)` receives a `PluginContext` — your gateway to the host:
 
-| Member                                                    | Purpose                                                                        | Permission               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
-| `context.manifest`                                        | Your plugin's name, version, id, directory.                                    | none                     |
-| `context.logger`                                          | Logger prefixed with your plugin name.                                         | none                     |
-| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
-| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |
-| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                            | `LISTEN_EVENTS`          |
-| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                    | `EMIT_EVENTS`            |
-| `context.events`                                          | The raw shared event bus (restricted surface).                                 | per-method               |
-| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
-| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
+| Member                                                    | Purpose                                                                                     | Permission               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------ |
+| `context.manifest`                                        | Your plugin's name, version, id, directory.                                                 | none                     |
+| `context.logger`                                          | Logger prefixed with your plugin name.                                                      | none                     |
+| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                              | per-entity (see below)   |
+| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                                        | `DATABASE_ACCESS`        |
+| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                                         | `LISTEN_EVENTS`          |
+| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                                 | `EMIT_EVENTS`            |
+| `context.events`                                          | The raw shared event bus (restricted surface).                                              | per-method               |
+| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                                | `RESOLVE_HOST_PROVIDERS` |
+| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials.              | `ACCESS_MQTT_SERVERS`    |
 | `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                             | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                          | `ACCESS_MQTT_SERVERS`    |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -447,7 +445,7 @@ route props (`path`, `element`, ...) with an `authRequired` field:
 | `"resources.update"`                       | A single required RBAC permission key.   |
 | `["resources.update", "resources.create"]` | Any one of several RBAC permission keys. |
 
-See [Permissions](../user-management/permissions.md) for the full list of available permission keys.
+See [Permissions](user-management/permissions.md) for the full list of available permission keys.
 
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.
@@ -789,15 +787,15 @@ so they share the workspace toolchain, caching and CI.
   plugin. Plugin source changes require running `install-dev` again; this target
   does not watch plugin sources.
 
-  | Target           | Produces                                                                |
-  | ---------------- | ----------------------------------------------------------------------- |
-  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
-  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)              |
+  | Target           | Produces                                                                       |
+  | ---------------- | ------------------------------------------------------------------------------ |
+  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized)        |
+  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)                     |
   | `build`          | stages `package.json` and `plugin.json` in `package/` (depends on both builds) |
-  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                 |
-  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)            |
-  | `pack-test`      | validates the packed tarball and loads its backend                      |
-  | `publish`        | publishes a new package version to npm                                  |
+  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                        |
+  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)                   |
+  | `pack-test`      | validates the packed tarball and loads its backend                             |
+  | `publish`        | publishes a new package version to npm                                         |
 
   ```bash
    # Build and pack a single plugin app:
@@ -839,7 +837,7 @@ even after final unsubscribe; recreated consumers receive fresh samples.
 The host recovers valid same-user credential rotation without clearing queries
 and retains the stream across same-batch cleanup/setup. Plugin event payloads
 have no local replay.
-See [Plugin live updates](../../development/live-updates.md#plugin-live-updates)
+See [Plugin live updates](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 for the contract and examples, including reconnection and cleanup.
-The [WAGO sampling schedule](../../development/live-updates.md#wago-sampling-schedule)
+The [WAGO sampling schedule](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 lists the shared backend intervals for all nine WAGO topics.

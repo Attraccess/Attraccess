@@ -19,17 +19,18 @@ Attraccess uses an SSH-only commissioning flow. WAGO Web-Based Management (WBM) 
 
 The server verifies the pinned host key and checks the bundled runtime release checksum and manifest, prepares the supported platform, transfers the release over SSH and starts enrollment. Preparation uses the firmware-installed vendor Docker tools and establishes persistent access to only the required digital registers. The captured FW31 vendor `install` action downloads or extracts no engine; missing Docker binaries remain unsupported. The controller never needs an image registry or Internet connection for installation.
 
-**Destructive commissioning (2026-09-06):** existing applications and workloads may stop working or be erased. Attraccess does not preserve, back up, or restore preexisting CODESYS applications, retained PLC data, other workloads or their host settings. It always stops and permanently disables CODESYS, verifying both process and boot state before granting I/O. If this cannot be verified, installation fails before enrollment/runtime launch. The [earlier preservation decision](wago-fw31-support.md) is retained as superseded history.
+**Destructive commissioning (2026-09-06):** existing applications and workloads may stop working or be erased. Attraccess does not preserve, back up, or restore preexisting CODESYS applications, retained PLC data, other workloads or their host settings. It always stops and permanently disables CODESYS, verifying both process and boot state before granting I/O. If this cannot be verified, installation fails before enrollment/runtime launch. The [earlier preservation decision](devices/wago-fw31-support.md) is retained as superseded history.
 
 ## Preconditions
 
 - Confirm the controller order number is `751-9301` and it is on a private IPv4 network: `10.0.0.0/8`, `172.16.0.0/12`, or `192.168.0.0/16`.
-- Confirm the supported firmware baseline in **WAGO controllers**. The current default baseline is WAGO CC100 firmware `31`; BSP version `2024.12.0` alone does not identify that firmware. See [FW31 support boundaries](wago-fw31-support.md) for source compatibility and qualification limits.
+- Confirm the supported firmware baseline in **WAGO controllers**. The current default baseline is WAGO CC100 firmware `31`; BSP version `2024.12.0` alone does not identify that firmware. See [FW31 support boundaries](devices/wago-fw31-support.md) for source compatibility and qualification limits.
 - Select the local MQTT server the controller should use. Commissioning follows that server's configured transport, including plain MQTT or TLS with its configured certificate options. For a private CA, import the issuing CA PEM bundle in MQTT settings.
 - The guided flow assumes the factory SSH login (`root` / `wago`). If that login has been changed, choose **Use a different SSH login** for installation, inspection or recovery. Non-root identities require `sudo` access. Custom passwords are not saved with the commissioning session.
 - The runtime is built from the same source and bundled automatically with every production server image. The dialog shows the bundled release; custom runtime uploads are not supported. For local development, first run `pnpm nx run plugin-wago:install-runtime-dev`, then restart a running API with `pnpm serve`. This explicit target builds the runtime and copies it into local server storage. Starting the dev server does not build it.
 
 The release packager accepts an uncompressed Docker archive via `--image-archive` and stores gzip data in the outer tar's `image.tar` member. It produces the outer tar and matching SHA-256 after compression. Do not pass an already compressed archive. Compare the **final outer tar size** with the controller's current storage preflight; stream size alone is not enough. Every delivery attempt resolves the current release, including retries of sessions created before a release change.
+
 - Ensure the controller can reach the selected local MQTT broker. No external registry, DNS, or Internet access is required or used.
 
 ## Commission a controller
@@ -78,7 +79,7 @@ The complete no-code configuration journey is owned by ATT-1058 and must be veri
 4. Publish the reviewed draft with `POST /api/wago/controllers/:id/configuration/publish`. Record the returned `revision` and `contentHash`; Attraccess publishes that Desired Configuration to the controller.
 5. Poll `GET /api/wago/controllers/:id/configuration/revisions` until the recorded revision has `state: "applied"`, a non-empty `reportedAt`, and the same `contentHash` returned at publish. If its state is `rejected`, stop, correct the complete Desired Configuration, and repeat the workflow with a new revision.
 
-Also confirm a current heartbeat and the expected runtime version. An applied configuration report proves acceptance of that revision, not physical hardware readiness or output feedback. Do not operate equipment based on an API response alone. Verify the integrated diagnostics and configuration screens in the exact tested build, and record physical/nontechnical evidence using [WAGO Acceptance Evidence](wago-acceptance-evidence.md).
+Also confirm a current heartbeat and the expected runtime version. An applied configuration report proves acceptance of that revision, not physical hardware readiness or output feedback. Do not operate equipment based on an API response alone. Verify the integrated diagnostics and configuration screens in the exact tested build, and record physical/nontechnical evidence using [WAGO Acceptance Evidence](devices/wago-acceptance-evidence.md).
 
 ## Recovery
 
@@ -162,6 +163,6 @@ Current software behavior and remaining release limits:
 - The compressed packager and server-owned runtime catalog verify the bundle checksum, build descriptor, manifest and hardware profile before delivery. The commissioning API does not accept custom runtime uploads or legacy environment-configured bundles.
 - Preexisting CODESYS/workload preservation and restoration are outside product scope. Unique minimum-privilege SSH management access and the remaining management-service baseline still require implementation and firmware-31 qualification; their status must not be presented as a blanket Docker/I/O blocker.
 - Container start is not success evidence. Fresh permanent heartbeat and matching runtime readiness/configuration probes are required, followed by physical qualification.
-- The current runtime deployment remains subject to the image digest, least-privilege model, and hardware verification evidence documented in [WAGO CC100 Docker Runtime](wago-cc100-runtime.md).
+- The current runtime deployment remains subject to the image digest, least-privilege model, and hardware verification evidence documented in [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md).
 
 Do not use these gaps as reasons to bypass host-key, bundle checksum/manifest, or MQTT identity/credential checks. Escalate them through the release process and attach hardware evidence to [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies).

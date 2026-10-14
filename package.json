@@ -3,6 +3,7 @@
   "version": "1.10.0",
   "license": "SEE LICENSE IN LICENSE.md",
   "scripts": {
+    "docs:check": "node scripts/check-docs-parity.mjs",
     "serve": "node --experimental-strip-types scripts/dev-serve.mts",
     "seed:dev": "nx run api:seed-dev",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
