@@ -78,6 +78,7 @@ public:
     void resetCardPresence() override {}
     void enableCardDetection() override { ++enabled; }
     void disableCardDetection() override { ++disabled; }
+    bool suspend() override { ++disabled; return true; }
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)>) override {}
     void setCardRemovalCallback(std::function<void(uint32_t)>) override {}
     bool getAvailableKeyNo(uint8_t *, uint8_t *, uint8_t *) override { return false; }

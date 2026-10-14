@@ -2,6 +2,21 @@
 #include "../platform.hpp"
 
 void Application::processState() {
+  // OTA owns the UI even across disconnects and late card-flow callbacks.
+  // Do not run sticky enrollment/reset workflows against suspended NFC.
+  if (this->firmwareUpdateActive) {
+#ifdef HAS_LVGL_DISPLAY
+    if (this->state != APPLICATION_STATE_FIRMWARE_UPDATE)
+      Display::transitionToScreen(&Display::firmwareUpdateScreen);
+    Display::firmwareUpdateScreen.setProgress(this->firmwareUpdateProgressPct);
+    Display::firmwareUpdateScreen.setAvailableVersion(this->availableFirmwareVersion);
+#endif
+    this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
+#ifdef HAS_WS2812_LED
+    this->updateLedState();
+#endif
+    return;
+  }
 #ifdef HAS_WS2812_LED
   this->updateLedState();
 #endif
@@ -332,27 +347,6 @@ bool Application::processAuthenticationState()
     if (this->nfc.isCardPresent()) {
       this->processCardAuthenticationData();
     }
-#endif
-    return true;
-  }
-
-  if (this->externalState == EXTERNAL_STATE_FIRMWARE_UPDATE) {
-    if (this->state == APPLICATION_STATE_FIRMWARE_UPDATE) {
-#ifdef HAS_LVGL_DISPLAY
-      Display::firmwareUpdateScreen.setProgress(
-          this->firmwareUpdateProgressPct);
-      Display::firmwareUpdateScreen.setAvailableVersion(
-          this->availableFirmwareVersion);
-#endif
-      return true;
-    }
-
-#ifdef HAS_LVGL_DISPLAY
-    Display::transitionToScreen(&Display::firmwareUpdateScreen);
-#endif
-    this->state = APPLICATION_STATE_FIRMWARE_UPDATE;
-#ifdef HAS_WS2812_LED
-    this->updateLedState();
 #endif
     return true;
   }

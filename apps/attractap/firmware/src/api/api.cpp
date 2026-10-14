@@ -40,7 +40,7 @@ void API::setFirmwareUpdateProgressCallback(std::function<void(int)> callback)
     this->firmwareUpdateProgressCallback = callback;
 }
 
-void API::setFirmwareUpdateMetaCallback(std::function<void(std::string availableVersion)> callback)
+void API::setFirmwareUpdateMetaCallback(std::function<bool(std::string availableVersion)> callback)
 {
     this->firmwareUpdateMetaCallback = callback;
 }

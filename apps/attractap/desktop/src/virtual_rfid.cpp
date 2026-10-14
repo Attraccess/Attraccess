@@ -116,7 +116,7 @@ void VirtualNfc::setKeyVersion(uint8_t keyNumber, uint8_t keyVersion)
 
 bool VirtualNfc::authenticate(uint8_t keyNumber, uint8_t *key)
 {
-    if (presentedCard >= CardCount) return false;
+    if (suspended || presentedCard >= CardCount) return false;
     const Card &card = currentCard();
     return card.present && card.type != CardType::Unknown && !card.failAuthentication && keyNumber < KeySlotCount &&
            std::equal(card.keys[keyNumber].begin(), card.keys[keyNumber].end(), key);
@@ -137,7 +137,7 @@ bool VirtualNfc::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKe
 
 bool VirtualNfc::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNumber)
 {
-    if (presentedCard >= CardCount)
+    if (suspended || presentedCard >= CardCount)
         return false;
     const Card &card = currentCard();
     if (!card.present || card.type == CardType::Unknown || card.failAuthentication)
