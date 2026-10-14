@@ -104,7 +104,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
 
   const handleSubmit = useCallback(() => {
-    if (!formRef.current?.checkValidity()) return;
+    if (isSaving || !formRef.current?.checkValidity()) return;
 
     const payload = {
       requestBody: {
@@ -122,7 +122,16 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     } else {
       saveSettings(payload);
     }
-  }, [url, publicInternetUrl, licenseKey, defaultLanguage, saveSettings, saveSettingsFirstTimeSetup, endpoint]);
+  }, [
+    url,
+    publicInternetUrl,
+    licenseKey,
+    defaultLanguage,
+    saveSettings,
+    saveSettingsFirstTimeSetup,
+    endpoint,
+    isSaving,
+  ]);
 
   const showLoading = variant === 'standalone' && isLoading;
 
@@ -145,6 +154,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
       className="flex flex-col gap-4"
     >
       <TextField
+        isDisabled={isSaving}
         isRequired
         value={url}
         onChange={(value) => {
@@ -157,6 +167,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         <Description>{t('inputs.url.description')}</Description>
       </TextField>
       <TextField
+        isDisabled={isSaving}
         value={publicInternetUrl}
         onChange={(value) => {
           hasEditedPublicInternetUrl.current = true;
@@ -187,6 +198,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
       {variant === 'standalone' && (
         <>
           <PasswordInput
+            isDisabled={isSaving}
             label={t('inputs.licenseKey.label')}
             description={t('inputs.licenseKey.description')}
             value={licenseKey}

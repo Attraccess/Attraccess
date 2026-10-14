@@ -100,6 +100,7 @@ export function GeneralSection() {
     trimmedPublicUrl && !isAbsoluteUrl(trimmedPublicUrl) ? t('inputs.publicInternetUrl.errors.invalid') : null;
 
   const handleSave = () => {
+    if (isSaving) return;
     // Errors stay hidden until the first save attempt — flagging a half-typed URL red on every
     // keystroke is noise, not help.
     setHasAttemptedSave(true);
@@ -152,6 +153,7 @@ export function GeneralSection() {
       >
         <SettingsRow stacked label={t('inputs.url.label')} hint={t('inputs.url.description')}>
           <TextField
+            isDisabled={isSaving}
             isRequired
             className="w-full"
             aria-label={t('inputs.url.label')}
@@ -185,6 +187,7 @@ export function GeneralSection() {
           hint={t('inputs.publicInternetUrl.description')}
         >
           <TextField
+            isDisabled={isSaving}
             className="w-full"
             aria-label={t('inputs.publicInternetUrl.label')}
             value={publicInternetUrl}
@@ -199,6 +202,7 @@ export function GeneralSection() {
         <SettingsRow stacked label={t('inputs.licenseKey.label')} hint={t('inputs.licenseKey.description')}>
           <div className="flex w-full flex-col gap-2">
             <PasswordInput
+              isDisabled={isSaving}
               aria-label={t('inputs.licenseKey.label')}
               autoComplete="off"
               value={licenseKey}

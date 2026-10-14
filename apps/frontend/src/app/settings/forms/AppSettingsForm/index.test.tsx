@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AppSettingsForm } from './index';
+import userEvent from '@testing-library/user-event';
 const state = vi.hoisted(() => ({
   settings: { app: {} as Record<string, unknown> },
   loading: false,
+  pending: false,
   systemLanguage: { defaultLanguage: 'en' as 'en' | 'de', configured: false },
   save: vi.fn(),
   setup: vi.fn(),
@@ -27,17 +29,18 @@ vi.mock('@attraccess/react-query-client', () => ({
   useSettingsServiceGetSystemSettings: () => ({ data: state.settings, isLoading: state.loading }),
   useSettingsServiceUpdateSystemSettings: (options: typeof state.options) => {
     state.options = options;
-    return { mutate: state.save };
+    return { mutate: state.save, isPending: state.pending };
   },
   useSettingsServiceApplyFirstTimeSetupSettings: (options: typeof state.options) => {
     state.options = options;
-    return { mutate: state.setup };
+    return { mutate: state.setup, isPending: state.pending };
   },
 }));
 vi.mock('../../../../components/CommunityLicenseButton', () => ({ CommunityLicenseButton: () => null }));
 beforeEach(() => {
   vi.clearAllMocks();
   state.loading = false;
+  state.pending = false;
   state.systemLanguage = { defaultLanguage: 'en', configured: false };
   state.settings = { app: { url: 'https://app.example', publicInternetUrl: 'https://public.example' } };
 });
@@ -226,3 +229,40 @@ it('reloads the saved system language when first-time setup is resumed', () => {
   render(<AppSettingsForm variant="wizard" endpoint="first-time-setup" />);
   expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
 });
+
+it.each(['settings', 'first-time-setup'] as const)(
+  'prevents changes while %s is saving and restores editing after failure',
+  async (endpoint) => {
+    const variant = endpoint === 'settings' ? 'standalone' : 'wizard';
+    const view = render(<AppSettingsForm variant={variant} endpoint={endpoint} />);
+    const url = screen.getByLabelText('inputs.url.label');
+    const publicUrl = screen.getByLabelText('inputs.publicInternetUrl.label');
+    await userEvent.type(url, '/submitted');
+    if (variant === 'standalone')
+      await userEvent.type(screen.getByLabelText('inputs.licenseKey.label'), 'submitted-license');
+    await userEvent.click(
+      screen.getByRole('button', { name: variant === 'standalone' ? 'actions.save' : 'actions.next' }),
+    );
+    state.pending = true;
+    view.rerender(<AppSettingsForm variant={variant} endpoint={endpoint} />);
+    expect(url).toBeDisabled();
+    expect(publicUrl).toBeDisabled();
+    expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toBeDisabled();
+    await userEvent.type(url, '/unsaved');
+    expect(url).toHaveValue(
+      variant === 'standalone' ? 'https://app.example/submitted' : window.location.origin + '/submitted',
+    );
+    if (variant === 'standalone') expect(screen.getByLabelText('inputs.licenseKey.label')).toBeDisabled();
+    act(() => state.options.onError(new Error('failed')));
+    state.pending = false;
+    view.rerender(<AppSettingsForm variant={variant} endpoint={endpoint} />);
+    expect(url).toBeEnabled();
+    expect(publicUrl).toBeEnabled();
+    if (variant === 'standalone')
+      expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('submitted-license');
+    await userEvent.type(url, '/retry');
+    expect(url).toHaveValue(
+      variant === 'standalone' ? 'https://app.example/submitted/retry' : window.location.origin + '/submitted/retry',
+    );
+  },
+);

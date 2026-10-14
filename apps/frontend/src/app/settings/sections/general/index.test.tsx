@@ -25,7 +25,11 @@ vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), error: vi.fn(), apiError: vi.fn() }),
 }));
 vi.mock('../../../../components/CommunityLicenseButton', () => ({
-  CommunityLicenseButton: () => <button type="button">community license</button>,
+  CommunityLicenseButton: ({ isDisabled }: { isDisabled: boolean }) => (
+    <button type="button" disabled={isDisabled}>
+      community license
+    </button>
+  ),
 }));
 
 const saveSettings = vi.fn();
@@ -76,6 +80,39 @@ describe('GeneralSection', () => {
     const reloaded = render(<GeneralSection />);
     expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
     expect(saveBar(reloaded.container)).toBeNull();
+  });
+
+  it('prevents edits during a pending save and preserves the draft after failure', async () => {
+    let pending = false;
+    let fail: (() => void) | undefined;
+    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation((options) => {
+      fail = () => options?.onError?.(new Error('failed'), {} as never, undefined as never, {} as never);
+      return { mutate: saveSettings, isPending: pending } as unknown as ReturnType<
+        typeof useSettingsServiceUpdateSystemSettings
+      >;
+    });
+    const view = render(<GeneralSection />);
+    await userEvent.type(urlField(), '/submitted');
+    await userEvent.type(screen.getByLabelText('inputs.licenseKey.label'), 'submitted-license');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    pending = true;
+    view.rerender(<GeneralSection />);
+    for (const name of ['inputs.url.label', 'inputs.publicInternetUrl.label', 'inputs.licenseKey.label']) {
+      expect(screen.getByLabelText(name)).toBeDisabled();
+      await userEvent.type(screen.getByLabelText(name), 'unsaved');
+    }
+    expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'community license' })).toBeDisabled();
+    expect(urlField()).toHaveValue('https://example.org/submitted');
+    expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('submitted-license');
+    act(() => fail?.());
+    pending = false;
+    view.rerender(<GeneralSection />);
+    expect(urlField()).toBeEnabled();
+    expect(urlField()).toHaveValue('https://example.org/submitted');
+    expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('submitted-license');
+    await userEvent.type(urlField(), '/retry');
+    expect(urlField()).toHaveValue('https://example.org/submitted/retry');
   });
 
   it('shows no save bar until something is edited', () => {
