@@ -28,7 +28,7 @@ export function KioskGuard() {
     }
 
     try {
-      kioskReturn.current = sessionStorage.getItem(STORAGE_KEY) ?? kioskReturn.current;
+      kioskReturn.current = kioskReturn.current ?? sessionStorage.getItem(STORAGE_KEY);
     } catch {
       // Public routes remain usable; an entered kiosk still cannot be left.
     }

@@ -11,6 +11,7 @@ function Page() {
       <KioskGuard />
       <span>{location.pathname + location.search}</span>
       <button onClick={() => navigate('/kiosk/resources/7?mode=touch')}>Enter kiosk</button>
+      <button onClick={() => navigate('/kiosk/resources/8?mode=touch')}>Switch kiosk</button>
       <button onClick={() => navigate('/resources')}>Leave kiosk</button>
     </>
   );
@@ -62,4 +63,18 @@ it('restores the persisted kiosk destination on remount', () => {
   view.unmount();
   open();
   expect(screen.getByText('/kiosk/resources/7?mode=touch')).toBeTruthy();
+});
+
+it('prefers the latest kiosk destination when its storage write fails', () => {
+  open();
+  fireEvent.click(screen.getByRole('button', { name: 'Enter kiosk' }));
+  expect(sessionStorage.getItem('kiosk-return')).toBe('/kiosk/resources/7?mode=touch');
+  vi.spyOn(sessionStorage, 'setItem').mockImplementation(() => {
+    throw new DOMException('Storage write is blocked', 'QuotaExceededError');
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Switch kiosk' }));
+  expect(screen.getByText('/kiosk/resources/8?mode=touch')).toBeTruthy();
+  expect(sessionStorage.getItem('kiosk-return')).toBe('/kiosk/resources/7?mode=touch');
+  fireEvent.click(screen.getByRole('button', { name: 'Leave kiosk' }));
+  expect(screen.getByText('/kiosk/resources/8?mode=touch')).toBeTruthy();
 });
