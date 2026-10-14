@@ -108,7 +108,9 @@ export const OtaRequest = Operation.extend({
   approved: z.literal(true),
   approvalId: Id,
   image: z.strictObject({
-    url: z.url({ protocol: /^https$/ }),
+    // JSON Schema has no regex flags; explicit case variants preserve HTTPS
+    // validation for both runtime consumers and exported contract validators.
+    url: z.url().regex(/^[hH][tT][tT][pP][sS]:\/\/[^/?#\s]+/),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     softwareVersion: z.number().int().min(0).max(0xffffffff),
   }),

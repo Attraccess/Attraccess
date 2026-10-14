@@ -57,6 +57,32 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
         expect(validate(request)).toBe(schemas.SubscriptionRequest.safeParse(request).success);
       }
     }
+    if (name === 'OtaRequest') {
+      const request = fixtures.OtaRequest as { image: object };
+      for (const [url, valid] of [
+        ['https://example.org/update.bin', true],
+        ['HTTPS://example.org/update.bin', true],
+        ['hTtPs://example.org:8443/update.bin?version=2', true],
+        ['http://example.org/update.bin', false],
+        ['ftp://example.org/update.bin', false],
+        ['file:///update.bin', false],
+        ['mailto:firmware@example.org', false],
+        ['wss://example.org/update.bin', false],
+        ['/update.bin', false],
+        ['https://', false],
+        ['https:example.org/update.bin', false],
+      ] as const) {
+        const value = { ...request, image: { ...request.image, url } };
+        expect(schemas.OtaRequest.safeParse(value).success, url).toBe(valid);
+        expect(validate(value), url).toBe(valid);
+      }
+      const withoutApprovalId = { ...(fixtures.OtaRequest as Record<string, unknown>) };
+      delete withoutApprovalId.approvalId;
+      for (const value of [{ ...request, approved: false }, withoutApprovalId]) {
+        expect(schemas.OtaRequest.safeParse(value).success).toBe(false);
+        expect(validate(value)).toBe(false);
+      }
+    }
     expect(validate(fixtures[name]), `${name}: ${JSON.stringify(validate.errors)}`).toBe(true);
     expect(validate({ invalid: true }), name).toBe(false);
     const value = fixtures[name];
