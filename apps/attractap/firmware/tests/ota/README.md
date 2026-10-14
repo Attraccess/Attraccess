@@ -3,12 +3,15 @@
 The firmware test target also runs the production OTA state machine on the host.
 It checks that NFC is suspended before flash preparation, preparation failures
 reboot instead of stranding a suspended reader, and reconnects resume the same
-image without erasing it again. Run these checks independently with:
+image without erasing it again. RF shutdown failure must abort before flash or
+chunk requests. A Node regression drives the fixture's early-resume timing race.
+Run these checks independently with:
 
 ```sh
 cmake -S apps/attractap/firmware/tests/ota -B apps/attractap/firmware/tests/ota/build
 cmake --build apps/attractap/firmware/tests/ota/build
 ctest --test-dir apps/attractap/firmware/tests/ota/build --output-on-failure
+node --test apps/attractap/firmware/tests/ota/hardware-soak.test.mjs
 ```
 
 The hardware fixture below exercises the actual reader's WebSocket, flash writes,
@@ -47,6 +50,9 @@ were bypassed. Stopping NFC polling allowed repeated complete transfers. Firmwar
 preparing flash, and keeps NFC suspended across reconnect/resume until reboot.
 Suspension also rejects card authentication and enrollment calls, so delayed
 callbacks cannot use NFC while an update is in progress.
+Active enrollment/reset sessions are canceled, and OTA owns the screen even
+when late card requests or a disconnect arrive. The desktop reader workflow
+tests exercise these cases through the production application callbacks.
 Already affected readers may need one USB installation: the OTA receiver runs
 the currently installed firmware throughout a transfer. This change protects
 OTA; idle Wi-Fi loss during normal card polling was also observed on the affected

@@ -64,9 +64,10 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
     }
     // Quiesce NFC before flash preparation or the first chunk request. The
     // metadata callback also owns the application's update-screen transition.
-    if (this->metaCallback)
+    if (!this->metaCallback || !this->metaCallback(availableVersion))
     {
-        this->metaCallback(availableVersion);
+        this->abortFirmwareUpdate("NFC RF shutdown failed");
+        return;
     }
     esp_err_t err = esp_ota_begin(this->ota.updatePartition, OTA_SIZE_UNKNOWN, &this->ota.otaHandle);
     if (err != ESP_OK)

@@ -132,7 +132,9 @@ server.on('connection', (socket) => {
         offer();
         retryTimer = setInterval(() => { if (!updateAcked && socket.readyState === 1) offer(); }, 4000);
         timers.add(retryTimer);
-        firstChunkTimer = after(firstChunkTimeout, () => finish(false, 'OTA stuck at 0%: no first chunk request'));
+        if (!firstChunk) {
+          firstChunkTimer = after(firstChunkTimeout, () => finish(false, 'OTA stuck at 0%: no first chunk request'));
+        }
         if (cycleNumber !== completed) {
           cycleNumber = completed;
           lastOffset = 0;

@@ -85,7 +85,8 @@ int main()
     // OTA suspension survives the normal reconnect path enabling detection.
     const int detectionsBeforeOta = detected;
     const int removalsBeforeOta = removed;
-    nfcContract.suspend();
+    assert(nfcContract.suspend());
+    assert(nfcContract.suspend());
     nfc.setPresent(1, false);
     nfcContract.enableCardDetection();
     nfc.setPresent(0, true);

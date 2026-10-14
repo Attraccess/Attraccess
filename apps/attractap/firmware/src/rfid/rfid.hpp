@@ -43,7 +43,7 @@ public:
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback) override;
     void setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback) override;
     void disableCardDetection() override;
-    void suspend() override;
+    bool suspend() override;
 
     // Forget the currently tracked card so the next enableCardDetection() cycle
     // re-detects from a clean state (fresh readPassiveTargetID) instead of
@@ -114,6 +114,7 @@ private:
     // Toggled from main loop / callbacks, read by the NFC task.
     volatile bool cardDetectionEnabled = false;
     bool suspended = false;
+    bool rfFieldOff = false;
     std::function<void(uint8_t *, uint8_t)> cardDetectionCallback;
     std::function<void(uint32_t presentationTimeMs)> cardRemovalCallback;
     void handleCardDetection();

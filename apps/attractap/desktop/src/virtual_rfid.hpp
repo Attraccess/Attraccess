@@ -57,7 +57,7 @@ public:
 
     void enableCardDetection() override { if (!suspended) cardDetectionEnabled = true; }
     void disableCardDetection() override { cardDetectionEnabled = false; }
-    void suspend() override { suspended = true; cardDetectionEnabled = false; }
+    bool suspend() override { suspended = true; cardDetectionEnabled = false; return true; }
     void resetCardPresence() override { cardPresenceReported = false; }
 
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback) override;

@@ -18,6 +18,6 @@ target_include_directories(ota-lifecycle PRIVATE "${arduinojson_SOURCE_DIR}/src"
 target_link_libraries(ota-lifecycle PRIVATE ArduinoJson)
 
 enable_testing()
-foreach(scenario nfc-before-flash preparation-failure resume invalid-offer)
+foreach(scenario nfc-before-flash preparation-failure nfc-failure resume invalid-offer)
     add_test(NAME "ota-${scenario}" COMMAND ota-lifecycle "${scenario}")
 endforeach()

@@ -249,9 +249,24 @@ void Application::setupActionCallbacks()
   this->api.setFirmwareUpdateMetaCallback([this](std::string availableVersion) {
     // Card polling can disrupt Wi-Fi on the reader. Keep NFC stopped through
     // reconnect/resume as well as the initial transfer.
-    this->nfc.suspend();
+    this->firmwareUpdateActive = true;
+    const bool nfcStopped = this->nfc.suspend();
+#ifdef HAS_LVGL_DISPLAY
+    if ((this->enrollPhase != ENROLL_PHASE_NONE && this->enrollPhase != ENROLL_PHASE_SUCCESS) ||
+        this->externalState == EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO)
+      this->api.sendEnrollNewCardCancel();
+    if ((this->resetPhase != RESET_PHASE_NONE && this->resetPhase != RESET_PHASE_SUCCESS) ||
+        this->externalState == EXTERNAL_STATE_RESET_NFC_CARD)
+      this->api.sendResetNfcCardCancel();
+    this->enrollPhase = ENROLL_PHASE_NONE;
+    this->resetPhase = RESET_PHASE_NONE;
+    this->cardAuthenticationPending = false;
+    this->enrollKeyMaterialReady = false;
+    this->enrollErrorPending = false;
+#endif
     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
     this->availableFirmwareVersion = availableVersion;
+    return nfcStopped;
   });
 
   this->api.setFirmwareUpdateProgressCallback([this](int percent) {

@@ -17,6 +17,7 @@ struct Device
     uint32_t now = 10000;
     bool nfcSuspended = false;
     bool failPreparation = false;
+    bool failNfcShutdown = false;
     bool hasPartition = true;
     unsigned preparations = 0;
     unsigned reboots = 0;
@@ -65,10 +66,11 @@ struct Fixture
     std::vector<int> progress;
     std::string failure;
     std::function<void(int)> onProgress = [&](int value) { progress.push_back(value); };
-    std::function<void(std::string)> onMeta = [&](std::string version) {
+    std::function<bool(std::string)> onMeta = [&](std::string version) {
         require(version == "next", "wrong firmware version passed to the application");
-        state.nfcSuspended = true;
+        state.nfcSuspended = !state.failNfcShutdown;
         ++suspensions;
+        return state.nfcSuspended;
     };
     std::function<void(const char *, const char *)> onError = [&](const char *, const char *reason) { failure = reason; };
     OtaUpdater updater{logger, [&](const char *type, JsonObject payload) {
@@ -136,6 +138,20 @@ static void resume()
     require(f.progress.back() == 100 && f.failure.empty(), "resumed update failed to reach 100%");
 }
 
+static void nfcFailure()
+{
+    Fixture f;
+    f.state.failNfcShutdown = true;
+    f.begin();
+    require(f.failure == "NFC RF shutdown failed", "unconfirmed RF shutdown did not abort the update");
+    require(f.state.preparations == 0, "flash was prepared without confirmed RF shutdown");
+    f.begin();
+    require(f.suspensions == 1, "failed OTA accepted another offer before rebooting");
+    f.state.now += 3001;
+    f.updater.tick();
+    require(f.state.reboots == 1 && f.requestedOffsets.empty(), "RF shutdown failure did not reboot without requesting data");
+}
+
 static void invalidOffer()
 {
     Fixture f;
@@ -158,6 +174,7 @@ int main(int argc, char **argv)
         if (scenario == "nfc-before-flash") beforeFlash();
         else if (scenario == "preparation-failure") preparationFailure();
         else if (scenario == "resume") resume();
+        else if (scenario == "nfc-failure") nfcFailure();
         else if (scenario == "invalid-offer") invalidOffer();
         else throw std::runtime_error("unknown lifecycle scenario");
         std::cout << scenario << " passed\n";

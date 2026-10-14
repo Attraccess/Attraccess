@@ -85,10 +85,10 @@ void NFC::disableCardDetection()
     this->cardDetectionEnabled = false;
 }
 
-void NFC::suspend()
+bool NFC::suspend()
 {
     LockGuard guard(*this);
-    if (this->suspended) return;
+    if (this->rfFieldOff) return true;
     this->suspended = true;
     this->cardDetectionEnabled = false;
     this->resetCardPresence();
@@ -96,8 +96,10 @@ void NFC::suspend()
     // A timed-out InListPassiveTarget can still be running on the PN532.
     // Stopping host polling alone leaves its RF field active during OTA.
     I2CBusGuard busGuard;
-    if (!this->pn532.setRfField(false))
+    this->rfFieldOff = this->pn532.setRfField(false);
+    if (!this->rfFieldOff)
         this->logger.error("Failed to turn off NFC RF field for firmware update");
+    return this->rfFieldOff;
 }
 
 void NFC::resetCardPresence()
