@@ -460,6 +460,105 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     await bounded.app.shutdown();
     expect(Date.now() - before).toBeLessThan(200);
   });
+  it.each([false, true])('cleans resources acquired during shutdown (after deadline: %s)', async (afterDeadline) => {
+    vi.useFakeTimers();
+    let finishInitialization!: () => void;
+    const initialization = new Promise<void>((resolve) => (finishInitialization = resolve));
+    let enteredInitialization!: () => void;
+    const entered = new Promise<void>((resolve) => (enteredInitialization = resolve));
+    let acquired = false;
+    const order: string[] = [];
+    const platform = {
+      initialize: vi.fn(async () => {
+        enteredInitialization();
+        await initialization;
+        acquired = true;
+        order.push('acquired');
+      }),
+      dispose: vi.fn(async () => {
+        acquired = false;
+        order.push('disposed');
+      }),
+    };
+    const app = createApplication({ platform, version: versionFixture, config: { port: 0, shutdownMs: 30 } });
+    apps.push(app);
+    const starting = expect(app.start()).rejects.toThrow('Shutdown began during initialization.');
+    try {
+      await entered;
+      const stopping = app.shutdown();
+      expect(app.shutdown()).toBe(stopping);
+      expect(platform.dispose).not.toHaveBeenCalled();
+      if (afterDeadline) {
+        await vi.advanceTimersByTimeAsync(30);
+        await stopping;
+        expect(platform.dispose).not.toHaveBeenCalled();
+      }
+      finishInitialization();
+      await starting;
+      await stopping;
+      expect(order).toEqual(['acquired', 'disposed']);
+      expect(acquired).toBe(false);
+      expect(platform.dispose).toHaveBeenCalledOnce();
+      expect(app.ready).toBe(false);
+      expect(app.server.listening).toBe(false);
+      expect(Reflect.get(app.stream, 'expirationTimer')).toBeUndefined();
+      expect(Reflect.get(app.stream, 'buffer')).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      finishInitialization();
+      vi.useRealTimers();
+    }
+  });
+  it('cleans partial acquisition when pending initialization fails during shutdown', async () => {
+    let finishInitialization!: () => void;
+    const initialization = new Promise<void>((resolve) => (finishInitialization = resolve));
+    let acquired = false;
+    const platform = {
+      initialize: vi.fn(async () => {
+        await initialization;
+        acquired = true;
+        throw new Error('simulated late initialization failure');
+      }),
+      dispose: vi.fn(async () => {
+        acquired = false;
+      }),
+    };
+    const app = createApplication({ platform, version: versionFixture, config: { port: 0, shutdownMs: 100 } });
+    apps.push(app);
+    const starting = expect(app.start()).rejects.toThrow('simulated late initialization failure');
+    const stopping = app.shutdown();
+    finishInitialization();
+    await Promise.all([starting, stopping]);
+    expect(acquired).toBe(false);
+    expect(platform.dispose).toHaveBeenCalledOnce();
+    expect(app.ready).toBe(false);
+    expect(app.server.listening).toBe(false);
+  });
+  it('keeps readiness false when shutdown begins at the listening event', async () => {
+    const platform = { initialize: vi.fn(async () => undefined), dispose: vi.fn(async () => undefined) };
+    const app = createApplication({ platform, version: versionFixture, config: { port: 0, shutdownMs: 100 } });
+    apps.push(app);
+    let stopping: Promise<void> | undefined;
+    app.server.once('listening', () => (stopping = app.shutdown()));
+    await expect(app.start()).rejects.toThrow('Shutdown began while starting the listener.');
+    await stopping;
+    expect(app.ready).toBe(false);
+    expect(app.server.listening).toBe(false);
+    expect(platform.dispose).toHaveBeenCalledOnce();
+    expect(Reflect.get(app.stream, 'buffer')).toHaveLength(0);
+    expect(Reflect.get(app.stream, 'expirationTimer')).toBeUndefined();
+  });
+  it('does not acquire resources when started after shutdown', async () => {
+    const platform = { initialize: vi.fn(async () => undefined), dispose: vi.fn(async () => undefined) };
+    const app = createApplication({ platform, version: versionFixture, config: { port: 0 } });
+    apps.push(app);
+    await app.shutdown();
+    await expect(app.start()).rejects.toThrow('Application is already started or shutting down.');
+    expect(platform.initialize).not.toHaveBeenCalled();
+    expect(platform.dispose).not.toHaveBeenCalled();
+    expect(app.ready).toBe(false);
+    expect(app.server.listening).toBe(false);
+  });
   it('returns deadlines and bounded-payload errors without echoing sensitive requests', async () => {
     const { url } = await start({ payloadBytes: 512, requestTimeoutMs: 100 });
     const body = { ...(fixtures.CommandRequest as object), deadline: '2000-01-01T00:00:00.000Z' };

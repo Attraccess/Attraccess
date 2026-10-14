@@ -32,7 +32,7 @@ export function createApplication(options: ApplicationOptions) {
   const sockets = new Set<Socket>();
   let ready = false;
   let draining = false;
-  let platformStarted = false;
+  let initialization: Promise<void> | undefined;
   let shutdownPromise: Promise<void> | undefined;
   const send = (res: ServerResponse, status: number, value: unknown, requestId: string) => {
     if (res.writableEnded || res.destroyed) return;
@@ -237,7 +237,12 @@ export function createApplication(options: ApplicationOptions) {
         if (!server.listening) resolve();
         else server.close(() => resolve());
       });
-      const dispose = platformStarted ? Promise.resolve().then(() => options.platform.dispose()) : Promise.resolve();
+      // Initialization may install cleanup only after asynchronous acquisition.
+      // Keep this chain alive even if the shutdown deadline wins the race, so
+      // resources acquired later still receive cleanup, including failed starts.
+      const dispose = initialization
+        ? initialization.catch(() => undefined).then(() => options.platform.dispose())
+        : Promise.resolve();
       // Disposal shares the same absolute shutdown budget as connection draining.
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -264,12 +269,14 @@ export function createApplication(options: ApplicationOptions) {
       return ready;
     },
     async start() {
+      if (draining || initialization) throw new Error('Application is already started or shutting down.');
       try {
-        platformStarted = true;
-        await options.platform.initialize();
+        initialization = Promise.resolve().then(() => options.platform.initialize());
+        await initialization;
         if (draining) throw new Error('Shutdown began during initialization.');
         server.listen(config.port, config.host);
         await once(server, 'listening');
+        if (draining) throw new Error('Shutdown began while starting the listener.');
         ready = true;
         stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });
         stream.publish({ type: 'capabilities', payload: INITIAL_CAPABILITIES });
