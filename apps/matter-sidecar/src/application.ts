@@ -34,6 +34,7 @@ export function createApplication(options: ApplicationOptions) {
   let draining = false;
   let initialization: Promise<void> | undefined;
   let shutdownPromise: Promise<void> | undefined;
+  const listenerAbort = new AbortController();
   const send = (res: ServerResponse, status: number, value: unknown, requestId: string) => {
     if (res.writableEnded || res.destroyed) return;
     res.writeHead(status, {
@@ -234,9 +235,11 @@ export function createApplication(options: ApplicationOptions) {
           }),
       );
       const closed = new Promise<void>((resolve) => {
-        if (!server.listening) resolve();
-        else server.close(() => resolve());
+        // close() also cancels a pending bind before the listening event.
+        server.close(() => resolve());
       });
+      // A cancelled bind emits no listening event; release the startup waiter.
+      listenerAbort.abort();
       // Initialization may install cleanup only after asynchronous acquisition.
       // Keep this chain alive even if the shutdown deadline wins the race, so
       // resources acquired later still receive cleanup, including failed starts.
@@ -275,7 +278,10 @@ export function createApplication(options: ApplicationOptions) {
         await initialization;
         if (draining) throw new Error('Shutdown began during initialization.');
         server.listen(config.port, config.host);
-        await once(server, 'listening');
+        await once(server, 'listening', { signal: listenerAbort.signal }).catch((error) => {
+          if (draining) throw new Error('Shutdown began while starting the listener.');
+          throw error;
+        });
         if (draining) throw new Error('Shutdown began while starting the listener.');
         ready = true;
         stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });

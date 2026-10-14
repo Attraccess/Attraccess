@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { once } from 'node:events';
-import { request } from 'node:http';
+import { createServer, request } from 'node:http';
 import { createConnection } from 'node:net';
 import { WebSocket } from 'ws';
 import { routes, ErrorEnvelope, INITIAL_CAPABILITIES, SUPPORTED_RELEASE } from '@attraccess/matter-contract';
@@ -547,6 +547,71 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     expect(platform.dispose).toHaveBeenCalledOnce();
     expect(Reflect.get(app.stream, 'buffer')).toHaveLength(0);
     expect(Reflect.get(app.stream, 'expirationTimer')).toBeUndefined();
+  });
+  it.each([3, 4, 8])('cancels pending HTTP binding when shutdown follows %s microtasks', async (depth) => {
+    let stopping: Promise<void> | undefined;
+    let listeningWhenShutdown: boolean | undefined;
+    const platform = {
+      initialize: vi.fn(async () => {
+        let remaining = depth;
+        const stop = () => {
+          if (remaining-- > 0) queueMicrotask(stop);
+          else {
+            listeningWhenShutdown = app.server.listening;
+            stopping = app.shutdown();
+          }
+        };
+        queueMicrotask(stop);
+      }),
+      dispose: vi.fn(async () => undefined),
+    };
+    const app = createApplication({ platform, version: versionFixture, config: { port: 0, shutdownMs: 100 } });
+    apps.push(app);
+    // The spy observes calls without replacing Node's asynchronous bind behavior.
+    const listen = vi.spyOn(app.server, 'listen');
+    const listening = vi.fn();
+    app.server.on('listening', listening);
+    try {
+      await expect(app.start()).rejects.toThrow('Shutdown began while starting the listener.');
+      await stopping;
+      // Let pending Node callbacks run, so a listener opening after shutdown fails.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(listen).toHaveBeenCalledOnce();
+      expect(listeningWhenShutdown).toBe(false);
+      expect(listening).not.toHaveBeenCalled();
+      expect(app.ready).toBe(false);
+      expect(app.server.listening).toBe(false);
+      expect(app.server.address()).toBeNull();
+      expect(platform.dispose).toHaveBeenCalledOnce();
+      expect(Reflect.get(app.stream, 'buffer')).toHaveLength(0);
+      expect(Reflect.get(app.stream, 'expirationTimer')).toBeUndefined();
+    } finally {
+      listen.mockRestore();
+      // Also clean up the leaked listener when this regression is run before the fix.
+      if (app.server.listening) await new Promise<void>((resolve) => app.server.close(() => resolve()));
+    }
+  });
+  it('preserves bind failures and cleans initialized resources', async () => {
+    const occupied = createServer();
+    occupied.listen(0, '127.0.0.1');
+    await once(occupied, 'listening');
+    const address = occupied.address();
+    if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
+    const platform = { initialize: vi.fn(async () => undefined), dispose: vi.fn(async () => undefined) };
+    const app = createApplication({
+      platform,
+      version: versionFixture,
+      config: { port: address.port, shutdownMs: 100 },
+    });
+    apps.push(app);
+    try {
+      await expect(app.start()).rejects.toMatchObject({ code: 'EADDRINUSE' });
+      expect(app.ready).toBe(false);
+      expect(app.server.listening).toBe(false);
+      expect(platform.dispose).toHaveBeenCalledOnce();
+    } finally {
+      await new Promise<void>((resolve) => occupied.close(() => resolve()));
+    }
   });
   it('does not acquire resources when started after shutdown', async () => {
     const platform = { initialize: vi.fn(async () => undefined), dispose: vi.fn(async () => undefined) };
