@@ -59,10 +59,20 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
     }
     if (name === 'OtaRequest') {
       const request = fixtures.OtaRequest as { image: object };
+      const validateApi = ajv.compile(api.components.schemas.OtaRequest);
+      expect(doc.$defs.OtaRequest.properties.image.properties.url).toMatchObject({ type: 'string', format: 'uri' });
       for (const [url, valid] of [
         ['https://example.org/update.bin', true],
         ['HTTPS://example.org/update.bin', true],
         ['hTtPs://example.org:8443/update.bin?version=2', true],
+        ['https://localhost/update.bin', true],
+        ['https://192.0.2.1/update.bin', true],
+        ['https://[2001:db8::1]:65535/update.bin', true],
+        ['https://[::1]/update.bin', true],
+        ['https://[2001:0DB8:0000:0000:0000:0000:0000:0001]/update.bin', true],
+        ['https://example.org?version=2', true],
+        ['https://user:password@example.org:0/update%20file.bin?q=a%2Fb#release', true],
+        ['https://xn--bcher-kva.example/update.bin', true],
         ['http://example.org/update.bin', false],
         ['ftp://example.org/update.bin', false],
         ['file:///update.bin', false],
@@ -71,16 +81,53 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
         ['/update.bin', false],
         ['https://', false],
         ['https:example.org/update.bin', false],
+        ['https://:', false],
+        ['https://:443/update.bin', false],
+        ['https://example.org:invalid/update.bin', false],
+        ['https://example.org:bad-port/update.bin', false],
+        ['https://example.org:65536/update.bin', false],
+        ['https://example.org:99999/update.bin', false],
+        ['https://[invalid]/update.bin', false],
+        ['https://[not-an-ip]/update.bin', false],
+        ['https://[not-ip]/update.bin', false],
+        ['https://[2001:db8:::1]/update.bin', false],
+        ['https://[broken/update.bin', false],
+        ['https://%zz/update.bin', false],
+        ['https://exa%zzmple.org/update.bin', false],
+        ['https://exa%20mple.org/update.bin', false],
+        ['https://exa mple.org/update.bin', false],
+        ['https://256.1.1.1/update.bin', false],
+        ['https://256.256.256.256/update.bin', false],
+        ['https://user@/update.bin', false],
+        ['https://example.123/update.bin', false],
+        ['https://example.org/update%zz.bin', false],
+        ['https://example.org/a b', false],
+        ['https://example.org/über.bin', false],
+        ['https://bücher.example/update.bin', false],
+        ['https://example.org\\update.bin', false],
+        ['https://example.org/%', false],
+        ['https://example.org/\nfirmware.bin', false],
+        [' https://example.org/update.bin', false],
+        ['https://example.org/update.bin\n', false],
       ] as const) {
         const value = { ...request, image: { ...request.image, url } };
         expect(schemas.OtaRequest.safeParse(value).success, url).toBe(valid);
         expect(validate(value), url).toBe(valid);
+        expect(validateApi(value), url).toBe(valid);
+      }
+      for (const port of ['0', '1', '65534', '65535', '000443', '65536', '99999', '-1', '1.5']) {
+        const value = { ...request, image: { ...request.image, url: `https://example.org:${port}/update.bin` } };
+        const valid = /^\d+$/.test(port) && Number(port) <= 65535;
+        expect(schemas.OtaRequest.safeParse(value).success, port).toBe(valid);
+        expect(validate(value), port).toBe(valid);
+        expect(validateApi(value), port).toBe(valid);
       }
       const withoutApprovalId = { ...(fixtures.OtaRequest as Record<string, unknown>) };
       delete withoutApprovalId.approvalId;
       for (const value of [{ ...request, approved: false }, withoutApprovalId]) {
         expect(schemas.OtaRequest.safeParse(value).success).toBe(false);
         expect(validate(value)).toBe(false);
+        expect(validateApi(value)).toBe(false);
       }
     }
     expect(validate(fixtures[name]), `${name}: ${JSON.stringify(validate.errors)}`).toBe(true);

@@ -103,14 +103,35 @@ export const ThreadStatus = z.strictObject({
 // Dataset is request-only; statuses and events contain no dataset bytes.
 export const ThreadRequest = Operation.extend({ dataset: z.string().regex(/^(?:[0-9a-f]{2}){1,254}$/) });
 export const OtaStatus = z.strictObject({ available: z.boolean(), activeOperationId: Id.nullable() });
+
+// Define URL syntax once as an exportable ASCII URI grammar. International
+// domains use punycode; path/query text uses percent encoding. Do not normalize
+// URLs with WHATWG parsing, whose acceptance rules differ from URI validators.
+const uriCharacter = "(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f]{2})";
+const dnsLabel = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?';
+// WHATWG interprets a numeric final label as IPv4, even in an otherwise DNS host.
+const dnsHost = `(?!(?:${dnsLabel}\\.)*(?:[0-9]+|0[xX][0-9A-Fa-f]*)\\.?(?=[:/?#]|$))${dnsLabel}(?:\\.${dnsLabel})*\\.?`;
+const ipv4 = z.regexes.ipv4.source.slice(1, -1);
+const ipv6 = z.regexes.ipv6.source.slice(1, -1);
+// URI format alone allows arbitrary port numbers. Keep the wire range explicit.
+const port = '0*(?:[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])';
+const httpsImageUrlPattern = new RegExp(
+  `^[hH][tT][tT][pP][sS]://(?:(?:${uriCharacter}|:)*@)?(?:${ipv4}|\\[${ipv6}\\]|${dnsHost})` +
+    `(?::${port})?(?:/(?:${uriCharacter}|[:@/])*)?(?:\\?(?:${uriCharacter}|[:@/?])*)?` +
+    `(?:#(?:${uriCharacter}|[:@/?])*)?(?![\\s\\S])`,
+);
 export const OtaRequest = Operation.extend({
   device: NodeIdentity,
   approved: z.literal(true),
   approvalId: Id,
   image: z.strictObject({
-    // JSON Schema has no regex flags; explicit case variants preserve HTTPS
-    // validation for both runtime consumers and exported contract validators.
-    url: z.url().regex(/^[hH][tT][tT][pP][sS]:\/\/[^/?#\s]+/),
+    // The pattern enforces URL validity at runtime and in exports. URI format
+    // remains explicit metadata rather than being replaced by Zod's regex check.
+    url: z.string().regex(httpsImageUrlPattern).meta({
+      format: 'uri',
+      description:
+        'HTTPS URI with a DNS/punycode, dotted-decimal IPv4 or hexadecimal IPv6 host; port 0–65535; percent-encoded text.',
+    }),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     softwareVersion: z.number().int().min(0).max(0xffffffff),
   }),
