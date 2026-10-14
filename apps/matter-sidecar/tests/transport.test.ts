@@ -16,9 +16,9 @@ const apps: ReturnType<typeof createApplication>[] = [];
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.shutdown()));
 });
-async function start(config = {}) {
+async function start(config = {}, version = versionFixture) {
   const platform = { initialize: vi.fn(async () => undefined), dispose: vi.fn(async () => undefined) };
-  const app = createApplication({ platform, version: versionFixture, config: { port: 0, shutdownMs: 100, ...config } });
+  const app = createApplication({ platform, version, config: { port: 0, shutdownMs: 100, ...config } });
   apps.push(app);
   return { app, platform, ...(await app.start()) };
 }
@@ -37,6 +37,47 @@ async function connect(url: string) {
   return { ws, messages };
 }
 describe('real local HTTP and WebSocket transport with a simulated platform', () => {
+  it('reports an incompatible own release in diagnostics and rejects operations and upgrades', async () => {
+    const version = {
+      ...versionFixture,
+      build: { ...versionFixture.build, version: '999.0.0' },
+      sidecarRelease: '999.0.0',
+    };
+    const { url } = await start({}, version);
+    for (const path of ['/health/live', '/health/ready', '/version'])
+      expect((await fetch(url + path)).status).toBe(200);
+    expect(await (await fetch(url + '/version')).json()).toEqual(version);
+    const verifyError = (body: unknown) => {
+      const result = ErrorEnvelope.parse(body);
+      expect(result.error.code).toBe('INCOMPATIBLE_RELEASE');
+      expect(result.error.details.received).toMatchObject({ sidecar: '999.0.0' });
+      expect(result.error.details.supported).toEqual([SUPPORTED_RELEASE]);
+      expect(result.error.message).toMatch('Upgrade or downgrade');
+    };
+    for (const route of routes.filter((route) => route.path.startsWith('/v1/'))) {
+      const response = await fetch(url + route.path, { method: route.method, headers });
+      expect(response.status, route.path).toBe(409);
+      verifyError(await response.json());
+    }
+    const ws = new WebSocket(url.replace('http:', 'ws:') + '/v1/events', { headers });
+    ws.on('error', () => undefined);
+    const response = await new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+      ws.once('open', () => {
+        ws.terminate();
+        reject(new Error('Incompatible sidecar accepted an upgrade'));
+      });
+      ws.once('unexpected-response', (_, res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.once('end', () => {
+          ws.terminate();
+          resolve({ status: res.statusCode ?? 0, body: JSON.parse(body) });
+        });
+      });
+    });
+    expect(response.status).toBe(409);
+    verifyError(response.body);
+  });
   it('contains a rejected upgrade socket reset and continues serving HTTP and WebSocket clients', async () => {
     const { app, port, url } = await start();
     const resetHandled = new Promise<void>((resolve) => {

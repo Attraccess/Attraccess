@@ -120,7 +120,7 @@ export function createApplication(options: ApplicationOptions) {
               'Only /v1 is supported. Upgrade or downgrade to the supported release combination.',
               { supportedWireVersions: [1] },
             );
-          checkCompatibility(req.headers);
+          checkCompatibility(req.headers, version.sidecarRelease);
           if (!ready) throw new ProtocolError('UNAVAILABLE', 'Sidecar is not ready or is shutting down.');
         }
         const route = routes.find((route) => route.path === path && route.method === req.method);
@@ -205,7 +205,7 @@ export function createApplication(options: ApplicationOptions) {
         throw new ProtocolError('UNSUPPORTED_WIRE_VERSION', 'Only /v1/events is supported.', {
           supportedWireVersions: [1],
         });
-      checkCompatibility(req.headers);
+      checkCompatibility(req.headers, version.sidecarRelease);
       if (path !== '/v1/events') throw new ProtocolError('NOT_FOUND', 'WebSocket route is /v1/events.');
       if (!ready) throw new ProtocolError('UNAVAILABLE', 'Sidecar is not ready or is shutting down.');
       wss.handleUpgrade(req, socket, head, (ws) => attachClient(ws, requestId, stream, config));

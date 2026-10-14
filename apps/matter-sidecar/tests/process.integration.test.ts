@@ -1,6 +1,7 @@
 import { afterEach, it, expect } from 'vitest';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { WebSocket } from 'ws';
 import { fixtures } from '@attraccess/matter-contract/testing';
@@ -40,6 +41,9 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const)
     const version = VersionResponse.parse(await (await fetch(process.url + '/version')).json());
     expect(version.matterJsRelease).toBe(MATTER_JS_RELEASE);
     expect(version.sidecarRelease).toBe(SUPPORTED_RELEASE.sidecar);
+    const packageVersion = JSON.parse(readFileSync('apps/matter-sidecar/package.json', 'utf8')).version;
+    expect(version.sidecarRelease).toBe(packageVersion);
+    expect(version.build.version).toBe(packageVersion);
     expect(version.build.revision).toBe(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim());
     expect(await (await fetch(process.url + '/health/ready')).json()).toMatchObject({
       ready: true,

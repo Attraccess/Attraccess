@@ -11,7 +11,7 @@ await build({
   format: 'esm',
   target: 'node24',
   external: ['@matter/*', 'ws'],
-  define: { BUILD_REVISION: JSON.stringify(revision) },
+  define: { BUILD_REVISION: JSON.stringify(revision), BUILD_VERSION: JSON.stringify(pkg.version) },
   sourcemap: true,
 });
 mkdirSync('dist/apps/matter-sidecar', { recursive: true });

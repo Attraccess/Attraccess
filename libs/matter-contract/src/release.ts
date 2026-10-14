@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import metadata from '../package.json' with { type: 'json' };
-import { Capabilities, ReleaseTuple, WIRE_VERSION, STORAGE_SCHEMA_VERSION, Id } from './primitives.js';
+import { Capabilities, Release, ReleaseTuple, WIRE_VERSION, STORAGE_SCHEMA_VERSION, Id } from './primitives.js';
 
 // Package releases are authoritative. Builds and plugin manifest checks use this same policy.
 export const SUPPORTED_RELEASE = ReleaseTuple.parse(metadata.attraccessMatter.supportedRelease);
@@ -21,8 +21,9 @@ export const CompatibilityHeaders = z.strictObject({
 });
 export const VersionResponse = z.strictObject({
   schemaVersion: z.literal(WIRE_VERSION),
-  build: z.strictObject({ version: z.literal(SUPPORTED_RELEASE.sidecar), revision: z.string().min(1).max(100) }),
-  sidecarRelease: z.literal(SUPPORTED_RELEASE.sidecar),
+  // Diagnostics must report the running release even when policy rejects it.
+  build: z.strictObject({ version: Release, revision: z.string().min(1).max(100) }),
+  sidecarRelease: Release,
   matterJsRelease: z.literal(MATTER_JS_RELEASE),
   storageSchemaVersion: z.literal(STORAGE_SCHEMA_VERSION),
   wireProtocolVersion: z.literal(WIRE_VERSION),

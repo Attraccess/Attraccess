@@ -45,6 +45,19 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
   addFormats(ajv);
   for (const [name, schema] of Object.entries(doc.$defs)) {
     const validate = ajv.compile(schema as object);
+    if (name === 'VersionResponse') {
+      for (const [release, valid] of [
+        ['999.0.0', true],
+        ['999.0.0-rc.1', true],
+        ['not-a-version', false],
+        ['', false],
+      ] as const) {
+        const version = fixtures.VersionResponse as { build: object };
+        const value = { ...version, build: { ...version.build, version: release }, sidecarRelease: release };
+        expect(schemas.VersionResponse.safeParse(value).success).toBe(valid);
+        expect(validate(value)).toBe(valid);
+      }
+    }
     if (name === 'SubscriptionRequest') {
       for (const [minIntervalSeconds, maxIntervalSeconds] of [
         [100, 1],

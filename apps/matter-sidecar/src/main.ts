@@ -3,6 +3,7 @@ import { createApplication } from './application.js';
 import { matterPlatform } from './platform.js';
 
 declare const BUILD_REVISION: string;
+declare const BUILD_VERSION: string;
 let app: ReturnType<typeof createApplication> | undefined;
 let exiting = false;
 async function stop(exitCode: number) {
@@ -39,8 +40,8 @@ try {
     platform: matterPlatform(),
     version: {
       schemaVersion: 1,
-      build: { version: SUPPORTED_RELEASE.sidecar, revision: BUILD_REVISION },
-      sidecarRelease: SUPPORTED_RELEASE.sidecar,
+      build: { version: BUILD_VERSION, revision: BUILD_REVISION },
+      sidecarRelease: BUILD_VERSION,
       matterJsRelease: MATTER_JS_RELEASE,
       storageSchemaVersion: 1,
       wireProtocolVersion: 1,
