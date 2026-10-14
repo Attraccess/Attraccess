@@ -217,15 +217,14 @@ export function useTranslations(
 export function detectPreferredLanguage(): Language | undefined {
   const explicit = useTranslationState.getState().explicitLanguage;
   if (explicit) return explicit;
-  let stored: Language | undefined;
-  try {
-    stored =
-      getSupportedDeviceLanguage(globalThis.localStorage?.getItem(I18N_LANGUAGE_STORAGE_KEY)) ??
-      getSupportedDeviceLanguage(globalThis.sessionStorage?.getItem(I18N_LANGUAGE_STORAGE_KEY));
-  } catch {
-    // Browser detection still works when storage access is disabled.
+  for (const storage of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      const stored = getSupportedDeviceLanguage(globalThis[storage]?.getItem(I18N_LANGUAGE_STORAGE_KEY));
+      if (stored) return stored;
+    } catch {
+      // Each store can be unavailable independently; keep checking other preferences.
+    }
   }
-  if (stored) return stored;
   for (const locale of navigator.languages ?? [navigator.language]) {
     const language = getSupportedDeviceLanguage(locale);
     if (language) return language;

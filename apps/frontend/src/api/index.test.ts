@@ -4,11 +4,39 @@ import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { configureApiClient } from './index';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   localStorage.clear();
   sessionStorage.clear();
   useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
 });
+
+it.each(['getter', 'getItem'] as const)(
+  'registers the session preference when the local storage %s throws',
+  async (failure) => {
+    sessionStorage.setItem('language', 'de');
+    useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
+    vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US'] });
+    const unavailable = () => {
+      throw new Error('Storage unavailable');
+    };
+    if (failure === 'getter') vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(unavailable);
+    else vi.stubGlobal('localStorage', { getItem: unavailable });
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    configureApiClient();
+
+    await UsersService.createOneUser({
+      requestBody: {
+        username: 'registration-fixture',
+        email: 'registration@example.com',
+        password: 'fixture-password',
+        strategy: AuthenticationType.LOCAL_PASSWORD,
+      },
+    });
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Accept-Language')).toBe('de');
+  },
+);
 
 it.each([
   { browser: ['fr-FR'], selection: undefined, expected: 'und' },

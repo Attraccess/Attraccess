@@ -1,6 +1,12 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { detectAndSetLanguage, detectLanguage, useTranslations, useTranslationState } from './i18n';
+import {
+  detectAndSetLanguage,
+  detectLanguage,
+  detectPreferredLanguage,
+  useTranslations,
+  useTranslationState,
+} from './i18n';
 
 beforeEach(() => {
   useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
@@ -100,4 +106,28 @@ it('retains an explicit choice in memory when both browser stores are inaccessib
   vi.stubGlobal('sessionStorage', blocked);
   useTranslationState.getState().setLanguage('de');
   expect(detectLanguage('en')).toBe('de');
+});
+
+it.each(['getter', 'getItem'] as const)('uses the session language when the local storage %s throws', (failure) => {
+  vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US'] });
+  vi.stubGlobal('sessionStorage', { getItem: () => 'de' });
+  const unavailable = () => {
+    throw new Error('Storage unavailable');
+  };
+  if (failure === 'getter') vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(unavailable);
+  else vi.stubGlobal('localStorage', { getItem: unavailable });
+
+  expect(detectPreferredLanguage()).toBe('de');
+  expect(detectLanguage('en')).toBe('de');
+  detectAndSetLanguage();
+  expect(useTranslationState.getState().language).toBe('de');
+  expect(useTranslationState.getState().explicitLanguage).toBeUndefined();
+});
+
+it('keeps memory and local choices ahead of the session language', () => {
+  vi.stubGlobal('sessionStorage', { getItem: () => 'de' });
+  localStorage.setItem('language', 'en');
+  expect(detectPreferredLanguage()).toBe('en');
+  useTranslationState.setState({ explicitLanguage: 'de' });
+  expect(detectPreferredLanguage()).toBe('de');
 });
