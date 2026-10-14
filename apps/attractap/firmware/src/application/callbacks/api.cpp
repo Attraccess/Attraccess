@@ -247,6 +247,9 @@ void Application::setupActionCallbacks()
 #endif
 
   this->api.setFirmwareUpdateMetaCallback([this](std::string availableVersion) {
+    // Card polling can disrupt Wi-Fi on the reader. Keep NFC stopped through
+    // reconnect/resume as well as the initial transfer.
+    this->nfc.suspend();
     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
     this->availableFirmwareVersion = availableVersion;
   });

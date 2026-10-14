@@ -25,6 +25,9 @@ public:
     virtual bool authenticate(uint8_t keyNumber, uint8_t *key) = 0;
     virtual void enableCardDetection() = 0;
     virtual void disableCardDetection() = 0;
+    // Stop polling and the RF field until reboot, including across API reconnects.
+    // Unlike disableCardDetection(), this also ends the current card session.
+    virtual void suspend() = 0;
     virtual void resetCardPresence() = 0;
     virtual void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback) = 0;
     virtual void setCardRemovalCallback(std::function<void(uint32_t)> callback) = 0;

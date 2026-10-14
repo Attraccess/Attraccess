@@ -64,11 +64,10 @@ void NFC::setup()
 
 void NFC::enableCardDetection()
 {
+    LockGuard guard(*this);
+    if (this->suspended) return;
     this->logger.info("Enabling card detection");
-    {
-        LockGuard guard(*this);
-        this->checkHardware();
-    }
+    this->checkHardware();
     // NOTE: IRQ-driven detection is impossible on this hardware - the PN532 IRQ
     // line is not physically wired (despite the PIN_PN532_IRQ define). Detection
     // stays polled on the NFC task (ATT-554).
@@ -84,6 +83,21 @@ void NFC::disableCardDetection()
 {
     this->logger.info("Disabling card detection");
     this->cardDetectionEnabled = false;
+}
+
+void NFC::suspend()
+{
+    LockGuard guard(*this);
+    if (this->suspended) return;
+    this->suspended = true;
+    this->cardDetectionEnabled = false;
+    this->resetCardPresence();
+
+    // A timed-out InListPassiveTarget can still be running on the PN532.
+    // Stopping host polling alone leaves its RF field active during OTA.
+    I2CBusGuard busGuard;
+    if (!this->pn532.setRfField(false))
+        this->logger.error("Failed to turn off NFC RF field for firmware update");
 }
 
 void NFC::resetCardPresence()
@@ -162,6 +176,7 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
     this->logger.info("changeKey started");
 
     LockGuard guard(*this);
+    if (this->suspended) return false;
     // The whole key-change is one multi-command card conversation — keep it
     // atomic on the shared bus (no callbacks fire inside).
     I2CBusGuard busGuard;
@@ -200,6 +215,7 @@ bool NFC::authenticate(uint8_t keyNumber, uint8_t *key)
     this->logger.info("authenticate started");
 
     LockGuard guard(*this);
+    if (this->suspended) return false;
     I2CBusGuard busGuard;
 
     // Step 1: Authenticate with key
@@ -261,6 +277,7 @@ void NFC::detectCardType()
 void NFC::loop()
 {
     LockGuard guard(*this);
+    if (this->suspended) return;
     this->checkHardware();
     this->handleCardDetection();
 }
@@ -354,6 +371,7 @@ bool NFC::waitForCard(uint32_t timeoutMs)
                                            // card type)
 
     LockGuard guard(*this);
+    if (this->suspended) return false;
     I2CBusGuard busGuard;
 
     // Wait for an NTAG242 card.  When one is found 'uid' will be populated with
@@ -412,6 +430,7 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
     this->logger.info("getAvailableKeyNo started");
 
     LockGuard guard(*this);
+    if (this->suspended) return false;
 
     // The card was just selected by handleCardDetection's readPassiveTargetID.
     // Re-running readPassiveTargetID here would fire a second back-to-back

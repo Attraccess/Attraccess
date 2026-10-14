@@ -24,6 +24,16 @@ bool Adafruit_PN532::SAMConfig(void)
   return (pn532_packetbuffer[offset] == 0x15);
 }
 
+bool Adafruit_PN532::setRfField(bool enabled)
+{
+  // PN532 User Manual 7.3.1: RFConfiguration item 0x01, RF on/off bit.
+  uint8_t command[] = {PN532_COMMAND_RFCONFIGURATION, 0x01, uint8_t(enabled ? 0x01 : 0x00)};
+  if (!sendCommandCheckAck(command, sizeof(command))) return false;
+  uint8_t response[9] = {};
+  readdata(response, sizeof(response));
+  return response[6] == PN532_COMMAND_RFCONFIGURATION + 1;
+}
+
 /**************************************************************************/
 /*!
     Sets the MxRtyPassiveActivation byte of the RFConfiguration register
