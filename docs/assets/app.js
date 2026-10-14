@@ -21,6 +21,8 @@ localStorage.setItem('attraccess-docs-lang', currentLang);
   }
 })();
 
+document.documentElement.lang = currentLang;
+
 // ===== Dark Mode — set on html element so :root CSS variables work =====
 var savedTheme = localStorage.getItem('attraccess-docs-theme');
 var theme = savedTheme === 'dark' ? 'dark' : 'light';
