@@ -15,7 +15,7 @@ Die Übersicht zeigt den **Gesamtverbrauch**, einschließlich Messungen außerha
 - **total**: kumulativer Zählerstand. Die erste Messung außerhalb einer Sitzung legt die Basis fest. Spätere Zuwächse erhöhen den Gesamtverbrauch. Wiederholte identische Werte werden nicht doppelt gezählt; sinkende Werte werden abgelehnt.
 - **increment**: diesen Betrag hinzufügen. Jede neue Flow-Ausführung erhöht den Gesamtverbrauch und während einer Sitzung auch deren Verbrauch. Die Wiederholung desselben Knotens innerhalb einer Flow-Ausführung zählt den Betrag nicht erneut.
 
-Beide Modi funktionieren auch in gewöhnlichen MQTT- oder Schaltflächen-Flows ohne laufende Sitzung. Dieselbe Verbrauchsmenge darf nicht als Zählerstand und zusätzlich als Zuwachs gemeldet werden.
+Beide Modi funktionieren auch in gewöhnlichen Flows (zum Beispiel mit MQTT- oder Schaltflächen-Triggern), ohne Messanforderung oder aktive Sitzung. Verwenden Sie für einen physischen Zähler konsistente Werte und Meldemodi; dieselbe Verbrauchsmenge darf nicht als Zählerstand und zusätzlich als Zuwachs gemeldet werden.
 
 Werte müssen nichtnegative Dezimalzahlen sein. Die Berechnung erfolgt exakt mit neun Nachkommastellen. **Gemessen am** kann den ISO-Zeitstempel der Quelle enthalten. Ungültige, veraltete oder zukünftige Messungen und sinkende Zählerstände werden abgelehnt, nicht als null gewertet.
 
