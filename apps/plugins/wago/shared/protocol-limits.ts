@@ -10,6 +10,7 @@ export const MESSAGE_LIMITS = Object.freeze({
   nodes: 65_536,
   pendingControl: 8,
   pendingCommands: 256,
+  retainedCommands: 4_096,
   pendingBackend: 64,
 });
 
@@ -105,4 +106,23 @@ export class MessageAdmission {
       this.pending -= 1;
     }
   }
+}
+
+/** Reserve room for the largest normal state: observed and commanded outputs,
+ * manual ownership IDs, inputs, and the fixed readiness/envelope fields.
+ * Count encoded bytes (including escapes and multi-byte IDs), not characters.
+ */
+export function stateBudgetError(snapshot: unknown): string | null {
+  const channels = (snapshot as { logicalChannels?: unknown })?.logicalChannels;
+  if (!Array.isArray(channels)) return null; // Domain validators report malformed collections.
+  const encoder = new TextEncoder();
+  let bytes = 2048;
+  for (const channel of channels) {
+    if (!channel || typeof channel.id !== 'string' || !Array.isArray(channel.capabilities)) continue;
+    const idBytes = encoder.encode(JSON.stringify(channel.id)).byteLength;
+    if (channel.capabilities.includes('output')) bytes += 3 * idBytes + 16;
+    else if (channel.capabilities.includes('input')) bytes += idBytes + 7;
+    if (bytes > MESSAGE_LIMITS.operationalBytes) return 'configuration state exceeds supported byte limit';
+  }
+  return null;
 }

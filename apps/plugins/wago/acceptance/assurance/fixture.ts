@@ -15,6 +15,7 @@ import { parseOperationalMessage } from '../../backend/protocol/index';
 import plugin from '../../backend/plugin';
 import { MemoryDeviceAdapter } from '../../cc100-runtime/src/io/adapters';
 import { WagoRuntime, JsonStateStore, hash, type Snapshot } from '../../cc100-runtime/src/runtime';
+import { isIdentifier } from '../../shared/protocol-limits';
 import { MqttTransport } from '../../cc100-runtime/src/transport/mqtt';
 
 export const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -60,6 +61,8 @@ export class AssuranceFixture {
     received: 0,
     processed: 0,
     rejected: 0,
+    protocolRejected: 0,
+    diagnosticsRejected: 0,
     duplicate: 0,
     gaps: 0,
     intentionalDiscard: 0,
@@ -156,24 +159,7 @@ export class AssuranceFixture {
     this.provider = new RabbitmqCredentialProvisioningProvider(this.context);
     const managementClient = (this.provider as unknown as { client: { managementApiBase: () => string } }).client;
     managementClient.managementApiBase = () => this.management;
-    this.backendClient.on('message', (topic, payload) => {
-      try {
-        const parsed = parseOperationalMessage(this.prefix, topic, payload);
-        if (!parsed) return;
-        this.counts.received++;
-        const key = `${parsed.hardwareId}/${parsed.message.streamId}/${parsed.message.category}`;
-        const previous = this.sequences.get(key) ?? 0;
-        if (parsed.message.sequence <= previous) this.counts.duplicate++;
-        else {
-          // Count only gaps between observed packets in one category/stream.
-          // The first packet can start above one after a durable sequence reservation.
-          if (previous > 0) this.counts.gaps += Math.max(0, parsed.message.sequence - previous - 1);
-          this.sequences.set(key, parsed.message.sequence);
-        }
-      } catch {
-        this.counts.rejected++;
-      }
-    });
+    this.backendClient.on('message', (topic, payload) => this.observeOperationalPacket(topic, payload));
     for (let i = 0; i < count; i++) {
       const hardwareId = `controller-${i}`;
       const username = `wago-${randomUUID()}`;
@@ -229,6 +215,35 @@ export class AssuranceFixture {
     await this.fresh();
   }
 
+  observeOperationalPacket(topic: string, payload: Buffer) {
+    const root = `${this.prefix}/v1/controllers/`;
+    if (!topic.startsWith(root)) return;
+    const [hardwareId, suffix, extra] = topic.slice(root.length).split('/');
+    if (
+      !isIdentifier(hardwareId) ||
+      extra !== undefined ||
+      !['state', 'measurements', 'faults', 'acknowledgements'].includes(suffix)
+    )
+      return;
+    this.counts.received++;
+    try {
+      const parsed = parseOperationalMessage(this.prefix, topic, payload);
+      if (!parsed) return;
+      const key = `${parsed.hardwareId}/${parsed.message.streamId}/${parsed.message.category}`;
+      const previous = this.sequences.get(key) ?? 0;
+      if (parsed.message.sequence <= previous) this.counts.duplicate++;
+      else {
+        // Count only gaps between observed packets in one category/stream.
+        // The first packet can start above one after a durable sequence reservation.
+        if (previous > 0) this.counts.gaps += Math.max(0, parsed.message.sequence - previous - 1);
+        this.sequences.set(key, parsed.message.sequence);
+      }
+    } catch {
+      this.counts.protocolRejected++;
+      this.counts.rejected++;
+    }
+  }
+
   recordError(message: string) {
     if (this.errors.length < 20) this.errors.push(message);
   }
@@ -240,7 +255,10 @@ export class AssuranceFixture {
     this.backend.diagnostics.ingest = (...args) => {
       const accepted = ingest(...args);
       if (accepted) this.counts.processed++;
-      else this.counts.rejected++;
+      else {
+        this.counts.diagnosticsRejected++;
+        this.counts.rejected++;
+      }
       return accepted;
     };
     await this.backend.onApplicationBootstrap();

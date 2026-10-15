@@ -94,6 +94,15 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
           'unsupported_operation',
         );
 
+      // Never evict unexpired (or legacy unknown-expiry) replay protection.
+      // Reserve synchronously before the first persistence await so concurrent
+      // channels cannot exceed the persistent history budget.
+      if (
+        new Set([...this.state.commandIds, ...Object.keys(this.state.commandExpiries ?? {})]).size >=
+        MESSAGE_LIMITS.retainedCommands
+      )
+        return this.acknowledge(command.id, 'rejected', 'command replay history is full', 'replay_history_full');
+
       // Keep the reservation through an unexpected exit after the physical write.
       // Unknown legacy expiries cannot safely be evicted; known IDs are pruned at expiry.
       this.state.commandIds = [...this.state.commandIds, command.id];

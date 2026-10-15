@@ -1,4 +1,4 @@
-import { structureLimitError, isIdentifier, MESSAGE_LIMITS } from '../../shared/protocol-limits';
+import { structureLimitError, stateBudgetError, isIdentifier, MESSAGE_LIMITS } from '../../shared/protocol-limits';
 import { createHash } from 'node:crypto';
 import { pulseBehaviorError } from '../../channel-behavior';
 import type { EngineeringUnit } from '../../measurement-contract';
@@ -445,7 +445,7 @@ export function validateRange(
 }
 
 export function validateSnapshot(snapshot: unknown): ConfigurationValidationError[] {
-  const limitError = structureLimitError(snapshot);
+  const limitError = structureLimitError(snapshot) ?? stateBudgetError(snapshot);
   if (limitError) return [{ path: '$', code: 'message_limit', message: limitError }];
   let value: Record<string, unknown>;
   try {

@@ -1,6 +1,6 @@
 import { MESSAGE_LIMITS, MessageAdmission, isIdentifier, structureLimitError } from '../../shared/protocol-limits';
-import { validateSnapshot as validateRuntime } from '../../cc100-runtime/src/runtime';
-import { parseHeartbeat } from './index';
+import { WagoRuntime, hash, type Snapshot, validateSnapshot as validateRuntime } from '../../cc100-runtime/src/runtime';
+import { parseHeartbeat, parseOperationalMessage } from './index';
 import { validateSnapshot } from '../configuration/model';
 
 describe('wire resource budgets', () => {
@@ -64,6 +64,51 @@ describe('wire resource budgets', () => {
     expect(validateSnapshot(configuration)).toEqual([]);
     expect(validateRuntime(configuration)).toEqual([]);
     configuration.physicalPoints.push({ id: 'excess', hardwareProfile: '879-3000', channel: 256 });
+    expect(validateSnapshot(configuration)[0].code).toBe('message_limit');
+    expect(validateRuntime(configuration)[0].code).toBe('message_limit');
+  });
+
+  it('round-trips the largest supported long-ID normal state and rejects the next channel on both validators', async () => {
+    const count = Math.floor((MESSAGE_LIMITS.operationalBytes - 2048) / (3 * 130 + 16));
+    const configuration: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'p', hardwareProfile: '879-3000', channel: 0 }],
+      logicalChannels: Array.from({ length: count }, (_, i) => ({
+        id: 'x'.repeat(123) + String(i).padStart(5, '0'),
+        physicalPointId: 'p',
+        profile: 'generic-digital-output',
+        capabilities: ['output'],
+        disconnectPolicy: { mode: 'hold' },
+      })),
+    };
+    expect(validateSnapshot(configuration)).toEqual([]);
+    expect(validateRuntime(configuration)).toEqual([]);
+    const outputs = Object.fromEntries(configuration.logicalChannels.map(({ id }) => [id, false]));
+    const publish = jest.fn(async () => undefined);
+    const runtime = new WagoRuntime({
+      hardwareId: 'fixture',
+      prefix: 'fixture',
+      pairingCode: 'fixture',
+      device: { read: async () => false, write: async () => undefined },
+      store: {
+        load: async () => ({
+          accepted: { revision: 1, contentHash: hash(configuration), snapshot: configuration },
+          outputs,
+          manualOutputChannelIds: Object.keys(outputs),
+          commandIds: [],
+        }),
+        save: async () => undefined,
+      },
+      transport: { publish, subscribe: async () => undefined },
+    });
+    await runtime.start();
+    const states = publish.mock.calls as unknown as Array<[string, unknown]>;
+    const [topic, state] = states.filter(([topic]) => topic.endsWith('/state')).pop()!;
+    const bytes = Buffer.from(JSON.stringify(state));
+    expect(bytes.length).toBeGreaterThan(65_536);
+    expect(bytes.length).toBeLessThanOrEqual(MESSAGE_LIMITS.operationalBytes);
+    expect(parseOperationalMessage('fixture', topic, bytes)?.message.category).toBe('state');
+    configuration.logicalChannels.push({ ...configuration.logicalChannels[0], id: 'y'.repeat(128) });
     expect(validateSnapshot(configuration)[0].code).toBe('message_limit');
     expect(validateRuntime(configuration)[0].code).toBe('message_limit');
   });

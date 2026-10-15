@@ -1,9 +1,12 @@
 /* eslint-disable @nx/enforce-module-boundaries -- Recovery composes production persistence and encryption in owned fixtures. */
-import { randomUUID } from 'node:crypto';
-import { copyFile, readFile, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { Readable } from 'node:stream';
+import { copyFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
 import { EncryptionService } from '../../../../api/src/encryption/encryption.service';
+import { WagoRuntimeArtifactCatalog } from '../../backend/runtime/artifacts/catalog';
 import { WagoManagedAccess } from '../../backend/runtime/managed/access.entity';
 import { JsonStateStore, WagoRuntime, hash } from '../../cc100-runtime/src/runtime';
 import { MemoryDeviceAdapter } from '../../cc100-runtime/src/io/adapters';
@@ -42,7 +45,6 @@ describe('isolated recovery using existing state and credential services', () =>
   });
 
   it('restores a consistent database, runtime state and encrypted management secret with the original recovery key', async () => {
-    const start = Date.now();
     const secret = randomUUID();
     const encryption = encryptor(secret);
     const credential = JSON.stringify({ privateKey: 'isolated-ssh-fixture-only', token: randomUUID() });
@@ -61,17 +63,73 @@ describe('isolated recovery using existing state and credential services', () =>
     fixture.backend.onModuleDestroy();
     await Promise.all(fixture.devices.map((device) => device.client.endAsync(true)));
     await fixture.database.destroy();
+    const storage = join(fixture.directory, 'host-storage');
+    const storageBackup = join(fixture.directory, 'host-storage.backup');
+    const build = join(fixture.directory, 'server-build');
+    await mkdir(build, { recursive: true });
+    const image = `ghcr.io/attraccess/wago-cc100-runtime@sha256:${'a'.repeat(64)}`;
+    const manifest = {
+      schemaVersion: 1,
+      runtime: 'attraccess-wago-cc100',
+      runtimeVersion: '0.2.6',
+      protocolVersion: '1.0.0',
+      image,
+      hardware: {
+        model: '751-9301',
+        platform: 'linux/arm/v7',
+        firmwareBaseline: '31',
+        profile: 'cc100-751-9301-fw31-digital-v1',
+      },
+    };
+    await writeFile(join(build, 'manifest.json'), JSON.stringify(manifest));
+    await writeFile(join(build, 'image-reference'), image + '\n');
+    await writeFile(join(build, 'image.tar'), 'isolated-controller-image');
+    const bundlePath = join(fixture.directory, 'runtime.tar');
+    execFileSync('/usr/bin/tar', [
+      '--format=ustar',
+      '-cf',
+      bundlePath,
+      '-C',
+      build,
+      'manifest.json',
+      'image-reference',
+      'image.tar',
+    ]);
+    const bundle = await readFile(bundlePath);
+    const digest = createHash('sha256').update(bundle).digest('hex');
+    const catalog = new WagoRuntimeArtifactCatalog(storage);
+    const artifact = await catalog.import({ bundle: Readable.from([bundle]), checksum: Readable.from([digest]) });
+    await catalog.onModuleDestroy();
     const database = join(fixture.directory, 'database.sqlite');
     const backup = join(fixture.directory, 'database.backup');
     await copyFile(database, backup);
     const runtimeBackups = await Promise.all(
       fixture.devices.map(async (device) => ({ device, state: await device.store.load() })),
     );
+    await cp(storage, storageBackup, { recursive: true });
+    const snapshotAt = new Date().toISOString();
+    const start = Date.now();
     // Simulate loss only after all writers have stopped; never copy a live SQLite file.
     await writeFile(database, 'lost');
+    await rm(storage, { recursive: true });
     for (const { device } of runtimeBackups)
       await writeFile(join(fixture.directory, `${device.hardwareId}.json`), 'corrupt');
     await copyFile(backup, database);
+    await cp(storageBackup, storage, { recursive: true });
+    const restoredCatalog = new WagoRuntimeArtifactCatalog(storage);
+    try {
+      expect(await restoredCatalog.get(digest)).toEqual(artifact);
+      expect(await restoredCatalog.current()).toEqual(artifact);
+      const delivery = await restoredCatalog.acquire(digest);
+      try {
+        expect(await readFile(delivery.path)).toEqual(bundle);
+        expect(delivery.manifest).toEqual(manifest);
+      } finally {
+        await delivery.cleanup();
+      }
+    } finally {
+      await restoredCatalog.onModuleDestroy();
+    }
     await fixture.database.initialize();
     const restored = await fixture.database
       .getRepository(WagoManagedAccess)
@@ -91,10 +149,9 @@ describe('isolated recovery using existing state and credential services', () =>
     await fixture.fresh();
     await fixture.command(fixture.devices[0]);
     results.push({
-      exercise: 'configuration/runtime restoration and isolated disaster recovery',
+      exercise: 'coordinated database, host-storage and runtime restoration',
       milliseconds: Date.now() - start,
-      boundary:
-        'all writes drained before snapshot; no acknowledged commands lost before snapshot; key required; no real SSH or host backup proven',
+      boundary: `snapshot ${snapshotAt}; writers stopped; database, production artifact catalog ${digest} in isolated host storage, encrypted secrets and controller states restored together; no acknowledged commands lost through snapshot; changes after snapshot excluded; original key required; real SSH, production backup tooling and physical media unproven`,
     });
   });
 

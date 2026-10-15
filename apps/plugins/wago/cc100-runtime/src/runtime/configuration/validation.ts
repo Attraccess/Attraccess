@@ -1,4 +1,9 @@
-import { structureLimitError, isIdentifier, MESSAGE_LIMITS } from '../../../../shared/protocol-limits';
+import {
+  structureLimitError,
+  stateBudgetError,
+  isIdentifier,
+  MESSAGE_LIMITS,
+} from '../../../../shared/protocol-limits';
 import { createHash } from 'node:crypto';
 import { pulseBehaviorError } from '../../../../channel-behavior';
 import { ENGINEERING_UNITS } from '../../../../measurement-contract';
@@ -169,7 +174,7 @@ export function validateDisconnectAndPulse(
 }
 
 export function validateSnapshot(value: unknown): ValidationError[] {
-  const limitError = structureLimitError(value);
+  const limitError = structureLimitError(value) ?? stateBudgetError(value);
   if (limitError) return [{ path: '$', code: 'message_limit', message: limitError }];
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return [{ path: 'snapshot', code: 'invalid_snapshot', message: 'snapshot must be an object' }];

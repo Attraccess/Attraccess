@@ -56,6 +56,14 @@ before canonical serialization.
 | Runtime concurrent messages | 8 each for claims/configuration/credentials; 256 commands | Admission counts running and queued operations; excess is dropped synchronously |
 | Plugin concurrent MQTT callbacks | 64 total | Admission before calling async handlers; synchronous consumers retain their own bounded queues |
 
+Persistent replay history is limited to 4,096 distinct command identities. When
+full, new commands receive `replay_history_full` before persistence or actuation;
+unexpired and legacy unknown-expiry reservations are preserved. Capacity returns
+only as known expiries pass. Configuration validation also reserves encoded-byte
+room for observed/commanded output maps, manual output ownership IDs and the normal
+state envelope, so an accepted configuration can report normal state within the
+shared operational limit (including commissioning readiness).
+
 These are defensive software ceilings, not throughput recommendations. They cover
 existing fixtures and a valid 4,096-point/4,096-channel boundary snapshot. The first
 excessive string, byte, collection or depth is rejected. Excess traffic produces
@@ -93,7 +101,9 @@ WAGO_FLEET_DOCKER_CONTEXT=orbstack WAGO_ASSURANCE_PROFILE=sustained \
 `production-assurance` is an uncached Nx target; `production-fleet` remains the
 ordinary short integration regression. When using Nx with an application `.env`,
 set `NX_LOAD_DOT_ENV_FILES=false` so that inherited application settings are not
-silently supplied to an isolated runner.
+silently supplied to an isolated runner. Pull-request CI runs the short profile
+explicitly with cache disabled and a dedicated runner Docker context, disables
+application environment loading and retains evidence even when the run fails.
 
 | Input | Default and allowed range |
 | --- | --- |
@@ -112,7 +122,12 @@ The runner increases load through quarter, half and full requested rate, then
 repeats the highest passing stage. The configured full rate is a declared budget,
 not an automatically discovered maximum. Raise it in bounded subsequent runs to
 investigate a limiting condition. A budget or stage failure stays visible; only a
-repeated passing stage can support a recommendation. Recovery exercises restart
+repeated passing stage can support a recommendation. A stage must generate at
+least 99% of its scheduled offers and acknowledge at least 99% of its requested
+rate over actual stage time, including drain. Reports record expected offers,
+missed offers as generation failures, the 1% tolerance and achieved commands/second.
+Matching operational packets count as received before decoding; protocol rejection
+and diagnostics callback rejection are reported separately. Recovery exercises restart
 runtime/plugin instances and stop/start the RabbitMQ application. They do not
 restart the Docker host. Some Docker engines remap ephemeral ports on container
 restart, so host/container reboot testing is a separate deployment exercise.
@@ -139,7 +154,7 @@ missing PUBACK/SUBACK recovery uses deterministic transport tests; replay,
 malformed input and persistence failures also have separate acceptance tests.
 
 Review `environment.json`, `broker.json`, `measurements.json`, `security.json`,
-`traffic.json`, `recovery.json`, `summary.txt` and `lifecycle.json` together.
+`traffic.json`, `recovery.json`, `rotation.json`, `upgrade-recovery.json`, `summary.txt` and `lifecycle.json` together.
 `failure.json`, `source-drift.json`, a failed/interrupted lifecycle or incomplete
 cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
@@ -170,6 +185,12 @@ are retained outside source in Factory run `9ec4136d-070f-4f85-ab23-d75f9da50a64
 use the selected evidence directories recorded in that run's validation summary.
 Preliminary failed, interrupted or source-drifted runs are not operating-envelope
 evidence.
+
+The reports below predate the review fixes to replay admission, state budgets and
+load acceptance. They remain historical observations at their recorded fingerprint;
+they do not qualify the corrected revision. Re-run the sustained profile before
+using them to recommend an operating envelope for the corrected revision. Fresh
+short-profile evidence validates the corrections separately.
 
 ### Observed software envelope
 
@@ -264,6 +285,14 @@ reviewer disposition and unresolved consequence. Specifically check destructive
 consent; permanent CODESYS disablement before I/O; pinned trust; narrow permissions;
 operation ownership; no emergency-stop/personnel-protection claims; timeout/feedback
 limitations; and no expansion of hardware or Modbus qualification from fixtures.
+
+The official CNC emergency-stop circuit must remain electrically and functionally
+unchanged. Attraccess must never acknowledge, reset, bridge or bypass that circuit.
+A separate operational input labelled “E-stop” by the manufacturer does not change
+this prohibition. Before using such an input, require an independent reviewer to
+record the manufacturer wiring reference and observed separation from the official
+safety circuit, and confirm that operating the input cannot reset or bypass it.
+Record an explicit pass/fail observation; missing evidence blocks use of the input.
 
 This review is **pending**. Publish qualified combinations only through the normal
 release pipeline after the applicable review and physical/operator evidence. The

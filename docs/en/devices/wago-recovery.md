@@ -157,10 +157,16 @@ managed update record/operation ownership.
 artifact/signing trust or inability to reconcile the update journal blocks progress.
 Keep the runtime in failsafe until recovery is verified.
 
-**Evidence/follow-up:** existing runtime update coordinator, lifecycle-interruption,
-artifact verification and commissioning acceptance tests exercise failed transfer,
-launch/readiness and rollback with software host fixtures. They are not on-device
-upgrade evidence. Repeat the full procedure on FW31 with physical observations.
+**Evidence/follow-up:** `recovery.json` records a coordinated stopped-writer restore
+of SQLite, an isolated host-storage tree, encrypted management material and controller
+state, followed by fresh authenticated commands. It records the snapshot/data-loss
+boundary and elapsed restoration time; it does not prove a customer's backup tools.
+`upgrade-recovery.json` records measured transfer, start and readiness failure
+recovery through the production coordinator and signed management helper. The
+signature verifier and updater run against simulated FW31 host interfaces; prior
+image, credentials and the stopped-state checkpoint must survive. Each result is
+bound to the runner's source fingerprint. These are not on-device upgrade or
+real-SSH evidence. Repeat the full procedure on FW31 with physical observations.
 
 ## 6. Disaster recovery
 

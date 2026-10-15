@@ -5,19 +5,7 @@ import { join } from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { AssuranceFixture, delay, eventually } from './fixture';
 
-type Stage = {
-  rate: number;
-  repeat: boolean;
-  seconds: number;
-  offered: number;
-  acknowledged: number;
-  failed: number;
-  timeout: number;
-  overloadDiscard: number;
-  maxPending: number;
-  latencyMs: number[];
-  passed: boolean;
-};
+import { runLoadStage, type Stage } from './load-stage';
 const options = JSON.parse(process.env.WAGO_ASSURANCE_OPTIONS ?? '{}') as {
   durationSeconds: number;
   rate: number;
@@ -119,59 +107,21 @@ describe('measured software envelope with real broker and production processing'
       ];
       let highest = 0;
       async function runStage(rate: number, repeat: boolean, seconds: number) {
-        const stage: Stage = {
+        const stage = await runLoadStage({
           rate,
           repeat,
-          seconds: 0,
-          offered: 0,
-          acknowledged: 0,
-          failed: 0,
-          timeout: 0,
-          overloadDiscard: 0,
-          maxPending: 0,
-          latencyMs: [],
-          passed: false,
-        };
-        stages.push(stage);
-        const start = Date.now();
-        const inFlight = new Set<Promise<void>>();
-        let nextOffer = start;
-        while (Date.now() - start < seconds * 1000) {
-          if (peakRss > options.memoryMiB * 1024 * 1024) throw new Error('Declared memory budget reached');
-          stage.offered++;
-          if (pending >= options.maxPending) stage.overloadDiscard++;
-          else {
-            pending++;
-            stage.maxPending = Math.max(stage.maxPending, pending);
-            const sentAt = Date.now();
-            const operation = fixture
-              .command(fixture.devices[next() % fixture.devices.length])
-              .then(() => {
-                stage.acknowledged++;
-                if (stage.latencyMs.length === 4096) stage.latencyMs.shift();
-                stage.latencyMs.push(Date.now() - sentAt);
-              })
-              .catch((error: unknown) => {
-                stage.failed++;
-                if (
-                  String(error).toLowerCase().includes('timeout') ||
-                  String(error).toLowerCase().includes('timed out')
-                )
-                  stage.timeout++;
-              })
-              .finally(() => {
-                pending--;
-                inFlight.delete(operation);
-              });
-            inFlight.add(operation);
-          }
-          if (stage.offered % Math.max(1, rate * 5) === 0) await writeReport();
-          nextOffer += 1000 / rate;
-          await delay(Math.max(1, nextOffer - Date.now()));
-        }
-        await Promise.all(inFlight);
-        stage.seconds = (Date.now() - start) / 1000;
-        stage.passed = stage.failed === 0 && stage.overloadDiscard === 0 && stage.offered === stage.acknowledged;
+          seconds,
+          maxPending: options.maxPending,
+          memoryReached: () => peakRss > options.memoryMiB * 1024 * 1024,
+          command: () => fixture.command(fixture.devices[next() % fixture.devices.length]),
+          pendingChanged: (value) => {
+            pending = value;
+          },
+          started: (value) => {
+            stages.push(value);
+          },
+          progress: writeReport,
+        });
         await writeReport();
         return stage.passed;
       }
@@ -184,14 +134,20 @@ describe('measured software envelope with real broker and production processing'
               outcome,
               elapsedSeconds: (Date.now() - started) / 1000,
               boundaries: {
-                offered: 'scheduled command at stage ingress',
+                offered: 'generated command at stage ingress',
+                expectedOffers: 'configured rate multiplied by scheduled stage duration',
+                generationFailures: 'scheduled offers not generated; at most 1% tolerated',
+                achievedCommandsPerSecond: 'acknowledged commands divided by actual stage time including drain',
                 acknowledged: 'production plugin matched controller acknowledgement after runtime processing',
                 received: 'operational packet seen at backend MQTT connection',
                 gaps: 'sequence gaps between observed packets in the same controller, stream and category; excludes the first packet',
                 runtimeWrites:
                   'successful memory-adapter writes, including startup and policies; not physical observations',
                 processed: 'production diagnostics accepted packet',
-                rejected: 'diagnostics or protocol rejected packet; includes duplicate subscriptions',
+                protocolRejected: 'ingress packets rejected by the operational parser',
+                diagnosticsRejected: 'diagnostics callback rejections; may include duplicate subscriptions',
+                rejected:
+                  'sum of protocol and diagnostics rejections; processing observations, not unique wire packets',
                 missing: 'stage offered minus acknowledgements, failures and overload discards',
                 intentionalDiscard:
                   'outgoing QoS publications explicitly removed by the production transport on disconnect or acknowledgement timeout',

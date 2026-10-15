@@ -65,4 +65,59 @@ describe('runtime wire admission', () => {
     await Promise.all([first, ...commands]);
     expect(state.commandIds.length).toBeLessThanOrEqual(MESSAGE_LIMITS.pendingCommands);
   });
+  it('bounds sequential replay history across restart without evicting unexpired reservations', async () => {
+    let state: RuntimeState = {
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: {},
+      commandIds: [],
+    };
+    const store = {
+      load: async () => state,
+      save: async (next: RuntimeState) => {
+        state = next;
+      },
+    };
+    const publish = jest.fn(async () => undefined);
+    const device = new MemoryDeviceAdapter();
+    const create = () =>
+      new WagoRuntime({
+        hardwareId: 'fixture',
+        prefix: 'fixture',
+        pairingCode: 'fixture',
+        store,
+        transport: { publish, subscribe: async () => undefined },
+        device,
+      });
+    let runtime = create();
+    await runtime.start();
+    const expiry = Date.now() + 60_000;
+    const command = (id: string, expiresAt = new Date(expiry).toISOString()) =>
+      Buffer.from(JSON.stringify(validCommand({ id, expiresAt })));
+    for (let i = 0; i < MESSAGE_LIMITS.retainedCommands; i++) await runtime.receiveCommand(command(`sequential-${i}`));
+    expect(state.commandIds).toHaveLength(MESSAGE_LIMITS.retainedCommands);
+    expect(Object.keys(state.commandExpiries ?? {})).toHaveLength(MESSAGE_LIMITS.retainedCommands);
+    runtime = create();
+    await runtime.start();
+    const write = jest.spyOn(device, 'write');
+    await runtime.receiveCommand(command('overflow'));
+    expect(write).not.toHaveBeenCalled();
+    expect(publish).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ id: 'overflow', code: 'replay_history_full' }),
+      undefined,
+    );
+    await runtime.receiveCommand(command('sequential-0'));
+    expect(publish).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ id: 'sequential-0', status: 'duplicate' }),
+      undefined,
+    );
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(expiry + 1);
+    try {
+      await runtime.receiveCommand(command('after-expiry', new Date(expiry + 60_000).toISOString()));
+      expect(state.commandIds).toEqual(['after-expiry']);
+    } finally {
+      clock.mockRestore();
+    }
+  }, 60_000);
 });

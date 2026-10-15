@@ -328,6 +328,13 @@ The runtime runs on a WAGO CC100 `751-9301` with WAGO Linux firmware and Docker.
 
 This runtime is **not safety rated**. It must not be used as an emergency stop, personnel-protection function, or replacement for certified safety circuits. Keep all official emergency-stop and safety circuits independent. A runtime fault, loss of MQTT, container crash, reboot, or configuration error must be treated as an operational fault, not proof of a safe state.
 
+For CNC equipment, keep the official emergency-stop circuit electrically and
+functionally unchanged. Never acknowledge, reset, bridge or bypass it through
+Attraccess. A separate operational input manufacturer-labelled “E-stop” is subject
+to the same prohibition: obtain the independent wiring/separation observation in
+[the safety review checklist](wago-production-assurance.md#independent-safety-claim-and-compatibility-review)
+before using that input.
+
 ## Preconditions
 
 Before deployment, confirm all of the following:
