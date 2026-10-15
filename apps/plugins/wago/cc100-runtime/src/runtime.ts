@@ -10,6 +10,19 @@ export type { DeviceAdapter, RuntimeState, Snapshot, Transport, ValidationError 
 export { JsonStateStore } from './runtime/state-store';
 
 export class WagoRuntime extends RuntimeTelemetry {
+  get messageStatistics() {
+    const lanes = [
+      this.receiveDiscoveryClaimAdmission,
+      this.receiveCredentialRotationAdmission,
+      this.receiveDesiredAdmission,
+      this.receiveCommandAdmission,
+    ];
+    return {
+      pending: lanes.reduce((sum, lane) => sum + lane.pending, 0),
+      rejected: lanes.reduce((sum, lane) => sum + lane.rejected, 0),
+    };
+  }
+
   public async start(activateConnectionHandling?: () => Promise<void>): Promise<void> {
     // Startup can be interrupted by a missing MQTT acknowledgement. Retry only
     // unfinished subscriptions, preserving the loaded state and sequence counters.

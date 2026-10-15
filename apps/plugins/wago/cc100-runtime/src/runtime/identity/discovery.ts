@@ -1,12 +1,22 @@
+import { MESSAGE_LIMITS, MessageAdmission, structureLimitError } from '../../../../shared/protocol-limits';
 import { RuntimeCredentials } from './credentials';
 import { CAPABILITIES, CREDENTIAL_EPOCH, DiscoveryClaim } from './protocol';
 import { runtimeVersion } from '../../../manifest.json';
 
 export abstract class RuntimeDiscovery extends RuntimeCredentials {
-  async receiveDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
+  protected readonly receiveDiscoveryClaimAdmission = new MessageAdmission(MESSAGE_LIMITS.pendingControl);
+
+  receiveDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
+    return this.receiveDiscoveryClaimAdmission.run(payload.length, MESSAGE_LIMITS.controlBytes, () =>
+      this.processDiscoveryClaim(payload),
+    );
+  }
+
+  private async processDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
     let claim: unknown;
     try {
       claim = JSON.parse(payload.toString('utf8'));
+      if (structureLimitError(claim)) return;
     } catch {
       return undefined;
     }
@@ -15,7 +25,14 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
       string,
       unknown
     >;
-    if (typeof username !== 'string' || !username || typeof password !== 'string' || !password) return undefined;
+    if (
+      typeof username !== 'string' ||
+      !username.trim() ||
+      username.length > 255 ||
+      typeof password !== 'string' ||
+      !password
+    )
+      return undefined;
     if (
       credentialEpoch !== undefined &&
       (typeof credentialEpoch !== 'string' || !CREDENTIAL_EPOCH.test(credentialEpoch))
@@ -34,7 +51,13 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
       configuration && typeof configuration === 'object'
         ? (configuration as Record<string, unknown>).namespace
         : undefined;
-    if (namespace !== undefined && (typeof namespace !== 'string' || !namespace)) return undefined;
+    if (
+      namespace !== undefined &&
+      (typeof namespace !== 'string' ||
+        namespace.length > 512 ||
+        namespace.split('/').some((segment) => !segment || /[+#]/.test(segment)))
+    )
+      return undefined;
     const credentials: DiscoveryClaim = {
       username,
       password,

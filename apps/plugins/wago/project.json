@@ -31,7 +31,7 @@
     "test-production-fleet-cleanup": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node --test apps/plugins/wago/scripts/test-production-fleet.test.mjs"
+        "command": "node --test apps/plugins/wago/scripts/test-production-fleet.test.mjs apps/plugins/wago/scripts/test-production-assurance.test.mjs"
       }
     },
     "typecheck": {
@@ -69,7 +69,8 @@
         "{projectRoot}/channel-behavior.ts",
         "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*",
         "{workspaceRoot}/apps/plugins/shelly/frontend/src/{i18n.ts,en.json,de.json}",
-        "{workspaceRoot}/apps/plugins/rabbitmq/frontend/src/{i18n.ts,en.json,de.json}"
+        "{workspaceRoot}/apps/plugins/rabbitmq/frontend/src/{i18n.ts,en.json,de.json}",
+        "{projectRoot}/shared/**/*"
       ],
       "options": {
         "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
@@ -400,6 +401,14 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/wago/cc100-runtime"
+      }
+    },
+    "production-assurance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/test-production-assurance.mjs"
       }
     }
   }

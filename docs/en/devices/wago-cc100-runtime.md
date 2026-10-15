@@ -1,5 +1,10 @@
 # WAGO CC100 Docker Runtime
 
+See [production assurance preparation](wago-production-assurance.md) for current
+software evidence and support boundaries, and [recovery procedures](wago-recovery.md)
+for coordinated backups, compromise, outages, replacement and upgrade recovery.
+Physical qualification and independent security/safety reviews remain separate.
+
 > **Engineering reference, not the supported operator installation path.** This guide records the manual runtime baseline at `9e0a1c47`. It is not hardware-validated: [ATT-984](https://linear.app/attraccess/issue/ATT-984/prove-the-no-code-cc100-journey-on-hardware-with-a-nontechnical-user) is the release gate. Do not use it to control equipment until required hardware/user evidence exists. Follow [Guided Commissioning](wago-cc100-commissioning.md) for the SSH-only UI path and [Acceptance Evidence](wago-acceptance-evidence.md) for release prerequisites. Manual shell, registry, JSON mapping and credential-copy steps below do not satisfy that gate.
 
 ## Front panel configuration and live controls

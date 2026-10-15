@@ -1,3 +1,4 @@
+import { structureLimitError, isIdentifier, MESSAGE_LIMITS } from '../../../../shared/protocol-limits';
 import { createHash } from 'node:crypto';
 import { pulseBehaviorError } from '../../../../channel-behavior';
 import { ENGINEERING_UNITS } from '../../../../measurement-contract';
@@ -168,9 +169,13 @@ export function validateDisconnectAndPulse(
 }
 
 export function validateSnapshot(value: unknown): ValidationError[] {
+  const limitError = structureLimitError(value);
+  if (limitError) return [{ path: '$', code: 'message_limit', message: limitError }];
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return [{ path: 'snapshot', code: 'invalid_snapshot', message: 'snapshot must be an object' }];
   }
+  if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MESSAGE_LIMITS.configurationBytes - 1024)
+    return [{ path: '$', code: 'message_limit', message: 'configuration exceeds supported byte limit' }];
   const snapshot = value as Partial<Snapshot>;
   const errors: ValidationError[] = [];
   validateKeys(
@@ -206,7 +211,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       ['id', 'hardwareProfile', 'channel', 'modbus'],
       errors,
     );
-    if (!point?.id || pointIds.has(point.id)) {
+    if (!isIdentifier(point?.id) || pointIds.has(point.id)) {
       errors.push({
         path: `snapshot.physicalPoints[${index}].id`,
         code: 'invalid_id',
@@ -262,7 +267,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       ],
       errors,
     );
-    if (!channel?.id || channelIdCounts.get(channel.id) !== 1) {
+    if (!isIdentifier(channel?.id) || channelIdCounts.get(channel.id) !== 1) {
       errors.push({ path: `${path}.id`, code: 'invalid_id', message: 'logical channel IDs must be unique' });
     }
     if (!pointIds.has(channel?.physicalPointId ?? '')) {

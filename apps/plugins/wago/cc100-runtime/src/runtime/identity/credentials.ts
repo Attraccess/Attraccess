@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS, MessageAdmission, structureLimitError } from '../../../../shared/protocol-limits';
 import { RuntimeContext } from '../context';
 import { DiscoveryClaim } from './protocol';
 
@@ -21,13 +22,22 @@ export abstract class RuntimeCredentials extends RuntimeContext {
   }
 
   /** Persist before disconnecting; the acknowledgement is emitted only by the authenticated new connection. */
+  protected readonly receiveCredentialRotationAdmission = new MessageAdmission(MESSAGE_LIMITS.pendingControl);
+
   receiveCredentialRotation(payload: Buffer): Promise<void> {
+    return this.receiveCredentialRotationAdmission.run(payload.length, MESSAGE_LIMITS.controlBytes, () =>
+      this.processCredentialRotation(payload),
+    );
+  }
+
+  private async processCredentialRotation(payload: Buffer): Promise<void> {
     const update = this.credentialUpdates.then(async () => {
       if (!this.loaded || !this.options.reconnectCredentials || !this.state.credentials || payload.length > 8192)
         return;
       let input: Record<string, unknown>;
       try {
         input = JSON.parse(payload.toString('utf8'));
+        if (structureLimitError(input)) return;
       } catch {
         return;
       }

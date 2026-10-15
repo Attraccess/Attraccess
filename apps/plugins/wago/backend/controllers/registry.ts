@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS } from '../../shared/protocol-limits';
 import { WagoSettings } from './settings.entity';
 
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -289,7 +290,7 @@ export abstract class WagoRegistry extends WagoServiceState {
           await this.subscribeMqtt(serverId, `${root}/${suffix}`, async (message) => {
             if (message.serverId !== controller.mqttServerId || message.topic !== `${root}/${suffix}`) return;
             if (!active()) {
-              if (!this.destroyed && suffix === 'state' && message.payload.length <= 65_536)
+              if (!this.destroyed && suffix === 'state' && message.payload.length <= MESSAGE_LIMITS.operationalBytes)
                 retained = Buffer.from(message.payload);
               return;
             }

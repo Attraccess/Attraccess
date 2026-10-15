@@ -1,10 +1,19 @@
+import { MESSAGE_LIMITS, MessageAdmission, structureLimitError } from '../../../../shared/protocol-limits';
 import { hash, validateDesired } from './validation';
 import { OutputRoutingBusyError } from '../../outputs/controller';
 import { RuntimeDiscovery } from '../identity/discovery';
 import { type Snapshot } from '../types';
 
 export abstract class RuntimeConfiguration extends RuntimeDiscovery {
-  async receiveDesired(payload: Buffer): Promise<void> {
+  protected readonly receiveDesiredAdmission = new MessageAdmission(MESSAGE_LIMITS.pendingControl);
+
+  receiveDesired(payload: Buffer): Promise<void> {
+    return this.receiveDesiredAdmission.run(payload.length, MESSAGE_LIMITS.configurationBytes, () =>
+      this.processDesired(payload),
+    );
+  }
+
+  private async processDesired(payload: Buffer): Promise<void> {
     let desired: {
       protocolVersion: number;
       revision: number;
@@ -15,6 +24,7 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
     };
     try {
       desired = JSON.parse(payload.toString('utf8'));
+      if (structureLimitError(desired)) return;
     } catch {
       return this.reportRejected(0, '', [
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },
@@ -36,7 +46,12 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
       if (!errors.length && desired.contentHash !== hash(desired.snapshot))
         errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
       if (!errors.length) errors.push(...(this.options.device.validate?.(desired.snapshot) ?? []));
-      if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
+      if (errors.length)
+        return this.reportRejected(
+          Number.isSafeInteger(desired?.revision) ? desired.revision : 0,
+          typeof desired?.contentHash === 'string' ? desired.contentHash : '',
+          errors,
+        );
       if (
         this.state.accepted?.revision === desired.revision &&
         this.state.accepted.contentHash === desired.contentHash

@@ -1,5 +1,10 @@
 # WAGO diagnostics
 
+See [production assurance preparation](wago-production-assurance.md) for current
+software evidence and support boundaries, and [recovery procedures](wago-recovery.md)
+for coordinated backups, compromise, outages, replacement and upgrade recovery.
+Physical qualification and independent security/safety reviews remain separate.
+
 Open **WAGO → Diagnostics** on a controller row. The view polls every five seconds and provides an **Open configuration** action. The controller list continues to poll permanent heartbeat connectivity independently of commissioning.
 
 Applied configuration is not proof of physical I/O readiness. Diagnostics consumes canonical source timestamps and optional `state.readiness.hardwareAvailable` when supplied. Reported availability is shown separately: `false` invalidates samples, while `true` does not prove physical I/O readiness, which remains **unknown**. Concrete legacy payloads without source timestamps have **missing** source freshness and are never current. Retained output state can be old. Recent faults remain visible for the retention window; their disappearance is not evidence of recovery.

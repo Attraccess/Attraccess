@@ -1,5 +1,10 @@
 # Guided WAGO CC100 Commissioning
 
+See [production assurance preparation](wago-production-assurance.md) for current
+software evidence and support boundaries, and [recovery procedures](wago-recovery.md)
+for coordinated backups, compromise, outages, replacement and upgrade recovery.
+Physical qualification and independent security/safety reviews remain separate.
+
 > **Work in progress.** This is the operator walkthrough for the current guided commissioning implementation. It is not a hardware release procedure: [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies) remains the hardware-in-the-loop release gate. Keep the controller disconnected from production equipment until that evidence is complete.
 
 Use this guide to commission a WAGO CC100 `751-9301` into an on-premises, air-gapped Attraccess installation. The local Attraccess server and controller must be on the same private network.

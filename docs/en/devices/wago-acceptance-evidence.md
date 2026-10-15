@@ -1,6 +1,6 @@
 # WAGO Acceptance Evidence
 
-**Release blocked until reviewed physical and participant evidence exists.** This guide supports ATT-984 and ATT-985; it is not a supported-beta announcement. Passing automated tests, a connected controller or a complete evidence form does not demonstrate the operator journey.
+**Release blocked until reviewed physical and participant evidence exists.** This guide supports ATT-984 and the ATT-988 assurance preparation; it is not a supported-beta announcement. Passing automated tests, a connected controller or a complete evidence form does not demonstrate the operator journey.
 
 ## Before Any Hardware Session
 
@@ -59,6 +59,6 @@ The checker never connects to hardware, changes Linear, signs artifacts or publi
 
 ## Publication Boundary
 
-ATT-985 remains blocked by physical/nontechnical acceptance and ATT-983 audit coverage. Attach the reviewed evidence to those tickets. Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and checksum-checked ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
+ATT-985 was canceled and is historical publication context. Physical/nontechnical acceptance remains with ATT-984; ATT-988 prepares additional software assurance and independent review procedures. Neither ticket state nor software fixtures replace reviewed physical evidence. See [assurance boundaries](wago-production-assurance.md) and [recovery procedures](wago-recovery.md). Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and checksum-checked ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
 
 Broader four-assembly qualification, billing, telemetry history and arbitration are deferred. They must not be advertised as proven capabilities of this first slice.

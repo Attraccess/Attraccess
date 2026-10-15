@@ -1,5 +1,10 @@
 # CC100 FW31 software support boundaries
 
+See [production assurance preparation](wago-production-assurance.md) for current
+software evidence and support boundaries, and [recovery procedures](wago-recovery.md)
+for coordinated backups, compromise, outages, replacement and upgrade recovery.
+Physical qualification and independent security/safety reviews remain separate.
+
 ## 2026-09-06 supersession: destructive commissioning
 
 The product decision on **2026-09-06** supersedes the prior-workload preservation
