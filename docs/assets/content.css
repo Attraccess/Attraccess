@@ -35,8 +35,10 @@
   color: var(--link-color--hover) !important;
 }
 .markdown-section table {
-  display: table;
+  display: block;
   width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-collapse: collapse;
 }
 .markdown-section table th {

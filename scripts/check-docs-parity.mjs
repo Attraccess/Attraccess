@@ -52,6 +52,12 @@ function navigation(markdown) {
     .map((line) => line.replace(/\[[^\]]+\]/g, '[label]').replace(/\*\*.+?\*\*/g, '**group**'));
 }
 
+// MQTT topic names are wire identifiers, even when their descriptions are
+// translated. Compare slash-separated inline examples in MQTT guides.
+function mqttTopics(markdown) {
+  return [...markdown.matchAll(/`([^`\n]+\/[^`\n]+)`/g)].map((match) => match[1]);
+}
+
 const english = pages(join(docsRoot, 'en')).sort();
 const german = pages(join(docsRoot, 'de')).sort();
 const failures = [];
@@ -75,6 +81,7 @@ for (const page of new Set([...english, ...german])) {
   for (const [name, compare] of [
     ['section, list, table or code-example structure', structure],
     ['link destinations or order', links],
+    ...(page.startsWith('devices/mqtt/') ? [['MQTT topic identifiers', mqttTopics]] : []),
     ...(page === '_sidebar.md' ? [['navigation hierarchy', navigation]] : []),
   ]) {
     try {

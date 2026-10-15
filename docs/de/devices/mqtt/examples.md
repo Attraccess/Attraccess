@@ -12,7 +12,7 @@ Diese Seite zeigt praktische Beispiele, wie Sie MQTT mit Attraccess verwenden k√
 ### Was Sie benoetigen
 
 - Ein intelligentes Relais oder eine schaltbare Steckdose, die mit Ihrem MQTT-Broker verbunden ist
-- Das Relais lauscht auf ein Topic wie `werkstatt/laser/strom`
+- Das Relais lauscht auf ein Topic wie `workshop/laser/power`
 
 ### Flow-Einrichtung
 
@@ -24,11 +24,11 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT-Nachricht senden (MQTT Publish)**
 3. Konfigurieren Sie den MQTT-Knoten:
 
-| Einstellung | Wert                    |
-| ----------- | ----------------------- |
-| **Server**  | Ihr MQTT-Broker         |
-| **Topic**   | `werkstatt/laser/strom` |
-| **Payload** | `ON`                    |
+| Einstellung | Wert                   |
+| ----------- | ---------------------- |
+| **Server**  | Ihr MQTT-Broker        |
+| **Topic**   | `workshop/laser/power` |
+| **Payload** | `ON`                   |
 
 **Ausschalten:**
 
@@ -36,11 +36,11 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT-Nachricht senden (MQTT Publish)**
 3. Konfigurieren Sie den MQTT-Knoten:
 
-| Einstellung | Wert                    |
-| ----------- | ----------------------- |
-| **Server**  | Ihr MQTT-Broker         |
-| **Topic**   | `werkstatt/laser/strom` |
-| **Payload** | `OFF`                   |
+| Einstellung | Wert                   |
+| ----------- | ---------------------- |
+| **Server**  | Ihr MQTT-Broker        |
+| **Topic**   | `workshop/laser/power` |
+| **Payload** | `OFF`                  |
 
 <!-- TODO: Screenshot des Stromsteuerungs-Flows im Editor -->
 
@@ -56,7 +56,7 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 ### Was Sie benoetigen
 
 - Einen Temperatursensor, der mit Ihrem MQTT-Broker verbunden ist
-- Der Sensor veroeffentlicht Daten auf einem Topic wie `werkstatt/3ddrucker/temperatur`
+- Der Sensor veroeffentlicht Daten auf einem Topic wie `workshop/3dprinter/temperature`
 
 ### Flow-Einrichtung
 
@@ -66,7 +66,7 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 | Einstellung | Wert                             |
 | ----------- | -------------------------------- |
 | **Server**  | Ihr MQTT-Broker                  |
-| **Topic**   | `werkstatt/3ddrucker/temperatur` |
+| **Topic**   | `workshop/3dprinter/temperature` |
 
 3. Verbinden Sie ihn mit einem **Verarbeitungs**-Knoten (z.B. **Wenn**-Bedingung), um zu pruefen, ob die Temperatur einen Schwellenwert ueberschreitet
 4. Verbinden Sie die Bedingung mit einem **Ausgabe**-Knoten (z.B. **HTTP-Anfrage**, um eine Benachrichtigung zu senden)
@@ -75,7 +75,7 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 
 | Knoten                                        | Konfiguration                                   |
 | --------------------------------------------- | ----------------------------------------------- |
-| **MQTT-Nachricht empfangen (MQTT Subscribe)** | Topic: `werkstatt/3ddrucker/temperatur`         |
+| **MQTT-Nachricht empfangen (MQTT Subscribe)** | Topic: `workshop/3dprinter/temperature`         |
 | **Wenn-Bedingung**                            | `payload.value > 250`                           |
 | **HTTP-Anfrage**                              | Warnung an Ihren Benachrichtigungsdienst senden |
 
@@ -102,9 +102,9 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 
 | Geraet      | Topic                       | Payload |
 | ----------- | --------------------------- | ------- |
-| Lasercutter | `werkstatt/laser/strom`     | `ON`    |
-| Absaugung   | `werkstatt/absaugung/strom` | `ON`    |
-| Raumlicht   | `werkstatt/licht/zone3`     | `ON`    |
+| Lasercutter | `workshop/laser/power`      | `ON`    |
+| Absaugung   | `workshop/extraction/power` | `ON`    |
+| Raumlicht   | `workshop/lights/zone3`     | `ON`    |
 
 3. Wiederholen Sie dies mit einem **Nutzung beendet**-Eingabeknoten, der mit denselben Topics mit `OFF`-Payloads verbunden ist
 

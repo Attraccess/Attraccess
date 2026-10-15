@@ -6,7 +6,7 @@ MQTT ist ein leichtgewichtiges Nachrichtenprotokoll, das häufig in IoT-Anwendun
 
 MQTT (Message Queuing Telemetry Transport) ist ein Protokoll zum Senden und Empfangen kleiner Nachrichten zwischen Geraeten. Es arbeitet nach dem Publish/Subscribe-Modell:
 
-- **Publish** -- Ein Geraet sendet eine Nachricht an ein Topic (z.B. `werkstatt/laser/strom`)
+- **Publish** -- Ein Geraet sendet eine Nachricht an ein Topic (z.B. `workshop/laser/power`)
 - **Subscribe** -- Ein Geraet lauscht auf Nachrichten zu einem Topic
 - **Broker** -- Ein Server, der Nachrichten zwischen Publishern und Subscribern vermittelt
 
