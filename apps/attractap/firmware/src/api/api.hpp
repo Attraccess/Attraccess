@@ -342,7 +342,7 @@ protected:
     std::function<void(const ActionResult &)> actionResultCallback;
     std::function<void(bool)> insufficientBalanceCallback;
     std::function<void(int)> firmwareUpdateProgressCallback;
-    std::function<void(std::string availableVersion)> firmwareUpdateMetaCallback;
+    std::function<bool(std::string availableVersion)> firmwareUpdateMetaCallback;
 };
 
 #include "../settings/settings.hpp"
@@ -525,7 +525,8 @@ private:
     // Firmware update progress callback with status enum
 public:
     void setFirmwareUpdateProgressCallback(std::function<void(int)> callback);
-    void setFirmwareUpdateMetaCallback(std::function<void(std::string availableVersion)> callback);
+    // Return false to abort preparation before erasing flash (e.g. RF shutdown failed).
+    void setFirmwareUpdateMetaCallback(std::function<bool(std::string availableVersion)> callback);
 
 private:
 

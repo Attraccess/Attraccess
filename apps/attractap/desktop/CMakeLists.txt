@@ -198,6 +198,9 @@ add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES} 
 target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
+add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
+add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
+set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
 set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
@@ -210,5 +213,7 @@ set_property(TEST
     attractap-demo-protocol-tests
     attractap-desktop-display-tests
     attractap-reader-workflow-tests
+    attractap-ota-interrupt-enrollment
+    attractap-ota-interrupt-reset
     attractap-reader-timeout-tests
     APPEND PROPERTY ENVIRONMENT "SDL_AUDIO_DRIVER=dummy")

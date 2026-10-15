@@ -28,6 +28,7 @@ private:
     INfc &nfc;
     Logger logger;
     API &api;
+    bool firmwareUpdateActive = false;
     Beeper beeper;
 
 #ifdef HAS_LVGL_DISPLAY

@@ -13,6 +13,13 @@ struct ReaderProfileConfiguration
     }
 };
 
+class WorkflowApi : public API
+{
+public:
+    using API::API;
+    bool prepareFirmwareUpdate() { return firmwareUpdateMetaCallback("test"); }
+};
+
 struct ReaderWorkflow
 {
     std::filesystem::path output;
@@ -20,7 +27,7 @@ struct ReaderWorkflow
     ProfileStore profile;
     ReaderProfileConfiguration configuration{profile};
     Server server;
-    API api{server};
+    WorkflowApi api{server};
     VirtualNfc nfc{profile};
     Application application{nfc, api};
     Framebuffer display;
@@ -138,4 +145,5 @@ struct ReaderWorkflow
     void testSessionSummary();
     void testWallClock();
     void testTimeouts();
+    void testFirmwareUpdate(bool reset);
 };

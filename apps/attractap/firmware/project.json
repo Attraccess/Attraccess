@@ -46,7 +46,11 @@
           "ctest --test-dir apps/attractap/firmware/tests/lvgl-memory/build --output-on-failure",
           "cmake -S apps/attractap/firmware/tests/websocket -B apps/attractap/firmware/tests/websocket/build",
           "cmake --build apps/attractap/firmware/tests/websocket/build",
-          "ctest --test-dir apps/attractap/firmware/tests/websocket/build --output-on-failure"
+          "ctest --test-dir apps/attractap/firmware/tests/websocket/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/ota -B apps/attractap/firmware/tests/ota/build",
+          "cmake --build apps/attractap/firmware/tests/ota/build",
+          "ctest --test-dir apps/attractap/firmware/tests/ota/build --output-on-failure",
+          "node --test apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
         ],
         "parallel": false,
         "cwd": "."

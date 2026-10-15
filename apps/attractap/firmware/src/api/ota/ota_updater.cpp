@@ -62,23 +62,23 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
         this->ota.inProgress = false;
         return;
     }
+    // Quiesce NFC before flash preparation or the first chunk request. The
+    // metadata callback also owns the application's update-screen transition.
+    if (!this->metaCallback || !this->metaCallback(availableVersion))
+    {
+        this->abortFirmwareUpdate("NFC RF shutdown failed");
+        return;
+    }
     esp_err_t err = esp_ota_begin(this->ota.updatePartition, OTA_SIZE_UNKNOWN, &this->ota.otaHandle);
     if (err != ESP_OK)
     {
-        this->logger.error((std::string("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
-        this->ota.inProgress = false;
+        this->abortFirmwareUpdate((std::string("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
         return;
     }
     this->ota.lastReportedPercent = -1;
     this->ota.version = availableVersion;
     this->consecutiveChunkFailures = 0;
     this->lastChunkRequestSendFailed = false;
-
-    if (this->metaCallback)
-    {
-        this->logger.debugf("Firmware update available: %s > %s", FIRMWARE_VERSION, availableVersion.c_str());
-        this->metaCallback(availableVersion.c_str());
-    }
 
     this->updateFirmwareProgress(0);
 
