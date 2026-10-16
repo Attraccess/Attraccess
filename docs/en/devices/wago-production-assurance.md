@@ -181,6 +181,36 @@ cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
 substitutes for sustained evidence.
 
+## Runtime rejection accounting validation
+
+Commit `35d47a8d50239ba9eeef0d18f179d458c4d32864` adds fixed, payload-free
+runtime rejection counts. The focused regression checks parsing, structure and
+validation failures across all four incoming handlers while preserving accepted
+configuration and outputs. The broker regression confirms counting, unchanged
+stored state and outputs, retention across runtime replacement and successful
+subsequent commands.
+
+The short and sustained profiles each passed all 19 assurance tests with source
+fingerprint `f4796062328e9f547eeff68c9c6da8681663396ad484ea619a440a8044bf9f3c`.
+The sustained run used the clean commit above and acknowledged all 19,800 commands
+over 3,600.005 seconds of offered workload. The 2, 4, 8 and repeated 8
+commands/second stages passed without generation failures, command failures,
+timeouts, overload discards or missing acknowledgements. Both profiles removed
+their owned broker and temporary state. Reports are `review-fix-round4-ci` and
+`review-fix-round4-sustained-8` in Factory run
+`9ec4136d-070f-4f85-ab23-d75f9da50a64`; revision binding and check receipts are in
+`review-fix-round4/fix-validation.json`.
+
+Complete backend, frontend and runtime tests, relevant typechecking, lint,
+formatting and builds passed. Simulator, fleet, commissioning backend and
+headless desktop/mobile checks, audit hooks and runner checks also passed. The
+initial environment/setup failures and interrupted combined test attempt remain
+recorded separately. The existing optional packaged-release-image test remains
+skipped without a selected release image. Earlier supplemental editor-label
+failures were not changed or rerun. These results retain the two-controller
+software-fixture envelope; physical qualification, real SSH recovery and
+independent penetration and safety reviews remain outstanding.
+
 ## Fault-reporting correction validation on 2026-10-16
 
 Commit `00ad42b164d708c6a2e80a8b0e1c908e6569e168` fixes polling change detection
