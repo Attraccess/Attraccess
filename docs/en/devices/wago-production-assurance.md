@@ -171,7 +171,49 @@ cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
 substitutes for sustained evidence.
 
-## Software environment tested on 2026-10-15
+## Current software validation on 2026-10-16
+
+The corrected implementation was frozen at commit `d185d82aaaede9972f5676528b9c99995a4fddda` for
+sustained validation, with a clean working tree and source fingerprint
+`986947b215c2bd9136fa499487487c55beef3bfefef04671f0f44ab96839d3ef`.
+The selected reports are `review-fix-round2-ci` and
+`review-fix-round2-sustained` in Factory run
+`9ec4136d-070f-4f85-ab23-d75f9da50a64`. The short profile run before committing and the clean
+sustained profile share that fingerprint. All 18 assurance tests passed
+in each profile, and both removed their owned broker and temporary state. The
+revision binding, affected regression receipts and limitations are retained in
+`review-fix-round2/fix-validation.json`.
+
+The sustained profile used seed `988`, two independently provisioned software
+controllers, two logical outputs per controller, a two-CPU/1,024 MiB broker budget
+and a 1,024 MiB process RSS budget. Its workload uses plaintext MQTT on loopback;
+separate TLS checks do not establish TLS throughput.
+
+| Offered aggregate commands/second | Repeated stage | Measured stage time | Acknowledged / offered | Command acknowledgement p99 |
+| --- | --- | --- | --- | --- |
+| 2 | no | 900.003 seconds | 1,800 / 1,800 | 15 ms |
+| 4 | no | 900.001 seconds | 3,600 / 3,600 | 15 ms |
+| 8 | no | 900.003 seconds | 7,200 / 7,200 | 15 ms |
+| 8 | yes | 900.002 seconds | 7,200 / 7,200 | 16 ms |
+
+The total offered workload lasted 3,600.009 seconds. All 19,800 commands were
+acknowledged, with no generation failures, command failures, timeouts, overload
+discards or missing acknowledgements. Peak process RSS was
+313.0 MiB. Latency uses at most the last 4,096 acknowledgements per
+stage. These observations support only the tested software-fixture envelope;
+physical controller capacity, sustained Modbus operation and independent
+penetration and safety reviews remain unverified.
+
+Fresh affected regressions passed: 391 runtime tests, 211 backend configuration,
+protocol and readiness tests, eight simulator checks, six fleet checks,
+commissioning backend and desktop/mobile journeys, audit hooks, typechecks and the
+runtime bundle build. The repository commit hook also passed. A supplemental
+configuration-editor browser suite passed 29 of 31 tests; two review-panel display
+label checks remain unresolved in unchanged frontend code. Those failures are
+retained in `review-fix-round2/configuration-browser-limitation.json` and are not
+claimed as passing QA.
+
+## Historical software environment tested on 2026-10-15
 
 The short and sustained assurance profiles and regression suites used this source
 combination. These are software fixtures on a shared development host, not a
@@ -198,12 +240,11 @@ Preliminary failed, interrupted or source-drifted runs are not operating-envelop
 evidence.
 
 The reports below predate the review fixes to replay admission, state budgets and
-load acceptance. They remain historical observations at their recorded fingerprint;
-they do not qualify the corrected revision. Re-run the sustained profile before
-using them to recommend an operating envelope for the corrected revision. Fresh
-short-profile evidence validates the corrections separately.
+load acceptance. They remain historical observations at their recorded fingerprint
+and do not qualify the corrected revision. Use the current revision-bound
+validation above for the corrected software-fixture envelope.
 
-### Observed software envelope
+### Historical observed software envelope
 
 The selected reports are `assurance-short-1400` and `assurance-hour-1458` in that
 Factory run. Both passed all nine security, traffic, recovery and measurement tests,
