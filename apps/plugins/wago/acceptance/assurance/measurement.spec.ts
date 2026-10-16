@@ -148,6 +148,8 @@ describe('measured software envelope with real broker and production processing'
                   'matching oversized runtime MQTT packets dropped before listener delivery; once per wire event, retained across transport replacement',
                 wireAdmissionRejected:
                   'runtime and backend admission rejections, retained across replacement; separate from parser and diagnostics observations',
+                runtimeRejected:
+                  'runtime parsing, structure and validation/policy rejections before actuation; per handler invocation, payload-free, retained across runtime replacement; separate from transport/admission and backend observations',
                 protocolRejected: 'ingress packets rejected by the operational parser',
                 diagnosticsRejected: 'diagnostics callback rejections; may include duplicate subscriptions',
                 rejected:
@@ -178,6 +180,16 @@ describe('measured software envelope with real broker and production processing'
                 transportOversizedRejected:
                   fixture.retiredTransportRejected +
                   fixture.devices.reduce((sum, device) => sum + device.transport.statistics.oversizedRejected, 0),
+                runtimeRejected: Object.fromEntries(
+                  (['parsing', 'structure', 'validation'] as const).map((reason) => [
+                    reason,
+                    fixture.retiredRuntimeRejected[reason] +
+                      fixture.devices.reduce(
+                        (sum, device) => sum + device.runtime.messageStatistics.runtimeRejected[reason],
+                        0,
+                      ),
+                  ]),
+                ),
                 wireAdmissionRejected:
                   fixture.retiredWireRejected +
                   fixture.devices.reduce((sum, device) => sum + device.runtime.messageStatistics.rejected, 0) +

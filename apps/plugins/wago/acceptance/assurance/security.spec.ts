@@ -101,6 +101,35 @@ describe('independent broker identities and verified TLS', () => {
     );
   });
 
+  it('reports runtime parser, structure and validation drops without writes and retains counts across replacement', async () => {
+    const device = fixture.devices[0];
+    const topic = `${fixture.prefix}/v1/controllers/${device.hardwareId}/commands`;
+    const before = await device.store.load();
+    const write = jest.spyOn(device.adapter, 'write');
+    const initial = device.runtime.messageStatistics.runtimeRejected;
+    const retired = { ...fixture.retiredRuntimeRejected };
+    for (const payload of ['{invalid', JSON.stringify({ secret: 'x'.repeat(MESSAGE_LIMITS.stringLength + 1) }), '{}'])
+      await fixture.backendClient.publishAsync(topic, payload, { qos: 1 });
+    await eventually(() => device.runtime.messageStatistics.runtimeRejected.validation === initial.validation + 1);
+    expect(device.runtime.messageStatistics.runtimeRejected).toEqual({
+      parsing: initial.parsing + 1,
+      structure: initial.structure + 1,
+      validation: initial.validation + 1,
+    });
+    expect(await device.store.load()).toEqual(before);
+    expect(write).not.toHaveBeenCalled();
+    write.mockRestore();
+    await device.client.endAsync(true);
+    await fixture.startDevice(device);
+    for (const reason of ['parsing', 'structure', 'validation'] as const)
+      expect(fixture.retiredRuntimeRejected[reason]).toBe(retired[reason] + initial[reason] + 1);
+    expect(device.runtime.messageStatistics.runtimeRejected).toEqual({ parsing: 0, structure: 0, validation: 0 });
+    await fixture.command(device);
+    evidence.push(
+      'runtime parsing, structure and validation rejections counted separately without state changes or writes; counts retained across replacement; valid commands resume',
+    );
+  });
+
   it('separates enrollment from operational identities and rejects anonymous sessions', async () => {
     const identity = `enrollment-${randomUUID()}`;
     const root = `${fixture.prefix}/discovery/temporary`;

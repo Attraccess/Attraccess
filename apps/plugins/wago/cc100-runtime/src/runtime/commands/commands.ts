@@ -29,16 +29,16 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
     };
     try {
       command = JSON.parse(payload.toString('utf8'));
-      if (structureLimitError(command)) return;
+      if (structureLimitError(command)) return this.rejectRuntimeMessage('structure');
     } catch {
-      return;
+      return this.rejectRuntimeMessage('parsing');
     }
     if (
       !isIdentifier(command?.id) ||
       !isIdentifier(command.channelId) ||
       !['set', 'pulse', 'release'].includes(command.action)
     )
-      return;
+      return this.rejectRuntimeMessage('validation');
     if (
       (command.source !== undefined && command.source !== 'manual') ||
       (command.action === 'release' && command.source !== 'manual')

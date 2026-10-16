@@ -75,6 +75,16 @@ several callbacks subscribe to its topic. The total includes retired transports
 after runtime replacement. Parser, diagnostics and admission rejection counters
 retain their separate counting boundaries.
 
+`runtimeRejected` separately counts runtime JSON parsing, structural-limit and
+validation/policy failures across commands, desired configuration, discovery and
+credential rotation. Each rejected handler invocation increments one category,
+including commands rejected with an acknowledgement. These fixed counters
+saturate at the largest safe integer, contain no payloads or identifiers and are
+returned as snapshots by `messageStatistics`. Assurance reports retain the counts
+across runtime replacement. They are processing observations, not unique MQTT
+packets; do not add them to backend parser/diagnostics observations to infer a
+unique rejected-packet total. Transport and admission drops remain separate.
+
 These are defensive software ceilings, not throughput recommendations. They cover
 existing fixtures and a valid 4,096-point/4,096-channel boundary snapshot. The first
 excessive string, byte, collection or depth is rejected. Excess traffic produces

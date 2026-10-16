@@ -33,13 +33,13 @@ export abstract class RuntimeCredentials extends RuntimeContext {
   private async processCredentialRotation(payload: Buffer): Promise<void> {
     const update = this.credentialUpdates.then(async () => {
       if (!this.loaded || !this.options.reconnectCredentials || !this.state.credentials || payload.length > 8192)
-        return;
+        return this.rejectRuntimeMessage('validation');
       let input: Record<string, unknown>;
       try {
         input = JSON.parse(payload.toString('utf8'));
-        if (structureLimitError(input)) return;
+        if (structureLimitError(input)) return this.rejectRuntimeMessage('structure');
       } catch {
-        return;
+        return this.rejectRuntimeMessage('parsing');
       }
       if (
         !input ||
@@ -53,9 +53,9 @@ export abstract class RuntimeCredentials extends RuntimeContext {
         !input.password ||
         input.password.length > 4096
       )
-        return;
+        return this.rejectRuntimeMessage('validation');
       const expiry = this.credentialRotationExpiry(input);
-      if (expiry === undefined) return;
+      if (expiry === undefined) return this.rejectRuntimeMessage('validation');
       const previous = this.state.credentialRotation;
       if (
         previous &&
@@ -63,7 +63,7 @@ export abstract class RuntimeCredentials extends RuntimeContext {
           (input.revision === previous.revision &&
             (input.token !== previous.token || input.password !== this.state.credentials.password)))
       )
-        return;
+        return this.rejectRuntimeMessage('validation');
       const nextCredentials = { ...this.state.credentials, password: input.password };
       const nextRotation = { revision: input.revision as number, token: input.token };
       let saved = false;
@@ -74,6 +74,7 @@ export abstract class RuntimeCredentials extends RuntimeContext {
         await this.options.store.save(this.state);
         saved = true;
       });
+      if (!saved) this.rejectRuntimeMessage('validation');
       if (saved && this.state.credentials) await this.options.reconnectCredentials(this.state.credentials);
     });
     this.credentialUpdates = update.catch(() => undefined);

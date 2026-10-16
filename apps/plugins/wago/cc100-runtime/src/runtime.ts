@@ -18,6 +18,7 @@ export class WagoRuntime extends RuntimeTelemetry {
       this.receiveCommandAdmission,
     ];
     return {
+      runtimeRejected: { ...this.runtimeRejections },
       pending: lanes.reduce((sum, lane) => sum + lane.pending, 0),
       rejected: lanes.reduce((sum, lane) => sum + lane.rejected, 0),
     };

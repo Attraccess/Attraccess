@@ -24,24 +24,26 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
     };
     try {
       desired = JSON.parse(payload.toString('utf8'));
-      if (structureLimitError(desired)) return;
+      if (structureLimitError(desired)) return this.rejectRuntimeMessage('structure');
     } catch {
       return this.reportRejected(0, '', [
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },
       ]);
     }
     if (desired && Object.prototype.hasOwnProperty.call(desired, 'runtimeImageId')) {
-      if (typeof desired.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(desired.runtimeImageId)) return;
-      if (this.options.runtimeImageId && desired.runtimePolicyToken !== this.runtimePolicyToken) return;
+      if (typeof desired.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(desired.runtimeImageId))
+        return this.rejectRuntimeMessage('validation');
+      if (this.options.runtimeImageId && desired.runtimePolicyToken !== this.runtimePolicyToken)
+        return this.rejectRuntimeMessage('validation');
       this.runtimeUpdateRequired = desired.runtimeImageId !== this.options.runtimeImageId;
       if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
       this.requestStatePublication();
       // Policy-only messages use the existing authenticated configuration ACL.
       if (!Object.prototype.hasOwnProperty.call(desired, 'snapshot')) return;
     }
-    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return this.rejectRuntimeMessage('validation');
     await this.runConfigurationUpdate(async () => {
-      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
+      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return this.rejectRuntimeMessage('validation');
       const errors = validateDesired(desired);
       if (!errors.length && desired.contentHash !== hash(desired.snapshot))
         errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });

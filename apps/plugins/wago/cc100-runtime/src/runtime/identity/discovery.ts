@@ -16,11 +16,11 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
     let claim: unknown;
     try {
       claim = JSON.parse(payload.toString('utf8'));
-      if (structureLimitError(claim)) return;
+      if (structureLimitError(claim)) return this.rejectRuntimeMessage('structure');
     } catch {
-      return undefined;
+      return this.rejectRuntimeMessage('parsing');
     }
-    if (!claim || typeof claim !== 'object') return undefined;
+    if (!claim || typeof claim !== 'object') return this.rejectRuntimeMessage('validation');
     const { username, password, configuration, acknowledgementToken, expiresAt, credentialEpoch } = claim as Record<
       string,
       unknown
@@ -32,12 +32,12 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
       typeof password !== 'string' ||
       !password
     )
-      return undefined;
+      return this.rejectRuntimeMessage('validation');
     if (
       credentialEpoch !== undefined &&
       (typeof credentialEpoch !== 'string' || !CREDENTIAL_EPOCH.test(credentialEpoch))
     )
-      return undefined;
+      return this.rejectRuntimeMessage('validation');
     const expiry = expiresAt === undefined ? undefined : typeof expiresAt === 'string' ? Date.parse(expiresAt) : NaN;
     if (
       expiry !== undefined &&
@@ -46,7 +46,7 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
         expiry <= Date.now() ||
         expiry - Date.now() > 60_000)
     )
-      return undefined;
+      return this.rejectRuntimeMessage('validation');
     const namespace =
       configuration && typeof configuration === 'object'
         ? (configuration as Record<string, unknown>).namespace
@@ -57,7 +57,7 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
         namespace.length > 512 ||
         namespace.split('/').some((segment) => !segment || /[+#]/.test(segment)))
     )
-      return undefined;
+      return this.rejectRuntimeMessage('validation');
     const credentials: DiscoveryClaim = {
       username,
       password,
@@ -80,7 +80,7 @@ export abstract class RuntimeDiscovery extends RuntimeCredentials {
       await this.options.store.save(this.state);
       saved = true;
     });
-    if (!saved) return undefined;
+    if (!saved) return this.rejectRuntimeMessage('validation');
     if (typeof acknowledgementToken === 'string' && acknowledgementToken)
       await this.options.transport.publish(`${this.discoveryClaimTopic()}/ack`, { acknowledgementToken });
     return credentials;

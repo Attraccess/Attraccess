@@ -52,6 +52,7 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
   }
 
   protected reportRejected(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
+    this.rejectRuntimeMessage(errors.some((error) => error.code === 'invalid_json') ? 'parsing' : 'validation');
     return this.publishReport(revision, contentHash, errors);
   }
 
@@ -79,6 +80,7 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
     error?: string,
     code?: string,
   ): Promise<void> {
+    if (status === 'rejected') this.rejectRuntimeMessage('validation');
     return this.publishOperational('acknowledgements', { id, status, error, code });
   }
 
