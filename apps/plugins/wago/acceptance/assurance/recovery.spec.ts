@@ -213,6 +213,8 @@ describe('isolated recovery using existing state and credential services', () =>
     expect(write).not.toHaveBeenCalled();
     const active = fixture.devices[1];
     const before = await active.store.load();
+    const outputBefore = new Map(active.adapter.values);
+    const activeWrite = jest.spyOn(active.adapter, 'write');
     const persist = jest.spyOn(active.store, 'save').mockRejectedValueOnce(new Error('unavailable persistence'));
     await expect(
       active.runtime.receiveCommand(
@@ -229,6 +231,9 @@ describe('isolated recovery using existing state and credential services', () =>
       ),
     ).rejects.toThrow('unavailable persistence');
     persist.mockRestore();
+    expect(activeWrite).not.toHaveBeenCalled();
+    expect(active.adapter.values).toEqual(outputBefore);
+    activeWrite.mockRestore();
     expect((await active.store.load()).outputs).toEqual(before.outputs);
     results.push({
       exercise: 'unavailable/corrupt persistence',

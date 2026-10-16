@@ -146,6 +146,8 @@ describe('measured software envelope with real broker and production processing'
                 processed: 'production diagnostics accepted packet',
                 transportOversizedRejected:
                   'matching oversized runtime MQTT packets dropped before listener delivery; once per wire event, retained across transport replacement',
+                transportAcknowledgementTimeouts:
+                  'runtime MQTT PUBACK/SUBACK deadline expirations; one deadline can reject several pending operations; retained across transport replacement, separate from stage command acknowledgement timeouts',
                 wireAdmissionRejected:
                   'runtime and backend admission rejections, retained across replacement; separate from parser and diagnostics observations',
                 runtimeRejected:
@@ -174,6 +176,7 @@ describe('measured software envelope with real broker and production processing'
               faults,
               counters: {
                 ...fixture.counts,
+                transportAcknowledgementTimeouts: fixture.transportAcknowledgementTimeouts,
                 intentionalDiscard:
                   fixture.retiredStaleDiscarded +
                   fixture.devices.reduce((sum, device) => sum + device.transport.statistics.staleDiscarded, 0),

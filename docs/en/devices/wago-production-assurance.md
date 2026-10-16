@@ -75,6 +75,12 @@ several callbacks subscribe to its topic. The total includes retired transports
 after runtime replacement. Parser, diagnostics and admission rejection counters
 retain their separate counting boundaries.
 
+`transportAcknowledgementTimeouts` counts runtime MQTT PUBACK/SUBACK deadline
+expirations, including retired transports after replacement. A single expired
+deadline can reject several pending operations. This total is separate from each
+load stage's command acknowledgement `timeout` count, which measures the plugin's
+wait for a controller command result.
+
 `runtimeRejected` separately counts runtime JSON parsing, structural-limit and
 validation/policy failures across commands, desired configuration, discovery and
 credential rotation. Each rejected handler invocation increments one category,

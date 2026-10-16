@@ -75,6 +75,14 @@ export class AssuranceFixture {
   retiredWireRejected = 0;
   readonly retiredRuntimeRejected = { parsing: 0, structure: 0, validation: 0 };
   retiredTransportRejected = 0;
+  retiredAcknowledgementTimeouts = 0;
+
+  get transportAcknowledgementTimeouts() {
+    return (
+      this.retiredAcknowledgementTimeouts +
+      this.devices.reduce((sum, device) => sum + device.transport.statistics.acknowledgementTimeouts, 0)
+    );
+  }
   readonly directory = process.env.WAGO_FLEET_TEMP ? join(process.env.WAGO_FLEET_TEMP, randomUUID()) : '';
   readonly url = process.env.WAGO_FLEET_MQTT_URL ?? '';
   readonly management = process.env.WAGO_FLEET_MANAGEMENT_URL ?? '';
@@ -270,6 +278,7 @@ export class AssuranceFixture {
     if (device.transport) {
       this.retiredStaleDiscarded += device.transport.statistics.staleDiscarded;
       this.retiredTransportRejected += device.transport.statistics.oversizedRejected;
+      this.retiredAcknowledgementTimeouts += device.transport.statistics.acknowledgementTimeouts;
     }
     if (device.runtime) {
       this.retiredWireRejected += device.runtime.messageStatistics.rejected;
