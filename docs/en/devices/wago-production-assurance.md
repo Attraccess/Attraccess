@@ -171,7 +171,43 @@ cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
 substitutes for sustained evidence.
 
-## Current software validation on 2026-10-16
+## Fault-reporting correction validation on 2026-10-16
+
+Commit `00ad42b164d708c6a2e80a8b0e1c908e6569e168` fixes polling change detection
+when readiness diagnostics exceed the wire budget. Complete diagnostics now
+contribute to a fixed-size local digest, so changed channel faults remain visible
+while repeated unchanged polls still deduplicate. The 80-channel regression also
+covers recovery, recurring faults and forced publication.
+
+Both the short and sustained profiles passed all 18 assurance tests against this
+clean implementation, with source fingerprint
+`1a3e019f25dff941b9711b74c38ec180cea1b62e3b06fa04195b42b18dac85bb`.
+Selected reports are `review-fix-round3-ci` and `review-fix-round3-sustained-8` in
+Factory run `9ec4136d-070f-4f85-ab23-d75f9da50a64`; revision binding, full check
+receipts and limitations are in `review-fix-round3/fix-validation.json`.
+Both profiles removed their owned broker and temporary state.
+
+The sustained run used the same two-controller software-fixture envelope and
+resource budgets as the earlier run below. All 19,800 commands were acknowledged
+over 3,600.006 seconds of offered workload, with no generation failures, command
+failures, timeouts, overload discards or missing acknowledgements. The 2, 4, 8 and
+repeated 8 commands/second stages each passed. Acknowledgement p99 was 16, 15, 13
+and 13 ms respectively; peak process RSS was 333.0 MiB. These results establish
+only the tested software-fixture envelope, not physical controller or sustained
+Modbus capacity.
+
+Complete uncached `plugin-wago` test, typecheck, lint and build targets passed,
+including 79 backend suites (1,665 passing tests) and 25 frontend suites (277
+passing tests). One existing optional Docker packaged-release-image test was
+skipped because no release image was selected. All 391 runtime tests, runtime
+typechecking and strict lint/formatting, runtime/simulator builds, eight simulator
+checks, six fleet checks, commissioning backend and headless desktop/mobile
+journeys, 22 audit-hook checks and 16 runner/checker tests also passed.
+The earlier supplemental configuration-editor browser label failures below were
+not rerun or fixed by this correction. Physical qualification, real SSH recovery
+and independent penetration and safety reviews remain outstanding.
+
+## Earlier software validation on 2026-10-16
 
 The corrected implementation was frozen at commit `d185d82aaaede9972f5676528b9c99995a4fddda` for
 sustained validation, with a clean working tree and source fingerprint
