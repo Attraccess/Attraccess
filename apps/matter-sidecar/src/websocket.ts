@@ -36,7 +36,7 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
     }
     ws.close(
       code,
-      error.code === 'RECONCILIATION_REQUIRED' ? 'Reconciliation required: obtain a snapshot' : error.code,
+      error.code === 'RECONCILIATION_REQUIRED' ? 'Reconciliation required: snapshots unavailable' : error.code,
     );
     const kill = setTimeout(() => ws.terminate(), Math.min(1000, config.shutdownMs));
     kill.unref();

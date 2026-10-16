@@ -28,15 +28,21 @@ describe('CC100 packed digital I/O', () => {
       }
       await publish(topic, payload, options);
     });
+    const completed = deferred();
     const outputs = fixture.runtime['outputs'];
-    const shutdown = jest.spyOn(
-      outputs as unknown as { writePulseShutdown: (typeof outputs)['writePulseShutdown'] },
-      'writePulseShutdown',
-    );
+    const writePulseShutdown = outputs['writePulseShutdown'].bind(outputs);
+    const shutdown = jest
+      .spyOn(outputs as unknown as { writePulseShutdown: (typeof outputs)['writePulseShutdown'] }, 'writePulseShutdown')
+      .mockImplementation(async (pulse) => {
+        const result = await writePulseShutdown(pulse);
+        completed.resolve();
+        return result;
+      });
     const action = fixture.command('DO1', true, 'pulse', 'pulse');
     await started.promise;
     try {
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      // Wait for real file I/O and state persistence, even on a busy runner.
+      await completed.promise;
       expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');
     } finally {
       release.resolve();

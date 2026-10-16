@@ -381,7 +381,7 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
       expect(ws.bufferedAmount).toBeLessThanOrEqual(clientQueueBytes);
       if (testCase.overflow) {
         expect(ws.send).not.toHaveBeenCalled();
-        expect(ws.close).toHaveBeenCalledWith(4009, 'Reconciliation required: obtain a snapshot');
+        expect(ws.close).toHaveBeenCalledWith(4009, 'Reconciliation required: snapshots unavailable');
       } else {
         expect(ws.send).toHaveBeenCalledOnce();
         expect(ErrorEnvelope.parse(JSON.parse(ws.send.mock.calls[0][0])).error.code).toBe('VALIDATION_ERROR');
@@ -404,7 +404,7 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     ws.send('invalid-json');
     const [code, reason] = await closed;
     expect(code).toBe(4009);
-    expect(reason.toString()).toBe('Reconciliation required: obtain a snapshot');
+    expect(reason.toString()).toBe('Reconciliation required: snapshots unavailable');
     expect(messages).toEqual([]);
   });
   it.each(['text', 'binary', 'fragmented'])(
