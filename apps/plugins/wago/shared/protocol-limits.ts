@@ -2,6 +2,8 @@
 export const MESSAGE_LIMITS = Object.freeze({
   controlBytes: 8_192,
   operationalBytes: 262_144,
+  stateEnvelopeBytes: 8_192,
+  readinessDiagnosticBytes: 4_096,
   configurationBytes: 1_048_576,
   stringLength: 4_096,
   identifierLength: 128,
@@ -108,7 +110,7 @@ export class MessageAdmission {
   }
 }
 
-/** Reserve room for the largest normal state: observed and commanded outputs,
+/** Reserve room for the largest state: observed and commanded outputs,
  * manual ownership IDs, inputs, and the fixed readiness/envelope fields.
  * Count encoded bytes (including escapes and multi-byte IDs), not characters.
  */
@@ -116,7 +118,7 @@ export function stateBudgetError(snapshot: unknown): string | null {
   const channels = (snapshot as { logicalChannels?: unknown })?.logicalChannels;
   if (!Array.isArray(channels)) return null; // Domain validators report malformed collections.
   const encoder = new TextEncoder();
-  let bytes = 2048;
+  let bytes = MESSAGE_LIMITS.stateEnvelopeBytes;
   for (const channel of channels) {
     if (!channel || typeof channel.id !== 'string' || !Array.isArray(channel.capabilities)) continue;
     const idBytes = encoder.encode(JSON.stringify(channel.id)).byteLength;

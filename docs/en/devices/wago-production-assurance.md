@@ -60,9 +60,20 @@ Persistent replay history is limited to 4,096 distinct command identities. When
 full, new commands receive `replay_history_full` before persistence or actuation;
 unexpired and legacy unknown-expiry reservations are preserved. Capacity returns
 only as known expiries pass. Configuration validation also reserves encoded-byte
-room for observed/commanded output maps, manual output ownership IDs and the normal
-state envelope, so an accepted configuration can report normal state within the
-shared operational limit (including commissioning readiness).
+room for observed/commanded output maps, manual output ownership IDs and an
+8,192-byte state envelope, including up to 4,096 encoded bytes of readiness
+errors. If those errors exceed the diagnostic budget, state carries a
+`diagnostics_truncated` summary while retaining readiness and hardware-availability
+flags calculated from every failure. Individual channel faults remain separate
+publications. Accepted configurations can therefore report both healthy and
+failure states within the shared operational limit, including commissioning
+readiness.
+
+Assurance reports count matching oversized runtime MQTT packets before listener
+delivery. Each wire event increments `transportOversizedRejected` once, even when
+several callbacks subscribe to its topic. The total includes retired transports
+after runtime replacement. Parser, diagnostics and admission rejection counters
+retain their separate counting boundaries.
 
 These are defensive software ceilings, not throughput recommendations. They cover
 existing fixtures and a valid 4,096-point/4,096-channel boundary snapshot. The first

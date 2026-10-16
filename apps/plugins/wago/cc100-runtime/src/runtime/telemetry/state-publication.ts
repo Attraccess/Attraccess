@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS } from '../../../../shared/protocol-limits';
 import { RuntimeModbusOutputPolling } from './modbus-output-polling';
 
 export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling {
@@ -81,7 +82,18 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
           Boolean(accepted) &&
           !errors.some((error) => error.code !== 'modbus_read_failed') &&
           this.connected,
-        errors,
+        // Preserve readiness flags computed from all failures, but keep the wire
+        // diagnostics within the reserved envelope even for failing large fleets.
+        errors:
+          Buffer.byteLength(JSON.stringify(errors)) <= MESSAGE_LIMITS.readinessDiagnosticBytes
+            ? errors
+            : [
+                {
+                  path: 'hardware',
+                  code: 'diagnostics_truncated',
+                  message: 'Readiness diagnostics exceed state budget; inspect channel faults.',
+                },
+              ],
       },
     };
     this.options.onReadiness?.({ connected: this.connected, ...payload.readiness });

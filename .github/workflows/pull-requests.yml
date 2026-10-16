@@ -75,6 +75,7 @@ jobs:
         plugins,
         attractap-firmware-version,
         wago-runtime-version,
+        wago-production-assurance,
         balena-compose-check,
         fail2ban-smoke,
         grafana-provisioning-smoke,

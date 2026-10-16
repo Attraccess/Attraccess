@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { connectAsync, type MqttClient } from 'mqtt';
 import { RabbitmqManagementClient } from '../../../rabbitmq/backend/management/client';
+import { MESSAGE_LIMITS } from '../../shared/protocol-limits';
 import { AssuranceFixture, delay, eventually } from './fixture';
 
 const output = process.env.WAGO_ASSURANCE_OUTPUT ?? '';
@@ -76,6 +77,28 @@ describe('independent broker identities and verified TLS', () => {
     } finally {
       fixture.backendClient.off('message', receive);
     }
+  });
+
+  it('counts transport rejections once per packet and retains them across runtime transport replacement', async () => {
+    const device = fixture.devices[0];
+    const topic = `${fixture.prefix}/v1/controllers/${device.hardwareId}/commands`;
+    const listener = jest.fn();
+    await device.transport.subscribe(topic, listener);
+    const oversized = Buffer.alloc(MESSAGE_LIMITS.configurationBytes + 1, 65);
+    await fixture.backendClient.publishAsync(topic, oversized, { qos: 1 });
+    await eventually(() => device.transport.statistics.oversizedRejected === 1);
+    expect(listener).not.toHaveBeenCalled();
+    await device.client.endAsync(true);
+    await fixture.startDevice(device);
+    expect(fixture.retiredTransportRejected).toBe(1);
+    expect(device.transport.statistics.oversizedRejected).toBe(0);
+    await fixture.backendClient.publishAsync(topic, oversized, { qos: 1 });
+    await eventually(() => device.transport.statistics.oversizedRejected === 1);
+    expect(fixture.retiredTransportRejected + device.transport.statistics.oversizedRejected).toBe(2);
+    await fixture.command(device);
+    evidence.push(
+      'oversized runtime MQTT packets counted once before listener delivery; cumulative count survives transport replacement; valid command resumes',
+    );
   });
 
   it('separates enrollment from operational identities and rejects anonymous sessions', async () => {

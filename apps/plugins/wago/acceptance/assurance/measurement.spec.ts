@@ -144,6 +144,10 @@ describe('measured software envelope with real broker and production processing'
                 runtimeWrites:
                   'successful memory-adapter writes, including startup and policies; not physical observations',
                 processed: 'production diagnostics accepted packet',
+                transportOversizedRejected:
+                  'matching oversized runtime MQTT packets dropped before listener delivery; once per wire event, retained across transport replacement',
+                wireAdmissionRejected:
+                  'runtime and backend admission rejections, retained across replacement; separate from parser and diagnostics observations',
                 protocolRejected: 'ingress packets rejected by the operational parser',
                 diagnosticsRejected: 'diagnostics callback rejections; may include duplicate subscriptions',
                 rejected:
@@ -171,6 +175,9 @@ describe('measured software envelope with real broker and production processing'
                 intentionalDiscard:
                   fixture.retiredStaleDiscarded +
                   fixture.devices.reduce((sum, device) => sum + device.transport.statistics.staleDiscarded, 0),
+                transportOversizedRejected:
+                  fixture.retiredTransportRejected +
+                  fixture.devices.reduce((sum, device) => sum + device.transport.statistics.oversizedRejected, 0),
                 wireAdmissionRejected:
                   fixture.retiredWireRejected +
                   fixture.devices.reduce((sum, device) => sum + device.runtime.messageStatistics.rejected, 0) +

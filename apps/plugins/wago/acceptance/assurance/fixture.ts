@@ -73,6 +73,7 @@ export class AssuranceFixture {
   readonly errors: string[] = [];
   retiredStaleDiscarded = 0;
   retiredWireRejected = 0;
+  retiredTransportRejected = 0;
   readonly directory = process.env.WAGO_FLEET_TEMP ? join(process.env.WAGO_FLEET_TEMP, randomUUID()) : '';
   readonly url = process.env.WAGO_FLEET_MQTT_URL ?? '';
   readonly management = process.env.WAGO_FLEET_MANAGEMENT_URL ?? '';
@@ -265,7 +266,10 @@ export class AssuranceFixture {
   }
 
   async startDevice(device: Device) {
-    if (device.transport) this.retiredStaleDiscarded += device.transport.statistics.staleDiscarded;
+    if (device.transport) {
+      this.retiredStaleDiscarded += device.transport.statistics.staleDiscarded;
+      this.retiredTransportRejected += device.transport.statistics.oversizedRejected;
+    }
     if (device.runtime) this.retiredWireRejected += device.runtime.messageStatistics.rejected;
     const connectingAt = Date.now();
     device.client = await this.connect(device.username, device.password, 100);
