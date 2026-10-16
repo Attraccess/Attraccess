@@ -123,6 +123,78 @@ describe('wire resource budgets', () => {
     },
   );
 
+  it('publishes changed channel faults on unforced polls when readiness diagnostics are shortened', async () => {
+    class PollingRuntime extends WagoRuntime {
+      poll(force = false) {
+        return this.publishState(force);
+      }
+    }
+    const configuration: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'p', hardwareProfile: '879-3000', channel: 0 }],
+      logicalChannels: Array.from({ length: 80 }, (_, i) => ({
+        id: `channel-${i}`,
+        physicalPointId: 'p',
+        profile: 'generic-digital-output',
+        capabilities: ['output'],
+        disconnectPolicy: { mode: 'hold' },
+      })),
+    };
+    expect(validateSnapshot(configuration)).toEqual([]);
+    expect(validateRuntime(configuration)).toEqual([]);
+    let failure = 'timeout';
+    const publish = jest.fn(async (_topic: string, _payload: unknown) => undefined);
+    const runtime = new PollingRuntime({
+      hardwareId: 'fixture',
+      prefix: 'fixture',
+      pairingCode: 'fixture',
+      device: {
+        read: async () => {
+          if (failure) throw new Error(failure);
+          return false;
+        },
+        write: async () => undefined,
+      },
+      store: {
+        load: async () => ({
+          accepted: { revision: 1, contentHash: hash(configuration), snapshot: configuration },
+          outputs: Object.fromEntries(configuration.logicalChannels.map(({ id }) => [id, false])),
+          commandIds: [],
+        }),
+        save: async () => undefined,
+      },
+      transport: { publish, subscribe: async () => undefined },
+    });
+    await runtime.start();
+    expect(publish.mock.calls.filter(([topic]) => topic.endsWith('/faults'))).toHaveLength(80);
+    expect(publish.mock.calls.find(([topic]) => topic.endsWith('/state'))?.[1]).toMatchObject({
+      readiness: { errors: [{ code: 'diagnostics_truncated' }] },
+    });
+    publish.mockClear();
+    await runtime.poll();
+    expect(publish).not.toHaveBeenCalled();
+    failure = 'connection refused';
+    await runtime.poll();
+    const faults = publish.mock.calls.filter(([topic]) => topic.endsWith('/faults'));
+    expect(faults).toHaveLength(80);
+    for (const [, fault] of faults) expect(fault).toMatchObject({ message: failure });
+    publish.mockClear();
+    await runtime.poll();
+    expect(publish).not.toHaveBeenCalled();
+    failure = '';
+    await runtime.poll();
+    expect(publish.mock.calls.find(([topic]) => topic.endsWith('/state'))?.[1]).toMatchObject({
+      readiness: { errors: [], hardwareAvailable: true },
+    });
+    publish.mockClear();
+    failure = 'connection refused';
+    await runtime.poll();
+    expect(publish.mock.calls.filter(([topic]) => topic.endsWith('/faults'))).toHaveLength(80);
+    publish.mockClear();
+    await runtime.poll(true);
+    expect(publish.mock.calls.filter(([topic]) => topic.endsWith('/faults'))).toHaveLength(80);
+  });
+
   it('rejects oversized bytes before JSON decoding without quoting the payload', () => {
     const parse = jest.spyOn(JSON, 'parse');
     expect(() => parseHeartbeat(Buffer.alloc(MESSAGE_LIMITS.operationalBytes + 1, 65))).toThrow('byte limit');
