@@ -187,6 +187,27 @@ cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
 substitutes for sustained evidence.
 
+## Transport timeout reporting validation on 2026-10-16
+
+The sustained profile passed all 20 assurance tests on clean commit
+`1839247f1a37581b0b87277ef0bd9e776afaf1c6`, including the transport timeout
+counter and strengthened persistence-failure assertions. Its source fingerprint
+`8358231dd49279d069dd06e513ef98a6d9d6e4d47a5c6d9dde5ba911ef33b1c5`
+matches the previously completed short profile in `ci-fix-assurance-short`.
+
+All 19,800 offered commands were acknowledged over 3,600.009 seconds of workload.
+The 2, 4, 8 and repeated 8 commands/second stages passed without generation
+failures, command failures, command timeouts, overload discards or missing
+acknowledgements. The separate `transportAcknowledgementTimeouts` total was zero.
+Runtime, plugin and broker restart recovery also passed. The runner confirmed
+unchanged source and removed its owned broker and temporary state.
+
+Reports are in `review-fix-round5-sustained` in Factory run
+`9ec4136d-070f-4f85-ab23-d75f9da50a64`; the validation receipt is
+`review-fix-round5/fix-validation.json`. This refresh retains the two-controller
+software-fixture envelope. Physical qualification, real SSH recovery and
+independent penetration and safety reviews remain outstanding.
+
 ## Runtime rejection accounting validation
 
 Commit `35d47a8d50239ba9eeef0d18f179d458c4d32864` adds fixed, payload-free
