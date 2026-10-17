@@ -1,5 +1,5 @@
 import { WebSocket, WebSocketServer } from 'ws';
-import { ClientMessage, ServerMessage, StreamReady } from '@attraccess/matter-contract';
+import { ClientMessage, Id, ServerMessage, StreamReady } from '@attraccess/matter-contract';
 import { EventStream } from './stream.js';
 import { ProtocolError } from './errors.js';
 import type { SidecarConfig } from './config.js';
@@ -56,6 +56,10 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
       } catch {
         throw new ProtocolError('VALIDATION_ERROR', 'Malformed JSON WebSocket message.');
       }
+      if (typeof value === 'object' && value !== null && 'requestId' in value) {
+        const correlation = Id.safeParse(value.requestId);
+        if (correlation.success) requestId = correlation.data;
+      }
       const parsed = ClientMessage.safeParse(value);
       if (!parsed.success) {
         const version =
@@ -71,7 +75,6 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
           'VALIDATION_ERROR',
           'Only one resume request is permitted per connection. Reconnect to resume again.',
         );
-      requestId = parsed.data.requestId;
       const result = stream.resume(parsed.data.cursor, (event) => {
         send(event);
       });

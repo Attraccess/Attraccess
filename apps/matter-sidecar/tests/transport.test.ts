@@ -303,6 +303,27 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
       );
     }
   });
+  it.each([
+    { schemaVersion: 2, cursor: null },
+    { schemaVersion: 1, cursor: 'bad' },
+  ])('correlates rejected messages with their valid request ID: %j', async (fields) => {
+    const { url } = await start();
+    const client = await connect(url);
+    const requestId = '11111111-1111-4111-8111-111111111111';
+    client.ws.send(JSON.stringify({ type: 'resume', requestId, ...fields }));
+    await once(client.ws, 'close');
+    expect(ErrorEnvelope.parse(client.messages[0]).error.requestId).toBe(requestId);
+  });
+  it.each([undefined, null, 'invalid-id', { secret: 'must not be reflected' }])(
+    'retains connection correlation when a rejected message has an invalid request ID: %j',
+    async (requestId) => {
+      const { url } = await start();
+      const client = await connect(url);
+      client.ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId, cursor: 'bad' }));
+      await once(client.ws, 'close');
+      expect(ErrorEnvelope.parse(client.messages[0]).error.requestId).toBe(headers['x-request-id']);
+    },
+  );
   it('validates message versions after initial subscription and closes idle streams', async () => {
     const { url } = await start({ resumeTimeoutMs: 50 });
     const client = await connect(url);
