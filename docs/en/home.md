@@ -8,18 +8,18 @@ Attraccess helps you manage machines, tools, workstations and doors across produ
 
 Run Attraccess on your own infrastructure, connect your identity provider and use usage records, maintenance schedules and audit logs to support day-to-day operations.
 
-Attraccess is **source-available** under the [modified Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Commercial use requires a license after a 30-day evaluation; qualifying non-commercial use is free. The full license terms are written in German; see [Licensing and activation](getting-started/overview.md#licensing) for an English summary and setup instructions.
+Attraccess is **source-available** under the [modified Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Commercial use requires a license after a 30-day evaluation; qualifying non-commercial use is free. Free installations also require a license key. The full license terms are written in German; see [Licensing and activation](getting-started/overview.md#licensing) for an English summary and setup instructions.
 
 ## Who is this documentation for?
 
-| Audience | Recommended Sections |
-|----------|---------------------|
-| **Operators, Researchers & Students** | [End User Guide](end-user/overview.md), [Using the Reader](attractap/using-the-reader.md) |
-| **Production & Lab Leads, Safety Officers** | [Resources](resources/overview.md), [Safety Briefings](resources/introductions.md), [Usage Exports](resources/csv-export.md) |
-| **Maintenance & Automation Teams** | [Maintenance](resources/maintenance.md), [Flows](flows/overview.md), [Forms](forms/overview.md) |
-| **Administrators** | [First-Time Setup](setup/first-time-setup.md), [User Management](user-management/overview.md), [Settings](settings/overview.md) |
-| **IT Administrators** | [Installation](installation/docker-compose.md), [SSO](user-management/sso-overview.md), [Monitoring](monitoring/overview.md), [Audit Log](settings/audit-log.md) |
-| **Developers** | [Developer Guide](developer/overview.md), [API Reference](developer/api-reference.md) |
+| Audience                                    | Recommended Sections                                                                                                                                             |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Operators, Researchers & Students**       | [End User Guide](end-user/overview.md), [Using the Reader](attractap/using-the-reader.md)                                                                        |
+| **Production & Lab Leads, Safety Officers** | [Resources](resources/overview.md), [Safety Briefings](resources/introductions.md), [Usage Exports](resources/csv-export.md)                                     |
+| **Maintenance & Automation Teams**          | [Maintenance](resources/maintenance.md), [Flows](flows/overview.md), [Forms](forms/overview.md)                                                                  |
+| **Administrators**                          | [First-Time Setup](setup/first-time-setup.md), [User Management](user-management/overview.md), [Settings](settings/overview.md)                                  |
+| **IT Administrators**                       | [Installation](installation/docker-compose.md), [SSO](user-management/sso-overview.md), [Monitoring](monitoring/overview.md), [Audit Log](settings/audit-log.md) |
+| **Developers**                              | [Developer Guide](developer/overview.md), [API Reference](developer/api-reference.md)                                                                            |
 
 ## Quick Start
 

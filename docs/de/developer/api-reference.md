@@ -34,33 +34,35 @@ Für das React-Frontend werden TanStack-Query-Hooks automatisch in der Bibliothe
 
 **Wichtige Dateien:**
 
-| Datei | Beschreibung |
-|-------|-------------|
-| `schemas.gen.ts` | Generierte Anfrage-/Antwort-Schemas |
-| `types.gen.ts` | Generierte TypeScript-Typdefinitionen |
+| Datei            | Beschreibung                          |
+| ---------------- | ------------------------------------- |
+| `schemas.gen.ts` | Generierte Anfrage-/Antwort-Schemas   |
+| `types.gen.ts`   | Generierte TypeScript-Typdefinitionen |
 
 Diese Hooks übernehmen Datenabruf, Caching und Zustandsverwaltung automatisch.
 
 ## Authentifizierung
 
-Die API verwendet **Session-Cookies** zur Authentifizierung. Wenn Sie sich über den Endpunkt `/api/auth/login` anmelden, wird ein Session-Cookie gesetzt. Dieses Cookie wird bei allen nachfolgenden Anfragen mitgesendet.
+Die API akzeptiert entweder ein **Session-Cookie** oder ein selbst verwaltetes API-Token. Bei Anmeldung über `/api/auth/login` wird ein Session-Cookie gesetzt und mit folgenden Anfragen gesendet. Erstellen Sie API-Tokens auf der Kontosicherheitsseite und senden Sie sie mit `Authorization: Bearer <token>`.
+
+Jedes API-Token hat eine explizite Berechtigungs-Erlaubnisliste. Anfragen erhalten nur die Schnittmenge dieser Liste und der aktuellen Rechte des Token-Eigentümers; Entfernen eines Eigentümerrechts wirkt deshalb sofort.
 
 > [!NOTE]
 > Im Vite-Entwicklungssetup leitet das Frontend alle `/api`-Anfragen an das Backend weiter, sodass Cookies nahtlos über denselben Ursprung funktionieren.
 
 ## Wichtige API-Module
 
-| Modul | Basispfad | Beschreibung |
-|-------|-----------|-------------|
-| **Auth** | `/api/auth` | Anmeldung, Abmeldung, Registrierung, SSO |
-| **Users** | `/api/users` | Benutzerverwaltung |
-| **Resources** | `/api/resources` | Ressourcen-CRUD, Nutzungssitzungen |
-| **Projects** | `/api/projects` | Projektverwaltung |
-| **Settings** | `/api/settings` | Systemkonfiguration |
-| **Attractap** | `/api/attractap` | RFID-Leser-Verwaltung |
-| **MQTT** | `/api/mqtt` | MQTT-Server-Konfiguration |
-| **Billing** | `/api/billing` | Abrechnung und Transaktionen |
-| **Plugins** | `/api/plugins` | Plugin-Verwaltung |
+| Modul         | Basispfad        | Beschreibung                             |
+| ------------- | ---------------- | ---------------------------------------- |
+| **Auth**      | `/api/auth`      | Anmeldung, Abmeldung, Registrierung, SSO |
+| **Users**     | `/api/users`     | Benutzerverwaltung                       |
+| **Resources** | `/api/resources` | Ressourcen-CRUD, Nutzungssitzungen       |
+| **Projects**  | `/api/projects`  | Projektverwaltung                        |
+| **Settings**  | `/api/settings`  | Systemkonfiguration                      |
+| **Attractap** | `/api/attractap` | RFID-Leser-Verwaltung                    |
+| **MQTT**      | `/api/mqtt`      | MQTT-Server-Konfiguration                |
+| **Billing**   | `/api/billing`   | Abrechnung und Transaktionen             |
+| **Plugins**   | `/api/plugins`   | Plugin-Verwaltung                        |
 
 ## Attractap-WebSocket: Sitzung beenden
 
@@ -71,13 +73,31 @@ Bei Erfolg enthält die Antwort `success: true` und `endedOwnSession: boolean`: 
 `billingSummary?: { amount: number, total: string }` erscheint nur für eine eigene Gebühr ungleich null. `amount` nutzt die Datenbank-Währungseinheiten; `total` ist der bestehende formatierte Währungs-/Credits-Text und wird unverändert angezeigt. Ein Fehler beim Laden der Gebühr macht das erfolgreiche Beenden nicht zum Fehler und entfernt Dauer/Eigentümer nicht. Neue Firmware akzeptiert ganze Dauern von 0–4294967295 und nutzt die bisherige Rückmeldung bei fehlenden oder ungültigen Zusammenfassungsdaten. Ältere Firmware ignoriert die zusätzlichen Felder.
 
 ```json
-{"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":42,"endedOwnSession":true,"durationSeconds":1440,"billingSummary":{"amount":290,"total":"2,90 EUR"}}}}
+{
+  "event": "EVENT",
+  "data": {
+    "type": "STOP_RESOURCE_USAGE_SESSION",
+    "payload": {
+      "success": true,
+      "requestId": 42,
+      "endedOwnSession": true,
+      "durationSeconds": 1440,
+      "billingSummary": { "amount": 290, "total": "2,90 EUR" }
+    }
+  }
+}
 ```
 
 Antwort ohne Gebühr (einschließlich Nullbeträgen):
 
 ```json
-{"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":43,"endedOwnSession":true,"durationSeconds":1440}}}
+{
+  "event": "EVENT",
+  "data": {
+    "type": "STOP_RESOURCE_USAGE_SESSION",
+    "payload": { "success": true, "requestId": 43, "endedOwnSession": true, "durationSeconds": 1440 }
+  }
+}
 ```
 
 ## Clients neu generieren

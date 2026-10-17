@@ -16,9 +16,9 @@ The Attraccess logo and name are displayed in the sidebar and on the login page.
 
 In light mode, Attraccess uses white main backgrounds with RAL 5021 water blue (`#256D7B`) accents. Dark mode uses dark surfaces and lighter teal accents for readability. Flat surfaces, clear borders and restrained 4–6 px corners keep the interface focused on the task. Success, warning and error colors retain their meaning in both modes.
 
-The default appearance is light, independent of your operating system's color mode. You can optionally switch to dark mode using the color-mode button on the login page, in the sidebar, or in the mobile header. Your choice is remembered in this browser for this Attraccess installation when local storage is available.
+The default appearance follows your operating system's color mode. You can optionally switch between light and dark mode using the color-mode button on the login page, in the sidebar, or in the mobile header. Your choice is remembered in this browser for this Attraccess installation when local storage is available.
 
-Attraccess Companion also defaults to light. Its setup wizard has a color-mode button in the top-right corner on every step and remembers its own choice locally. This preference is separate from the web app and is not synced across apps or devices. Each newly created Companion kiosk window starts in light mode with a fresh session; it does not inherit the wizard's choice.
+Attraccess Companion also follows the operating system's color mode by default. Its setup wizard has a color-mode button in the top-right corner on every step and remembers its own choice locally. This preference is separate from the web app and is not synced across apps or devices. Each newly created Companion kiosk window starts with a fresh session that follows the operating system's color mode; it does not inherit the wizard's choice.
 
 This documentation has its own optional dark-mode toggle and remembers your choice separately.
 

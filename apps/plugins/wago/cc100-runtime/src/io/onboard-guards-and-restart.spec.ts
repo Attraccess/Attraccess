@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { WagoRuntime } from '../runtime';
-import { OnboardIoFixture, snapshot } from './onboard-io.test-utils';
+import { OnboardIoFixture, snapshot, deferred } from './onboard-io.test-utils';
 jest.mock('node:fs/promises', () => ({ __esModule: true, ...jest.requireActual('node:fs/promises') }));
 describe('CC100 packed digital I/O', () => {
   let fixture: OnboardIoFixture;
@@ -50,10 +50,22 @@ describe('CC100 packed digital I/O', () => {
     pulsed.logicalChannels[0].pulse = { durationMs: 20 };
     await fixture.apply(pulsed);
     await Promise.all([fixture.command('DO2', true), fixture.command('DO3', true), fixture.command('DO4', true)]);
+    const completed = deferred();
+    const outputs = fixture.runtime['outputs'];
+    const writePulseShutdown = outputs['writePulseShutdown'].bind(outputs);
+    const shutdown = jest
+      .spyOn(outputs as unknown as { writePulseShutdown: (typeof outputs)['writePulseShutdown'] }, 'writePulseShutdown')
+      .mockImplementation(async (pulse) => {
+        const result = await writePulseShutdown(pulse);
+        completed.resolve();
+        return result;
+      });
     await fixture.command('DO1', true, 'pulse', 'pulse');
     await fixture.command('DO1', true, 'pulse', 'pulse');
     expect(fixture.messages.at(-1)?.payload.status).toBe('duplicate');
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    // Pulse completion includes the packed output write and asynchronous state save.
+    await completed.promise;
+    shutdown.mockRestore();
     expect(await readFile(fixture.paths.output, 'utf8')).toBe('14');
     await fixture.runtime.setConnected(false);
     expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');

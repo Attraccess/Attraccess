@@ -87,6 +87,10 @@ Feature requests are welcome. Open a GitHub issue with the label "feature reques
 - Your proposed solution
 - Any alternatives you have considered
 
+## Documentation translations
+
+English and German documentation are translated replicas across every area. When adding or changing a page, update the matching path in `docs/en/` and `docs/de/` together. Keep section order, examples, links and navigation identical apart from translated text. Run `pnpm docs:check` before committing; it checks page coverage, navigation, links and content structure. Review translation accuracy and rendered pages separately.
+
 ## See Also
 
 - [Developer Overview](developer/overview.md) – Getting started with development

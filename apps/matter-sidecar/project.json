@@ -1,0 +1,176 @@
+{
+  "name": "matter-sidecar",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/matter-sidecar/src",
+  "tags": ["type:app", "scope:matter"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "options": {
+        "command": "tsc -p apps/matter-sidecar/tsconfig.json --noEmit"
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/package.json",
+        "{workspaceRoot}/apps/matter-sidecar/package.json",
+        "{workspaceRoot}/apps/plugins/matter/package.json",
+        "{workspaceRoot}/apps/plugins/matter/plugin.json",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
+      ]
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "options": {
+        "command": "eslint apps/matter-sidecar --max-warnings=0 && prettier --ignore-path .gitignore --check apps/matter-sidecar"
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/package.json",
+        "{workspaceRoot}/apps/matter-sidecar/package.json",
+        "{workspaceRoot}/apps/plugins/matter/package.json",
+        "{workspaceRoot}/apps/plugins/matter/plugin.json",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs",
+        "{workspaceRoot}/eslint.config.cjs",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        "{workspaceRoot}/.prettierrc",
+        "{workspaceRoot}/.prettierignore",
+        "{workspaceRoot}/.gitignore"
+      ]
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "options": {
+        "command": "vitest run --config apps/matter-sidecar/vitest.config.mts"
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/package.json",
+        "{workspaceRoot}/apps/matter-sidecar/package.json",
+        "{workspaceRoot}/apps/plugins/matter/package.json",
+        "{workspaceRoot}/apps/plugins/matter/plugin.json",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
+      ]
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["matter-contract:build"],
+      "options": {
+        "command": "node libs/matter-contract/check-releases.mjs && node apps/matter-sidecar/build.mjs"
+      },
+      "cache": true,
+      "outputs": ["{workspaceRoot}/dist/apps/matter-sidecar"],
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/package.json",
+        "{workspaceRoot}/apps/matter-sidecar/package.json",
+        "{workspaceRoot}/apps/plugins/matter/package.json",
+        "{workspaceRoot}/apps/plugins/matter/plugin.json",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs",
+        {
+          "runtime": "git rev-parse HEAD"
+        }
+      ]
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node dist/apps/matter-sidecar/main.mjs"
+      },
+      "cache": false,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/package.json",
+        "{workspaceRoot}/apps/matter-sidecar/package.json",
+        "{workspaceRoot}/apps/plugins/matter/package.json",
+        "{workspaceRoot}/apps/plugins/matter/plugin.json",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
+      ]
+    },
+    "integration-test": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "vitest run --config apps/matter-sidecar/vitest.integration.config.mts"
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/package.json",
+        "{workspaceRoot}/apps/matter-sidecar/package.json",
+        "{workspaceRoot}/apps/plugins/matter/package.json",
+        "{workspaceRoot}/apps/plugins/matter/plugin.json",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs",
+        {
+          "runtime": "git rev-parse HEAD"
+        }
+      ]
+    },
+    "contract-export": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "options": {
+        "command": "nx run matter-contract:export-contract"
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/package.json",
+        "{workspaceRoot}/apps/matter-sidecar/package.json",
+        "{workspaceRoot}/apps/plugins/matter/package.json",
+        "{workspaceRoot}/apps/plugins/matter/plugin.json",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/check-releases.mjs"
+      ],
+      "outputs": ["{workspaceRoot}/dist/contracts/matter"]
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/matter-sidecar"
+      }
+    }
+  }
+}

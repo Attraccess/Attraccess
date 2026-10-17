@@ -32,6 +32,7 @@ const { values } = parseArgs({
   options: {
     entry: { type: 'string', multiple: true },
     outfile: { type: 'string', multiple: true },
+    tsconfig: { type: 'string' },
   },
 });
 
@@ -39,7 +40,9 @@ const entries = values.entry ?? [];
 const outfiles = values.outfile ?? [];
 
 if (entries.length === 0 || entries.length !== outfiles.length) {
-  console.error('usage: esbuild-backend.mjs --entry <file> --outfile <file> [--entry <file> --outfile <file> ...]');
+  process.stderr.write(
+    'usage: esbuild-backend.mjs --entry <file> --outfile <file> [--entry <file> --outfile <file> ...]\n',
+  );
   process.exit(1);
 }
 
@@ -67,9 +70,13 @@ for (const { entry, outfile } of pairs) {
     target: 'es2021',
     outfile,
     external: HOST_SHARED_EXTERNALS,
-    tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } },
+    ...(values.tsconfig
+      ? { tsconfig: resolve(process.cwd(), values.tsconfig) }
+      : { tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } } }),
     logLevel: 'info',
   });
 }
 
-console.log(`Built ${pairs.map(({ label }) => label).join(', ')} — host-shared packages externalized, not bundled.`);
+process.stdout.write(
+  `Built ${pairs.map(({ label }) => label).join(', ')} — host-shared packages externalized, not bundled.\n`,
+);

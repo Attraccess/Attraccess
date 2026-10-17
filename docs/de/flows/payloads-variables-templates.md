@@ -155,7 +155,7 @@ Die Arithmetik verwendet JavaScript-Gleitkommazahlen. Dezimalrechnungen können 
 
 ### Exakte Skalierung und Wertzuordnungen
 
-`{{scaleDecimal payload.count "1/1000"}}` skaliert Dezimalwerte ohne Gleitkomma-Zwischenschritte. Der Faktor kann eine Dezimalzahl oder ein Bruch wie `"5/18"` sein. Das Ergebnis ist Text mit neun Nachkommastellen; bei genau halben Werten wird von null weg gerundet. Mit `precision=2` werden zwei Nachkommastellen verwendet (erlaubter Bereich: 0–18); `min=0` lehnt negative Eingaben vor dem Runden ab.
+`{{scaleDecimal payload.count "1/1000"}}` skaliert Dezimalwerte ohne Gleitkomma-Zwischenschritte. Der Faktor kann eine Dezimalzahl oder ein Bruch wie `"5/18"` sein. Das Ergebnis ist Text, auf neun Nachkommastellen gerundet; bei genau halben Werten wird von null weg gerundet. Mit `precision=2` werden zwei Nachkommastellen verwendet (erlaubter Bereich: 0–18); `min=0` lehnt negative Eingaben vor dem Runden ab.
 
 `{{mapValue payload.kind '{"box":"12","bag":"3"}'}}` sucht einen Wert in einem JSON-Objekt. Leerzeichen an den Schlüsselrändern werden entfernt; `foldCase=true` prüft zuerst den exakten Schlüssel, dann seine Kleinschreibung. Fehlende Zuordnungen führen zu einem Knotenfehler. `{{scaleDecimal payload.count (mapValue payload.kind '{"box":"12","bag":"3"}')}}` rechnet beispielsweise Kisten oder Beutel in einzelne Stücke um.
 
@@ -188,7 +188,7 @@ Bei einem Objekt als Ergebnis wird der Ressourcenkontext erneut ergänzt. Gespei
 
 Wenn spätere Knoten frühere Ereignisdaten benötigen, speichern Sie die nötigen Werte vor dem ersetzenden Knoten mit **Variablen setzen** und lesen sie danach wieder. Zusätzliche Felder aus **Payload setzen** überleben eine bestätigte HTTP-Antwort nicht.
 
-Wenn ein Ausgang mehrere Knoten verbindet, laufen seine Zweige gleichzeitig. Werden diese Zweige mit demselben Knoten verbunden, läuft dieser einmal je eingehender Verbindung; er führt die Payloads nicht zusammen. Verlassen Sie sich nicht auf eine Reihenfolge zwischen Zweigen.
+Wenn ein Ausgang mehrere Knoten verbindet, laufen seine Zweige gleichzeitig. Werden diese Zweige mit demselben Knoten verbunden, läuft dieser einmal je eingehender Verbindung; er führt die Payloads nicht zusammen und wartet nicht darauf, sie zu kombinieren. Verlassen Sie sich nicht auf eine Reihenfolge zwischen Zweigen.
 
 ## Dauerhaft gespeicherte Flow-Variablen
 

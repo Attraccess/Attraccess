@@ -63,7 +63,7 @@ Attraccess ist **source-available** unter der [modifizierten Prosperity Public L
 - **Nicht-kommerzielle Nutzung** durch Privatpersonen und gemeinnützige Organisationen ist im Rahmen der Lizenzbedingungen kostenlos.
 - **Forks und weitergegebene Änderungen** unterliegen denselben Lizenzbedingungen. Separat lizenzierte Komponenten behalten ihre jeweilige Lizenz.
 
-Für kommerzielle Lizenzen und Unterstützung bei der Integration wenden Sie sich an [contact@attraccess.org](mailto:contact@attraccess.org). Die vollständigen Bedingungen finden Sie in der verlinkten Lizenz.
+Die verlinkte `LICENSE.md` enthält die vollständigen Bedingungen auf Deutsch und hat Vorrang vor dieser Zusammenfassung. Für Lizenzfragen und Integrationsunterstützung wenden Sie sich an [contact@attraccess.org](mailto:contact@attraccess.org).
 
 ### Aktivierung
 

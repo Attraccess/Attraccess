@@ -108,11 +108,11 @@ volumes:
 
 ### Umgebungsvariablen
 
-| Variable | Standard | Beschreibung |
-|----------|----------|--------------|
-| `GRAFANA_ADMIN_USER` | `admin` | Grafana-Admin-Benutzername (nur bei erstem Init wirksam — siehe Fehlerbehebung) |
-| `GRAFANA_ADMIN_PASSWORD` | `attraccess` | Grafana-Admin-Passwort (nur bei erstem Init wirksam — siehe Fehlerbehebung) |
-| `PROMETHEUS_METRICS_API_KEY` | _(leer)_ | Bearer-Token, mit dem Prometheus Attraccess scrapt. Wenn gesetzt, schreibt `monitoring-init` ihn in `prometheus.yml`. Beim ersten Deploy leer lassen, dann in Attraccess einen Schlüssel erzeugen und nachreichen. |
+| Variable                     | Standard     | Beschreibung                                                                                                                                                                                                       |
+| ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GRAFANA_ADMIN_USER`         | `admin`      | Grafana-Admin-Benutzername (nur bei erstem Init wirksam — siehe Fehlerbehebung)                                                                                                                                    |
+| `GRAFANA_ADMIN_PASSWORD`     | `attraccess` | Grafana-Admin-Passwort (nur bei erstem Init wirksam — siehe Fehlerbehebung)                                                                                                                                        |
+| `PROMETHEUS_METRICS_API_KEY` | _(leer)_     | Bearer-Token, mit dem Prometheus Attraccess scrapt. Wenn gesetzt, schreibt `monitoring-init` ihn in `prometheus.yml`. Beim ersten Deploy leer lassen, dann in Attraccess einen Schlüssel erzeugen und nachreichen. |
 
 > [!WARNING]
 > Ändern Sie das Standard-Grafana-Passwort vor der Produktivstellung.
@@ -156,11 +156,11 @@ scrape_configs:
 > [!NOTE]
 > Das Alerting wird vollständig von Grafana verwaltet (siehe `grafana/provisioning/alerting`), daher lädt Prometheus keine `rule_files`.
 
-| Einstellung | Standard | Beschreibung |
-|-------------|----------|--------------|
-| `scrape_interval` (Job) | `10s` | Scrape-Intervall pro Job für den Attraccess-Job |
-| `scrape_interval` (global) | `15s` | Standard-Scrape-Intervall für alle anderen Jobs |
-| `evaluation_interval` | `15s` | Wie oft Prometheus Aufzeichnungs- und Alarmregeln auswertet |
+| Einstellung                | Standard | Beschreibung                                                |
+| -------------------------- | -------- | ----------------------------------------------------------- |
+| `scrape_interval` (Job)    | `10s`    | Scrape-Intervall pro Job für den Attraccess-Job             |
+| `scrape_interval` (global) | `15s`    | Standard-Scrape-Intervall für alle anderen Jobs             |
+| `evaluation_interval`      | `15s`    | Wie oft Prometheus Aufzeichnungs- und Alarmregeln auswertet |
 
 > [!TIP]
 > Ein 10-Sekunden-Scrape-Intervall bietet gute Granularität für die meisten Dashboards. Erhöhen Sie es auf 30s oder 60s, wenn Sie den Ressourcenverbrauch reduzieren möchten.
@@ -200,33 +200,44 @@ Der Grafana-Service nutzt `service_name: prometheus` für die netzinterne Auflö
 
 Das Haupt-Dashboard enthält Panels für:
 
-| Panel | Beschreibung |
-|-------|--------------|
-| **HTTP Request Rate** | Anfragen pro Sekunde aufgeschlüsselt nach Route |
-| **HTTP Request Latency** | p50-, p95- und p99-Antwortzeiten |
-| **HTTP Error Rate** | 4xx- und 5xx-Fehler über die Zeit |
-| **Authentication** | Erfolgreiche und fehlgeschlagene Anmeldeversuche, SSO-Nutzung |
-| **Users** | Registrierte Gesamtbenutzer und neue Registrierungen |
-| **Resources** | Gesamtressourcen und aktive Nutzungssitzungen |
-| **Resource Usage Duration** | p50- und p95-Sitzungsdauern |
-| **Resource Usage Sessions** | Gestartete und beendete Sitzungen über die Zeit |
-| **Connected Devices** | Anzahl verbundener Attractap-RFID-Leser |
-| **RFID Tap Events** | Tap-Ereignisse über die Zeit |
-| **Billing Transactions** | Transaktionsanzahl nach Status |
-| **Emails Sent** | E-Mail-Zustellungsanzahl |
-| **System Overview** | Projekte, Gruppen, MQTT-Server, überfällige Wartung |
-| **Maintenance Events** | Wartungsaktivität nach Typ |
+| Panel                       | Beschreibung                                                  |
+| --------------------------- | ------------------------------------------------------------- |
+| **HTTP Request Rate**       | Anfragen pro Sekunde aufgeschlüsselt nach Route               |
+| **HTTP Request Latency**    | p50-, p95- und p99-Antwortzeiten                              |
+| **HTTP Error Rate**         | 4xx- und 5xx-Fehler über die Zeit                             |
+| **Authentication**          | Erfolgreiche und fehlgeschlagene Anmeldeversuche, SSO-Nutzung |
+| **Users**                   | Registrierte Gesamtbenutzer und neue Registrierungen          |
+| **Resources**               | Gesamtressourcen und aktive Nutzungssitzungen                 |
+| **Resource Usage Duration** | p50- und p95-Sitzungsdauern                                   |
+| **Resource Usage Sessions** | Gestartete und beendete Sitzungen über die Zeit               |
+| **Connected Devices**       | Anzahl verbundener Attractap-RFID-Leser                       |
+| **RFID Tap Events**         | Tap-Ereignisse über die Zeit                                  |
+| **Billing Transactions**    | Transaktionsanzahl nach Status                                |
+| **Emails Sent**             | E-Mail-Zustellungsanzahl                                      |
+| **System Overview**         | Projekte, Gruppen, MQTT-Server, überfällige Wartung           |
+| **Maintenance Events**      | Wartungsaktivität nach Typ                                    |
 
 ### Node Runtime
 
 Das Laufzeit-Dashboard enthält Panels für:
 
-| Panel | Beschreibung |
-|-------|--------------|
-| **CPU Usage** | Benutzer- und System-CPU-Zeit |
-| **Memory Usage** | Verwendeter Heap, Gesamt-Heap, RSS, externer Speicher |
-| **Event Loop Lag** | Aktuelle Verzögerung und p99-Perzentil |
-| **Active Handles & Requests** | Offene Handles und ausstehende Anfragen |
+| Panel                         | Beschreibung                                          |
+| ----------------------------- | ----------------------------------------------------- |
+| **CPU Usage**                 | Benutzer- und System-CPU-Zeit                         |
+| **Memory Usage**              | Verwendeter Heap, Gesamt-Heap, RSS, externer Speicher |
+| **Event Loop Lag**            | Aktuelle Verzögerung und p99-Perzentil                |
+| **Active Handles & Requests** | Offene Handles und ausstehende Anfragen               |
+
+### Host- und Container-Metriken
+
+Die gebündelten Coolify- und Balena-Compose-Stacks betreiben außerdem:
+
+| Exporter          | Zweck                                     |
+| ----------------- | ----------------------------------------- |
+| **node-exporter** | Host-RAM- und Dateisystemnutzung          |
+| **cAdvisor**      | Docker-Container-CPU- und Speichernutzung |
+
+Betriebliche Speicherwarnungen verwenden Host-/Container-Speichermetriken. V8-Heap-Nutzung bleibt als Anwendungsdiagnose im Node-Runtime-Dashboard, ist aber nicht die primäre Warnung für „Server-RAM wird knapp“, da V8 nahe seiner aktuellen Heap-Zuteilung liegen kann, während der Host noch viel freien Speicher hat.
 
 ## Anpassen der gebündelten Konfigurationen
 
@@ -236,15 +247,17 @@ Da die Konfigurationen im `attraccess`-Image liegen und bei jedem Stack-Start in
 - **Dashboards / Datenquellen**: `monitoring/grafana/**` im Fork/PR ändern und Image neu bauen.
 - **Per-Deploy-Overrides**: Compose mit einer `docker-compose.override.yml` erweitern, die eigene Dateien über den Mount-Punkt des benannten Volumes legt.
 
+Die Grafana-Provisionierungs- und Dashboard-Volumes gelten als Attraccess-verwaltet. Beim Stack-Start entfernt Attraccess veraltete verwaltete Dateien vor Kopieren der aktuellen gebündelten Dateien. War eine Alarmregel-UID in vorherigen gebündelten Regeln enthalten und fehlt im aktuellen Bundle, schreibt der Start auch eine temporäre Grafana-Provisionierungsdatei `deleteRules`, um entfernte Attraccess-verwaltete Alarme aus Grafana zu löschen.
+
 ## Prometheus extern verfügbar machen (optional)
 
 Standardmäßig ist Prometheus nur intern verfügbar (keine `ports`-Zuordnung). Wenn Sie direkten Zugriff zum Debuggen benötigen:
 
 ```yaml
-  prometheus:
-    # ...
-    ports:
-      - '9090:9090'
+prometheus:
+  # ...
+  ports:
+    - '9090:9090'
 ```
 
 > [!WARNING]
@@ -252,15 +265,15 @@ Standardmäßig ist Prometheus nur intern verfügbar (keine `ports`-Zuordnung). 
 
 ## Fehlerbehebung
 
-| Problem | Lösung |
-|---------|--------|
-| Prometheus zeigt Ziel als "DOWN" mit `401` | Bearer-Token fehlt oder ist falsch — `PROMETHEUS_METRICS_API_KEY` auf den in Attraccess erzeugten Wert setzen und Stack neu deployen, sodass `monitoring-init` die Konfiguration neu schreibt |
-| Prometheus zeigt Ziel als "DOWN" ohne Auth-Fehler | Prüfen, ob der `attraccess`-Dienst vom Prometheus-Container erreichbar ist (Netzwerk, Hostname `attraccess:3000`) |
-| Keine Daten in Grafana-Dashboards | Bestätigen Sie, dass Prometheus läuft und scrapt. Prüfen Sie die Zielseite unter `http://prometheus:9090/targets` |
-| Grafana-Login springt zurück zur Login-Seite | `GF_SERVER_ROOT_URL` ist falsch — muss die vollständige externe URL mit Schema (`https://...`) sein, ohne Port-Suffix hinter einem Reverse-Proxy |
-| Grafana-Login fehlgeschlagen (falsches Passwort) | `GF_SECURITY_ADMIN_PASSWORD` greift nur beim ersten Init. Nach Anlage des `grafana-data`-Volumes Passwort via `grafana-cli admin reset-admin-password` im Container ändern oder Volume löschen, um neu zu initialisieren |
-| Dashboards erscheinen nicht | Prüfen, ob `monitoring-init` mit Code 0 beendet wurde (`docker compose ps -a monitoring-init`). Wenn nicht, Logs prüfen und Stack neu starten |
-| Veraltete Metriken nach Neustart | Gauge-Metriken (wie Gesamtbenutzer) werden beim Start aus der Datenbank neu befüllt. Counter-Metriken werden beim Neustart auf Null zurückgesetzt — dies ist normales Prometheus-Verhalten |
+| Problem                                           | Lösung                                                                                                                                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Prometheus zeigt Ziel als "DOWN" mit `401`        | Bearer-Token fehlt oder ist falsch — `PROMETHEUS_METRICS_API_KEY` auf den in Attraccess erzeugten Wert setzen und Stack neu deployen, sodass `monitoring-init` die Konfiguration neu schreibt                            |
+| Prometheus zeigt Ziel als "DOWN" ohne Auth-Fehler | Prüfen, ob der `attraccess`-Dienst vom Prometheus-Container erreichbar ist (Netzwerk, Hostname `attraccess:3000`)                                                                                                        |
+| Keine Daten in Grafana-Dashboards                 | Bestätigen Sie, dass Prometheus läuft und scrapt. Prüfen Sie die Zielseite unter `http://prometheus:9090/targets`                                                                                                        |
+| Grafana-Login springt zurück zur Login-Seite      | `GF_SERVER_ROOT_URL` ist falsch — muss die vollständige externe URL mit Schema (`https://...`) sein, ohne Port-Suffix hinter einem Reverse-Proxy                                                                         |
+| Grafana-Login fehlgeschlagen (falsches Passwort)  | `GF_SECURITY_ADMIN_PASSWORD` greift nur beim ersten Init. Nach Anlage des `grafana-data`-Volumes Passwort via `grafana-cli admin reset-admin-password` im Container ändern oder Volume löschen, um neu zu initialisieren |
+| Dashboards erscheinen nicht                       | Prüfen, ob `monitoring-init` mit Code 0 beendet wurde (`docker compose ps -a monitoring-init`). Wenn nicht, Logs prüfen und Stack neu starten                                                                            |
+| Veraltete Metriken nach Neustart                  | Gauge-Metriken (wie Gesamtbenutzer) werden beim Start aus der Datenbank neu befüllt. Counter-Metriken werden beim Neustart auf Null zurückgesetzt — dies ist normales Prometheus-Verhalten                               |
 
 ## Siehe auch
 

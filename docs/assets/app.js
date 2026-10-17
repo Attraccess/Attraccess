@@ -14,10 +14,14 @@ localStorage.setItem('attraccess-docs-lang', currentLang);
   if (match) {
     currentLang = match[1];
     localStorage.setItem('attraccess-docs-lang', currentLang);
-    var rest = match[2] || '/';
+    var rest = (match[2] || '/').replace(/^\/mqtt\//, '/devices/mqtt/');
     window.location.replace(window.location.pathname + '#' + rest);
+  } else if (/^#\/mqtt\//.test(hash)) {
+    window.location.replace(window.location.pathname + hash.replace(/^#\/mqtt\//, '#/devices/mqtt/'));
   }
 })();
+
+document.documentElement.lang = currentLang;
 
 // ===== Dark Mode — set on html element so :root CSS variables work =====
 var savedTheme = localStorage.getItem('attraccess-docs-theme');
