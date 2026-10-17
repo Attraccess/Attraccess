@@ -55,7 +55,7 @@ Ein null-Cursor startet frisch am aktuellen Sequenzstand und trifft keine Aussag
 
 Der Arbeitsspeicherpuffer hält höchstens 1.000 Ereignisse für fünf Minuten. Zustellung nach Wiederverbindung erfolgt mindestens einmal: Empfänger müssen Duplikate anhand der Ereignis-ID unterdrücken. Ordnung gilt innerhalb einer Stream-Instanz, niemals über Neustarts hinweg. Ungültige, abgelaufene, verdrängte, zukünftige oder fremde Cursor liefern `RECONCILIATION_REQUIRED` und schließen mit Code `4009`. Auch Warteschlangenüberlauf schließt mit `4009`; bei voller Verbindung kann nur der verständliche Schließgrund ankommen. Standardlimit der Ausgangswarteschlange: 1 MiB.
 
-Abgleich bedeutet: maßgeblichen Inventar-Snapshot mit Stream-Sequenzstand abrufen, danach hinter diesem Stand wiederaufnehmen. Das Snapshot-Schema existiert, aber Snapshots sind hier noch nicht verfügbar; der Fehler meldet `snapshotAvailable: false`. Niemals still zum neuesten Ereignis springen oder physische Befehle wiederholen. Jeder neue Prozess hat eine neue Stream-ID.
+Eine maßgebliche Wiederherstellung ist in diesem Fundament nicht verfügbar; der Fehler meldet `snapshotAvailable: false`. Den Verbraucherzustand als nicht abgeglichen beibehalten. Niemals still zum neuesten Ereignis springen oder physische Befehle wiederholen. Eine künftige Snapshot-Funktion wird den Abgleich ermöglichen: maßgeblichen Inventar-Snapshot mit Stream-Sequenzstand abrufen, danach hinter diesem Stand wiederaufnehmen. Heute existiert nur das Snapshot-Schema. Jeder neue Prozess hat eine neue Stream-ID.
 
 ## Physische Sicherheit und sensible Daten
 

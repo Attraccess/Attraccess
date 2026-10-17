@@ -80,13 +80,13 @@ export class EventStream {
   ): ProtocolError {
     return new ProtocolError(
       'RECONCILIATION_REQUIRED',
-      'Event stream cannot resume safely; reconcile from an authoritative snapshot.',
+      'Event stream cannot resume safely; authoritative recovery is unavailable in this foundation. Keep consumer state unreconciled.',
       {
         reconciliation: {
           reason,
           snapshotAvailable: false,
           action:
-            'Obtain an authoritative snapshot with a stream watermark, then resume after that watermark. Feature snapshots are unavailable in this foundation.',
+            'Keep consumer state unreconciled: authoritative snapshots are unavailable in this foundation. Do not silently advance the cursor or retry physical commands.',
         },
       },
     );

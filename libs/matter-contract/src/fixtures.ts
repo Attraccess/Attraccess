@@ -42,7 +42,7 @@ export const fixtures: Record<string, unknown> = {
     reason: 'different_instance',
     snapshotAvailable: false,
     action:
-      'Obtain an authoritative snapshot with a stream watermark, then resume after that watermark. Feature snapshots are unavailable in this foundation.',
+      'Keep consumer state unreconciled: authoritative snapshots are unavailable in this foundation. Do not silently advance the cursor or retry physical commands.',
   },
   ErrorEnvelope: {
     schemaVersion: 1,

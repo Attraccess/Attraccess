@@ -55,6 +55,21 @@ describe('bounded event resume', () => {
     expect(fresh.replay).toEqual([]);
     expect(fresh.watermark.sequence).toBe(1);
   });
+  it.each(['malformed', 'expired', 'evicted', 'future', 'different_instance', 'slow_client'] as const)(
+    'keeps consumers unreconciled when recovery is unavailable: %s',
+    (reason) => {
+      const stream = new EventStream();
+      const error = stream.reconcile(reason).envelope('11111111-1111-4111-8111-111111111111').error;
+      expect(error.message).toContain('authoritative recovery is unavailable');
+      expect(error.retryable).toBe(false);
+      expect(error.details.reconciliation).toEqual({
+        reason,
+        snapshotAvailable: false,
+        action:
+          'Keep consumer state unreconciled: authoritative snapshots are unavailable in this foundation. Do not silently advance the cursor or retry physical commands.',
+      });
+    },
+  );
   it('rejects evicted, expired, future, malformed and previous-process cursors', () => {
     let now = 0;
     const stream = new EventStream(1, 100, () => now);

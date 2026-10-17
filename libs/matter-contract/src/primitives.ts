@@ -66,7 +66,7 @@ export const Reconciliation = z.strictObject({
   reason: z.enum(['malformed', 'expired', 'evicted', 'future', 'different_instance', 'slow_client']),
   snapshotAvailable: z.literal(false),
   action: z.literal(
-    'Obtain an authoritative snapshot with a stream watermark, then resume after that watermark. Feature snapshots are unavailable in this foundation.',
+    'Keep consumer state unreconciled: authoritative snapshots are unavailable in this foundation. Do not silently advance the cursor or retry physical commands.',
   ),
 });
 export const ErrorEnvelope = z.strictObject({

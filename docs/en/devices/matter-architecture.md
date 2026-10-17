@@ -55,7 +55,7 @@ A null cursor starts fresh at the current watermark; it makes no assertion about
 
 The in-memory buffer keeps at most 1,000 events for five minutes. Reconnect delivery is at least once: consumers must suppress duplicates by event ID. Ordering holds within one stream instance, never across restarts. Malformed, expired, evicted, future or different-instance cursors return `RECONCILIATION_REQUIRED` and close with code `4009`. Queue overflow also closes with `4009`; a saturated connection may receive only the actionable close reason. Default outgoing queue limit is 1 MiB.
 
-Reconciliation means obtaining an authoritative inventory snapshot containing a stream watermark, then resuming after that watermark. The snapshot schema exists, but snapshots are unavailable in this foundation; the error says `snapshotAvailable: false`. Do not silently advance to the latest event or replay physical commands. A new process uses a new stream ID.
+Authoritative recovery is unavailable in this foundation; the error says `snapshotAvailable: false`. Keep consumer state unreconciled. Do not silently advance to the latest event or replay physical commands. A future snapshot capability will allow reconciliation by obtaining an authoritative inventory snapshot containing a stream watermark, then resuming after that watermark. Only the snapshot schema exists today. A new process uses a new stream ID.
 
 ## Physical safety and sensitive data
 
