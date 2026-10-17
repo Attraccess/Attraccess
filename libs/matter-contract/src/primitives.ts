@@ -7,11 +7,12 @@ export const Id = z.uuid();
 export const UInt64 = z.string().regex(/^[0-9a-f]{16}$/);
 export const Timestamp = z.iso.datetime({ precision: 3 });
 export const Sequence = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
-// Preserve build metadata in diagnostics; operational compatibility still uses exact release strings.
+// SemVer 2.0 identifiers may contain hyphens; numeric prerelease identifiers cannot have leading zeroes.
+// Preserve the full diagnostic version; operational compatibility still uses exact release strings.
 export const Release = z
   .string()
   .regex(
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/,
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/,
   )
   .max(100);
 export const ReleaseTuple = z.strictObject({ attraccess: Release, plugin: Release, sidecar: Release });

@@ -49,6 +49,16 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
       for (const [release, valid] of [
         ['999.0.0', true],
         ['999.0.0-rc.1', true],
+        ['0.1.0--rc.1', true],
+        ['0.1.0--', true],
+        ['0.1.0-0.a--b.1+001.a-b', true],
+        ['0.1.0-01a', true],
+        ['0.1.0-01', false],
+        ['0.1.0-rc.01', false],
+        ['0.1.0-rc..1', false],
+        ['0.1.0-rc_1', false],
+        ['0.1.0-', false],
+        ['01.1.0-rc.1', false],
         ['0.1.0+build.1', true],
         ['0.1.0-rc.1+build.1', true],
         ['0.1.0+001.a-b', true],
@@ -59,10 +69,12 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
         ['not-a-version', false],
         ['', false],
       ] as const) {
+        const validateApi = ajv.compile(api.components.schemas.VersionResponse);
         const version = fixtures.VersionResponse as { build: object };
         const value = { ...version, build: { ...version.build, version: release }, sidecarRelease: release };
         expect(schemas.VersionResponse.safeParse(value).success).toBe(valid);
         expect(validate(value)).toBe(valid);
+        expect(validateApi(value)).toBe(valid);
       }
     }
     if (name === 'SubscriptionRequest') {

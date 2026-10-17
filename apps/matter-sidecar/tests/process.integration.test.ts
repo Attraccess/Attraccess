@@ -1,7 +1,8 @@
 import { afterEach, it, expect } from 'vitest';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { build } from 'esbuild';
 import { createConnection } from 'node:net';
 import { WebSocket } from 'ws';
 import { fixtures } from '@attraccess/matter-contract/testing';
@@ -15,8 +16,8 @@ afterEach(async () => {
     await once(child, 'exit');
   }
 });
-async function launch(extraEnv: NodeJS.ProcessEnv = {}) {
-  const child = spawn(process.execPath, ['dist/apps/matter-sidecar/main.mjs'], {
+async function launch(extraEnv: NodeJS.ProcessEnv = {}, entryPoint = 'dist/apps/matter-sidecar/main.mjs') {
+  const child = spawn(process.execPath, [entryPoint], {
     env: { PATH: process.env.PATH, MATTER_PORT: '0', ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -91,3 +92,41 @@ it('stays alive after real TCP resets during rejected WebSocket upgrades', async
   expect(sidecar.child.exitCode).toBeNull();
   expect(sidecar.stderr()).toBe('');
 });
+
+it.each(['0.1.0--rc.1', '0.1.0-0.a--b.1+001.a-b'])(
+  'starts a native prerelease build %s with diagnostics and exact release rejection',
+  async (release) => {
+    const directory = mkdtempSync('dist/apps/matter-sidecar/diagnostic-');
+    try {
+      const entryPoint = `${directory}/main.mjs`;
+      await build({
+        entryPoints: ['apps/matter-sidecar/src/main.ts'],
+        outfile: entryPoint,
+        bundle: true,
+        platform: 'node',
+        format: 'esm',
+        target: 'node24',
+        external: ['@matter/*', 'ws'],
+        define: { BUILD_REVISION: JSON.stringify('prerelease-regression'), BUILD_VERSION: JSON.stringify(release) },
+      });
+      const sidecar = await launch({}, entryPoint);
+      if (!sidecar.url) throw new Error(sidecar.stderr());
+      const version = VersionResponse.parse(await (await fetch(sidecar.url + '/version')).json());
+      expect(version.build.version).toBe(release);
+      expect(version.sidecarRelease).toBe(release);
+      expect((await fetch(sidecar.url + '/health/ready')).status).toBe(200);
+      const response = await fetch(sidecar.url + '/v1/capabilities', {
+        headers: fixtures.CompatibilityHeaders as Record<string, string>,
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        error: { code: 'INCOMPATIBLE_RELEASE', details: { received: { sidecar: release } } },
+      });
+      sidecar.child.kill('SIGTERM');
+      expect((await sidecar.closed)[0], sidecar.stderr()).toBe(0);
+      expect(sidecar.stderr()).toBe('');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);

@@ -37,7 +37,7 @@ async function connect(url: string) {
   return { ws, messages };
 }
 describe('real local HTTP and WebSocket transport with a simulated platform', () => {
-  it.each(['999.0.0', '0.1.0+build.1', '0.1.0-rc.1+build.1'])(
+  it.each(['999.0.0', '0.1.0+build.1', '0.1.0-rc.1+build.1', '0.1.0--rc.1', '0.1.0-0.a--b.1+001.a-b'])(
     'reports incompatible own release %s in diagnostics and rejects operations and upgrades',
     async (release) => {
       const version = {
@@ -215,6 +215,8 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
         'password=review-only-secret',
         '999.0.0',
         '999.0.0-rc.1',
+        '999.0.0--rc.1',
+        '999.0.0-0.a--b.1+001.a-b',
         '999.0.0+build.1',
         '1'.repeat(101),
         undefined,
