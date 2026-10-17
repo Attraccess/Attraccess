@@ -24,6 +24,7 @@ import { AttractapGateway } from '../attractap/websockets/websocket.gateway';
 import { WebsocketService } from '../attractap/websockets/websocket.service';
 import { AttractapEventType, AuthenticatedWebSocket } from '../attractap/websockets/websocket.types';
 import { SessionService } from '../users-and-auth/auth/session.service';
+import { SupervisionService } from '../resources/supervision/supervision.service';
 import { bootstrap } from '../main.bootstrap';
 import { existsSync, readFileSync, realpathSync } from 'fs';
 import { join, relative, isAbsolute } from 'path';
@@ -406,6 +407,9 @@ describe('desktop simulator against an isolated real API', () => {
       try {
         await desktop().screen('supervision');
         expect(settled).toBe(false);
+        const requests = api().get(SupervisionService).listPendingForSupervisor(supervisor.id);
+        expect(requests).toHaveLength(1);
+        expect(requests[0]).toMatchObject({ resourceId: resource.id, requesterUserId: requester.id });
         expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
         await desktop().snapshot('supervision-request');
         if (abort) {
@@ -439,6 +443,12 @@ describe('desktop simulator against an isolated real API', () => {
             const root = desktop().root;
             await desktop().dispose();
             expect(existsSync(root)).toBe(false);
+            // HTTP abort ends the client wait; reader disconnect cancels the backend request.
+            await waitFor(
+              () => api().get(SupervisionService).listPendingForSupervisor(supervisor.id).length === 0,
+              'backend supervision cancellation after reader disconnect',
+            );
+            expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
           } else {
             await desktop().remove();
           }
