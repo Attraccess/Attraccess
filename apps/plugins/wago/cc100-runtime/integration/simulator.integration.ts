@@ -155,6 +155,13 @@ describe('isolated broker / executable simulator', () => {
       'restored output',
     );
     expect(fixture.messages.slice(start).some((item) => item.topic === discoveryTopic(hardwareId))).toBe(false);
-    expect(fixture.errors).toEqual([]);
+    // The forced TCP disconnects above may report ECONNRESET before reconnecting.
+    // Keep rejecting every other diagnostic; recovery is asserted above.
+    expect(
+      fixture.errors
+        .join('')
+        .split('\n')
+        .filter((line) => line.trim() && line !== 'WAGO simulator MQTT connection error: read ECONNRESET'),
+    ).toEqual([]);
   });
 });

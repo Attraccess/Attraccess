@@ -127,6 +127,7 @@ void API::onReaderAuthenticated(JsonObject data)
     this->onServerTime(data["payload"]["serverTime"]);
 
     State::setApiState(true, deviceName);
+    ++authenticationCount;
 
     if (this->deviceNameCallback != nullptr)
     {

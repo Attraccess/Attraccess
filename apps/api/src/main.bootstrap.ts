@@ -261,12 +261,18 @@ export async function bootstrap() {
     abortOnError: false,
   });
 
-  const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
-  const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
-  const backendUrlFromDb = skipDatabaseMigrations
-    ? appConfig.ATTRACCESS_URL
-    : await appForConfig.get(SettingsService).getUrl();
-  await appForConfig.close();
+  let appConfig: AppConfigType;
+  let storageConfig: StorageConfigType;
+  let backendUrlFromDb: string;
+  try {
+    appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
+    storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
+    backendUrlFromDb = skipDatabaseMigrations
+      ? appConfig.ATTRACCESS_URL
+      : await appForConfig.get(SettingsService).getUrl();
+  } finally {
+    await appForConfig.close();
+  }
   // AppModule is constructed again below. Plugin providers in that application
   // must not receive repositories from the closed configuration DataSource.
   PluginModule.resetHostReferences();
@@ -278,56 +284,61 @@ export async function bootstrap() {
     httpsOptions,
     abortOnError: false,
   });
-  bootstrapLogger.log('Main application instance created.');
+  try {
+    bootstrapLogger.log('Main application instance created.');
 
-  configureBootstrapHttp(app, appConfig, bootstrapLogger);
+    configureBootstrapHttp(app, appConfig, bootstrapLogger);
 
-  if (skipDatabaseMigrations) {
-    bootstrapLogger.log('Skipping database migrations.');
-  } else {
-    // Run migrations before the app fully starts
-    try {
-      bootstrapLogger.log('Running database migrations...');
-      const dataSource = app.get(DataSource);
+    if (skipDatabaseMigrations) {
+      bootstrapLogger.log('Skipping database migrations.');
+    } else {
+      // Run migrations before the app fully starts
+      try {
+        bootstrapLogger.log('Running database migrations...');
+        const dataSource = app.get(DataSource);
 
-      if (!dataSource.isInitialized) {
-        await dataSource.initialize();
-        bootstrapLogger.log('Database connection initialized.');
+        if (!dataSource.isInitialized) {
+          await dataSource.initialize();
+          bootstrapLogger.log('Database connection initialized.');
+        }
+
+        const pendingMigrations = await dataSource.showMigrations();
+        if (pendingMigrations) {
+          const allMigrations = dataSource.migrations;
+          const executedMigrations = dataSource.migrations;
+          bootstrapLogger.log(
+            `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
+          );
+          await dataSource.runMigrations();
+          bootstrapLogger.log('Migrations completed successfully.');
+        } else {
+          bootstrapLogger.log('No pending migrations found.');
+        }
+      } catch (error) {
+        bootstrapLogger.error('Failed to run database migrations');
+        bootstrapLogger.error(error);
+        PluginService.recordBootFailure(error);
+        throw error;
       }
-
-      const pendingMigrations = await dataSource.showMigrations();
-      if (pendingMigrations) {
-        const allMigrations = dataSource.migrations;
-        const executedMigrations = dataSource.migrations;
-        bootstrapLogger.log(
-          `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
-        );
-        await dataSource.runMigrations();
-        bootstrapLogger.log('Migrations completed successfully.');
-      } else {
-        bootstrapLogger.log('No pending migrations found.');
-      }
-    } catch (error) {
-      bootstrapLogger.error('Failed to run database migrations');
-      bootstrapLogger.error(error);
-      PluginService.recordBootFailure(error);
-      throw error;
     }
+
+    const { globalPrefix, documentFactory } = await configureBootstrapApi(app, appConfig, bootstrapLogger);
+
+    const port = appConfig.PORT;
+    // Listening and related logging will be handled by startListening function
+    bootstrapLogger.log('Bootstrap process completed.');
+    return {
+      app,
+      globalPrefix,
+      swaggerDocumentFactory: documentFactory,
+      port,
+      nodeEnv: appConfig.NODE_ENV,
+      shouldGuardPluginLifecycle,
+    };
+  } catch (error) {
+    await app.close();
+    throw error;
   }
-
-  const { globalPrefix, documentFactory } = await configureBootstrapApi(app, appConfig, bootstrapLogger);
-
-  const port = appConfig.PORT;
-  // Listening and related logging will be handled by startListening function
-  bootstrapLogger.log('Bootstrap process completed.');
-  return {
-    app,
-    globalPrefix,
-    swaggerDocumentFactory: documentFactory,
-    port,
-    nodeEnv: appConfig.NODE_ENV,
-    shouldGuardPluginLifecycle,
-  };
 }
 
 export async function startListening(app: NestExpressApplication, port: number, globalPrefix: string, nodeEnv: string) {

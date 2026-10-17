@@ -429,6 +429,7 @@ public:
     void requestBillingTopup(uint32_t amountCents);
 
     void onDeviceName(std::function<void(std::string)> callback);
+    uint32_t authenticationGeneration() const { return authenticationCount; }
     void setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback);
 
     void disableConnectionAttempts();
@@ -469,6 +470,8 @@ private:
     void onSupervisionRequestResult(JsonObject data);
     void onSupervisorCardAuthenticationData(JsonObject data);
     void onSupervisionResolved(JsonObject data);
+
+    uint32_t authenticationCount = 0;
 
     void sendAck(const char *type);
     void sendMessage(const char *type);

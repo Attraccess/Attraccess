@@ -82,7 +82,10 @@ void SdlDisplay::flush(const lv_area_t *area, uint8_t *pxMap)
 
     const int rowBytes = target.w * LV_COLOR_FORMAT_GET_SIZE(LV_COLOR_FORMAT_RGB565);
     for (int row = 0; row < target.h; ++row)
+    {
+        std::memcpy(framebuffer.data() + (target.y + row) * Width + target.x, pxMap + row * rowBytes, rowBytes);
         std::memcpy(static_cast<uint8_t *>(pixels) + row * pitch, pxMap + row * rowBytes, rowBytes);
+    }
     SDL_UnlockTexture(texture);
     render();
 }
@@ -91,6 +94,28 @@ bool SdlDisplay::readTouch(TouchPoint &point)
 {
     point = touch;
     return point.pressed;
+}
+
+bool SdlDisplay::saveScreenshot(const std::filesystem::path &path) const
+{
+    SDL_Surface *frame = SDL_RenderReadPixels(renderer, nullptr);
+    if (!frame) return false;
+    const bool saved = SDL_SavePNG(frame, path.c_str());
+    SDL_DestroySurface(frame);
+    return saved;
+}
+
+bool SdlDisplay::saveDisplayScreenshot(const std::filesystem::path &path) const
+{
+    SDL_Surface *raw = SDL_CreateSurfaceFrom(Width, Height, SDL_PIXELFORMAT_RGB565,
+                                            const_cast<uint16_t *>(framebuffer.data()), Width * sizeof(uint16_t));
+    if (!raw) return false;
+    SDL_Surface *frame = SDL_ConvertSurface(raw, SDL_PIXELFORMAT_RGBA32);
+    SDL_DestroySurface(raw);
+    if (!frame) return false;
+    const bool saved = SDL_SavePNG(frame, path.c_str());
+    SDL_DestroySurface(frame);
+    return saved;
 }
 
 bool SdlDisplay::pollEvents()

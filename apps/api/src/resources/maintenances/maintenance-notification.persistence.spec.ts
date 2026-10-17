@@ -53,7 +53,7 @@ describe('Scheduled maintenance commit notification', () => {
       emitScheduledMaintenanceCreated: publish,
     };
     service = new MaintenanceScheduleEvaluatorService(
-      { manager } as never,
+      { manager, existsBy: async () => true } as never,
       {} as never,
       {} as never,
       {} as never,

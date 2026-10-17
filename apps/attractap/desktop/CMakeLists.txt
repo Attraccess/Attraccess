@@ -101,6 +101,7 @@ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/device_shell.S" PROPERT
 add_library(attractap-desktop-runtime
     src/api_endpoint.cpp
     src/card_menu.cpp
+    src/desktop_simulator.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
     src/host_websocket_worker.cpp
@@ -181,6 +182,19 @@ target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wp
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
 set_tests_properties(attractap-desktop-display-tests PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
+
+# The API E2E suite launches this probe against a disposable Nest application.
+add_executable(attractap-desktop-real-api tests/real_api.cpp)
+target_link_libraries(attractap-desktop-real-api PRIVATE attractap-desktop-runtime)
+target_compile_options(attractap-desktop-real-api PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+
+# Exercise the actual JSON-command implementation, including checkable widgets.
+add_executable(attractap-real-api-controls-tests tests/real-api-controls.test.cpp)
+target_link_libraries(attractap-real-api-controls-tests PRIVATE attractap-desktop-runtime)
+target_compile_options(attractap-real-api-controls-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+add_test(NAME attractap-real-api-controls-tests COMMAND attractap-real-api-controls-tests)
+set_tests_properties(attractap-real-api-controls-tests PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software;SDL_AUDIO_DRIVER=dummy")
 
 file(GLOB ATTRACTAP_READER_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/reader/*.cpp")
 add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES} tests/controlled-clock.cpp)

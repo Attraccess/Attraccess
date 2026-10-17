@@ -125,6 +125,14 @@ bool VirtualNfc::authenticate(uint8_t keyNumber, uint8_t *key)
 bool VirtualNfc::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey,
                             uint8_t *newKey, uint8_t keyVersion)
 {
+    // Host-only one-shot physical removal at the synchronous write boundary.
+    if (removeOnWrite && presentedCard < CardCount)
+    {
+        removeOnWrite = false;
+        didRemoveOnWrite = true;
+        setPresent(presentedCard, false);
+        return false;
+    }
     if (presentedCard >= CardCount || keyNumber >= KeySlotCount || currentCard().failWrite || !authenticate(0, masterKey) ||
         !authenticate(keyNumber, oldKey))
         return false;

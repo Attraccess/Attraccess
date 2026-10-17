@@ -153,15 +153,19 @@ describe('API bootstrap ordering and configuration', () => {
       await httpApp?.close();
     });
 
-    it.each([100 * 1024 + 1, 10 * 1024 * 1024])('parses configuration requests of %i bytes', async (bytes) => {
-      const body = { snapshot: { version: 1, profile: '' } };
-      body.snapshot.profile = 'x'.repeat(bytes - Buffer.byteLength(JSON.stringify(body)));
-      const response = await request(httpApp.getHttpServer()).post('/api/plugin-configuration/1/validate').send(body);
+    it.each([100 * 1024 + 1, 10 * 1024 * 1024])(
+      'parses configuration requests of %i bytes',
+      async (bytes) => {
+        const body = { snapshot: { version: 1, profile: '' } };
+        body.snapshot.profile = 'x'.repeat(bytes - Buffer.byteLength(JSON.stringify(body)));
+        const response = await request(httpApp.getHttpServer()).post('/api/plugin-configuration/1/validate').send(body);
 
-      expect(response.body).not.toHaveProperty('message', 'request entity too large');
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual(body);
-    });
+        expect(response.body).not.toHaveProperty('message', 'request entity too large');
+        expect(response.status).toBe(201);
+        expect(response.body).toEqual(body);
+      },
+      20_000,
+    );
 
     it('saves a draft when its snapshot and optimistic concurrency data exceed 100 KiB together', async () => {
       const snapshot = { version: 1, profile: 'x'.repeat(60 * 1024) };
@@ -286,6 +290,7 @@ describe('API bootstrap ordering and configuration', () => {
     datasource.runMigrations.mockRejectedValue(error);
     await expect(bootstrap()).rejects.toThrow('migration failed');
     expect(PluginService.recordBootFailure).toHaveBeenCalledWith(error);
+    expect(app.close).toHaveBeenCalledTimes(2);
     expect(app.setGlobalPrefix).not.toHaveBeenCalled();
   });
 });
