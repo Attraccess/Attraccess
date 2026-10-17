@@ -186,7 +186,21 @@ export class DesktopFixture {
     const result: ProbeResult = JSON.parse(readFileSync(response, 'utf8'));
     appendFileSync(
       join(this.screenshots, 'observations.ndjson'),
-      JSON.stringify({ launch: this.launch, sequence, description, ...result }) + '\n',
+      // Persist only diagnostic fields; credentials remain in the in-memory result.
+      JSON.stringify({
+        launch: this.launch,
+        sequence,
+        description,
+        readerId: result.readerId,
+        authenticationGeneration: result.authenticationGeneration,
+        authenticated: result.authenticated,
+        networkAvailable: result.networkAvailable,
+        screen: result.screen,
+        removedOnWrite: result.removedOnWrite,
+        ok: result.ok,
+        labels: result.labels,
+        keyVersions: result.keyVersions,
+      }) + '\n',
     );
     if (requireSuccess && !result.ok)
       throw new Error(`Desktop command ${description} failed. Visible labels: ${JSON.stringify(result.labels)}`);

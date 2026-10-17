@@ -25,8 +25,8 @@ import { WebsocketService } from '../attractap/websockets/websocket.service';
 import { AttractapEventType, AuthenticatedWebSocket } from '../attractap/websockets/websocket.types';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { bootstrap } from '../main.bootstrap';
-import { existsSync, realpathSync } from 'fs';
-import { relative, isAbsolute } from 'path';
+import { existsSync, readFileSync, realpathSync } from 'fs';
+import { join, relative, isAbsolute } from 'path';
 import { DesktopFixture, buildProbe, waitFor } from './desktop-simulator.fixture';
 import { disposeStorage, storageRoot } from '../test/desktop-real-api.test-fixture';
 
@@ -229,6 +229,9 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().click(resource.name);
     await authenticate();
     expect(socket().state.lastAuthenticatedUserId).toBe(user1.id);
+    const diagnostics = readFileSync(join(desktop().screenshots, 'observations.ndjson'), 'utf8');
+    for (const line of diagnostics.trim().split('\n')) expect(JSON.parse(line)).not.toHaveProperty('devicePin');
+    expect(diagnostics).not.toContain('7391');
   }, 90_000);
 
   it('enrolls cards, rejects unknown and incorrect keys, and recovers from write failure and removal', async () => {
