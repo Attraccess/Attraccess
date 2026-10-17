@@ -152,14 +152,7 @@ bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::file
         auto *object = findText(text);
         while (object && !lv_obj_has_flag(object, LV_OBJ_FLAG_CLICKABLE)) object = lv_obj_get_parent(object);
         if (!object || lv_obj_has_state(object, LV_STATE_DISABLED)) return false;
-        // LVGL's normal event callbacks perform the application action. Checkable
-        // widgets need the state toggle normally performed by the input device.
-        if (lv_obj_has_flag(object, LV_OBJ_FLAG_CHECKABLE))
-        {
-            if (lv_obj_has_state(object, LV_STATE_CHECKED)) lv_obj_remove_state(object, LV_STATE_CHECKED);
-            else lv_obj_add_state(object, LV_STATE_CHECKED);
-            lv_obj_send_event(object, LV_EVENT_VALUE_CHANGED, nullptr);
-        }
+        // LVGL's release handler owns checkable state and VALUE_CHANGED events.
         lv_obj_send_event(object, LV_EVENT_PRESSED, nullptr);
         lv_obj_send_event(object, LV_EVENT_RELEASED, nullptr);
         lv_obj_send_event(object, LV_EVENT_CLICKED, nullptr);
