@@ -1,3 +1,4 @@
+import { withWagoPersistenceFixture } from '../wago-service.test-fixture';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -15,7 +16,7 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
   const dataSource = new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: plugin.entities,
+    entities: plugin.persistenceAdapters.flatMap((entry) => entry.entities ?? []),
     synchronize: true,
   });
   const get = jest.fn(() => {
@@ -33,7 +34,11 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
   } as unknown as PluginContext;
   let module: TestingModule | undefined;
   try {
-    const nodes = typeof plugin.flowNodes === 'function' ? plugin.flowNodes(context) : plugin.flowNodes;
+    const neutralContext = withWagoPersistenceFixture(context);
+    expect(Reflect.get(neutralContext, 'dataSource')).toBeUndefined();
+    expect(Reflect.get(neutralContext, 'getRepository')).toBeUndefined();
+    expect(Reflect.get(neutralContext, 'get')).toBeUndefined();
+    const nodes = typeof plugin.flowNodes === 'function' ? plugin.flowNodes(neutralContext) : plugin.flowNodes;
     expect(nodes?.map((node) => node.type)).toEqual([
       'plugin.wago.command',
       'plugin.wago.event-received',
@@ -41,7 +46,7 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
       'plugin.wago.wait-for-state',
     ]);
     await dataSource.initialize();
-    module = await Test.createTestingModule({ imports: [plugin.register(context)] }).compile();
+    module = await Test.createTestingModule({ imports: [plugin.register(neutralContext)] }).compile();
     await module.init();
     expect(registerLiveTopic.mock.calls.map(([topic]) => topic.topic)).toEqual([
       'controllers',

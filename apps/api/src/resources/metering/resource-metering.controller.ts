@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Patch, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { ResourceMeteringSession } from '@attraccess/database-entities';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+import { ResourceMeteringSession } from '@attraccess/application-models';
 import { ResourceMeteringService } from './resource-metering.service';
 import {
   MeterNameDto,

@@ -22,6 +22,8 @@ import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { createCA, createCert } from 'mkcert';
 import { join } from 'path';
+import { resolveBackendConfig } from './database/backend.config';
+import { DatabaseErrors } from './database/backend';
 
 /** SAML state may carry authentication context. HTTPS is required even when
  * the configured application URL is missing, HTTP, or later changed. Express
@@ -101,7 +103,7 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
     app.set('trust proxy', false);
   }
 
-  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
+  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost), app.get(DatabaseErrors)));
 
   app.use(cookieParser());
 
@@ -221,6 +223,9 @@ export async function bootstrap() {
     bootstrapLogger.error("Application configuration ('app') not loaded. Exiting.");
     throw new Error("Application configuration ('app') not loaded.");
   }
+  // .env is now loaded. Reject unavailable engines before plugin recovery,
+  // migrations, module discovery or any database-backed settings reads.
+  resolveBackendConfig();
   if (!earlyConfig.PLUGIN_DIR) {
     bootstrapLogger.warn('PLUGIN_DIR is not set — plugin backends will not be loaded.');
   }

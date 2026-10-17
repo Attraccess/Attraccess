@@ -1,12 +1,15 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { createSharedLiveSampler, type AuthenticatedUser, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import {
+  createSharedLiveSampler,
+  type AuthenticatedUser,
+  type PluginContext,
+} from '@attraccess/plugins-backend-sdk/v2';
 import { WagoService } from './controllers/service';
 import { WagoCommissioningService } from './commissioning/service';
 import { WagoDiagnosticsService } from './diagnostics/service';
 import { WagoManagedRuntimeService } from './runtime/managed/service';
 import { WagoNetworkChangeService } from './network/service';
-import { WagoController } from './controllers/entity';
-import { WagoCommissioningSession } from './commissioning/sessions/session.entity';
+import { WagoDiagnosticsPersistence } from './flow/persistence/port';
 
 /** Sample authoritative services once per active topic, shared across tabs/users. */
 @Injectable()
@@ -14,12 +17,13 @@ export class WagoLiveUpdatesService implements OnModuleInit {
   private readonly sample = createSharedLiveSampler<string>();
 
   constructor(
-    @Inject(Symbol.for('attraccess.plugin.context')) private readonly context: PluginContext,
+    @Inject(Symbol.for('attraccess.plugin.context')) private readonly context: Pick<PluginContext, 'liveUpdates'>,
     @Inject(WagoService) private readonly wago: WagoService,
     @Inject(WagoCommissioningService) private readonly commissioning: WagoCommissioningService,
     @Inject(WagoDiagnosticsService) private readonly diagnostics: WagoDiagnosticsService,
     @Inject(WagoManagedRuntimeService) private readonly managed: WagoManagedRuntimeService,
     @Inject(WagoNetworkChangeService) private readonly network: WagoNetworkChangeService,
+    @Inject(WagoDiagnosticsPersistence) private readonly persistence: WagoDiagnosticsPersistence,
   ) {}
 
   onModuleInit(): void {
@@ -42,10 +46,7 @@ export class WagoLiveUpdatesService implements OnModuleInit {
           if (!pattern.test(identifier ?? '')) throw new NotFoundException();
           const [id, offset = 0] = identifier.split(':').map(Number);
           if (!Number.isSafeInteger(id) || !Number.isSafeInteger(offset)) throw new NotFoundException();
-          const exists =
-            kind === 'session'
-              ? await this.context.getRepository(WagoCommissioningSession).existsBy({ id })
-              : await this.context.getRepository(WagoController).existsBy({ id });
+          const exists = await this.persistence.targetExists(kind === 'session' ? 'session' : 'controller', id);
           if (!exists) throw new NotFoundException();
         },
         source: ({ identifier }) =>

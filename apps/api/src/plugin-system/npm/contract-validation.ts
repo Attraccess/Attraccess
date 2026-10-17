@@ -1,9 +1,11 @@
-import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk/v2';
 import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
+import { assertPluginBackendSupport } from '../persistence/port';
+import { resolveBackendConfig } from '../../database/backend.config';
 
 const entryPath = z
   .string()
@@ -24,6 +26,7 @@ const packageSchema = z
     author: z.union([z.string(), z.object({ name: z.string().optional() })]).optional(),
     scripts: z.record(z.string(), z.string()).optional(),
     attraccess: z.object({
+      persistence: PluginManifestSchema.shape.persistence,
       dependencies: PluginDependenciesSchema,
       displayName: z.string().min(1),
       description: z.string().optional(),
@@ -95,17 +98,17 @@ export function parseNpmPluginPackage(
   if (!main.backend && !main.frontend) {
     throw new BadRequestException('Package must declare a backend or frontend entry point');
   }
-  return {
-    pkg,
-    manifest: PluginManifestSchema.parse({
-      name: pkg.name,
-      version: pkg.version,
-      main,
-      attraccessVersion: { exact: hostVersion },
-      permissions: pkg.attraccess.permissions,
-      dependencies: pkg.attraccess.dependencies,
-    }),
-  };
+  const manifest = PluginManifestSchema.parse({
+    name: pkg.name,
+    version: pkg.version,
+    main,
+    attraccessVersion: { exact: hostVersion },
+    permissions: pkg.attraccess.permissions,
+    dependencies: pkg.attraccess.dependencies,
+    persistence: pkg.attraccess.persistence,
+  });
+  assertPluginBackendSupport(manifest, resolveBackendConfig().type);
+  return { pkg, manifest };
 }
 
 function validateSdkPeerDependency(

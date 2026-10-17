@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, type PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import {
   BadRequestException,
   Body,
@@ -48,9 +48,9 @@ export class WagoControllerApi {
     @Inject(WagoService) protected readonly wago: WagoService,
     @Inject(WagoCommissioningService) protected readonly commissioning: WagoCommissioningService,
     @Inject(WagoCredentialRotationService) protected readonly credentialRotation: WagoCredentialRotationService,
-    @Inject(Symbol.for('attraccess.plugin.context')) context?: PluginContext,
+    @Inject(Symbol.for('attraccess.plugin.context')) context?: Pick<PluginContext, 'audit' | 'logger'>,
   ) {
-    this.audit = new WagoAudit(context as PluginContext);
+    this.audit = new WagoAudit(context);
   }
 
   protected readonly audit: WagoAudit;

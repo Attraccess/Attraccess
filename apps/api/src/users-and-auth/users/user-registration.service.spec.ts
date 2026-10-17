@@ -2,7 +2,7 @@ import { registerUserRegistrationServiceFixture } from './user-registration.serv
 import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CreateUserDto } from './dtos/createUser.dto';
-import { EntityManager } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
 
 describe('UserRegistrationService', () => {
@@ -54,7 +54,7 @@ describe('UserRegistrationService', () => {
       jest.spyOn(fixture.authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(fixture.usersService, 'withTransaction').mockImplementation(async (handler) => {
-        const result = await handler({} as EntityManager);
+        const result = await handler({} as TransactionScope);
         expect(fixture.emailService.sendVerificationEmail).not.toHaveBeenCalled();
         return result;
       });
@@ -184,7 +184,7 @@ describe('UserRegistrationService', () => {
       jest.spyOn(fixture.authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(fixture.usersService, 'withTransaction').mockImplementation(async (handler) => {
         expect(fixture.authService.hashPassword).toHaveBeenCalledWith('password');
-        return handler({} as EntityManager);
+        return handler({} as TransactionScope);
       });
 
       await fixture.service.createOne({
@@ -327,9 +327,9 @@ describe('UserRegistrationService', () => {
           await new Promise<void>((resolve) => {
             releaseFirstTransaction = resolve;
           });
-          return handler({} as EntityManager);
+          return handler({} as TransactionScope);
         })
-        .mockImplementationOnce(async (handler) => handler({} as EntityManager));
+        .mockImplementationOnce(async (handler) => handler({} as TransactionScope));
 
       const firstRequest = fixture.service.createOne(dto);
       await firstTransactionStarted;

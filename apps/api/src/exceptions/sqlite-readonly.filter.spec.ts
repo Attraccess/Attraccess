@@ -2,6 +2,7 @@ import { type ArgumentsHost, Logger } from '@nestjs/common';
 import { BaseExceptionFilter, type HttpAdapterHost } from '@nestjs/core';
 import { QueryFailedError } from 'typeorm';
 import { SqliteReadonlyFilter } from './sqlite-readonly.filter';
+import { SqliteDatabaseErrors } from '../database/sqlite/errors';
 afterEach(() => jest.restoreAllMocks());
 it.each([
   { code: 'SQLITE_READONLY', message: 'write failed' },
@@ -9,7 +10,7 @@ it.each([
 ])('adds actionable storage guidance for read-only failures and delegates the original exception', (driver) => {
   const base = jest.spyOn(BaseExceptionFilter.prototype, 'catch').mockImplementation(() => undefined);
   const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-  const filter = new SqliteReadonlyFilter({ httpAdapter: {} } as HttpAdapterHost),
+  const filter = new SqliteReadonlyFilter({ httpAdapter: {} } as HttpAdapterHost, new SqliteDatabaseErrors()),
     host = {} as ArgumentsHost;
   const error = new QueryFailedError(
     'UPDATE fixture',
@@ -23,7 +24,7 @@ it.each([
 it('delegates unrelated exceptions without misleading storage guidance', () => {
   const base = jest.spyOn(BaseExceptionFilter.prototype, 'catch').mockImplementation(() => undefined);
   const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-  const filter = new SqliteReadonlyFilter({ httpAdapter: {} } as HttpAdapterHost),
+  const filter = new SqliteReadonlyFilter({ httpAdapter: {} } as HttpAdapterHost, new SqliteDatabaseErrors()),
     host = {} as ArgumentsHost;
   const error = new Error('Unrelated failure');
   filter.catch(error, host);

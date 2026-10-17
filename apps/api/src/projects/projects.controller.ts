@@ -1,3 +1,7 @@
+import { ResourceUsage } from '../transport/models/resourceUsage.dto';
+import { Project } from '../transport/models/project.dto';
+import { ProjectInvitation } from '../transport/models/project-invitation.dto';
+import { mapResponse } from '../transport/response-mapper';
 import {
   Controller,
   Body,
@@ -22,7 +26,7 @@ import { ProjectUsageService } from './project-usage.service';
 
 import { ProjectsService } from './projects.service';
 
-import { Auth, AuthenticatedRequest, Project } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -47,8 +51,6 @@ import { computeNextPage } from '../types/response';
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
 
 import { FindManyProjectsResponseDto } from './dto/find-many-response.dto';
-
-import { ProjectInvitation } from '@attraccess/database-entities';
 
 import { CreateProjectInvitationDto } from './dto/create-project-invitation.dto';
 
@@ -129,7 +131,8 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Query() query: GetProjectUsageHistoryQueryDto,
   ): Promise<ProjectUsageHistoryResponseDto> {
-    return await this.projectUsageService.getProjectUsageHistory(req.user.id, id, query);
+    const page = await this.projectUsageService.getProjectUsageHistory(req.user.id, id, query);
+    return { ...page, data: page.data.map((record) => mapResponse(ResourceUsage, record)) };
   }
 
   @Get(':id/usage/stats')
@@ -154,7 +157,7 @@ export class ProjectsController {
       logo: project.logo ? this.fileStorageService.getPublicPath(`projects/${project.id}`, project.logo) : null,
     } as ProjectWithAccessDto;
 
-    return transformedProject;
+    return mapResponse(ProjectWithAccessDto, transformedProject);
   }
 
   @Get()
@@ -284,7 +287,9 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ProjectInvitation[]> {
     await this.projectAccessService.ensureOwner(req.user.id, id);
-    return await this.projectsService.listProjectInvitations(id);
+    return (await this.projectsService.listProjectInvitations(id)).map((record) =>
+      mapResponse(ProjectInvitation, record),
+    );
   }
 
   @Post(':id/invitations')
@@ -296,13 +301,16 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() data: CreateProjectInvitationDto,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.createProjectInvitation(
-      req.user.id,
-      id,
-      data.invitedUserId,
-      data.role,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+    return mapResponse(
+      ProjectInvitation,
+      await this.projectsService.createProjectInvitation(
+        req.user.id,
+        id,
+        data.invitedUserId,
+        data.role,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 
@@ -315,12 +323,15 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.resendProjectInvitation(
-      req.user.id,
-      id,
-      invitationId,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+    return mapResponse(
+      ProjectInvitation,
+      await this.projectsService.resendProjectInvitation(
+        req.user.id,
+        id,
+        invitationId,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 
@@ -333,12 +344,15 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.cancelProjectInvitation(
-      req.user.id,
-      id,
-      invitationId,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+    return mapResponse(
+      ProjectInvitation,
+      await this.projectsService.cancelProjectInvitation(
+        req.user.id,
+        id,
+        invitationId,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 }

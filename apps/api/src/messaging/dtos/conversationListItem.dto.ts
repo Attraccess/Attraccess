@@ -1,7 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Message, User } from '@attraccess/database-entities';
+import { Message } from '../../transport/models/message.dto';
+import { User } from '../../transport/models/user.dto';
 
 export class ConversationListItemDto {
+  static readonly responseFields = {
+    id: null,
+    otherParticipant: () => User,
+    otherParticipantOnline: null,
+    lastMessage: () => Message,
+    updatedAt: null,
+    unreadCount: null,
+  };
   @ApiProperty({
     description: 'The unique identifier of the conversation',
     example: 1,

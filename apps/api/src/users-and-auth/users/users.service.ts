@@ -1,11 +1,10 @@
 import { DateTimePreferences, validateDateTimeLocale } from '@attraccess/shared';
-import { AuthenticationDetail, ResourceUsage, Session, User, Role } from '@attraccess/database-entities';
+import { User } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { DataSource, EntityManager, Repository, In, IsNull, Not } from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../database/transaction-scope';
+import { NewUserAccount, UserPersistence } from './persistence/port';
 
 import { EmailService } from '../../email/email.service';
 
@@ -34,17 +33,10 @@ import {
 @Injectable()
 export class UsersService extends UserDirectory {
   constructor(
-    @InjectRepository(User)
-    protected userRepository: Repository<User>,
-    @InjectRepository(AuthenticationDetail)
-    protected authenticationDetailRepository: Repository<AuthenticationDetail>,
-    @InjectRepository(Session)
-    protected sessionRepository: Repository<Session>,
-    @InjectRepository(ResourceUsage)
-    protected resourceUsageRepository: Repository<ResourceUsage>,
+    protected persistence: UserPersistence,
+    protected transactions: DatabaseTransactions,
     protected licenseService: LicenseService,
     protected emailService: EmailService,
-    protected dataSource: DataSource,
     protected readonly tokenHashService: TokenHashService,
     protected readonly metricsService: MetricsService,
     protected readonly rbacService: RbacService,
@@ -59,7 +51,7 @@ export class UsersService extends UserDirectory {
     if (validation?.error) {
       throw new BadRequestException(`Invalid or unsupported date/time locale: ${validation.error}`);
     }
-    await this.userRepository.update(userId, { dateTimeLocale: validation?.locale ?? null });
+    await this.persistence.patchAccount(userId, { dateTimeLocale: validation?.locale ?? null });
     const updated = await this.findOne({ id: userId });
     if (!updated) throw new UserNotFoundException(userId);
     return updated;
@@ -77,7 +69,7 @@ export class UsersService extends UserDirectory {
     }
     const oldLocale = existing.locale ?? 'en';
 
-    await this.userRepository.update(userId, { locale: cleaned });
+    await this.persistence.patchAccount(userId, { locale: cleaned });
     this.metricsService.usersLocaleSyncsTotal.inc({ locale: cleaned });
     this.metricsService.usersPerLocale.dec({ locale: oldLocale });
     this.metricsService.usersPerLocale.inc({ locale: cleaned });
@@ -89,8 +81,8 @@ export class UsersService extends UserDirectory {
     return updated;
   }
 
-  async withTransaction<T>(handler: (manager: EntityManager) => Promise<T>): Promise<T> {
-    return this.dataSource.transaction(handler);
+  async withTransaction<T>(handler: (scope: TransactionScope) => Promise<T>): Promise<T> {
+    return this.transactions.run({ resourceIds: [], accountIds: [] }, handler);
   }
 
   async ensureLicenseForNewUsers(newUsersCount: number): Promise<void> {
@@ -98,7 +90,7 @@ export class UsersService extends UserDirectory {
       return;
     }
 
-    const currentAmountOfUsers = await this.userRepository.count();
+    const currentAmountOfUsers = await this.persistence.count();
     await this.licenseService.verifyLicense({
       usageLimits: {
         users: currentAmountOfUsers + newUsersCount,
@@ -106,9 +98,10 @@ export class UsersService extends UserDirectory {
     });
   }
 
+  // The existing manager option carries the neutral parent transaction scope.
   async createMany(
     users: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
-    options?: { grantAllPermissionsToFirst?: boolean; manager?: EntityManager; actorId?: number },
+    options?: { grantAllPermissionsToFirst?: boolean; manager?: TransactionScope; actorId?: number },
   ): Promise<User[]> {
     if (users.length === 0) {
       return [];
@@ -121,9 +114,9 @@ export class UsersService extends UserDirectory {
       roleKey: userData.roleKey,
     }));
 
-    const run = async (manager: EntityManager) => {
-      const repo = manager.getRepository(User);
-      const totalExisting = await repo.count();
+    const run = async (scope: TransactionScope) => {
+      const operations = this.accountOperations(scope);
+      const totalExisting = await operations.count();
 
       const entities = normalized.map((data) => {
         this.validateUsernameOrThrow(data.username);
@@ -131,7 +124,7 @@ export class UsersService extends UserDirectory {
           throw new BadRequestException('Email is required');
         }
 
-        const user = repo.create();
+        const user: NewUserAccount = { username: data.username, email: data.email, externalIdentifier: null };
         user.username = data.username;
         user.email = data.email;
         user.externalIdentifier = null;
@@ -141,18 +134,18 @@ export class UsersService extends UserDirectory {
         return user;
       });
 
-      const saved = await repo.save(entities);
+      const saved = await operations.createAccounts(entities);
 
       // Assign administrator role to the first user when bootstrapping; default roles for everyone else.
       // Pass the transactional manager so role assignments are part of the same transaction.
       if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
-        await this.rbacService.assignRoleByKey(saved[0].id, 'administrator', manager);
+        await this.rbacService.assignRoleByKey(saved[0].id, 'administrator', scope);
         for (const u of saved.slice(1)) {
-          await this.rbacService.assignDefaultRoles(u.id, manager);
+          await this.rbacService.assignDefaultRoles(u.id, scope);
         }
       } else {
         for (const u of saved) {
-          await this.rbacService.assignDefaultRoles(u.id, manager);
+          await this.rbacService.assignDefaultRoles(u.id, scope);
         }
       }
 
@@ -165,14 +158,10 @@ export class UsersService extends UserDirectory {
           ? await this.rbacService.getEffectivePermissions(options.actorId)
           : null;
 
-      const roleRepo = manager.getRepository(Role);
       for (let i = 0; i < saved.length; i++) {
         const roleKey = normalized[i]?.roleKey;
         if (roleKey) {
-          const role = await roleRepo.findOne({
-            where: { key: roleKey },
-            relations: ['rolePermissions'],
-          });
+          const role = await operations.roleForImport(roleKey);
           if (!role) {
             throw new BadRequestException(`Role with key '${roleKey}' not found`);
           }
@@ -183,14 +172,16 @@ export class UsersService extends UserDirectory {
               throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
             }
           }
-          await this.rbacService.assignRoleByKey(saved[i].id, roleKey, manager);
+          await this.rbacService.assignRoleByKey(saved[i].id, roleKey, scope);
         }
       }
 
       return saved;
     };
 
-    const savedUsers = await (options?.manager ? run(options.manager) : this.userRepository.manager.transaction(run));
+    const savedUsers = await (options?.manager
+      ? run(options.manager)
+      : this.transactions.run({ resourceIds: [], accountIds: [] }, run));
     for (const u of savedUsers) {
       this.metricsService.usersPerLocale.inc({ locale: u.locale ?? 'en' });
     }
@@ -208,9 +199,9 @@ export class UsersService extends UserDirectory {
     if (!ids.length) {
       return;
     }
-    await this.userRepository.manager.transaction(async (manager) => {
+    await this.transactions.run({ resourceIds: [], accountIds: ids }, async (scope) => {
       for (const id of ids) {
-        await this.anonymizeAndSoftDelete(id, manager);
+        await this.anonymizeAndSoftDelete(id, scope);
       }
     });
   }
@@ -225,7 +216,7 @@ export class UsersService extends UserDirectory {
     const expiresAt = addDays(new Date(), 1);
     const storedToken = this.tokenHashService.hashToken(token);
 
-    await this.userRepository.update(user.id, {
+    await this.persistence.patchAccount(user.id, {
       deleteAccountToken: storedToken,
       deleteAccountTokenExpiresAt: expiresAt,
       deleteAccountRequestedAt: new Date(),
@@ -236,22 +227,13 @@ export class UsersService extends UserDirectory {
 
   async confirmSelfDeletion(email: string, token: string): Promise<void> {
     const expected = this.tokenHashService.hashToken(token);
-    let user = await this.userRepository.findOne({
-      where: { email },
-      withDeleted: true,
-    });
+    let user = await this.persistence.account({ email }, undefined, true);
 
     // The email is anonymized on deletion and may be reused, so use the retained
     // confirmation token when the email no longer identifies this confirmation.
     // Raw tokens support confirmations created before tokens were stored as hashes.
     if (!user || (user.deleteAccountToken !== expected && user.deleteAccountToken !== token)) {
-      user = await this.userRepository.findOne({
-        where: {
-          deleteAccountToken: In([expected, token]),
-          deletedAt: Not(IsNull()),
-        },
-        withDeleted: true,
-      });
+      user = await this.persistence.deletedAccountByTokens([expected, token]);
     }
 
     if (!user) {
@@ -273,20 +255,16 @@ export class UsersService extends UserDirectory {
     await this.anonymizeAndSoftDelete(user.id);
   }
 
-  protected async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
+  protected async anonymizeAndSoftDelete(id: number, scope?: TransactionScope): Promise<void> {
     // ponytail: wrap check-then-delete in a transaction to close the TOCTOU race where two concurrent
     // deletions of the last two administrators could both pass the isLastAdministrator guard and both proceed
-    const run = async (em: EntityManager) => {
-      if (await this.rbacService.isLastAdministrator(id, em)) {
+    const run = async (parent: TransactionScope) => {
+      if (await this.rbacService.isLastAdministrator(id, parent)) {
         throw new ForbiddenException('Cannot delete the last administrator');
       }
 
-      const repo = em.getRepository(User);
-      const authRepo = em.getRepository(AuthenticationDetail);
-      const sessionRepo = em.getRepository(Session);
-      const usageRepo = em.getRepository(ResourceUsage);
-
-      const user = await repo.findOne({ where: { id }, withDeleted: true });
+      const operations = this.accountOperations(parent);
+      const user = await operations.account({ id }, undefined, true);
       if (!user) {
         throw new UserNotFoundException(id);
       }
@@ -295,9 +273,7 @@ export class UsersService extends UserDirectory {
         return;
       }
 
-      const activeUsageSession = await usageRepo.findOne({
-        where: { userId: user.id, endTime: IsNull() },
-      });
+      const activeUsageSession = await operations.hasOpenUsage(user.id);
       if (activeUsageSession) {
         throw new UserHasActiveUsageSessionsException();
       }
@@ -306,10 +282,10 @@ export class UsersService extends UserDirectory {
       const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
       const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
 
-      await authRepo.delete({ userId: user.id });
-      await sessionRepo.delete({ userId: user.id });
+      await operations.removeAuthentication(user.id);
+      await operations.removeSessions(user.id);
 
-      await repo.update(user.id, {
+      await operations.patchAccount(user.id, {
         username: anonymizedUsername,
         email: anonymizedEmail,
         isEmailVerified: false,
@@ -322,14 +298,14 @@ export class UsersService extends UserDirectory {
         lastUsernameChangeAt: null,
       });
 
-      await repo.softDelete(user.id);
+      await operations.softDeleteAccount(user.id);
       this.metricsService.usersPerLocale.dec({ locale: user.locale ?? 'en' });
     };
 
-    if (manager) {
-      await run(manager);
+    if (scope) {
+      await run(scope);
     } else {
-      await this.dataSource.transaction(run);
+      await this.transactions.run({ resourceIds: [], accountIds: [id] }, run);
     }
   }
 }

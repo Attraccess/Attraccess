@@ -1,3 +1,5 @@
+import { ResourceRetrainingPersistence } from './persistence/port';
+import { TypeormResourceRetrainingPersistence } from './persistence/typeorm-adapter';
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
@@ -25,7 +27,10 @@ import { ResourceRetrainingController } from './resourceRetraining.controller';
     EmailModule,
   ],
   controllers: [ResourceRetrainingController],
-  providers: [ResourceRetrainingService],
+  providers: [
+    ResourceRetrainingService,
+    { provide: ResourceRetrainingPersistence, useClass: TypeormResourceRetrainingPersistence },
+  ],
   exports: [ResourceRetrainingService],
 })
 export class ResourceRetrainingModule {}

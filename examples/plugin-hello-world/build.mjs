@@ -21,16 +21,16 @@ const PACKAGE = join(HERE, 'package');
 
 // Host-shared packages must NEVER be bundled into the backend artifact: they
 // carry the dependency-injection identities, the shared event bus and the
-// single database connection. A bundled copy is treated as a *different* type
-// and silently fails to connect. The SDK itself is safe to bundle.
+// shared capability tokens. A bundled copy is treated as a different type.
+// The SDK's neutral entry must resolve to the host's single SDK instance.
 const HOST_SHARED_EXTERNALS = [
   '@nestjs/common',
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
+  '@attraccess/plugins-backend-sdk/v2',
 ];
 
 rmSync(PACKAGE, { recursive: true, force: true });
@@ -70,3 +70,4 @@ try {
 // 3. npm metadata at the package root. npm pack excludes source and dev files
 // through the package's files allowlist.
 cpSync(join(HERE, 'package.json'), join(PACKAGE, 'package.json'));
+cpSync(join(HERE, 'plugin.json'), join(PACKAGE, 'plugin.json'));

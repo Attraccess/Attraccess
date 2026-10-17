@@ -3,17 +3,16 @@
 
 import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-
-export enum PasswordPolicyRole {
-  ADMIN = 'admin',
-}
-
-export const PASSWORD_POLICY_ROLES: PasswordPolicyRole[] = [PasswordPolicyRole.ADMIN];
+import { PasswordPolicyRole } from '@attraccess/application-models';
 
 @Entity()
 export class PasswordPolicyOverride {
   @PrimaryColumn({ type: 'simple-enum', enum: PasswordPolicyRole })
-  @ApiProperty({ description: 'Role this override applies to', enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole' })
+  @ApiProperty({
+    description: 'Role this override applies to',
+    enum: PasswordPolicyRole,
+    enumName: 'PasswordPolicyRole',
+  })
   role!: PasswordPolicyRole;
 
   @Column({ type: 'integer', nullable: true })
@@ -61,7 +60,12 @@ export class PasswordPolicyOverride {
   historySize!: number | null;
 
   @Column({ type: 'integer', nullable: true })
-  @ApiProperty({ description: 'Override forced rotation interval in days', example: 90, nullable: true, required: false })
+  @ApiProperty({
+    description: 'Override forced rotation interval in days',
+    example: 90,
+    nullable: true,
+    required: false,
+  })
   rotationDays!: number | null;
 
   @CreateDateColumn()
@@ -76,3 +80,5 @@ export class PasswordPolicyOverride {
   @ApiProperty({ description: 'Row version for optimistic concurrency control', example: 1 })
   version!: number;
 }
+
+export { PasswordPolicyRole, PASSWORD_POLICY_ROLES } from '@attraccess/application-models';

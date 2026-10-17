@@ -1,4 +1,4 @@
-import { Resource, User } from '@attraccess/database-entities';
+import type { Resource, User } from '@attraccess/application-models';
 
 export enum SystemEvent {
   RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED',

@@ -1,4 +1,4 @@
-import type { PluginFlowNodePreviewRow } from '@attraccess/plugins-backend-sdk';
+import type { PluginFlowNodePreviewRow } from '@attraccess/plugins-backend-sdk/v2';
 import type { WagoConfigurationSnapshot } from '../configuration/model';
 import { DIGITAL_TERMINALS } from '../configuration/digital';
 

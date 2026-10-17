@@ -1,4 +1,4 @@
-import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk/v2';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from './dependencies';
 export const mainSchema = z.object({
@@ -7,6 +7,13 @@ export const mainSchema = z.object({
 });
 
 export const PluginManifestSchema = z.object({
+  persistence: z
+    .object({
+      contractVersion: z.literal(2),
+      supportedBackends: z.array(z.string().min(1)).min(1),
+    })
+    .strict()
+    .optional(),
   dependencies: PluginDependenciesSchema,
   name: z.string(),
   main: z.object({

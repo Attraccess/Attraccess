@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { MqttServer } from '@attraccess/database-entities';
+import { MqttPersistence } from '../persistence/port';
+import { MqttServer } from '@attraccess/application-models';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { MetricsService } from '../../metrics/metrics.service';
@@ -9,17 +8,16 @@ import { MetricsService } from '../../metrics/metrics.service';
 @Injectable()
 export class MqttServerService {
   constructor(
-    @InjectRepository(MqttServer)
-    private readonly mqttServerRepository: Repository<MqttServer>,
+    private readonly persistence: MqttPersistence,
     private readonly encryptionService: EncryptionService,
     private readonly metricsService: MetricsService,
-  ) { }
+  ) {}
 
   /**
    * Get all MQTT servers
    */
   async findAll(): Promise<MqttServer[]> {
-    const servers = await this.mqttServerRepository.find();
+    const servers = await this.persistence.listServers();
     servers.forEach((server) => this.decryptServerPassword(server));
     return servers;
   }
@@ -28,9 +26,7 @@ export class MqttServerService {
    * Get a single MQTT server by ID
    */
   async findOne(id: number): Promise<MqttServer> {
-    const server = await this.mqttServerRepository.findOne({
-      where: { id },
-    });
+    const server = await this.persistence.readServer(id);
 
     if (!server) {
       throw new NotFoundException(`MQTT server with ID ${id} not found`);
@@ -44,11 +40,10 @@ export class MqttServerService {
    * Create a new MQTT server
    */
   async create(createMqttServerDto: CreateMqttServerDto): Promise<MqttServer> {
-    const newServer = this.mqttServerRepository.create({
+    const saved = await this.persistence.createServer({
       ...createMqttServerDto,
       password: createMqttServerDto.password ? this.encryptionService.encrypt(createMqttServerDto.password) : null,
     });
-    const saved = await this.mqttServerRepository.save(newServer);
     this.metricsService.mqttServersTotal.inc();
     return saved;
   }
@@ -63,7 +58,7 @@ export class MqttServerService {
     Object.assign(server, updateMqttServerDto);
     server.password = server.password ? this.encryptionService.encrypt(server.password) : null;
 
-    return this.mqttServerRepository.save(server);
+    return this.persistence.saveServer(server);
   }
 
   /**
@@ -71,7 +66,7 @@ export class MqttServerService {
    */
   async remove(id: number): Promise<void> {
     const server = await this.findOne(id);
-    await this.mqttServerRepository.remove(server);
+    await this.persistence.removeServer(server);
     this.metricsService.mqttServersTotal.dec();
   }
 

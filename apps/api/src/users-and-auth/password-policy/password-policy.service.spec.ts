@@ -1,3 +1,13 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DataSource } from 'typeorm';
+import { entities, PasswordPolicy, PasswordPolicyOverride } from '@attraccess/database-entities';
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import { SqliteTransactionDriver, closeResourceTransactionConnection } from '../../database/sqlite/transactions';
+import { PASSWORD_POLICY_WRITES } from './persistence/port';
+import { passwordPolicyTransactionOperations } from './persistence/typeorm-adapter';
+import { PasswordPolicyService } from './password-policy.service';
 import { registerPasswordPolicyServiceFixture } from './password-policy.service.password-policy-service.test-fixture';
 import { PasswordPolicyRole, AuthenticationType } from '@attraccess/database-entities';
 import * as bcrypt from 'bcrypt';
@@ -329,5 +339,52 @@ describe('PasswordPolicyService', () => {
       });
       expect(result.errors.map((e) => e.code)).toContain('MIN_LENGTH');
     });
+  });
+});
+
+describe('password policy writes with SQLite transactions', () => {
+  it('rolls back an invalid effective override before audit, then commits and audits a valid change', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'attraccess-password-policy-'));
+    const source = await new DataSource({
+      type: 'sqlite',
+      database: join(directory, 'database.sqlite'),
+      entities: Object.values(entities),
+      synchronize: true,
+    }).initialize();
+    try {
+      const persistence = passwordPolicyTransactionOperations(source.manager);
+      await persistence.savePolicy({ id: 1, ...DEFAULT_PASSWORD_POLICY });
+      await persistence.saveOverride({ role: PasswordPolicyRole.ADMIN, minLength: 16 }, true);
+      const driver = new SqliteTransactionDriver(source);
+      driver.register(PASSWORD_POLICY_WRITES, passwordPolicyTransactionOperations);
+      const audit = { record: jest.fn() };
+      const service = new PasswordPolicyService(
+        persistence,
+        new DatabaseTransactions(driver),
+        {} as never,
+        {} as never,
+        {} as never,
+        audit as never,
+      );
+      const context = { actorId: 7, actorUsername: 'admin' };
+      await expect(service.updatePolicy({ maxLength: 14 }, context)).rejects.toThrow();
+      const afterRejection = await source.getRepository(PasswordPolicy).findOneByOrFail({ id: 1 });
+      expect(afterRejection.maxLength).toBe(DEFAULT_PASSWORD_POLICY.maxLength);
+      expect(audit.record).not.toHaveBeenCalled();
+      expect(
+        (await source.getRepository(PasswordPolicyOverride).findOneByOrFail({ role: PasswordPolicyRole.ADMIN }))
+          .minLength,
+      ).toBe(16);
+      await expect(service.updatePolicy({ maxLength: 160 }, context)).resolves.toEqual(
+        expect.objectContaining({ maxLength: 160 }),
+      );
+      expect((await source.getRepository(PasswordPolicy).findOneByOrFail({ id: 1 })).maxLength).toBe(160);
+      expect(audit.record).toHaveBeenCalledTimes(1);
+      expect(Object.getPrototypeOf(await persistence.policy())).toBe(Object.prototype);
+    } finally {
+      await closeResourceTransactionConnection(source);
+      await source.destroy();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

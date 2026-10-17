@@ -1,3 +1,4 @@
+import { TypeormEmailTemplatePersistence } from './persistence/typeorm-adapter';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateType, EmailTemplateTranslation } from '@attraccess/database-entities';
@@ -6,9 +7,7 @@ import { MjmlService } from './mjml.service';
 jest.mock('./email-defaults', () => ({
   EMAIL_TEMPLATE_DEFAULTS: { 'verify-email': { subject: 'Default subject', variables: [] } },
   readDefaultTemplateBody: jest.fn(() => '<mjml></mjml>'),
-  SHIPPED_TRANSLATIONS: [
-    { templateType: 'verify-email', locale: 'de', key: 'greeting', value: 'Hallo {name},' },
-  ],
+  SHIPPED_TRANSLATIONS: [{ templateType: 'verify-email', locale: 'de', key: 'greeting', value: 'Hallo {name},' }],
 }));
 
 const makeRepo = () => ({
@@ -30,8 +29,7 @@ const setup = () => {
   const mjmlService = { validateAndConvert: jest.fn() } as unknown as MjmlService;
 
   const service = new EmailTemplateService(
-    emailTemplateRepo as never,
-    translationRepo as never,
+    new TypeormEmailTemplatePersistence(emailTemplateRepo as never, translationRepo as never),
     mjmlService,
   );
 
@@ -49,7 +47,10 @@ describe('EmailTemplateService — translation CRUD', () => {
       const result = await service.getTranslationsMap(EmailTemplateType.VERIFY_EMAIL, 'de');
 
       expect(result).toEqual({ greeting: 'Hallo' });
-      expect(translationRepo.findBy).toHaveBeenCalledWith({ templateType: EmailTemplateType.VERIFY_EMAIL, locale: 'de' });
+      expect(translationRepo.findBy).toHaveBeenCalledWith({
+        templateType: EmailTemplateType.VERIFY_EMAIL,
+        locale: 'de',
+      });
     });
 
     it('merges base translations with regional overrides per key', async () => {
@@ -58,7 +59,12 @@ describe('EmailTemplateService — translation CRUD', () => {
       translationRepo.findBy
         .mockResolvedValueOnce([
           { key: 'greeting', value: 'Hallo', locale: 'de', templateType: EmailTemplateType.VERIFY_EMAIL },
-          { key: 'footer', value: 'Ignoriere diese E-Mail', locale: 'de', templateType: EmailTemplateType.VERIFY_EMAIL },
+          {
+            key: 'footer',
+            value: 'Ignoriere diese E-Mail',
+            locale: 'de',
+            templateType: EmailTemplateType.VERIFY_EMAIL,
+          },
         ]) // base rows (de)
         .mockResolvedValueOnce([
           { key: 'greeting', value: 'Grüezi', locale: 'de-CH', templateType: EmailTemplateType.VERIFY_EMAIL },
@@ -131,7 +137,9 @@ describe('EmailTemplateService — translation CRUD', () => {
       const { service, emailTemplateRepo, translationRepo } = setup();
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
       const manager = { delete: jest.fn(), insert: jest.fn() };
-      translationRepo.manager.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<void>) => fn(manager));
+      translationRepo.manager.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<void>) =>
+        fn(manager),
+      );
 
       await service.setTranslations(EmailTemplateType.VERIFY_EMAIL, 'de', {});
 
@@ -146,12 +154,16 @@ describe('EmailTemplateService — translation CRUD', () => {
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
       emailTemplateRepo.update.mockResolvedValue({});
       const manager = { delete: jest.fn(), insert: jest.fn(), create: jest.fn().mockImplementation((_, e) => e) };
-      translationRepo.manager.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<void>) => fn(manager));
+      translationRepo.manager.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<void>) =>
+        fn(manager),
+      );
 
       await service.resetToDefault(EmailTemplateType.VERIFY_EMAIL);
 
       expect(translationRepo.manager.transaction).toHaveBeenCalled();
-      expect(manager.delete).toHaveBeenCalledWith(EmailTemplateTranslation, { templateType: EmailTemplateType.VERIFY_EMAIL });
+      expect(manager.delete).toHaveBeenCalledWith(EmailTemplateTranslation, {
+        templateType: EmailTemplateType.VERIFY_EMAIL,
+      });
       expect(manager.insert).toHaveBeenCalledWith(EmailTemplateTranslation, [
         { templateType: 'verify-email', locale: 'de', key: 'greeting', value: 'Hallo {name},' },
       ]);
@@ -163,9 +175,9 @@ describe('EmailTemplateService — translation CRUD', () => {
       const { service, emailTemplateRepo } = setup();
       emailTemplateRepo.findOneBy.mockResolvedValue(null);
 
-      await expect(
-        service.deleteTranslations('nonexistent' as EmailTemplateType, 'de'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.deleteTranslations('nonexistent' as EmailTemplateType, 'de')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('deletes translations for the given type and locale', async () => {

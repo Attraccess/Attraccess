@@ -1,3 +1,5 @@
+import { BillingPersistence } from './persistence/port';
+import { DatabaseTransactions } from '../database/transaction-scope';
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
@@ -38,6 +40,7 @@ describe('BillingModule', () => {
 
       expect(controllersMeta).toContain(BillingController);
       expect(providersMeta).toContain(BillingService);
+      expect(providersMeta.some((provider:{provide?:unknown})=>provider.provide===BillingPersistence)).toBe(true);
       expect(exportsMeta).toContain(BillingService);
 
       // Ensure TypeOrmModule.forFeature is registered in imports
@@ -55,6 +58,8 @@ describe('BillingModule', () => {
         controllers: [BillingController],
         providers: [
           BillingService,
+          {provide:BillingPersistence,useValue:{}},
+          {provide:DatabaseTransactions,useValue:{}},
           { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
           {
             provide: AuditService,

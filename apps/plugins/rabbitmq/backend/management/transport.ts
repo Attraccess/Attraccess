@@ -1,4 +1,4 @@
-import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk';
+import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk/v2';
 import { X509Certificate } from 'node:crypto';
 import { request, RequestOptions } from 'node:https';
 import { isIP } from 'node:net';

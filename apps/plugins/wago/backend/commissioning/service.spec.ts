@@ -1,3 +1,6 @@
+import { createSqliteDeviceOperations } from '../runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from './persistence/typeorm-adapter';
+import { createSqliteManagementStore } from '../management/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -32,7 +35,14 @@ const secrets = {
 describe('WagoCommissioningService transport and diagnostics', () => {
   {
     it.each([false, true])('streams safe checkpoints and bounds an SSH process that stalls (%s)', async (stall) => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       const progress = jest.fn();
       const kill = jest.fn();
       jest.mocked(spawn).mockImplementation(((command: string) => {
@@ -103,7 +113,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
 
   {
     it('finishes a stalled upload within the remaining budget even when SSH never emits close', async () => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       const kill = jest.fn();
       jest.mocked(spawn).mockImplementation(((command: string) => {
         const child = Object.assign(new EventEmitter(), {
@@ -173,7 +190,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
 
   {
     it('retains only fixed upload diagnostics and SSH exit status, never remote secrets', async () => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       jest.mocked(spawn).mockImplementation(((command: string) => {
         const child = Object.assign(new EventEmitter(), {
           stdout: new EventEmitter(),
@@ -256,7 +280,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
 
   {
     it('maps only the bounded storage diagnostic from SSH stderr to a fixed message', async () => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       jest.mocked(spawn).mockImplementation(((command: string) => {
         const child = Object.assign(new EventEmitter(), {
           stdout: new EventEmitter(),
@@ -292,7 +323,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
 
   {
     it('maps only the exact pre-journal lock diagnostic from SSH stderr', async () => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       jest.mocked(spawn).mockImplementation(((command: string) => {
         const child = Object.assign(new EventEmitter(), {
           stdout: new EventEmitter(),
@@ -427,7 +465,11 @@ describe('WagoCommissioningService transport and diagnostics', () => {
     const repository = {
       find: jest.fn().mockResolvedValue([]),
       findOneBy: jest.fn().mockResolvedValue(session),
-      save: jest.fn(async (value) => value),
+      save: jest.fn(async (value) => {
+        const stored = await repository.findOneBy.getMockImplementation()?.({ id: value.id });
+        if (stored) Object.assign(stored, value);
+        return value;
+      }),
     };
     const wago = {
       registerCommissioningDiscoveryHandler: jest.fn(),
@@ -444,7 +486,13 @@ describe('WagoCommissioningService transport and diagnostics', () => {
       secrets: { encrypt: jest.fn().mockReturnValue('ciphertext'), decrypt: jest.fn().mockReturnValue(verifier) },
       logger: { warn: jest.fn() },
     };
-    const service = new Service(context as unknown as PluginContext, wago as unknown as WagoService);
+    const service = new Service(
+      context as unknown as PluginContext,
+      wago as unknown as WagoService,
+      createSqliteManagementStore(context as unknown as PluginContext),
+      createSqliteCommissioningPersistence(context as unknown as PluginContext),
+      createSqliteDeviceOperations(context as unknown as PluginContext),
+    );
     service['sessions'] = repository as never;
     const inspect = jest.fn().mockRejectedValue(new Error('arbitrary-secret'));
     const sudo = jest.fn().mockResolvedValue('');
@@ -470,7 +518,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
         return child;
       }) as never);
       const context = { getMqttServerConfig: jest.fn().mockResolvedValue({}) } as unknown as PluginContext;
-      const service = new WagoCommissioningService(context, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))(context);
       await expect(service.create({ mqttServerId: 2, targetHost: '10.0.0.1', name: 'Mock' })).rejects.toThrow(
         'Commissioning SSH host-key scan failed.',
       );
@@ -490,7 +545,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
 
   {
     it.each(['root', 'operator'])('streams the full privileged inspection over stdin for %s', async (username) => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       const credential = { username, password: 'fixture-only' };
       const firmware = fw31IdentityOutput();
       const script = `${wagoFw31IdentityRead()}; root=''; ${wagoCodesysClassificationShell()}\nprintf '\\nCODESYS='; wago_codesys_classify`;
@@ -545,7 +607,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
 
   {
     it('does not add a sudo password to root command input', async () => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       const run = jest.fn().mockResolvedValue('');
       service['run'] = run;
 
@@ -570,7 +639,14 @@ describe('WagoCommissioningService transport and diagnostics', () => {
 
   {
     it('sends a sudo password before command input for alternate SSH users', async () => {
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       const run = jest.fn().mockResolvedValue('');
       service['run'] = run;
 
@@ -633,9 +709,16 @@ describe('WagoCommissioningService transport and diagnostics', () => {
       getMqttServerConfig: jest.fn().mockResolvedValue({}),
       secrets: secrets,
     } as unknown as PluginContext;
-    const service = new WagoCommissioningService(context, {
-      registerCommissioningDiscoveryHandler: jest.fn(),
-    } as unknown as WagoService);
+    const service = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        {
+          registerCommissioningDiscoveryHandler: jest.fn(),
+        } as unknown as WagoService,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+      ))(context);
     service.onApplicationBootstrap();
 
     const session = await service.create({ mqttServerId: 1, targetHost: '192.168.1.10', name: 'Boiler room' });

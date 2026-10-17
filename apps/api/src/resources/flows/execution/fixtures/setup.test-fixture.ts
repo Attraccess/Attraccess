@@ -1,3 +1,5 @@
+import { sqliteRepositoryFixture } from '../../../../database/conformance/sqlite-fixture';
+import { TypeormFlowEventPersistence } from '../../persistence/typeorm-adapter';
 import { ResourceFlowsExecutorService } from '../resource-flows-executor.service';
 import { FlowLogRecorderService } from '../../logs/flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
@@ -110,15 +112,22 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
     },
   } as unknown as Repository<BillingTransactionItem>;
 
+  const persistenceFixture = sqliteRepositoryFixture(
+    (entity) =>
+      (entity === ResourceFlowNode
+        ? scope.flowNodeRepository
+        : entity === ResourceFlowEdge
+          ? scope.flowEdgeRepository
+          : scope.resourceRepository) as object,
+    (work) => Reflect.get(billingItemRepoMock.manager, 'transaction')(work),
+  );
   scope.operatingIntervals = { transition: jest.fn().mockResolvedValue(null) };
   scope.service = new ResourceFlowsExecutorService(
-    scope.flowNodeRepository as Repository<ResourceFlowNode>,
-    scope.flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-    scope.resourceRepository as Repository<Resource>,
+    persistenceFixture.flows,
+    persistenceFixture.transactions,
     scope.flowLogs,
     scope.mqttClientService,
     scope.resourceUsageService,
-    billingItemRepoMock,
     scope.eventEmitter,
     scope.resourceHealthService,
     scope.variablesService,
@@ -133,5 +142,6 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
     } as unknown as CompanionGatewayService,
     scope.operatingIntervals as never,
     { report: jest.fn() } as never,
+    new TypeormFlowEventPersistence(scope.flowNodeRepository as never),
   );
 }

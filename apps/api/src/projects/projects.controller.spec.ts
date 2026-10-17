@@ -169,7 +169,12 @@ describe('ProjectsController', () => {
 
       const result = await controller.create(req as AuthenticatedRequest, { ...data }, logo);
 
-      expect(projectsService.create).toHaveBeenCalledWith(6, expect.objectContaining({ ...data, logo }), 'session', undefined);
+      expect(projectsService.create).toHaveBeenCalledWith(
+        6,
+        expect.objectContaining({ ...data, logo }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(6, 40);
       expect(result).toEqual(expect.objectContaining({ id: 40, logo: 'projects/40/logo.png' }));
     });
@@ -187,7 +192,12 @@ describe('ProjectsController', () => {
 
       const result = await controller.create(req as AuthenticatedRequest, { ...data });
 
-      expect(projectsService.create).toHaveBeenCalledWith(7, expect.objectContaining({ ...data }), 'session', undefined);
+      expect(projectsService.create).toHaveBeenCalledWith(
+        7,
+        expect.objectContaining({ ...data }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(7, 41);
       expect(result.logo).toBeNull();
     });
@@ -210,7 +220,13 @@ describe('ProjectsController', () => {
 
       const result = await controller.update(req as AuthenticatedRequest, id, { ...data }, logo);
 
-      expect(projectsService.updateOne).toHaveBeenCalledWith(8, 55, expect.objectContaining({ ...data, logo }), 'session', undefined);
+      expect(projectsService.updateOne).toHaveBeenCalledWith(
+        8,
+        55,
+        expect.objectContaining({ ...data, logo }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(8, 55);
       expect(result).toEqual(expect.objectContaining({ id: 55, logo: 'projects/55/fresh.png' }));
     });
@@ -229,7 +245,13 @@ describe('ProjectsController', () => {
 
       const result = await controller.update(req as AuthenticatedRequest, id, { ...data });
 
-      expect(projectsService.updateOne).toHaveBeenCalledWith(9, 56, expect.objectContaining({ ...data }), 'session', undefined);
+      expect(projectsService.updateOne).toHaveBeenCalledWith(
+        9,
+        56,
+        expect.objectContaining({ ...data }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(9, 56);
       expect(result.logo).toBeNull();
     });
@@ -292,7 +314,7 @@ describe('ProjectsController', () => {
       const result = await controller.createInvitation(req as AuthenticatedRequest, 3, { invitedUserId: 99 });
 
       expect(projectsService.createProjectInvitation).toHaveBeenCalledWith(12, 3, 99, undefined, 'session', undefined);
-      expect(result).toBe(invitation);
+      expect(result).toEqual(invitation);
     });
   });
 });

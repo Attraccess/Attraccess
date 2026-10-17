@@ -1,4 +1,7 @@
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { sqliteRepositoryFixture } from '../../../../database/conformance/sqlite-fixture';
+import { DatabaseTransactions } from '../../../../database/transaction-scope';
+import { UsagePersistence } from '../../persistence/port';
+import { Resource, ResourceUsage, User, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -20,6 +23,8 @@ import { ResourcesService } from '../../../resources.service';
 import { ResourceRetrainingService } from '../../../retraining/resourceRetraining.service';
 import { createResourceUsageMocks } from './mocks.test-fixture';
 import { ResourceUsageService } from '../resource-usage.service';
+const PERSISTENCE_FIXTURE = Symbol('usage persistence fixture');
+
 export function createResourceUsageTestingModule(mocks: ReturnType<typeof createResourceUsageMocks>) {
   const {
     mockRbacService,
@@ -44,6 +49,36 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
   return Test.createTestingModule({
     providers: [
       ResourceUsageService,
+      {
+        provide: PERSISTENCE_FIXTURE,
+        useFactory: (
+          resources: object,
+          usages: { manager: { transaction: (work: (manager: never) => Promise<unknown>) => Promise<unknown> } },
+          users: object,
+        ) =>
+          sqliteRepositoryFixture(
+            (entity) =>
+              entity === Resource
+                ? resources
+                : entity === ResourceUsage
+                  ? usages
+                  : entity === ResourceUsageLifecycleAttempt
+                    ? { find: async () => [...mocks.lifecycleAttempts.values()] }
+                    : users,
+            (work) => usages.manager.transaction(work),
+          ),
+        inject: [getRepositoryToken(Resource), getRepositoryToken(ResourceUsage), getRepositoryToken(User)],
+      },
+      {
+        provide: UsagePersistence,
+        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.usage,
+        inject: [PERSISTENCE_FIXTURE],
+      },
+      {
+        provide: DatabaseTransactions,
+        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.transactions,
+        inject: [PERSISTENCE_FIXTURE],
+      },
       {
         provide: getRepositoryToken(Resource),
         useFactory: mockRepository,

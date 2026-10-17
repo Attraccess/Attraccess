@@ -1,3 +1,4 @@
+import { sqliteResourceFixture } from '../../../database/conformance/sqlite-fixture';
 import { Logger } from '@nestjs/common';
 import {
   BillingTransaction,
@@ -79,7 +80,7 @@ describe('Additional billing items around finalization', () => {
       .save({ id: 1, resourceUsageId: 1, status: BillingTransactionStatus.Pending, amount: 0 });
     executor = new BillingSetAdditionalItemsExecutor(
       { getActiveSession: jest.fn().mockResolvedValue({ id: 1 }) } as unknown as ResourceUsageService,
-      source.getRepository(BillingTransactionItem),
+      sqliteResourceFixture(source).transactions,
     );
   });
 
@@ -117,16 +118,19 @@ describe('Additional billing items around finalization', () => {
 
   it('keeps item writes inside the caller-owned transaction and rejects completed bills there too', async () => {
     await expect(
-      source.transaction(async (transactionManager) => {
-        await executor.execute(node, { id: 1, quantity: 2 }, { ...ctx, transactionManager });
-        throw new Error('caller rolled back');
-      }),
+      sqliteResourceFixture(source).transactions.run(
+        { resourceIds: [1], accountIds: [] },
+        async (transactionManager) => {
+          await executor.execute(node, { id: 1, quantity: 2 }, { ...ctx, transactionManager });
+          throw new Error('caller rolled back');
+        },
+      ),
     ).rejects.toThrow('caller rolled back');
     expect(await source.getRepository(BillingTransactionItem).count()).toBe(0);
     await source.getRepository(BillingTransaction).update(1, { status: BillingTransactionStatus.Completed });
 
     await expect(
-      source.transaction((transactionManager) =>
+      sqliteResourceFixture(source).transactions.run({ resourceIds: [1], accountIds: [] }, (transactionManager) =>
         executor.execute(node, { id: 1, quantity: 2 }, { ...ctx, transactionManager }),
       ),
     ).rejects.toBeInstanceOf(NoUsageSessionError);

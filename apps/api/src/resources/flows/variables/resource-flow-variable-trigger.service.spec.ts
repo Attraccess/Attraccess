@@ -1,3 +1,5 @@
+import { FlowTriggerPersistence } from '../persistence/port';
+import { TypeormFlowTriggerPersistence } from '../persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -36,6 +38,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFlowVariableTriggerService,
+        { provide: FlowTriggerPersistence, useClass: TypeormFlowTriggerPersistence },
         { provide: getRepositoryToken(ResourceFlowNode), useValue: nodeRepo },
         { provide: ResourceFlowsExecutorService, useValue: executor },
         { provide: ResourceFlowVariablesService, useValue: variables },

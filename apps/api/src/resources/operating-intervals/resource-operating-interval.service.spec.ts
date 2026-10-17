@@ -1,3 +1,5 @@
+import { DatabaseTransactions, OperationToken } from '../../database/transaction-scope';
+import { operatingIntervalTransactionOperations } from './persistence/typeorm-adapter';
 import { ResourceOperatingInterval } from '@attraccess/database-entities';
 import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
@@ -38,7 +40,16 @@ describe('ResourceOperatingIntervalService', () => {
     } as unknown as EntityManager;
     eventEmitter = new EventEmitter2();
     service = new ResourceOperatingIntervalService(
-      { manager } as Repository<ResourceOperatingInterval>,
+      new DatabaseTransactions({
+        backend: 'sqlite',
+        run: async (_conflicts, work) =>
+          transaction(async (manager: EntityManager) =>
+            work({
+              resolve: <T extends object>(_token: OperationToken<T>) =>
+                operatingIntervalTransactionOperations(manager) as unknown as T,
+            }),
+          ),
+      }),
       operatingMetrics,
       eventEmitter,
     );

@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import { User } from '../../../transport/models/user.dto';
 import { PaginatedResponseWithNextPage } from '../../../types/response';
 import { ApiProperty } from '@nestjs/swagger';
 

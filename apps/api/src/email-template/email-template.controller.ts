@@ -1,9 +1,11 @@
+import { EmailTemplate } from '../transport/models/email-template.dto';
+import { mapResponse } from '../transport/response-mapper';
 import { recordAdministrationSafely, auditSubjectKeyId } from '../audit/policies/administration';
 import { Controller, Delete, Get, HttpCode, HttpStatus, Post, Body, Patch, Param, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { AuditService } from '../audit/audit.service';
-import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { EmailTemplateService, TemplateTranslations } from './email-template.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { UpsertTranslationsDto } from './dto/upsert-translations.dto';
@@ -22,8 +24,8 @@ export class EmailTemplateController {
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'List all email templates' })
   @ApiResponse({ status: 200, description: 'List of email templates', type: [EmailTemplate] })
-  findAll(): Promise<EmailTemplate[]> {
-    return this.emailTemplateService.findAll();
+  async findAll(): Promise<EmailTemplate[]> {
+    return (await this.emailTemplateService.findAll()).map((record) => mapResponse(EmailTemplate, record));
   }
 
   @Get(':type')
@@ -32,8 +34,8 @@ export class EmailTemplateController {
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
   @ApiResponse({ status: 200, type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  findOne(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
-    return this.emailTemplateService.findOne(type);
+  async findOne(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
+    return mapResponse(EmailTemplate, await this.emailTemplateService.findOne(type));
   }
 
   @Patch(':type')
@@ -43,15 +45,18 @@ export class EmailTemplateController {
   @ApiBody({ type: UpdateEmailTemplateDto })
   @ApiResponse({ status: 200, type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  update(
+  async update(
     @Param('type') type: EmailTemplateType,
     @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<EmailTemplate> {
-    return this.emailTemplateService.update(type, updateEmailTemplateDto).then(async (template) => {
-      await this.record(req, 'email_template.updated', type, { templateType: type });
-      return template;
-    });
+    return mapResponse(
+      EmailTemplate,
+      await this.emailTemplateService.update(type, updateEmailTemplateDto).then(async (template) => {
+        await this.record(req, 'email_template.updated', type, { templateType: type });
+        return template;
+      }),
+    );
   }
 
   @Post(':type/reset')
@@ -61,11 +66,17 @@ export class EmailTemplateController {
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type' })
   @ApiResponse({ status: 200, description: 'Template reset to default', type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  resetToDefault(@Param('type') type: EmailTemplateType, @Req() req: AuthenticatedRequest): Promise<EmailTemplate> {
-    return this.emailTemplateService.resetToDefault(type).then(async (template) => {
-      await this.record(req, 'email_template.reset', type, { templateType: type });
-      return template;
-    });
+  async resetToDefault(
+    @Param('type') type: EmailTemplateType,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<EmailTemplate> {
+    return mapResponse(
+      EmailTemplate,
+      await this.emailTemplateService.resetToDefault(type).then(async (template) => {
+        await this.record(req, 'email_template.reset', type, { templateType: type });
+        return template;
+      }),
+    );
   }
 
   @Get(':type/translations')

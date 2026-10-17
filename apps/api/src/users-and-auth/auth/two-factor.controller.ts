@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Optional, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk/v2';
 import { TwoFactorService } from './two-factor.service';
 import { TwoFactorCodeDto, TwoFactorPolicyDto, TwoFactorSetupResponseDto, TwoFactorStatusDto } from './two-factor.dto';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
@@ -96,16 +96,18 @@ export class TwoFactorController {
     action: 'two_factor_setup_started' | 'two_factor_enabled' | 'two_factor_disabled',
     request: AuthenticatedRequest,
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-      subjectId: request.user.id,
-      details: {},
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    })).then(() => undefined);
+    return Promise.resolve(
+      this.identityAudit?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectId: request.user.id,
+        details: {},
+        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+      }),
+    ).then(() => undefined);
   }
 }

@@ -1,4 +1,4 @@
-import { BillingTransaction } from '@attraccess/database-entities';
+import { BillingTransaction } from '../../transport/models/billing-transaction.dto';
 import { PaginatedResponseWithNextPage } from '../../types/response';
 import { ApiProperty } from '@nestjs/swagger';
 

@@ -1,3 +1,4 @@
+import { TypeormEmailTemplatePersistence } from '../../email-template/persistence/typeorm-adapter';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSource, QueryRunner } from 'typeorm';
@@ -25,8 +26,10 @@ describe('RefreshMeterEvidenceReceipt1791200000000', () => {
     runner = source.createQueryRunner();
     await new EmailTemplateTranslations1782500000000().up(runner);
     service = new EmailTemplateService(
-      source.getRepository(EmailTemplate),
-      source.getRepository(EmailTemplateTranslation),
+      new TypeormEmailTemplatePersistence(
+        source.getRepository(EmailTemplate),
+        source.getRepository(EmailTemplateTranslation),
+      ),
       new MjmlService(),
     );
     await runner.query(

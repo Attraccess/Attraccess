@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/database-entities/src",
   "projectType": "library",
-  "tags": ["type:lib", "scope:core"],
+  "tags": ["type:lib", "scope:core", "persistence:schema"],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
@@ -16,7 +16,6 @@
         "assets": ["libs/database-entities/*.md"]
       }
     },
-    
     "nx-release-publish": {
       "options": {
         "packageRoot": "dist/{projectRoot}",

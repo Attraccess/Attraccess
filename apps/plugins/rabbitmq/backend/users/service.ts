@@ -1,5 +1,5 @@
-import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import {
   Body,
   Controller,

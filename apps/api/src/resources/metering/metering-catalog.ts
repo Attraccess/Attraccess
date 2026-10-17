@@ -1,31 +1,23 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { EntityManager, In, Repository } from 'typeorm';
-import {
-  Resource,
-  ResourceMeter,
-  ResourceFlowNode,
-  ResourceFlowEdge,
-  ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
-} from '@attraccess/database-entities';
+import { MeteringPersistence, MeterNameConflictError } from './persistence/port';
+import { ResourceMeter, ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
-import { findActiveUsage } from '../usage/sessions/active-usage';
 
-export async function requireMeter(manager: EntityManager, resourceId: number, meterId: number) {
-  const meter = await manager.findOne(ResourceMeter, { where: { id: meterId, resourceId } });
+export async function requireMeter(persistence: MeteringPersistence, resourceId: number, meterId: number) {
+  const meter = await persistence.meter(resourceId, meterId);
   if (!meter) throw new BadRequestException('METER_NOT_FOUND');
   return meter;
 }
 
+export function requireMeteringRecord<T>(record: T | null, subject: string): T {
+  if (!record) throw new Error(`Metering record was not found: ${subject}`);
+  return record;
+}
+
 /** Meter configuration and read-only views of definition and consumption state. */
 export class MeteringCatalog {
-  constructor(
-    private readonly meters: Repository<ResourceMeter>,
-    private readonly sessions: Repository<ResourceMeteringSession>,
-    private readonly nodes: Repository<ResourceFlowNode>,
-    private readonly edges: Repository<ResourceFlowEdge>,
-  ) {}
+  constructor(private readonly persistence: MeteringPersistence) {}
 
   /** The meter is defined by its flow branches: trigger → acknowledgement, trigger → report. */
   async getDefinition(resourceId: number, meterId: number) {
@@ -35,16 +27,16 @@ export class MeteringCatalog {
 
   private async getDefinitionFlow(resourceId: number) {
     const [allNodes, edges] = await Promise.all([
-      this.nodes.find({ where: { resourceId } }),
-      this.edges.find({ where: { resourceId } }),
+      this.persistence.flowNodes(resourceId),
+      this.persistence.flowEdges(resourceId),
     ]);
     return { allNodes, edges };
   }
 
   async listMeters(resourceId: number) {
     const [meters, usage, active] = await Promise.all([
-      this.meters.find({ where: { resourceId }, order: { id: 'ASC' } }),
-      findActiveUsage(this.sessions.manager, resourceId),
+      this.persistence.meters(resourceId, true),
+      this.persistence.activeUsage(resourceId),
       this.findActiveSessions(resourceId),
     ]);
     return meters.map((meter) => {
@@ -89,32 +81,31 @@ export class MeteringCatalog {
   }
 
   async createMeter(resourceId: number, name: string) {
-    if (!(await this.meters.manager.existsBy(Resource, { id: resourceId })))
-      throw new BadRequestException('RESOURCE_NOT_FOUND');
+    if (!(await this.persistence.resourceExists(resourceId))) throw new BadRequestException('RESOURCE_NOT_FOUND');
     let meter: ResourceMeter;
     try {
-      meter = await this.meters.save({ resourceId, name: name.trim() });
+      meter = await this.persistence.createMeter(resourceId, name.trim());
     } catch (error) {
-      if (String(error).includes('UNIQUE')) throw new ConflictException('METER_NAME_EXISTS');
+      if (error instanceof MeterNameConflictError) throw new ConflictException('METER_NAME_EXISTS');
       throw error;
     }
     return this.getMeterDto(resourceId, meter.id);
   }
 
   async updateMeter(resourceId: number, meterId: number, name: string) {
-    const meter = await requireMeter(this.meters.manager, resourceId, meterId);
+    const meter = await requireMeter(this.persistence, resourceId, meterId);
     try {
-      await this.meters.update({ id: meter.id, resourceId }, { name: name.trim() });
+      await this.persistence.renameMeter(resourceId, meter.id, name.trim());
     } catch (error) {
-      if (String(error).includes('UNIQUE')) throw new ConflictException('METER_NAME_EXISTS');
+      if (error instanceof MeterNameConflictError) throw new ConflictException('METER_NAME_EXISTS');
       throw error;
     }
     return this.getMeterDto(resourceId, meterId);
   }
 
   async setRate(resourceId: number, meterId: number, creditsPerUnit: number) {
-    const meter = await requireMeter(this.meters.manager, resourceId, meterId);
-    await this.meters.update(meter.id, { creditsPerUnit });
+    const meter = await requireMeter(this.persistence, resourceId, meterId);
+    await this.persistence.setRate(meter.id, creditsPerUnit);
     return this.getMeterDto(resourceId, meterId);
   }
 
@@ -129,15 +120,13 @@ export class MeteringCatalog {
   }
 
   async findActiveSessions(resourceId: number) {
-    const usage = await findActiveUsage(this.sessions.manager, resourceId);
+    const usage = await this.persistence.activeUsage(resourceId);
     if (!usage) return [];
-    return this.sessions.find({
-      where: { resourceId, usageId: usage.id, status: ResourceMeteringSessionStatus.Active },
-    });
+    return this.persistence.activeSessions(usage.id, resourceId);
   }
 
   async getStatus(resourceId: number) {
-    const meters = await this.meters.find({ where: { resourceId } });
+    const meters = await this.persistence.meters(resourceId);
     const flow = await this.getDefinitionFlow(resourceId);
     const definitions = meters.map((meter) => {
       const definition = meterDefinitionFromFlow(meter.id, flow);
@@ -150,11 +139,7 @@ export class MeteringCatalog {
         interimIntervalMinutes: definition.hasCollection ? definition.collect.interimIntervalMinutes : 0,
       };
     });
-    const unsettled = await this.sessions.find({
-      where: { resourceId, status: In([ResourceMeteringSessionStatus.Pending, ResourceMeteringSessionStatus.Failed]) },
-      order: { createdAt: 'DESC' },
-      take: 20,
-    });
+    const unsettled = await this.persistence.unsettledSessions(resourceId);
     return {
       meters: definitions,
       unsettled: unsettled.map((session) => ({

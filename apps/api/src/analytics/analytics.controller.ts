@@ -1,6 +1,9 @@
+import { mapResponse } from '../transport/response-mapper';
+import { ResourceUsage } from '../transport/models/resourceUsage.dto';
+import { BillingTransaction } from '../transport/models/billing-transaction.dto';
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AnalyticsQueryDto } from './dtos/analyticsQuery.dto';
 import { PaginatedResourceUsageResponseDto } from './dtos/paginatedResourceUsageResponse.dto';
@@ -30,7 +33,13 @@ export class AnalyticsController {
   ): Promise<PaginatedResourceUsageResponseDto> {
     const { start, end, page, limit } = query;
     const [data, total] = await this.analyticsService.getResourceUsageHoursInDateRange({ start, end }, page, limit);
-    return { data, total, page, limit, nextPage: computeNextPage(page, limit, total) };
+    return {
+      data: data.map((record) => mapResponse(ResourceUsage, record)),
+      total,
+      page,
+      limit,
+      nextPage: computeNextPage(page, limit, total),
+    };
   }
 
   @Post('resource-operating-durations')
@@ -62,6 +71,12 @@ export class AnalyticsController {
   ): Promise<PaginatedBillingTransactionsResponseDto> {
     const { start, end, page, limit } = query;
     const [data, total] = await this.analyticsService.getBillingTransactionsInDateRange({ start, end }, page, limit);
-    return { data, total, page, limit, nextPage: computeNextPage(page, limit, total) };
+    return {
+      data: data.map((record) => mapResponse(BillingTransaction, record)),
+      total,
+      page,
+      limit,
+      nextPage: computeNextPage(page, limit, total),
+    };
   }
 }

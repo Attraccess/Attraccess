@@ -1,4 +1,4 @@
-import { AuthenticationType, User } from '@attraccess/database-entities';
+import { AuthenticationType, User } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 
@@ -20,7 +20,7 @@ import { SignupDomainService } from './signup-domain.service';
 
 import { UsersService } from './users.service';
 
-import { EntityManager } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 
 @Injectable()
 export class UserRegistrationService {
@@ -124,9 +124,9 @@ export class UserRegistrationService {
   ): Promise<User> {
     let existingAdmin: User | undefined;
 
-    const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
+    const { user, verificationToken } = await this.usersService.withTransaction(async (scope: TransactionScope) => {
       existingAdmin = overwriteFirstTimeAdmin
-        ? await this.usersService.releaseFirstTimeSetupAdminIdentifiers(manager)
+        ? await this.usersService.releaseFirstTimeSetupAdminIdentifiers(scope)
         : undefined;
       const user = await this.usersService.createOne(
         {
@@ -136,7 +136,7 @@ export class UserRegistrationService {
           locale,
           isFirstTimeSetupAdmin: !!existingAdmin,
         },
-        manager,
+        scope,
         { excludedUserIdFromLicenseUsage: existingAdmin?.id },
       );
       this.logger.debug(`User created with ID: ${user.id}`);
@@ -150,13 +150,13 @@ export class UserRegistrationService {
             password: body.password,
           },
         },
-        manager,
+        scope,
         hashedPassword,
       );
       this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
 
       this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
-      const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
+      const verificationToken = await this.authService.generateEmailVerificationToken(user, scope);
       return { user, verificationToken };
     });
 

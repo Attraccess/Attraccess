@@ -18,7 +18,7 @@ import { canonicalEnvelope, sourceTime, validEnvelope } from '../diagnostics/env
 
 import { hash, isValidHardwareId } from './model';
 
-import { type PluginContext, type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
+import { type PluginContext, type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk/v2';
 
 import { MqttSubscriptionError } from './model';
 
@@ -43,7 +43,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       return;
     }
     const canonical = canonicalEnvelope(rawHeartbeat, 'heartbeat');
-    const controller = await this.controllers.findOneBy({ hardwareId });
+    const controller = await this.registry.controllerByHardware(hardwareId);
     if (
       !controller ||
       controller.trustState !== 'claimed' ||
@@ -114,7 +114,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     // A heartbeat may have loaded this entity before a concurrent SSH network
     // change commits. Persist telemetry fields only; never overwrite that
     // operation's broker, credential or enrollment bindings with an old snapshot.
-    await this.controllers.save({
+    await this.registry.saveController({
       id: controller.id,
       protocolVersion: controller.protocolVersion,
       runtimeVersion: controller.runtimeVersion,
@@ -150,29 +150,27 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       this.context.logger.warn(`Ignoring WAGO announcement without a valid enrollment secret on ${topic}`);
       return;
     }
-    const existing = await this.controllers.findOneBy({ hardwareId });
+    const existing = await this.registry.controllerByHardware(hardwareId);
     if (existing?.trustState === 'claimed') return; // Discovery can never modify trusted identity or configuration.
     const now = new Date().toISOString();
-    const candidate =
-      existing ??
-      this.controllers.create({
-        hardwareId,
-        trustState: 'untrusted',
-        name: null,
-        mqttServerId: serverId,
-        enrollmentId: enrollment.id,
-        pairingCodeHash: '',
-        fingerprint: null,
-        protocolVersion: '',
-        runtimeVersion: '',
-        capabilities: '[]',
-        lastSequence: 0,
-        lastHeartbeatAt: null,
-        lastSeenAt: now,
-        compatibilityError: null,
-        createdAt: now,
-        updatedAt: now,
-      });
+    const candidate = existing ?? {
+      hardwareId,
+      trustState: 'untrusted',
+      name: null,
+      mqttServerId: serverId,
+      enrollmentId: enrollment.id,
+      pairingCodeHash: '',
+      fingerprint: null,
+      protocolVersion: '',
+      runtimeVersion: '',
+      capabilities: '[]',
+      lastSequence: 0,
+      lastHeartbeatAt: null,
+      lastSeenAt: now,
+      compatibilityError: null,
+      createdAt: now,
+      updatedAt: now,
+    };
     candidate.mqttServerId = serverId;
     candidate.enrollmentId = enrollment.id;
     candidate.pairingCodeHash = hash(announcement.pairingCode);
@@ -184,10 +182,10 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     candidate.lastSeenAt = now;
     candidate.compatibilityError = compatibilityError(announcement);
     candidate.updatedAt = now;
-    await this.controllers.save(candidate);
+    const persistedCandidate = await this.registry.saveController(candidate);
     if (this.commissioningDiscoveryHandler) {
       try {
-        await this.commissioningDiscoveryHandler(candidate);
+        await this.commissioningDiscoveryHandler(persistedCandidate);
       } catch (error) {
         this.context.logger.warn(
           `Could not automatically claim commissioned WAGO controller ${candidate.hardwareId}: ${String(error)}`,
@@ -218,7 +216,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     if (this.destroyed) return;
     const networkRevision = this.networkSubscriptionRevision;
     const settings = await this.getSettings();
-    const [controllers, enrollments] = await Promise.all([this.controllers.find(), this.activeEnrollments()]);
+    const [controllers, enrollments] = await Promise.all([this.registry.controllers(), this.activeEnrollments()]);
     const serverIds = new Set<number>();
     if (settings.defaultMqttServerId) serverIds.add(settings.defaultMqttServerId);
     controllers

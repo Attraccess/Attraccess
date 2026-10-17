@@ -1,3 +1,5 @@
+import { MaintenancePersistence } from './persistence/port';
+import { TypeormMaintenancePersistence } from './persistence/typeorm-adapter';
 import { Resource, ResourceIntroducer, ResourceMaintenance } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -41,6 +43,7 @@ export function registerMaintenanceServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceMaintenanceService,
+        {provide:MaintenancePersistence,useFactory:(maintenance:object,resource:object,introducer:object)=>new TypeormMaintenancePersistence({getRepository:(entity:unknown)=>entity===ResourceMaintenance?maintenance:entity===Resource?resource:introducer} as never),inject:[getRepositoryToken(ResourceMaintenance),getRepositoryToken(Resource),getRepositoryToken(ResourceIntroducer)]},
         {
           provide: getRepositoryToken(ResourceMaintenance),
           useValue: {

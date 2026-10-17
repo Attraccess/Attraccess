@@ -1,3 +1,5 @@
+import { SumupPersistence } from '../persistence/port';
+import { TypeormSumupPersistence } from '../persistence/typeorm-adapter';
 // Tests for SumUpService billing integration with mocked SDK
 // FEATURE: Billing SumUp integration
 
@@ -129,6 +131,7 @@ export function registerSumUpServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SumUpService,
+        { provide: SumupPersistence, useClass: TypeormSumupPersistence },
         { provide: getRepositoryToken(Setting), useValue: mockSettingRepository },
         { provide: getRepositoryToken(BillingTransaction), useValue: mockBillingTransactionRepository },
         { provide: EncryptionService, useValue: mockEncryptionService },

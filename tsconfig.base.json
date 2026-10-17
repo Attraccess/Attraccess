@@ -19,6 +19,15 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "paths": {
+      "@attraccess/application-models": [
+        "./libs/application-models/src/index.ts"
+      ],
+      "@attraccess/plugins-backend-sdk/v2": [
+        "./libs/plugins-backend-sdk/src/v2.ts"
+      ],
+      "@attraccess/plugins-backend-sdk/adapter": [
+        "./libs/plugins-backend-sdk/src/adapter.ts"
+      ],
       "@attraccess/api-client": [
         "./libs/api-client/src/index.ts"
       ],

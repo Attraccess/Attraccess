@@ -1,10 +1,9 @@
-import { AuthenticationDetail, AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+import { AuthenticationDetail, AuthenticationType, SSOProviderType, User } from '@attraccess/application-models';
 
 import { Injectable, Logger, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, EntityManager } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
+import { AUTHENTICATION_WRITES, AuthenticationPersistence, NewAuthenticationDetail } from './persistence/port';
 
 import { EmailService } from '../../email/email.service';
 
@@ -59,8 +58,7 @@ export class UserEmailVerificationTokenExpiredException extends UnauthorizedExce
 export class AuthService {
   constructor(
     protected emailService: EmailService,
-    @InjectRepository(AuthenticationDetail)
-    protected authenticationDetailRepository: Repository<AuthenticationDetail>,
+    protected persistence: AuthenticationPersistence,
     protected usersService: UsersService,
     protected readonly tokenHashService: TokenHashService,
     protected readonly metricsService: MetricsService,
@@ -73,33 +71,16 @@ export class AuthService {
   protected readonly logger = new Logger(AuthService.name);
 
   async findUserIdBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<number | null> {
-    const detail = await this.authenticationDetailRepository.findOne({
-      where: {
-        type: AuthenticationType.SSO,
-        providerType,
-        providerId,
-        ssoSubject: subject,
-      },
-    });
-
-    return detail?.userId ?? null;
+    return (await this.persistence.ssoIdentity(providerType, providerId, subject))?.userId ?? null;
   }
-
   async userHasSSOAuthentication(userId: number): Promise<boolean> {
-    const count = await this.authenticationDetailRepository.count({
-      where: { userId, type: AuthenticationType.SSO },
-    });
-    return count > 0;
+    return (await this.persistence.ssoCount(userId)) > 0;
   }
-
   async findSSOAuthenticationDetail(userId: number): Promise<AuthenticationDetail | null> {
-    return this.authenticationDetailRepository.findOne({
-      where: { userId, type: AuthenticationType.SSO },
-    });
+    return this.persistence.detail(userId, AuthenticationType.SSO);
   }
-
   async updateSSOSubject(detailId: number, ssoSubject: string): Promise<void> {
-    await this.authenticationDetailRepository.update(detailId, { ssoSubject });
+    await this.persistence.updateSubject(detailId, ssoSubject);
   }
 
   async generatePasswordResetToken(email: string): Promise<string> {
@@ -136,7 +117,7 @@ export class AuthService {
 
     if (authenticationDetail) {
       authenticationDetail.password = await this.hashPassword(password);
-      await this.authenticationDetailRepository.save(authenticationDetail);
+      await this.persistence.saveAuthentication(authenticationDetail);
     } else {
       await this.addAuthenticationDetails(user.id, {
         type: AuthenticationType.LOCAL_PASSWORD,
@@ -150,7 +131,7 @@ export class AuthService {
     await this.emailService.sendPasswordChangedEmail(user);
   }
 
-  async generateEmailVerificationToken(user: User, manager?: EntityManager): Promise<string> {
+  async generateEmailVerificationToken(user: User, scope?: TransactionScope): Promise<string> {
     const token = randomBytes(16).toString('base64url').slice(0, 21);
     const storedToken = this.tokenHashService.hashToken(token);
 
@@ -161,7 +142,7 @@ export class AuthService {
         emailVerificationToken: storedToken,
         emailVerificationTokenExpiresAt: addDays(new Date(), 3),
       },
-      manager,
+      scope,
     );
 
     this.logger.debug(`Email verification token set for user ID: ${user.id}`);
@@ -201,9 +182,7 @@ export class AuthService {
     authenticationType: AuthenticationType,
     userId: number,
   ): Promise<AuthenticationDetail> {
-    const details = await this.authenticationDetailRepository.findOne({
-      where: { userId, type: authenticationType },
-    });
+    const details = await this.persistence.detail(userId, authenticationType);
 
     if (!details) {
       this.logger.debug(`Authentication details not found for user ID: ${userId}`);
@@ -261,12 +240,10 @@ export class AuthService {
   async addAuthenticationDetails(
     userId: number,
     options: AuthenticationOptions,
-    manager?: EntityManager,
+    scope?: TransactionScope,
     hashedPassword?: string,
   ): Promise<AuthenticationDetail> {
-    const authenticationDetail = new AuthenticationDetail();
-    authenticationDetail.userId = userId;
-    authenticationDetail.type = options.type;
+    const authenticationDetail: NewAuthenticationDetail = { userId, type: options.type };
 
     if (options.type === AuthenticationType.LOCAL_PASSWORD) {
       this.logger.debug(`Adding local password authentication for user ID: ${userId}`);
@@ -277,16 +254,12 @@ export class AuthService {
       authenticationDetail.ssoSubject = options.details.subject;
     }
 
-    const saved = manager
-      ? await manager.save(authenticationDetail)
-      : await this.authenticationDetailRepository.save(authenticationDetail);
-    return saved;
+    const operations = scope ? scope.resolve(AUTHENTICATION_WRITES) : this.persistence;
+    return operations.saveAuthentication(authenticationDetail);
   }
 
   async removeLocalPasswordAuthentication(userId: number): Promise<void> {
-    const detail = await this.authenticationDetailRepository.findOne({
-      where: { userId, type: AuthenticationType.LOCAL_PASSWORD },
-    });
+    const detail = await this.persistence.detail(userId, AuthenticationType.LOCAL_PASSWORD);
 
     if (detail) {
       await this.removeAuthenticationDetails(detail.id);
@@ -294,9 +267,7 @@ export class AuthService {
   }
 
   async removeAuthenticationDetails(authenticationDetailsId: number): Promise<void> {
-    await this.authenticationDetailRepository.delete({
-      id: authenticationDetailsId,
-    });
+    await this.persistence.removeDetail(authenticationDetailsId);
   }
 
   async getUserByLoginIdentifierAndAuthenticationDetails(

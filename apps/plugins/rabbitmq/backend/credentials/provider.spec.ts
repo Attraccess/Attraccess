@@ -1,4 +1,4 @@
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { RabbitmqCredentialProvisioningProvider, mqttFiltersToRegex } from './provider';
 

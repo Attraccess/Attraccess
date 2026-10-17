@@ -1,4 +1,4 @@
-import { ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowVariableScope } from '@attraccess/application-models';
 
 export class ResourceFlowVariableChangedEvent {
   static readonly EVENT_NAME = 'resource.flow.variable.changed';

@@ -6,7 +6,7 @@
 // credentials, a request timeout, and translation of upstream failures into
 // HTTP exceptions whose messages tell the operator what actually went wrong
 // (unreachable broker, rejected credentials, missing management privileges, …).
-import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk';
+import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk/v2';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { describeManagementError, managementApiBase, managementRequest } from './transport';
 

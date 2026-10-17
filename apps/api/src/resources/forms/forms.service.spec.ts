@@ -1,15 +1,24 @@
+import { DatabaseTransactions, TransactionOperations } from '../../database/transaction-scope';
+import { FormsPersistence } from './persistence/port';
+import { TypeormFormsPersistence } from './persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  Form,
-  FormField,
-  FormFieldType,
-  FormSubmission,
-  Resource,
-  ResourceFormAction,
-} from '@attraccess/database-entities';
+import { Form, FormField, FormFieldType, Resource, ResourceFormAction } from '@attraccess/database-entities';
 import { ResourceFormsService } from './forms.service';
 import { EntityManager } from 'typeorm';
+
+const transactionsFor = (
+  manager: EntityManager,
+  run = (work: (manager: EntityManager) => Promise<unknown>) => work(manager),
+) =>
+  new DatabaseTransactions({
+    backend: 'sqlite',
+    run: (_conflicts, work) =>
+      run((bound) =>
+        work({
+          resolve: (() => new TypeormFormsPersistence(bound)) as TransactionOperations['resolve'],
+        }),
+      ) as never,
+  });
 
 const makeField = (overrides: Partial<FormField>): FormField =>
   ({
@@ -52,10 +61,13 @@ describe('ResourceFormsService pagination + per-field validation', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFormsService,
-        { provide: getRepositoryToken(Form), useValue: formRepo },
-        { provide: getRepositoryToken(FormField), useValue: { find: jest.fn() } },
-        { provide: getRepositoryToken(FormSubmission), useValue: { save: jest.fn() } },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepo },
+        {
+          provide: FormsPersistence,
+          useValue: new TypeormFormsPersistence({
+            getRepository: (entity: unknown) => (entity === Form ? formRepo : resourceRepo),
+          } as EntityManager),
+        },
+        { provide: DatabaseTransactions, useValue: transactionsFor({} as EntityManager) },
       ],
     }).compile();
 
@@ -119,23 +131,25 @@ describe('ResourceFormsService pagination + per-field validation', () => {
     const manager = {
       getRepository: jest.fn((entity) => (entity === Form ? formRepo : { save })),
     } as unknown as EntityManager;
-    const drafts = await service.prepareRequiredSubmissions({
-      resourceId: 5,
-      action: ResourceFormAction.START,
-      userId: 3,
-      resourceUsageId: 9,
-      manager,
-      submissions: [
-        {
-          formId: 7,
-          answers: [
-            { fieldId: 11, value: 'Alice' },
-            { fieldId: 13, value: true },
-            { fieldId: 14, value: 'blue' },
-          ],
-        },
-      ],
-    });
+    const drafts = await transactionsFor(manager).run({ resourceIds: [5], accountIds: [3] }, (scope) =>
+      service.prepareRequiredSubmissions({
+        resourceId: 5,
+        action: ResourceFormAction.START,
+        userId: 3,
+        resourceUsageId: 9,
+        manager: scope,
+        submissions: [
+          {
+            formId: 7,
+            answers: [
+              { fieldId: 11, value: 'Alice' },
+              { fieldId: 13, value: true },
+              { fieldId: 14, value: 'blue' },
+            ],
+          },
+        ],
+      }),
+    );
     expect(drafts).toHaveLength(1);
     expect(drafts[0]).toMatchObject({ resourceUsageId: 9, userId: 3, formId: 7 });
     expect(drafts[0].data['11'].value).toBe('Alice');
@@ -165,11 +179,13 @@ describe('ResourceFormsService field updates', () => {
     };
     const manager = { getRepository: (entity: unknown) => (entity === Form ? formRepo : fieldRepo) };
     formRepo.manager.transaction.mockImplementation((run) => run(manager));
+    const resourceRepo = { findOne: jest.fn().mockResolvedValue({ id: 5 }) };
+    const readManager = {
+      getRepository: (entity: unknown) => (entity === Resource ? resourceRepo : entity === Form ? formRepo : fieldRepo),
+    } as EntityManager;
     const service = new ResourceFormsService(
-      formRepo as never,
-      fieldRepo as never,
-      {} as never,
-      { findOne: jest.fn().mockResolvedValue({ id: 5 }) } as never,
+      new TypeormFormsPersistence(readManager),
+      transactionsFor(readManager, (work) => formRepo.manager.transaction(work)),
     );
     return { service, fieldRepo, formRepo };
   };

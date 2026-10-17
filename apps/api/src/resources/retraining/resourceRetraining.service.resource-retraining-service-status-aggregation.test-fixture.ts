@@ -1,3 +1,4 @@
+import { TypeormResourceRetrainingPersistence } from './persistence/typeorm-adapter';
 import { ResourceRetrainingService } from './resourceRetraining.service';
 import { IntroductionHistoryAction } from '@attraccess/database-entities';
 
@@ -18,11 +19,13 @@ export function registerResourceRetrainingServiceStatusAggregationFixture() {
     };
     const resourceGroups = { getGroupsOfResource: jest.fn().mockResolvedValue([{ id: 2 }]) };
     const service = new ResourceRetrainingService(
-      resources as never,
-      groups as never,
-      usage as never,
-      introductions as never,
-      history as never,
+      new TypeormResourceRetrainingPersistence(
+        resources as never,
+        groups as never,
+        usage as never,
+        introductions as never,
+        history as never,
+      ),
       resourceGroups as never,
       {} as never,
       {} as never,

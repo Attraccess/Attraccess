@@ -1,17 +1,17 @@
-import { InjectRepository } from '@nestjs/typeorm';
+import { GroupIntroductionPersistence, GROUP_INTRODUCTION_OPERATIONS } from '../persistence/port';
 
 import {
   IntroductionHistoryAction,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
   User,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { EntityManager, Repository } from 'typeorm';
+import { TransactionScope } from '../../../database/transaction-scope';
 
 import { AuditService } from '../../../audit/audit.service';
 
@@ -30,10 +30,7 @@ import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-i
 @Injectable()
 export class ResourceGroupsIntroductionsService {
   constructor(
-    @InjectRepository(ResourceIntroduction)
-    protected readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
-    @InjectRepository(ResourceIntroductionHistoryItem)
-    protected readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
+    @Inject(GroupIntroductionPersistence) protected readonly persistence: GroupIntroductionPersistence,
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly notifications: NotificationDispatchService,
@@ -41,66 +38,35 @@ export class ResourceGroupsIntroductionsService {
     protected readonly audit: AuditService,
   ) {}
 
+  protected operations(scope?: TransactionScope): GroupIntroductionPersistence {
+    return scope ? scope.resolve(GROUP_INTRODUCTION_OPERATIONS) : this.persistence;
+  }
+
   protected readonly logger = new Logger(ResourceGroupsIntroductionsService.name);
 
   protected async getLastHistoryItemOfIntroduction(
     introductionId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<ResourceIntroductionHistoryItem | null> {
-    const resourceIntroductionHistoryItemRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceIntroductionHistoryItem)
-      : this.resourceIntroductionHistoryItemRepository;
-
-    return await resourceIntroductionHistoryItemRepository.findOne({
-      where: {
-        introduction: {
-          id: introductionId,
-        },
-      },
-      order: {
-        createdAt: 'DESC',
-        id: 'DESC',
-      },
-    });
+    return this.operations(transactionalEntityManager).latest(introductionId);
   }
 
   public async getManyByGroupId(groupId: number): Promise<ResourceIntroduction[]> {
-    return await this.resourceIntroductionRepository.find({
-      where: {
-        resourceGroup: { id: groupId },
-      },
-      relations: ['receiverUser', 'tutorUser', 'history'],
-      cache: false,
-    });
+    return this.persistence.list({ kind: 'group', id: groupId });
   }
 
   public async getHistoryByGroupIdAndUserId(
     groupId: number,
     userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
-    return await this.resourceIntroductionHistoryItemRepository.find({
-      where: { introduction: { resourceGroup: { id: groupId }, receiverUser: { id: userId } } },
-    });
+    return this.persistence.history({ kind: 'group', id: groupId }, userId);
   }
 
   public async hasValidIntroduction(
     { groupId, userId }: { groupId: number; userId: number },
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
-    const resourceIntroductionRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceIntroduction)
-      : this.resourceIntroductionRepository;
-
-    const introduction = await resourceIntroductionRepository.findOne({
-      where: {
-        resourceGroup: {
-          id: groupId,
-        },
-        receiverUser: {
-          id: userId,
-        },
-      },
-    });
+    const introduction = await this.operations(transactionalEntityManager).find({ kind: 'group', id: groupId }, userId);
 
     if (!introduction) {
       return false;
@@ -138,13 +104,7 @@ export class ResourceGroupsIntroductionsService {
   }
 
   protected async createOne(groupId: number, userId: number, tutorUserId?: number): Promise<ResourceIntroduction> {
-    const introduction = await this.resourceIntroductionRepository.create({
-      resourceGroup: { id: groupId },
-      receiverUser: { id: userId },
-      ...(tutorUserId != null ? { tutorUser: { id: tutorUserId } } : {}),
-    });
-
-    return await this.resourceIntroductionRepository.save(introduction);
+    return this.persistence.create({ kind: 'group', id: groupId }, userId, tutorUserId);
   }
 
   protected async updateIntroductionStatus(
@@ -157,17 +117,12 @@ export class ResourceGroupsIntroductionsService {
     authenticationMethod?: 'session' | 'api-token' | null,
     apiTokenId?: number | null,
   ): Promise<ResourceIntroductionHistoryItem> {
-    let existingIntroduction = await this.resourceIntroductionRepository.findOne({
-      where: {
-        receiverUser: { id: userId },
-        resourceGroup: { id: groupId },
-      },
-    });
+    let existingIntroduction = await this.persistence.find({ kind: 'group', id: groupId }, userId);
 
     if (!existingIntroduction) {
       existingIntroduction = await this.createOne(groupId, userId, tutorUserId);
     } else if (tutorUserId != null && existingIntroduction.tutorUserId !== tutorUserId) {
-      await this.resourceIntroductionRepository.update(existingIntroduction.id, { tutorUserId });
+      await this.persistence.setTutor(existingIntroduction.id, tutorUserId);
       // Keep the in-memory entity in sync so subsequent history/logging sees the updated tutor.
       existingIntroduction.tutorUserId = tutorUserId;
     }
@@ -177,14 +132,12 @@ export class ResourceGroupsIntroductionsService {
       nextStatus === IntroductionHistoryAction.GRANT &&
       (await this.retraining.getIntroductionRetrainingStatus(existingIntroduction.id))?.isDue === true;
 
-    const historyItem = this.resourceIntroductionHistoryItemRepository.create({
+    const savedHistoryItem = await this.persistence.appendHistory({
       introduction: existingIntroduction,
       action: nextStatus,
-      performedByUser: { id: performedByUserId ?? userId },
+      performedByUserId: performedByUserId ?? userId,
       comment: data?.comment,
     });
-
-    const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(groupId),

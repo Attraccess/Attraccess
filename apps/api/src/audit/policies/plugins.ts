@@ -1,4 +1,4 @@
-import type { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
+import type { PluginAuditEvent } from '@attraccess/plugins-backend-sdk/v2';
 import { CompiledPluginAuditField, getPluginAuditDomain } from '../../plugin-system/audit/audit-registry';
 import { AUDIT_DOMAIN_QUERY_PATTERN } from './domains';
 import { dataFields, positive, uuid, withinDetailsLimit } from './projection';

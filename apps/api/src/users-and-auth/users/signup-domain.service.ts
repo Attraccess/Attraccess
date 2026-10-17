@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Setting } from '@attraccess/database-entities';
+import { SignupDomainPersistence } from './persistence/port';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
 
 /**
@@ -9,33 +7,18 @@ import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.e
  */
 @Injectable()
 export class SignupDomainService {
-  constructor(
-    @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
-  ) {}
+  constructor(private readonly persistence: SignupDomainPersistence) {}
 
   public async getWhitelist(): Promise<string[]> {
-    const localSignupDomainWhitelist = await this.settingRepository.findOne({
-      where: {
-        parent: 'auth',
-        key: 'local_signup_domain_whitelist',
-      },
-    });
-
-    return (localSignupDomainWhitelist?.value ?? '*')
+    const value = await this.persistence.readWhitelist();
+    return (value ?? '*')
       .split(',')
       .map((domain) => domain.trim().toLowerCase())
       .filter((domain) => domain !== '');
   }
 
   public async setWhitelist(domains: string[]): Promise<void> {
-    await this.settingRepository.update(
-      {
-        parent: 'auth',
-        key: 'local_signup_domain_whitelist',
-      },
-      { value: domains.join(',') },
-    );
+    await this.persistence.updateWhitelist(domains.join(','));
   }
 
   public async isLocalSignupEnabled(): Promise<boolean> {

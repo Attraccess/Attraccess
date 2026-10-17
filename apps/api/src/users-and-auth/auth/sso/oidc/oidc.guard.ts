@@ -10,7 +10,7 @@ import { SettingsService } from '../../../../settings/settings.service';
 import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY, SSO_OIDC_STATE_REQUEST_KEY } from './oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import {
   InvalidSSOProviderIdException,
   InvalidSSOProviderTypeException,

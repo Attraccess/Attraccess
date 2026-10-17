@@ -324,7 +324,7 @@ export function readableValue(
     return Object.entries(value)
       .map(
         ([key, item]) =>
-          `${fieldLabel(field ? `${field}.${key}` : key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t, key, context)}`,
+          `${fieldLabel(field ? `${field}.${key}` : key, t) ?? (key === 'id' ? (t ? t('fields.name') : 'Name') : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names, t, key === 'id' && field === 'logicalChannels' ? 'channelId' : key, context)}`,
       )
       .join('; ');
   }

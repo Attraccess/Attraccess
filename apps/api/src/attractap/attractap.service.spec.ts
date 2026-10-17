@@ -1,3 +1,6 @@
+import { TypeormAttractapPersistence } from './persistence/typeorm-adapter';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AuditService } from '../audit/audit.service';
 import { DeleteResult, Repository } from 'typeorm';
 import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
 import { AttractapService } from './attractap.service';
@@ -32,7 +35,7 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
       },
     };
 
-    service = new AttractapService(
+    service = makeService(
       nfcCardRepository as unknown as Repository<NFCCard>,
       {} as Repository<Attractap>,
       {} as Repository<AttractapCrashReport>,
@@ -182,7 +185,7 @@ describe('AttractapService reader maintenance and crash reports', () => {
       symbolicate: jest.fn().mockResolvedValue({ buildId: 'build', status: 'completed', backtrace: 'task: main' }),
     };
     const firmware = { getFirmwareDefinition: jest.fn().mockReturnValue({ version: '2.0' }) };
-    const service = new AttractapService(
+    const service = makeService(
       {} as never,
       readers as never,
       reports as never,
@@ -262,3 +265,29 @@ describe('AttractapService reader maintenance and crash reports', () => {
     expect(firmware.getFirmwareDefinition).not.toHaveBeenCalled();
   });
 });
+
+function makeService(
+  cards: Repository<NFCCard>,
+  readers: Repository<Attractap>,
+  crashes: Repository<AttractapCrashReport>,
+  events: EventEmitter2,
+  resources: Repository<Resource>,
+  users: Repository<User>,
+  encryption: EncryptionService,
+  metrics: MetricsService,
+  symbolication: CoredumpSymbolicationService,
+  firmware: AttractapFirmwareService,
+  notifications: NotificationDispatchService,
+  audit: AuditService,
+): AttractapService {
+  return new AttractapService(
+    new TypeormAttractapPersistence(cards, readers, crashes, resources, users),
+    events,
+    encryption,
+    metrics,
+    symbolication,
+    firmware,
+    notifications,
+    audit,
+  );
+}

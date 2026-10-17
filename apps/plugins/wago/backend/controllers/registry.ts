@@ -1,4 +1,4 @@
-import { WagoSettings } from './settings.entity';
+import { WagoSettings } from './settings.record';
 
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 
@@ -10,7 +10,7 @@ import {
 
 import { WagoService } from './service';
 
-import { WagoController } from './entity';
+import { WagoController } from './record';
 
 import { WagoControllerSummary } from './model';
 
@@ -20,13 +20,10 @@ import { WagoAudit, type WagoManualCommandAuditResult } from '../audit/index';
 
 import { randomUUID } from 'node:crypto';
 
-import { type PluginAuditPrincipal, type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
+import { type PluginAuditPrincipal, type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk/v2';
 
-import { WagoEnrollment } from './enrollment.entity';
 
-import { WagoConfigurationDraft } from '../configuration/draft.entity';
 
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
 
 import { MqttSubscriptionError } from './model';
 
@@ -46,13 +43,13 @@ export abstract class WagoRegistry extends WagoServiceState {
       if (operationalPrefix !== undefined) {
         const normalizedPrefix = normalizeOperationalPrefix(operationalPrefix);
         if (normalizedPrefix !== settings.operationalPrefix) {
-          const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
+          const controllers = await this.registry.controllers(undefined, true);
           if (controllers.length)
             throw new ConflictException('operational MQTT prefix cannot change after a controller has been claimed');
           settings.operationalPrefix = normalizedPrefix;
         }
       }
-      await this.settings.save(settings);
+      await this.registry.saveSettings(settings);
       return settings;
     };
     const settings = operationalPrefix === undefined ? await save() : await this.withClaimConfigurationLock(save);
@@ -61,15 +58,9 @@ export abstract class WagoRegistry extends WagoServiceState {
   }
 
   async getSettings(): Promise<WagoSettings> {
-    const settings = await this.settings.findOneBy({ id: 1 });
+    const settings = await this.registry.settings();
     if (settings) return settings;
-    await this.settings
-      .createQueryBuilder()
-      .insert()
-      .values({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' })
-      .orIgnore()
-      .execute();
-    return this.settings.findOneByOrFail({ id: 1 });
+    return this.registry.initializeSettings({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' });
   }
 
   async setRuntimePolicy(
@@ -98,7 +89,7 @@ export abstract class WagoRegistry extends WagoServiceState {
       { qos: 1, retain: false },
     );
     // Replay configuration skipped by the boot-time runtime gate, without creating a revision.
-    const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    const revision = await this.configuration.latestRevision(controllerId);
     if (revision && (revision.state === 'published' || revision.state === 'applied'))
       await this.context.mqtt.publish(
         controller.mqttServerId,
@@ -138,7 +129,7 @@ export abstract class WagoRegistry extends WagoServiceState {
   }
 
   async list(): Promise<WagoControllerSummary[]> {
-    const controllers = await this.controllers.find({ order: { hardwareId: 'ASC' } });
+    const controllers = await this.registry.controllers('hardwareId');
     return controllers.map((controller) => ({
       id: controller.id,
       hardwareId: controller.hardwareId,
@@ -241,16 +232,7 @@ export abstract class WagoRegistry extends WagoServiceState {
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    // The host datasource is available only after plugin module construction completes.
-    this.controllers = this.context.getRepository(WagoController);
-    this.settings = this.context.getRepository(WagoSettings);
-    this.enrollments = this.context.getRepository(WagoEnrollment);
-    this.drafts = this.context.getRepository(WagoConfigurationDraft);
-    this.revisions = this.context.getRepository(WagoConfigurationRevision);
-    const enrollments = await this.enrollments
-      .createQueryBuilder('enrollment')
-      .where('enrollment.consumedAt IS NULL')
-      .getMany();
+    const enrollments = await this.registry.unconsumedEnrollments();
     for (const enrollment of enrollments) this.scheduleEnrollmentExpiry(enrollment);
     try {
       await this.subscribeConfiguredServers();

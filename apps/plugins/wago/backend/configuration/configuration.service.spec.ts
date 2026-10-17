@@ -547,7 +547,7 @@ describe('WagoService configuration and commands', () => {
       snapshot: '{"version":1,"physicalPoints":[],"logicalChannels":[]}',
     };
     revisionRepository.find.mockResolvedValue([revision]);
-    expect(await service.getConfigurationBaseline(1)).toBe(revision);
+    expect(await service.getConfigurationBaseline(1)).toEqual(revision);
     expect(revisionRepository.find).toHaveBeenCalledWith({
       where: { controllerId: 1, state: 'applied' },
       order: { revision: 'DESC' },

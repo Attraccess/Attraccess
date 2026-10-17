@@ -8,15 +8,15 @@ import {
   Resource,
   ResourceHealthStatus,
   EmailTemplate,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { formatCredits, toExactCredits } from '@attraccess/shared';
 
 import { Injectable, Logger } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { EmailRecipientPersistence } from './persistence/port';
 
-import { Repository, EntityManager } from 'typeorm';
+import { TransactionScope } from '../database/transaction-scope';
 
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 
@@ -50,8 +50,7 @@ export class EmailService {
     protected readonly emailLayoutService: EmailLayoutService,
     protected readonly metricsService: MetricsService,
     protected readonly externalCallTimer: ExternalCallTimer,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    protected readonly recipients: EmailRecipientPersistence,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -361,9 +360,7 @@ export class EmailService {
   }
 
   async sendAccessChangeEmail(recipient: User, accessChange: { title: string; body: string; url?: string }) {
-    const resolvedRecipient = recipient?.email
-      ? recipient
-      : await this.userRepository.findOne({ where: { id: recipient.id } });
+    const resolvedRecipient = recipient?.email ? recipient : await this.recipients.user(recipient.id);
 
     if (!resolvedRecipient?.email) {
       return;
@@ -397,7 +394,7 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.VERIFY_EMAIL, context);
   }
 
-  async sendUserInvitationEmail(user: User, verificationToken: string, manager?: EntityManager) {
+  async sendUserInvitationEmail(user: User, verificationToken: string, scope?: TransactionScope) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
     const verificationUrl = `${url}/accept-invitation?email=${encodeURIComponent(
@@ -409,7 +406,7 @@ export class EmailService {
       url: verificationUrl,
     };
 
-    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context, manager);
+    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context, scope);
   }
 
   async sendPasswordResetEmail(user: User, resetToken: string) {
@@ -490,11 +487,11 @@ export class EmailService {
     user: User,
     templateType: EmailTemplateType,
     context: Record<string, unknown>,
-    manager?: EntityManager,
+    scope?: TransactionScope,
   ) {
     try {
       const locale = user.locale ?? 'en';
-      const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
+      const dbTemplate = await this.emailTemplateService.findOne(templateType, scope);
 
       const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
       const { transporter, from } = await this.createTransporter();

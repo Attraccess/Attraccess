@@ -1,3 +1,4 @@
+import { createWagoDiagnosticsPersistence } from '../flow/persistence/typeorm-adapter';
 import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { EffectivePermissionsGuard, type PluginContext } from '@attraccess/plugins-backend-sdk';
@@ -37,13 +38,13 @@ describe('resource diagnostics', () => {
       getMany: jest.fn().mockResolvedValue([]),
     };
     const service = new WagoDiagnosticsService(
-      {
+      createWagoDiagnosticsPersistence({
         getRepository: (entity: unknown) =>
           entity === WagoController
             ? { createQueryBuilder: () => controllersQuery }
             : { createQueryBuilder: () => revisionsQuery },
         dataSource: { getRepository: () => ({ createQueryBuilder: () => nodesQuery }) },
-      } as unknown as PluginContext,
+      } as unknown as PluginContext),
       {} as WagoService,
     );
     return { nodesQuery, controllersQuery, revisionsQuery, service };

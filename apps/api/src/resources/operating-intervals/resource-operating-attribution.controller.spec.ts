@@ -1,3 +1,4 @@
+import { TypeormOperatingAttributionPersistence } from './persistence/typeorm-adapter';
 import { ResourceOperatingAttributionController } from './resource-operating-attribution.controller';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import {
@@ -5,13 +6,8 @@ import {
   ResourceOperatingAttributionSummary,
 } from './resource-operating-attribution.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
-} from '@attraccess/database-entities';
-import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
+import { IsNull, LessThan, MoreThan } from 'typeorm';
 
 describe('ResourceOperatingAttributionController', () => {
   it('returns the current attribution for the requested resource', async () => {
@@ -51,9 +47,14 @@ describe('ResourceOperatingAttributionController', () => {
     };
     const lifecycleAttemptRepository = { find: jest.fn().mockResolvedValue([]) };
     const service = new ResourceOperatingAttributionService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      usageRepository as unknown as Repository<ResourceUsage>,
-      lifecycleAttemptRepository as unknown as Repository<ResourceUsageLifecycleAttempt>,
+      new TypeormOperatingAttributionPersistence({
+        getRepository: (entity: unknown) =>
+          entity === ResourceOperatingInterval
+            ? intervalRepository
+            : entity === ResourceUsage
+              ? usageRepository
+              : lifecycleAttemptRepository,
+      } as never),
     );
     const maintenanceService = {
       canManageMaintenance: jest.fn().mockResolvedValue(true),

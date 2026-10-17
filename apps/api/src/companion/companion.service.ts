@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
-import { CompanionDevice } from '@attraccess/database-entities';
+import type { CompanionDevice } from '@attraccess/application-models';
+import { CompanionPersistence } from './persistence/port';
 import { randomBytes } from 'crypto';
 import { genSalt, hash, compare } from 'bcrypt';
 import { createReadStream, existsSync, readFileSync, statSync } from 'fs';
@@ -14,16 +13,15 @@ export class CompanionService {
   private readonly assetsDir: string;
   private manifest: CompanionManifestDto | null = null;
 
-  constructor(
-    @InjectRepository(CompanionDevice)
-    private readonly deviceRepo: Repository<CompanionDevice>,
-  ) {
+  constructor(private readonly persistence: CompanionPersistence) {
     this.assetsDir = join(__dirname, 'assets', 'companion-app');
     const manifestPath = join(this.assetsDir, 'companions.json');
     if (existsSync(manifestPath)) {
       try {
         this.manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as CompanionManifestDto;
-        this.logger.log(`Loaded companion manifest: version=${this.manifest.version}, platforms=${this.manifest.platforms.length}`);
+        this.logger.log(
+          `Loaded companion manifest: version=${this.manifest.version}, platforms=${this.manifest.platforms.length}`,
+        );
       } catch (err) {
         this.logger.error(`Failed to parse companions.json: ${(err as Error).message}`);
       }
@@ -71,14 +69,13 @@ export class CompanionService {
     const tokenHash = await hash(token, salt);
     const name = randomBytes(3).toString('base64url').slice(0, 4);
 
-    const device = this.deviceRepo.create({ name, tokenHash });
-    await this.deviceRepo.save(device);
+    const device = await this.persistence.register(name, tokenHash);
     this.logger.log(`Registered new companion device id=${device.id}`);
     return { device, token };
   }
 
   async findById(id: number): Promise<CompanionDevice | null> {
-    return this.deviceRepo.findOne({ where: { id }, relations: ['resources'] });
+    return this.persistence.findById(id);
   }
 
   async verifyToken(device: CompanionDevice, token: string): Promise<boolean> {
@@ -86,19 +83,18 @@ export class CompanionService {
   }
 
   async touchLastConnection(device: CompanionDevice, appVersion?: string): Promise<void> {
-    await this.deviceRepo.update(device.id, { lastConnection: new Date(), ...(appVersion !== undefined && { appVersion }) });
+    await this.persistence.touchConnection(device.id, new Date(), appVersion);
   }
 
   async findAll(): Promise<CompanionDevice[]> {
-    return this.deviceRepo.find({ relations: ['resources'] });
+    return this.persistence.listDevices();
   }
 
   async updateName(id: number, name: string): Promise<CompanionDevice> {
-    await this.deviceRepo.update(id, { name });
-    return this.deviceRepo.findOneOrFail({ where: { id } });
+    return this.persistence.rename(id, name);
   }
 
   async delete(id: number): Promise<void> {
-    await this.deviceRepo.delete(id);
+    await this.persistence.remove(id);
   }
 }

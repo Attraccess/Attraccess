@@ -1,4 +1,4 @@
-import { Message } from '@attraccess/database-entities';
+import type { Message } from '@attraccess/application-models';
 
 export class MessageCreatedEvent {
   static readonly EVENT_NAME = 'message.created';

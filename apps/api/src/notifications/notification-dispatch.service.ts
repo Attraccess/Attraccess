@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ResourceHealthStatus, User } from '@attraccess/database-entities';
+import { ResourceHealthStatus, User } from '@attraccess/application-models';
 import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
 import { NotificationPreferenceService } from './notification-preference.service';

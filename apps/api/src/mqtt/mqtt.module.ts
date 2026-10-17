@@ -1,7 +1,12 @@
+import { MqttPersistence } from './persistence/port';
+import { TypeormMqttPersistence } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MqttServer } from '@attraccess/database-entities';
-import { MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER, MQTT_SERVER_HOST_PROVIDER } from '@attraccess/plugins-backend-sdk';
+import {
+  MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER,
+  MQTT_SERVER_HOST_PROVIDER,
+} from '@attraccess/plugins-backend-sdk/v2';
 import { MqttServerController } from './servers/mqtt-server.controller';
 import { MqttServerService } from './servers/mqtt-server.service';
 import { MqttClientService } from './mqtt-client.service';
@@ -14,6 +19,7 @@ import { MqttCredentialProvisioningService } from './mqtt-credential-provisionin
   controllers: [MqttServerController],
   providers: [
     MqttServerService,
+    { provide: MqttPersistence, useClass: TypeormMqttPersistence },
     MqttClientService,
     MqttServerHostProviderService,
     MqttCredentialProvisioningService,

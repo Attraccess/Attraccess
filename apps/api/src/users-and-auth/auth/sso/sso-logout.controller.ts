@@ -1,4 +1,4 @@
-import { SessionAuth } from '@attraccess/plugins-backend-sdk';
+import { SessionAuth } from '@attraccess/plugins-backend-sdk/v2';
 import { LogoutReturnResult, SsoLogoutSetupUrls } from './logout.types';
 import {
   BadRequestException,

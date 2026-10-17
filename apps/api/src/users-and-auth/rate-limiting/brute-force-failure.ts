@@ -9,7 +9,7 @@ interface BruteForceProtectionServiceBruteForceFailureContext {
   ipCounters: BruteForceProtectionService['ipCounters'];
   ipCoarseCounters: BruteForceProtectionService['ipCoarseCounters'];
   accountCounters: BruteForceProtectionService['accountCounters'];
-  userRepository: BruteForceProtectionService['userRepository'];
+  persistence: BruteForceProtectionService['persistence'];
 }
 export async function recordFailure(
   context: BruteForceProtectionServiceBruteForceFailureContext,
@@ -54,22 +54,9 @@ export async function recordFailure(
     accountEntry.lockoutCount += 1;
     accountEntry.count = 0;
     accountEntry.firstAt = now;
-    await context.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await context.persistence.lockAccount(userId, lockedUntil);
     return;
   }
 
-  await context.userRepository.update(
-    { id: userId },
-    {
-      failedLoginAttempts: accountEntry.count,
-      firstFailedLoginAt: new Date(accountEntry.firstAt),
-    },
-  );
+  await context.persistence.recordFailureState(userId, accountEntry.count, new Date(accountEntry.firstAt));
 }

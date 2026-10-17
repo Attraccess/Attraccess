@@ -1,3 +1,4 @@
+import { sqliteResourceFixture } from '../../../database/conformance/sqlite-fixture';
 import {
   BillingTransaction,
   BillingTransactionItem,
@@ -449,11 +450,13 @@ describe('Flow-defined metering', () => {
       const finalOperation = await usageLifecycleScope.source
         .getRepository(ResourceMeteringOperation)
         .findOneByOrFail({ kind: 'final' });
-      await usageLifecycleScope.source.transaction((manager) =>
-        usageLifecycleScope.metering.settleInTransaction(manager, ended.id, {
-          status: 'collected',
-          meters: { [finalOperation.sessionId ?? 'missing']: { status: 'ready', operationId: finalOperation.id } },
-        }),
+      await sqliteResourceFixture(usageLifecycleScope.source).transactions.run(
+        { resourceIds: [1], accountIds: [ended.userId] },
+        (manager) =>
+          usageLifecycleScope.metering.settleInTransaction(manager, ended.id, {
+            status: 'collected',
+            meters: { [finalOperation.sessionId ?? 'missing']: { status: 'ready', operationId: finalOperation.id } },
+          }),
       );
       expect(
         (await usageLifecycleScope.items(ended.id)).items.filter((item) => item.name === 'Energy (kWh)'),
@@ -854,7 +857,7 @@ describe('Flow-defined metering', () => {
         ]);
         expect(corrections[0].userId).toBe(original.userId);
         expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).toHaveBeenCalledTimes(1);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).toHaveBeenCalledWith(
+        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit.mock.calls[0][0]).toEqual(
           expect.objectContaining({
             transactionId: corrections[0].id,
             userId: original.userId,
@@ -862,8 +865,11 @@ describe('Flow-defined metering', () => {
             amount: -45,
             source: 'meter-correction',
           }),
-          expect.anything(),
         );
+        // A bound port expires after commit; inspect its presence without trying to read its methods afterward.
+        expect(
+          Boolean(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit.mock.calls[0][1]),
+        ).toBe(true);
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).toHaveBeenCalledWith(
           corrections[0].id,
         );

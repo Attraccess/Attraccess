@@ -1,4 +1,6 @@
-import { User } from '@attraccess/database-entities';
+import { User } from '../../transport/models/user.dto';
+import { mapResponse } from '../../transport/response-mapper';
+import type { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateSessionResponse {
@@ -25,4 +27,15 @@ export interface JwtPayload {
   sub: number;
   username: string;
   tokenId: string;
+}
+
+/** Session records may be plain objects. Never depend on an ORM prototype for privacy filtering. */
+export function mapSessionUser(user: AuthenticatedUser): User {
+  const projected = mapResponse(User, user);
+  for (const key of ['effectivePermissions', 'authenticationMethod', 'apiTokenId', 'jwtTokenId'] as const) {
+    if (Object.prototype.hasOwnProperty.call(user, key)) {
+      Object.assign(projected, { [key]: user[key] });
+    }
+  }
+  return projected;
 }

@@ -1,3 +1,4 @@
+import { TypeormWagoCredentialPersistence } from './persistence/typeorm-adapter';
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -9,7 +10,7 @@ import type { RuntimeState } from '../../cc100-runtime/src/runtime';
 import { WagoRuntime } from '../../cc100-runtime/src/runtime';
 import { WagoController } from '../controllers/entity';
 import { WagoCredentialRotationService, WagoCredentialRotationUncertainError } from './service';
-import { WagoCredentialRotationEntity } from './service';
+import { WagoCredentialRotationEntity } from './persistence/schema';
 import { WagoCredentialRotation1780010610000 } from './migration';
 
 describe('credential rotation with isolated SQLite and fixture broker transport', () => {
@@ -110,7 +111,13 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
         payload: Buffer.from(JSON.stringify({ revision, token, credentialEpoch, status: 'reconnected' })),
       });
     });
-    service = new WagoCredentialRotationService(context);
+    service = new WagoCredentialRotationService(
+      context,
+      new TypeormWagoCredentialPersistence(
+        () => db.getRepository(WagoController),
+        () => db.getRepository(WagoCredentialRotationEntity),
+      ),
+    );
   });
   afterEach(async () => {
     jest.useRealTimers();
@@ -217,7 +224,13 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       });
     });
     await expect(
-      new WagoCredentialRotationService(context).rotate(1, 'attraccess/wago', principal, guard(), true),
+      new WagoCredentialRotationService(
+        context,
+        new TypeormWagoCredentialPersistence(
+          () => db.getRepository(WagoController),
+          () => db.getRepository(WagoCredentialRotationEntity),
+        ),
+      ).rotate(1, 'attraccess/wago', principal, guard(), true),
     ).resolves.toEqual({ state: 'completed', revision: 1 });
     expect(rotate).toHaveBeenCalledTimes(1);
   });

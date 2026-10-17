@@ -2,9 +2,8 @@
 // FEATURE: Manual maintenance mode for resources
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
+import { MaintenanceRequestRecipients } from './persistence/port';
+import type { Resource, User } from '@attraccess/application-models';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -20,14 +19,7 @@ export class MaintenanceRequestNotificationListener {
   private readonly logger = new Logger(MaintenanceRequestNotificationListener.name);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(ResourceMaintenanceRequest)
-    private readonly requestRepository: Repository<ResourceMaintenanceRequest>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly recipients: MaintenanceRequestRecipients,
     private readonly notifications: NotificationDispatchService,
     private readonly rbacService: RbacService,
   ) {}
@@ -35,18 +27,12 @@ export class MaintenanceRequestNotificationListener {
   @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
   async handleRequestCreated(event: ResourceMaintenanceRequestCreatedEvent): Promise<void> {
     try {
-      const request = await this.requestRepository.findOne({
-        where: { id: event.requestId },
-        relations: ['createdByUser'],
-      });
+      const request = await this.recipients.requestWithAuthor(event.requestId);
       if (!request) {
         return;
       }
 
-      const resource = await this.resourceRepository.findOne({
-        where: { id: event.resourceId },
-        relations: ['groups'],
-      });
+      const resource = await this.recipients.resourceWithGroups(event.resourceId);
       if (!resource) {
         this.logger.warn(`Maintenance request for missing resource ${event.resourceId}; skipping notifications`);
         return;
@@ -90,16 +76,9 @@ export class MaintenanceRequestNotificationListener {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
-    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
+    const admins = adminIds.length > 0 ? await this.recipients.usersByIds(adminIds) : [];
 
-    const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
-    if (groupIds.length > 0) {
-      introducerWhere.push({ resourceGroupId: In(groupIds) });
-    }
-    const introducerRows = await this.resourceIntroducerRepository.find({
-      where: introducerWhere,
-      relations: ['user'],
-    });
+    const introducerRows = await this.recipients.introducers(resource.id, groupIds);
 
     const byId = new Map<number, User>();
     for (const admin of admins) {

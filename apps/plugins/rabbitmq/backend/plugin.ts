@@ -6,8 +6,8 @@
 // frontend slots. All RabbitMQ knowledge lives here in the plugin — the core
 // only hands us a generic MQTT server config through the ACCESS_MQTT_SERVERS
 // hook (see RabbitmqDetectionService).
-import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { RabbitmqDetectionController } from './detection/service';
 import { RabbitmqDetectionService } from './detection/service';
@@ -53,6 +53,7 @@ class RabbitmqController {
 class RabbitmqPluginModule {}
 
 const plugin: PluginBackendModule = {
+  persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
   credentialProvisioningProvider(context: PluginContext): RabbitmqCredentialProvisioningProvider {
     return new RabbitmqCredentialProvisioningProvider(context);
   },

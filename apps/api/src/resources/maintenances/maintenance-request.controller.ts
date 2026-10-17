@@ -1,3 +1,5 @@
+import { ResourceMaintenanceRequest } from '../../transport/models/resource-maintenance-request.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Controller, Get, Post, Param, Body, Query, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { MaintenanceRequestService } from './maintenance-request.service';
@@ -7,8 +9,8 @@ import {
   ListMaintenanceRequestsDto,
   PaginatedMaintenanceRequestResponse,
 } from './dtos';
-import { ResourceMaintenanceRequest } from '@attraccess/database-entities';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
@@ -36,7 +38,10 @@ export class MaintenanceRequestController {
     @Body() dto: CreateMaintenanceRequestDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceRequest> {
-    return await this.requestService.createRequest(resourceId, request.user.id, dto.reason);
+    return mapResponse(
+      ResourceMaintenanceRequest,
+      await this.requestService.createRequest(resourceId, request.user.id, dto.reason),
+    );
   }
 
   @Get()
@@ -55,7 +60,8 @@ export class MaintenanceRequestController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: ListMaintenanceRequestsDto,
   ): Promise<PaginatedMaintenanceRequestResponse> {
-    return await this.requestService.listRequests(resourceId, query);
+    const page = await this.requestService.listRequests(resourceId, query);
+    return { ...page, data: page.data.map((record) => mapResponse(ResourceMaintenanceRequest, record)) };
   }
 
   @Post(':requestId/resolve')
@@ -79,6 +85,9 @@ export class MaintenanceRequestController {
     @Body() dto: ResolveMaintenanceRequestDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceRequest> {
-    return await this.requestService.resolveRequest(resourceId, requestId, request.user.id, dto.action, dto.reason);
+    return mapResponse(
+      ResourceMaintenanceRequest,
+      await this.requestService.resolveRequest(resourceId, requestId, request.user.id, dto.action, dto.reason),
+    );
   }
 }

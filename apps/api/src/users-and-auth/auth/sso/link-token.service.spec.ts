@@ -1,3 +1,4 @@
+import { TypeormSsoLinkSecretPersistence } from '../persistence/typeorm-adapter';
 import { UnauthorizedException } from '@nestjs/common';
 import { InsertResult, Repository } from 'typeorm';
 import { SSOProviderType, Setting } from '@attraccess/database-entities';
@@ -43,7 +44,7 @@ describe('SSOLinkTokenService', () => {
     repository.insert.mockResolvedValue({ identifiers: [], generatedMaps: [], raw: [] } as InsertResult);
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      new TypeormSsoLinkSecretPersistence(repository as unknown as Repository<Setting>),
       encryptionService as EncryptionService,
     );
 
@@ -64,7 +65,7 @@ describe('SSOLinkTokenService', () => {
     repository.findOneBy.mockResolvedValue({ value: 'existing-secret' } as Setting);
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      new TypeormSsoLinkSecretPersistence(repository as unknown as Repository<Setting>),
       encryptionService as EncryptionService,
     );
 
@@ -92,7 +93,7 @@ describe('SSOLinkTokenService', () => {
       .mockResolvedValueOnce({ value: 'rotated-secret' } as Setting); // refresh fetch
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      new TypeormSsoLinkSecretPersistence(repository as unknown as Repository<Setting>),
       encryptionService as EncryptionService,
     );
 
@@ -111,7 +112,7 @@ describe('SSOLinkTokenService', () => {
     repository.insert.mockRejectedValue(new Error('duplicate'));
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      new TypeormSsoLinkSecretPersistence(repository as unknown as Repository<Setting>),
       encryptionService as EncryptionService,
     );
 
@@ -127,7 +128,7 @@ describe('SSOLinkTokenService', () => {
     repository.insert.mockRejectedValue(new Error('write failure'));
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      new TypeormSsoLinkSecretPersistence(repository as unknown as Repository<Setting>),
       encryptionService as EncryptionService,
     );
 
@@ -137,7 +138,7 @@ describe('SSOLinkTokenService', () => {
   it('rejects expired tokens', async () => {
     repository.findOneBy.mockResolvedValue({ value: 'expire-secret' } as Setting);
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      new TypeormSsoLinkSecretPersistence(repository as unknown as Repository<Setting>),
       encryptionService as EncryptionService,
     );
 

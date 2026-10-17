@@ -1,3 +1,5 @@
+import { DatabaseTransactions, OperationToken } from '../../database/transaction-scope';
+import { TypeormFlowWriteOperations, TypeormResourceFlowPersistence } from './persistence/typeorm-adapter';
 import { createMock } from '@golevelup/ts-jest';
 import type { PluginFlowTriggerNodeDefinition } from '@attraccess/plugins-backend-sdk';
 import { Resource, ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
@@ -19,7 +21,7 @@ it('reports invalid plugin trigger configuration when loading a saved flow', asy
   };
   registerPluginFlowNodes('validation-test', [definition]);
   const node = Object.assign(new ResourceFlowNode(), { id: 'event', type: definition.type, data: {} });
-  const service = new ResourceFlowsService(
+  const service = makeFlowService(
     createMock<Repository<ResourceFlowNode>>({ find: jest.fn().mockResolvedValue([node]) }),
     createMock<Repository<ResourceFlowEdge>>({ find: jest.fn().mockResolvedValue([]) }),
     createMock<Repository<Resource>>({ findOne: jest.fn().mockResolvedValue({ id: 1 }) }),
@@ -40,7 +42,7 @@ describe('saving MQTT flow subscriptions', () => {
   const mqtt = createMock<MqttClientService>();
   const events = new EventEmitter2();
   const resources = createMock<Repository<Resource>>();
-  const service = new ResourceFlowsService(
+  const service = makeFlowService(
     createMock<Repository<ResourceFlowNode>>({ manager }),
     createMock<Repository<ResourceFlowEdge>>(),
     resources,
@@ -115,6 +117,21 @@ describe('saving MQTT flow subscriptions', () => {
     expect(result.validationErrors).toEqual(expect.arrayContaining([expect.objectContaining({ nodeId: 'invalid' })]));
     expect(mqtt.subscribe).not.toHaveBeenCalled();
   });
+  it('does not subscribe or announce when commit fails after writing the graph', async () => {
+    manager.transaction.mockImplementationOnce(async (work: (manager: EntityManager) => Promise<unknown>) => {
+      await work(manager);
+      throw new Error('commit rejected');
+    });
+    await expect(
+      service.saveResourceFlow(1, {
+        nodes: [node('new', ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, 'new-topic')],
+        edges: [],
+      }),
+    ).rejects.toThrow('commit rejected');
+    expect(mqtt.subscribe).not.toHaveBeenCalled();
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
   it('does not announce a flow change when persistence fails', async () => {
     manager.save.mockRejectedValueOnce(new Error('database rejected write'));
     await expect(service.saveResourceFlow(1, { nodes: [], edges: [] })).rejects.toThrow('database rejected write');
@@ -124,7 +141,7 @@ describe('saving MQTT flow subscriptions', () => {
 
 describe('plugin node configuration schemas', () => {
   const resources = createMock<Repository<Resource>>();
-  const service = new ResourceFlowsService(
+  const service = makeFlowService(
     createMock<Repository<ResourceFlowNode>>(),
     createMock<Repository<ResourceFlowEdge>>(),
     resources,
@@ -171,3 +188,28 @@ describe('plugin node configuration schemas', () => {
     await expect(service.resolveNodeSchema(99, 'plugin.schema-test.static', {})).rejects.toThrow();
   });
 });
+
+function makeFlowService(
+  nodes: Repository<ResourceFlowNode>,
+  edges: Repository<ResourceFlowEdge>,
+  resources: Repository<Resource>,
+  mqtt: MqttClientService,
+  events: EventEmitter2,
+): ResourceFlowsService {
+  const transactions = new DatabaseTransactions({
+    backend: 'sqlite',
+    run: (_conflicts, work) =>
+      nodes.manager.transaction(async (manager) =>
+        work({
+          resolve: <T extends object>(_token: OperationToken<T>): T =>
+            new TypeormFlowWriteOperations(manager) as unknown as T,
+        }),
+      ),
+  });
+  return new ResourceFlowsService(
+    new TypeormResourceFlowPersistence(nodes, edges, resources),
+    transactions,
+    mqtt,
+    events,
+  );
+}

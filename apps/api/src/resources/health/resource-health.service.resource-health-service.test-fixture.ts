@@ -1,3 +1,5 @@
+import { ResourceHealthPersistence } from './persistence/port';
+import { TypeormResourceHealthPersistence } from './persistence/typeorm-adapter';
 import { Resource, ResourceHealthState } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -76,6 +78,7 @@ export function registerResourceHealthServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceHealthService,
+        { provide: ResourceHealthPersistence, useClass: TypeormResourceHealthPersistence },
         { provide: getRepositoryToken(ResourceHealthState), useValue: healthRepo },
         { provide: getRepositoryToken(Resource), useValue: resourceRepo },
         EventEmitter2,

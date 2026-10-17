@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsPositive } from 'class-validator';
-import { UsageDurationUnit } from '@attraccess/database-entities';
+import { UsageDurationUnit } from '@attraccess/application-models';
 
 /**
  * Config for USAGE_HOURS trigger. Baseline = when the last maintenance

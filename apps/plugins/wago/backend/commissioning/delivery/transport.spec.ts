@@ -1,3 +1,6 @@
+import { createSqliteDeviceOperations } from '../../runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../persistence/typeorm-adapter';
+import { createSqliteManagementStore } from '../../management/persistence/typeorm-adapter';
 import * as processTools from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -52,7 +55,14 @@ describe('commissioning SSH transport boundaries', () => {
         });
         return child;
       }) as never);
-      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {} as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))({} as PluginContext);
       const result = service['run'](
         host,
         key.fingerprint,
@@ -133,7 +143,14 @@ describe('commissioning SSH transport boundaries', () => {
       });
       return child;
     }) as never);
-    const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+    const service = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        {} as WagoService,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+      ))({} as PluginContext);
     const proof = await service['verifyManagementKey'](
       { controllerId: 1, host, hostKeyFingerprint: key.fingerprint },
       'operator',

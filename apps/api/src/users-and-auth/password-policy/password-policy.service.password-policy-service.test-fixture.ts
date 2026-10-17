@@ -1,3 +1,7 @@
+import { DatabaseTransactions, OperationToken } from '../../database/transaction-scope';
+import { EntityManager } from 'typeorm';
+import { PasswordPolicyPersistence } from './persistence/port';
+import { passwordPolicyTransactionOperations, TypeormPasswordPolicyPersistence } from './persistence/typeorm-adapter';
 import {
   AuthenticationDetail,
   PasswordHistory,
@@ -145,6 +149,32 @@ export function registerPasswordPolicyServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordPolicyService,
+        {
+          provide: PasswordPolicyPersistence,
+          useFactory: (policy, overrides, history, auth) =>
+            new TypeormPasswordPolicyPersistence(policy, overrides, history, auth),
+          inject: [
+            getRepositoryToken(PasswordPolicy),
+            getRepositoryToken(PasswordPolicyOverride),
+            getRepositoryToken(PasswordHistory),
+            getRepositoryToken(AuthenticationDetail),
+          ],
+        },
+        {
+          provide: DatabaseTransactions,
+          useFactory: (source: DataSource) =>
+            new DatabaseTransactions({
+              backend: 'sqlite',
+              run: (_conflicts, work) =>
+                source.transaction(async (manager: EntityManager) =>
+                  work({
+                    resolve: <T extends object>(_token: OperationToken<T>): T =>
+                      passwordPolicyTransactionOperations(manager) as unknown as T,
+                  }),
+                ),
+            }),
+          inject: [DataSource],
+        },
         { provide: IdentityAuditService, useValue: identityAudit },
         { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
         { provide: getRepositoryToken(PasswordPolicyOverride), useValue: overrideRepo },

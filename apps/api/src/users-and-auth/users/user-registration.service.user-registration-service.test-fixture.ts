@@ -1,3 +1,5 @@
+import { SignupDomainPersistence } from './persistence/port';
+import { TypeormSignupDomainPersistence } from './persistence/typeorm-adapter';
 import { Setting } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -25,6 +27,7 @@ export function registerUserRegistrationServiceFixture() {
         UserRegistrationService,
         // Real SignupDomainService so the domain-whitelist check is genuinely exercised
         SignupDomainService,
+        { provide: SignupDomainPersistence, useClass: TypeormSignupDomainPersistence },
         {
           provide: getRepositoryToken(Setting),
           useValue: { findOne: jest.fn(), update: jest.fn() },

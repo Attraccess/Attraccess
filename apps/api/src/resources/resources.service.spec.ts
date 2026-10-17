@@ -1,3 +1,5 @@
+import { ResourceCatalogPersistence } from './persistence/port';
+import { TypeormResourceCatalogPersistence } from './persistence/typeorm-adapter';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { DocumentationType, Resource, ResourceType, SupervisionMode } from '@attraccess/database-entities';
@@ -120,6 +122,7 @@ describe('ResourcesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourcesService,
+        { provide: ResourceCatalogPersistence, useClass: TypeormResourceCatalogPersistence },
         {
           provide: getRepositoryToken(Resource),
           useFactory: mockResourceRepository,
@@ -156,7 +159,7 @@ describe('ResourcesService', () => {
     const resource = createMockResource({ id: 8, name: 'Lathe', type: ResourceType.Machine });
     scope.resourceRepository.count.mockResolvedValue(2);
     scope.resourceRepository.create.mockReturnValue(resource);
-    scope.resourceRepository.save.mockResolvedValue(resource);
+    scope.resourceRepository.save.mockImplementation(async (record) => record);
     scope.mockResourceImageService.saveImage.mockResolvedValue('image.webp');
     const file = { buffer: Buffer.from('image') };
     const result = await scope.service.createResource(

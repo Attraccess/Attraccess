@@ -1,10 +1,7 @@
-import {
-  Auth,
-  AuthenticatedRequest,
-  BillingTransaction,
-  ResourceBillingConfiguration,
-  ResourceFlowNodeType,
-} from '@attraccess/plugins-backend-sdk';
+import { mapResponse } from '../transport/response-mapper';
+import { Auth, AuthenticatedRequest, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk/v2';
+import { BillingTransaction } from '../transport/models/billing-transaction.dto';
+import { ResourceBillingConfiguration } from '../transport/models/resource-billing-configuration.dto';
 
 import {
   Body,
@@ -24,7 +21,7 @@ import {
 
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 import { finalize } from 'rxjs/operators';
 
@@ -125,7 +122,7 @@ export class BillingController {
     );
 
     return {
-      configuration: config,
+      configuration: mapResponse(ResourceBillingConfiguration, config),
       additionalItems: additionalItemsFlowNodes.map((node) => ({
         name: (node.data.name ?? '') as string,
         unitPrice: (node.data.unitPrice ?? 0) as number,
@@ -150,7 +147,10 @@ export class BillingController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() body: UpdateResourceBillingConfigurationDto,
   ): Promise<ResourceBillingConfiguration> {
-    return await this.billingService.updateResourceBillingConfiguration(resourceId, body);
+    return mapResponse(
+      ResourceBillingConfiguration,
+      await this.billingService.updateResourceBillingConfiguration(resourceId, body),
+    );
   }
 
   @Post('/billing/configuration')
@@ -184,7 +184,10 @@ export class BillingController {
     const subject = this.liveNotificationsService.getTransactionSubject(userId);
     return this.sse.wrap(
       'billing',
-      subject.asObservable().pipe(finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId))),
+      subject.asObservable().pipe(
+        map((event) => ({ data: mapResponse(BillingTransaction, event.data) })),
+        finalize(() => this.liveNotificationsService.deleteSubjectIfUnobserved(userId)),
+      ),
     );
   }
 
@@ -234,7 +237,7 @@ export class BillingController {
     @Param('transactionId', ParseIntPipe) transactionId: number,
     @Req() request: AuthenticatedRequest,
   ): Promise<BillingTransaction> {
-    return await this.billingService.getTransaction(transactionId, request.user.id);
+    return mapResponse(BillingTransaction, await this.billingService.getTransaction(transactionId, request.user.id));
   }
 
   @Post('/users/:userId/billing/transactions')
@@ -246,7 +249,10 @@ export class BillingController {
     @Req() request: AuthenticatedRequest,
     @Body() body: ModifyBalanceDto,
   ): Promise<BillingTransaction> {
-    return await this.billingService.createManualTransaction(userId, request.user.id, body.amount);
+    return mapResponse(
+      BillingTransaction,
+      await this.billingService.createManualTransaction(userId, request.user.id, body.amount),
+    );
   }
 
   @Post('/billing/transactions/:transactionId/refund')
@@ -334,7 +340,10 @@ export class BillingController {
     @Body() body: SumupTopUpDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<BillingTransaction> {
-    return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount);
+    return mapResponse(
+      BillingTransaction,
+      await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount),
+    );
   }
 
   @Post('/billing/top-up/sumup/callback')

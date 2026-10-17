@@ -1,7 +1,14 @@
+import {
+  DatabaseTransactions,
+  TransactionScope,
+  operationToken,
+  TransactionOperations,
+} from '../../database/transaction-scope';
+import { MAINTENANCE_EVALUATION_OPERATIONS } from './persistence/port';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 
 describe('Scheduled maintenance commit notification', () => {
@@ -23,27 +30,47 @@ describe('Scheduled maintenance commit notification', () => {
     const publish = () => {
       reads.push(observer.query('SELECT COUNT(*) AS count FROM maintenance'));
     };
-    const manager = {
-      transaction: (work: (em: EntityManager) => Promise<void>) =>
+    const insert = operationToken<{ create(resourceId: number): Promise<{ id: number }> }>(
+      'fixture maintenance write',
+      ['create'],
+    );
+    const transactions = new DatabaseTransactions({
+      backend: 'sqlite',
+      run: (_conflicts, work) =>
         writer.transaction(async (em) => {
-          // Only schedule discovery is a fixture; writes and commit boundaries use real SQLite.
-          jest.spyOn(em, 'getRepository').mockReturnValue({
-            find: async () => [{ id: 1, triggerType: 'TIME_INTERVAL', timeIntervalConfig: { duration: 1 } }],
-          } as never);
-          await work(em);
+          const result = await work({
+            resolve: ((token) => {
+              if (token.id === MAINTENANCE_EVALUATION_OPERATIONS.id)
+                return {
+                  enabledSchedules: async () => [
+                    { id: 1, triggerType: 'TIME_INTERVAL', timeIntervalConfig: { duration: 1 } },
+                  ],
+                };
+              if (token.id === insert.id)
+                return {
+                  create: async (resourceId: number) => {
+                    await em.query('INSERT INTO maintenance (id, resourceId) VALUES (1, ?)', [resourceId]);
+                    return { id: 1 };
+                  },
+                };
+              throw new Error('Unknown fixture operation');
+            }) as TransactionOperations['resolve'],
+          });
           if (rollback) throw new Error('Commit rejected');
+          return result;
         }),
-    };
+    });
     const maintenance = {
       hasActiveMaintenance: async () => false,
       createMaintenanceFromSchedule: async (
         resourceId: number,
         _scheduleId: number,
         _reason: string,
-        em: EntityManager,
+        em: TransactionScope,
         notify = true,
       ) => {
-        await em.query('INSERT INTO maintenance (id, resourceId) VALUES (1, ?)', [resourceId]);
+        expect(Reflect.get(em, 'query')).toBeUndefined();
+        await em.resolve(insert).create(resourceId);
         if (notify) {
           publish();
           await reads[reads.length - 1];
@@ -53,10 +80,8 @@ describe('Scheduled maintenance commit notification', () => {
       emitScheduledMaintenanceCreated: publish,
     };
     service = new MaintenanceScheduleEvaluatorService(
-      { manager } as never,
       {} as never,
-      {} as never,
-      {} as never,
+      transactions,
       maintenance as never,
       {} as never,
       {} as never,

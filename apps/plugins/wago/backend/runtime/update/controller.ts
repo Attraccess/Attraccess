@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import {
   BadRequestException,
   Body,

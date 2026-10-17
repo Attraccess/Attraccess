@@ -13,7 +13,7 @@ To add or remove an Official package, update that allowlist in a normal pull req
 
 This guide is a complete walkthrough. It follows a working example —
 **`plugin-hello-world`** — that exercises every core capability: a backend
-controller, an injected repository, a typed event handler, and a frontend route.
+controller, permission-checked host operations, a typed event handler, and a frontend route.
 
 > [!TIP]
 > The full source is in the repository at
@@ -28,8 +28,7 @@ controller, an injected repository, a typed event handler, and a frontend route.
 | `@attraccess/plugins-backend-sdk`  | `npm install -D @attraccess/plugins-backend-sdk`  | Backend modules, `PluginContext`, typed events, permissions |
 | `@attraccess/plugins-frontend-sdk` | `npm install -D @attraccess/plugins-frontend-sdk` | Frontend plugin contract and route types                    |
 
-Both SDKs are needed only at build time (types). They are not bundled into the
-shipped artifact.
+Backend application code imports `@attraccess/plugins-backend-sdk/v2`. SQLite schema and adapter code imports `/adapter`. Externalize the SDK and its subpaths so runtime tokens, shared values and TypeORM resolve from the host. Frontend type-only imports are erased by the build.
 
 ## Anatomy of a plugin
 
@@ -64,21 +63,23 @@ keyword and an `attraccess` object:
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
+    "persistence": { "contractVersion": 2, "supportedBackends": ["sqlite"] },
     "permissions": ["READ_USERS", "LISTEN_EVENTS"],
     "sdk": { "backend": "^1.9.0", "frontend": "^1.9.0" }
   }
 }
 ```
 
-| Field                                        | Required     | Notes                                                                                                  |
-| -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
-| `name`                                       | yes          | Immutable npm package identifier.                                                                      |
-| `version`                                    | yes          | Your plugin's semantic version.                                                                        |
-| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
-| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
-| `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
-| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
-| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
+| Field                                        | Required                | Notes                                                                                                  |
+| -------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `name`                                       | yes                     | Immutable npm package identifier.                                                                      |
+| `version`                                    | yes                     | Your plugin's semantic version.                                                                        |
+| `attraccess.backend` / `attraccess.frontend` | at least one            | Relative package entry point.                                                                          |
+| `attraccess.styles`                          | no                      | Stylesheet alongside the frontend entry point.                                                         |
+| `attraccess.persistence`                     | yes for v2 backend code | Contract version and implemented backend names; mirrored by the backend module.                        |
+| `attraccess.migrations`                      | no                      | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
+| `attraccess.host`                            | yes                     | Compatible Attraccess host semver range.                                                               |
+| `attraccess.permissions`                     | no                      | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
 
 ## Dependencies on other Attraccess plugins
 
@@ -87,9 +88,7 @@ Declare plugin dependencies in `package.json` under `attraccess.dependencies`:
 ```json
 {
   "attraccess": {
-    "dependencies": [
-      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
-    ]
+    "dependencies": [{ "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }]
   }
 }
 ```
@@ -111,7 +110,7 @@ graph, so your controllers and providers behave like first-class parts of the
 API.
 
 ```ts
-import type { PluginBackendModule, PluginContext, SystemEvent } from '@attraccess/plugins-backend-sdk';
+import type { PluginBackendModule, PluginContext, SystemEvent } from '@attraccess/plugins-backend-sdk/v2';
 import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
@@ -123,11 +122,6 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 // SystemEvent is imported as a TYPE only (erased at build time); supply the enum
 // value as a string-literal cast to keep the artifact SDK-free at runtime.
 const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
-
-interface UserRow {
-  id: number;
-  username: string;
-}
 
 @Injectable()
 class HelloWorldService implements OnModuleInit {
@@ -141,18 +135,15 @@ class HelloWorldService implements OnModuleInit {
   }
 
   async greetUsers(): Promise<string[]> {
-    // Injected repository over the shared connection. Addressing the entity by
-    // NAME ('User') means we don't import the entity class; the host resolves it
-    // and gates the call behind READ_USERS.
-    const users = this.context.getRepository<UserRow>('User');
-    const rows = await users.find({ take: 5 });
+    // Requires READ_USERS. Only public identity fields cross the host boundary.
+    const rows = await this.context.operations.users.list({ limit: 5 });
     return rows.map((row) => `Hello, ${row.username}!`);
   }
 }
 
 @Controller('hello-world')
 class HelloWorldController {
-  constructor(private readonly service: HelloWorldService) {}
+  constructor(@Inject(HelloWorldService) private readonly service: HelloWorldService) {}
 
   @Get('greetings')
   async greetings(): Promise<{ greetings: string[] }> {
@@ -163,6 +154,7 @@ class HelloWorldController {
 class HelloWorldPluginModule {}
 
 const plugin: PluginBackendModule = {
+  persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
   register(context: PluginContext): DynamicModule {
     return {
       module: HelloWorldPluginModule,
@@ -179,24 +171,32 @@ export default plugin;
 
 `register(context)` receives a `PluginContext` — your gateway to the host:
 
-| Member                                                    | Purpose                                                                        | Permission               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
-| `context.manifest`                                        | Your plugin's name, version, id, directory.                                    | none                     |
-| `context.logger`                                          | Logger prefixed with your plugin name.                                         | none                     |
-| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
-| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |
-| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                            | `LISTEN_EVENTS`          |
-| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                    | `EMIT_EVENTS`            |
-| `context.events`                                          | The raw shared event bus (restricted surface).                                 | per-method               |
-| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
-| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                             | `ACCESS_MQTT_SERVERS`    |
+| Member                                                    | Purpose                                                                                     | Permission            |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------------------- |
+| `context.manifest`                                        | Your plugin's name, version, id, directory.                                                 | none                  |
+| `context.logger`                                          | Logger prefixed with your plugin name.                                                      | none                  |
+| `context.operations.users.list({ limit: 5 })`             | Public user IDs and names.                                                                  | `READ_USERS`          |
+| `context.operations.resources.findById(id)`               | Resource record.                                                                            | `ACCESS_RESOURCES`    |
+| `context.operations.flows.findReferences({ nodeTypes })`  | Saved flow reference records.                                                               | `ACCESS_RESOURCES`    |
+| `context.operations.settings.findByKey({ parent, key })`  | Setting value without initialization writes.                                                | `READ_SETTINGS`       |
+| `context.persistence.resolve(token)`                      | This plugin's registered method-only operation port.                                        | `DATABASE_ACCESS`     |
+| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                                         | `LISTEN_EVENTS`       |
+| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                                 | `EMIT_EVENTS`         |
+| `context.events`                                          | The raw shared event bus (restricted surface).                                              | per-method            |
+| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials.              | `ACCESS_MQTT_SERVERS` |
+| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS` |
+| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                          | `ACCESS_MQTT_SERVERS` |
 
 > [!IMPORTANT]
-> Resolve services and repositories through `context`, never by re-initialising
-> TypeORM or instantiating a second `EventEmitter`. The whole point is that you
-> share the host's single database connection and event bus.
+> Do not open another TypeORM connection or event bus from application code. Use host capabilities and your plugin's operation ports. Explicit `@Inject(...)` annotations are required for constructor dependencies when bundling with esbuild; it does not emit TypeScript decorator metadata.
+
+### Persistence contract and legacy plugins
+
+Keep application records and business rules separate from SQLite schema classes. Declare only implemented backend names in both `attraccess.persistence` (npm metadata, or top-level `persistence` in `plugin.json`) and the backend export. The host rejects unsupported combinations before loading schema, inspecting migration history, migrating or activating the plugin.
+
+A declaration does not make SQL portable. Register SQLite entities and typed operation factories in `persistenceAdapters`, then resolve only those reviewed methods through `context.persistence`. Keep joins, conditional writes and engine errors in the adapter; do not expose generic repositories or query strings. See [Plugin database migrations](plugins/database-migrations.md) for a complete composition example.
+
+The root `@attraccess/plugins-backend-sdk` entry and its raw SQLite context remain available for existing plugins without a persistence declaration. Those plugins are explicitly SQLite-only. They are not silently converted to v2 or given support for future engines. No removal date or automatic data conversion is promised. SDK v2 application code has no `getRepository`, `dataSource` or arbitrary `get(token)` escape hatch.
 
 ### Backend plugin permissions
 
@@ -208,13 +208,13 @@ naming the missing permission.
 
 | Permission               | Grants access to                                                                                                                                                      |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                 |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources.                                                                                                       |
-| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                       |
-| `DATABASE_ACCESS`        | `context.dataSource` and `context.getRepository(...)` for any other entity.                                                                                           |
+| `READ_USERS`             | `context.operations.users.list(...)` — public identity projection.                                                                                                    |
+| `ACCESS_RESOURCES`       | `context.operations.resources` and `context.operations.flows` — declared host reads.                                                                                  |
+| `READ_SETTINGS`          | `context.operations.settings.findByKey(...)` — read a setting.                                                                                                        |
+| `DATABASE_ACCESS`        | `context.persistence.resolve(...)` — this plugin's registered operations; no raw connection in v2.                                                                    |
 | `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                           |
 | `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                               |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
+| `RESOLVE_HOST_PROVIDERS` | Legacy SQLite context only; arbitrary provider resolution is absent from v2.                                                                                          |
 | `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
 
 ### MQTT subscriptions
@@ -240,7 +240,7 @@ also removed automatically when the plugin module is destroyed.
 
 A few notes on the boundary:
 
-- `DATABASE_ACCESS` is the broad grant: it covers the raw `dataSource` and a
+- In the legacy SQLite context, `DATABASE_ACCESS` is the broad grant: it covers the raw `dataSource` and a
   repository for **any** entity, so it implicitly includes what `READ_USERS`,
   `ACCESS_RESOURCES` and `READ_SETTINGS` grant. Prefer the narrow per-entity
   permissions when you only need one of those tables.
@@ -268,7 +268,7 @@ the host's `SystemEvent`s with compile-time-checked payloads:
   the event. Requires `EMIT_EVENTS`.
 
 ```ts
-import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { SystemEvent } from '@attraccess/plugins-backend-sdk/v2';
 
 const subscription = context.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, ({ resource, user }) => {
   context.logger.log(`Resource ${resource.id} usage started by user ${user.id}`);
@@ -293,7 +293,7 @@ bundle its own. Split dependencies into two groups:
 | Dependency                                                                                                | How to declare it                                  | Why                                                                                                                                                  |
 | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
-| `@attraccess/plugins-backend-sdk` and your own code                                                       | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
+| `@attraccess/plugins-backend-sdk` and its `/v2` and `/adapter` subpaths                                   | `peerDependencies`, externalized                   | Resolve shared tokens, values and schema authoring from the host. Bundle your own application and adapter implementation code.                       |
 
 Ship a **CommonJS** entry point (`index.js`), not an ES module. A minimal
 [esbuild](https://esbuild.github.io/) build that follows the rule:
@@ -789,15 +789,15 @@ so they share the workspace toolchain, caching and CI.
   plugin. Plugin source changes require running `install-dev` again; this target
   does not watch plugin sources.
 
-  | Target           | Produces                                                                |
-  | ---------------- | ----------------------------------------------------------------------- |
-  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
-  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)              |
+  | Target           | Produces                                                                       |
+  | ---------------- | ------------------------------------------------------------------------------ |
+  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized)        |
+  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)                     |
   | `build`          | stages `package.json` and `plugin.json` in `package/` (depends on both builds) |
-  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                 |
-  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)            |
-  | `pack-test`      | validates the packed tarball and loads its backend                      |
-  | `publish`        | publishes a new package version to npm                                  |
+  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                        |
+  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)                   |
+  | `pack-test`      | validates the packed tarball and loads its backend                             |
+  | `publish`        | publishes a new package version to npm                                         |
 
   ```bash
    # Build and pack a single plugin app:

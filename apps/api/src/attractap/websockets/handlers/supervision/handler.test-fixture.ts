@@ -1,3 +1,4 @@
+import { TypeormAttractapResourceReader } from '../../../persistence/typeorm-adapter';
 import { SupervisionMode, User } from '@attraccess/database-entities';
 import { AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapSupervisionHandler } from './supervision.handler';
@@ -91,7 +92,7 @@ export function registerAttractapSupervisionHandlerFixture() {
       resourceUsageService,
       supervisionService,
       usersService,
-      resourceRepository,
+      resourceReader: new TypeormAttractapResourceReader(resourceRepository as never),
     });
   });
   return {

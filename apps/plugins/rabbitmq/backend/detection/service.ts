@@ -1,5 +1,5 @@
-import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { Controller, Get, Inject, Injectable, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { describeManagementError, managementApiBase, managementRequest } from '../management/transport';

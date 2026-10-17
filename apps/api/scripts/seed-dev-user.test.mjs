@@ -399,3 +399,21 @@ test('rejects a database symlink escaping the configured storage directory', asy
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('rejects an unavailable database backend before seeding or fixture writes', async () => {
+  const { directory, file, db } = await database();
+  try {
+    const result = spawnSync(process.execPath, [script, '--db', file, '--allow-external-db', '--demo'], {
+      encoding: 'utf8',
+      env: { ...process.env, DATABASE_TYPE: 'postgres' },
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Unsupported DATABASE_TYPE/);
+    for (const table of ['user', 'authentication_detail', 'user_role', 'resource', 'resource_group']) {
+      assert.deepEqual(await rows(db, `SELECT * FROM ${table}`), []);
+    }
+  } finally {
+    await close(db);
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

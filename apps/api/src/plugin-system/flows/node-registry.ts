@@ -6,7 +6,7 @@
  * Services that need the list import getRegisteredPluginFlowNodes() directly.
  */
 
-import type { PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk';
+import type { PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk/v2';
 
 // ponytail: Map keyed by type for O(1) lookup; registration order preserved via insertion order.
 interface RegisteredPluginFlowNode {

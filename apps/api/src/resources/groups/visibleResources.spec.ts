@@ -1,3 +1,5 @@
+import { TypeormGroupPersistence } from './persistence/typeorm-adapter';
+import { Resource, ResourceGroup } from '@attraccess/database-entities';
 import { DataSource, EntitySchema } from 'typeorm';
 import { ResourceGroupsService } from './resourceGroups.service';
 import { ResourceGroupsController } from './resourceGroups.controller';
@@ -33,10 +35,7 @@ describe('visible resource existence', () => {
       'CREATE TABLE resource_introduction_history_item (id INTEGER, introductionId INTEGER, action TEXT, createdAt TEXT)',
     );
     service = new ResourceGroupsService(
-      source.getRepository('resource_group') as never,
-      source.getRepository('resource') as never,
-      {} as never,
-      {} as never,
+      new TypeormGroupPersistence({getRepository:(entity:unknown)=>source.getRepository(entity===Resource?'resource':entity===ResourceGroup?'resource_group':'unsupported')} as never),
       {} as never,
       {} as never,
       {} as never,

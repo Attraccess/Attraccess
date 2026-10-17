@@ -9,7 +9,7 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { createTransport } from 'nodemailer';
-import { Repository } from 'typeorm';
+import { TypeormEmailRecipientPersistence } from './persistence/typeorm-adapter';
 import { EmailLayoutService } from './../email-layout/email-layout.service';
 import {
   EMAIL_TEMPLATE_DEFAULTS,
@@ -169,7 +169,7 @@ describe('EmailService', () => {
       emailLayoutService as unknown as EmailLayoutService,
       metricsService as unknown as MetricsService,
       externalCallTimer as unknown as ExternalCallTimer,
-      userRepository as unknown as Repository<User>,
+      new TypeormEmailRecipientPersistence(userRepository as never),
     );
 
     return { service, sendMail, close, settingsService, emailTemplateService, emailLayoutService, userRepository };

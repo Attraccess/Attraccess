@@ -1,3 +1,7 @@
+import { SqliteAuditTransactionObserver } from './persistence/transaction-observer';
+import { SqliteAuditPersistence } from './persistence/sqlite-audit-storage';
+import { User } from '@attraccess/database-entities';
+import { TypeormSettingsPersistence } from '../settings/persistence/typeorm-adapter';
 import { AuditLog, entities, Setting } from '@attraccess/database-entities';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -75,8 +79,11 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), null);
-    audit = new AuditService(source, store);
+    store = new SettingsStoreService(
+      new TypeormSettingsPersistence(source.getRepository(Setting), source.getRepository(User)),
+      null,
+    );
+    audit = new AuditService(new SqliteAuditPersistence(source), store, new SqliteAuditTransactionObserver(source));
     const module = await Test.createTestingModule({
       controllers: [AuditController, SettingsController],
       providers: [

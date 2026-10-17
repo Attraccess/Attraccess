@@ -1,4 +1,7 @@
-import { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { WagoManagedPersistence } from './persistence/port';
+import { WagoDeviceOperations } from '../device-operations';
+import { WagoCommissioningPersistence } from '../../commissioning/persistence/port';
+import { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 
 import { Inject, Injectable, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 
@@ -6,7 +9,7 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto';
 
 import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
 
-import { WagoController } from '../../controllers/entity';
+import { WagoController } from '../../controllers/record';
 
 import { managedHostHelper } from './provisioning/helper';
 
@@ -18,7 +21,7 @@ import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
 
 import { WagoService } from '../../controllers/service';
 
-import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.record';
 
 import {
   RuntimeUpdateError,
@@ -37,19 +40,22 @@ export class WagoManagedRuntimeService
   implements OnApplicationBootstrap, OnModuleDestroy
 {
   constructor(
-    @Inject(Symbol.for('attraccess.plugin.context')) context: PluginContext,
+    @Inject(Symbol.for('attraccess.plugin.context')) context: Omit<PluginContext, 'operations' | 'persistence'>,
     @Inject(WagoService) wago: WagoService,
     @Inject(WagoRuntimeArtifactsService) artifacts: WagoRuntimeArtifactsService,
     @Inject(WagoCommissioningReadiness) readiness: WagoCommissioningReadiness,
+    @Inject(WagoCommissioningPersistence) commissioningPersistence: WagoCommissioningPersistence,
+    @Inject(WagoDeviceOperations) operations: WagoDeviceOperations,
+    @Inject(WagoManagedPersistence) persistence: WagoManagedPersistence,
   ) {
-    super(context, wago, artifacts, readiness);
+    super(context, wago, artifacts, readiness, commissioningPersistence, operations, persistence);
   }
 
   protected async completeEnrolment(controller: WagoController): Promise<boolean> {
     if (!controller.mqttServerId) return false;
-    const bound = await this.access.findOne({ where: { controllerId: controller.id }, order: { sessionId: 'DESC' } });
+    const bound = await this.persistence.latestAccess(controller.id);
     if (!bound) return false;
-    const session = await this.sessions.findOneBy({ id: bound.sessionId });
+    const session = await this.commissioningPersistence.session(bound.sessionId);
     if (!session || !['awaiting_verification', 'completed'].includes(session.state)) return false;
     if (session.hardwareId !== controller.hardwareId || session.mqttServerId !== controller.mqttServerId) return false;
     let access = await this.loadSession(session.id);
@@ -94,8 +100,8 @@ export class WagoManagedRuntimeService
       if (!principal) throw new Error('Management audit initiator unavailable');
       await this.securityAudit(session.id, 'security_apply', principal, operationId, 'attempted');
       attempted = true;
-      await this.sessions.update(session.id, { updatedAt: new Date().toISOString() });
-      await this.access.update(access.sessionId, { controllerId: controller.id });
+      await this.commissioningPersistence.updateSession(session.id, { updatedAt: new Date().toISOString() });
+      await this.persistence.updateAccess(access.sessionId, { controllerId: controller.id });
       if (remoteStatus === 'cutover\n') {
         // A previous attempt already failed. Request the same safe rollback as
         // the watchdog, without retiring the key or confirming an unknown policy.
@@ -214,21 +220,13 @@ export class WagoManagedRuntimeService
   ): Promise<boolean> {
     if (attempted && principal)
       await this.securityAudit(session.id, 'security_apply', principal, operationId, 'failed').catch(() => undefined);
-    await this.access
-      .createQueryBuilder()
-      .update()
-      .set({ state: 'recovery_required' })
-      .where('session_id = :sessionId AND state NOT IN (:...retired)', {
-        sessionId: session.id,
-        retired: ['retiring', 'retired'],
-      })
-      .execute();
+    await this.persistence.setUnretiredState(session.id, 'recovery_required');
     // Keep the last audited attempt's diagnosis through transient offline
     // probes while the controller reboots or its rollback is still running.
     const transientOfflineProbe =
       stage === 'status' && error instanceof RuntimeUpdateError && error.failure === 'offline';
     if (attempted || !session.failureReason || !transientOfflineProbe)
-      await this.sessions.update(session.id, {
+      await this.commissioningPersistence.updateSession(session.id, {
         failureReason: managedSetupFailure(stage, error, operation.signal.aborted),
         updatedAt: new Date().toISOString(),
       });
@@ -250,7 +248,7 @@ export class WagoManagedRuntimeService
 
   protected async auditUpdate(record: RuntimeUpdateRecord) {
     const access = await this.required(record.controllerId);
-    const session = await this.sessions.findOneByOrFail({ id: access.sessionId });
+    const session = await this.requiredSession(access.sessionId);
     const principal = JSON.parse(session.initiatingPrincipal ?? 'null') as PluginAuditPrincipal | null;
     if (!principal || !Number.isSafeInteger(principal.userId) || principal.userId <= 0)
       throw new RuntimeUpdateError('audit');
@@ -277,7 +275,7 @@ export class WagoManagedRuntimeService
     return {
       inspect: async (id, signal) => {
         const access = await this.required(id);
-        const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
+        const controller = await this.commissioningPersistence.controller(id, true);
         const output = await this.connection(access, `inspect ${access.token}`, signal);
         const match = new RegExp(
           `^${MANAGED_HELPER_PROTOCOL}\\n([a-f0-9]{64})\\n(sha256:[a-f0-9]{64}) (true|false)\\n$`,
@@ -347,7 +345,7 @@ export class WagoManagedRuntimeService
         await command(id, 'activate', token, signal);
       },
       verify: async (id, _token, imageId, since, signal) => {
-        const controller = await this.controllers.findOneByOrFail({ id, trustState: 'claimed' });
+        const controller = await this.requiredController(id);
         if (!controller.mqttServerId) throw new RuntimeUpdateError('offline');
         const prefix = (await this.wago.getSettings()).operationalPrefix;
         const activation = _token === null ? undefined : this.runtimeActivations.get(_token);
@@ -409,26 +407,18 @@ export class WagoManagedRuntimeService
           throw error;
         }
         owners.set(owner, access.fingerprint);
-        await this.updates.createQueryBuilder().insert().values({ controllerId }).orIgnore().execute();
+        await this.persistence.initializeUpdate(controllerId);
         return true;
       },
       load: async (controllerId) => {
-        const row = await this.updates.findOneBy({ controllerId });
-        return row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null;
+        const metadata = await this.persistence.updateMetadata(controllerId);
+        return metadata ? (JSON.parse(metadata) as RuntimeUpdateRecord) : null;
       },
       save: async (record, owner, now) => {
         const fingerprint = owners.get(owner);
         if (!fingerprint) throw new Error('Update lease lost');
-        const result = await this.updates
-          .createQueryBuilder()
-          .update()
-          .set({ metadata: JSON.stringify(record) })
-          .where(
-            'controller_id = :controllerId AND EXISTS (SELECT 1 FROM plugin_wago_device_operations WHERE fingerprint = :fingerprint AND owner = :owner AND lease_until > :now)',
-            { controllerId: record.controllerId, fingerprint, owner, now },
-          )
-          .execute();
-        if (result.affected !== 1) throw new Error('Update lease lost');
+        if (!(await this.persistence.saveUpdate(record.controllerId, JSON.stringify(record), fingerprint, owner, now)))
+          throw new Error('Update lease lost');
       },
       release: async (_id, owner) => {
         const fingerprint = owners.get(owner);

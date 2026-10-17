@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Allow } from 'class-validator';
-import { ResourceFlowVariableScope, ResourceFlowVariableValueType } from '@attraccess/database-entities';
+import { ResourceFlowVariableScope } from '@attraccess/application-models';
+import { ResourceFlowVariableValueType } from '@attraccess/application-models';
 
 export class FlowVariableDto {
   @ApiProperty() id!: number;

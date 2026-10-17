@@ -1,15 +1,10 @@
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  ResourceUsageAction,
-} from '@attraccess/database-entities';
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/application-models';
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { OperatingAttributionPersistence, OPERATING_ATTRIBUTION_READS } from './persistence/port';
 
-import { Repository, EntityManager, In, IsNull, LessThan, MoreThan } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 
 export const ATTRIBUTION_LOOKBACK_MS = 31 * 24 * 60 * 60_000;
 
@@ -78,13 +73,12 @@ export type SweepEvent =
 @Injectable()
 export class ResourceOperatingAttributionService {
   constructor(
-    @InjectRepository(ResourceOperatingInterval)
-    protected readonly intervalRepository: Repository<ResourceOperatingInterval>,
-    @InjectRepository(ResourceUsage)
-    protected readonly usageRepository: Repository<ResourceUsage>,
-    @InjectRepository(ResourceUsageLifecycleAttempt)
-    protected readonly lifecycleAttemptRepository: Repository<ResourceUsageLifecycleAttempt>,
+    @Inject(OperatingAttributionPersistence) protected readonly persistence: OperatingAttributionPersistence,
   ) {}
+
+  protected operations(scope?: TransactionScope): OperatingAttributionPersistence {
+    return scope ? scope.resolve(OPERATING_ATTRIBUTION_READS) : this.persistence;
+  }
 
   derive(
     operatingIntervals: ResourceOperatingInterval[],
@@ -250,33 +244,9 @@ export class ResourceOperatingAttributionService {
     windowStart = new Date(asOf.getTime() - ATTRIBUTION_LOOKBACK_MS),
   ): Promise<ResourceOperatingAttributionSummary> {
     const [operatingIntervals, usages, operatingDataAvailable, pendingSessionEnds] = await Promise.all([
-      this.intervalRepository.find({
-        where: [
-          { resourceId, startTime: LessThan(asOf), endTime: IsNull() },
-          { resourceId, startTime: LessThan(asOf), endTime: MoreThan(windowStart) },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.usageRepository.find({
-        where: [
-          {
-            resourceId,
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: IsNull(),
-          },
-          {
-            resourceId,
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: MoreThan(windowStart),
-          },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.intervalRepository.existsBy({ resourceId }),
+      this.persistence.intervals([resourceId], asOf, windowStart),
+      this.persistence.usages([resourceId], asOf, windowStart),
+      this.persistence.hasData(resourceId),
       this.getPendingSessionEnds([resourceId]),
     ]);
 
@@ -295,40 +265,12 @@ export class ResourceOperatingAttributionService {
     }
 
     const [operatingIntervals, usages, resourcesWithOperatingData, pendingSessionEnds] = await Promise.all([
-      this.intervalRepository.find({
-        where: [
-          { resourceId: In(uniqueResourceIds), startTime: LessThan(asOf), endTime: IsNull() },
-          { resourceId: In(uniqueResourceIds), startTime: LessThan(asOf), endTime: MoreThan(windowStart) },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.usageRepository.find({
-        where: [
-          {
-            resourceId: In(uniqueResourceIds),
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: IsNull(),
-          },
-          {
-            resourceId: In(uniqueResourceIds),
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-            startTime: LessThan(asOf),
-            endTime: MoreThan(windowStart),
-          },
-        ],
-        order: { startTime: 'ASC' },
-      }),
-      this.intervalRepository
-        .createQueryBuilder('interval')
-        .select('DISTINCT interval.resourceId', 'resourceId')
-        .where('interval.resourceId IN (:...resourceIds)', { resourceIds: uniqueResourceIds })
-        .getRawMany<{ resourceId: number }>(),
+      this.persistence.intervals(uniqueResourceIds, asOf, windowStart),
+      this.persistence.usages(uniqueResourceIds, asOf, windowStart),
+      this.persistence.resourcesWithData(uniqueResourceIds),
       this.getPendingSessionEnds(uniqueResourceIds),
     ]);
-    const availableResourceIds = new Set(resourcesWithOperatingData.map(({ resourceId }) => resourceId));
+    const availableResourceIds = new Set(resourcesWithOperatingData);
     const intervalsByResourceId = groupByResourceId(operatingIntervals);
     const usagesByResourceId = groupByResourceId(usages);
 
@@ -348,29 +290,18 @@ export class ResourceOperatingAttributionService {
     );
   }
 
-  async getForUsage(usage: ResourceUsage, manager: EntityManager): Promise<number> {
+  async getForUsage(usage: ResourceUsage, manager: TransactionScope): Promise<number> {
     if (!usage.endTime) {
       return 0;
     }
 
-    const intervals = await manager.getRepository(ResourceOperatingInterval).find({
-      where: [
-        { resourceId: usage.resourceId, startTime: LessThan(usage.endTime), endTime: IsNull() },
-        { resourceId: usage.resourceId, startTime: LessThan(usage.endTime), endTime: MoreThan(usage.startTime) },
-      ],
-      order: { startTime: 'ASC' },
-    });
+    const intervals = await this.operations(manager).intervals([usage.resourceId], usage.endTime, usage.startTime);
     const { attributedOperatingDurationMs } = this.derive(intervals, [usage], usage.endTime, usage.startTime);
     return (attributedOperatingDurationMs ?? 0) / 60_000;
   }
 
-  protected async getPendingSessionEnds(resourceIds: number[], manager?: EntityManager): Promise<Map<number, Date>> {
-    const attempts = await (
-      manager?.getRepository(ResourceUsageLifecycleAttempt) ?? this.lifecycleAttemptRepository
-    ).find({
-      where: { resourceId: In(resourceIds), kind: In(['end', 'takeover']) },
-      select: ['previousUsageId', 'transitionTime'],
-    });
+  protected async getPendingSessionEnds(resourceIds: number[], manager?: TransactionScope): Promise<Map<number, Date>> {
+    const attempts = await this.operations(manager).pendingEnds(resourceIds);
     return new Map(
       attempts.flatMap((attempt) =>
         attempt.previousUsageId === null ? [] : [[attempt.previousUsageId, attempt.transitionTime] as const],
@@ -382,7 +313,7 @@ export class ResourceOperatingAttributionService {
   async getDurationsForWindows(
     windows: ResourceDurationWindow[],
     asOf: Date,
-    manager?: EntityManager,
+    manager?: TransactionScope,
   ): Promise<Map<string, ResourceDurations>> {
     const result = new Map<string, ResourceDurations>();
     const windowsByResource = new Map<number, ResourceDurationWindow[]>();
@@ -392,33 +323,18 @@ export class ResourceOperatingAttributionService {
       windowsByResource.set(window.resourceId, resourceWindows);
     }
     const resourceIds = [...windowsByResource.keys()];
-    const intervalRepository = manager?.getRepository(ResourceOperatingInterval) ?? this.intervalRepository;
-    const usageRepository = manager?.getRepository(ResourceUsage) ?? this.usageRepository;
 
     // Each resource gets its own oldest requested boundary. Sharing a boundary across a batch
     // would load an unbounded history for unrelated resources with newer service cycles.
     for (let offset = 0; offset < resourceIds.length; offset += 150) {
       const batchIds = resourceIds.slice(offset, offset + 150);
       const batchWindows = batchIds.flatMap((id) => windowsByResource.get(id) ?? []);
-      const where = batchIds.flatMap((resourceId) => {
-        const start = new Date(
-          Math.min(...(windowsByResource.get(resourceId) ?? []).map((window) => window.start.getTime())),
-        );
-        return [
-          { resourceId, startTime: LessThan(asOf), endTime: IsNull() },
-          { resourceId, startTime: LessThan(asOf), endTime: MoreThan(start) },
-        ];
-      });
-      const [intervals, usages, pendingSessionEnds] = await Promise.all([
-        intervalRepository.find({ where, select: ['resourceId', 'startTime', 'endTime'] }),
-        usageRepository.find({
-          where: where.map((condition) => ({
-            ...condition,
-            usageAction: ResourceUsageAction.Usage,
-            lifecyclePending: false,
-          })),
-          select: ['id', 'resourceId', 'startTime', 'endTime'],
-        }),
+      const boundaries = batchIds.map((resourceId) => ({
+        resourceId,
+        start: new Date(Math.min(...(windowsByResource.get(resourceId) ?? []).map((window) => window.start.getTime()))),
+      }));
+      const [{ intervals, usages }, pendingSessionEnds] = await Promise.all([
+        this.operations(manager).durationRows(boundaries, asOf),
         this.getPendingSessionEnds(batchIds, manager),
       ]);
       const intervalsByResource = groupByResourceId(intervals);

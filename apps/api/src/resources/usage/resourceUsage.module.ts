@@ -1,3 +1,11 @@
+import { DataSource } from 'typeorm';
+import { SqliteTransactionDriver } from '../../database/sqlite/transactions';
+import { UsageNoteRecipients, SupervisedUsageHistory, UsagePersistence, USAGE_OPERATIONS } from './persistence/port';
+import {
+  TypeormUsageNoteRecipients,
+  TypeormSupervisedUsageHistory,
+  TypeormUsagePersistence,
+} from './persistence/typeorm-adapter';
 import { Module, forwardRef } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
@@ -43,10 +51,20 @@ import { ResourceMeteringModule } from '../metering/resource-metering.module';
   ],
   controllers: [ResourceUsageController],
   providers: [
+    {
+      provide: UsagePersistence,
+      useFactory: (source: DataSource, driver: SqliteTransactionDriver) => {
+        driver.register(USAGE_OPERATIONS, (manager) => new TypeormUsagePersistence(manager));
+        return new TypeormUsagePersistence(source.manager);
+      },
+      inject: [DataSource, SqliteTransactionDriver],
+    },
     ResourceUsageService,
     ResourceUsageNoteNotificationListener,
+    { provide: UsageNoteRecipients, useClass: TypeormUsageNoteRecipients },
     ResourceSessionNotificationListener,
     SupervisedUsageAutoPromotionListener,
+    { provide: SupervisedUsageHistory, useClass: TypeormSupervisedUsageHistory },
   ],
   exports: [ResourceUsageService],
 })

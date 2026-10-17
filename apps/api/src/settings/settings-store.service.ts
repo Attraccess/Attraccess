@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Setting } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { SettingsPersistence } from './persistence/port';
 import { EncryptionService } from '../encryption/encryption.service';
 import { APP_PARENT, SETTINGS_CACHE_TTL_MS } from './constants';
 
@@ -17,8 +15,7 @@ export class SettingsStoreService {
   private readonly cache = new Map<string, CachedSetting>();
 
   constructor(
-    @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
+    private readonly persistence: SettingsPersistence,
     private readonly encryptionService: EncryptionService,
   ) {}
 
@@ -26,17 +23,14 @@ export class SettingsStoreService {
     return this.getPlainSetting(APP_PARENT, key);
   }
 
-  async getPlainSetting(
-    parent: string,
-    key: string,
-  ): Promise<string | null> {
+  async getPlainSetting(parent: string, key: string): Promise<string | null> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
     if (cached) {
       return cached.value;
     }
 
-    const existing = await this.settingRepository.findOneBy({ parent, key });
+    const existing = await this.persistence.read(parent, key);
     if (existing?.value) {
       this.setCache(cacheKey, existing.value, true);
       return existing.value;
@@ -45,17 +39,14 @@ export class SettingsStoreService {
     return null;
   }
 
-  async getSecretSetting(
-    parent: string,
-    key: string,
-  ): Promise<{ value: string | null; configured: boolean }> {
+  async getSecretSetting(parent: string, key: string): Promise<{ value: string | null; configured: boolean }> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
     if (cached) {
       return { value: cached.value, configured: cached.configured };
     }
 
-    const existing = await this.settingRepository.findOneBy({ parent, key });
+    const existing = await this.persistence.read(parent, key);
     if (existing?.value) {
       const decrypted = this.decryptSecret(parent, key, existing.value);
       this.setCache(cacheKey, decrypted, true);
@@ -69,12 +60,12 @@ export class SettingsStoreService {
     const cacheKey = this.getCacheKey(parent, key);
     const normalized = this.normalizeString(value);
     if (!normalized) {
-      await this.settingRepository.delete({ parent, key });
+      await this.persistence.remove(parent, key);
       this.setCache(cacheKey, null, false);
       return;
     }
 
-    await this.upsertSetting(parent, key, normalized);
+    await this.persistence.write(parent, key, normalized);
     this.setCache(cacheKey, normalized, true);
   }
 
@@ -82,13 +73,13 @@ export class SettingsStoreService {
     const cacheKey = this.getCacheKey(parent, key);
     const normalized = this.normalizeString(value);
     if (!normalized) {
-      await this.settingRepository.delete({ parent, key });
+      await this.persistence.remove(parent, key);
       this.setCache(cacheKey, null, false);
       return;
     }
 
     const encrypted = this.encryptionService.encrypt(normalized);
-    await this.upsertSetting(parent, key, encrypted);
+    await this.persistence.write(parent, key, encrypted);
     this.setCache(cacheKey, normalized, true);
   }
 
@@ -122,16 +113,6 @@ export class SettingsStoreService {
     }
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
-  }
-
-  private async upsertSetting(parent: string, key: string, value: string): Promise<void> {
-    const existing = await this.settingRepository.findOneBy({ parent, key });
-    if (existing) {
-      existing.value = value;
-      await this.settingRepository.save(existing);
-    } else {
-      await this.settingRepository.save(this.settingRepository.create({ parent, key, value }));
-    }
   }
 
   private decryptSecret(parent: string, key: string, value: string): string {

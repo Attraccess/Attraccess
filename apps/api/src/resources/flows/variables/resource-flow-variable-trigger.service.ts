@@ -1,13 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
-import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceFlowVariableScope,
-  VariableChangedNodeDataSchema,
-} from '@attraccess/database-entities';
+import { FlowTriggerPersistence } from '../persistence/port';
+import { ResourceFlowVariableScope, VariableChangedNodeDataSchema } from '@attraccess/application-models';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 import { ResourceFlowsExecutorService } from '../execution/resource-flows-executor.service';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
@@ -17,19 +11,16 @@ export class ResourceFlowVariableTriggerService {
   private readonly logger = new Logger(ResourceFlowVariableTriggerService.name);
 
   constructor(
-    @InjectRepository(ResourceFlowNode)
-    private readonly nodeRepository: Repository<ResourceFlowNode>,
+    private readonly persistence: FlowTriggerPersistence,
     private readonly executor: ResourceFlowsExecutorService,
     private readonly variables: ResourceFlowVariablesService,
   ) {}
 
   @OnEvent(ResourceFlowVariableChangedEvent.EVENT_NAME)
   async handle(event: ResourceFlowVariableChangedEvent): Promise<void> {
-    const where: FindOptionsWhere<ResourceFlowNode> = { type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED };
-    if (event.scope === ResourceFlowVariableScope.RESOURCE && event.resourceId !== null) {
-      where.resourceId = event.resourceId;
-    }
-    const candidates = await this.nodeRepository.find({ where });
+    const candidates = await this.persistence.variableTriggers(
+      event.scope === ResourceFlowVariableScope.RESOURCE && event.resourceId !== null ? event.resourceId : undefined,
+    );
 
     for (const node of candidates) {
       const parsed = VariableChangedNodeDataSchema.safeParse(node.data);

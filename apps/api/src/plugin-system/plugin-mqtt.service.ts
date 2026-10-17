@@ -1,4 +1,4 @@
-import type { PluginMqttMessage, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
+import type { PluginMqttMessage, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk/v2';
 import { Injectable, LoggerService } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../mqtt/mqtt-client.service';

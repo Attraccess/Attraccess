@@ -1,3 +1,4 @@
+import { FlowEventPersistence } from '../persistence/port';
 import {
   forwardRef,
   Inject,
@@ -8,21 +9,19 @@ import {
   Logger,
 } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { FlowExecutionPersistence, FLOW_EXECUTION_READS } from '../persistence/port';
 
-import { Repository, EntityManager } from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../../database/transaction-scope';
 
 import {
   ResourceFlowNode,
-  ResourceFlowEdge,
   Resource,
-  BillingTransactionItem,
   ResourceFlowNodeType,
   CompanionForegroundAppNodeDataSchema,
   CompanionIdleActiveNodeDataSchema,
   ResourceUsage,
   ResourceUsageAction,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
@@ -52,7 +51,7 @@ import { heartbeatKey, NodeProcessingResult } from '../node-executors';
 
 import { FlowExecutionOptions, UsageEventData, FlowResourceContext } from './flow-execution.types';
 
-import { getFlowRepository, FlowExecutionContext } from './flow-execution-context';
+import { FlowExecutionContext } from './flow-execution-context';
 
 import { ResourceSessionStartedEvent } from '../../usage/events/resource-usage.events';
 
@@ -71,18 +70,12 @@ import { buildNodeExecutorRegistry } from './node-executor-registry';
 @Injectable()
 export class ResourceFlowsExecutorService implements OnModuleInit {
   public constructor(
-    @InjectRepository(ResourceFlowNode)
-    protected readonly flowNodeRepository: Repository<ResourceFlowNode>,
-    @InjectRepository(ResourceFlowEdge)
-    flowEdgeRepository: Repository<ResourceFlowEdge>,
-    @InjectRepository(Resource)
-    resourceRepository: Repository<Resource>,
+    @Inject(FlowExecutionPersistence) protected readonly persistence: FlowExecutionPersistence,
+    transactions: DatabaseTransactions,
     flowLogs: FlowLogRecorderService,
     mqttClientService: MqttClientService,
     @Inject(forwardRef(() => ResourceUsageService))
     protected readonly resourceUsageService: ResourceUsageService,
-    @InjectRepository(BillingTransactionItem)
-    billingTransactionItemRepository: Repository<BillingTransactionItem>,
     eventEmitter: EventEmitter2,
     resourceHealthService: ResourceHealthService,
     variablesService: ResourceFlowVariablesService,
@@ -91,13 +84,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     companionGatewayService: CompanionGatewayService,
     operatingIntervals: ResourceOperatingIntervalService,
     @Inject(forwardRef(() => ResourceMeteringService)) metering: ResourceMeteringService,
+    flowEvents: FlowEventPersistence,
   ) {
     const nodeExecutors = buildNodeExecutorRegistry({
       resourceActivity: this.resourceActivity,
       heartbeatLastSeen: this.heartbeatLastSeen,
       resourceHealthService,
       resourceUsageService,
-      billingTransactionItemRepository,
+      transactions,
       mqttClientService,
       operatingIntervals,
       eventEmitter,
@@ -106,22 +100,21 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       metering,
     });
     this.engine = new FlowExecutionEngine(
-      flowNodeRepository,
-      flowEdgeRepository,
+      persistence,
       flowLogs,
       flowTimer,
       nodeExecutors,
-      new FlowExecutionContext(resourceRepository, variablesService),
+      new FlowExecutionContext(persistence, variablesService),
       this.logger,
     );
     this.triggers = new FlowTriggerDispatcher(
-      flowNodeRepository,
+      flowEvents,
       mqttClientService,
       (nodes, data) => this.startFlow(nodes, data),
       this.logger,
     );
     this.monitor = new FlowResourceMonitor(
-      flowNodeRepository,
+      flowEvents,
       this.resourceActivity,
       this.heartbeatLastSeen,
       resourceHealthService,
@@ -155,13 +148,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       throw new ForbiddenException('You are not allowed to press this button');
     }
 
-    const button = await this.flowNodeRepository.findOne({
-      where: {
-        resourceId,
-        type: ResourceFlowNodeType.INPUT_BUTTON,
-        id: buttonId.toString(),
-      },
-    });
+    const button = await this.persistence.button(resourceId, buttonId.toString());
 
     if (!button) {
       throw new NotFoundException('UNKNOWN_BUTTON_ID', { cause: { buttonId } });
@@ -230,17 +217,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
     initialData: object = {},
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
     options: FlowExecutionOptions = {},
   ): Promise<object[]> {
-    const repository = getFlowRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
-
-    const allNodes = await repository.find({
-      where: {
-        resourceId,
-        type: triggerNodeType,
-      },
-    });
+    const allNodes = await (
+      transactionManager ? transactionManager.resolve(FLOW_EXECUTION_READS) : this.persistence
+    ).triggers(resourceId, triggerNodeType);
 
     const nodes = options.metering
       ? allNodes.filter((node) => node.data?.meterId === options.metering?.meterId)
@@ -264,12 +246,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   ) {
     this.logger.debug(`Looking for flow nodes of type '${eventType}' for resource ID: ${resourceId}`);
 
-    const eventNodes = await this.flowNodeRepository.find({
-      where: {
-        resourceId,
-        type: eventType,
-      },
-    });
+    const eventNodes = await this.persistence.triggers(resourceId, eventType);
 
     if (eventNodes.length === 0) {
       this.logger.debug(`No flow nodes found for event type '${eventType}' and resource ID: ${resourceId}`);
@@ -361,7 +338,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   public async startFlow(
     node: ResourceFlowNode | ResourceFlowNode[],
     data: NodeProcessingResult,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
     resourceContextCache: Map<number, FlowResourceContext> = new Map(),
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {

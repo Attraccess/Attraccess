@@ -1,4 +1,4 @@
-import { ResourceFlowNode, SetPayloadNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, SetPayloadNodeDataSchema } from '@attraccess/application-models';
 import { set as lodashSet } from 'lodash-es';
 import z from 'zod';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';

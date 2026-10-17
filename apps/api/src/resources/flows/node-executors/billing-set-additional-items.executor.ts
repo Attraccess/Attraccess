@@ -1,23 +1,17 @@
 import { Logger } from '@nestjs/common';
-import { EntityManager, Repository } from 'typeorm';
-import {
-  ResourceFlowNode,
-  BillingTransaction,
-  BillingTransactionItem,
-  BillingTransactionItemCreateSchema,
-  BillingTransactionStatus,
-} from '@attraccess/database-entities';
+import { DatabaseTransactions, TransactionScope } from '../../../database/transaction-scope';
+import { BILLING_OPERATIONS } from '../../../billing/persistence/port';
+import { ResourceFlowNode, BillingTransactionItemCreateSchema } from '@attraccess/application-models';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
 export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   private readonly logger = new Logger(BillingSetAdditionalItemsExecutor.name);
 
   constructor(
     private readonly resourceUsageService: ResourceUsageService,
-    private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
+    private readonly transactions: DatabaseTransactions,
   ) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
@@ -66,7 +60,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       return { payload: item };
     }
 
-    const savePendingItem = async (manager: EntityManager): Promise<void> => {
+    const savePendingItem = async (manager: TransactionScope): Promise<void> => {
       const activeUsageSession = usageId
         ? undefined
         : await this.resourceUsageService.getActiveSession(node.resourceId, manager);
@@ -74,13 +68,11 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
         throw new NoUsageSessionError();
       }
 
-      const billingTransaction = await manager.findOne(BillingTransaction, {
-        where: {
-          resourceUsageId: usageId ?? activeUsageSession.id,
-          resourceUsage: { resourceId: node.resourceId },
-          status: BillingTransactionStatus.Pending,
-        },
-      });
+      const persistence = manager.resolve(BILLING_OPERATIONS);
+      const billingTransaction = await persistence.pendingUsageTransaction(
+        node.resourceId,
+        usageId ?? activeUsageSession.id,
+      );
 
       if (!billingTransaction) {
         throw new NoUsageSessionError();
@@ -94,26 +86,26 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
         unitPrice: data.unitPrice,
       };
 
-      const existingItem = await manager.findOne(BillingTransactionItem, {
-        where: dedupData,
+      const existingItem = await persistence.matchingPendingItem(billingTransaction.id, {
+        name: dedupData.name,
+        description: dedupData.description,
+        externalReference: dedupData.externalReference,
+        unitPrice: dedupData.unitPrice,
       });
 
       if (existingItem) {
-        await manager.update(BillingTransactionItem, existingItem.id, {
-          quantity: existingItem.quantity + quantity,
-        });
+        await persistence.updateItemQuantity(existingItem.id, existingItem.quantity + quantity);
       } else {
-        await manager.save(BillingTransactionItem, { ...dedupData, quantity });
+        await persistence.saveItem({ ...dedupData, quantity });
       }
     };
 
-    if (ctx.transactionManager) {
-      await savePendingItem(ctx.transactionManager);
-    } else {
-      // Share finalization's write queue so a delayed event cannot pass the status check
-      // before finalization and then change its completed items afterward.
-      await runSerializedTransaction(this.billingTransactionItemRepository.manager, savePendingItem);
-    }
+    // Share finalization's write queue and explicit parent scope, without independent commits.
+    await this.transactions.run(
+      { resourceIds: [node.resourceId], accountIds: [] },
+      savePendingItem,
+      ctx.transactionManager,
+    );
 
     return { payload: item };
   }

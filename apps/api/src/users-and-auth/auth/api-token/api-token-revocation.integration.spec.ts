@@ -1,3 +1,4 @@
+import { TypeormApiTokenPersistence } from '../persistence/typeorm-adapter';
 import { DataSource, EntitySchema } from 'typeorm';
 import { ApiToken, ApiTokenPermission } from '@attraccess/database-entities';
 import { ApiTokenService } from './api-token.service';
@@ -42,7 +43,11 @@ describe('API token revocation with SQLite', () => {
       entities: [tokenSchema, permissionSchema],
       synchronize: true,
     }).initialize();
-    service = new ApiTokenService(database.getRepository(ApiToken), {} as never, {} as never, {} as never);
+    service = new ApiTokenService(
+      new TypeormApiTokenPersistence(database.getRepository(ApiToken), {} as never),
+      {} as never,
+      {} as never,
+    );
     await database.getRepository(ApiToken).save([
       { id: 1, userId: 1, name: 'Active', revokedAt: null },
       { id: 2, userId: 1, name: 'Revoked', revokedAt: new Date() },

@@ -14,8 +14,8 @@ module.exports = {
   output: {
     path: join(__dirname, '../../dist/apps/migrations'),
     library: {
-      type: 'commonjs2'
-    }
+      type: 'commonjs2',
+    },
   },
   plugins: [
     new NxAppWebpackPlugin({
@@ -29,15 +29,16 @@ module.exports = {
       outputHashing: 'none',
       generatePackageJson: true,
       deleteOutputPath: true,
-    })
+    }),
   ],
   externals: {
     typeorm: 'commonjs typeorm',
     tslib: 'commonjs tslib',
-    zod: 'commonjs zod'
+    zod: 'commonjs zod',
   },
   entry: {
     main: './apps/api/src/database/datasource.ts',
-    ...migrationEntries
-  }
+    tooling: join(__dirname, 'src/database/tooling.ts'),
+    ...migrationEntries,
+  },
 };

@@ -1,19 +1,10 @@
-import {
-  Body,
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  ParseIntPipe,
-  Post,
-  Query,
-  Req,
-  Sse,
-} from '@nestjs/common';
+import { Message } from '../transport/models/message.dto';
+import { mapResponse } from '../transport/response-mapper';
+import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Query, Req, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { Message, MessageReferenceType } from '@attraccess/database-entities';
-import { Observable } from 'rxjs';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+import { MessageReferenceType } from '@attraccess/application-models';
+import { map, Observable } from 'rxjs';
 import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
@@ -38,7 +29,13 @@ export class MessagingController {
   @ApiOperation({ summary: 'Subscribe to live new messages for the authenticated user', operationId: 'messagingLive' })
   streamMessages(@Req() req: AuthenticatedRequest): Observable<{ data: Message }> {
     const subject = this.messagingLiveService.getUserMessageSubject(req.user.id);
-    return this.messagingLiveService.trackPresence(req.user.id, this.sse.wrap('messaging', subject.asObservable()));
+    return this.messagingLiveService.trackPresence(
+      req.user.id,
+      this.sse.wrap(
+        'messaging',
+        subject.asObservable().pipe(map((event) => ({ data: mapResponse(Message, event.data) }))),
+      ),
+    );
   }
 
   @Post('users/:userId/contact')
@@ -89,10 +86,15 @@ export class MessagingController {
 
   @Get('conversations')
   @Auth()
-  @ApiOperation({ summary: 'List the authenticated user inbox conversations', operationId: 'messagingListConversations' })
+  @ApiOperation({
+    summary: 'List the authenticated user inbox conversations',
+    operationId: 'messagingListConversations',
+  })
   @ApiResponse({ status: 200, description: 'The inbox conversations', type: [ConversationListItemDto] })
   async listConversations(@Req() req: AuthenticatedRequest): Promise<ConversationListItemDto[]> {
-    return this.messagingService.listConversations(req.user.id);
+    return (await this.messagingService.listConversations(req.user.id)).map((record) =>
+      mapResponse(ConversationListItemDto, record),
+    );
   }
 
   @Get('unread-count')
@@ -131,7 +133,8 @@ export class MessagingController {
     @Query() query: ListMessagesQueryDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ListMessagesResponseDto> {
-    return this.messagingService.listMessages(id, req.user.id, query.page, query.limit);
+    const page = await this.messagingService.listMessages(id, req.user.id, query.page, query.limit);
+    return { ...page, data: page.data.map((record) => mapResponse(Message, record)) };
   }
 
   @Post('conversations/:id/messages')
@@ -145,14 +148,16 @@ export class MessagingController {
     @Body() dto: SendMessageDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<Message> {
-    return this.messagingService.sendMessage(
-      id,
-      req.user.id,
-      dto.content,
-      dto.referenceType !== undefined && dto.referenceId !== undefined
-        ? { referenceType: dto.referenceType, referenceId: dto.referenceId }
-        : undefined,
+    return mapResponse(
+      Message,
+      await this.messagingService.sendMessage(
+        id,
+        req.user.id,
+        dto.content,
+        dto.referenceType !== undefined && dto.referenceId !== undefined
+          ? { referenceType: dto.referenceType, referenceId: dto.referenceId }
+          : undefined,
+      ),
     );
   }
-
 }

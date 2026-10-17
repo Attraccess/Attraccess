@@ -1,4 +1,4 @@
-import { ResourceBillingConfiguration } from '@attraccess/database-entities';
+import { ResourceBillingConfiguration } from '../../transport/models/resource-billing-configuration.dto';
 import { ApiProperty } from '@nestjs/swagger';
 
 class ResourceBillingConfigurationItemDto {

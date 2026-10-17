@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DateRangeValue } from './dtos/dateRangeValue';
-import { BillingTransaction, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Between, FindManyOptions, Repository } from 'typeorm';
+import { AnalyticsPersistence } from './persistence/port';
 import {
   ResourceOperatingAttributionService,
   ResourceOperatingAttributionSummary,
@@ -11,49 +9,16 @@ import {
 @Injectable()
 export class AnalyticsService {
   public constructor(
-    @InjectRepository(ResourceUsage)
-    private resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(BillingTransaction)
-    private billingTransactionRepository: Repository<BillingTransaction>,
+    private readonly persistence: AnalyticsPersistence,
     private readonly operatingAttributionService: ResourceOperatingAttributionService,
   ) {}
 
   public async getResourceUsageHoursInDateRange(dateRange: DateRangeValue, page = 1, limit = 500) {
-    const findOptions: FindManyOptions<ResourceUsage> = {
-      where: {
-        startTime: Between(dateRange.start, dateRange.end),
-        usageAction: ResourceUsageAction.Usage,
-        lifecyclePending: false,
-      },
-      order: {
-        startTime: 'DESC',
-        id: 'DESC',
-        userId: 'DESC',
-      },
-      relations: ['user', 'resource', 'supervisorUser'],
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    return await this.resourceUsageRepository.findAndCount(findOptions);
+    return this.persistence.usageReportPage({ ...dateRange, page, limit });
   }
 
   public async getBillingTransactionsInDateRange(dateRange: DateRangeValue, page = 1, limit = 500) {
-    const findOptions: FindManyOptions<BillingTransaction> = {
-      where: {
-        createdAt: Between(dateRange.start, dateRange.end),
-      },
-      order: {
-        createdAt: 'DESC',
-        id: 'DESC',
-        userId: 'DESC',
-      },
-      relations: ['user', 'resourceUsage', 'resourceUsage.resource', 'items'],
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    return await this.billingTransactionRepository.findAndCount(findOptions);
+    return this.persistence.billingReportPage({ ...dateRange, page, limit });
   }
 
   public async getResourceOperatingDurations(

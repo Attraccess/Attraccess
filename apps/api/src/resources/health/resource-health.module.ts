@@ -1,3 +1,5 @@
+import { ResourceHealthPersistence, ResourceHealthRecipients } from './persistence/port';
+import { TypeormResourceHealthPersistence, TypeormResourceHealthRecipients } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Resource, ResourceHealthState, ResourceIntroducer, User } from '@attraccess/database-entities';
@@ -16,7 +18,12 @@ import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
     RbacModule,
   ],
   controllers: [ResourceHealthController],
-  providers: [ResourceHealthService, ResourceHealthNotificationListener],
+  providers: [
+    ResourceHealthService,
+    ResourceHealthNotificationListener,
+    { provide: ResourceHealthPersistence, useClass: TypeormResourceHealthPersistence },
+    { provide: ResourceHealthRecipients, useClass: TypeormResourceHealthRecipients },
+  ],
   exports: [ResourceHealthService],
 })
 export class ResourceHealthModule {}

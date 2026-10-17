@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import { DeviceRegistryService } from '../devices/registry/service';
 import { ShellyFirmwareService } from './service.service';
 import { defer } from 'rxjs';

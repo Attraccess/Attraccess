@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { MessageReferenceType } from '@attraccess/database-entities';
+import { MessageReferenceType } from '@attraccess/application-models';
 
 export class SuggestedMessageDto {
   @ApiProperty({

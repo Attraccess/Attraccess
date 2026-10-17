@@ -1,3 +1,5 @@
+import { MaintenanceRequestPersistence } from './persistence/port';
+import { TypeormMaintenanceRequestPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -26,6 +28,7 @@ describe('MaintenanceRequestService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceRequestService,
+        { provide: MaintenanceRequestPersistence, useClass: TypeormMaintenanceRequestPersistence },
         {
           provide: getRepositoryToken(ResourceMaintenanceRequest),
           useValue: {

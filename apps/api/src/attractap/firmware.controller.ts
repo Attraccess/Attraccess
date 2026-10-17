@@ -1,5 +1,5 @@
 import { Controller, Get, Inject, Param, Logger, Res } from '@nestjs/common';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AttractapFirmwareService } from './firmware.service';
 import { AttractapFirmware } from './dtos/firmware.dto';

@@ -1,17 +1,7 @@
-// Shelly management plugin — backend half.
-//
-// A persisted device registry with a manual add-by-IP flow and a
-// generation/model probe (ATT-496), plus mDNS + subnet-scan auto-discovery that
-// populates it (ATT-497), and device info + admin password management (ATT-498).
-// Built as a first-class nx app (tag type:plugin); see
-// apps/plugins/scripts for the shared esbuild/Vite/zip recipe.
-//
-// The plugin registers a NestJS module whose controller is mounted into the host
-// API and whose services share the host's TypeORM connection via a real
-// repository over an owned, namespaced entity (see device-registry.service.ts).
-// The `entities` export below tells the host to register that entity's metadata
-// into the shared DataSource so getRepository(ShellyDevice) resolves.
-import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginBackendAdapters } from '@attraccess/plugins-backend-sdk/adapter';
+import { SHELLY_DEVICES } from './devices/registry/persistence/port';
+import { TypeormDeviceRegistry } from './devices/registry/persistence/typeorm-adapter';
+import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import { DynamicModule } from '@nestjs/common';
 import { DeviceRegistryService } from './devices/registry/service';
 import { DiscoveryService } from './devices/discovery/service';
@@ -31,10 +21,20 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
 class ShellyPluginModule {}
 
-const plugin: PluginBackendModule = {
-  // Host registers these into the shared DataSource at load time (gated on
-  // DATABASE_ACCESS) so the registry service can use a real repository.
-  entities: [ShellyDevice],
+const plugin: PluginBackendModule & PluginBackendAdapters = {
+  persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
+  persistenceAdapters: [
+    {
+      backend: 'sqlite',
+      entities: [ShellyDevice],
+      operations: [
+        {
+          token: SHELLY_DEVICES,
+          create: ({ manager }) => new TypeormDeviceRegistry(manager.getRepository(ShellyDevice)),
+        },
+      ],
+    },
+  ],
   register(context: PluginContext): DynamicModule {
     return {
       module: ShellyPluginModule,

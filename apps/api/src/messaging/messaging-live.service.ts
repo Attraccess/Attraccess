@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
+import { MessagingLivePersistence } from './persistence/port';
 import { Observable, Subject } from 'rxjs';
-import { Repository } from 'typeorm';
-import { ConversationParticipant, Message } from '@attraccess/database-entities';
+import type { Message } from '@attraccess/application-models';
 import { MessageCreatedEvent } from './events/message-created.event';
 
 @Injectable()
@@ -11,12 +10,7 @@ export class MessagingLiveService {
   private readonly messageSubjects: Map<number, Subject<{ data: Message }>> = new Map();
   private readonly connectionCounts: Map<number, number> = new Map();
 
-  public constructor(
-    @InjectRepository(ConversationParticipant)
-    private readonly participantRepository: Repository<ConversationParticipant>,
-    @InjectRepository(Message)
-    private readonly messageRepository: Repository<Message>,
-  ) {}
+  public constructor(private readonly persistence: MessagingLivePersistence) {}
 
   public getUserMessageSubject(userId: number): Subject<{ data: Message }> {
     if (!this.messageSubjects.has(userId)) {
@@ -65,15 +59,9 @@ export class MessagingLiveService {
   @OnEvent(MessageCreatedEvent.EVENT_NAME)
   public async notifyNewMessage(event: MessageCreatedEvent): Promise<void> {
     const message = event.message;
-    const messageWithSender =
-      (await this.messageRepository.findOne({
-        where: { id: message.id },
-        relations: ['sender'],
-      })) ?? message;
+    const messageWithSender = (await this.persistence.messageWithSender(message.id)) ?? message;
 
-    const participants = await this.participantRepository.find({
-      where: { conversationId: message.conversationId },
-    });
+    const participants = await this.persistence.participants(message.conversationId);
 
     for (const participant of participants) {
       if (participant.userId === message.senderId) {

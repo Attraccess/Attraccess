@@ -1,7 +1,10 @@
+import { Permission } from '../../transport/models/permission.dto';
+import { Role } from '../../transport/models/role.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Body, Controller, Delete, Get, Optional, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Permission, Role } from '@attraccess/database-entities';
-import { Auth, AuthAny, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+
+import { Auth, AuthAny, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { RbacService } from './rbac.service';
 import { CreateRoleDto } from './dtos/create-role.dto';
 import { UpdateRoleDto } from './dtos/update-role.dto';
@@ -29,8 +32,8 @@ export class RbacController {
   @AuthAny('users.roles.manage', 'system.settings.manage')
   @ApiOperation({ summary: 'List all permissions', operationId: 'listPermissions' })
   @ApiResponse({ status: 200, type: [Permission] })
-  listPermissions(): Promise<Permission[]> {
-    return this.rbacService.getPermissions();
+  async listPermissions(): Promise<Permission[]> {
+    return (await this.rbacService.getPermissions()).map((record) => mapResponse(Permission, record));
   }
 
   @Post('roles')
@@ -41,7 +44,7 @@ export class RbacController {
     const actor = request.user as AuthenticatedUser;
     const role = await this.rbacService.createRole(body, actor.effectivePermissions ?? new Set());
     await this.record('role_created', role, request);
-    return role;
+    return mapResponse(Role, await role);
   }
 
   @Patch('roles/:id')
@@ -56,7 +59,7 @@ export class RbacController {
     const actor = request.user as AuthenticatedUser;
     const role = await this.rbacService.updateRole(id, body, actor.effectivePermissions ?? new Set());
     await this.record('role_updated', role, request);
-    return role;
+    return mapResponse(Role, await role);
   }
 
   @Delete('roles/:id')
@@ -88,17 +91,19 @@ export class RbacController {
     role: Role,
     request: AuthenticatedRequest,
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-      subjectType: 'identity.role',
-      subjectId: role.id,
-      details: { role: role.key },
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    })).then(() => undefined);
+    return Promise.resolve(
+      this.identityAudit?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectType: 'identity.role',
+        subjectId: role.id,
+        details: { role: role.key },
+        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+      }),
+    ).then(() => undefined);
   }
 }

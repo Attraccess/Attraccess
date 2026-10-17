@@ -14,6 +14,12 @@ import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
 
 describe('SsoController', () => {
   const fixture = registerSsoControllerFixture();
+  const publicProvider = () => {
+    const oidcConfiguration = { ...fixture.mockSSOProvider.oidcConfiguration };
+    Reflect.deleteProperty(oidcConfiguration, 'clientSecret');
+    return { ...fixture.mockSSOProvider, oidcConfiguration };
+  };
+
 
   it('should be defined', () => {
     expect(fixture.controller).toBeDefined();
@@ -22,15 +28,33 @@ describe('SsoController', () => {
   describe('getProviders', () => {
     it('should return an array of providers', async () => {
       const result = await fixture.controller.getAll();
-      expect(result).toEqual([fixture.mockSSOProvider]);
+      expect(result).toEqual([publicProvider()]);
       expect(fixture.ssoService.getAllProviders).toHaveBeenCalled();
     });
   });
 
   describe('getProviderById', () => {
+    it('projects plain records without returning client secrets or unrecognized private fields', async () => {
+      const provider = {
+        ...fixture.mockSSOProvider,
+        privateState: 'private-provider-state',
+        oidcConfiguration: {
+          ...fixture.mockSSOProvider.oidcConfiguration,
+          privateState: 'private-configuration-state',
+        },
+      };
+      fixture.ssoService.getProviderByTypeAndIdWithConfiguration.mockResolvedValueOnce(provider);
+      const response = await fixture.controller.getOneById('1');
+      expect(response.oidcConfiguration.clientId).toBe(provider.oidcConfiguration.clientId);
+      expect(response.oidcConfiguration).not.toHaveProperty('clientSecret');
+      expect(response.oidcConfiguration).not.toHaveProperty('privateState');
+      expect(response).not.toHaveProperty('privateState');
+      expect(provider.oidcConfiguration.clientSecret).toBe('test-client-secret');
+    });
+
     it('should return a single provider', async () => {
       const result = await fixture.controller.getOneById('1');
-      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(result).toEqual(publicProvider());
       expect(fixture.ssoService.getProviderById).toHaveBeenCalledWith(1);
     });
 
@@ -57,7 +81,7 @@ describe('SsoController', () => {
 
       const result = await fixture.controller.createOne(createDto, { user: { id: 1 } } as AuthenticatedRequest);
 
-      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(result).toEqual(publicProvider());
       expect(fixture.ssoService.createProvider).toHaveBeenCalledWith(createDto);
       expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -78,7 +102,7 @@ describe('SsoController', () => {
             user: { id: 1 },
           } as AuthenticatedRequest,
         ),
-      ).resolves.toEqual(fixture.mockSSOProvider);
+      ).resolves.toEqual(publicProvider());
     });
   });
 
@@ -99,7 +123,7 @@ describe('SsoController', () => {
       } as unknown as AuthenticatedRequest;
       const result = await fixture.controller.updateOne('1', updateDto, mockReq);
 
-      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(result).toEqual(publicProvider());
       expect(fixture.ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
       expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({

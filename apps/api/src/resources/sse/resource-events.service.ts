@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy, NotFoundException } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Resource } from '@attraccess/database-entities';
+import { ResourceEventPersistence } from '../persistence/port';
+import { ResourceUsage } from '../../transport/models/resourceUsage.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import {
   ResourceSessionStartedEvent,
   ResourceUsageSessionEndedEvent,
@@ -23,10 +23,7 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   // Create subjects for each resource id
   private resourceSubjects: Map<number, Subject<MessageEvent>> = new Map();
 
-  constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-  ) {}
+  constructor(private readonly persistence: ResourceEventPersistence) {}
 
   onModuleInit() {
     // Send keep-alive messages every 10 seconds to prevent connection timeouts
@@ -52,8 +49,8 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async subscribeResource(resourceId: number): Promise<Observable<MessageEvent>> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) throw new NotFoundException(`Resource with ID ${resourceId} not found`);
+    const exists = await this.persistence.exists(resourceId);
+    if (!exists) throw new NotFoundException(`Resource with ID ${resourceId} not found`);
 
     // Allocate lazily: validation can finish after a connection has disconnected.
     return new Observable<MessageEvent>((subscriber) => {
@@ -87,18 +84,8 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async getResourceInUseStatus(resourceId: number): Promise<boolean> {
-    // Check if resource has an active usage session (no endTime)
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-      relations: ['usages'],
-    });
-
-    if (!resource) {
-      return false;
-    }
-
-    // Look for active usage sessions (those without an end time)
-    const activeUsage = resource.usages?.find((usage) => usage.endTime === null && !usage.lifecyclePending);
+    const sessions = await this.persistence.sessionStates(resourceId);
+    const activeUsage = sessions.find((usage) => usage.endTime === null && !usage.lifecyclePending);
 
     return !!activeUsage;
   }
@@ -115,7 +102,7 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
       usage: { resource },
     } = event;
     this.emitToResource(resource.id, {
-      ...event,
+      usage: mapResponse(ResourceUsage, event.usage),
       inUse: true,
       eventType: ResourceSessionStartedEvent.EVENT_NAME,
     });

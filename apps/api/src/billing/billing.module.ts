@@ -1,3 +1,11 @@
+import { DataSource } from 'typeorm';
+import { SqliteTransactionDriver } from '../database/sqlite/transactions';
+import { SumupPersistence, BillingLivePersistence, BillingPersistence, BILLING_OPERATIONS } from './persistence/port';
+import {
+  TypeormSumupPersistence,
+  TypeormBillingLivePersistence,
+  TypeormBillingPersistence,
+} from './persistence/typeorm-adapter';
 import {
   BillingTransaction,
   ResourceBillingConfiguration,
@@ -28,7 +36,22 @@ import { BillingLiveTopicsProvider } from './live-notifications/billing-live-top
     LiveTopicsModule,
   ],
   controllers: [BillingController],
-  providers: [BillingService, SumUpService, LiveNotificationsService, BillingLiveTopicsProvider],
+  providers: [
+    {
+      provide: BillingPersistence,
+      useFactory: (source: DataSource, driver: SqliteTransactionDriver) => {
+        driver.register(BILLING_OPERATIONS, (manager) => new TypeormBillingPersistence(manager));
+        return new TypeormBillingPersistence(source.manager);
+      },
+      inject: [DataSource, SqliteTransactionDriver],
+    },
+    { provide: SumupPersistence, useClass: TypeormSumupPersistence },
+    { provide: BillingLivePersistence, useClass: TypeormBillingLivePersistence },
+    BillingService,
+    SumUpService,
+    LiveNotificationsService,
+    BillingLiveTopicsProvider,
+  ],
   exports: [BillingService, SumUpService, LiveNotificationsService],
 })
 export class BillingModule {}

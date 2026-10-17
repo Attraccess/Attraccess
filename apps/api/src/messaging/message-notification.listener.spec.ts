@@ -1,3 +1,5 @@
+import { MessageNotificationPersistence } from './persistence/port';
+import { TypeormMessageNotificationPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConversationParticipant, Message, User } from '@attraccess/database-entities';
@@ -60,6 +62,7 @@ describe('MessageNotificationListener', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MessageNotificationListener,
+        { provide: MessageNotificationPersistence, useFactory: () => new TypeormMessageNotificationPersistence(participantRepository as never, userRepository as never) },
         { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
         { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: MessagingLiveService, useValue: liveService },

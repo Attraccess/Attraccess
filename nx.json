@@ -219,6 +219,7 @@
       "api",
       "frontend",
       "api-client",
+      "application-models",
       "database-entities",
       "env",
       "plugins-backend-sdk",

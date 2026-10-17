@@ -1,3 +1,5 @@
+import { MqttPersistence } from './persistence/port';
+import { TypeormMqttPersistence } from './persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MqttClientService } from './mqtt-client.service';
@@ -32,6 +34,7 @@ export async function resetTestFixture(scope: MqttClientServiceTestScope) {
   scope.moduleRef = await Test.createTestingModule({
     providers: [
       MqttClientService,
+      { provide: MqttPersistence, useClass: TypeormMqttPersistence },
       {
         provide: getRepositoryToken(MqttServer),
         useValue: scope.mockRepository,

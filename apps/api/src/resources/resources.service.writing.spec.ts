@@ -1,3 +1,5 @@
+import { ResourceCatalogPersistence } from './persistence/port';
+import { TypeormResourceCatalogPersistence } from './persistence/typeorm-adapter';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { DocumentationType, Resource, ResourceType } from '@attraccess/database-entities';
@@ -118,6 +120,7 @@ describe('ResourcesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourcesService,
+        { provide: ResourceCatalogPersistence, useClass: TypeormResourceCatalogPersistence },
         {
           provide: getRepositoryToken(Resource),
           useFactory: mockResourceRepository,

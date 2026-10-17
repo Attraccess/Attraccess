@@ -1,3 +1,5 @@
+import { UsageNoteRecipients } from '../persistence/port';
+import { TypeormUsageNoteRecipients } from '../persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
@@ -44,6 +46,7 @@ describe('ResourceUsageNoteNotificationListener', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: UsageNoteRecipients, useFactory: () => new TypeormUsageNoteRecipients(resourceRepository as never, introducerRepository as never, userRepository as never) },
         ResourceUsageNoteNotificationListener,
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },
         { provide: getRepositoryToken(ResourceIntroducer), useValue: introducerRepository },

@@ -17,14 +17,14 @@ describe('AuthService', () => {
     });
     expect(local).toMatchObject({ userId: 7, password: 'hashed-password', type: AuthenticationType.LOCAL_PASSWORD });
     expect(bcrypt.hash).toHaveBeenCalledWith('secret', expect.any(Number));
-    const manager = { save: jest.fn(async (value) => value) };
+    const scope = { resolve: () => ({ saveAuthentication: jest.fn(async (value) => value) }) };
     const sso = await fixture.authService.addAuthenticationDetails(
       7,
       {
         type: AuthenticationType.SSO,
         details: { providerType: SSOProviderType.SAML, providerId: 3, subject: 'external-subject' },
       },
-      manager as never,
+      scope as never,
     );
     expect(sso).toMatchObject({
       userId: 7,
@@ -36,7 +36,7 @@ describe('AuthService', () => {
     const prehashed = await fixture.authService.addAuthenticationDetails(
       7,
       { type: AuthenticationType.LOCAL_PASSWORD, details: { password: 'unused' } },
-      manager as never,
+      scope as never,
       'prepared-hash',
     );
     expect(prehashed.password).toBe('prepared-hash');

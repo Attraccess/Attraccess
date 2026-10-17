@@ -1,10 +1,13 @@
+import { WagoDeviceOperations } from '../runtime/device-operations';
+import { WagoCommissioningPersistence } from './persistence/port';
+import { PersistentManagementStore } from '../management/store';
 import { Inject, Optional } from '@nestjs/common';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_CONTEXT, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 
-import { WagoCommissioningSession } from './sessions/session.entity';
+import { WagoCommissioningSession } from './sessions/session.record';
 
 import { WagoService } from '../controllers/service';
 
@@ -45,14 +48,15 @@ import { RuntimeDeliveryBundle } from './model';
 
 export abstract class WagoCommissioningServiceState {
   constructor(
-    @Inject(PLUGIN_CONTEXT) protected readonly context: PluginContext,
+    @Inject(PLUGIN_CONTEXT) protected readonly context: Omit<PluginContext, 'operations' | 'persistence'>,
     @Inject(WagoService) protected readonly wago: WagoService,
+    @Inject(PersistentManagementStore) protected readonly managementStore: PersistentManagementStore,
+    @Inject(WagoCommissioningPersistence) protected readonly persistence: WagoCommissioningPersistence,
+    @Inject(WagoDeviceOperations) protected readonly deviceOperations: WagoDeviceOperations,
     @Optional() @Inject(WagoRuntimeArtifactsService) protected readonly artifacts?: WagoRuntimeArtifactCatalog,
     @Optional() @Inject(WagoCommissioningReadiness) protected readonly readiness?: WagoCommissioningReadiness,
     @Optional() @Inject(WagoManagedRuntimeService) protected readonly managedRuntime?: WagoManagedRuntimeService,
   ) {}
-
-  protected sessions!: Repository<WagoCommissioningSession>;
 
   protected management!: WagoManagementService;
 

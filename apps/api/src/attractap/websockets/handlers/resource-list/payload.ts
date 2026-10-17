@@ -3,7 +3,7 @@ import {
   ResourceHealthStatus,
   ResourceIntroducerType,
   SupervisionMode,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import type { ResourceListService } from './resource-list.service';
 

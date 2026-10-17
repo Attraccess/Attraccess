@@ -1,4 +1,4 @@
-import { Resource, ResourceUsage, User, ResourceType, ResourceUsageAction } from '@attraccess/database-entities';
+import { ResourceUsage, User, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 
 import {
   forwardRef,
@@ -15,11 +15,11 @@ import {
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { UsagePersistence } from '../persistence/port';
 
 import { Redis } from 'ioredis';
 
-import { Repository, EntityManager, FindOneOptions, In } from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../../database/transaction-scope';
 
 import { AuditService } from '../../../audit/audit.service';
 
@@ -57,9 +57,7 @@ import { ResourceOperatingAttributionService } from '../../operating-intervals/r
 
 import { ResourceRetrainingService } from '../../retraining/resourceRetraining.service';
 
-import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
-
-import { activeUsageWhere } from './active-usage';
+import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk/v2';
 
 import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.dto';
 
@@ -81,12 +79,8 @@ export { EndSessionOptions, StartSessionOptions } from '../lifecycle/usage-lifec
 @Injectable()
 export class ResourceUsageService extends UsageSessions implements OnModuleInit, OnModuleDestroy {
   constructor(
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceUsage)
-    protected readonly resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    @Inject(UsagePersistence) protected readonly persistence: UsagePersistence,
+    protected readonly transactions: DatabaseTransactions,
     protected readonly resourceIntroductionService: ResourceIntroductionsService,
     protected readonly resourceIntroducersService: ResourceIntroducersService,
     protected readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
@@ -134,41 +128,17 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
 
   protected accessCacheGeneration = 0;
 
-  protected readonly DETAIL_RELATIONS = [
-    'user',
-    'project',
-    'supervisorUser',
-    'formSubmissions',
-    'formSubmissions.form',
-    'formSubmissions.user',
-  ];
-
   public async getActiveSession(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<ResourceUsage | null> {
-    const resourceUsageRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceUsage)
-      : this.resourceUsageRepository;
-
-    return await resourceUsageRepository.findOne({
-      where: {
-        resourceId,
-        ...activeUsageWhere(),
-      },
-      order: { startTime: 'DESC', id: 'DESC' },
-      relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
-    });
+    return this.usageOperations(transactionalEntityManager).activeSession(resourceId);
   }
 
   public async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage | null>> {
     const map = new Map<number, ResourceUsage | null>(resourceIds.map((id) => [id, null]));
     if (resourceIds.length === 0) return map;
-    const sessions = await this.resourceUsageRepository.find({
-      where: { resourceId: In(resourceIds), ...activeUsageWhere() },
-      order: { startTime: 'DESC', id: 'DESC' },
-      relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
-    });
+    const sessions = await this.persistence.activeSessions(resourceIds);
     for (const session of sessions) {
       // Legacy duplicates are retained for explicit resolution. Single and bulk reads agree.
       if (!map.get(session.resourceId)) map.set(session.resourceId, session);
@@ -177,10 +147,7 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
   }
 
   async getSessionDetails(resourceId: number, usageId: number, user: AuthenticatedUser): Promise<ResourceUsage> {
-    const usage = await this.resourceUsageRepository.findOne({
-      where: { id: usageId, resourceId, lifecyclePending: false },
-      relations: this.DETAIL_RELATIONS,
-    });
+    const usage = await this.persistence.sessionDetails(resourceId, usageId);
     if (!usage) throw new NotFoundException('Usage session not found');
 
     if (usage.userId !== user.id && !user.effectivePermissions?.has('resources.update')) {
@@ -197,21 +164,8 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     limit = 10,
     userId?: number,
   ): Promise<{ data: ResourceUsage[]; total: number }> {
-    const whereClause: FindOneOptions<ResourceUsage>['where'] = { resourceId, lifecyclePending: false };
-
-    // Add userId filter if provided
-    if (userId) {
-      whereClause.userId = userId;
-      this.logger.debug(`Filtering usage history by userId ${userId}`);
-    }
-
-    const [data, total] = await this.resourceUsageRepository.findAndCount({
-      where: whereClause,
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { startTime: 'DESC' },
-      relations: this.DETAIL_RELATIONS,
-    });
+    if (userId) this.logger.debug(`Filtering usage history by userId ${userId}`);
+    const [data, total] = await this.persistence.history(resourceId, userId, (page - 1) * limit, limit);
 
     this.logger.debug(`Found ${data.length} usage records out of ${total} total for resource ${resourceId}`);
 
@@ -235,8 +189,10 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
 
     this.logger.debug(`persisting door action for resource ${resourceId}`, { usageData });
 
-    let usage = await this.resourceUsageRepository.save(usageData, { reload: true });
-    usage = await this.resourceUsageRepository.findOne({ where: { id: usage.id }, relations: ['user', 'resource'] });
+    const usage = await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (scope) => {
+      const saved = await this.usageOperations(scope).saveUsage(usageData);
+      return this.usageOperations(scope).usageWithResourceAndUser(saved.id);
+    });
 
     await this.emitUsageEvent(usage.id);
 
@@ -289,11 +245,7 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
       dto,
     });
 
-    const usage = await this.resourceUsageRepository.findOne({
-      where: { id: usageId, resourceId },
-      relations: ['user', 'project', 'resource'],
-    });
-
+    const usage = await this.persistence.usageForProjectUpdate(resourceId, usageId);
     if (!usage) {
       throw new NotFoundException('Usage session not found');
     }
@@ -324,24 +276,18 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
       usage.project = project;
     }
 
-    await this.resourceUsageRepository.save(usage);
+    await this.persistence.saveUsage(usage);
 
-    return await this.resourceUsageRepository.findOne({
-      where: { id: usage.id },
-      relations: ['resource', 'user', 'project'],
-    });
+    return await this.persistence.usageWithProject(usage.id);
   }
 
-  protected async emitUsageEvent(usageId: number, transactionalEntityManager?: EntityManager): Promise<void> {
-    const resourceUsageRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceUsage)
-      : this.resourceUsageRepository;
-
-    const usage = await resourceUsageRepository.findOne({
-      where: { id: usageId },
-      relations: ['resource', 'user'],
-    });
-    await this.eventEmitter.emitAsync(ResourceSessionStartedEvent.EVENT_NAME, new ResourceSessionStartedEvent(usage));
+  protected async emitUsageEvent(usageId: number, transactionalEntityManager?: TransactionScope): Promise<void> {
+    const usage = await this.usageOperations(transactionalEntityManager).usageWithResourceAndUser(usageId);
+    const emit = async () => {
+      await this.eventEmitter.emitAsync(ResourceSessionStartedEvent.EVENT_NAME, new ResourceSessionStartedEvent(usage));
+    };
+    if (transactionalEntityManager) transactionalEntityManager.afterCommit(emit);
+    else await emit();
   }
 
   protected async notifySessionEnded(

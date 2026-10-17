@@ -1,5 +1,12 @@
 # PoC backend plugin (ATT-454)
 
+This is a **SQLite-only legacy SDK compatibility fixture**. New plugins should
+follow the [neutral SDK Hello World example](../plugin-hello-world/README.md).
+The retained `DataSource` and `EventEmitter2` checks deliberately verify class
+identity across standalone bundles. They do not establish portability to another
+database backend. Its deliberately broken bundle remains a negative test of
+that legacy loading contract.
+
 A **standalone** example backend plugin. It exists to answer the review feedback
 on the original spike: the first PoC lived *inside* `apps/api`, so it was
 co-compiled with the host (same bundler, same `tsconfig`, same `node_modules`).

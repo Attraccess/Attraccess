@@ -1,3 +1,5 @@
+import { UserRole } from '../../transport/models/user-role.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import {
   Body,
   Controller,
@@ -12,8 +14,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+
+import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { RbacService } from '../rbac/rbac.service';
 import { AssignRoleDto } from '../rbac/dtos/assign-role.dto';
@@ -38,8 +40,8 @@ export class UserPermissionsController {
   @Auth('users.roles.manage')
   @ApiOperation({ summary: "Get a user's role assignments", operationId: 'getUserRoleAssignments' })
   @ApiResponse({ status: 200, type: [UserRole] })
-  getUserRoles(@Param('id', ParseIntPipe) id: number): Promise<UserRole[]> {
-    return this.rbacService.getUserRoles(id);
+  async getUserRoles(@Param('id', ParseIntPipe) id: number): Promise<UserRole[]> {
+    return (await this.rbacService.getUserRoles(id)).map((record) => mapResponse(UserRole, record));
   }
 
   @Post(':id/roles')
@@ -59,7 +61,7 @@ export class UserPermissionsController {
     const user = await this.usersService.findOne({ id });
     if (user) this.permissionsService.notifyPermissionsChanged(user, actor.id);
     await this.record('user_role_assigned', id, body.roleId, request);
-    return result;
+    return mapResponse(UserRole, await result);
   }
 
   @Delete(':id/roles/:roleId')

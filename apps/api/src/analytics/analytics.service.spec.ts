@@ -1,3 +1,5 @@
+import { AnalyticsPersistence } from './persistence/port';
+import { TypeormAnalyticsPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsService } from './analytics.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -21,6 +23,7 @@ describe('AnalyticsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AnalyticsService,
+        { provide: AnalyticsPersistence, useClass: TypeormAnalyticsPersistence },
         {
           provide: getRepositoryToken(ResourceUsage),
           useValue: mockRepository,

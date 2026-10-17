@@ -1,12 +1,6 @@
+import { TypeormProjectPersistence } from './persistence/typeorm-adapter';
 import { registerProjectsServiceFixture } from './projects.service.projects-service.test-fixture';
-import {
-  Project,
-  entities,
-  ProjectInvitation,
-  ProjectMember,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { Project, entities, ProjectInvitation, ProjectMember, User } from '@attraccess/database-entities';
 import { CreateProjectDto } from './dto/create.dto';
 import { FileUpload } from './../common/types/file-upload.types';
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
@@ -215,11 +209,12 @@ describe('ProjectsService', () => {
         const sqliteAudit = { recordProject: jest.fn().mockResolvedValue(undefined) };
         const sqliteMetrics = { projectsTotal: { inc: jest.fn(), dec: jest.fn() } };
         const sqliteService = new ProjectsService(
-          projects,
-          source.getRepository(ProjectMember),
-          source.getRepository(ProjectInvitation),
-          source.getRepository(User),
-          source.getRepository(ResourceUsage),
+          new TypeormProjectPersistence(
+            projects,
+            source.getRepository(ProjectMember),
+            source.getRepository(ProjectInvitation),
+            source.getRepository(User),
+          ),
           {} as FileStorageService,
           {
             ensureOwner: jest.fn().mockResolvedValue({ id: 1, name: 'Project', logo: null }),
@@ -394,8 +389,8 @@ describe('ProjectsService', () => {
         .mockResolvedValueOnce(concurrentlyArchived)
         .mockResolvedValueOnce(concurrentlyUnarchived);
 
-      expect(await fixture.service.archiveOne(2, 3)).toBe(concurrentlyArchived);
-      expect(await fixture.service.unarchiveOne(2, 4)).toBe(concurrentlyUnarchived);
+      expect(await fixture.service.archiveOne(2, 3)).toEqual(concurrentlyArchived);
+      expect(await fixture.service.unarchiveOne(2, 4)).toEqual(concurrentlyUnarchived);
 
       expect(fixture.projectRepository.save).not.toHaveBeenCalled();
       expect(fixture.projectRepository.update).toHaveBeenCalledTimes(2);

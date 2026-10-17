@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Body, Controller, HttpCode, Param, Put, Req, Sse, UnauthorizedException } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk/v2';
 import { LiveUpdatesService } from './live-updates.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 

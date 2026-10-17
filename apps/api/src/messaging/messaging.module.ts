@@ -1,3 +1,7 @@
+import { MessageNotificationPersistence } from './persistence/port';
+import { TypeormMessageNotificationPersistence } from './persistence/typeorm-adapter';
+import { MessagingPersistence, MessagingLivePersistence } from './persistence/port';
+import { TypeormMessagingPersistence, TypeormMessagingLivePersistence } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Conversation, ConversationParticipant, Message, Resource, User } from '@attraccess/database-entities';
@@ -23,8 +27,11 @@ import { MessagingLiveTopicsProvider } from './messaging-live-topics.provider';
   controllers: [MessagingController],
   providers: [
     MessagingService,
+    { provide: MessagingPersistence, useClass: TypeormMessagingPersistence },
+    { provide: MessagingLivePersistence, useClass: TypeormMessagingLivePersistence },
     MessagingLiveService,
     MessageNotificationListener,
+    { provide: MessageNotificationPersistence, useClass: TypeormMessageNotificationPersistence },
     MessageRateLimitService,
     MessagingLiveTopicsProvider,
   ],

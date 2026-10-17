@@ -77,13 +77,17 @@ describe('ResourceUsageService', () => {
       usageAction: ResourceUsageAction.Usage,
     } as ResourceUsage;
     scope.resourceUsageRepository.findOne.mockResolvedValue(usage);
+    scope.resourceUsageRepository.save.mockImplementation(async (data) => Object.assign(usage, data));
     const user = { id: 7 } as User;
-    expect(await scope.service.updateSessionProject(1, 8, user, { projectId: 9 })).toBe(usage);
+    expect(await scope.service.updateSessionProject(1, 8, user, { projectId: 9 })).toEqual(usage);
     expect(scope.projectsService.findOneById).toHaveBeenCalledWith(7, 9);
-    expect(scope.resourceUsageRepository.save).toHaveBeenCalledWith(expect.objectContaining({ projectId: 9 }));
+    expect(scope.resourceUsageRepository.save).toHaveBeenCalledWith(expect.objectContaining({ projectId: 9 }), {
+      reload: true,
+    });
     await scope.service.updateSessionProject(1, 8, user, { projectId: null });
     expect(scope.resourceUsageRepository.save).toHaveBeenLastCalledWith(
       expect.objectContaining({ projectId: null, project: null }),
+      { reload: true },
     );
   });
 
@@ -145,7 +149,7 @@ describe('ResourceUsageService', () => {
     it('loads the requested visible session and its usage details for the owner', async () => {
       const usage = { id: 8, userId: 1, resourceId: 5 } as ResourceUsage;
       getSessionDetailsScope.resourceUsageRepository.findOne.mockResolvedValue(usage);
-      expect(await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester)).toBe(
+      expect(await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester)).toEqual(
         usage,
       );
       expect(getSessionDetailsScope.resourceUsageRepository.findOne).toHaveBeenCalledWith({
@@ -170,7 +174,7 @@ describe('ResourceUsageService', () => {
       const usage = { id: 8, userId: 2, projectId: 3 } as ResourceUsage;
       getSessionDetailsScope.resourceUsageRepository.findOne.mockResolvedValue(usage);
       getSessionDetailsScope.projectsService.findOneById.mockResolvedValue({ id: 3 } as Project);
-      expect(await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester)).toBe(
+      expect(await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester)).toEqual(
         usage,
       );
       expect(getSessionDetailsScope.projectsService.findOneById).toHaveBeenCalledWith(1, 3);

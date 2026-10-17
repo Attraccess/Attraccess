@@ -1,4 +1,4 @@
-import { MeteringReadyNodeDataSchema, ResourceFlowNode } from '@attraccess/database-entities';
+import { MeteringReadyNodeDataSchema, ResourceFlowNode } from '@attraccess/application-models';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 

@@ -1,3 +1,4 @@
+import { TypeormWagoCredentialPersistence } from '../../backend/credentials/persistence/typeorm-adapter';
 import { AuditLog } from '@attraccess/database-entities';
 import type { PluginContext, PluginMqttClient } from '@attraccess/plugins-backend-sdk';
 import type { INestApplication } from '@nestjs/common';
@@ -16,7 +17,8 @@ import { heartbeatTopic, discoveryTopic } from '../../backend/protocol';
 import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
 import { WagoController } from '../../backend/controllers/entity';
-import { WagoCredentialRotationService, WagoCredentialRotationEntity } from '../../backend/credentials/service';
+import { WagoCredentialRotationService } from '../../backend/credentials/service';
+import { WagoCredentialRotationEntity } from '../../backend/credentials/persistence/schema';
 import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/catalog';
 import { WagoControllerApi } from '../../backend/controllers/controller';
 import { WagoService } from '../../backend/controllers/service';
@@ -105,7 +107,17 @@ export class AuditFixtureState {
         SessionStrategy,
         { provide: WagoService, useValue: this.wago },
         { provide: WagoCommissioningService, useValue: this.commissioning },
-        { provide: WagoCredentialRotationService, useFactory: () => new WagoCredentialRotationService(this.context) },
+        {
+          provide: WagoCredentialRotationService,
+          useFactory: () =>
+            new WagoCredentialRotationService(
+              this.context,
+              new TypeormWagoCredentialPersistence(
+                () => this.db.getRepository(WagoController),
+                () => this.db.getRepository(WagoCredentialRotationEntity),
+              ),
+            ),
+        },
         { provide: Symbol.for('attraccess.plugin.context'), useValue: this.context },
         { provide: SessionService, useValue: { validateSession: async () => null } },
         { provide: TwoFactorService, useValue: { getStatus: async () => ({ required: false }) } },

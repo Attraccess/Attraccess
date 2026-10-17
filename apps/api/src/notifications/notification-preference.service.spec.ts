@@ -1,3 +1,5 @@
+import { NotificationPersistence } from './persistence/port';
+import { TypeormNotificationPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotificationPreference } from '@attraccess/database-entities';
@@ -18,6 +20,7 @@ describe('NotificationPreferenceService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationPreferenceService,
+        { provide: NotificationPersistence, useClass: TypeormNotificationPersistence },
         { provide: getRepositoryToken(NotificationPreference), useValue: repository },
       ],
     }).compile();

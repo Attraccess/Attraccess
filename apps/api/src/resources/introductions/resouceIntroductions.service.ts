@@ -3,15 +3,15 @@ import {
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
   User,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { IntroductionPersistence, INTRODUCTION_OPERATIONS } from './persistence/port';
 
-import { EntityManager, Repository } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -32,10 +32,7 @@ import { ResourceIntroductionChangedEvent } from './events/resource-introduction
 @Injectable()
 export class ResourceIntroductionsService {
   constructor(
-    @InjectRepository(ResourceIntroduction)
-    protected readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
-    @InjectRepository(ResourceIntroductionHistoryItem)
-    protected readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
+    @Inject(IntroductionPersistence) protected readonly persistence: IntroductionPersistence,
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
@@ -44,48 +41,34 @@ export class ResourceIntroductionsService {
     protected readonly audit: AuditService,
   ) {}
 
+  protected operations(scope?: TransactionScope): IntroductionPersistence {
+    return scope ? scope.resolve(INTRODUCTION_OPERATIONS) : this.persistence;
+  }
+
   protected readonly logger = new Logger(ResourceIntroductionsService.name);
 
   protected async getIntroductionOfUser(
     resourceId: number,
     userId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<ResourceIntroduction> {
     this.logger.debug(`Getting introduction for resourceId: ${resourceId}, userId: ${userId}`);
 
-    const resourceIntroductionRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceIntroduction)
-      : this.resourceIntroductionRepository;
-
-    const introduction = await resourceIntroductionRepository.findOne({
-      where: {
-        resource: { id: resourceId },
-        receiverUser: { id: userId },
-      },
-    });
+    const introduction = await this.operations(transactionalEntityManager).find(
+      { kind: 'resource', id: resourceId },
+      userId,
+    );
     this.logger.debug(`Found introduction: ${introduction ? `id=${introduction.id}` : 'null'}`);
     return introduction;
   }
 
   protected async getLastHistoryItemOfIntroduction(
     introductionId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Getting last history item for introductionId: ${introductionId}`);
 
-    const resourceIntroductionHistoryItemRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceIntroductionHistoryItem)
-      : this.resourceIntroductionHistoryItemRepository;
-
-    const historyItem = await resourceIntroductionHistoryItemRepository.findOne({
-      where: {
-        introduction: { id: introductionId },
-      },
-      order: {
-        createdAt: 'DESC',
-        id: 'DESC',
-      },
-    });
+    const historyItem = await this.operations(transactionalEntityManager).latest(introductionId);
 
     this.logger.debug(
       `Found last history item: ${historyItem ? `id=${historyItem.id}, action=${historyItem.action}` : 'null'}`,
@@ -96,7 +79,7 @@ export class ResourceIntroductionsService {
   protected async getLastHistoryItemOfUser(
     resourceId: number,
     userId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<ResourceIntroductionHistoryItem | null> {
     this.logger.debug(`Getting last history item for resourceId: ${resourceId}, userId: ${userId}`);
     const introduction = await this.getIntroductionOfUser(resourceId, userId, transactionalEntityManager);
@@ -116,7 +99,7 @@ export class ResourceIntroductionsService {
   public async hasValidIntroduction(
     resourceId: number,
     userId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     this.logger.debug(`Checking if user ${userId} has valid introduction for resource ${resourceId}`);
 
@@ -128,13 +111,7 @@ export class ResourceIntroductionsService {
 
   public async getMany(resourceId: number, includeGroups = false): Promise<ResourceIntroduction[]> {
     this.logger.debug(`Getting all introductions for resourceId: ${resourceId}`);
-    const introductions = await this.resourceIntroductionRepository.find({
-      where: includeGroups
-        ? [{ resource: { id: resourceId } }, { resourceGroup: { resources: { id: resourceId } } }]
-        : { resource: { id: resourceId } },
-      relations: ['receiverUser', 'tutorUser', 'history', ...(includeGroups ? ['resourceGroup'] : [])],
-      cache: false,
-    });
+    const introductions = await this.persistence.list({ kind: 'resource', id: resourceId }, includeGroups);
     this.logger.debug(`Found ${introductions.length} introductions for resource ${resourceId}`);
     return introductions;
   }
@@ -144,9 +121,7 @@ export class ResourceIntroductionsService {
     userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
     this.logger.debug(`Getting history for resourceId: ${resourceId}, userId: ${userId}`);
-    const history = await this.resourceIntroductionHistoryItemRepository.find({
-      where: { introduction: { resource: { id: resourceId }, receiverUser: { id: userId } } },
-    });
+    const history = await this.persistence.history({ kind: 'resource', id: resourceId }, userId);
     this.logger.debug(`Found ${history.length} history items for resourceId: ${resourceId}, userId: ${userId}`);
     return history;
   }
@@ -180,13 +155,7 @@ export class ResourceIntroductionsService {
 
   protected async createOne(resourceId: number, userId: number, tutorUserId?: number): Promise<ResourceIntroduction> {
     this.logger.debug(`Creating new introduction for resourceId: ${resourceId}, userId: ${userId}`);
-    const introduction = this.resourceIntroductionRepository.create({
-      resource: { id: resourceId },
-      receiverUser: { id: userId },
-      ...(tutorUserId != null ? { tutorUser: { id: tutorUserId } } : {}),
-    });
-
-    const savedIntroduction = await this.resourceIntroductionRepository.save(introduction);
+    const savedIntroduction = await this.persistence.create({ kind: 'resource', id: resourceId }, userId, tutorUserId);
     this.logger.debug(`Created new introduction with id: ${savedIntroduction.id}`);
 
     return savedIntroduction;
@@ -209,7 +178,7 @@ export class ResourceIntroductionsService {
       this.logger.debug('No existing introduction found, creating new one');
       resourceIntroduction = await this.createOne(resourceId, userId, tutorUserId);
     } else if (tutorUserId != null && resourceIntroduction.tutorUserId !== tutorUserId) {
-      await this.resourceIntroductionRepository.update(resourceIntroduction.id, { tutorUserId });
+      await this.persistence.setTutor(resourceIntroduction.id, tutorUserId);
       // Keep the in-memory entity in sync so subsequent history/logging sees the updated tutor.
       resourceIntroduction.tutorUserId = tutorUserId;
     }
@@ -220,14 +189,12 @@ export class ResourceIntroductionsService {
       (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
-    const historyItem = this.resourceIntroductionHistoryItemRepository.create({
+    const savedHistoryItem = await this.persistence.appendHistory({
       introduction: { id: resourceIntroduction.id },
       action: nextStatus,
       comment: data?.comment,
-      performedByUser: { id: performedByUserId ?? userId },
+      performedByUserId: performedByUserId ?? userId,
     });
-
-    const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
     this.logger.debug(`Created new history item with id: ${savedHistoryItem.id}`);
 
     this.eventEmitter.emit(

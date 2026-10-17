@@ -1,3 +1,6 @@
+import { createWagoDiagnosticsPersistence } from '../flow/persistence/typeorm-adapter';
+import { bindWagoPersistenceFixture } from '../wago-service.test-fixture';
+import { createWagoRegistryPersistence } from '../controllers/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { configurationHash } from '../configuration/model';
 import { WagoDiagnosticsStore } from './store';
@@ -104,7 +107,7 @@ describe('controller diagnostics', () => {
         },
         dataSource: { getRepository: () => ({ createQueryBuilder: () => resourceQueries.shift() }) },
       } as unknown as PluginContext;
-      const service = new WagoDiagnosticsService(context, {} as WagoService);
+      const service = new WagoDiagnosticsService(createWagoDiagnosticsPersistence(context), {} as WagoService);
 
       await expect(service.getResource(1)).resolves.toMatchObject({
         controllers: [
@@ -128,9 +131,13 @@ describe('controller diagnostics', () => {
           lastSequence: 0,
           lastHeartbeatAt: null,
         };
-        const save = jest.fn().mockResolvedValue(controller);
-        const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
+        const save = jest.fn(async (row) => Object.assign(controller, row));
+        const service = ((context: PluginContext) =>
+          new WagoService(context, ...createWagoRegistryPersistence(context)))({
+          logger: { warn: jest.fn() },
+        } as unknown as PluginContext);
         Reflect.set(service, 'controllers', { findOneBy: async () => controller, save });
+        bindWagoPersistenceFixture(service, {} as PluginContext);
         const heartbeat = Reflect.get(service, 'onHeartbeat').bind(service) as (
           id: string,
           payload: Buffer,
@@ -164,8 +171,12 @@ describe('controller diagnostics', () => {
         const save = jest.fn(async (value) => {
           stored = { ...stored, ...value };
         });
-        const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
+        const service = ((context: PluginContext) =>
+          new WagoService(context, ...createWagoRegistryPersistence(context)))({
+          logger: { warn: jest.fn() },
+        } as unknown as PluginContext);
         Reflect.set(service, 'controllers', { findOneBy: async () => ({ ...stored }), save });
+        bindWagoPersistenceFixture(service, {} as PluginContext);
         const send = (sequence: number, runtimeVersion = '0.1.0') =>
           Reflect.get(service, 'onHeartbeat').call(
             service,
@@ -211,8 +222,11 @@ describe('controller diagnostics', () => {
         stored = { ...stored, ...value };
       });
       const context = { logger: { warn: jest.fn() } } as unknown as PluginContext;
-      const service = new WagoService(context);
+      const service = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(
+        context,
+      );
       Reflect.set(service, 'controllers', { findOneBy: async () => ({ ...stored }), save });
+      bindWagoPersistenceFixture(service, {} as PluginContext);
       const envelope = { streamId: '00000000-0000-4000-8000-000000000001', sequence: 1 };
       service.diagnostics.ingest(
         1,
@@ -271,9 +285,13 @@ describe('controller diagnostics', () => {
             lastSequence: 0,
             lastHeartbeatAt: null,
           };
-          const save = jest.fn().mockResolvedValue(controller);
-          const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
+          const save = jest.fn(async (row) => Object.assign(controller, row));
+          const service = ((context: PluginContext) =>
+            new WagoService(context, ...createWagoRegistryPersistence(context)))({
+            logger: { warn: jest.fn() },
+          } as unknown as PluginContext);
           Reflect.set(service, 'controllers', { findOneBy: async () => controller, save });
+          bindWagoPersistenceFixture(service, {} as PluginContext);
           const heartbeat = Reflect.get(service, 'onHeartbeat').bind(service) as (
             id: string,
             payload: Buffer,
@@ -351,7 +369,7 @@ describe('controller diagnostics', () => {
     const diagnostics = new WagoDiagnosticsStore();
     const latest = { ...revision };
     return {
-      service: new WagoDiagnosticsService(context, { diagnostics } as WagoService),
+      service: new WagoDiagnosticsService(createWagoDiagnosticsPersistence(context), { diagnostics } as WagoService),
       diagnostics,
       latest,
       revision,

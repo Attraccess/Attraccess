@@ -1,6 +1,7 @@
 {
   "name": "@attraccess/plugins-frontend-sdk",
   "version": "1.10.0",
+  "dependencies": { "@attraccess/application-models": "*" },
   "type": "module",
   "main": "./index.js",
   "types": "./index.d.ts",

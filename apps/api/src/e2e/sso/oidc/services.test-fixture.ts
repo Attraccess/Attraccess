@@ -1,8 +1,27 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { DatabaseTransactions } from '../../../database/transaction-scope';
+import { SqliteTransactionDriver } from '../../../database/sqlite/transactions';
+import { RBAC_WRITES } from '../../../users-and-auth/rbac/persistence/port';
+import {
+  TypeormRbacPersistence,
+  rbacTransactionOperations,
+} from '../../../users-and-auth/rbac/persistence/typeorm-adapter';
+import { USER_WRITES } from '../../../users-and-auth/users/persistence/port';
+import {
+  TypeormUserPersistence,
+  userTransactionOperations,
+} from '../../../users-and-auth/users/persistence/typeorm-adapter';
+import { AUTHENTICATION_WRITES } from '../../../users-and-auth/auth/persistence/port';
+import {
+  TypeormAuthenticationPersistence,
+  authenticationTransactionOperations,
+} from '../../../users-and-auth/auth/persistence/typeorm-adapter';
 import { OidcTokenVerifier } from '../../../users-and-auth/auth/sso/oidc/oidc-token-verifier.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
 import {
   AuthenticationDetail,
   Permission,
+  RolePermission,
   ResourceUsage,
   Role,
   SSOProviderType,
@@ -30,6 +49,7 @@ export function createOidcTestServices(dataSource: DataSource) {
   const userRoleRepo = dataSource.getRepository(UserRole);
   const roleRepo = dataSource.getRepository(Role);
   const permissionRepo = dataSource.getRepository(Permission);
+  const rolePermissionRepo = dataSource.getRepository(RolePermission);
 
   const mockConfigService = {
     get: (key: string): AppConfigType | undefined => {
@@ -63,22 +83,29 @@ export function createOidcTestServices(dataSource: DataSource) {
   } as unknown as LicenseService;
 
   const tokenHashService = new TokenHashService(mockConfigService);
-  const rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
+  const driver = new SqliteTransactionDriver(dataSource);
+  driver.register(USER_WRITES, userTransactionOperations);
+  driver.register(RBAC_WRITES, rbacTransactionOperations);
+  driver.register(AUTHENTICATION_WRITES, authenticationTransactionOperations);
+  const transactions = new DatabaseTransactions(driver);
+  const rbacService = new RbacService(
+    new TypeormRbacPersistence(userRoleRepo, roleRepo, permissionRepo, userRepo, rolePermissionRepo),
+    transactions,
+    new EventEmitter2(),
+    null,
+  );
   const usersService = new UsersService(
-    userRepo,
-    authDetailRepo,
-    sessionRepo,
-    resourceUsageRepo,
+    new TypeormUserPersistence(userRepo, authDetailRepo, sessionRepo, resourceUsageRepo),
+    transactions,
     mockLicenseService,
     mockEmailService,
-    dataSource,
     tokenHashService,
     mockMetricsService,
     rbacService,
   );
   const authService = new AuthService(
     mockEmailService,
-    authDetailRepo,
+    new TypeormAuthenticationPersistence(authDetailRepo),
     usersService,
     tokenHashService,
     mockMetricsService,

@@ -1,4 +1,4 @@
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider, SSOProviderType } from '@attraccess/application-models';
 
 const MAX_INLINE_ROLE_MAPPINGS_BYTES = 180;
 const MAX_INLINE_FIELD_BYTES = 96;

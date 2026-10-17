@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { SSOProviderSAMLConfiguration } from '@attraccess/application-models';
 
 export interface SSOSamlRequestOptions {
   providerId: number;

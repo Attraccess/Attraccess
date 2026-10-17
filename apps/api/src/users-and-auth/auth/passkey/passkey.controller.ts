@@ -1,9 +1,11 @@
+import { Passkey } from '../../../transport/models/passkey.dto';
+import { mapResponse } from '../../../transport/response-mapper';
 import { Body, Controller, Delete, Get, Optional, Param, ParseIntPipe, Patch, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk/v2';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
-import { Passkey } from '@attraccess/database-entities';
+
 import { PasskeyService } from './passkey.service';
 import {
   PasskeyOptionsResponseDto,
@@ -37,7 +39,7 @@ export class PasskeyController {
   @ApiOperation({ summary: 'List the passkeys of the current user', operationId: 'listPasskeys' })
   @ApiOkResponse({ description: 'The passkeys of the current user', type: [Passkey] })
   async list(@Req() request: AuthenticatedRequest): Promise<Passkey[]> {
-    return this.passkeyService.listForUser(request.user.id);
+    return (await this.passkeyService.listForUser(request.user.id)).map((record) => mapResponse(Passkey, record));
   }
 
   @SessionAuth()
@@ -65,7 +67,7 @@ export class PasskeyController {
       requestOrigin(request),
     );
     await this.record('passkey_created', request);
-    return passkey;
+    return mapResponse(Passkey, await passkey);
   }
 
   @SessionAuth()
@@ -79,7 +81,7 @@ export class PasskeyController {
   ): Promise<Passkey> {
     const passkey = await this.passkeyService.rename(request.user.id, id, body.name);
     await this.record('passkey_renamed', request);
-    return passkey;
+    return mapResponse(Passkey, await passkey);
   }
 
   @SessionAuth()
@@ -157,17 +159,19 @@ export class PasskeyController {
     action: 'passkey_created' | 'passkey_renamed' | 'passkey_deleted',
     request: AuthenticatedRequest,
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-      subjectId: request.user.id,
-      details: {},
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    })).then(() => undefined);
+    return Promise.resolve(
+      this.identityAudit?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectId: request.user.id,
+        details: {},
+        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+      }),
+    ).then(() => undefined);
   }
 }
 

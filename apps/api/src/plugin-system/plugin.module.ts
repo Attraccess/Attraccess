@@ -1,3 +1,4 @@
+import { LegacyPluginSandbox } from './persistence/legacy-context';
 import { Global, Module, DynamicModule, Type, Logger } from '@nestjs/common';
 
 import { ModuleRef } from '@nestjs/core';
@@ -72,6 +73,13 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 
 import { createPluginAuditContext } from './runtime/audit-context';
+import { assertPluginBackendSupport } from './persistence/port';
+import { resolveBackendConfig } from '../database/backend.config';
+import type { PluginBackendModule as NeutralPluginBackendModule } from '@attraccess/plugins-backend-sdk/v2';
+import type { PluginBackendAdapters } from '@attraccess/plugins-backend-sdk/adapter';
+import { createNeutralGuardedContext } from './runtime/guarded-context';
+import { SqlitePluginHostOperations } from './persistence/typeorm-adapter';
+import { SqlitePluginAdapters } from './persistence/plugin-adapters';
 
 function getImplementationClass(): typeof PluginModule {
   return require('./plugin.module').PluginModule;
@@ -194,6 +202,7 @@ export class PluginModule {
   }
 
   protected static loadPluginModule(manifest: LoadedPluginManifest): DynamicModule {
+    assertPluginBackendSupport(manifest, resolveBackendConfig().type);
     if (!manifest.main.backend?.directory || !manifest.main.backend?.entryPoint) {
       this.logger.error(`Plugin ${manifest.name} has no backend, skipping backend module loading`);
       return null;
@@ -207,7 +216,47 @@ export class PluginModule {
 
     this.logger.log(`Imported module: ${manifest.name}`);
 
-    const exported = importedModule.default as PluginBackendModule | DynamicModule;
+    let exported = importedModule.default as PluginBackendModule | DynamicModule;
+    let context: PluginContext | undefined;
+
+    if (manifest.persistence) {
+      const neutral = importedModule.default as NeutralPluginBackendModule & Partial<PluginBackendAdapters>;
+      assertPluginBackendSupport(
+        { name: manifest.name, persistence: neutral?.persistence },
+        resolveBackendConfig().type,
+      );
+      if (
+        !neutral?.persistence ||
+        typeof neutral.register !== 'function' ||
+        JSON.stringify([...neutral.persistence.supportedBackends].sort()) !==
+          JSON.stringify([...manifest.persistence.supportedBackends].sort())
+      ) {
+        throw new Error(`Plugin "${manifest.name}" exports a persistence contract inconsistent with its manifest.`);
+      }
+      const registrations = (neutral.persistenceAdapters ?? []).filter(({ backend }) => backend === 'sqlite');
+      if (registrations.length > 1) throw new Error(`Plugin "${manifest.name}" has duplicate SQLite registrations.`);
+      const registration = registrations[0];
+      context = getImplementationClass().createPluginContext(manifest);
+      const source = () => getImplementationClass().requireRef(getImplementationClass().dataSourceRef, 'DataSource');
+      const neutralContext = createNeutralGuardedContext(
+        context,
+        manifest.permissions ?? [],
+        new SqlitePluginHostOperations(source),
+        new SqlitePluginAdapters(registration, source).bind(),
+      );
+      // Normalize callbacks inside composition. V2 plugin code receives only the neutral context.
+      exported = {
+        entities: [...(registration?.entities ?? [])],
+        register: () => neutral.register(neutralContext),
+        flowNodes: () =>
+          typeof neutral.flowNodes === 'function' ? neutral.flowNodes(neutralContext) : neutral.flowNodes,
+        auditDomains: () =>
+          typeof neutral.auditDomains === 'function' ? neutral.auditDomains(neutralContext) : neutral.auditDomains,
+        credentialProvisioningProvider: neutral.credentialProvisioningProvider
+          ? () => neutral.credentialProvisioningProvider(neutralContext)
+          : undefined,
+      };
+    }
 
     // Register any entities the plugin owns into the shared DataSource BEFORE it
     // initialises (which happens later, at NestFactory.create). The schema is
@@ -215,7 +264,7 @@ export class PluginModule {
     // resolvable so the plugin can use context.getRepository(Entity).
     getImplementationClass().registerPluginEntities(manifest, (exported as PluginBackendModule)?.entities);
 
-    const context = getImplementationClass().createPluginContext(manifest);
+    context ??= getImplementationClass().createPluginContext(manifest);
 
     // Register any custom flow nodes contributed by this plugin.
     const configuredFlowNodes = (exported as PluginBackendModule)?.flowNodes;
@@ -363,7 +412,7 @@ export class PluginModule {
             // The initial sandbox check may have fallen back to DATABASE_ACCESS
             // because metadata was unavailable before host injection. Resolve
             // the entity permission again against the live DataSource.
-            PluginSandboxService.assertRepositoryPermission(base, manifest.permissions ?? [], entity);
+            LegacyPluginSandbox.assertRepositoryPermission(base, manifest.permissions ?? [], entity);
             resolved = resolveRepository();
           }
           return resolved;
@@ -423,7 +472,7 @@ export class PluginModule {
       },
     };
 
-    return PluginSandboxService.createGuardedContext(base, manifest.permissions ?? []);
+    return LegacyPluginSandbox.createGuardedContext(base, manifest.permissions ?? []);
   }
 
   /** Discard host instances when the temporary configuration app is closed. */

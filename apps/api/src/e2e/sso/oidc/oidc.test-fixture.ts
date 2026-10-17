@@ -1,3 +1,4 @@
+import { closeResourceTransactionConnection } from '../../../database/sqlite/transactions';
 import type { SsoSessionRequest } from '../../../users-and-auth/auth/sso/sso-session-request';
 import type { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
 import { User, entities } from '@attraccess/database-entities';
@@ -117,6 +118,7 @@ export function registerSsoOidcIntegrationE2eWithTestcontainersFixture() {
 
   afterAll(async () => {
     if (dataSource?.isInitialized) {
+      await closeResourceTransactionConnection(dataSource);
       await dataSource.destroy();
     }
     await container?.stop();

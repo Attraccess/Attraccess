@@ -1,3 +1,4 @@
+import { TypeormOperatingDiagnosticsPersistence } from './persistence/typeorm-adapter';
 import { ResourceFlowNode, ResourceOperatingInterval } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
@@ -55,8 +56,10 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
       recordDataQualityFailures: jest.fn(),
     };
     service = new ResourceOperatingDiagnosticsService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      flowNodeRepository as unknown as Repository<ResourceFlowNode>,
+      new TypeormOperatingDiagnosticsPersistence(
+        intervalRepository as unknown as Repository<ResourceOperatingInterval>,
+        flowNodeRepository as unknown as Repository<ResourceFlowNode>,
+      ),
       attributionService as unknown as ResourceOperatingAttributionService,
       operatingMetrics,
     );

@@ -1,3 +1,5 @@
+import { ResourceCatalogPersistence } from './persistence/port';
+import { TypeormResourceCatalogPersistence } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
@@ -61,7 +63,12 @@ import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
     LiveTopicsModule,
   ],
   controllers: [ResourcesController],
-  providers: [ResourcesService, ResourceImageService, ResourceLiveTopicsProvider],
+  providers: [
+    { provide: ResourceCatalogPersistence, useClass: TypeormResourceCatalogPersistence },
+    ResourcesService,
+    ResourceImageService,
+    ResourceLiveTopicsProvider,
+  ],
   exports: [ResourcesService, ResourceImageService],
 })
 export class ResourcesModule {}

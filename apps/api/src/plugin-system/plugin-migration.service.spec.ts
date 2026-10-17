@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { SqlitePluginMigrations } from './persistence/typeorm-adapter';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
@@ -65,7 +66,9 @@ describe('PluginMigrationService', () => {
     root = mkdtempSync(join(tmpdir(), 'plugin-migration-'));
     dbFile = join(root, 'test.sqlite');
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
-    PluginMigrationService.configureForTesting({ type: 'sqlite', database: dbFile });
+    PluginMigrationService.configureForTesting(
+      new SqlitePluginMigrations(() => root, { type: 'sqlite', database: dbFile }),
+    );
 
     writeMigrationPlugin(root, 'widgets', 'widgets');
     // getPlugins() rewrites the migrations directory to be plugin-folder relative
@@ -76,6 +79,22 @@ describe('PluginMigrationService', () => {
   afterEach(() => {
     PluginMigrationService.configureForTesting(null);
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('rejects unsupported plugin backends before schema loading, history reads or database creation', async () => {
+    manifest.persistence = { contractVersion: 2, supportedBackends: ['postgres'] };
+    // An entry that would execute immediately if support validation happened too late.
+    writeFileSync(join(root, 'widgets/mig/index.js'), 'throw new Error("migration entry was evaluated")');
+    await expect(PluginMigrationService.runUpMigrations(manifest)).rejects.toThrow(
+      'does not support the selected database backend',
+    );
+    await expect(PluginMigrationService.runDownMigrations(manifest)).rejects.toThrow(
+      'does not support the selected database backend',
+    );
+    await expect(PluginMigrationService.assertReplacementMigrationHistory(manifest, root)).rejects.toThrow(
+      'does not support the selected database backend',
+    );
+    expect(existsSync(dbFile)).toBe(false);
   });
 
   it('allows replacement only when the target retains every applied migration', async () => {
@@ -168,5 +187,65 @@ describe('PluginMigrationService', () => {
 
     expect(PluginMigrationService.hasMigrations(noMig)).toBe(false);
     expect(await PluginMigrationService.runUpMigrations(noMig)).toBe(0);
+  });
+
+  it('runs adapter-registered migrations with the same durable history, replacement and uninstall checks', async () => {
+    manifest.persistence = { contractVersion: 2, supportedBackends: ['sqlite'] };
+    manifest.main.migrations = undefined;
+    const backend = join(root, manifest.main.backend.directory, manifest.main.backend.entryPoint);
+    mkdirSync(join(root, manifest.main.backend.directory), { recursive: true });
+    writeFileSync(
+      backend,
+      MIGRATION_ENTRY +
+        `
+      module.exports.default = {
+        persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
+        persistenceAdapters: [{ backend: 'sqlite', migrations: [CreateWidget1700000000000] }]
+      };
+    `,
+    );
+    expect(PluginMigrationService.hasMigrations(manifest)).toBe(true);
+    expect(await PluginMigrationService.runUpMigrations(manifest)).toBe(1);
+    expect(await PluginMigrationService.runUpMigrations(manifest)).toBe(0);
+    expect(await tableExists(dbFile, 'plugin_widget')).toBe(true);
+    await PluginMigrationService.assertReplacementMigrationHistory(manifest, root);
+    writeFileSync(
+      backend,
+      `module.exports.default = {
+      persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
+      persistenceAdapters: [{ backend: 'sqlite', migrations: [] }]
+    };`,
+    );
+    await expect(PluginMigrationService.assertReplacementMigrationHistory(manifest, root)).rejects.toThrow(
+      'CreateWidget1700000000000',
+    );
+    // Restore the released class before uninstall; replacement rejection retains the database.
+    expect(await tableExists(dbFile, 'plugin_widget')).toBe(true);
+    writeFileSync(
+      backend,
+      MIGRATION_ENTRY +
+        `module.exports.default = {
+      persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
+      persistenceAdapters: [{ backend: 'sqlite', migrations: [CreateWidget1700000000000] }]
+    };`,
+    );
+    expect(await PluginMigrationService.runDownMigrations(manifest)).toBe(1);
+    expect(await tableExists(dbFile, 'plugin_widget')).toBe(false);
+    expect(await tableExists(dbFile, 'plugin_migrations_widgets')).toBe(false);
+  });
+
+  it('rejects unsupported adapter migrations before evaluating backend code or creating a database', async () => {
+    manifest.persistence = { contractVersion: 2, supportedBackends: ['postgres'] };
+    manifest.main.migrations = undefined;
+    const backend = join(root, manifest.main.backend.directory, manifest.main.backend.entryPoint);
+    mkdirSync(join(root, manifest.main.backend.directory), { recursive: true });
+    writeFileSync(backend, 'throw new Error("backend entry was evaluated")');
+    expect(() => PluginMigrationService.hasMigrations(manifest)).toThrow('does not support');
+    await expect(PluginMigrationService.runUpMigrations(manifest)).rejects.toThrow('does not support');
+    await expect(PluginMigrationService.runDownMigrations(manifest)).rejects.toThrow('does not support');
+    await expect(PluginMigrationService.assertReplacementMigrationHistory(manifest, root)).rejects.toThrow(
+      'does not support',
+    );
+    expect(existsSync(dbFile)).toBe(false);
   });
 });

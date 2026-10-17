@@ -1,3 +1,4 @@
+import { sqliteRepositoryFixture } from '../../database/conformance/sqlite-fixture';
 import { registerResourceOperatingAttributionServiceFixture } from './resource-operating-attribution.service.resource-operating-attribution-service.test-fixture';
 import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
 import { MoreThan } from 'typeorm';
@@ -290,7 +291,7 @@ describe('ResourceOperatingAttributionService', () => {
         find: jest.fn().mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]),
       })),
     };
-    const minutes = await fixture.service.getForUsage(fixture.usage(2, '10:15:00', '10:45:00'), manager as never);
+    const minutes = await sqliteRepositoryFixture(manager.getRepository).transactions.run({resourceIds:[1],accountIds:[]},scope=>fixture.service.getForUsage(fixture.usage(2,'10:15:00','10:45:00'),scope));
 
     expect(minutes).toBe(30);
   });

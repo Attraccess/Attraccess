@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { NotificationPreference } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { NotificationPreference } from '@attraccess/application-models';
+import { NotificationPersistence } from './persistence/port';
 import {
   ALL_NOTIFICATION_CATEGORIES,
   DEFAULT_NOTIFICATION_CHANNELS,
@@ -15,13 +14,10 @@ import { UpdateNotificationPreferencesDto } from './dtos/update-notification-pre
 
 @Injectable()
 export class NotificationPreferenceService {
-  constructor(
-    @InjectRepository(NotificationPreference)
-    private readonly preferenceRepository: Repository<NotificationPreference>,
-  ) {}
+  constructor(private readonly persistence: NotificationPersistence) {}
 
   public async getPreferences(userId: number): Promise<NotificationPreferencesDto> {
-    const row = await this.preferenceRepository.findOne({ where: { userId } });
+    const row = await this.persistence.readPreferences(userId);
     return this.toDto(this.resolvePreferences(row));
   }
 
@@ -29,15 +25,12 @@ export class NotificationPreferenceService {
     userId: number,
     dto: UpdateNotificationPreferencesDto,
   ): Promise<NotificationPreferencesDto> {
-    const existing = await this.preferenceRepository.findOne({ where: { userId } });
+    const existing = await this.persistence.readPreferences(userId);
     const preferences = this.resolvePreferences(existing);
     preferences[dto.category] = { ...preferences[dto.category], ...dto.channels };
 
     const serialized = JSON.stringify(preferences);
-    const row = existing ?? this.preferenceRepository.create({ userId, categoryChannels: serialized });
-    row.categoryChannels = serialized;
-
-    const saved = await this.preferenceRepository.save(row);
+    const saved = await this.persistence.saveCategoryChannels(userId, serialized, existing);
     return this.toDto(this.resolvePreferences(saved));
   }
 
@@ -46,7 +39,7 @@ export class NotificationPreferenceService {
     category: NotificationCategory,
     channel: NotificationChannel,
   ): Promise<boolean> {
-    const row = await this.preferenceRepository.findOne({ where: { userId } });
+    const row = await this.persistence.readPreferences(userId);
     return this.resolvePreferences(row)[category][channel];
   }
 

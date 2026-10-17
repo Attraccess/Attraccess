@@ -1,3 +1,6 @@
+import { SqliteTransactionDriver } from '../database/sqlite/transactions';
+import { User } from '@attraccess/database-entities';
+import { TypeormSettingsPersistence } from '../settings/persistence/typeorm-adapter';
 import { Setting } from '@attraccess/database-entities';
 import { EffectivePermissionsGuard, PLUGIN_AUDIT_HOST_PROVIDER, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { ExecutionContext, ForbiddenException, Module, UnauthorizedException, ValidationPipe } from '@nestjs/common';
@@ -166,7 +169,10 @@ describe('durable audit SQLite', () => {
       }
       ownerPermissions.delete('users.api-tokens.manage');
       await request(server).get('/api/settings/audit').set('Authorization', 'Bearer settings-token').expect(401);
-      const restartedStore = new SettingsStoreService(fixture.source.getRepository(Setting), null);
+      const restartedStore = new SettingsStoreService(
+        new TypeormSettingsPersistence(fixture.source.getRepository(Setting), fixture.source.getRepository(User)),
+        null,
+      );
       expect(await readAuditSettings(restartedStore)).toEqual({
         enabled: false,
         retention_days: 4,
@@ -235,6 +241,7 @@ describe('durable audit SQLite', () => {
       const module = await builder
         .useMocker((token) => {
           if (token === DataSource) return fixture.source;
+          if (token === SqliteTransactionDriver) return new SqliteTransactionDriver(fixture.source);
           if (token === EventEmitter2) return new EventEmitter2();
           return {};
         })
@@ -266,7 +273,11 @@ describe('durable audit SQLite', () => {
     const module = await Test.createTestingModule({ imports: [AuditModule] })
       .overrideModule(SettingsModule)
       .useModule(FixtureSettingsModule)
-      .useMocker((token) => (token === DataSource ? fixture.source : undefined))
+      .useMocker((token) => {
+        if (token === DataSource) return fixture.source;
+        if (token === SqliteTransactionDriver) return new SqliteTransactionDriver(fixture.source);
+        return undefined;
+      })
       .compile();
     await module.init();
     const sink = module.get<AuditService>(PLUGIN_AUDIT_HOST_PROVIDER);

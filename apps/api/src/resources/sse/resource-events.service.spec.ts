@@ -1,3 +1,4 @@
+import { TypeormResourceEventPersistence } from '../persistence/typeorm-adapter';
 import { Repository } from 'typeorm';
 import { Resource, ResourceUsage } from '@attraccess/database-entities';
 import { ResourceEventsService } from './resource-events.service';
@@ -10,7 +11,9 @@ describe('resource initial state and subject cleanup', () => {
         query.relations ? { usages: [{ endTime: null, lifecyclePending: false }] } : { id: 1 },
       ),
     };
-    const service = new ResourceEventsService(repository as unknown as Repository<Resource>);
+    const service = new ResourceEventsService(
+      new TypeormResourceEventPersistence(repository as unknown as Repository<Resource>),
+    );
     const first = jest.fn(),
       second = jest.fn();
     const a = (await service.subscribeResource(1)).subscribe(first);
@@ -36,7 +39,9 @@ describe('resource initial state and subject cleanup', () => {
           }),
         ),
     };
-    const service = new ResourceEventsService(repository as unknown as Repository<Resource>);
+    const service = new ResourceEventsService(
+      new TypeormResourceEventPersistence(repository as unknown as Repository<Resource>),
+    );
     const callback = jest.fn();
     const sub = (await service.subscribeResource(1)).subscribe(callback);
     sub.unsubscribe();
@@ -58,7 +63,9 @@ describe('resource initial state and subject cleanup', () => {
           }),
         ),
     };
-    const service = new ResourceEventsService(repository as unknown as Repository<Resource>);
+    const service = new ResourceEventsService(
+      new TypeormResourceEventPersistence(repository as unknown as Repository<Resource>),
+    );
     const callback = jest.fn();
     const sub = (await service.subscribeResource(1)).subscribe(callback);
     const usage = new ResourceUsage();

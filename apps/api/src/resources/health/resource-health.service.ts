@@ -1,19 +1,12 @@
 // Manages resource health state tracking with mutable status and source lifecycle tracking
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
-import {
-  Resource,
-  ResourceHealthState,
-  ResourceHealthStatus,
-  ResourceHealthSource,
-} from '@attraccess/database-entities';
+import { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from '@attraccess/application-models';
 
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { In, Repository } from 'typeorm';
+import { ResourceHealthPersistence } from './persistence/port';
 
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
@@ -40,10 +33,7 @@ export class ResourceHealthService {
   private readonly logger = new Logger(ResourceHealthService.name);
 
   constructor(
-    @InjectRepository(ResourceHealthState)
-    private readonly healthRepository: Repository<ResourceHealthState>,
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    private readonly persistence: ResourceHealthPersistence,
     private readonly eventEmitter: EventEmitter2,
     private readonly audit: AuditService,
   ) {}
@@ -65,9 +55,7 @@ export class ResourceHealthService {
     const reason = this.normalizeReason(input.status, input.reason);
     const reportedAt = input.reportedAt ?? new Date();
 
-    const existing = await this.healthRepository.findOne({
-      where: { resourceId: input.resourceId, identifier },
-    });
+    const existing = await this.persistence.findEntry(input.resourceId, identifier);
 
     const previousStatus = existing?.status ?? null;
 
@@ -77,9 +65,9 @@ export class ResourceHealthService {
       existing.reason = reason;
       existing.source = input.source;
       existing.lastReportedAt = reportedAt;
-      saved = await this.healthRepository.save(existing);
+      saved = await this.persistence.storeEntry(existing);
     } else {
-      const created = this.healthRepository.create({
+      saved = await this.persistence.storeEntry({
         resourceId: input.resourceId,
         identifier,
         status: input.status,
@@ -87,7 +75,6 @@ export class ResourceHealthService {
         source: input.source,
         lastReportedAt: reportedAt,
       });
-      saved = await this.healthRepository.save(created);
     }
 
     if (previousStatus !== input.status) {
@@ -118,19 +105,13 @@ export class ResourceHealthService {
   }
 
   async listForResource(resourceId: number): Promise<ResourceHealthState[]> {
-    return await this.healthRepository.find({
-      where: { resourceId },
-      order: { identifier: 'ASC' },
-    });
+    return this.persistence.listEntries([resourceId]);
   }
 
   async listForResources(resourceIds: number[]): Promise<Map<number, ResourceHealthState[]>> {
     const map = new Map<number, ResourceHealthState[]>(resourceIds.map((id) => [id, []]));
     if (resourceIds.length === 0) return map;
-    const entries = await this.healthRepository.find({
-      where: { resourceId: In(resourceIds) },
-      order: { identifier: 'ASC' },
-    });
+    const entries = await this.persistence.listEntries(resourceIds);
     for (const entry of entries) {
       const bucket = map.get(entry.resourceId);
       if (bucket) bucket.push(entry);
@@ -139,7 +120,7 @@ export class ResourceHealthService {
   }
 
   async getSummary(resourceId: number): Promise<ResourceHealthSummaryDto> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.persistence.findResource(resourceId);
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
@@ -156,9 +137,7 @@ export class ResourceHealthService {
   }
 
   async isResourceUnhealthy(resourceId: number): Promise<boolean> {
-    const count = await this.healthRepository.count({
-      where: { resourceId, status: ResourceHealthStatus.UNHEALTHY },
-    });
+    const count = await this.persistence.countUnhealthy(resourceId);
     return count > 0;
   }
 
@@ -172,7 +151,7 @@ export class ResourceHealthService {
     const getContextOwner = () => this;
     return clearEntryImplementation(
       {
-        healthRepository: getContextOwner().healthRepository,
+        persistence: getContextOwner().persistence,
         audit: getContextOwner().audit,
         logger: getContextOwner().logger,
         eventEmitter: getContextOwner().eventEmitter,

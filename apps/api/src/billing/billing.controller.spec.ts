@@ -94,13 +94,13 @@ describe('BillingController', () => {
       const req = fixture.baseReq();
       const res = await fixture.controller.createManualTransaction(5, req, { amount: 25 });
       expect(fixture.service.createManualTransaction).toHaveBeenCalledWith(5, 1, 25);
-      expect(res).toBe(tx);
+      expect(res).toEqual(tx);
     });
   });
 
   describe('getResourceBillingConfiguration', () => {
     it('delegates to service and returns configuration', async () => {
-      const cfg = { pricing: { perHour: 10 } };
+      const cfg = { resourceId: 42, creditsPerMinute: 10 };
       fixture.service.getResourceBillingConfiguration.mockResolvedValue(cfg);
       const res = await fixture.controller.getResourceBillingConfiguration(42);
       expect(fixture.service.getResourceBillingConfiguration).toHaveBeenCalledWith(42);
@@ -110,12 +110,12 @@ describe('BillingController', () => {
 
   describe('updateResourceBillingConfiguration', () => {
     it('delegates to service and returns updated configuration', async () => {
-      const body = { pricing: { perHour: 12 } } as UpdateResourceBillingConfigurationDto;
-      const updated = { pricing: { perHour: 12 } };
+      const body = { creditsPerMinute: 12 } as UpdateResourceBillingConfigurationDto;
+      const updated = { resourceId: 7, creditsPerMinute: 12 };
       fixture.service.updateResourceBillingConfiguration.mockResolvedValue(updated);
       const res = await fixture.controller.updateResourceBillingConfiguration(7, body);
       expect(fixture.service.updateResourceBillingConfiguration).toHaveBeenCalledWith(7, body);
-      expect(res).toBe(updated);
+      expect(res).toEqual(updated);
     });
   });
 
@@ -192,7 +192,7 @@ describe('BillingController', () => {
       const req = fixture.baseReq({ id: 55 });
       const res = await fixture.controller.topUpWithSumUpReader({ readerId: 'r-22', amount: 2500 }, req);
       expect(fixture.sumUp.topUpWithReader).toHaveBeenCalledWith(55, 'r-22', 2500);
-      expect(res).toBe(tx);
+      expect(res).toEqual(tx);
     });
   });
 

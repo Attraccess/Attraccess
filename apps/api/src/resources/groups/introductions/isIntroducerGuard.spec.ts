@@ -1,9 +1,12 @@
+import { TypeormGroupIntroducerPersistence } from '../persistence/typeorm-adapter';
 import { BadRequestException, type ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { type ResourceIntroducer } from '@attraccess/database-entities';
 import { type Repository } from 'typeorm';
 import { IsResourceGroupIntroducerGuard } from './isIntroducerGuard';
 const repository = { findOne: jest.fn() };
-const guard = new IsResourceGroupIntroducerGuard(repository as unknown as Repository<ResourceIntroducer>);
+const guard = new IsResourceGroupIntroducerGuard(
+  new TypeormGroupIntroducerPersistence(repository as unknown as Repository<ResourceIntroducer>),
+);
 function context(user: unknown, groupId?: string): ExecutionContext {
   return { switchToHttp: () => ({ getRequest: () => ({ user, params: { groupId } }) }) } as ExecutionContext;
 }

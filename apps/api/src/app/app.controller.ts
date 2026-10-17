@@ -1,7 +1,7 @@
 import { Controller, Get, Header, Post, StreamableFile } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

@@ -1,3 +1,5 @@
+import { MessagingLivePersistence } from './persistence/port';
+import { TypeormMessagingLivePersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { firstValueFrom, take, toArray } from 'rxjs';
@@ -17,6 +19,7 @@ describe('MessagingLiveService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MessagingLiveService,
+        { provide: MessagingLivePersistence, useClass: TypeormMessagingLivePersistence },
         { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
         { provide: getRepositoryToken(Message), useValue: messageRepository },
       ],
@@ -55,9 +58,7 @@ describe('MessagingLiveService', () => {
     const messageWithSender = { ...message, sender: { id: 5, username: 'sender' } } as Message;
     messageRepository.findOne.mockResolvedValue(messageWithSender);
 
-    const recipientEvents = firstValueFrom(
-      service.getUserMessageSubject(9).pipe(take(1), toArray()),
-    );
+    const recipientEvents = firstValueFrom(service.getUserMessageSubject(9).pipe(take(1), toArray()));
 
     const senderEvents: { data: Message }[] = [];
     service.getUserMessageSubject(5).subscribe((event) => senderEvents.push(event));

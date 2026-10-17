@@ -1,3 +1,5 @@
+import { CompanionPersistence } from './persistence/port';
+import { TypeormCompanionPersistence } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
@@ -9,7 +11,13 @@ import { CompanionController, CompanionDownloadController } from './companion.co
 
 @Module({
   imports: [TypeOrmModule.forFeature([CompanionDevice, ResourceFlowNode])],
-  providers: [CompanionService, CompanionGatewayService, CompanionAuthHandler, CompanionGateway],
+  providers: [
+    { provide: CompanionPersistence, useClass: TypeormCompanionPersistence },
+    CompanionService,
+    CompanionGatewayService,
+    CompanionAuthHandler,
+    CompanionGateway,
+  ],
   controllers: [CompanionController, CompanionDownloadController],
   exports: [CompanionService, CompanionGateway, CompanionGatewayService],
 })

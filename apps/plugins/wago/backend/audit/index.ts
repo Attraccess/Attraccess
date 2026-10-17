@@ -3,7 +3,7 @@ import type {
   PluginAuditPrincipal,
   PluginAuditReceipt,
   PluginContext,
-} from '@attraccess/plugins-backend-sdk';
+} from '@attraccess/plugins-backend-sdk/v2';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { WAGO_PRESETS } from '../configuration/model';
