@@ -43,7 +43,8 @@ describe('MetricsGuard (HTTP integration)', () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
-    await app.init();
+    // Keep one listener alive for the fixture; per-request ephemeral listeners can reuse stale keep-alive sockets.
+    await app.listen(0, '127.0.0.1');
   });
 
   afterAll(async () => {
@@ -65,23 +66,15 @@ describe('MetricsGuard (HTTP integration)', () => {
   });
 
   it('returns 401 when the Authorization scheme is not Bearer', async () => {
-    await request(app.getHttpServer())
-      .get('/api/metrics')
-      .set('Authorization', 'Basic dXNlcjpwYXNz')
-      .expect(401);
+    await request(app.getHttpServer()).get('/api/metrics').set('Authorization', 'Basic dXNlcjpwYXNz').expect(401);
   });
 
   it('returns 401 when the bearer token does not match', async () => {
-    await request(app.getHttpServer())
-      .get('/api/metrics')
-      .set('Authorization', 'Bearer wrong-key')
-      .expect(401);
+    await request(app.getHttpServer()).get('/api/metrics').set('Authorization', 'Bearer wrong-key').expect(401);
   });
 
   it('returns 401 (not 200) when the key is passed via query param', async () => {
-    await request(app.getHttpServer())
-      .get('/api/metrics?api_key=configured-key')
-      .expect(401);
+    await request(app.getHttpServer()).get('/api/metrics?api_key=configured-key').expect(401);
   });
 
   it('returns 200 and the Prometheus exposition when the bearer matches', async () => {

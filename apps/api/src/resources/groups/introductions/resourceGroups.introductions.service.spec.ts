@@ -9,12 +9,16 @@ import {
 import { ResourceGroupsIntroductionsService } from './resourceGroups.introductions.service';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
+import { ResourceRetrainingService } from '../../retraining/resourceRetraining.service';
+import { AuditService } from '../../../audit/audit.service';
 
 describe('ResourceGroupsIntroductionsService notifications', () => {
   let service: ResourceGroupsIntroductionsService;
   let introductionRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock; find: jest.Mock };
   let historyRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock };
   let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
+  let retraining: { getIntroductionRetrainingStatus: jest.Mock };
+  let audit: { recordResource: jest.Mock };
 
   beforeEach(async () => {
     introductionRepository = {
@@ -31,6 +35,8 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
       find: jest.fn(),
     };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
+    retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
+    audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,10 +45,13 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
         { provide: getRepositoryToken(ResourceIntroductionHistoryItem), useValue: historyRepository },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: NotificationDispatchService, useValue: notifications },
+        { provide: ResourceRetrainingService, useValue: retraining },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
     service = module.get(ResourceGroupsIntroductionsService);
+    audit.recordResource.mockClear();
   });
 
   it('notifies the user when a group introduction is granted', async () => {
@@ -76,6 +85,31 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     await service.grant(5, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'introduction.granted', actorId: 9, subjectType: 'resource_group', subjectId: 5,
+      details: { recipientUserId: 3 },
+    }));
+  });
+
+  it('records a cleared event only when the renewed group introduction was due', async () => {
+    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+    retraining.getIntroductionRetrainingStatus.mockResolvedValueOnce({ isDue: true }).mockResolvedValueOnce({ isDue: false });
+
+    await service.grant(5, 3);
+
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'retraining.cleared', subjectType: 'resource_group', subjectId: 5,
+      details: { introductionId: 10, usageUserId: 3 },
+    }));
+  });
+
+  it('does not clear a group introduction when inactivity remains due after renewal', async () => {
+    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+    retraining.getIntroductionRetrainingStatus.mockResolvedValue({ isDue: true });
+
+    await service.grant(5, 3);
+
+    expect(audit.recordResource).not.toHaveBeenCalled();
   });
 
   it('records the acting user for a revoked introduction', async () => {
@@ -84,6 +118,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     await service.revoke(5, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({ action: 'introduction.revoked', actorId: 9 }));
   });
 
   it('does not notify when a group introduction is granted twice without an effective access change', async () => {

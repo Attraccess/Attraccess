@@ -58,7 +58,7 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
       )}
 
       {canManageIntroductions &&
-        (row.hasValidIntroduction ? (
+        (row.hasValidDirectIntroduction ? (
           <Tooltip>
             <Tooltip.Trigger>
               <Button
@@ -66,13 +66,17 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
                 isIconOnly
                 isPending={isRevokingIntroduction && pendingIntroductionUserId === row.user.id}
                 onPress={() => onToggleIntroduction(row.user, 'revoke')}
-                aria-label={t('rowActions.revokeIntroduction')}
+                aria-label={t(
+                  target.type === 'resource' ? 'rowActions.revokeDirectIntroduction' : 'rowActions.revokeIntroduction',
+                )}
                 data-cy={`people-row-revoke-introduction-${row.user.id}`}
               >
                 <ShieldOffIcon className="w-4 h-4" />
               </Button>
             </Tooltip.Trigger>
-            <Tooltip.Content>{t('rowActions.revokeIntroduction')}</Tooltip.Content>
+            <Tooltip.Content>
+              {t(target.type === 'resource' ? 'rowActions.revokeDirectIntroduction' : 'rowActions.revokeIntroduction')}
+            </Tooltip.Content>
           </Tooltip>
         ) : row.introduction ? (
           <Tooltip>

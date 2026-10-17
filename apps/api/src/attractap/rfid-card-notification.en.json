@@ -1,0 +1,10 @@
+{
+  "registeredTitle": "RFID card registered",
+  "registeredBody": "RFID card #{cardId} was registered for your account.",
+  "activatedTitle": "RFID card activated",
+  "activatedBody": "RFID card #{cardId} was activated.",
+  "deactivatedTitle": "RFID card deactivated",
+  "deactivatedBody": "RFID card #{cardId} was deactivated.",
+  "deletedTitle": "RFID card deleted",
+  "deletedBody": "RFID card #{cardId} was deleted from your account."
+}

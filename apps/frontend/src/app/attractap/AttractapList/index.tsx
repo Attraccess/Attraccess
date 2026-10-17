@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
-  Chip,
   Table,
   TableBody,
   TableCell,
@@ -11,12 +9,18 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
+  Chip,
 } from '@heroui/react';
-import { ActivityIcon, ArrowRightIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
 import { EmptyState } from '../../../components/emptyState';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
+import { PageAction, PageHeader } from '../../../components/pageHeader/index';
+import { AttractapHardwareSetup } from '../HardwareSetup/index';
+import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
+import { AttractapDeleteModal } from './delete/index';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
   useAttractapServiceGetFirmwares,
@@ -24,16 +28,11 @@ import {
   useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { PageAction, PageHeader } from '../../../components/pageHeader';
-import { AttractapHardwareSetup } from '../HardwareSetup';
-import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole';
 import { useNow } from '../../../hooks/useNow';
-
 import de from './de.json';
 import en from './en.json';
-import { AttractapDeleteModal } from './delete';
 
-export function AttractapList() {
+export function useAttractapListState() {
   const { t } = useTranslations({
     de,
     en,
@@ -110,6 +109,31 @@ export function AttractapList() {
     },
     [firmwares],
   );
+  return {
+    t,
+    license,
+    navigate,
+    openedReaderEditor,
+    setOpenedReaderEditor,
+    formatDateTime,
+    staleReaders,
+    activeReaders,
+    firmwareUpdateChip,
+  } as const;
+}
+
+export function AttractapList() {
+  const {
+    t,
+    license,
+    navigate,
+    openedReaderEditor,
+    setOpenedReaderEditor,
+    formatDateTime,
+    staleReaders,
+    activeReaders,
+    firmwareUpdateChip,
+  } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
     return null;

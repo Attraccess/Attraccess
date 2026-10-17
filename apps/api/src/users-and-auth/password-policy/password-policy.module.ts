@@ -7,7 +7,6 @@ import {
   AuthenticationDetail,
   PasswordHistory,
   PasswordPolicy,
-  PasswordPolicyAudit,
   PasswordPolicyOverride,
 } from '@attraccess/database-entities';
 import { PasswordPolicyService } from './password-policy.service';
@@ -22,7 +21,6 @@ import { RbacModule } from '../rbac/rbac.module';
     TypeOrmModule.forFeature([
       PasswordPolicy,
       PasswordPolicyOverride,
-      PasswordPolicyAudit,
       PasswordHistory,
       AuthenticationDetail,
     ]),

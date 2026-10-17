@@ -1,6 +1,3 @@
-import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import en from './en.json';
-import de from './de.json';
 import {
   Alert,
   AlertContent,
@@ -14,9 +11,14 @@ import {
   NumberFieldInput,
   Spinner,
 } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { PageHeader } from '../../../../components/pageHeader';
+import { Button } from '../../../../components/button/index';
+import { PageHeader } from '../../../../components/pageHeader/index';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
+import { Select } from '../../../../components/select/index';
+import { TransactionProcessingCard } from './transactionProcessingStatus/index';
+import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
 import {
   BillingTransaction,
   useBillingServiceGetBillingBalance,
@@ -29,22 +31,12 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { Select } from '../../../../components/select';
-import { TransactionProcessingCard } from './transactionProcessingStatus';
 import { useAuth } from '../../../../hooks/useAuth';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
-interface Props {
-  className?: string;
-  title?: string;
-  subtitle?: string;
-  desiredAmount?: number;
-  onProcessingComplete?: () => void;
-}
-
-export function BillingDashboardTopupCard(props: Props) {
+export function useBillingDashboardTopupCardState(props: Props) {
   const { className, title, subtitle, desiredAmount, onProcessingComplete } = props;
   const { t, tExists } = useTranslations({
     en: {
@@ -79,7 +71,7 @@ export function BillingDashboardTopupCard(props: Props) {
           error,
           t,
           tExists,
-          baseTranslationKey: 'error.toast',
+          baseTranslationKey: 'api',
         });
       },
     });
@@ -128,6 +120,59 @@ export function BillingDashboardTopupCard(props: Props) {
   }, [amount, topUpWithSumUpReader, readerId, configuration]);
 
   const formatNumber = useNumberFormatter();
+  return {
+    className,
+    title,
+    subtitle,
+    onProcessingComplete,
+    t,
+    topUpTransaction,
+    setTopUpTransaction,
+    configuration,
+    sumUpConfiguration,
+    isLoadingSumUpConfiguration,
+    isSumUpConfigurationError,
+    readers,
+    isPendingTopUpWithSumUpReader,
+    amount,
+    setAmount,
+    readerId,
+    setReaderId,
+    onSubmit,
+    formatNumber,
+  } as const;
+}
+
+export interface Props {
+  className?: string;
+  title?: string;
+  subtitle?: string;
+  desiredAmount?: number;
+  onProcessingComplete?: () => void;
+}
+
+export function BillingDashboardTopupCard(props: Props) {
+  const {
+    className,
+    title,
+    subtitle,
+    onProcessingComplete,
+    t,
+    topUpTransaction,
+    setTopUpTransaction,
+    configuration,
+    sumUpConfiguration,
+    isLoadingSumUpConfiguration,
+    isSumUpConfigurationError,
+    readers,
+    isPendingTopUpWithSumUpReader,
+    amount,
+    setAmount,
+    readerId,
+    setReaderId,
+    onSubmit,
+    formatNumber,
+  } = useBillingDashboardTopupCardState(props);
 
   if (isLoadingSumUpConfiguration) {
     return (

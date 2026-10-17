@@ -43,6 +43,9 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Project Specific
+apps/plugins/wago/runtime-assets
+!apps/plugins/wago/runtime-assets/cc100-build
+!apps/plugins/wago/runtime-assets/cc100-build/**
 !.npmrc
 .cursor
 .github

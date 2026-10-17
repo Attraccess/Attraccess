@@ -3,7 +3,7 @@ import { WindowsMetricsAdapter } from './adapters/windows';
 import { MacosMetricsAdapter } from './adapters/macos';
 import { LinuxMetricsAdapter } from './adapters/linux';
 
-export { SystemMetricsAdapter, ForegroundAppInfo, UsbDeviceInfo } from './types';
+export { SystemMetricsAdapter, type ForegroundAppInfo, type UsbDeviceInfo } from './types';
 export { WindowsMetricsAdapter } from './adapters/windows';
 export { MacosMetricsAdapter } from './adapters/macos';
 export { LinuxMetricsAdapter } from './adapters/linux';

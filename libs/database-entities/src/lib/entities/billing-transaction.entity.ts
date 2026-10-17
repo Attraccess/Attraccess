@@ -88,6 +88,17 @@ export class BillingTransaction {
   @ApiProperty({ description: 'The billing transaction that is being refunded', type: () => BillingTransaction })
   refundOf!: BillingTransaction | null;
 
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'The billing transaction this one corrects; the corrected transaction itself is never changed',
+    nullable: true,
+  })
+  correctionOfId!: number | null;
+
+  @ManyToOne(() => BillingTransaction, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'correctionOfId' })
+  correctionOf?: BillingTransaction | null;
+
   @Column({ type: 'text', nullable: true })
   @ApiProperty({ description: 'The external reference e.g. sumup transaction ID' })
   externalReference!: string | null;

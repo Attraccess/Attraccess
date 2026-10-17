@@ -1,0 +1,35 @@
+{
+  "title": "Preset foundation",
+  "description": "Preview settings, then copy selected changes into your local edits. Save draft when ready.",
+  "previewError": "Could not preview preset.",
+  "copyError": "Could not copy preset.",
+  "loadError": "Could not load presets: {{error}}",
+  "preset": "Preset",
+  "applyTo": "Apply to channel",
+  "meteredHint": "Bind a live power measurement and a named output action to the same Modbus point to use this preset.",
+  "digitalHint": "Add a digital {{direction}} or a compatible Modbus output to use this preset.",
+  "feedback": "Optional feedback input",
+  "noFeedback": "No feedback",
+  "preview": "Preview preset",
+  "copy": "Copy selected changes to local edits",
+  "reapply": "Reapply preset to local edits",
+  "items": {
+    "metered-switched-load": {
+      "name": "Metered switched load",
+      "description": "Switches an output off immediately when disconnected and reports a transformed measurement."
+    },
+    "pulsed-lock-bank": {
+      "name": "Pulsed lock bank",
+      "description": "Pulses an output briefly and returns it to off immediately when disconnected."
+    },
+    "guarded-enable-request": {
+      "name": "Guarded enable request",
+      "description": "Makes a non-safety enable request only while an operational guard is satisfied."
+    },
+    "generic-digital-output": { "name": "Generic digital output", "description": "A conservative output foundation." },
+    "generic-monitored-input": {
+      "name": "Generic monitored input",
+      "description": "A monitored digital input foundation."
+    }
+  }
+}

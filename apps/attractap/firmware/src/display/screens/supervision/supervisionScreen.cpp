@@ -1,9 +1,10 @@
 #include "supervisionScreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
-#include "platform.hpp"
+#include "../../../platform.hpp"
 
 void SupervisionScreen::init()
 {
@@ -53,8 +54,8 @@ void SupervisionScreen::init()
    const char *initialName = this->view.requesterName.length() > 0 ? this->view.requesterName.c_str() : "...";
    lv_label_set_text(this->requesterNameLabel, initialName);
    lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->requesterNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->requesterNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->requesterNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->requesterNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current supervision phase.
    this->statusLabel = lv_label_create(this->screen);
@@ -62,7 +63,7 @@ void SupervisionScreen::init()
    lv_obj_set_height(this->statusLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->statusLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_style_text_align(this->statusLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->statusLabel, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->statusLabel, &attractap_font_montserrat_latin1_28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Secondary hint — who may approve + the web fallback note.
    this->hintLabel = lv_label_create(this->screen);
@@ -72,7 +73,7 @@ void SupervisionScreen::init()
    lv_label_set_text(this->hintLabel, this->view.supervisorHint.c_str());
    lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->hintLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Cancel button — lets the user abort the supervised start.
    this->cancelButton = lv_button_create(this->screen);
@@ -93,76 +94,6 @@ void SupervisionScreen::init()
 
    this->updateTimeoutBar();
    this->applyStatus();
-}
-
-void SupervisionScreen::loop()
-{
-   this->updateTimeoutBar();
-}
-
-void SupervisionScreen::updateTimeoutBar()
-{
-   if (!this->timeoutBar)
-   {
-      return;
-   }
-   uint32_t now = millis();
-   int32_t remainingSeconds = 0;
-   if (this->timeoutTime > now)
-   {
-      remainingSeconds = (int32_t)((this->timeoutTime - now) / 1000);
-   }
-   if (remainingSeconds > 30)
-   {
-      remainingSeconds = 30;
-   }
-   lv_bar_set_value(this->timeoutBar, remainingSeconds, LV_ANIM_ON);
-}
-
-void SupervisionScreen::applyStatus()
-{
-   if (!this->statusLabel)
-   {
-      return;
-   }
-
-   const char *text = "";
-   lv_color_t color = DisplayTheme::text();
-   switch (this->view.status)
-   {
-   case STATUS_WAITING:
-      text = "Aufsichts-Karte auflegen";
-      color = DisplayTheme::text();
-      break;
-   case STATUS_VERIFYING:
-      text = "Karte gelesen...\nbitte nicht bewegen";
-      color = DisplayTheme::warning();
-      break;
-   case STATUS_SUCCESS:
-      text = "Freigegeben!";
-      color = DisplayTheme::success();
-      break;
-   case STATUS_ERROR:
-      text = this->view.statusMessage.length() > 0 ? this->view.statusMessage.c_str() : "Fehler";
-      color = DisplayTheme::danger();
-      break;
-   }
-
-   lv_label_set_text(this->statusLabel, text);
-   lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   // Hide the cancel button once approved — nothing left to cancel.
-   if (this->cancelButton)
-   {
-      if (this->view.status == STATUS_SUCCESS)
-      {
-         lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
-      }
-      else
-      {
-         lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
-      }
-   }
 }
 
 lv_obj_t *SupervisionScreen::getScreen()
@@ -250,4 +181,74 @@ void SupervisionScreen::destroy()
    this->statusLabel = nullptr;
    this->hintLabel = nullptr;
    this->cancelButton = nullptr;
+}
+
+void SupervisionScreen::loop()
+{
+   this->updateTimeoutBar();
+}
+
+void SupervisionScreen::updateTimeoutBar()
+{
+   if (!this->timeoutBar)
+   {
+      return;
+   }
+   uint32_t now = millis();
+   int32_t remainingSeconds = 0;
+   if (this->timeoutTime > now)
+   {
+      remainingSeconds = (int32_t)((this->timeoutTime - now) / 1000);
+   }
+   if (remainingSeconds > 30)
+   {
+      remainingSeconds = 30;
+   }
+   lv_bar_set_value(this->timeoutBar, remainingSeconds, LV_ANIM_ON);
+}
+
+void SupervisionScreen::applyStatus()
+{
+   if (!this->statusLabel)
+   {
+      return;
+   }
+
+   const char *text = "";
+   lv_color_t color = DisplayTheme::text();
+   switch (this->view.status)
+   {
+   case STATUS_WAITING:
+      text = "Aufsichts-Karte auflegen";
+      color = DisplayTheme::text();
+      break;
+   case STATUS_VERIFYING:
+      text = "Karte gelesen...\nbitte nicht bewegen";
+      color = DisplayTheme::warning();
+      break;
+   case STATUS_SUCCESS:
+      text = "Freigegeben!";
+      color = DisplayTheme::success();
+      break;
+   case STATUS_ERROR:
+      text = this->view.statusMessage.length() > 0 ? this->view.statusMessage.c_str() : "Fehler";
+      color = DisplayTheme::danger();
+      break;
+   }
+
+   lv_label_set_text(this->statusLabel, text);
+   lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Hide the cancel button once approved — nothing left to cancel.
+   if (this->cancelButton)
+   {
+      if (this->view.status == STATUS_SUCCESS)
+      {
+         lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+      else
+      {
+         lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+   }
 }

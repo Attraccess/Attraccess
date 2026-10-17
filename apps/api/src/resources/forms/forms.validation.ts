@@ -2,7 +2,7 @@ import { FormFieldType } from '@attraccess/database-entities';
 import { BadRequestException } from '@nestjs/common';
 import { z, ZodError, ZodIssueCode } from 'zod';
 
-const normalizeOptionalInput = (value: unknown) => {
+export const normalizeOptionalInput = (value: unknown) => {
   if (value === undefined || value === null) {
     return undefined;
   }
@@ -12,22 +12,49 @@ const normalizeOptionalInput = (value: unknown) => {
   return value;
 };
 
-const coerceOptionalNumber = (message: string) =>
+export const textFieldValueSchema = z.custom<string>((value) => typeof value === 'string', {
+  message: 'Text field values must be strings.',
+});
+
+export const numberFieldValueSchema = z
+  .preprocess((value) => normalizeOptionalInput(value), z.coerce.number())
+  .refine((value) => !Number.isNaN(value), { message: 'Number field values must be numeric.' })
+  .transform((value) => value.toString());
+
+export const booleanFieldValueSchema = z
+  .custom<boolean | 'true' | 'false'>(
+    (value) => value === true || value === false || value === 'true' || value === 'false',
+    { message: 'Boolean field values must be true or false.' },
+  )
+  .transform((value) => (value === true || value === 'true' ? 'true' : 'false'));
+
+export const selectFieldValueSchema = z.custom<string>((value) => typeof value === 'string', {
+  message: 'Select field values must be strings.',
+});
+
+export const formFieldValueSchemaByType: Record<FormFieldType, z.ZodType<string>> = {
+  [FormFieldType.TEXT]: textFieldValueSchema,
+  [FormFieldType.NUMBER]: numberFieldValueSchema,
+  [FormFieldType.BOOLEAN]: booleanFieldValueSchema,
+  [FormFieldType.SELECT]: selectFieldValueSchema,
+};
+
+export const coerceOptionalNumber = (message: string) =>
+  z.optional(
+    z
+      .preprocess((value) => normalizeOptionalInput(value), z.coerce.number().optional())
+      .refine((value) => value === undefined || !Number.isNaN(value), { message }),
+  );
+
+export const coerceOptionalPositiveNumber = (message: string) =>
   z.optional(
     z
       .preprocess((value) => normalizeOptionalInput(value), z.coerce.number().optional())
       .refine((value) => value === undefined || !Number.isNaN(value), { message })
+      .refine((value) => value === undefined || (value as number) > 0, { message }),
   );
 
-const coerceOptionalPositiveNumber = (message: string) =>
-  z.optional(
-    z
-      .preprocess((value) => normalizeOptionalInput(value), z.coerce.number().optional())
-      .refine((value) => value === undefined || !Number.isNaN(value), { message })
-      .refine((value) => value === undefined || (value as number) > 0, { message })
-  );
-
-const optionalTrimmedString = z
+export const optionalTrimmedString = z
   .preprocess((value) => {
     if (typeof value !== 'string') {
       return value;
@@ -37,11 +64,11 @@ const optionalTrimmedString = z
   }, z.string())
   .optional();
 
-const createNumericOptionSchema = (message: string) => coerceOptionalNumber(message);
+export const createNumericOptionSchema = (message: string) => coerceOptionalNumber(message);
 
-const createPositiveNumericOptionSchema = (message: string) => coerceOptionalPositiveNumber(message);
+export const createPositiveNumericOptionSchema = (message: string) => coerceOptionalPositiveNumber(message);
 
-const textFieldOptionsSchema = z
+export const textFieldOptionsSchema = z
   .object({
     placeholder: optionalTrimmedString,
     multiline: z.boolean().optional(),
@@ -53,7 +80,7 @@ const textFieldOptionsSchema = z
     return value;
   });
 
-const numberFieldOptionsSchema = z
+export const numberFieldOptionsSchema = z
   .object({
     min: createNumericOptionSchema('Number field min option must be numeric.'),
     max: createNumericOptionSchema('Number field max option must be numeric.'),
@@ -75,7 +102,7 @@ const numberFieldOptionsSchema = z
     return value;
   });
 
-const booleanFieldOptionsSchema = z
+export const booleanFieldOptionsSchema = z
   .object({
     trueLabel: optionalTrimmedString,
     falseLabel: optionalTrimmedString,
@@ -87,9 +114,9 @@ const booleanFieldOptionsSchema = z
     return value;
   });
 
-const MAX_SELECT_OPTIONS = 12;
+export const MAX_SELECT_OPTIONS = 12;
 
-const selectOptionsArraySchema = z
+export const selectOptionsArraySchema = z
   .array(
     z.preprocess((value) => {
       if (typeof value === 'string') {
@@ -111,7 +138,7 @@ const selectOptionsArraySchema = z
     return unique;
   });
 
-const selectFieldOptionsSchema = z
+export const selectFieldOptionsSchema = z
   .preprocess((value) => {
     if (value === undefined || value === null) {
       return [];
@@ -126,41 +153,14 @@ const selectFieldOptionsSchema = z
   }, selectOptionsArraySchema)
   .transform((value) => (value.length ? value : null));
 
-type FieldOptionsPayload = Record<string, unknown> | string[] | null;
+export type FieldOptionsPayload = Record<string, unknown> | string[] | null;
 
-const formFieldOptionsSchemaByType: Record<FormFieldType, z.ZodType<FieldOptionsPayload>> = {
+export const formFieldOptionsSchemaByType: Record<FormFieldType, z.ZodType<FieldOptionsPayload>> = {
   [FormFieldType.TEXT]: textFieldOptionsSchema,
   [FormFieldType.NUMBER]: numberFieldOptionsSchema,
   [FormFieldType.BOOLEAN]: booleanFieldOptionsSchema,
   [FormFieldType.SELECT]: selectFieldOptionsSchema,
 };
-
-const textFieldValueSchema = z.custom<string>((value) => typeof value === 'string', {
-  message: 'Text field values must be strings.',
-});
-
-const numberFieldValueSchema = z
-  .preprocess((value) => normalizeOptionalInput(value), z.coerce.number())
-  .refine((value) => !Number.isNaN(value), { message: 'Number field values must be numeric.' })
-  .transform((value) => value.toString());
-
-const booleanFieldValueSchema = z
-  .custom<
-    boolean | 'true' | 'false'
-  >((value) => value === true || value === false || value === 'true' || value === 'false', { message: 'Boolean field values must be true or false.' })
-  .transform((value) => (value === true || value === 'true' ? 'true' : 'false'));
-
-const selectFieldValueSchema = z.custom<string>((value) => typeof value === 'string', {
-  message: 'Select field values must be strings.',
-});
-
-const formFieldValueSchemaByType: Record<FormFieldType, z.ZodType<string>> = {
-  [FormFieldType.TEXT]: textFieldValueSchema,
-  [FormFieldType.NUMBER]: numberFieldValueSchema,
-  [FormFieldType.BOOLEAN]: booleanFieldValueSchema,
-  [FormFieldType.SELECT]: selectFieldValueSchema,
-};
-
 const parseWithSchema = <T>(schema: z.ZodType<T>, payload: unknown, fallbackMessage: string): T => {
   try {
     return schema.parse(payload);

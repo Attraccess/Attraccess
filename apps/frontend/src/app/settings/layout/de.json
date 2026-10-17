@@ -1,6 +1,8 @@
 {
   "title": "Einstellungen",
   "subtitle": "Systemkonfiguration verwalten",
+  "search": "Einstellung suchen…",
+  "noResults": "Keine passenden Einstellungen",
   "navLabel": "Einstellungsbereiche",
   "backToSettings": "Einstellungen",
   "groups": {

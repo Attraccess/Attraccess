@@ -9,5 +9,14 @@
     "target": "es2021"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+  "exclude": [
+    "jest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test-cases.ts",
+    "src/**/*.test-fixture.ts",
+    "src/**/*.spec.*.ts",
+    "src/**/*.test.*.ts",
+    "src/test-utils/**/*.ts"
+  ]
 }

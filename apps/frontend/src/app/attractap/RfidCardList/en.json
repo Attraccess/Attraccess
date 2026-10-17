@@ -1,0 +1,39 @@
+{
+  "nfcCards": "RFID Cards",
+  "readers": "Attractap Readers",
+  "noNfcCardsFound": "No RFID Cards found",
+  "nfcCardsTable": {
+    "headers": {
+      "id": "ID",
+      "uid": "UID",
+      "lastSeen": "Last seen",
+      "createdAt": "Created at",
+      "actions": "Actions"
+    },
+    "actions": {
+      "delete": "Delete",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
+    "deleteModal": {
+      "title": "Delete RFID Card",
+      "description": "You are about to delete the RFID Card with the ID {{id}}. This action cannot be undone.",
+      "readerLabel": "Select Attractap",
+      "readerPlaceholder": "Select a Attractap",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    }
+  },
+  "enroll": "Enroll RFID Card",
+  "enrollModal": {
+    "title": "Enroll RFID Card",
+    "description": "To enroll a new RFID Card, choose a connected Attractap in the list below. Then click on the button \"Enroll new RFID Card\" and follow the instructions on the Attractap.",
+    "readerLabel": "Select Attractap",
+    "readerPlaceholder": "Select a Attractap",
+    "cancel": "Cancel",
+    "enroll": "Enroll"
+  },
+  "userCards": "RFID Cards — {{username}}",
+  "errorFetchCards": "Could not load RFID cards",
+  "errorOperation": "Could not start the card operation"
+}

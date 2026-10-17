@@ -46,4 +46,25 @@ export class BillingTransactionItem {
   @Column({ type: 'integer' })
   @ApiProperty({ description: 'The quantity of the billing transaction item', example: '100' })
   quantity!: number;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Raw milliseconds used to calculate this duration charge; null for legacy or non-duration items',
+    nullable: true,
+    required: false,
+  })
+  durationMs!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    description:
+      'Exact metered quantity, without a unit; null with a captured meter price means the final reading was unavailable',
+  })
+  meterQuantity!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ nullable: true, required: false, description: 'Captured price per measured value' })
+  meterCreditsPerUnit!: number | null;
 }

@@ -77,7 +77,8 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [FakeModule] }).compile();
     app = moduleRef.createNestApplication<NestExpressApplication>();
     app.set('trust proxy', trustProxy);
-    await app.init();
+    // Keep one listener alive for the fixture; per-request ephemeral listeners can reuse stale keep-alive sockets.
+    await app.listen(0, '127.0.0.1');
     bruteForce = app.get(BruteForceProtectionService);
     audit = app.get(AuthAuditLogger);
   }

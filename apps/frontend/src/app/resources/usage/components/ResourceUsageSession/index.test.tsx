@@ -20,7 +20,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
 }));
 
-vi.mock('../../../../../utils/sse', () => ({ useSSE: () => undefined }));
+vi.mock('../../../../../utils/live-updates', () => ({ useLiveUpdates: () => undefined }));
 
 // The child components are irrelevant here — we only assert which branch renders.
 vi.mock('../StartSessionControls', () => ({

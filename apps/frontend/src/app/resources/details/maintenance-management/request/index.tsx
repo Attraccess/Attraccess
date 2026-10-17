@@ -7,6 +7,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   TextArea,
   useOverlayState,
@@ -89,7 +90,7 @@ export function RequestMaintenanceButton(props: Props) {
         <DrawerHeader>
           <div className="flex items-center gap-2">
             <MessageSquareWarningIcon className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">{t('modal.title')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('modal.title')}</DrawerHeading>
           </div>
         </DrawerHeader>
         <DrawerBody>

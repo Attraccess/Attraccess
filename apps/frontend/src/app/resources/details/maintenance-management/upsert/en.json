@@ -1,31 +1,32 @@
 {
-    "title": "Create maintenance period",
-    "inputs": {
-        "startTime": {
-            "label": "Start time"
-        },
-        "hasEndDate": {
-            "label": "End time already known?"
-        },
-        "endTime": {
-            "label": "End time"
-        },
-        "reason": {
-            "label": "Reason (optional)",
-            "displayedToUsers": "Displayed to users"
-        }
+  "title": "Create maintenance period",
+  "inputs": {
+    "incompleteDate": "Complete the date and time.",
+    "startTime": {
+      "label": "Start time"
     },
-    "actions": {
-        "save": "Save"
+    "hasEndDate": {
+      "label": "End time already known?"
     },
-    "alert": {
-        "error": {
-            "title": "Error adding maintenance period"
-        }
+    "endTime": {
+      "label": "End time"
     },
-    "audit": {
-        "createdBy": "Created by",
-        "completedBy": "Completed by",
-        "completedAt": "Completed at"
+    "reason": {
+      "label": "Reason (optional)",
+      "displayedToUsers": "Displayed to users"
     }
+  },
+  "actions": {
+    "save": "Save"
+  },
+  "alert": {
+    "error": {
+      "title": "Error adding maintenance period"
+    }
+  },
+  "audit": {
+    "createdBy": "Created by",
+    "completedBy": "Completed by",
+    "completedAt": "Completed at"
+  }
 }

@@ -1,32 +1,40 @@
+import { Inject, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
+
 import {
-  WebSocketGateway,
+  ConnectedSocket,
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
+  WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Server } from 'ws';
-import { Inject, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
+
 import { randomBytes } from 'crypto';
+
 import { AsyncApi, AsyncApiPub, AsyncApiSub } from 'nestjs-asyncapi';
-import { CompanionGatewayService } from './companion-gateway.service';
+
+import { Server } from 'ws';
+
 import { CompanionAuthHandler } from './companion-auth.handler';
-import { CompanionAuthenticated } from './companion-authenticated.decorator';
+
+import { CompanionGatewayService } from './companion-gateway.service';
+
 import {
   CompanionAuthenticateDto,
+  CompanionAuthenticatePayload,
+  CompanionEventType,
+  CompanionSocket,
   CompanionAuthenticatedDto,
   CompanionDeviceRenamedDto,
   CompanionRegisterResponseDto,
   CompanionUpdateAvailableDto,
-  CompanionAuthenticatePayload,
-  CompanionIdleDto,
   CompanionForegroundAppDto,
+  CompanionIdleDto,
   CompanionUsbDeviceDto,
-  CompanionSocket,
-  CompanionEventType,
 } from './companion.types';
+
+import { CompanionAuthenticated } from './companion-authenticated.decorator';
 
 @AsyncApi()
 @WebSocketGateway({ path: '/api/companion/websocket' })
@@ -34,13 +42,13 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @WebSocketServer()
   server: Server;
 
-  private readonly logger = new Logger(CompanionGateway.name);
+  protected readonly logger = new Logger(CompanionGateway.name);
 
   @Inject(CompanionGatewayService)
-  private readonly gatewayService: CompanionGatewayService;
+  protected readonly gatewayService: CompanionGatewayService;
 
   @Inject(CompanionAuthHandler)
-  private readonly authHandler: CompanionAuthHandler;
+  protected readonly authHandler: CompanionAuthHandler;
 
   // ─── Connection lifecycle ─────────────────────────────────────────────────
 
@@ -89,81 +97,6 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     await this.authHandler.handleAuthenticate(socket, body as CompanionAuthenticatePayload);
   }
 
-  @SubscribeMessage('COMPANION_IDLE')
-  @CompanionAuthenticated()
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
-    channel: 'COMPANION_IDLE',
-    message: { name: 'COMPANION_IDLE', payload: CompanionIdleDto },
-    summary: 'Companion reports that the machine has become idle',
-  })
-  onIdle(
-    @MessageBody() body: CompanionIdleDto,
-    @ConnectedSocket() socket: CompanionSocket,
-  ): void {
-    this.gatewayService.handleIdleEvent(socket.deviceId as number, body);
-  }
-
-  @SubscribeMessage('COMPANION_ACTIVE')
-  @CompanionAuthenticated()
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
-    channel: 'COMPANION_ACTIVE',
-    message: { name: 'COMPANION_ACTIVE', payload: CompanionIdleDto },
-    summary: 'Companion reports that the machine has become active after being idle',
-  })
-  onActive(
-    @MessageBody() body: CompanionIdleDto,
-    @ConnectedSocket() socket: CompanionSocket,
-  ): void {
-    this.gatewayService.handleActiveEvent(socket.deviceId as number, body);
-  }
-
-  @SubscribeMessage('COMPANION_FOREGROUND_APP')
-  @CompanionAuthenticated()
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
-    channel: 'COMPANION_FOREGROUND_APP',
-    message: { name: 'COMPANION_FOREGROUND_APP', payload: CompanionForegroundAppDto },
-    summary: 'Companion reports the currently focused foreground application',
-  })
-  onForegroundApp(
-    @MessageBody() body: CompanionForegroundAppDto,
-    @ConnectedSocket() socket: CompanionSocket,
-  ): void {
-    this.gatewayService.handleForegroundAppEvent(socket.deviceId as number, body);
-  }
-
-  @SubscribeMessage('COMPANION_USB_CONNECTED')
-  @CompanionAuthenticated()
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
-    channel: 'COMPANION_USB_CONNECTED',
-    message: { name: 'COMPANION_USB_CONNECTED', payload: CompanionUsbDeviceDto },
-    summary: 'Companion reports that a USB device was connected',
-  })
-  onUsbConnected(
-    @MessageBody() body: CompanionUsbDeviceDto,
-    @ConnectedSocket() socket: CompanionSocket,
-  ): void {
-    this.gatewayService.handleUsbConnectedEvent(socket.deviceId as number, body);
-  }
-
-  @SubscribeMessage('COMPANION_USB_DISCONNECTED')
-  @CompanionAuthenticated()
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
-    channel: 'COMPANION_USB_DISCONNECTED',
-    message: { name: 'COMPANION_USB_DISCONNECTED', payload: CompanionUsbDeviceDto },
-    summary: 'Companion reports that a USB device was disconnected',
-  })
-  onUsbDisconnected(
-    @MessageBody() body: CompanionUsbDeviceDto,
-    @ConnectedSocket() socket: CompanionSocket,
-  ): void {
-    this.gatewayService.handleUsbDisconnectedEvent(socket.deviceId as number, body);
-  }
-
   // ─── Server → Client ─────────────────────────────────────────────────────
 
   @AsyncApiSub({
@@ -171,7 +104,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     message: { name: 'COMPANION_REQUEST_AUTHENTICATION', payload: Object },
     summary: 'Server requests the client to authenticate or register',
   })
-  private publishRequestAuthentication(socket: CompanionSocket): void {
+  protected publishRequestAuthentication(socket: CompanionSocket): void {
     socket.sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION, {});
   }
 
@@ -182,14 +115,18 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     message: { name: 'COMPANION_REGISTER_RESPONSE', payload: CompanionRegisterResponseDto },
     summary: 'Response to COMPANION_REGISTER with assigned credentials',
   })
-  private _specRegisterResponse() { /* emitted by CompanionAuthHandler.registerNewDevice */ }
+  protected _specRegisterResponse() {
+    /* emitted by CompanionAuthHandler.registerNewDevice */
+  }
 
   @AsyncApiSub({
     channel: 'COMPANION_AUTHENTICATED',
     message: { name: 'COMPANION_AUTHENTICATED', payload: CompanionAuthenticatedDto },
     summary: 'Sent after successful authentication with device info and resources',
   })
-  private _specAuthenticated() { /* emitted by CompanionAuthHandler.authenticateExistingDevice */ }
+  protected _specAuthenticated() {
+    /* emitted by CompanionAuthHandler.authenticateExistingDevice */
+  }
 
   @AsyncApiSub({
     channel: 'COMPANION_LOCK_PC',
@@ -214,14 +151,18 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     message: { name: 'COMPANION_UPDATE_AVAILABLE', payload: CompanionUpdateAvailableDto },
     summary: 'Notifies the companion that a new version is available',
   })
-  private _specUpdateAvailable() { /* emitted by CompanionAuthHandler.maybeSendUpdateAvailable on connect */ }
+  protected _specUpdateAvailable() {
+    /* emitted by CompanionAuthHandler.maybeSendUpdateAvailable on connect */
+  }
 
   @AsyncApiSub({
     channel: 'COMPANION_DEVICE_RENAMED',
     message: { name: 'COMPANION_DEVICE_RENAMED', payload: CompanionDeviceRenamedDto },
     summary: 'Notifies the companion that its display name has been changed by an admin',
   })
-  private _specDeviceRenamed() { /* emitted by CompanionGatewayService.sendDeviceRenamed */ }
+  protected _specDeviceRenamed() {
+    /* emitted by CompanionGatewayService.sendDeviceRenamed */
+  }
 
   public disconnectDevice(deviceId: number): void {
     for (const s of [...this.gatewayService.sockets.values()].filter((s) => s.deviceId === deviceId)) {
@@ -231,5 +172,65 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
         // ignore
       }
     }
+  }
+
+  @SubscribeMessage('COMPANION_IDLE')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_IDLE',
+    message: { name: 'COMPANION_IDLE', payload: CompanionIdleDto },
+    summary: 'Companion reports that the machine has become idle',
+  })
+  onIdle(@MessageBody() body: CompanionIdleDto, @ConnectedSocket() socket: CompanionSocket): void {
+    this.gatewayService.handleIdleEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_ACTIVE')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_ACTIVE',
+    message: { name: 'COMPANION_ACTIVE', payload: CompanionIdleDto },
+    summary: 'Companion reports that the machine has become active after being idle',
+  })
+  onActive(@MessageBody() body: CompanionIdleDto, @ConnectedSocket() socket: CompanionSocket): void {
+    this.gatewayService.handleActiveEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_FOREGROUND_APP')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_FOREGROUND_APP',
+    message: { name: 'COMPANION_FOREGROUND_APP', payload: CompanionForegroundAppDto },
+    summary: 'Companion reports the currently focused foreground application',
+  })
+  onForegroundApp(@MessageBody() body: CompanionForegroundAppDto, @ConnectedSocket() socket: CompanionSocket): void {
+    this.gatewayService.handleForegroundAppEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_USB_CONNECTED')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_USB_CONNECTED',
+    message: { name: 'COMPANION_USB_CONNECTED', payload: CompanionUsbDeviceDto },
+    summary: 'Companion reports that a USB device was connected',
+  })
+  onUsbConnected(@MessageBody() body: CompanionUsbDeviceDto, @ConnectedSocket() socket: CompanionSocket): void {
+    this.gatewayService.handleUsbConnectedEvent(socket.deviceId as number, body);
+  }
+
+  @SubscribeMessage('COMPANION_USB_DISCONNECTED')
+  @CompanionAuthenticated()
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @AsyncApiPub({
+    channel: 'COMPANION_USB_DISCONNECTED',
+    message: { name: 'COMPANION_USB_DISCONNECTED', payload: CompanionUsbDeviceDto },
+    summary: 'Companion reports that a USB device was disconnected',
+  })
+  onUsbDisconnected(@MessageBody() body: CompanionUsbDeviceDto, @ConnectedSocket() socket: CompanionSocket): void {
+    this.gatewayService.handleUsbDisconnectedEvent(socket.deviceId as number, body);
   }
 }

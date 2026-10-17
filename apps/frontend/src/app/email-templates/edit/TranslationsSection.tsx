@@ -1,62 +1,104 @@
-import { useEffect, useMemo, useState } from 'react';
-import { EmailTemplateType } from '@attraccess/react-query-client';
 import {
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownPopover,
-  DropdownTrigger,
-  Input,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Spinner,
   Tab,
   TabList,
   Tabs,
   TextArea,
+  Input,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
   TextField,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
 } from '@heroui/react';
 import type { Key } from '@heroui/react';
-import { buttonVariants } from '@heroui/styles';
-import { Languages, Plus, Trash2 } from 'lucide-react';
-import { Button } from '../../../components/button';
+import { Languages, Trash2, Plus } from 'lucide-react';
+import { Button } from '../../../components/button/index';
 import { StandardModal } from '../../../components/standardModal';
+import { useEffect, useMemo, useState } from 'react';
+import { buttonVariants } from '@heroui/styles';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { extractTranslationKeys } from '@attraccess/shared';
 import { useTemplateTranslations } from './useTemplateTranslations';
-
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
+import { EmailTemplateType } from '@attraccess/react-query-client';
 
-// Curated dropdown list; anything else (rarer languages, regional overrides
+export type LocaleValues = Record<string, string>;
+
+export interface TranslationsSectionProps {
+  templateType: EmailTemplateType;
+  liveContent: string;
+}
+
+export // Curated dropdown list; anything else (rarer languages, regional overrides
 // like fr-CA) can be added via the validated "Other language…" input below.
 const COMMON_LOCALES = [
-  'en', 'en-GB', 'en-US', 'de', 'de-AT', 'de-CH', 'fr', 'fr-CA', 'es', 'it', 'nl', 'pt', 'pt-BR',
-  'pl', 'cs', 'sk', 'da', 'sv', 'nb', 'fi', 'ru', 'uk', 'tr', 'ar', 'he', 'ja', 'ko', 'zh', 'zh-TW',
-  'hi', 'el', 'hu', 'ro', 'bg', 'hr', 'sl', 'sr', 'lt', 'lv', 'et', 'ca', 'eu', 'ga', 'id', 'th', 'vi',
+  'en',
+  'en-GB',
+  'en-US',
+  'de',
+  'de-AT',
+  'de-CH',
+  'fr',
+  'fr-CA',
+  'es',
+  'it',
+  'nl',
+  'pt',
+  'pt-BR',
+  'pl',
+  'cs',
+  'sk',
+  'da',
+  'sv',
+  'nb',
+  'fi',
+  'ru',
+  'uk',
+  'tr',
+  'ar',
+  'he',
+  'ja',
+  'ko',
+  'zh',
+  'zh-TW',
+  'hi',
+  'el',
+  'hu',
+  'ro',
+  'bg',
+  'hr',
+  'sl',
+  'sr',
+  'lt',
+  'lv',
+  'et',
+  'ca',
+  'eu',
+  'ga',
+  'id',
+  'th',
+  'vi',
 ];
 
-// Mirrors the backend DTO validation for translation locales.
+export // Mirrors the backend DTO validation for translation locales.
 const LOCALE_PATTERN = /^[a-z]{2,3}(-[A-Z]{2,3})?$/;
 
-type LocaleValues = Record<string, string>;
-
-const normalize = (values: LocaleValues | undefined) =>
+export const normalize = (values: LocaleValues | undefined) =>
   JSON.stringify(
     Object.entries(values ?? {})
       .filter(([, v]) => v.trim() !== '')
       .sort(([a], [b]) => a.localeCompare(b)),
   );
 
-interface TranslationsSectionProps {
-  templateType: EmailTemplateType;
-  liveContent: string;
-}
-
-export function TranslationsSection({ templateType, liveContent }: TranslationsSectionProps) {
+export function useTranslationsSectionState({ templateType, liveContent }: TranslationsSectionProps) {
   const { t, language } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
   const toast = useToastMessage();
   const { query, saveMutation, deleteMutation } = useTemplateTranslations(templateType);
@@ -210,11 +252,156 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
       </DropdownPopover>
     </Dropdown>
   );
+  return {
+    t,
+    language,
+    query,
+    saveMutation,
+    deleteMutation,
+    extractedKeys,
+    displayName,
+    existingLocales,
+    selectedLocale,
+    setSelectedLocale,
+    deleteTarget,
+    setDeleteTarget,
+    customLocaleOpen,
+    setCustomLocaleOpen,
+    customLocale,
+    setCustomLocale,
+    allLocales,
+    valuesFor,
+    isDirty,
+    filledCount,
+    handleAddLanguage,
+    handleEdit,
+    handleSave,
+    handleDeleteConfirmed,
+    addLanguageButton,
+  } as const;
+}
 
-  if (extractedKeys.length === 0) {
+export function TranslationDeleteModal({ model }: { model: ReturnType<typeof useTranslationsSectionState> }) {
+  return (
+    <StandardModal
+      isOpen={!!model.deleteTarget}
+      onOpenChange={(open) => !open && model.setDeleteTarget(null)}
+      size="sm"
+    >
+      {({ close }) => (
+        <>
+          <ModalHeader>
+            <ModalHeading>
+              {model.t('translations.removeLanguage', {
+                language: model.deleteTarget ? model.displayName(model.deleteTarget) : '',
+              })}
+            </ModalHeading>
+          </ModalHeader>
+          <ModalBody>
+            <p>
+              {model.t('translations.deleteConfirm', {
+                language: model.deleteTarget ? model.displayName(model.deleteTarget) : '',
+              })}
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onPress={close}>
+              {model.t('actions.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              isPending={model.deleteMutation.isPending}
+              onPress={model.handleDeleteConfirmed}
+              data-cy="translations-remove-language-confirm"
+            >
+              {model.t('translations.deleteConfirmButton')}
+            </Button>
+          </ModalFooter>
+        </>
+      )}
+    </StandardModal>
+  );
+}
+
+type Props = Pick<
+  ReturnType<typeof useTranslationsSectionState>,
+  'customLocaleOpen' | 'setCustomLocaleOpen' | 'customLocale' | 'handleAddLanguage' | 't' | 'setCustomLocale'
+>;
+
+export function TranslationsSectionStandardModal({
+  customLocaleOpen,
+  setCustomLocaleOpen,
+  customLocale,
+  handleAddLanguage,
+  t,
+  setCustomLocale,
+}: Props) {
+  return (
+    <StandardModal isOpen={customLocaleOpen} onOpenChange={setCustomLocaleOpen} size="sm">
+      {({ close }) => {
+        const trimmed = customLocale.trim();
+        const isValid = LOCALE_PATTERN.test(trimmed);
+        const addCustomLocale = () => {
+          if (!isValid) return;
+          handleAddLanguage(trimmed);
+          close();
+        };
+        return (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('translations.customLocaleTitle')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-default-500">{t('translations.customLocaleHint')}</p>
+                <TextField
+                  value={customLocale}
+                  onChange={setCustomLocale}
+                  isInvalid={trimmed !== '' && !isValid}
+                  aria-label={t('translations.customLocaleTitle')}
+                >
+                  <Input
+                    placeholder="de-CH"
+                    data-cy="translations-custom-locale-input"
+                    onKeyDown={(e) => e.key === 'Enter' && addCustomLocale()}
+                  />
+                </TextField>
+                {trimmed !== '' && !isValid && (
+                  <p className="text-xs text-danger">{t('translations.customLocaleInvalid')}</p>
+                )}
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close}>
+                {t('actions.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                isDisabled={!isValid}
+                onPress={addCustomLocale}
+                data-cy="translations-custom-locale-add"
+              >
+                {t('translations.customLocaleAdd')}
+              </Button>
+            </ModalFooter>
+          </>
+        );
+      }}
+    </StandardModal>
+  );
+}
+
+// Curated dropdown list; anything else (rarer languages, regional overrides
+// like fr-CA) can be added via the validated "Other language…" input below.
+// Mirrors the backend DTO validation for translation locales.
+
+export function TranslationsSection({ templateType, liveContent }: TranslationsSectionProps) {
+  const model = useTranslationsSectionState({ templateType, liveContent });
+
+  if (model.extractedKeys.length === 0) {
     return (
       <section className="w-full" data-cy="translations-section">
-        <p className="text-sm text-default-500">{t('translations.noKeys')}</p>
+        <p className="text-sm text-default-500">{model.t('translations.noKeys')}</p>
       </section>
     );
   }
@@ -222,19 +409,19 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
   // Until the server's languages are known, don't render the add/edit UI: the
   // empty state would be factually wrong, and re-adding a not-yet-listed
   // language could silently overwrite its existing translations on save.
-  if (query.isLoading) {
+  if (model.query.isLoading) {
     return (
       <section className="w-full flex justify-center py-10" data-cy="translations-section">
         <Spinner size="sm" />
       </section>
     );
   }
-  if (query.isError) {
+  if (model.query.isError) {
     return (
       <section className="w-full flex flex-col items-center gap-3 py-10" data-cy="translations-section">
-        <p className="text-sm text-danger">{t('translations.loadFailed')}</p>
-        <Button variant="ghost" size="sm" onPress={() => query.refetch()}>
-          {t('translations.retry')}
+        <p className="text-sm text-danger">{model.t('translations.loadFailed')}</p>
+        <Button variant="ghost" size="sm" onPress={() => model.query.refetch()}>
+          {model.t('translations.retry')}
         </Button>
       </section>
     );
@@ -242,84 +429,93 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
 
   return (
     <section className="w-full flex flex-col gap-4" data-cy="translations-section">
-      <p className="text-sm text-default-500">{t('translations.explainer')}</p>
+      <p className="text-sm text-default-500">{model.t('translations.explainer')}</p>
 
-      {allLocales.length === 0 ? (
+      {model.allLocales.length === 0 ? (
         <div
           className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-default-300 py-10 px-6 text-center"
           data-cy="translations-empty-state"
         >
           <Languages size={32} className="text-default-400" />
-          <p className="font-medium">{t('translations.emptyTitle')}</p>
-          <p className="text-sm text-default-500 max-w-md">{t('translations.emptyHint')}</p>
-          {addLanguageButton}
+          <p className="font-medium">{model.t('translations.emptyTitle')}</p>
+          <p className="text-sm text-default-500 max-w-md">{model.t('translations.emptyHint')}</p>
+          {model.addLanguageButton}
         </div>
       ) : (
         <>
           <div className="flex flex-row flex-wrap items-center gap-2">
-            <Tabs selectedKey={selectedLocale} onSelectionChange={(key: Key) => setSelectedLocale(String(key))}>
+            <Tabs
+              selectedKey={model.selectedLocale}
+              onSelectionChange={(key: Key) => model.setSelectedLocale(String(key))}
+            >
               <Tabs.ListContainer>
                 <TabList>
-                  {allLocales.map((locale) => (
+                  {model.allLocales.map((locale) => (
                     <Tab id={locale} key={locale} data-cy={`translations-language-tab-${locale}`}>
                       <Tabs.Indicator />
                       <span className="flex items-center gap-1.5">
-                        {displayName(locale)}
+                        {model.displayName(locale)}
                         <span className="text-xs text-default-400">
-                          {filledCount(locale)}/{extractedKeys.length}
+                          {model.filledCount(locale)}/{model.extractedKeys.length}
                         </span>
-                        {isDirty(locale) && <span className="w-1.5 h-1.5 rounded-full bg-warning" aria-hidden="true" />}
+                        {model.isDirty(locale) && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-warning" aria-hidden="true" />
+                        )}
                       </span>
                     </Tab>
                   ))}
                 </TabList>
               </Tabs.ListContainer>
             </Tabs>
-            {selectedLocale && (
+            {model.selectedLocale && (
               <Button
                 size="sm"
                 variant="ghost"
                 isIconOnly
                 className="text-danger"
-                onPress={() => setDeleteTarget(selectedLocale)}
-                aria-label={t('translations.removeLanguage', { language: displayName(selectedLocale) })}
+                onPress={() => model.setDeleteTarget(model.selectedLocale)}
+                aria-label={model.t('translations.removeLanguage', {
+                  language: model.displayName(model.selectedLocale),
+                })}
                 data-cy="translations-remove-language-button"
               >
                 <Trash2 size={16} />
               </Button>
             )}
-            <div className="ml-auto">{addLanguageButton}</div>
+            <div className="ml-auto">{model.addLanguageButton}</div>
           </div>
 
-          {selectedLocale && !existingLocales.includes(selectedLocale) && (
+          {model.selectedLocale && !model.existingLocales.includes(model.selectedLocale) && (
             <p className="text-sm text-warning" data-cy="translations-unsaved-language-hint">
-              {t('translations.unsavedLanguageHint', { language: displayName(selectedLocale) })}
+              {model.t('translations.unsavedLanguageHint', { language: model.displayName(model.selectedLocale) })}
             </p>
           )}
 
           <div className="flex flex-col gap-3" data-cy="translations-list">
-            {extractedKeys.map(({ key, defaultValue }) => (
+            {model.extractedKeys.map(({ key, defaultValue }) => (
               <div key={key} className="flex flex-col gap-1.5 rounded-lg border border-default-200 p-3">
                 <div className="flex gap-4">
                   <div className="flex flex-col gap-0.5 shrink-0">
                     <span className="text-xs uppercase tracking-wide text-default-400">
-                      {t('translations.keyColumn')}
+                      {model.t('translations.keyColumn')}
                     </span>
                     <span className="font-mono text-sm font-semibold text-default-600 whitespace-pre-wrap">{key}</span>
                   </div>
                   <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                     <span className="text-xs uppercase tracking-wide text-default-400">
-                      {t('translations.defaultColumn')}
+                      {model.t('translations.defaultColumn')}
                     </span>
                     <span className="text-sm text-default-600 whitespace-pre-wrap">{defaultValue}</span>
                   </div>
                 </div>
                 <TextArea
-                  value={valuesFor(selectedLocale)[key] ?? ''}
-                  onChange={(e) => handleEdit(key, e.target.value)}
-                  disabled={!selectedLocale}
-                  aria-label={t('translations.translationColumn', { language: displayName(selectedLocale) })}
-                  placeholder={t('translations.emptyTranslation')}
+                  value={model.valuesFor(model.selectedLocale)[key] ?? ''}
+                  onChange={(e) => model.handleEdit(key, e.target.value)}
+                  disabled={!model.selectedLocale}
+                  aria-label={model.t('translations.translationColumn', {
+                    language: model.displayName(model.selectedLocale),
+                  })}
+                  placeholder={model.t('translations.emptyTranslation')}
                   rows={2}
                   data-cy={`translation-input-${key}`}
                 />
@@ -331,96 +527,20 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
             <Button
               variant="primary"
               type="button"
-              onPress={handleSave}
-              isDisabled={!selectedLocale || !isDirty(selectedLocale)}
-              isPending={saveMutation.isPending}
+              onPress={model.handleSave}
+              isDisabled={!model.selectedLocale || !model.isDirty(model.selectedLocale)}
+              isPending={model.saveMutation.isPending}
               data-cy="save-translations-button"
             >
-              {t('translations.save')}
+              {model.t('translations.save')}
             </Button>
           </div>
         </>
       )}
 
-      <StandardModal isOpen={customLocaleOpen} onOpenChange={setCustomLocaleOpen} size="sm">
-        {({ close }) => {
-          const trimmed = customLocale.trim();
-          const isValid = LOCALE_PATTERN.test(trimmed);
-          const addCustomLocale = () => {
-            if (!isValid) return;
-            handleAddLanguage(trimmed);
-            close();
-          };
-          return (
-            <>
-              <ModalHeader>
-                <ModalHeading>{t('translations.customLocaleTitle')}</ModalHeading>
-              </ModalHeader>
-              <ModalBody>
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm text-default-500">{t('translations.customLocaleHint')}</p>
-                  <TextField
-                    value={customLocale}
-                    onChange={setCustomLocale}
-                    isInvalid={trimmed !== '' && !isValid}
-                    aria-label={t('translations.customLocaleTitle')}
-                  >
-                    <Input
-                      placeholder="de-CH"
-                      data-cy="translations-custom-locale-input"
-                      onKeyDown={(e) => e.key === 'Enter' && addCustomLocale()}
-                    />
-                  </TextField>
-                  {trimmed !== '' && !isValid && (
-                    <p className="text-xs text-danger">{t('translations.customLocaleInvalid')}</p>
-                  )}
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="ghost" onPress={close}>
-                  {t('actions.cancel')}
-                </Button>
-                <Button
-                  variant="primary"
-                  isDisabled={!isValid}
-                  onPress={addCustomLocale}
-                  data-cy="translations-custom-locale-add"
-                >
-                  {t('translations.customLocaleAdd')}
-                </Button>
-              </ModalFooter>
-            </>
-          );
-        }}
-      </StandardModal>
+      <TranslationsSectionStandardModal {...model} />
 
-      <StandardModal isOpen={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} size="sm">
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>
-                {t('translations.removeLanguage', { language: deleteTarget ? displayName(deleteTarget) : '' })}
-              </ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('translations.deleteConfirm', { language: deleteTarget ? displayName(deleteTarget) : '' })}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close}>
-                {t('actions.cancel')}
-              </Button>
-              <Button
-                variant="danger"
-                isPending={deleteMutation.isPending}
-                onPress={handleDeleteConfirmed}
-                data-cy="translations-remove-language-confirm"
-              >
-                {t('translations.deleteConfirmButton')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+      <TranslationDeleteModal model={model} />
     </section>
   );
 }

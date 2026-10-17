@@ -1,6 +1,8 @@
 # Contributing
 
-Attraccess is an open-source project and welcomes contributions from the community. This guide explains how to get involved.
+Attraccess is a source-available project and welcomes contributions from users, integration partners and developers. This guide explains how to get involved.
+
+The source code, forks and redistributed modifications are subject to the [modified Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Commercial use requires a license after the 30-day evaluation; see [Licensing](getting-started/overview.md#licensing) for an English summary of the German license terms.
 
 ## Source Code
 

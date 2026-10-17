@@ -50,7 +50,6 @@ export function VerifyEmail() {
       });
       const translation = t(key, { error: errorMessage });
       setError(translation);
-      didSendRequest.current = false;
     },
   });
 
@@ -87,9 +86,20 @@ export function VerifyEmail() {
   }, [token, email, t, verifyEmail]);
 
   useEffect(() => {
+    if (email) setResendEmail(email);
+  }, [email]);
+
+  useEffect(() => {
     if (token && email) {
-      activateEmail();
-      setResendEmail(email);
+      // StrictMode replays effects before mutation observers resubscribe. Defer
+      // the initial request so the discarded effect cannot leave a stale pending state.
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (!cancelled) activateEmail();
+      });
+      return () => {
+        cancelled = true;
+      };
     } else if (token !== null && email !== null) {
       setError(t('apiErrors.invalidLink'));
       didSendRequest.current = true;
@@ -166,7 +176,11 @@ export function VerifyEmail() {
             <Button
               variant="primary"
               className="w-full"
-              onPress={activateEmail}
+              onPress={() => {
+                didSendRequest.current = false;
+                activateEmail();
+              }}
+              isPending={verifyEmail.isPending}
               isDisabled={verifyEmail.isPending}
               data-cy="verify-email-error-try-again-button"
             >

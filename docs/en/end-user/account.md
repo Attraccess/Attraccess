@@ -1,6 +1,7 @@
 # My Account
 
 Manage your personal account settings in Attraccess. You can access your account settings by clicking on your profile icon in the top right corner.
+Use the search box to find a setting, then open its row to make changes. Settings are grouped by identity, sign-in and access, preferences, and advanced actions.
 
 <!-- TODO: Screenshot of account settings page -->
 
@@ -9,7 +10,7 @@ Manage your personal account settings in Attraccess. You can access your account
 ### Change Email
 
 1. Navigate to **My Account**
-2. Find the **Email** field
+2. Open **Personal details** and find the **Email** field
 3. Enter your new email address
 4. Save the changes
 5. You may need to verify the new email address
@@ -17,7 +18,7 @@ Manage your personal account settings in Attraccess. You can access your account
 ### Change Password
 
 1. Navigate to **My Account**
-2. Find the **Password** section
+2. Open **Password** under **Sign-in and access**
 3. Enter your current password
 4. Enter your new password
 5. Confirm the new password
@@ -33,7 +34,7 @@ Manage your personal account settings in Attraccess. You can access your account
 Two-factor authentication adds an extra layer of security to your account.
 
 1. Navigate to **My Account**
-2. Find the **Two-Factor Authentication** section
+2. Open **Two-Factor Authentication** under **Sign-in and access**
 3. Click **Enable**
 4. Scan the displayed **QR code** with your authenticator app (e.g., Google Authenticator, Microsoft Authenticator, Authy)
 5. Enter the **six-digit code** from the app to confirm
@@ -42,33 +43,33 @@ Two-factor authentication adds an extra layer of security to your account.
 ### Disable Two-Factor Authentication
 
 1. Navigate to **My Account**
-2. Find the **Two-Factor Authentication** section
+2. Open **Two-Factor Authentication** under **Sign-in and access**
 3. Click **Disable**
 4. Enter your current TOTP code to confirm
 
 > [!WARNING]
-> If you lose access to your authenticator app, you will need to contact your workshop administrator to reset 2FA on your account.
+> If you lose access to your authenticator app, you will need to contact your administrator to reset 2FA on your account.
 
-## NFC Cards
+## RFID Cards
 
-If your workshop uses Attractap NFC readers, you can view the NFC cards linked to your account.
+If your organization uses Attractap RFID readers, you can view the RFID cards linked to your account.
 
 1. Navigate to **My Account**
-2. Find the **NFC Cards** section
+2. Find the **RFID Cards** section
 3. View your registered cards
 
-<!-- TODO: Screenshot of NFC cards section -->
+<!-- TODO: Screenshot of RFID cards section -->
 
 > [!NOTE]
-> NFC cards are typically registered by a workshop administrator or via an Attractap reader. Contact your administrator if you need to register a new card.
+> RFID cards are typically registered by an administrator or via an Attractap reader. Contact your administrator if you need to register a new card.
 
 ## Delete Account
 
 If you want to permanently delete your account:
 
 1. Navigate to **My Account**
-2. Scroll to the bottom of the page
-3. Click **Delete Account**
+2. Open **Delete account** under **Advanced**
+3. Click **Delete account**
 4. Confirm the deletion
 
 > [!WARNING]

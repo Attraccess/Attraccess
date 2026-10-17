@@ -1,4 +1,4 @@
-import { DateTimeDisplay, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Chip,
@@ -14,8 +14,12 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader';
+import { PageHeader } from '../../../../components/pageHeader/index';
 import { EmptyState } from '../../../../components/emptyState';
+import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
+import { TransactionDetailsModal } from './transactionDetailsModal/index';
+import { RefundModal } from './transactionDetailsModal/refund/index';
+import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import de from './de.json';
 import en from './en.json';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -26,20 +30,16 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransactions,
 } from '@attraccess/react-query-client';
-import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { TransactionDetailsModal } from './transactionDetailsModal';
-import { RefundModal } from './transactionDetailsModal/refund';
 
-interface Props {
+export interface Props {
   className?: string;
   transactionsPerPage?: number;
   userId?: number;
   isDisabled?: boolean;
 }
 
-export function SummaryCard(props: Props) {
+export function useSummaryCardState(props: Props) {
   const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
 
@@ -113,6 +113,9 @@ export function SummaryCard(props: Props) {
           // Fallback to the known id even if the original transaction object isn't loaded
           originalId: originalTransaction?.id ?? transaction.refundOfId,
         };
+      } else if (transaction.correctionOfId) {
+        type = 'correction';
+        details = { originalId: transaction.correctionOfId };
       } else if (transaction.resourceUsageId) {
         type = 'resourceUsage';
         details = { resourceUsage: transaction.resourceUsage };
@@ -145,7 +148,7 @@ export function SummaryCard(props: Props) {
     }
   }, []);
 
-  const formatNumber = useNumberFormatter();
+  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const [openedTransactionId, setOpenedTransactionId] = useState<number | undefined>(undefined);
   const [isOpenDetails, setIsOpenDetails] = useState(false);
@@ -154,6 +157,39 @@ export function SummaryCard(props: Props) {
     setOpenedTransactionId(transactionId);
     setIsOpenDetails(true);
   }, []);
+  return {
+    className,
+    t,
+    configuration,
+    balance,
+    isLoadingBalance,
+    transactions,
+    getDetailsCellContent,
+    statusColor,
+    formatCredits,
+    openedTransactionId,
+    isOpenDetails,
+    setIsOpenDetails,
+    openDetails,
+  };
+}
+
+export function SummaryCard(props: Props) {
+  const {
+    className,
+    t,
+    configuration,
+    balance,
+    isLoadingBalance,
+    transactions,
+    getDetailsCellContent,
+    statusColor,
+    formatCredits,
+    openedTransactionId,
+    isOpenDetails,
+    setIsOpenDetails,
+    openDetails,
+  } = useSummaryCardState(props);
 
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;
@@ -168,7 +204,7 @@ export function SummaryCard(props: Props) {
       ) : (
         <p className="text-2xl font-bold">
           {t('balance', {
-            balance: formatNumber(dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit)),
+            balance: formatCredits(balance?.value ?? 0),
             currency: configuration.currency,
           })}
         </p>
@@ -205,7 +241,7 @@ export function SummaryCard(props: Props) {
                   </TableCell>
                   <TableCell className={cn(transaction.amount < 0 ? 'text-danger' : 'text-success')}>
                     {transaction.amount > 0 && '+'}
-                    {formatNumber(dbCurrencyToUserCurrency(transaction.amount, configuration.minorUnit))}
+                    {formatCredits(transaction.amount)}
                   </TableCell>
                   <TableCell>
                     <RefundModal transactionId={transaction.id}>

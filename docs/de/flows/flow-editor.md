@@ -47,6 +47,8 @@ Um zwei Knoten zu verbinden:
 
 Klicken Sie auf einen beliebigen Knoten, um dessen Einstellungen zu öffnen. Jeder Knotentyp hat eigene Konfigurationsoptionen -- siehe [Knotentypen](flows/node-types.md) für Details.
 
+Datenpfade, Vorlagensyntax und den Unterschied zwischen Payload-Feldern und gespeicherten Werten erklärt [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md). Unter **Variablen** im Editor können Sie dauerhafte Ressourcen- und globale Variablen ansehen oder bearbeiten.
+
 ## Auto-Layout
 
 Klicken Sie auf den **Auto-Layout** Button in der Werkzeugleiste, um alle Knoten automatisch in einem übersichtlichen, gut lesbaren Layout anzuordnen. Dies ist nützlich, wenn viele Knoten hinzugefügt wurden oder die Arbeitsfläche unübersichtlich geworden ist.
@@ -55,9 +57,9 @@ Klicken Sie auf den **Auto-Layout** Button in der Werkzeugleiste, um alle Knoten
 
 Sie können Flows zwischen Ressourcen teilen oder sichern:
 
-| Aktion | Vorgehensweise |
-|--------|---------------|
-| **Export** | Klicken Sie auf **Export**, um den Flow als JSON-Datei herunterzuladen |
+| Aktion     | Vorgehensweise                                                              |
+| ---------- | --------------------------------------------------------------------------- |
+| **Export** | Klicken Sie auf **Export**, um den Flow als JSON-Datei herunterzuladen      |
 | **Import** | Klicken Sie auf **Import** und wählen Sie eine zuvor exportierte JSON-Datei |
 
 > [!NOTE]
@@ -65,14 +67,16 @@ Sie können Flows zwischen Ressourcen teilen oder sichern:
 
 ## Ausführungsprotokolle
 
-Das Ausführungsprotokoll zeigt den Echtzeit-Status jedes Knotens während der Flow-Ausführung. Die Knotenfarben zeigen den aktuellen Zustand an:
+Öffnen Sie **Flow-Protokolle**, wählen Sie eine Aufzeichnungsdauer und klicken Sie vor dem Auslösen auf **Aufzeichnung starten**. Die Protokolle zeigen Eingang, Ausgang und Fehler jedes Knotens. Sie werden nur während der Aufzeichnung gesammelt und bleiben bis zum Verlassen oder Neuladen der Seite sichtbar. Beispiele finden Sie unter [Durchläufe prüfen und Fehler finden](flows/payloads-variables-templates.md#durchläufe-prüfen-und-fehler-finden).
 
-| Farbe | Status |
-|-------|--------|
-| **Grau** | Inaktiv -- noch nicht ausgeführt |
-| **Blau** | Verarbeitung -- wird gerade ausgeführt |
-| **Grün** | Abgeschlossen -- erfolgreich beendet |
-| **Rot** | Fehlgeschlagen -- ein Fehler ist aufgetreten |
+Die Knotenfarben zeigen den aktuellen Zustand an:
+
+| Farbe    | Status                                       |
+| -------- | -------------------------------------------- |
+| **Grau** | Inaktiv -- noch nicht ausgeführt             |
+| **Blau** | Verarbeitung -- wird gerade ausgeführt       |
+| **Grün** | Abgeschlossen -- erfolgreich beendet         |
+| **Rot**  | Fehlgeschlagen -- ein Fehler ist aufgetreten |
 
 <!-- TODO: Screenshot der Ausführungsprotokolle mit Farbindikatoren -->
 

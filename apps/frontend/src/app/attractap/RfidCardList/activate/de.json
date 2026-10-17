@@ -1,0 +1,6 @@
+{
+  "title": "RFID-Karte aktivieren",
+  "description": "Sind Sie sicher, dass Sie die RFID-Karte aktivieren möchten? Hierdurch werden alle anderen ihrer RFID-Karten deaktiviert.",
+  "cancel": "Abbrechen",
+  "activate": "Aktivieren"
+}

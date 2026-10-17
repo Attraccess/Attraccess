@@ -2,7 +2,7 @@
 #include <lvgl.h>
 #include <time.h>
 #include <stdio.h>
-#include "platform.hpp"
+#include "../../../platform.hpp"
 
 void ResourceDetailsScreen::updateElapsedTimeDisplay()
 {
@@ -23,49 +23,45 @@ void ResourceDetailsScreen::updateElapsedTimeDisplay()
    // loop() would invalidate (re-render) the label every tick (ATT-554 item 5).
    setLabelTextIfChanged(this->elapsedTime, millisToTimeString(elapsedMillis).c_str());
 }
-void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t sessionTimeoutTime)
+void ResourceDetailsScreen::setSessionTimeoutTime(uint32_t value) { sessionHeader.setDeadline(value); }
+void ResourceDetailsScreen::setSessionTimeoutPaused(bool value) { sessionHeader.setPaused(value); }
+void ResourceDetailsScreen::extendSessionTimeoutBy(uint32_t value) { sessionHeader.extend(value); }
+void ResourceDetailsScreen::updateSessionTimeoutIndicator() { sessionHeader.update(); }
+
+void ResourceDetailsScreen::setUsageStats(const API::UsageStats &stats)
 {
-   this->sessionTimeoutTime = sessionTimeoutTime;
-   this->updateSessionTimeoutIndicator();
+   if (!this->resourceCacheValid || stats.resourceId != this->resourceCache.id ||
+       (stats.usageId && stats.usageId != this->resourceCache.activeUsageId)) return;
+   this->usageStats = stats;
+   this->usageStatsValid = stats.usageId != 0;
+   this->usageStatsReceivedAt = millis();
+   this->updateUsageStatsDisplay();
 }
-void ResourceDetailsScreen::setSessionTimeoutPaused(bool paused)
+
+void ResourceDetailsScreen::updateUsageStatsDisplay()
 {
-   if (paused == this->sessionTimeoutPaused)
-   {
-      return;
+   if (!this->usageStatsContainer) return;
+   const bool visible = this->resourceCacheValid && this->resourceCache.hasActiveUsage &&
+       this->resourceCache.activeUsageId && this->loginUsernameCache == this->resourceCache.activeUser;
+   lv_obj_set_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN, !visible);
+   if (!visible) return;
+   const bool fresh = this->usageStatsValid && millis() - this->usageStatsReceivedAt < 25000;
+   std::string consumption;
+   if (fresh) {
+      for (const auto &meter : this->usageStats.meters) {
+         if (!consumption.empty()) consumption += "\n";
+         consumption += meter.name + ": " + (meter.value.empty() ? "Warte auf Messwert" : meter.value);
+         if (meter.creditsPerUnit >= 0 && !meter.formattedRate.empty())
+            consumption += "\n" + meter.formattedRate + " / Wert";
+      }
    }
-   this->sessionTimeoutPaused = paused;
-   if (paused)
-   {
-      // Capture freeze timestamp so the indicator can stay stable
-      this->pauseFrozenAtMs = millis();
+   if (consumption.empty()) consumption = "Warte auf Messwert";
+   setLabelTextIfChanged(this->meterValue, consumption.c_str());
+   std::string operating = "Keine Daten";
+   if (fresh && this->usageStats.operatingDurationMs >= 0) {
+      operating = millisToTimeString(this->usageStats.operatingDurationMs);
+      if (this->usageStats.isOperating >= 0)
+         operating += this->usageStats.isOperating ? " · Läuft" : " · Leerlauf";
    }
-   else
-   {
-      // On resume, refresh indicator immediately
-      this->updateSessionTimeoutIndicator();
-   }
-}
-void ResourceDetailsScreen::extendSessionTimeoutBy(uint32_t ms)
-{
-   this->sessionTimeoutTime += ms;
-   this->updateSessionTimeoutIndicator();
-}
-void ResourceDetailsScreen::updateSessionTimeoutIndicator()
-{
-   if (!this->sessionTimeoutIndicator)
-   {
-      return;
-   }
-   // If paused, freeze the bar at the last computed value
-   uint32_t now = this->sessionTimeoutPaused ? this->pauseFrozenAtMs : millis();
-   // add 1 second to the remaining time to prevent overflow if the transition takes a bit
-   double remainingMillis = this->sessionTimeoutTime - now + 1000;
-   long remainingSeconds = remainingMillis / 1000;
-   // Clamp to bar range [0,30]
-   if (remainingSeconds < 0)
-      remainingSeconds = 0;
-   if (remainingSeconds > 30)
-      remainingSeconds = 30;
-   lv_bar_set_value(this->sessionTimeoutIndicator, remainingSeconds, LV_ANIM_ON);
+   setLabelTextIfChanged(this->operatingValue, operating.c_str());
 }

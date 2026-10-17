@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PasskeyLogin } from './passkeyLogin';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TestWrapper } from '../../test-utils/wrappers';
 
 const startAuthentication = vi.fn();
@@ -83,4 +84,25 @@ describe('PasskeyLogin – error reporting', () => {
     await waitFor(() => expect(startAuthentication).toHaveBeenCalled());
     expect(errorAlert()).toBeNull();
   });
+});
+
+it('reactivates identity queries after a successful passkey login following logout', async () => {
+  startAuthentication.mockResolvedValue({ id: 'cred-1', response: {} });
+  createSessionWithPasskey.mockResolvedValue({});
+  const client = new QueryClient();
+  client.setQueryData(['auth-logout-status'], 'ended');
+  const invalidate = vi.spyOn(client, 'invalidateQueries').mockImplementation(async () => {
+    expect(client.getQueryData(['auth-logout-status'])).toBe('idle');
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <PasskeyLogin />
+    </QueryClientProvider>,
+    { wrapper: TestWrapper },
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Sign in with a passkey' }));
+  await waitFor(() => expect(invalidate).toHaveBeenCalled());
+  expect(client.getQueryData(['auth-logout-status'])).toBe('idle');
+  expect(errorAlert()).toBeNull();
+  client.clear();
 });

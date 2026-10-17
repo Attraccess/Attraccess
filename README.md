@@ -1,15 +1,25 @@
 # Attraccess
 
-A comprehensive resource management system for tracking and managing access to shared resources.
+Attraccess manages machine access and resource usage for industry, R&D and universities. It checks operator permissions and safety briefings, connects machines through PLCs and automation flows, and records usage for reporting and maintenance.
+
+Attraccess runs on your own infrastructure and is **source-available** under the [modified Prosperity Public License 3.0](LICENSE.md). Commercial use requires a license after a 30-day evaluation; qualifying non-commercial use is free under the license terms.
 
 ## Features
 
 - Resource Management
   - Track resource status, usage, and maintenance
   - Image support for resources with automatic resizing and caching
-  - Role-based access control
-  - Maintenance scheduling
-  - Usage tracking and reporting
+  - Operator permissions and documented safety briefings
+  - Preventive maintenance scheduling
+  - Usage tracking, project attribution and CSV reporting
+- Machine Integration
+  - Badge access through Attractap readers
+  - WAGO PLC integration and automation via MQTT and HTTP
+  - Workstation access through Attraccess Companion
+- IT & Operations
+  - Single sign-on via OIDC and SAML
+  - Role-based access control and audit logging
+  - On-premises deployment with Prometheus and Grafana monitoring
 
 ## Everything below is meant for developers
 
@@ -19,11 +29,11 @@ If you are looking for user documentation, take a look at https://docs.attracces
 
 Routine API/frontend work needs:
 
-| Dependency         | Purpose                                              |
-| ------------------ | ---------------------------------------------------- |
-| **Docker**         | `pnpm services` – mailpit, authentik, keycloak, etc. |
-| **Node.js** ≥20.10 | From `.nvmrc` (v24.13)                               |
-| **pnpm** ≥8        | Package manager                                      |
+| Dependency  | Purpose                                              |
+| ----------- | ---------------------------------------------------- |
+| **Docker**  | `pnpm services` – mailpit, authentik, keycloak, etc. |
+| **Node.js** | Exact version pinned in `.nvmrc`                     |
+| **pnpm**    | Exact version pinned in `package.json`               |
 
 **Quick setup:**
 
@@ -31,14 +41,20 @@ Routine API/frontend work needs:
 ./scripts/setup-dev-dependencies.sh
 ```
 
-This installs Node (via nvm if needed), pnpm, and project deps. You must install **Docker** manually if missing:
+This checks the pinned Node and pnpm versions, installs missing host tools, and
+sets up the workspace (dependencies, `.env`, submodules and database migrations).
+Host installation is in `scripts/setup-host-dependencies.sh`; workspace setup is
+in `scripts/setup-workspace.sh`. To repeat workspace setup without installing
+global tools, run `./scripts/setup-dev-dependencies.sh --workspace-only`.
+Docker is optional for API/frontend setup, but services and container tests need
+a running Docker daemon and the `docker compose` plugin. Install **Docker** manually if missing:
 
 - **Docker:** `curl -fsSL https://get.docker.com | sh` then `sudo usermod -aG docker $USER` (log out/in)
 
 For Attractap firmware work, also install the project-local ESP-IDF toolchain:
 
 ```bash
-INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh
+INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only
 ```
 
 ## Installation
@@ -59,11 +75,56 @@ INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh
 
 ## Development
 
+Tooling tests run as an ordinary Nx target, independently of coverage reporting:
+
+```bash
+pnpm test:tooling
+pnpm nx run api:test-scripts
+```
+
+Core CI discovers these targets automatically. `api:test` also runs the seeding
+regressions. `pnpm seed:dev -- --demo` creates a local administrator and demo
+resources after migrations. Seeding and migrations read `.env`; process variables
+take precedence. Both resolve `STORAGE_ROOT` through the API's shared path helper.
+Seeding configured storage outside the repository requires `--allow-external-db`,
+and local database paths cannot follow symlinks outside configured storage.
+
+Repository checks and generators are available through Nx:
+
+```bash
+pnpm lint:files                           # always checks current files
+pnpm lint:files --staged                  # always checks the Git index
+pnpm nx run @attraccess/source:check-balena-compose
+pnpm nx run @attraccess/source:check-brand-assets
+pnpm nx run @attraccess/source:generate-brand-assets
+```
+
+Validation targets can cache their results. Bootstrap, seeding, migrations,
+service management and asset generation always execute.
+
 Start the API and frontend in development mode (HMR), with automatic port resolution:
 
 ```bash
 pnpm serve
 ```
+
+By default, startup does not build or copy kiosk (Companion) installers or
+Attractap firmware. Build and bundle either set of assets before launching:
+
+```bash
+pnpm serve --with-kiosk                  # Companion installers for this host
+pnpm serve --with-attractap              # Active Attractap firmware variants
+pnpm serve --with-kiosk --with-attractap # Both
+```
+
+`--with-companion` is an alias for `--with-kiosk`. These flags also work with
+`--only=api`; frontend-only startup cannot prepare API assets. Requested builds
+must succeed before the servers launch. Firmware builds require ESP-IDF:
+`INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh`.
+
+CI always tests the deliverables and builds all Companion platforms and active
+firmware variants. Docker and Balena consume the same uploaded artifacts;
+missing installers or firmware fail the image build.
 
 The launcher probes for free ports and prints them at startup. Defaults:
 
@@ -106,7 +167,7 @@ Swagger documentation is available at `/api` when the server is running.
 
 ## Licensing & Activation
 
-Attraccess includes license verification. Set your license key via the `LICENSE_KEY` environment variable.
+Attraccess includes license verification. Configure your key in the setup wizard or under **Settings → Application Settings**. New installations can also seed the key with the `LICENSE_KEY` environment variable before the database is initialized. Existing installations use the stored key; change it in Settings.
 
 - Commercial users: Use the license key you received after purchasing a license.
 - Non-profit organizations: You can use Attraccess for free by setting `LICENSE_KEY` to the following special key:
@@ -116,6 +177,8 @@ I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICE
 ```
 
 ### How to set `LICENSE_KEY`
+
+The examples below seed a new installation. To change the key after setup, use **Settings → Application Settings**.
 
 - Shell / local `.env` file
 
@@ -139,7 +202,7 @@ services:
 docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md" attraccess/attraccess:latest
 ```
 
-If `LICENSE_KEY` is not provided at startup, the application will fail fast with an error. The error message includes guidance for non-profits on how to set the special key to use Attraccess for free.
+Licensed features require a valid configured key. Qualifying non-commercial users can enter the special key above in the setup wizard or application settings.
 
 ## Contributing
 

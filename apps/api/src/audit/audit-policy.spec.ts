@@ -1,95 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { projectAuditEvent, projectResourceAuditEvent } from './audit-policy';
-
-function event(): PluginAuditEvent & { pluginId: string } {
-  return {
-    pluginId: 'abcdefghijklmnopqrstu',
-    action: 'wago.publication',
-    operationId: randomUUID(),
-    principal: { userId: 42, authenticationMethod: 'session' },
-    outcome: 'succeeded',
-    subject: { type: 'wago.controller', id: 7 },
-    details: { revision: 2 },
-  };
-}
+import {
+  projectAttractapAuditEvent,
+  projectIdentityAuditEvent,
+  projectProjectAuditEvent,
+  projectResourceAuditEvent,
+} from './audit-policy';
 
 describe('audit storage safe snapshot', () => {
-  it('detaches all caller data before asynchronous work', () => {
-    const input = event();
-    const snapshot = projectAuditEvent(input);
-    input.action = 'raw-secret';
-    input.principal.userId = 9;
-    input.subject.id = 9;
-    Object.assign(input.details, { revision: 'raw-secret' });
-    input.details = { revision: 'raw-secret' };
-    expect(snapshot).toEqual({
-      ...event(),
-      operationId: input.operationId,
-    });
-    expect(Object.getPrototypeOf(snapshot.details)).toBeNull();
-  });
-
-  it.each(['action', 'principal', 'subject', 'details'])('rejects %s accessors without invoking them', (key) => {
-    const input = event();
-    const getter = jest.fn(() => 'raw-secret');
-    Object.defineProperty(input, key, { get: getter, enumerable: true });
-    expect(projectAuditEvent(input)).toBeNull();
-    expect(getter).not.toHaveBeenCalled();
-  });
-
-  it('rejects getters nested in otherwise valid details or principal', () => {
-    for (const [key, field] of [
-      ['details', 'revision'],
-      ['principal', 'userId'],
-    ] as const) {
-      const input = event();
-      const getter = jest.fn().mockReturnValueOnce(2).mockReturnValue('raw-secret');
-      Object.defineProperty(input[key], field, { get: getter, enumerable: true });
-      expect(projectAuditEvent(input)).toBeNull();
-      expect(getter).not.toHaveBeenCalled();
-    }
-  });
-
-  it('does not admit TypeORM SQL-expression functions as persisted identifiers', () => {
-    const expression = jest.fn(() => '(SELECT 1)');
-    expect(
-      projectAuditEvent({ ...event(), principal: { userId: expression, authenticationMethod: 'session' } }),
-    ).toBeNull();
-    expect(projectAuditEvent({ ...event(), subject: { type: 'wago.controller', id: expression } })).toBeNull();
-    expect(expression).not.toHaveBeenCalled();
-  });
-
-  it('rejects custom serialization, hidden fields, symbols and inherited payloads', () => {
-    const toJSON = jest.fn(() => ({ password: 'raw-secret' }));
-    for (const details of [
-      { revision: 2, toJSON },
-      Object.create({ toJSON }, { revision: { value: 2, enumerable: true } }),
-      Object.defineProperty({ revision: 2 }, 'password', { value: 'raw-secret' }),
-      { revision: 2, [Symbol('payload')]: 'raw-secret' },
-    ]) {
-      expect(projectAuditEvent({ ...event(), details })).toBeNull();
-    }
-    expect(toJSON).not.toHaveBeenCalled();
-  });
-
-  it('rejects cyclic values, arbitrary telemetry, and throwing proxies without leaking exceptions', () => {
-    const cyclic: Record<string, unknown> = {};
-    cyclic.revision = cyclic;
-    expect(projectAuditEvent({ ...event(), details: cyclic })).toBeNull();
-    expect(projectAuditEvent({ ...event(), action: 'wago.telemetry' })).toBeNull();
-    expect(
-      projectAuditEvent(
-        new Proxy(event(), {
-          ownKeys: () => {
-            throw new Error('raw-secret');
-          },
-        }),
-      ),
-    ).toBeNull();
-  });
-
-  it('allows only the reviewed resource maintenance and supervision fields', () => {
+  it('allows only reviewed resource fields, including safe resource administration projections', () => {
     const resourceEvent = {
       action: 'maintenance_schedule.created' as const,
       operationId: randomUUID(),
@@ -99,6 +17,115 @@ describe('audit storage safe snapshot', () => {
     };
     expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
     expect(projectResourceAuditEvent({ ...resourceEvent, details: { password: 'raw-secret' } })).toBeNull();
-    expect(projectResourceAuditEvent({ ...resourceEvent, action: 'resource.deleted' as never })).toBeNull();
+    const deletion = {
+      action: 'resource.deleted' as const,
+      operationId: randomUUID(),
+      actorId: 42,
+      subjectId: 7,
+      details: { 'before.name': 'Lathe', 'before.type': 'machine' },
+    };
+    expect(projectResourceAuditEvent(deletion)).toEqual(deletion);
+    expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
+  });
+
+  it('accepts generated role keys truncated after a separator', () => {
+    expect(
+      projectIdentityAuditEvent({
+        action: 'role_created',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        subjectType: 'identity.role',
+        subjectId: 1,
+        details: { role: `${'a'.repeat(79)}-` },
+      }),
+    ).toMatchObject({ details: { role: `${'a'.repeat(79)}-` } });
+  });
+
+  it('accepts truncated generated role keys inside password-policy override snapshots', () => {
+    const role = `${'a'.repeat(79)}-`;
+    expect(
+      projectIdentityAuditEvent({
+        action: 'password_policy_override_updated',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        subjectType: 'identity.password_policy',
+        subjectId: 1,
+        details: {
+          role,
+          before: JSON.stringify({ role, minLength: 10 }),
+          after: JSON.stringify({ role, minLength: 12 }),
+          field: 'minLength',
+        },
+      }),
+    ).toMatchObject({ details: { role, field: 'minLength' } });
+  });
+
+  it('allows only firmware reset reasons in Attractap crash events', () => {
+    const crash = {
+      action: 'reader.crash_reported' as const,
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    };
+    expect(projectAttractapAuditEvent(crash)).toEqual(crash);
+    expect(
+      projectAttractapAuditEvent({ ...crash, details: { ...crash.details, resetReason: 'raw-secret' } }),
+    ).toBeNull();
+  });
+
+  it('allows system-origin lifecycle events but rejects mixed origins', () => {
+    const resourceEvent = {
+      action: 'usage_session.ended' as const,
+      operationId: randomUUID(),
+      actorId: null,
+      subjectId: 7,
+      details: { usageId: 3, usageUserId: 42 },
+    };
+    expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
+    expect(projectResourceAuditEvent({ ...resourceEvent, authenticationMethod: 'session' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...resourceEvent, apiTokenId: 4 })).toBeNull();
+  });
+
+  it('allows explicitly system-originated introductions without synthesizing a user session', () => {
+    const event = {
+      action: 'introduction.granted' as const,
+      operationId: randomUUID(),
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    };
+
+    expect(projectResourceAuditEvent(event)).toEqual(event);
+    expect(projectResourceAuditEvent({ ...event, authenticationMethod: 'session' })).toBeNull();
+  });
+
+  it('allows only safe project administration snapshots', () => {
+    const projectEvent = {
+      action: 'project.invitation.sent' as const,
+      operationId: randomUUID(),
+      actorId: 42,
+      subjectType: 'project.invitation' as const,
+      subjectId: 7,
+      details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+    };
+    expect(projectProjectAuditEvent(projectEvent)).toEqual(projectEvent);
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { email: 'person@example.test' } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { projectId: 0 } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { role: 'administrator' } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { hasLogo: 2 } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { changedFields: 'logo' } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, authenticationMethod: 'api-token' })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, authenticationMethod: 'other' } as never)).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, authenticationMethod: 'session', apiTokenId: 9 })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, apiTokenId: 9 })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, authenticationMethod: 'api-token', apiTokenId: 9 })).toEqual(
+      expect.objectContaining({ authenticationMethod: 'api-token', apiTokenId: 9 }),
+    );
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { 'after.nameOmitted': 1 } })).toEqual(
+      expect.objectContaining({ details: { 'after.nameOmitted': 1 } }),
+    );
+    expect(projectProjectAuditEvent({ ...projectEvent, action: 'project.invitation.resent' as never })).toBeNull();
   });
 });

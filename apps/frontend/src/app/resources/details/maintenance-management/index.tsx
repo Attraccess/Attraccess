@@ -11,29 +11,23 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { PageAction, PageHeader } from '../../../../components/pageHeader';
-import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
-import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
+import { PageHeader, PageAction } from '../../../../components/pageHeader/index';
+import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay/index';
 import { HTMLAttributes, useMemo, useState } from 'react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useNavigate } from 'react-router-dom';
-
-import de from './de.json';
-import en from './en.json';
-import { ResourceMaintenanceUpsertModal } from './upsert';
-import { MarkDoneModal } from './mark-done';
-import { CheckCircleIcon, CogIcon, ConstructionIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
-import { useNow } from '../../../../hooks/useNow';
+import { MarkDoneModal } from './mark-done/index';
+import { CheckCircleIcon, ConstructionIcon, CogIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { EmptyState } from '../../../../components/emptyState';
 import { FlatSection } from '../../../../components/flatSection';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
+import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
+import { useNavigate } from 'react-router-dom';
+import de from './de.json';
+import en from './en.json';
+import { ResourceMaintenanceUpsertModal } from './upsert/index';
+import { useNow } from '../../../../hooks/useNow';
 
-interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
-  resourceId: number;
-  variant?: 'card' | 'flat';
-}
-
-export function MaintenanceManagement(props: Props) {
+export function useMaintenanceManagementState(props: Props) {
   const { resourceId, variant = 'card', className, ...htmlProps } = props;
 
   const { t } = useTranslations({
@@ -189,6 +183,38 @@ export function MaintenanceManagement(props: Props) {
       </TableScrollContainer>
     </Table>
   );
+  return {
+    resourceId,
+    variant,
+    className,
+    htmlProps,
+    t,
+    maintenanceWithStatus,
+    cardActions,
+    flatActions,
+    includePastSwitch,
+    tableContent,
+  } as const;
+}
+
+export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
+  resourceId: number;
+  variant?: 'card' | 'flat';
+}
+
+export function MaintenanceManagement(props: Props) {
+  const {
+    resourceId,
+    variant,
+    className,
+    htmlProps,
+    t,
+    maintenanceWithStatus,
+    cardActions,
+    flatActions,
+    includePastSwitch,
+    tableContent,
+  } = useMaintenanceManagementState(props);
 
   if (variant === 'flat') {
     return (

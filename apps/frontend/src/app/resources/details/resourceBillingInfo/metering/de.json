@@ -1,0 +1,54 @@
+{
+  "live": {
+    "title": "Laufende Sitzung",
+    "sessionTime": "Sitzungsdauer",
+    "meter": "Zählerstand",
+    "meterValue": "{{value}} ",
+    "meterWaiting": "Warte auf die erste Messung",
+    "meterUnavailable": "Messwert nicht verfügbar",
+    "meterAsOf": "Stand {{time}}",
+    "meterCost": "{{name}}: Kosten bisher",
+    "meterRate": "{{name}}: Sitzungspreis",
+    "rateValue": "{{rate}} pro Messwert",
+    "estimateUnavailable": "Schätzung überschreitet den unterstützten Abrechnungsbereich",
+    "estimateWaiting": "Warte auf Zählerdaten der Sitzung",
+    "estimate": "Voraussichtliche Kosten bisher",
+    "estimateNote": "Schätzung ohne zugeordnete Betriebsminuten und zusätzliche Flow-Positionen.",
+    "billingValue": "{{credits}} {{currency}}"
+  },
+  "setup": {
+    "title": "Zähler nicht eingerichtet",
+    "description": "Die Verbrauchabrechnung ist aktiv, aber es kann keine Sitzung starten, bis der Flow dieser Ressource ihren Zähler definiert.",
+    "problems": {
+      "start-trigger-missing": "Fügen Sie einen Auslöser „Messung starten“ hinzu.",
+      "ready-unreachable": "Verbinden Sie „Messung starten“ mit einem Knoten „Messung bereit“.",
+      "collect-trigger-missing": "Fügen Sie einen Auslöser „Messwert abfragen“ hinzu.",
+      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Verbrauch melden“."
+    },
+    "action": "Flows öffnen"
+  },
+  "unsettled": {
+    "pending": {
+      "title": "Verbrauchabrechnung ausstehend",
+      "description": "Nutzung #{{usageId}} ist beendet und die Grundgebühr ist abgerechnet. Der Verbrauchverbrauch fehlt aber noch, weil beim Beenden kein gültiger Zählerstand vorlag."
+    },
+    "failed": {
+      "title": "Verbrauchabrechnung fehlgeschlagen",
+      "description": "Der endgültige Verbrauch von Nutzung #{{usageId}} lässt sich nicht mehr sicher bestimmen."
+    },
+    "reason": "Grund: {{reason}}",
+    "lastReading": "Letzter akzeptierter Zählerstand: {{value}} (nicht abgerechnet)",
+    "retry": "Zähler erneut abfragen",
+    "retryHint": "Liest den Zähler noch einmal aus. Bei Erfolg wird der Verbrauch als zusätzliche Korrekturbuchung abgerechnet; die bestehende Abrechnung bleibt unverändert.",
+    "waive": "Zählerkosten erlassen",
+    "waiveHint": "Der Verbrauch wird nicht berechnet und es wird keine Buchung erstellt. Der Hinweis verschwindet.",
+    "retried": {
+      "title": "Verbrauch abgerechnet",
+      "description": "Der Zählerstand wurde abgefragt und der Verbrauch als Korrekturbuchung abgerechnet."
+    },
+    "waived": {
+      "title": "Zählerkosten erlassen",
+      "description": "Der Verbrauch dieses Zählers wird für diese Nutzung nicht abgerechnet."
+    }
+  }
+}

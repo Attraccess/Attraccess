@@ -14,7 +14,7 @@ import {
 import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';
-import { ResourceUsageService } from '../resources/usage/resourceUsage.service';
+import { ResourceUsageService } from '../resources/usage/sessions/resource-usage.service';
 import { MessageRateLimitService } from './rate-limiting/message-rate-limit.service';
 import { MessageRateLimitExceededException } from './rate-limiting/message-rate-limit.exception';
 

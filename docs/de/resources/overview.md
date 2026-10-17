@@ -1,6 +1,6 @@
 # Ressourcen
 
-Ressourcen sind das Herzstück von Attraccess. Eine Ressource ist alles, was in Ihrer Werkstatt verwaltet werden soll – Maschinen, Werkzeuge, Geräte oder auch Türen.
+Ressourcen sind das Herzstück von Attraccess. Eine Ressource ist alles, dessen Zugang und Nutzung Sie an Ihrem Standort verwalten – Produktionsmaschinen, Laborgeräte, Werkzeuge, gemeinsam genutzte Arbeitsplätze oder Türen.
 
 ## Was ist eine Ressource?
 

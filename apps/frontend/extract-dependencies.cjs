@@ -183,5 +183,7 @@ async function extractDependencies() {
   }
 }
 
-// Run the script
-extractDependencies();
+module.exports = { processDependency, processDependenciesInBatches, extractDependencies };
+
+// Keep imports side-effect free so the registry and filesystem boundaries can be tested.
+if (require.main === module) extractDependencies();

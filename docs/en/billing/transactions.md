@@ -13,12 +13,16 @@ The Billing dashboard shows all credit transactions across the system. Use it to
 
 Each transaction contains the following information:
 
-| Field | Description |
-|-------|-------------|
-| **User** | The user who was charged |
-| **Resource** | The resource that was used |
-| **Credits** | Number of credits charged |
+| Field         | Description                   |
+| ------------- | ----------------------------- |
+| **User**      | The user who was charged      |
+| **Resource**  | The resource that was used    |
+| **Credits**   | Number of credits charged     |
 | **Timestamp** | When the transaction occurred |
+
+For new usage sessions, completed duration charges retain the measured duration, rounded minutes and the rate saved at session start. Changing prices, billing factors or operating history later does not recalculate completed transactions.
+
+For nonzero totals, the default email receipt shows separate session and operating-duration calculations and the saved billing factor. A zero-total transaction does not send a billing email. Customized email templates are preserved when the default receipt is upgraded; administrators can reset the template to its default to adopt the updated layout. Historical transactions are not rewritten.
 
 ## Filtering Transactions
 

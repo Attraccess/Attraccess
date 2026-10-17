@@ -1,18 +1,28 @@
 import { BadRequestException, Controller, Get, Query, ValidationPipe } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiExtraModels, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
-import { AuditQueryDto } from './audit-query.dto';
+import { AuditQueryDto } from './dto/audit-query.dto';
+import { AuditMetaDto, AuditPageDto } from './dto/audit-response.dto';
 
 @ApiTags('Audit')
+@ApiExtraModels(AuditQueryDto)
 @Controller('admin/audit-log')
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
+  @Get('meta')
+  @Auth('system.audit.read')
+  @ApiOkResponse({ type: AuditMetaDto })
+  meta(): AuditMetaDto {
+    return this.audit.meta();
+  }
+
   @Get()
   @Auth('system.audit.read')
   @ApiQuery({ type: AuditQueryDto })
-  async list(@Query() input: unknown) {
+  @ApiOkResponse({ type: AuditPageDto })
+  async list(@Query() input: unknown): Promise<AuditPageDto> {
     // The unknown parameter bypasses global DTO stripping; reject unknown filters here.
     const query = await new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }).transform(
       input,

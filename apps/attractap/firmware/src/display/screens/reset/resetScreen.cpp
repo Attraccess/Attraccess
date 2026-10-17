@@ -1,9 +1,10 @@
 #include "resetScreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
-#include "platform.hpp"
+#include "../../../platform.hpp"
 
 void ResetScreen::init()
 {
@@ -41,10 +42,10 @@ void ResetScreen::init()
    lv_obj_t *title = lv_label_create(this->screen);
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   lv_label_set_text(title, "Karte zuruecksetzen");
+   lv_label_set_text(title, "Karte zurücksetzen");
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Username — the person the card belongs to. Most prominent line.
    this->userNameLabel = lv_label_create(this->screen);
@@ -54,8 +55,8 @@ void ResetScreen::init()
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
    lv_label_set_text(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->userNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current reset phase.
    this->statusLabel = lv_label_create(this->screen);
@@ -63,7 +64,7 @@ void ResetScreen::init()
    lv_obj_set_height(this->statusLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->statusLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_style_text_align(this->statusLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->statusLabel, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->statusLabel, &attractap_font_montserrat_latin1_32, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Cancel button — lets the user actively abort the reset.
    this->cancelButton = lv_button_create(this->screen);
@@ -81,77 +82,6 @@ void ResetScreen::init()
 
    this->updateTimeoutBar();
    this->applyStatus();
-}
-
-void ResetScreen::loop()
-{
-   this->updateTimeoutBar();
-}
-
-void ResetScreen::updateTimeoutBar()
-{
-   if (!this->timeoutBar)
-   {
-      return;
-   }
-   uint32_t now = millis();
-   int32_t remainingSeconds = 0;
-   if (this->timeoutTime > now)
-   {
-      remainingSeconds = (int32_t)((this->timeoutTime - now) / 1000);
-   }
-   if (remainingSeconds > 30)
-   {
-      remainingSeconds = 30;
-   }
-   lv_bar_set_value(this->timeoutBar, remainingSeconds, LV_ANIM_ON);
-}
-
-void ResetScreen::applyStatus()
-{
-   if (!this->statusLabel)
-   {
-      return;
-   }
-
-   const char *text = "";
-   lv_color_t color = DisplayTheme::text();
-   switch (this->status)
-   {
-   case STATUS_WAITING:
-      text = "Karte an den Leser halten";
-      color = DisplayTheme::text();
-      break;
-   case STATUS_WRITING:
-      text = "Karte wird zurueckgesetzt...\nbitte nicht bewegen";
-      color = DisplayTheme::warning();
-      break;
-   case STATUS_SUCCESS:
-      text = "Karte zurueckgesetzt!";
-      color = DisplayTheme::success();
-      break;
-   case STATUS_ERROR:
-      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : "Fehler";
-      color = DisplayTheme::danger();
-      break;
-   }
-
-   lv_label_set_text(this->statusLabel, text);
-   lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   // Hide the cancel button once the reset has succeeded — nothing left to
-   // cancel, and it auto-dismisses shortly after.
-   if (this->cancelButton)
-   {
-      if (this->status == STATUS_SUCCESS)
-      {
-         lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
-      }
-      else
-      {
-         lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
-      }
-   }
 }
 
 lv_obj_t *ResetScreen::getScreen()
@@ -233,4 +163,75 @@ void ResetScreen::destroy()
    this->userNameLabel = nullptr;
    this->statusLabel = nullptr;
    this->cancelButton = nullptr;
+}
+
+void ResetScreen::loop()
+{
+   this->updateTimeoutBar();
+}
+
+void ResetScreen::updateTimeoutBar()
+{
+   if (!this->timeoutBar)
+   {
+      return;
+   }
+   uint32_t now = millis();
+   int32_t remainingSeconds = 0;
+   if (this->timeoutTime > now)
+   {
+      remainingSeconds = (int32_t)((this->timeoutTime - now) / 1000);
+   }
+   if (remainingSeconds > 30)
+   {
+      remainingSeconds = 30;
+   }
+   lv_bar_set_value(this->timeoutBar, remainingSeconds, LV_ANIM_ON);
+}
+
+void ResetScreen::applyStatus()
+{
+   if (!this->statusLabel)
+   {
+      return;
+   }
+
+   const char *text = "";
+   lv_color_t color = DisplayTheme::text();
+   switch (this->status)
+   {
+   case STATUS_WAITING:
+      text = "Karte an den Leser halten";
+      color = DisplayTheme::text();
+      break;
+   case STATUS_WRITING:
+      text = "Karte wird zurückgesetzt...\nbitte nicht bewegen";
+      color = DisplayTheme::warning();
+      break;
+   case STATUS_SUCCESS:
+      text = "Karte zurückgesetzt!";
+      color = DisplayTheme::success();
+      break;
+   case STATUS_ERROR:
+      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : "Fehler";
+      color = DisplayTheme::danger();
+      break;
+   }
+
+   lv_label_set_text(this->statusLabel, text);
+   lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   // Hide the cancel button once the reset has succeeded — nothing left to
+   // cancel, and it auto-dismisses shortly after.
+   if (this->cancelButton)
+   {
+      if (this->status == STATUS_SUCCESS)
+      {
+         lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+      else
+      {
+         lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
+      }
+   }
 }

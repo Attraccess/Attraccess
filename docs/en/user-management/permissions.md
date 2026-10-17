@@ -38,6 +38,7 @@ These system-managed roles come pre-installed and cannot be deleted:
 | users | `users.update` | Update user accounts |
 | users | `users.delete` | Delete users |
 | users | `users.roles.manage` | Assign and revoke roles for users |
+| users | `users.rfid-cards.manage` | View, enroll, activate, deactivate, and delete RFID cards for any user |
 | system | `system.settings.manage` | Change system configuration |
 | system | `system.sso.manage` | Manage SSO provider configuration |
 | system | `system.plugins.manage` | Install and configure plugins |

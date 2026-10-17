@@ -5,20 +5,22 @@ import { Button as HeroButton, type ButtonProps as HeroButtonProps, Spinner } fr
 export type ButtonProps = HeroButtonProps;
 
 export function Button(props: ButtonProps) {
-  const { children, ...rest } = props;
+  const { children, isPending, isIconOnly, ...rest } = props;
+  const pendingContentClass = isPending ? (isIconOnly ? 'opacity-0' : 'pr-5') : '';
   return (
-    <HeroButton {...rest}>
+    <HeroButton {...rest} isPending={isPending} isIconOnly={isIconOnly}>
       {(renderProps) => (
         <>
           <span
-            className="inline-flex items-center gap-2"
-            style={{ visibility: renderProps.isPending ? 'hidden' : undefined }}
-            aria-hidden={renderProps.isPending || undefined}
+            className={`inline-flex items-center gap-2 ${pendingContentClass}`}
           >
             {typeof children === 'function' ? children(renderProps) : children}
           </span>
-          {renderProps.isPending && (
-            <span className="absolute inset-0 flex items-center justify-center">
+          {isPending && (
+            <span
+              className={`absolute flex items-center ${isIconOnly ? 'inset-0 justify-center' : 'right-3 inset-y-0'}`}
+              aria-hidden="true"
+            >
               <Spinner color="current" size="sm" />
             </span>
           )}

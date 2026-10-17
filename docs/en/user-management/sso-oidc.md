@@ -98,3 +98,21 @@ The provider ID is shown after creating the provider.
 - [SSO Overview](user-management/sso-overview.md)
 - [SAML Setup](user-management/sso-saml.md)
 - [Permissions](user-management/permissions.md)
+
+## OIDC central logout
+
+Configure optional **End-session URL** and **JWKS URL**, or leave them empty to use discovery from the configured issuer. Discovered issuer identity must match exactly. Configure the allowed asymmetric signing algorithms; the default is `RS256`. Endpoints require HTTPS in production; HTTP loopback URLs are allowed in local development. Provider metadata requests have bounded time, size, redirects, and cache lifetime. Key URLs in incoming tokens are never trusted.
+
+Register these URLs with the provider, replacing `API_ORIGIN` and `PROVIDER_ID` with the public API address and provider ID. The form shows the exact URLs from application settings:
+
+| Provider setting | URL |
+| --- | --- |
+| Post-logout redirect URI | `API_ORIGIN/api/auth/sso/OIDC/PROVIDER_ID/post-logout` |
+| Back-channel logout URI | `API_ORIGIN/api/auth/sso/OIDC/PROVIDER_ID/backchannel-logout` |
+| Front-channel logout URI | `API_ORIGIN/api/auth/sso/OIDC/PROVIDER_ID/frontchannel-logout` |
+
+**Logout everywhere** uses a verified ID-token hint when available and one-time server-side state. Configure the client's post-logout redirect URI exactly. Logout tokens sent by form-encoded POST must be signed, include matching issuer/audience, `iat`, `exp`, `jti`, the back-channel logout event, and `sub` or `sid`. They must not contain a nonce. Notifications must be issued within five minutes (`iat`) and must not be expired (`exp`), allowing 30 seconds of clock skew. The interval between issuance and expiry may exceed five minutes; a fresh token with a one-hour expiry is accepted. When both subject and session ID are supplied, both must match. Duplicate valid tokens succeed without ending newer sessions.
+
+Front-channel notifications accept `iss` and `sid` together. Without them, only the matching current browser session can be ended; a cookieless notification then does nothing. Attraccess cookies use SameSite=Strict, and third-party cookie restrictions can prevent cookie-only notifications from working. Parameter-based notifications do not require cookies. Enable **back-channel logout** for reliable provider notifications. Only the minimal notification endpoint permits iframe embedding; application pages keep their existing frame policy.
+
+Existing sessions without verified SSO correlation remain valid for local login/logout. If provider verification/discovery is unavailable for a legacy configuration, no untrusted ID-token correlation is recorded. Configure trusted JWKS metadata and sign in again to enable central logout.

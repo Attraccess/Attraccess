@@ -94,8 +94,8 @@ attraccess_resource_maintenance_overdue > 0
 
 | Metrik | Typ | Labels | Beschreibung |
 |--------|-----|--------|--------------|
-| `attraccess_attractap_devices_connected` | Gauge | -- | Anzahl verbundener Attractap-NFC-Leser |
-| `attraccess_attractap_nfc_taps_total` | Counter | -- | Gesamtanzahl der NFC-Tap-Ereignisse |
+| `attraccess_attractap_devices_connected` | Gauge | -- | Anzahl verbundener Attractap-RFID-Leser |
+| `attraccess_attractap_nfc_taps_total` | Counter | -- | Gesamtanzahl der RFID-Tap-Ereignisse |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Gesamtanzahl der Firmware-Update-Ereignisse |
 | `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Von Lesegeräten empfangene Crash-Berichte. `reset_reason` ist eine normalisierte Reset-Ursache (z. B. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
 

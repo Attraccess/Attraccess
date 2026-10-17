@@ -1,25 +1,29 @@
+import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
+
 import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
+
 import { LessThan, Repository } from 'typeorm';
+
+import { SettingsService } from '../../../settings/settings.service';
 import {
+  type AuthenticationResponseJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
   generateAuthenticationOptions,
-  generateRegistrationOptions,
   verifyAuthenticationResponse,
+  type PublicKeyCredentialCreationOptionsJSON,
+  type RegistrationResponseJSON,
+  generateRegistrationOptions,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
-import type {
-  AuthenticationResponseJSON,
-  AuthenticatorTransportFuture,
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-  RegistrationResponseJSON,
-} from '@simplewebauthn/server';
-import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
-import { SettingsService } from '../../../settings/settings.service';
-import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
 
-const CHALLENGE_TTL_MS = 5 * 60 * 1000;
-const RP_NAME = 'Attraccess';
+import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
+import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
+
+export const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+export const RP_NAME = 'Attraccess';
 
 /** Where the ceremony is happening: the configured app URL, plus the browser's own origin when it is the same host. */
 export interface RelyingParty {
@@ -27,19 +31,57 @@ export interface RelyingParty {
   expectedOrigin: string[];
 }
 
+export function readChallengeFromClientData(clientDataJSON: string): string | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(clientDataJSON, 'base64url').toString('utf8'));
+    return typeof parsed?.challenge === 'string' ? parsed.challenge : null;
+  } catch {
+    return null;
+  }
+}
+
+export function parseTransports(value: string | null): AuthenticatorTransportFuture[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return value.split(',').filter(Boolean) as AuthenticatorTransportFuture[];
+}
+
+export function safeOrigin(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+export function hostnameOf(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 @Injectable()
 export class PasskeyService {
-  private readonly logger = new Logger(PasskeyService.name);
-
   constructor(
     @InjectRepository(Passkey)
-    private readonly passkeyRepository: Repository<Passkey>,
+    protected readonly passkeyRepository: Repository<Passkey>,
     @InjectRepository(PasskeyChallenge)
-    private readonly challengeRepository: Repository<PasskeyChallenge>,
+    protected readonly challengeRepository: Repository<PasskeyChallenge>,
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly settingsService: SettingsService,
+    protected readonly userRepository: Repository<User>,
+    protected readonly settingsService: SettingsService,
   ) {}
+
+  protected readonly logger = new Logger(PasskeyService.name);
 
   /**
    * The RP ID must be a registrable domain, and every accepted origin must live on it.
@@ -82,70 +124,34 @@ export class PasskeyService {
     return this.passkeyRepository.save(passkey);
   }
 
-  async createRegistrationOptions(
-    user: User,
-    requestOrigin?: string,
-  ): Promise<PublicKeyCredentialCreationOptionsJSON> {
-    const { rpID } = await this.resolveRelyingParty(requestOrigin);
-    const existing = await this.listForUser(user.id);
-
-    const options = await generateRegistrationOptions({
-      rpName: RP_NAME,
-      rpID,
-      userName: user.username,
-      userDisplayName: user.username,
-      // The user handle must be stable so authenticators overwrite rather than pile up credentials
-      userID: new TextEncoder().encode(String(user.id)),
-      attestationType: 'none',
-      excludeCredentials: existing.map((passkey) => ({
-        id: passkey.credentialId,
-        transports: parseTransports(passkey.transports),
-      })),
-      authenticatorSelection: {
-        // Discoverable credentials are what make usernameless "Sign in with a passkey" possible
-        residentKey: 'required',
-        userVerification: 'preferred',
-      },
+  protected async storeChallenge(challenge: string, userId: number | null): Promise<void> {
+    // ponytail: opportunistic sweep instead of a cron; challenges live 5 minutes so the table stays tiny
+    await this.challengeRepository.delete({ expiresAt: LessThan(new Date()) });
+    await this.challengeRepository.insert({
+      challenge,
+      userId,
+      expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
     });
-
-    await this.storeChallenge(options.challenge, user.id);
-    return options;
   }
 
-  async verifyRegistration(
-    user: User,
-    response: RegistrationResponseJSON,
-    name: string | undefined,
-    requestOrigin?: string,
-  ): Promise<Passkey> {
-    const { rpID, expectedOrigin } = await this.resolveRelyingParty(requestOrigin);
-    const expectedChallenge = await this.consumeChallenge(response.response.clientDataJSON, user.id);
-
-    const verification = await verifyRegistrationResponse({
-      response,
-      expectedChallenge,
-      expectedOrigin,
-      expectedRPID: rpID,
-      requireUserVerification: false,
-    });
-
-    if (!verification.verified) {
-      throw new BadRequestException('PasskeyRegistrationFailed');
+  /**
+   * Looks up the challenge the client echoed back and burns it, so a captured assertion
+   * can never be replayed.
+   */
+  protected async consumeChallenge(clientDataJSON: string, userId: number | null): Promise<string> {
+    const challenge = readChallengeFromClientData(clientDataJSON);
+    if (!challenge) {
+      throw new BadRequestException('PasskeyChallengeInvalid');
     }
 
-    const { credential, credentialBackedUp } = verification.registrationInfo;
+    const stored = await this.challengeRepository.findOneBy({ challenge });
+    await this.challengeRepository.delete({ challenge });
 
-    return this.passkeyRepository.save(
-      this.passkeyRepository.create({
-        userId: user.id,
-        credentialId: credential.id,
-        publicKey: Buffer.from(credential.publicKey).toString('base64url'),
-        counter: credential.counter,
-        transports: credential.transports?.join(',') ?? null,
-        name: name?.trim() || 'Passkey',
-        backedUp: credentialBackedUp,
-      }),
-    );
+    if (!stored || stored.expiresAt.getTime() < Date.now() || stored.userId !== userId) {
+      throw new BadRequestException('PasskeyChallengeInvalid');
+    }
+
+    return challenge;
   }
 
   async createAuthenticationOptions(requestOrigin?: string): Promise<PublicKeyCredentialRequestOptionsJSON> {
@@ -207,71 +213,66 @@ export class PasskeyService {
     return user;
   }
 
-  private async storeChallenge(challenge: string, userId: number | null): Promise<void> {
-    // ponytail: opportunistic sweep instead of a cron; challenges live 5 minutes so the table stays tiny
-    await this.challengeRepository.delete({ expiresAt: LessThan(new Date()) });
-    await this.challengeRepository.insert({
-      challenge,
-      userId,
-      expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
+  async createRegistrationOptions(user: User, requestOrigin?: string): Promise<PublicKeyCredentialCreationOptionsJSON> {
+    const { rpID } = await this.resolveRelyingParty(requestOrigin);
+    const existing = await this.listForUser(user.id);
+
+    const options = await generateRegistrationOptions({
+      rpName: RP_NAME,
+      rpID,
+      userName: user.username,
+      userDisplayName: user.username,
+      // The user handle must be stable so authenticators overwrite rather than pile up credentials
+      userID: new TextEncoder().encode(String(user.id)),
+      attestationType: 'none',
+      excludeCredentials: existing.map((passkey) => ({
+        id: passkey.credentialId,
+        transports: parseTransports(passkey.transports),
+      })),
+      authenticatorSelection: {
+        // Discoverable credentials are what make usernameless "Sign in with a passkey" possible
+        residentKey: 'required',
+        userVerification: 'preferred',
+      },
     });
+
+    await this.storeChallenge(options.challenge, user.id);
+    return options;
   }
 
-  /**
-   * Looks up the challenge the client echoed back and burns it, so a captured assertion
-   * can never be replayed.
-   */
-  private async consumeChallenge(clientDataJSON: string, userId: number | null): Promise<string> {
-    const challenge = readChallengeFromClientData(clientDataJSON);
-    if (!challenge) {
-      throw new BadRequestException('PasskeyChallengeInvalid');
+  async verifyRegistration(
+    user: User,
+    response: RegistrationResponseJSON,
+    name: string | undefined,
+    requestOrigin?: string,
+  ): Promise<Passkey> {
+    const { rpID, expectedOrigin } = await this.resolveRelyingParty(requestOrigin);
+    const expectedChallenge = await this.consumeChallenge(response.response.clientDataJSON, user.id);
+
+    const verification = await verifyRegistrationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin,
+      expectedRPID: rpID,
+      requireUserVerification: false,
+    });
+
+    if (!verification.verified) {
+      throw new BadRequestException('PasskeyRegistrationFailed');
     }
 
-    const stored = await this.challengeRepository.findOneBy({ challenge });
-    await this.challengeRepository.delete({ challenge });
+    const { credential, credentialBackedUp } = verification.registrationInfo;
 
-    if (!stored || stored.expiresAt.getTime() < Date.now() || stored.userId !== userId) {
-      throw new BadRequestException('PasskeyChallengeInvalid');
-    }
-
-    return challenge;
-  }
-}
-
-function readChallengeFromClientData(clientDataJSON: string): string | null {
-  try {
-    const parsed = JSON.parse(Buffer.from(clientDataJSON, 'base64url').toString('utf8'));
-    return typeof parsed?.challenge === 'string' ? parsed.challenge : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseTransports(value: string | null): AuthenticatorTransportFuture[] | undefined {
-  if (!value) {
-    return undefined;
-  }
-  return value.split(',').filter(Boolean) as AuthenticatorTransportFuture[];
-}
-
-function safeOrigin(url: string | null | undefined): string | null {
-  if (!url) {
-    return null;
-  }
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
-
-function hostnameOf(url: string | null | undefined): string | null {
-  if (!url) {
-    return null;
-  }
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return null;
+    return this.passkeyRepository.save(
+      this.passkeyRepository.create({
+        userId: user.id,
+        credentialId: credential.id,
+        publicKey: Buffer.from(credential.publicKey).toString('base64url'),
+        counter: credential.counter,
+        transports: credential.transports?.join(',') ?? null,
+        name: name?.trim() || 'Passkey',
+        backedUp: credentialBackedUp,
+      }),
+    );
   }
 }

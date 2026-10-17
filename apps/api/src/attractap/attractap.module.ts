@@ -5,20 +5,21 @@ import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
+import { CardAccessService } from './card-access.service';
 import 'sqlite3';
 import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
-import { ResourceListService } from './websockets/handlers/resource-list.service';
+import { ResourceListService } from './websockets/handlers/resource-list/resource-list.service';
 import { ResourceActionGuard } from './websockets/handlers/resource-action.guard';
-import { AttractapAuthHandler } from './websockets/handlers/auth.handler';
-import { AttractapFirmwareHandler } from './websockets/handlers/firmware.handler';
-import { AttractapCrashReportHandler } from './websockets/handlers/crash-report.handler';
-import { AttractapCardHandler } from './websockets/handlers/card.handler';
-import { AttractapFormsHandler } from './websockets/handlers/forms.handler';
-import { AttractapSessionHandler } from './websockets/handlers/session.handler';
-import { AttractapBillingHandler } from './websockets/handlers/billing.handler';
-import { AttractapProjectsHandler } from './websockets/handlers/projects.handler';
-import { AttractapSupervisionHandler } from './websockets/handlers/supervision.handler';
+import { AttractapAuthHandler } from './websockets/handlers/auth/auth.handler';
+import { AttractapFirmwareHandler } from './websockets/handlers/firmware/firmware.handler';
+import { AttractapCrashReportHandler } from './websockets/handlers/crash-report/crash-report.handler';
+import { AttractapCardHandler } from './websockets/handlers/card/card.handler';
+import { AttractapFormsHandler } from './websockets/handlers/forms/forms.handler';
+import { AttractapSessionHandler } from './websockets/handlers/session/session.handler';
+import { AttractapBillingHandler } from './websockets/handlers/billing/billing.handler';
+import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
+import { AttractapSupervisionHandler } from './websockets/handlers/supervision/supervision.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
@@ -39,6 +40,9 @@ import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
 import { SupervisionModule } from '../resources/supervision/supervision.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
+import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -59,8 +63,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ResourceFormsModule,
     SupervisionModule,
     NotificationsModule,
+    AuditModule,
+    ResourceMeteringModule,
+    ResourceOperatingAttributionModule,
   ],
   providers: [
+    CardAccessService,
     AttractapService,
     WebsocketService,
     AttractapGateway,

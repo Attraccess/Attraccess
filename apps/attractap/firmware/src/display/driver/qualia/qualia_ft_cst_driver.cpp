@@ -16,64 +16,58 @@
 // FocalTech register map (FT6206 / CST826-compatible)
 #define FT_REG_TD_STATUS 0x02 // number of touch points (low nibble)
 
-// tl040wvs03_init_operations (formerly from Arduino_GFX Arduino_RGB_Display.h),
-// translated 1:1 to the esp_lcd_st7701 init command format. The panel is an
-// ST7701-family controller; COLMOD 0x66 = RGB666.
-//
-// The esp_lcd_st7701 driver writes MADCTL/COLMOD from panel_dev_config before
-// this table runs; the explicit 0x36/0x3A entries below overwrite them with
-// the intended values (the driver logs a benign warning for each).
-static const st7701_lcd_init_cmd_t tl040wvs03_init_cmds[] = {
-    // {cmd, data, data_bytes, delay_ms}
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x10}, 5, 0}, // BK0 select
-
-    {0xC0, (uint8_t[]){0x3B, 0x00}, 2, 0},
-    {0xC1, (uint8_t[]){0x0D, 0x02}, 2, 0},
-    {0xC2, (uint8_t[]){0x31, 0x05}, 2, 0},
-    {0xCD, (uint8_t[]){0x08}, 1, 0},
-
-    {0xB0, (uint8_t[]){0x00, 0x11, 0x18, 0x0E, 0x11, 0x06, 0x07, 0x08, 0x07, 0x22, 0x04, 0x12, 0x0F, 0xAA, 0x31, 0x18}, 16, 0},
-    {0xB1, (uint8_t[]){0x00, 0x11, 0x19, 0x0E, 0x12, 0x07, 0x08, 0x08, 0x08, 0x22, 0x04, 0x11, 0x11, 0xA9, 0x32, 0x18}, 16, 0},
-
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x11}, 5, 0}, // BK1 select
-
-    {0xB0, (uint8_t[]){0x60}, 1, 0},
-    {0xB1, (uint8_t[]){0x32}, 1, 0},
-    {0xB2, (uint8_t[]){0x07}, 1, 0},
-    {0xB3, (uint8_t[]){0x80}, 1, 0},
-    {0xB5, (uint8_t[]){0x49}, 1, 0},
-    {0xB7, (uint8_t[]){0x85}, 1, 0},
-    {0xB8, (uint8_t[]){0x21}, 1, 0},
-    {0xC1, (uint8_t[]){0x78}, 1, 0},
-    {0xC2, (uint8_t[]){0x78}, 1, 0},
-
-    {0xE0, (uint8_t[]){0x00, 0x1B, 0x02}, 3, 0},
-    {0xE1, (uint8_t[]){0x08, 0xA0, 0x00, 0x00, 0x07, 0xA0, 0x00, 0x00, 0x00, 0x44, 0x44}, 11, 0},
-    {0xE2, (uint8_t[]){0x11, 0x11, 0x44, 0x44, 0xED, 0xA0, 0x00, 0x00, 0xEC, 0xA0, 0x00, 0x00}, 12, 0},
-    {0xE3, (uint8_t[]){0x00, 0x00, 0x11, 0x11}, 4, 0},
-    {0xE4, (uint8_t[]){0x44, 0x44}, 2, 0},
-    {0xE5, (uint8_t[]){0x0A, 0xE9, 0xD8, 0xA0, 0x0C, 0xEB, 0xD8, 0xA0, 0x0E, 0xED, 0xD8, 0xA0, 0x10, 0xEF, 0xD8, 0xA0}, 16, 0},
-    {0xE6, (uint8_t[]){0x00, 0x00, 0x11, 0x11}, 4, 0},
-    {0xE7, (uint8_t[]){0x44, 0x44}, 2, 0},
-    {0xE8, (uint8_t[]){0x09, 0xE8, 0xD8, 0xA0, 0x0B, 0xEA, 0xD8, 0xA0, 0x0D, 0xEC, 0xD8, 0xA0, 0x0F, 0xEE, 0xD8, 0xA0}, 16, 0},
-    {0xEB, (uint8_t[]){0x02, 0x00, 0xE4, 0xE4, 0x88, 0x00, 0x40}, 7, 0},
-    {0xEC, (uint8_t[]){0x3C, 0x00}, 2, 0},
-    {0xED, (uint8_t[]){0xAB, 0x89, 0x76, 0x54, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x20, 0x45, 0x67, 0x98, 0xBA}, 16, 0},
-
-    {0x36, (uint8_t[]){0x00}, 1, 0}, // MADCTL
-
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x13}, 5, 0},
-    {0xE5, (uint8_t[]){0xE4}, 1, 0},
-    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x00}, 5, 0},
-
-    {0x3A, (uint8_t[]){0x66}, 1, 0},  // COLMOD: RGB666
-    {0x21, (uint8_t[]){0x00}, 0, 10}, // inversion on + 10 ms
-
-    {0x11, (uint8_t[]){0x00}, 0, 120}, // Sleep Out + 120 ms
-    {0x29, (uint8_t[]){0x00}, 0, 0},   // Display On
-};
-
 QualiaFtCstDriver::QualiaFtCstDriver(Logger &logger) : logger(logger) {}
+
+void QualiaFtCstDriver::flush(const lv_area_t *area, uint8_t *px_map)
+{
+    if (!initialized || !panel)
+    {
+        return;
+    }
+
+    esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px_map);
+}
+
+bool QualiaFtCstDriver::readTouch(TouchPoint &point)
+{
+    point.pressed = false;
+
+    if (!initialized || !touchOK || !touchDev)
+    {
+        return false;
+    }
+
+    // Serialize the touch read against PN532 traffic on the shared bus
+    // (ATT-554) — same rationale as RgbGt911Driver::readTouch.
+    I2CBusGuard busGuard;
+
+    // One burst read: TD_STATUS + P1 XH/XL/YH/YL — a single atomic transaction.
+    uint8_t reg = FT_REG_TD_STATUS;
+    uint8_t data[5] = {0};
+    if (i2c_master_transmit_receive(touchDev, &reg, 1, data, sizeof(data), ATTRACTAP_I2C_XFER_TIMEOUT_MS) != ESP_OK)
+    {
+        return false;
+    }
+
+    uint8_t touches = data[0] & 0x0F;
+    if (touches == 0 || touches > 2)
+    {
+        return false;
+    }
+
+    point.x = (int16_t)(((data[1] & 0x0F) << 8) | data[2]);
+    point.y = (int16_t)(((data[3] & 0x0F) << 8) | data[4]);
+    point.pressed = true;
+    return true;
+}
+
+#ifndef I2C_TOUCH_ADDR
+#define I2C_TOUCH_ADDR 0x48
+#endif
+
+// FocalTech register map (FT6206 / CST826-compatible)
+
+#include "st7701_qualia_commands.hpp"
 
 bool QualiaFtCstDriver::begin()
 {
@@ -212,48 +206,5 @@ bool QualiaFtCstDriver::begin()
     screenHeight = 480;
 
     initialized = true;
-    return true;
-}
-
-void QualiaFtCstDriver::flush(const lv_area_t *area, uint8_t *px_map)
-{
-    if (!initialized || !panel)
-    {
-        return;
-    }
-
-    esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px_map);
-}
-
-bool QualiaFtCstDriver::readTouch(TouchPoint &point)
-{
-    point.pressed = false;
-
-    if (!initialized || !touchOK || !touchDev)
-    {
-        return false;
-    }
-
-    // Serialize the touch read against PN532 traffic on the shared bus
-    // (ATT-554) — same rationale as RgbGt911Driver::readTouch.
-    I2CBusGuard busGuard;
-
-    // One burst read: TD_STATUS + P1 XH/XL/YH/YL — a single atomic transaction.
-    uint8_t reg = FT_REG_TD_STATUS;
-    uint8_t data[5] = {0};
-    if (i2c_master_transmit_receive(touchDev, &reg, 1, data, sizeof(data), ATTRACTAP_I2C_XFER_TIMEOUT_MS) != ESP_OK)
-    {
-        return false;
-    }
-
-    uint8_t touches = data[0] & 0x0F;
-    if (touches == 0 || touches > 2)
-    {
-        return false;
-    }
-
-    point.x = (int16_t)(((data[1] & 0x0F) << 8) | data[2]);
-    point.y = (int16_t)(((data[3] & 0x0F) << 8) | data[4]);
-    point.pressed = true;
     return true;
 }

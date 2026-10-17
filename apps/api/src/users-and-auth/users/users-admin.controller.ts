@@ -1,45 +1,65 @@
+import { User } from '@attraccess/database-entities';
+
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
 import {
   BadRequestException,
-  Body,
   Controller,
   Delete,
   ForbiddenException,
   Get,
   Logger,
+  Optional,
   Param,
   ParseIntPipe,
-  Patch,
-  Post,
   Query,
   Req,
   UseInterceptors,
+  Body,
+  Patch,
+  Post,
 } from '@nestjs/common';
+
 import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
-import { User } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
-import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
-import { UsersService } from './users.service';
-import { UserPasswordService } from './user-password.service';
+
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
-import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
-import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
-import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
-import { ChangeUsernameDto } from './dtos/changeUsername.dto';
-import { ChangeEmailDto } from './dtos/changeEmail.dto';
-import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
-import { mapEmailSendError } from './email-send-error.util';
+
 import { computeNextPage } from '../../types/response';
+
+import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
+
+import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
+
+import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+
+import { UserPasswordService } from './user-password.service';
+
+import { UsersService } from './users.service';
+import { randomUUID } from 'node:crypto';
+
+import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
+
+import { ChangeEmailDto } from './dtos/changeEmail.dto';
+
+import { ChangeUsernameDto } from './dtos/changeUsername.dto';
+
+import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
+
+import { mapEmailSendError } from './email-send-error.util';
 
 @ApiTags('Users')
 @Controller('users')
 @UseInterceptors(AuthRateLimitInterceptor)
 export class UsersAdminController {
-  private readonly logger = new Logger(UsersAdminController.name);
-
   constructor(
-    private readonly usersService: UsersService,
-    private readonly passwordService: UserPasswordService,
+    protected readonly usersService: UsersService,
+    protected readonly passwordService: UserPasswordService,
+    @Optional() protected readonly identityAudit?: IdentityAuditService,
   ) {}
+
+  protected readonly logger = new Logger(UsersAdminController.name);
 
   @Auth()
   @Get(':id')
@@ -95,6 +115,7 @@ export class UsersAdminController {
     }
 
     await this.usersService.deleteOne(id);
+    await this.record('user_deleted', id, request);
   }
 
   @Get()
@@ -188,6 +209,7 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     await this.passwordService.setUserPassword(id, body, request.user);
+    await this.record('user_updated', id, request, 'password');
     return { message: 'Password updated successfully' };
   }
 
@@ -200,7 +222,9 @@ export class UsersAdminController {
     @Body() body: ChangeUsernameDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    return await this.usersService.changeUsername(id, body.username, request.user);
+    const user = await this.usersService.changeUsername(id, body.username, request.user);
+    await this.record('user_updated', id, request, 'username');
+    return user;
   }
 
   @Patch(':id/email')
@@ -213,7 +237,9 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     try {
-      return await this.usersService.changeEmail(id, body.email, request.user);
+      const user = await this.usersService.changeEmail(id, body.email, request.user);
+      await this.record('user_updated', id, request, 'email');
+      return user;
     } catch (error) {
       throw mapEmailSendError(error);
     }
@@ -226,7 +252,31 @@ export class UsersAdminController {
   async changeUserBillingFactor(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ChangeBillingFactorDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    return await this.usersService.changeBillingFactor(id, body.billingFactor);
+    const user = await this.usersService.changeBillingFactor(id, body.billingFactor);
+    await this.record('user_updated', id, request, 'billingFactor');
+    return user;
+  }
+
+  protected record(
+    action: 'user_deleted' | 'user_updated',
+    subjectId: number,
+    request: AuthenticatedRequest,
+    field?: 'username' | 'email' | 'password' | 'billingFactor',
+  ): Promise<void> {
+    return Promise.resolve(
+      this.identityAudit?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectId,
+        details: field ? { field } : {},
+        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+      }),
+    ).then(() => undefined);
   }
 }

@@ -15,6 +15,7 @@
 #include "screens/connectionConfiguration/connectionConfigurationScreen.hpp"
 #include "screens/init/initscreen.hpp"
 #include "screens/lockscreen/lockscreen.hpp"
+#include "screens/sessionSummary/sessionSummaryScreen.hpp"
 #include "screens/noResources/noResourcesScreen.hpp"
 #include "screens/resourceList/resourceListScreen.hpp"
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
@@ -52,6 +53,7 @@ public:
     static InitScreen initScreen;
     static Lockscreen lockscreen;
     static NoResourcesScreen noResourcesScreen;
+    static SessionSummaryScreen sessionSummaryScreen;
     static ResourceListScreen resourceListScreen;
     static ResourceDetailsScreen resourceDetailsScreen;
     static EnrollmentScreen enrollmentScreen;
@@ -68,9 +70,11 @@ public:
 
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
+    static uint32_t touchPressSequence;
 
     // Global error popup helpers
     static void showErrorPopup(const std::string &title, const std::string &message);
+    static void showBillingSummary(const std::string &total);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
 
@@ -78,6 +82,7 @@ public:
     // "Open Settings" and "Reboot" actions. The settings action is wired by the
     // application; reboot is handled internally (esp_restart after a confirm).
     static void setOnOpenSettingsCallback(std::function<void()> callback);
+    static void setDrawerAvailableCallback(std::function<bool()> callback);
 
     /**
      * Thread-safe lv_async_call: takes lv_lock() around the timer-list
@@ -88,6 +93,9 @@ public:
     static void asyncCall(lv_async_cb_t cb, void *user_data);
 
 private:
+    static void setupFramebuffer();
+    static bool touchWarningPending;
+    static void showMessagePopup(const std::string &title, const std::string &message, bool error);
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.
@@ -140,14 +148,19 @@ private:
     static void openDrawer();
     static void closeDrawer();
     static void showRebootConfirm();
+    static bool isDrawerAvailable();
+    static void updateDrawerAvailability();
     // Fed every touch sample from touchpad_read to detect the top-edge pull-down
     // gesture without intercepting touches destined for the active screen.
     static void handleGestureSample(int16_t x, int16_t y, bool pressed);
 
     static lv_obj_t *drawerBackdrop;
+    static lv_obj_t *drawerGrabber;
     static lv_obj_t *drawerPanel;
+    static lv_obj_t *rebootConfirmOverlay;
     static bool drawerOpen;
     static std::function<void()> onOpenSettingsCallback;
+    static std::function<bool()> drawerAvailableCallback;
     static bool gestureCandidate;
     static bool gesturePrevPressed;
     static int16_t gestureStartY;

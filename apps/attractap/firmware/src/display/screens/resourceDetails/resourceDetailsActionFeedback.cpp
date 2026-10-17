@@ -20,59 +20,21 @@ void ResourceDetailsScreen::onToastDelete(lv_event_t *e)
 {
    (void)e;
 }
-void ResourceDetailsScreen::showActionProgress(const char *)
+void ResourceDetailsScreen::showActionProgress(const char *title)
 {
-   // The originating button can disappear during a screen transition, but the
-   // request must still block additional actions until its result arrives.
    this->actionInProgress = true;
-
-   if (!this->activeActionButton || !lv_obj_is_valid(this->activeActionButton))
-   {
-      return;
-   }
-
-   if (!this->activeActionSpinner || !lv_obj_is_valid(this->activeActionSpinner))
-   {
-      this->activeActionSpinner = lv_spinner_create(this->activeActionButton);
-      lv_obj_set_style_arc_color(this->activeActionSpinner, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_arc_color(this->activeActionSpinner, DisplayTheme::muted(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-      lv_obj_update_layout(this->activeActionButton);
-      const lv_coord_t labelHeight = this->activeActionLabel ? lv_obj_get_height(this->activeActionLabel) : 20;
-      lv_obj_set_size(this->activeActionSpinner, labelHeight, labelHeight);
-      lv_obj_set_align(this->activeActionSpinner, LV_ALIGN_CENTER);
-      lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
-   }
-
-   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
-   {
-      lv_obj_add_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
-   }
-   lv_obj_clear_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_state(this->activeActionButton, LV_STATE_DISABLED);
+   this->actionTitle = title ? title : "Bitte warten";
+   actionOverlay.show(this->screen, this->actionTitle.c_str(), this->resourceCacheValid ? this->resourceCache.name : "");
 }
 void ResourceDetailsScreen::hideActionProgress()
 {
-   this->hideActionProgressVisual();
-   if (this->activeActionButton && lv_obj_is_valid(this->activeActionButton))
-   {
-      lv_obj_clear_state(this->activeActionButton, LV_STATE_DISABLED);
-   }
+   actionOverlay.hide();
    this->activeActionButton = nullptr;
    this->activeActionLabel = nullptr;
    this->activeActionSpinner = nullptr;
    this->actionInProgress = false;
 }
-void ResourceDetailsScreen::hideActionProgressVisual()
-{
-   if (this->activeActionSpinner && lv_obj_is_valid(this->activeActionSpinner))
-   {
-      lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
-   }
-   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
-   {
-      lv_obj_clear_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
-   }
-}
+void ResourceDetailsScreen::hideActionProgressVisual() { actionOverlay.hide(); }
 void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
 {
    if (!this->screen)

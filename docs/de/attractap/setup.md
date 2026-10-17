@@ -62,7 +62,7 @@ Nach der Registrierung des Lesers muessen Sie festlegen, welche Ressource(n) er 
 
 ## Schritt 4: Setup testen
 
-1. Halten Sie eine registrierte NFC-Karte an den Leser
+1. Halten Sie eine registrierte RFID-Karte an den Leser
 2. Der Leser sollte mit dem Backend kommunizieren und eine Zugangsentscheidung auf dem Display anzeigen
 3. Wenn die Karte mit einem Benutzer verknuepft ist, der die Berechtigung fuer die zugewiesene Ressource hat, wird der Zugang gewaehrt
 
@@ -85,11 +85,11 @@ Der Leser kommuniziert mit dem Attraccess-Backend ueber WebSocket. Die Verbindun
 |---------|---------|
 | Leser-Display zeigt "Keine Verbindung" | Pruefen Sie die Netzwerkkonnektivitaet und ueberpruefen Sie die Attraccess-Server-URL |
 | Leser erscheint nicht in Attraccess | Stellen Sie sicher, dass der Leser im selben Netzwerk ist und das Backend erreichen kann |
-| Kartenscan ohne Reaktion | Ueberpruefen Sie, ob die NFC-Karte registriert ist und der Leser eine zugewiesene Ressource hat |
+| Kartenscan ohne Reaktion | Ueberpruefen Sie, ob die RFID-Karte registriert ist und der Leser eine zugewiesene Ressource hat |
 
 ## Siehe auch
 
 - [Ueberblick](attractap/overview.md) -- Was ist Attractap?
 - [Hardware](attractap/hardware.md) -- Hardware-Varianten und Komponenten
-- [NFC-Karten](attractap/nfc-cards.md) -- NFC-Karten registrieren und verwalten
+- [RFID-Karten](attractap/rfid-cards.md) -- RFID-Karten registrieren und verwalten
 - [Ressourcen](resources/overview.md) -- Maschinen und Tueren verwalten

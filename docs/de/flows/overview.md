@@ -6,11 +6,11 @@ Flows sind visuelle Automatisierungs-Workflows, die Sie an jede Ressource anheft
 
 Ein Flow ist eine Kette verbundener Knoten auf einer visuellen Arbeitsfläche. Jeder Flow gehört zu einer bestimmten Ressource und besteht aus drei Knotentypen:
 
-| Knotenkategorie | Zweck | Beispiele |
-|-----------------|-------|----------|
+| Knotenkategorie       | Zweck                                        | Beispiele                                                |
+| --------------------- | -------------------------------------------- | -------------------------------------------------------- |
 | **Eingabe (Trigger)** | Startet den Flow, wenn ein Ereignis eintritt | Tastendruck, Nutzung gestartet, MQTT-Nachricht empfangen |
-| **Verarbeitung** | Transformiert Daten oder steuert den Ablauf | Warten, Wenn (Bedingung), Payload setzen |
-| **Ausgabe (Aktion)** | Führt eine Aktion aus | HTTP-Anfrage, MQTT-Nachricht, Abrechnungsposten setzen |
+| **Verarbeitung**      | Transformiert Daten oder steuert den Ablauf  | Warten, Wenn (Bedingung), Payload setzen                 |
+| **Ausgabe (Aktion)**  | Führt eine Aktion aus                        | HTTP-Anfrage, MQTT-Nachricht, Abrechnungsposten setzen   |
 
 > [!NOTE]
 > Ein Flow beginnt immer mit mindestens einem **Eingabe**-Knoten und endet typischerweise mit einem oder mehreren **Ausgabe**-Knoten.
@@ -46,6 +46,7 @@ Hier sind einige häufige Beispiele:
 ## Siehe auch
 
 - [Flow-Editor](flows/flow-editor.md) -- Den visuellen Editor verwenden
+- [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) -- Knotendaten und gespeicherte Werte verwenden
 - [Knotentypen](flows/node-types.md) -- Alle verfügbaren Knotentypen
 - [MQTT & IoT](mqtt/overview.md) -- Hardware verbinden
 - [Abrechnung](billing/overview.md) -- Kostenerfassung automatisieren

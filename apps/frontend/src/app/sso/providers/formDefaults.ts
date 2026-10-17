@@ -7,10 +7,15 @@ export const getDefaultOidcConfiguration = () => ({
   userInfoURL: '',
   clientId: '',
   clientSecret: '',
+  endSessionURL: '',
+  jwksURL: '',
+  signingAlgorithms: ['RS256'],
 });
 
 export const getDefaultSamlConfiguration = () => ({
   entryPoint: '',
+  idpIssuer: '',
+  logoutURL: '',
   issuer: '',
   certificate: '',
   audience: '',

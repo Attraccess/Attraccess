@@ -5,6 +5,7 @@ import { PlusIcon, ArrowLeft, CalendarClockIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ResourceMaintenance,
+  ResourceType,
   useResourceMaintenancesServiceCanManageMaintenance,
   useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules,
   useResourceMaintenancesServiceFindMaintenances,
@@ -136,6 +137,7 @@ export function MaintenanceHubPage() {
 
       <ScheduleFormDrawer
         resourceId={resourceId}
+        supportsOperatingDuration={resource.type === ResourceType.MACHINE}
         scheduleId={drawerScheduleId}
         isOpen={drawerOpen}
         onClose={closeDrawer}

@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button, DrawerBody, DrawerHeader } from '@heroui/react';
+import { Button, DrawerBody, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { Navigate } from 'react-router-dom';
 import { Plus, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -49,7 +49,7 @@ export function MqttServersPage() {
       >
         <DrawerHeader>
           <div className="flex w-full items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold">{t('addNewMqttServer')}</h2>
+            <DrawerHeading className="text-lg font-semibold">{t('addNewMqttServer')}</DrawerHeading>
             <Button isIconOnly variant="ghost" aria-label={t('close')} onPress={close}>
               <X size={16} />
             </Button>

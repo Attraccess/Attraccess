@@ -1,9 +1,5 @@
-import { useCallback, useState } from 'react';
-import {
-  FormResponseDto,
-  FormSubmissionRequestDto,
-  ResourceFormsService,
-} from '@attraccess/react-query-client';
+import { useCallback, useRef, useState } from 'react';
+import { FormResponseDto, FormSubmissionRequestDto, ResourceFormsService } from '@attraccess/react-query-client';
 import { ResourceFormAction } from '../../details/forms/types';
 import { ResourceFormsModal } from '../components/ResourceFormsModal';
 
@@ -16,6 +12,17 @@ interface PendingRequest {
 
 export function useResourceFormsSubmission(resourceId: number) {
   const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
+  // Retain answers until the enclosing usage operation succeeds or the user cancels.
+  const drafts = useRef<{
+    resourceId: number;
+    values: Partial<Record<ResourceFormAction, FormSubmissionRequestDto[]>>;
+  }>({
+    resourceId,
+    values: {},
+  });
+  const clearFormsDraft = useCallback(() => {
+    drafts.current = { resourceId, values: {} };
+  }, [resourceId]);
 
   const requestForms = useCallback(
     async (action: ResourceFormAction): Promise<FormSubmissionRequestDto[]> => {
@@ -37,13 +44,16 @@ export function useResourceFormsSubmission(resourceId: number) {
         return;
       }
       if (result) {
+        if (drafts.current.resourceId !== resourceId) clearFormsDraft();
+        drafts.current.values[pendingRequest.action] = result;
         pendingRequest.resolve(result);
       } else {
+        clearFormsDraft();
         pendingRequest.reject(new Error('user_cancelled_forms'));
       }
       setPendingRequest(null);
     },
-    [pendingRequest],
+    [pendingRequest, resourceId, clearFormsDraft],
   );
 
   const modal = (
@@ -51,11 +61,15 @@ export function useResourceFormsSubmission(resourceId: number) {
       isOpen={!!pendingRequest}
       action={pendingRequest?.action ?? 'start'}
       forms={pendingRequest?.forms ?? []}
+      initialSubmissions={
+        pendingRequest && drafts.current.resourceId === resourceId
+          ? drafts.current.values[pendingRequest.action]
+          : undefined
+      }
       onSubmit={(values) => handleClose(values)}
       onCancel={() => handleClose()}
     />
   );
 
-  return { requestForms, modal };
+  return { requestForms, modal, clearFormsDraft };
 }
-

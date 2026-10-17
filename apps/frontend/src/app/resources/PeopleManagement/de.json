@@ -1,6 +1,9 @@
 {
   "title": "Personen & Berechtigungen",
-  "subtitle": "Einweiser, Wartende und Einweisungen für diese Ressource verwalten",
+  "subtitle": {
+    "resource": "Einweiser, Wartende und Einweisungen für diese Ressource verwalten",
+    "group": "Einweiser, Wartende und Einweisungen für diese Gruppe verwalten"
+  },
   "addPerson": "Person hinzufügen",
   "addOptions": {
     "introducer": "Als Einweiser ernennen",
@@ -33,7 +36,8 @@
     "revokeIntroducer": "Einweiser-Status entziehen",
     "revokeMaintainer": "Wartenden-Status entziehen",
     "revokeIntroduction": "Einweisung widerrufen",
-    "grantIntroduction": "Einweisung erneut gewähren"
+    "grantIntroduction": "Einweisung erneut gewähren",
+    "revokeDirectIntroduction": "Direkte Einweisung widerrufen"
   },
   "addModal": {
     "title": {
@@ -91,5 +95,9 @@
       "title": "Fehler beim Widerrufen der Einweisung",
       "description": "{{error}}"
     }
+  },
+  "sources": {
+    "direct": "Direkte Einweisung",
+    "group": "Eingewiesen über {{{group}}}"
   }
 }

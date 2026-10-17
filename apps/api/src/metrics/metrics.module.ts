@@ -16,6 +16,7 @@ import {
   EXTERNAL_METRICS,
   SSE_METRICS,
   FLOW_METRICS,
+  OPERATING_METRICS,
 } from './definitions/tokens';
 import { createHttpMetrics } from './definitions/http.metrics';
 import { createWsMetrics } from './definitions/ws.metrics';
@@ -24,6 +25,7 @@ import { createDbMetrics } from './definitions/db.metrics';
 import { createExternalMetrics } from './definitions/external.metrics';
 import { createSseMetrics } from './definitions/sse.metrics';
 import { createFlowMetrics } from './definitions/flow.metrics';
+import { createOperatingMetrics } from './definitions/operating.metrics';
 import { HttpMetricsInterceptor } from './instrumentation/http/http.interceptor';
 import { WsMetricsInterceptor } from './instrumentation/ws/ws.interceptor';
 import { CronTimer } from './instrumentation/cron/cron.helper';
@@ -31,6 +33,7 @@ import { DbMetricsInstrumentation } from './instrumentation/db/db.instrumentatio
 import { ExternalCallTimer } from './instrumentation/external/external.helper';
 import { SseInstrumentation } from './instrumentation/sse/sse.helper';
 import { FlowTimer } from './instrumentation/flow/flow.helper';
+import { OperatingMetricsRecorder } from './instrumentation/operating/operating.helper';
 
 const definitionProviders = [
   { provide: HTTP_METRICS, useFactory: (m: MetricsService) => createHttpMetrics(m.registry), inject: [MetricsService] },
@@ -40,6 +43,7 @@ const definitionProviders = [
   { provide: EXTERNAL_METRICS, useFactory: (m: MetricsService) => createExternalMetrics(m.registry), inject: [MetricsService] },
   { provide: SSE_METRICS, useFactory: (m: MetricsService) => createSseMetrics(m.registry), inject: [MetricsService] },
   { provide: FLOW_METRICS, useFactory: (m: MetricsService) => createFlowMetrics(m.registry), inject: [MetricsService] },
+  { provide: OPERATING_METRICS, useFactory: (m: MetricsService) => createOperatingMetrics(m.registry), inject: [MetricsService] },
 ];
 
 @Global()
@@ -58,6 +62,7 @@ const definitionProviders = [
     ExternalCallTimer,
     SseInstrumentation,
     FlowTimer,
+    OperatingMetricsRecorder,
     WsMetricsInterceptor,
     ...definitionProviders,
     {
@@ -76,6 +81,7 @@ const definitionProviders = [
     ExternalCallTimer,
     SseInstrumentation,
     FlowTimer,
+    OperatingMetricsRecorder,
     WsMetricsInterceptor,
     HTTP_METRICS,
     WS_METRICS,
@@ -84,6 +90,7 @@ const definitionProviders = [
     EXTERNAL_METRICS,
     SSE_METRICS,
     FLOW_METRICS,
+    OPERATING_METRICS,
     METRICS_TOGGLE_INVALIDATOR,
   ],
 })

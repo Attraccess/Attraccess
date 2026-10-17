@@ -1,6 +1,8 @@
 {
   "title": "Settings",
   "subtitle": "Manage system configuration",
+  "search": "Find a setting…",
+  "noResults": "No matching settings",
   "navLabel": "Settings sections",
   "backToSettings": "Settings",
   "groups": {

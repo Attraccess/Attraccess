@@ -3,7 +3,7 @@
 #include <functional>
 
 #include <string>
-#include "../../screens/IScreen.hpp"
+#include "../IScreen.hpp"
 #include "../../../settings/settings.hpp"
 #include "../../shared/pinInput/pinInputPage.hpp"
 #include "../../shared/powerOff/powerOffButton.hpp"
@@ -33,13 +33,16 @@ public:
     void setOnResetCertificateCallback(std::function<void()> onResetCertificateCallback);
 #ifdef HAS_POWER_BUTTON
     // Application wires this to IOExpander::powerOff(). Invoked after the user
-    // confirms the power-off dialog on the "Geraet" tab.
+    // confirms the power-off dialog on the "Gerät" tab.
     void setOnPowerOffCallback(std::function<void()> cb) { onPowerOffCallback = cb; }
 #endif
     void disablePinLock();
     void enablePinLock();
 
 private:
+    void createWifiTab(const NetworkConfig &networkConfig);
+    void createApiTab(const AttraccessApiConfig &apiConfig);
+    void createDeviceTab(const DeviceConfig &deviceConfig);
     std::function<void(const ConnectionConfig &)> onSaveCallback;
     std::function<void()> onResetCertificateCallback;
 #ifdef HAS_POWER_BUTTON

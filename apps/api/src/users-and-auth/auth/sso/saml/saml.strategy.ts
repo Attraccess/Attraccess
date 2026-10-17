@@ -1,30 +1,46 @@
-import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import {
-  Strategy,
-  Profile as SamlProfile,
-  PassportSamlConfig,
-  MultiSamlStrategy,
-} from '@node-saml/passport-saml';
+import { SsoSessionRequest } from '../sso-session-request';
+import { DOMParser } from '@xmldom/xmldom';
+import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+
 import { ModuleRef } from '@nestjs/core';
-import { UsersService } from '../../../users/users.service';
-import { SSOProviderSAMLConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
-import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
-import { EncryptionService } from '../../../../encryption/encryption.service';
-import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
+
+import { PassportSamlConfig, Profile as SamlProfile, Strategy, MultiSamlStrategy } from '@node-saml/passport-saml';
+
 import { MetricsService } from '../../../../metrics/metrics.service';
+
+import { UsersService } from '../../../users/users.service';
+
+import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
+
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-import { resolveSsoRoleAssignments } from '../permission-mapping';
+
+import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
+
+import { randomUUID } from 'node:crypto';
+
+import { SsoAuditService } from '../../../../audit/sso-audit.service';
+
 import { RbacService } from '../../../rbac/rbac.service';
 
-type StrategyCtor = new (...args: unknown[]) => Strategy;
-type SamlOptionsCallback = (error: Error | null, samlOptions?: PassportSamlConfig) => void;
+import { resolveSsoRoleAssignments } from '../permission-mapping';
+
+import { ssoAuditSnapshot } from '../audit/provider-audit';
+
+import { SSOService } from '../sso.service';
+
+import { EncryptionService } from '../../../../encryption/encryption.service';
+
+import { PassportStrategy } from '@nestjs/passport';
+
+export type StrategyCtor = new (...args: unknown[]) => Strategy;
+
+export type SamlOptionsCallback = (error: Error | null, samlOptions?: PassportSamlConfig) => void;
 
 @Injectable()
 export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unknown as StrategyCtor, 'sso-saml') {
-  private readonly logger = new Logger(SSOSamlStrategy.name);
-
-  constructor(private readonly moduleRef: ModuleRef) {
+  constructor(protected readonly moduleRef: ModuleRef) {
     const bootstrapLogger = new Logger(SSOSamlStrategy.name);
     const getSamlOptions = (req: SSOSamlRequest, done: SamlOptionsCallback) => {
       const requestOptions = req?.ssoSamlOptions;
@@ -49,7 +65,9 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     } as unknown as PassportSamlConfig);
   }
 
-  private recordFailure(error: unknown): void {
+  protected readonly logger = new Logger(SSOSamlStrategy.name);
+
+  protected recordFailure(error: unknown): void {
     try {
       const metricsService = this.moduleRef.get(MetricsService, { strict: false });
       recordSsoLoginFailure(metricsService, SSOProviderType.SAML, classifySsoFailureReason(error), this.logger);
@@ -59,126 +77,6 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
         `Failed to resolve MetricsService for SSO login failure metric: ${metricsError instanceof Error ? metricsError.message : String(metricsError)}`,
       );
     }
-  }
-
-  private static toPem(cert: string): string {
-    const sanitized = cert
-      .replace(/-----BEGIN CERTIFICATE-----/g, '')
-      .replace(/-----END CERTIFICATE-----/g, '')
-      .trim();
-    const chunked = sanitized.match(/.{1,64}/g)?.join('\n') ?? sanitized;
-    return `-----BEGIN CERTIFICATE-----\n${chunked}\n-----END CERTIFICATE-----`;
-  }
-
-  private static decryptSigningKey(
-    moduleRef: ModuleRef,
-    encrypted?: string | null,
-    logger?: Logger,
-  ): string | undefined {
-    if (!encrypted) {
-      return undefined;
-    }
-
-    try {
-      const encryptionService = moduleRef.get(EncryptionService, { strict: false });
-      if (!encryptionService) {
-        logger?.error('EncryptionService is not available; cannot decrypt SAML signing key');
-        return undefined;
-      }
-      return encryptionService.decrypt(encrypted);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : 'Unknown error';
-      logger?.error(`Failed to decrypt SAML signing key: ${reason}`);
-      return undefined;
-    }
-  }
-
-  private static buildPassportConfig(
-    moduleRef: ModuleRef,
-    requestOptions: SSOSamlRequestOptions,
-    logger: Logger,
-  ): PassportSamlConfig {
-    const config = requestOptions.samlConfiguration;
-    const signingPrivateKey = SSOSamlStrategy.decryptSigningKey(moduleRef, config.spSigningKeyEncrypted, logger);
-    const signingCertificatePem = config.spSigningCertificate
-      ? SSOSamlStrategy.toPem(config.spSigningCertificate)
-      : undefined;
-
-    if (config.signRequest && (!signingPrivateKey || !signingCertificatePem)) {
-      logger.warn(
-        'SAML request signing is enabled but signing materials are missing. AuthnRequests will be sent unsigned.',
-      );
-    }
-
-    return {
-      entryPoint: config.entryPoint,
-      issuer: config.issuer,
-      callbackUrl: requestOptions.callbackUrl,
-      idpCert: SSOSamlStrategy.toPem(config.certificate),
-      audience: config.audience ?? undefined,
-      wantAssertionsSigned: config.wantAssertionsSigned,
-      wantAuthnResponseSigned: config.wantAuthnResponseSigned,
-      forceAuthn: config.forceAuthn,
-      identifierFormat: null,
-      disableRequestedAuthnContext: false,
-      privateKey: signingPrivateKey,
-    };
-  }
-
-  private resolveEmail(profile: SamlProfile, config: SSOProviderSAMLConfiguration): string | undefined {
-    const baseCandidates = [
-      'email',
-      'mail',
-      'Email',
-      'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
-      'urn:oid:1.2.840.113549.1.9.1',
-    ];
-    const customCandidates = Array.isArray(config.emailAttributeKeys)
-      ? config.emailAttributeKeys.filter(
-          (candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0,
-        )
-      : [];
-    const candidates = [...customCandidates, ...baseCandidates];
-    for (const key of candidates) {
-      const raw = (profile as Record<string, unknown>)[key];
-      if (typeof raw === 'string' && raw.trim().length > 0) {
-        return raw;
-      }
-      if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') {
-        return raw[0];
-      }
-    }
-    if (Array.isArray((profile as unknown as { emails?: string[] }).emails)) {
-      const [first] = (profile as unknown as { emails?: string[] }).emails ?? [];
-      if (first) return first;
-    }
-
-    const attributes = (profile as Record<string, unknown>).attributes as Record<string, unknown> | undefined;
-    if (attributes) {
-      for (const key of candidates) {
-        const attributeValue = attributes[key];
-        if (typeof attributeValue === 'string' && attributeValue.trim().length > 0) {
-          return attributeValue;
-        }
-        if (Array.isArray(attributeValue) && attributeValue.length > 0 && typeof attributeValue[0] === 'string') {
-          return attributeValue[0];
-        }
-      }
-    }
-
-    this.logger.debug('No email attribute could be resolved from the SAML assertion', profile);
-    return undefined;
-  }
-
-  private resolveDisplayName(profile: SamlProfile, fallbackEmail: string): string {
-    const candidates = ['displayName', 'cn', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name', 'name'];
-    for (const key of candidates) {
-      const value = (profile as Record<string, unknown>)[key];
-      if (typeof value === 'string' && value.trim().length > 0) {
-        return value;
-      }
-    }
-    return fallbackEmail;
   }
 
   async validate(req: SSOSamlRequest, profile: SamlProfile): Promise<User> {
@@ -199,6 +97,33 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       this.recordFailure(error);
       throw error;
     }
+
+    const assertionXml =
+      typeof profile.getAssertionXml === 'function' ? (profile.getAssertionXml() as string) : undefined;
+    const assertion = assertionXml ? new DOMParser().parseFromString(assertionXml, 'text/xml') : undefined;
+    const providerIssuedAt = Date.parse(assertion?.documentElement.getAttribute('IssueInstant') ?? '');
+    const indexes = assertion
+      ? Array.from(assertion.getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'AuthnStatement'))
+          .map((node) => node.getAttribute('SessionIndex'))
+          .filter((index): index is string => !!index)
+      : [];
+    (req as SsoSessionRequest).ssoSessionContext = {
+      protocol: 'SAML',
+      ...(Number.isFinite(providerIssuedAt) ? { providerIssuedAt } : {}),
+      providerId,
+      issuer: typeof profile.issuer === 'string' ? profile.issuer : undefined,
+      nameID: samlUserId,
+      ...(typeof profile.nameIDFormat === 'string' && profile.nameIDFormat
+        ? { nameIDFormat: profile.nameIDFormat }
+        : {}),
+      ...(typeof profile.nameQualifier === 'string' && profile.nameQualifier
+        ? { nameQualifier: profile.nameQualifier }
+        : {}),
+      ...(typeof profile.spNameQualifier === 'string' && profile.spNameQualifier
+        ? { spNameQualifier: profile.spNameQualifier }
+        : {}),
+      sessionIndexes: indexes.length ? indexes : typeof profile.sessionIndex === 'string' ? [profile.sessionIndex] : [],
+    };
 
     const usersService = await this.moduleRef.get(UsersService);
     const email = this.resolveEmail(profile, config);
@@ -251,14 +176,19 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       throw error;
     }
 
+    await this.recordProvisioningAudit(user.id, config.ssoProviderId, 'user_created');
     return await this.syncPermissionsFromClaims(user, profile, config);
   }
 
-  private getPermissionClaimValues(profile: SamlProfile): unknown[] {
+  protected getPermissionClaimValues(profile: SamlProfile): unknown[] {
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
     const candidateKeys = [
-      'roles', 'role', 'groups', 'group', 'memberof',
+      'roles',
+      'role',
+      'groups',
+      'group',
+      'memberof',
       // Azure AD / ADFS URI-style claim names
       'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
       'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
@@ -286,7 +216,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return values;
   }
 
-  private resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
+  protected resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
     const roleNames: string[] = [];
     for (const value of claimValues) {
       if (Array.isArray(value)) {
@@ -300,7 +230,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return roleNames;
   }
 
-  private async syncPermissionsFromClaims(
+  protected async syncPermissionsFromClaims(
     user: User,
     profile: SamlProfile,
     config: SSOProviderSAMLConfiguration,
@@ -319,14 +249,159 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     // a wholly absent attribute (IdP misconfiguration, transient omission) must not silently
     // revoke anything. Intentionally not gated on a configured mapping: a cleared mapping must
     // still sync (with zero assignments) so roles granted under the old mapping get revoked.
+    let changes: { added: string[]; removed: string[]; updated: string[] } | undefined;
     if (rbacService && claimValues.length > 0) {
-      await rbacService.syncSsoRoles(
-        user.id,
-        roleAssignments,
-        SSOProviderType.SAML,
-        config.ssoProviderId,
+      changes = await rbacService.syncSsoRoles(user.id, roleAssignments, SSOProviderType.SAML, config.ssoProviderId);
+    }
+    if (changes) await this.recordProvisioningAudit(user.id, config.ssoProviderId, 'permissions_synced', changes);
+    return user;
+  }
+
+  protected async recordProvisioningAudit(
+    userId: number,
+    providerId: number,
+    action: 'user_created' | 'permissions_synced',
+    changes?: { added: string[]; removed: string[]; updated: string[] },
+  ): Promise<void> {
+    try {
+      const ssoService = this.moduleRef.get(SSOService, { strict: false });
+      const audit = this.moduleRef.get(SsoAuditService, { strict: false });
+      const provider = await ssoService?.getProviderByTypeAndIdWithConfiguration(SSOProviderType.SAML, providerId);
+      if (!audit || !provider) return;
+      const details = { provider: ssoAuditSnapshot(provider) };
+      await audit.record({
+        action: `sso.provisioning.${action}`,
+        operationId: randomUUID(),
+        actorId: null,
+        authenticationMethod: null,
+        subject: { type: 'user', id: userId },
+        details: { ...details, changes: JSON.stringify(action === 'user_created' ? { userCreated: true } : changes) },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record committed SAML provisioning audit: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    return user;
+  }
+
+  protected static toPem(cert: string): string {
+    const sanitized = cert
+      .replace(/-----BEGIN CERTIFICATE-----/g, '')
+      .replace(/-----END CERTIFICATE-----/g, '')
+      .trim();
+    const chunked = sanitized.match(/.{1,64}/g)?.join('\n') ?? sanitized;
+    return `-----BEGIN CERTIFICATE-----\n${chunked}\n-----END CERTIFICATE-----`;
+  }
+
+  protected static decryptSigningKey(
+    moduleRef: ModuleRef,
+    encrypted?: string | null,
+    logger?: Logger,
+  ): string | undefined {
+    if (!encrypted) {
+      return undefined;
+    }
+
+    try {
+      const encryptionService = moduleRef.get(EncryptionService, { strict: false });
+      if (!encryptionService) {
+        logger?.error('EncryptionService is not available; cannot decrypt SAML signing key');
+        return undefined;
+      }
+      return encryptionService.decrypt(encrypted);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown error';
+      logger?.error(`Failed to decrypt SAML signing key: ${reason}`);
+      return undefined;
+    }
+  }
+
+  static buildPassportConfig(
+    moduleRef: ModuleRef,
+    requestOptions: SSOSamlRequestOptions,
+    logger: Logger,
+  ): PassportSamlConfig {
+    const config = requestOptions.samlConfiguration;
+    const signingPrivateKey = SSOSamlStrategy.decryptSigningKey(moduleRef, config.spSigningKeyEncrypted, logger);
+    const signingCertificatePem = config.spSigningCertificate
+      ? SSOSamlStrategy.toPem(config.spSigningCertificate)
+      : undefined;
+
+    if (config.signRequest && (!signingPrivateKey || !signingCertificatePem)) {
+      logger.warn(
+        'SAML request signing is enabled but signing materials are missing. AuthnRequests will be sent unsigned.',
+      );
+    }
+
+    return {
+      entryPoint: config.entryPoint,
+      issuer: config.issuer,
+      idpIssuer: config.idpIssuer || undefined,
+      callbackUrl: requestOptions.callbackUrl,
+      idpCert: SSOSamlStrategy.toPem(config.certificate),
+      audience: config.audience ?? undefined,
+      wantAssertionsSigned: config.wantAssertionsSigned,
+      wantAuthnResponseSigned: config.wantAuthnResponseSigned,
+      forceAuthn: config.forceAuthn,
+      identifierFormat: null,
+      disableRequestedAuthnContext: false,
+      privateKey: signingPrivateKey,
+    };
+  }
+
+  protected resolveEmail(profile: SamlProfile, config: SSOProviderSAMLConfiguration): string | undefined {
+    const baseCandidates = [
+      'email',
+      'mail',
+      'Email',
+      'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+      'urn:oid:1.2.840.113549.1.9.1',
+    ];
+    const customCandidates = Array.isArray(config.emailAttributeKeys)
+      ? config.emailAttributeKeys.filter(
+          (candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0,
+        )
+      : [];
+    const candidates = [...customCandidates, ...baseCandidates];
+    for (const key of candidates) {
+      const raw = (profile as Record<string, unknown>)[key];
+      if (typeof raw === 'string' && raw.trim().length > 0) {
+        return raw;
+      }
+      if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') {
+        return raw[0];
+      }
+    }
+    if (Array.isArray((profile as unknown as { emails?: string[] }).emails)) {
+      const [first] = (profile as unknown as { emails?: string[] }).emails ?? [];
+      if (first) return first;
+    }
+
+    const attributes = (profile as Record<string, unknown>).attributes as Record<string, unknown> | undefined;
+    if (attributes) {
+      for (const key of candidates) {
+        const attributeValue = attributes[key];
+        if (typeof attributeValue === 'string' && attributeValue.trim().length > 0) {
+          return attributeValue;
+        }
+        if (Array.isArray(attributeValue) && attributeValue.length > 0 && typeof attributeValue[0] === 'string') {
+          return attributeValue[0];
+        }
+      }
+    }
+
+    this.logger.debug('No email attribute could be resolved from the SAML assertion');
+    return undefined;
+  }
+
+  protected resolveDisplayName(profile: SamlProfile, fallbackEmail: string): string {
+    const candidates = ['displayName', 'cn', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name', 'name'];
+    for (const key of candidates) {
+      const value = (profile as Record<string, unknown>)[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value;
+      }
+    }
+    return fallbackEmail;
   }
 }

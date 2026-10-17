@@ -64,7 +64,10 @@ export const SetupInstructionsSection = ({ isSamlProvider, setupUrls, onCopy }: 
         <div className="flex flex-col gap-1">
           <dt className="text-sm font-medium">{isSamlProvider ? t('samlAcsUrl') : t('oidcRedirectUri')}</dt>
           <dd className="flex items-center gap-2 rounded-md border border-default-200 bg-default-50 px-3 py-2">
-            <code className="flex-1 text-xs break-all font-mono text-default-700" data-cy="sso-provider-form-callback-url">
+            <code
+              className="flex-1 text-xs break-all font-mono text-default-700"
+              data-cy="sso-provider-form-callback-url"
+            >
               {hasSetupUrls ? (isSamlProvider ? samlCallbackUrl : oidcCallbackUrl) : t('setupUrlPending')}
             </code>
             {hasSetupUrls && (
@@ -90,6 +93,31 @@ export const SetupInstructionsSection = ({ isSamlProvider, setupUrls, onCopy }: 
               : t('setupUrlPending')}
           </p>
         </div>
+        {(isSamlProvider
+          ? (['samlSloUrl'] as const)
+          : (['postLogoutUrl', 'backchannelLogoutUrl', 'frontchannelLogoutUrl'] as const)
+        ).map((key) => (
+          <div key={key} className="flex flex-col gap-1">
+            <dt className="text-sm font-medium">{t(key)}</dt>
+            <dd className="flex items-center gap-2 rounded-md border border-default-200 bg-default-50 px-3 py-2">
+              <code className="flex-1 text-xs break-all font-mono">{setupUrls[key] || t('setupUrlPending')}</code>
+              {setupUrls[key] && (
+                <Button
+                  variant="ghost"
+                  isIconOnly
+                  size="sm"
+                  aria-label={`${t('copy')} ${t(key)}`}
+                  onPress={() => onCopy(setupUrls[key])}
+                >
+                  <Copy size={16} />
+                </Button>
+              )}
+            </dd>
+          </div>
+        ))}
+        <p className="text-sm text-muted">
+          {t(isSamlProvider ? 'samlLogoutRegistrationHint' : 'logoutRegistrationHint')}
+        </p>
       </dl>
 
       <div className="flex flex-wrap gap-3 text-xs">

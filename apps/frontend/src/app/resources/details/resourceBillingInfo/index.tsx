@@ -1,116 +1,42 @@
-import { Button, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton } from "@heroui/react";
+import { Button, cn, Skeleton } from '@heroui/react';
 import { CreditCard, Edit2Icon } from 'lucide-react';
-import {
-  useBillingServiceGetBillingBalance,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetResourceBillingConfiguration,
-  useLicenseServiceGetLicenseInformation,
-  useResourcesServiceGetOneResourceById,
-} from '@attraccess/react-query-client';
-import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import de from './de.json';
-import en from './en.json';
 import { ResourceBillingInfoEditor } from './editor';
-import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '../../../../hooks/useAuth';
+import { Fragment } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { FlatSection } from '../../../../components/flatSection';
-
-interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
-  resourceId: number;
-  onExampleAmountChange?: (amount: number) => void;
-  /** Reports whether the component renders any content. Lets parents reclaim layout space when hidden. */
-  onVisibilityChange?: (visible: boolean) => void;
-}
+import { LiveSessionBilling } from './metering/LiveSessionBilling';
+import { EnergySettlementNotices, MeterSetupNotice } from './metering/MeterNotices';
+import { Props } from './useBillingDetails';
+import { useBillingDetails } from './useBillingDetails';
+import { BillingDetails } from './BillingDetails';
 
 export function ResourceBillingInfo(props: Props) {
-  const { resourceId, onExampleAmountChange, onVisibilityChange, className, ...htmlProps } = props;
-
-  const { t } = useTranslations({ en, de });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
-  const { data: resourceBillingConfiguration } = useBillingServiceGetResourceBillingConfiguration({ resourceId });
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-
-  const { data: license } = useLicenseServiceGetLicenseInformation();
-  const formatNumber = useNumberFormatter();
-
-  const { user: currentUser, hasPermission } = useAuth();
-  const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 }, undefined, {
-    refetchInterval: 5000,
-  });
-
-  const adjustedBalance = useMemo(() => {
-    if (!configuration) {
-      return 0;
-    }
-
-    return dbCurrencyToUserCurrency(balance?.value ?? 0, configuration.minorUnit);
-  }, [balance, configuration]);
-
-  const creditsPerUsage = useMemo(() => {
-    if (!configuration) {
-      return 0;
-    }
-
-    return dbCurrencyToUserCurrency(
-      resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
-      configuration.minorUnit,
-    );
-  }, [resourceBillingConfiguration, configuration]);
-
-  const creditsPerMinute = useMemo(() => {
-    if (!configuration) {
-      return 0;
-    }
-
-    return dbCurrencyToUserCurrency(
-      resourceBillingConfiguration?.configuration.creditsPerMinute ?? 0,
-      configuration.minorUnit,
-    );
-  }, [resourceBillingConfiguration, configuration]);
-
-  const isFree = useMemo(() => {
-    return (
-      creditsPerUsage === 0 && creditsPerMinute === 0 && resourceBillingConfiguration?.additionalItems.length === 0
-    );
-  }, [creditsPerUsage, creditsPerMinute, resourceBillingConfiguration]);
-
-  const [exampleMinutes, setExampleMinutes] = useState(10);
-
-  const exampleCost = useMemo(() => {
-    if (!resourceBillingConfiguration || !configuration) {
-      return 0;
-    }
-
-    const customFlowBillingItemsCost = dbCurrencyToUserCurrency(
-      resourceBillingConfiguration.additionalItems.reduce((acc, item) => {
-        return acc + item.unitPrice * item.quantity;
-      }, 0),
-      configuration.minorUnit,
-    );
-
-    return creditsPerUsage + creditsPerMinute * exampleMinutes + customFlowBillingItemsCost;
-  }, [creditsPerUsage, creditsPerMinute, exampleMinutes, resourceBillingConfiguration, configuration]);
-
-  const exampleResultingBalance = useMemo(() => {
-    return adjustedBalance - exampleCost;
-  }, [adjustedBalance, exampleCost]);
-
-  useEffect(() => {
-    onExampleAmountChange?.(exampleCost);
-  }, [exampleCost, onExampleAmountChange]);
-
-  const isVisible = useMemo(() => {
-    if (!license?.modules.includes('billing')) return false;
-    if (!resourceBillingConfiguration) return false;
-    if (resource?.type !== 'machine') return false;
-    if (isFree && !hasPermission('billing.manage')) return false;
-    return true;
-  }, [license, resourceBillingConfiguration, resource, isFree, hasPermission]);
-
-  useEffect(() => {
-    onVisibilityChange?.(isVisible);
-  }, [isVisible, onVisibilityChange]);
+  const {
+    resourceId,
+    className,
+    htmlProps,
+    t,
+    configuration,
+    resourceBillingConfiguration,
+    resource,
+    license,
+    formatNumber,
+    formatCredits,
+    hasPermission,
+    adjustedBalance,
+    creditsPerUsage,
+    creditsPerMinute,
+    creditsPerOperatingMinute,
+    meters,
+    hasMeterSessions,
+    isFree,
+    exampleSessionMinutes,
+    setExampleSessionMinutes,
+    exampleOperatingMinutes,
+    setExampleOperatingMinutes,
+    exampleCost,
+    exampleResultingBalance,
+  } = useBillingDetails(props);
 
   if (!license?.modules.includes('billing')) {
     return null;
@@ -128,12 +54,12 @@ export function ResourceBillingInfo(props: Props) {
     return <Skeleton className="h-10 w-full" />;
   }
 
-  if (isFree && !hasPermission('billing.manage')) {
+  if (isFree && !hasMeterSessions && !hasPermission('billing.manage')) {
     return null;
   }
 
-  const dlClass = 'grid grid-cols-[1fr_max-content] gap-x-4 gap-y-2 text-sm items-center';
-  const valueClass = 'text-right whitespace-nowrap';
+  const dlClass = 'grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-center [&>dt]:wrap-anywhere';
+  const valueClass = 'text-right min-w-0 wrap-anywhere';
 
   const billingContent = (
     <div className="flex flex-col gap-3">
@@ -159,6 +85,30 @@ export function ResourceBillingInfo(props: Props) {
             currency: configuration.currency,
           })}
         </dd>
+        <dt>{t('perOperatingMinute.label')}</dt>
+        <dd className={cn(valueClass, 'text-warning')}>
+          {t('billingValue', {
+            credits: formatNumber(creditsPerOperatingMinute),
+            currency: configuration.currency,
+          })}
+        </dd>
+        {meters
+          .filter((meter) => meter.creditsPerUnit > 0)
+          .map((meter) => (
+            <Fragment key={meter.id}>
+              <dt>
+                {meter.name}
+                <br />
+                <small>{t('perUnit')}</small>
+              </dt>
+              <dd className={cn(valueClass, 'text-warning')}>
+                {t('billingValue', {
+                  credits: formatCredits(meter.creditsPerUnit),
+                  currency: configuration.currency,
+                })}
+              </dd>
+            </Fragment>
+          ))}
         {resourceBillingConfiguration.additionalItems.map((item) => (
           <Fragment key={JSON.stringify(item)}>
             <dt>{item.name}</dt>
@@ -176,27 +126,33 @@ export function ResourceBillingInfo(props: Props) {
         ))}
       </dl>
 
+      <MeterSetupNotice resourceId={resourceId} />
+      <EnergySettlementNotices resourceId={resourceId} />
+
+      <div className="border-t border-divider pt-3 empty:hidden">
+        <LiveSessionBilling
+          resourceId={resourceId}
+          currency={configuration.currency}
+          minorUnit={configuration.minorUnit}
+          dlClass={dlClass}
+          valueClass={valueClass}
+        />
+      </div>
+
       <dl className={cn(dlClass, 'border-t border-divider pt-3')}>
-        <dt>
-          <NumberField
-            aria-label={t('example.label', { minutes: exampleMinutes })}
-            value={exampleMinutes}
-            onChange={(value) => setExampleMinutes(value)}
-            minValue={0}
-            defaultValue={10}
-          >
-            <NumberFieldGroup>
-              <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-              <NumberFieldInput />
-              <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-            </NumberFieldGroup>
-          </NumberField>
-        </dt>
+        <BillingDetails
+          {...{
+            t,
+            exampleSessionMinutes,
+            setExampleSessionMinutes,
+            setExampleOperatingMinutes,
+            exampleOperatingMinutes,
+          }}
+        />
         <dd className={valueClass}>
           {t('billingValue', {
             credits: formatNumber(exampleCost),
             currency: configuration.currency,
-            minutes: exampleMinutes,
           })}
         </dd>
         <dt className="font-medium">{t('exampleResultingBalance.label')}</dt>
@@ -220,7 +176,6 @@ export function ResourceBillingInfo(props: Props) {
     <ResourceBillingInfoEditor resourceId={resourceId}>
       {(onOpen) => (
         <Button variant="primary" isIconOnly onPress={onOpen} aria-label={t('actions.edit')}>
-
           <Edit2Icon size={12} />
         </Button>
       )}

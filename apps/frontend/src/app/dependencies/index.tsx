@@ -89,6 +89,7 @@ export function Dependencies() {
 
   const { data: dependencies, status: fetchStatus } = useQuery({
     queryKey: ['dependencies'],
+    // eslint-disable-next-line no-restricted-syntax -- This is a static build artifact, not an API operation.
     queryFn: () => fetch('/dependencies.json').then((res) => res.json() as Promise<Dependency[]>),
   });
 

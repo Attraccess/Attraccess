@@ -110,5 +110,18 @@
   },
   "table": {
     "ariaLabel": "SSO-Anbieter"
-  }
+  },
+  "endSessionURL": "End-Session-URL (optional)",
+  "jwksURL": "JWKS-URL (optional)",
+  "signingAlgorithms": "Erlaubte Signaturalgorithmen",
+  "oidcLogoutHint": "Leere Endpunkte verwenden die vertrauenswürdige Issuer-Discovery. Der Standardalgorithmus ist RS256. Außer bei lokaler Entwicklung ist HTTPS erforderlich.",
+  "idpIssuer": "Entity-ID des Identitätsanbieters",
+  "logoutURL": "Abmelde-URL des Identitätsanbieters (optional)",
+  "samlLogoutHint": "Single Logout erfordert die Entity-ID und Abmelde-URL des Anbieters sowie Signaturzertifikat und privaten Schlüssel des Service Providers. Jede Abmeldenachricht muss signiert sein.",
+  "postLogoutUrl": "Weiterleitungs-URI nach Abmeldung",
+  "backchannelLogoutUrl": "Back-Channel-Abmelde-URI",
+  "frontchannelLogoutUrl": "Front-Channel-Abmelde-URI",
+  "samlSloUrl": "Single-Logout-Service-URL",
+  "logoutRegistrationHint": "Registrieren Sie diese exakten URLs beim Anbieter. Aktivieren Sie signierte Back-Channel-Nachrichten für zuverlässige Zustellung. Front-Channel-Nachrichten mit Sitzungs-ID werden unterstützt; Browser-Datenschutzeinstellungen können reine Cookie-Nachrichten blockieren.",
+  "samlLogoutRegistrationHint": "Registrieren Sie diese URL für HTTP-Redirect und HTTP-POST Single Logout. Attraccess sendet signierte Redirect-Nachrichten. Hinterlegen Sie das Signaturzertifikat des Anbieters und vertrauen Sie dem Attraccess-Signaturzertifikat."
 }

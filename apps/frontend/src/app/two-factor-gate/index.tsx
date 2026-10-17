@@ -18,8 +18,8 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
   }
 
   return (
-    <div className="flex w-full justify-center px-4 py-8">
-      <section className="max-w-lg w-full flex flex-col gap-6">
+    <div className="flex h-[var(--vvh,100dvh)] w-full flex-col overflow-y-auto px-4 py-8">
+      <section className="my-auto mx-auto max-w-lg w-full flex flex-col gap-6">
         <header className="flex flex-col gap-2 border-b border-separator pb-4">
           <h2 className="text-2xl font-bold">{t('title')}</h2>
           <p className="text-sm text-muted">

@@ -24,6 +24,10 @@ Konfigurationen werden im `attraccess`-Image ausgeliefert:
 
 Ein kurzlebiger Hilfsdienst `monitoring-init` startet dasselbe Image, kopiert die Dateien beim Stack-Start in benannte Volumes und beendet sich. Prometheus und Grafana mounten diese Volumes nur lesend und hängen von einem erfolgreichen Abschluss von `monitoring-init` ab (`service_completed_successfully`). Dadurch lässt sich die Compose-Datei eigenständig deployen — Operatoren müssen weder das Repository klonen noch ein lokales `./monitoring`-Verzeichnis pflegen.
 
+Wenn Pushover aktiviert ist, starten die gebündelten Compose-Konfigurationen für Coolify, Balena und die Entwicklung nach Grafana außerdem `grafana-contactpoints-cleanup`. Der Dienst entfernt alte dateiprovisionierte `Pushover`-Integrationen ohne Titel-/Nachrichtenvorlagen erst, wenn der aktuelle Empfänger `pushover-attraccess` vorhanden ist. Damit werden doppelte Benachrichtigungen nach Upgrades von älteren Builds behoben; eigene Vorlagen und über UI/API verwaltete Kontaktpunkte bleiben erhalten. Aktualisieren Sie beim Upgrade auch die Compose-Konfiguration, damit dieser Dienst ausgeführt wird.
+
+Die Bereinigung benötigt die **aktuellen** Grafana-Admin-Zugangsdaten. Wenn Sie das Passwort in Grafana geändert haben, setzen Sie `GRAFANA_ADMIN_PASSWORD` (bei Bedarf auch `GRAFANA_ADMIN_USER`) auf diese Zugangsdaten. Verwenden Sie auf Balena stattdessen die Geräte- oder Flottenvariablen `GF_SECURITY_ADMIN_PASSWORD` / `GF_SECURITY_ADMIN_USER`. Diese Variablen setzen ein bestehendes Grafana-Passwort nicht zurück. Authentifizierungsfehler erscheinen in den Logs des Bereinigungsdienstes; erstellen Sie den Dienst nach Korrektur der Zugangsdaten neu, um ihn erneut auszuführen.
+
 ## Coolify-Deployment
 
 Verwenden Sie [`coolify.docker-compose.yml`](https://github.com/Attraccess/Attraccess/blob/main/coolify.docker-compose.yml) aus dem Repo-Root. Coolify generiert FQDN-Routing und Session-Secrets automatisch über die Magic-Env-Konventionen `SERVICE_FQDN_*`, `SERVICE_URL_*` und `SERVICE_BASE64_*`. Nach dem Deployment:
@@ -206,8 +210,8 @@ Das Haupt-Dashboard enthält Panels für:
 | **Resources** | Gesamtressourcen und aktive Nutzungssitzungen |
 | **Resource Usage Duration** | p50- und p95-Sitzungsdauern |
 | **Resource Usage Sessions** | Gestartete und beendete Sitzungen über die Zeit |
-| **Connected Devices** | Anzahl verbundener Attractap-NFC-Leser |
-| **NFC Tap Events** | Tap-Ereignisse über die Zeit |
+| **Connected Devices** | Anzahl verbundener Attractap-RFID-Leser |
+| **RFID Tap Events** | Tap-Ereignisse über die Zeit |
 | **Billing Transactions** | Transaktionsanzahl nach Status |
 | **Emails Sent** | E-Mail-Zustellungsanzahl |
 | **System Overview** | Projekte, Gruppen, MQTT-Server, überfällige Wartung |

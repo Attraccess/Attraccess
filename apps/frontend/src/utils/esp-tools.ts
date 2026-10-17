@@ -1,4 +1,11 @@
-import { Transport, ESPLoader, IEspLoaderTerminal, FlashModeValues, FlashFreqValues, FlashSizeValues } from 'esptool-js';
+import {
+  Transport,
+  ESPLoader,
+  IEspLoaderTerminal,
+  FlashModeValues,
+  FlashFreqValues,
+  FlashSizeValues,
+} from 'esptool-js';
 import { Mutex } from 'async-mutex';
 
 export enum ESPToolsErrorType {
@@ -13,12 +20,6 @@ export enum ESPToolsErrorType {
   NO_TRANSPORT_AVAILABLE = 'NO_TRANSPORT_AVAILABLE',
 }
 
-export interface ESPToolsResult<T = unknown> {
-  success: boolean;
-  error: { type: ESPToolsErrorType; details?: unknown } | null;
-  data: T | null;
-}
-
 export interface Command {
   topic: string;
   payload?: string;
@@ -29,121 +30,43 @@ export interface ConnectionStateEvent {
   timestamp: number;
 }
 
-interface UseTransportOptionsBlocking<TResult = unknown> {
-  blocking: true;
-  fn: (transport: Transport, release: () => void) => Promise<TResult>;
-}
-
-interface UseTransportOptionsNonBlocking<TResult = unknown> {
-  blocking: false;
-  fn: (transport: Transport) => Promise<TResult>;
-}
-
-type EventListener<T = unknown> = (data: T) => void;
-
-export type ESPToolsEvent = 'connectionState';
-
 export type ESPToolsEventData = {
   connectionState: ConnectionStateEvent;
 };
 
+export type ESPToolsEvent = 'connectionState';
+
+export interface ESPToolsResult<T = unknown> {
+  success: boolean;
+  error: { type: ESPToolsErrorType; details?: unknown } | null;
+  data: T | null;
+}
+
+export type EventListener<T = unknown> = (data: T) => void;
+
+export interface UseTransportOptionsBlocking<TResult = unknown> {
+  blocking: true;
+  fn: (transport: Transport, release: () => void) => Promise<TResult>;
+}
+
+export interface UseTransportOptionsNonBlocking<TResult = unknown> {
+  blocking: false;
+  fn: (transport: Transport) => Promise<TResult>;
+}
+
 export class ESPTools {
-  private static _instance: ESPTools;
-  private _transport: Transport | null = null;
-  private _transportMutex = new Mutex();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _eventListeners: Map<string, Set<EventListener<any>>> = new Map();
-
-  public get isConnected(): boolean {
-    return !!this._transport;
-  }
-
-  private emit<TEvent extends ESPToolsEvent>(event: TEvent, data: ESPToolsEventData[TEvent]): void {
-    const listeners = this._eventListeners.get(event);
-    if (listeners) {
-      listeners.forEach((listener) => {
-        try {
-          listener(data);
-        } catch (error) {
-          console.error(`Error in event listener for ${event}:`, error);
-        }
-      });
-    }
-  }
-
-  public on<TEvent extends ESPToolsEvent>(event: TEvent, listener: EventListener<ESPToolsEventData[TEvent]>): void {
-    if (!this._eventListeners.has(event)) {
-      this._eventListeners.set(event, new Set());
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this._eventListeners.get(event) as Set<EventListener<any>>).add(listener);
-  }
-
-  public off<TEvent extends ESPToolsEvent>(event: TEvent, listener: EventListener<ESPToolsEventData[TEvent]>): void {
-    const listeners = this._eventListeners.get(event);
-    if (listeners) {
-      listeners.delete(listener);
-      if (listeners.size === 0) {
-        this._eventListeners.delete(event);
-      }
-    }
-  }
-
-  private setConnectionState(connected: boolean): void {
-    this.emit('connectionState', {
-      connected,
-      timestamp: Date.now(),
-    } as ConnectionStateEvent);
-  }
-
-  private async useTransport<TResult = unknown>(
-    opts: UseTransportOptionsBlocking<TResult> | UseTransportOptionsNonBlocking<TResult>,
-  ): Promise<TResult> {
-    let transport: Transport = this._transport as Transport;
-
-    if (!this._transport) {
-      const connectionResult = await this.connectToDevice();
-      if (!connectionResult.success) {
-        throw new Error('Failed to connect to device');
-      }
-      transport = this._transport as unknown as Transport;
-    }
-
-    const release = await this._transportMutex.acquire();
-
-    try {
-      if (opts.blocking) {
-        return await opts.fn(transport, release);
-      }
-
-      return await (opts as UseTransportOptionsNonBlocking<TResult>).fn(transport);
-    } catch (err) {
-      if (!transport.device.connected) {
-        console.debug('Device disconnected, disconnecting transport');
-        this.setConnectionState(false);
-        this._transport = null;
-        throw err;
-      }
-
-      console.error('Error using transport:', err);
-      if (
-        err instanceof Error &&
-        (err.message.includes('The port is closed') || err.message.includes('The device has been lost.'))
-      ) {
-        this.disconnect().catch((err) => {
-          console.error('Error disconnecting transport:', err);
-        });
-      }
-
-      throw err;
-    } finally {
-      release();
-    }
-  }
-
   private constructor() {
     // Private constructor to prevent instantiation
   }
+
+  protected _transport: Transport | null = null;
+
+  protected _transportMutex = new Mutex();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected _eventListeners: Map<string, Set<EventListener<any>>> = new Map();
+
+  private static _instance: ESPTools;
 
   public static getInstance(): ESPTools {
     if (!ESPTools._instance) {
@@ -152,70 +75,151 @@ export class ESPTools {
     return ESPTools._instance;
   }
 
-  public async connectToDevice(baudRate = 115200): Promise<ESPToolsResult<null>> {
-    if (this.isConnected) {
-      return {
-        success: true,
-        error: null,
-        data: null,
-      };
+  public async sendCommand(command: Command, waitForResponse = true, timeout = 15000): Promise<string | null> {
+    return await this.useTransport({
+      blocking: true,
+      fn: async (transport, release) => {
+        let commandString = `CMND ${command.topic}`;
+        if (command.payload) {
+          commandString += ` ${command.payload}`;
+        }
+
+        commandString += '\n';
+
+        const commandBuffer = new TextEncoder().encode(commandString + '\n');
+        console.debug(`Sending command: "${commandString}"`);
+        await transport.write(commandBuffer);
+
+        if (!waitForResponse) {
+          return null;
+        }
+
+        let continueReading = true;
+        let buffer = '';
+
+        const timeoutId = setTimeout(() => {
+          continueReading = false;
+        }, timeout);
+
+        let resolveResult: ((v: string | null) => void) | null = null;
+        const resultPromise = new Promise<string | null>((resolve) => {
+          resolveResult = resolve;
+        });
+
+        transport.rawRead(
+          (value) => {
+            if (!continueReading) return;
+            const chunk = new TextDecoder().decode(value);
+            buffer += chunk;
+
+            const bufferEndsWithNewLine = buffer.endsWith('\n');
+            const lines = buffer.split('\n');
+            if (!bufferEndsWithNewLine) {
+              buffer = lines.pop() || '';
+            } else {
+              buffer = '';
+            }
+
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine) continue;
+
+              const cleaned = trimmedLine.replace(/^[^\x20-\x7E]*/g, '');
+              console.debug('Cleaned line:', cleaned);
+
+              const respMatch = cleaned.match(/^RESP\s+(\S+)\s+(.+)$/);
+              if (!respMatch) {
+                console.debug('No response match');
+                continue;
+              }
+
+              const responseTopic = respMatch[1];
+              const payload = respMatch[2];
+              console.debug('Response topic:', responseTopic);
+
+              if (responseTopic !== command.topic) {
+                console.debug('Response topic does not match command topic:', responseTopic, '!==', command.topic);
+                continue;
+              }
+
+              clearTimeout(timeoutId);
+              continueReading = false;
+              resolveResult?.(payload ?? null);
+              return;
+            }
+          },
+          () => !continueReading,
+        );
+
+        return await resultPromise;
+      },
+    });
+  }
+
+  public async getSerialOutput(onWrite: (data: Uint8Array) => unknown) {
+    return await this.useTransport({
+      blocking: false,
+      fn: async (transport) => {
+        let isConsoleClosed = false;
+        const readLoopPromise = transport.rawRead(
+          (data) => onWrite(data),
+          () => isConsoleClosed,
+        );
+
+        return async () => {
+          isConsoleClosed = true;
+          await readLoopPromise;
+        };
+      },
+    });
+  }
+
+  public async disconnect(): Promise<void> {
+    if (!this._transport) {
+      return;
     }
 
     try {
-      // Request port from user
-      const port = await navigator.serial.requestPort();
-
-      port.addEventListener('disconnect', () => {
-        this._transport = null;
-        this.setConnectionState(false);
-      });
-
-      try {
-        // Open connection with ESP-specific settings
-        await port.open({
-          baudRate: 115200,
-          bufferSize: 8192,
-        });
-      } catch (err) {
-        const error = err as Error;
-        console.error(error);
-        return {
-          success: false,
-          error: { type: ESPToolsErrorType.PORT_OPEN_FAILED, details: error.message },
-          data: null,
-        };
-      }
-
-      try {
-        await port.close();
-      } catch (err) {
-        console.error(err);
-      }
-
-      this._transport = new Transport(port);
-      await this._transport.connect(baudRate);
-      this.setConnectionState(true);
+      await this._transport.disconnect();
     } catch (err) {
-      const error = err as Error;
-      if (error.name === 'NotFoundError') {
-        return {
-          success: false,
-          error: { type: ESPToolsErrorType.NO_PORT_SELECTED, details: error.message },
-          data: null,
-        };
-      }
-      return {
-        success: false,
-        error: { type: ESPToolsErrorType.CONNECTION_FAILED, details: error.message },
-        data: null,
-      };
+      console.error('Error disconnecting transport:', err);
+    } finally {
+      this._transport = null;
+      this.setConnectionState(false);
     }
+  }
 
-    return {
-      success: true,
-      error: null,
-      data: null,
-    };
+  public async hardReset(): Promise<void> {
+    return await this.useTransport({
+      blocking: true,
+      fn: async (transport) => {
+        await this._hardReset(transport);
+      },
+    });
+  }
+
+  protected async _hardReset(transport: Transport): Promise<void> {
+    await transport.device.setSignals({
+      dataTerminalReady: false,
+      requestToSend: true,
+      dataCarrierDetect: false,
+      clearToSend: false,
+      ringIndicator: false,
+      dataSetReady: false,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    await transport.device.setSignals({
+      dataTerminalReady: false,
+      requestToSend: false,
+      dataCarrierDetect: false,
+      clearToSend: false,
+      ringIndicator: false,
+      dataSetReady: false,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   public async flashFirmware(options: {
@@ -339,150 +343,156 @@ export class ESPTools {
     });
   }
 
-  private async _hardReset(transport: Transport): Promise<void> {
-    await transport.device.setSignals({
-      dataTerminalReady: false,
-      requestToSend: true,
-      dataCarrierDetect: false,
-      clearToSend: false,
-      ringIndicator: false,
-      dataSetReady: false,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 250));
-
-    await transport.device.setSignals({
-      dataTerminalReady: false,
-      requestToSend: false,
-      dataCarrierDetect: false,
-      clearToSend: false,
-      ringIndicator: false,
-      dataSetReady: false,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-
-  public async hardReset(): Promise<void> {
-    return await this.useTransport({
-      blocking: true,
-      fn: async (transport) => {
-        await this._hardReset(transport);
-      },
-    });
-  }
-
-  public async disconnect(): Promise<void> {
-    if (!this._transport) {
-      return;
+  public async connectToDevice(baudRate = 115200): Promise<ESPToolsResult<null>> {
+    if (this.isConnected) {
+      return {
+        success: true,
+        error: null,
+        data: null,
+      };
     }
 
     try {
-      await this._transport.disconnect();
+      // Request port from user
+      const port = await navigator.serial.requestPort();
+
+      port.addEventListener('disconnect', () => {
+        this._transport = null;
+        this.setConnectionState(false);
+      });
+
+      try {
+        // Open connection with ESP-specific settings
+        await port.open({
+          baudRate: 115200,
+          bufferSize: 8192,
+        });
+      } catch (err) {
+        const error = err as Error;
+        console.error(error);
+        return {
+          success: false,
+          error: { type: ESPToolsErrorType.PORT_OPEN_FAILED, details: error.message },
+          data: null,
+        };
+      }
+
+      try {
+        await port.close();
+      } catch (err) {
+        console.error(err);
+      }
+
+      this._transport = new Transport(port);
+      await this._transport.connect(baudRate);
+      this.setConnectionState(true);
     } catch (err) {
-      console.error('Error disconnecting transport:', err);
+      const error = err as Error;
+      if (error.name === 'NotFoundError') {
+        return {
+          success: false,
+          error: { type: ESPToolsErrorType.NO_PORT_SELECTED, details: error.message },
+          data: null,
+        };
+      }
+      return {
+        success: false,
+        error: { type: ESPToolsErrorType.CONNECTION_FAILED, details: error.message },
+        data: null,
+      };
+    }
+
+    return {
+      success: true,
+      error: null,
+      data: null,
+    };
+  }
+
+  protected async useTransport<TResult = unknown>(
+    opts: UseTransportOptionsBlocking<TResult> | UseTransportOptionsNonBlocking<TResult>,
+  ): Promise<TResult> {
+    let transport: Transport = this._transport as Transport;
+
+    if (!this._transport) {
+      const connectionResult = await this.connectToDevice();
+      if (!connectionResult.success) {
+        throw new Error('Failed to connect to device');
+      }
+      transport = this._transport as unknown as Transport;
+    }
+
+    const release = await this._transportMutex.acquire();
+
+    try {
+      if (opts.blocking) {
+        return await opts.fn(transport, release);
+      }
+
+      return await (opts as UseTransportOptionsNonBlocking<TResult>).fn(transport);
+    } catch (err) {
+      if (!transport.device.connected) {
+        console.debug('Device disconnected, disconnecting transport');
+        this.setConnectionState(false);
+        this._transport = null;
+        throw err;
+      }
+
+      console.error('Error using transport:', err);
+      if (
+        err instanceof Error &&
+        (err.message.includes('The port is closed') || err.message.includes('The device has been lost.'))
+      ) {
+        this.disconnect().catch((err) => {
+          console.error('Error disconnecting transport:', err);
+        });
+      }
+
+      throw err;
     } finally {
-      this._transport = null;
-      this.setConnectionState(false);
+      release();
     }
   }
 
-  public async getSerialOutput(onWrite: (data: Uint8Array) => unknown) {
-    return await this.useTransport({
-      blocking: false,
-      fn: async (transport) => {
-        let isConsoleClosed = false;
-        const readLoopPromise = transport.rawRead(
-          (data) => onWrite(data),
-          () => isConsoleClosed,
-        );
-
-        return async () => {
-          isConsoleClosed = true;
-          await readLoopPromise;
-        };
-      },
-    });
+  protected setConnectionState(connected: boolean): void {
+    this.emit('connectionState', {
+      connected,
+      timestamp: Date.now(),
+    } as ConnectionStateEvent);
   }
 
-  public async sendCommand(command: Command, waitForResponse = true, timeout = 15000): Promise<string | null> {
-    return await this.useTransport({
-      blocking: true,
-      fn: async (transport, release) => {
-        let commandString = `CMND ${command.topic}`;
-        if (command.payload) {
-          commandString += ` ${command.payload}`;
+  public off<TEvent extends ESPToolsEvent>(event: TEvent, listener: EventListener<ESPToolsEventData[TEvent]>): void {
+    const listeners = this._eventListeners.get(event);
+    if (listeners) {
+      listeners.delete(listener);
+      if (listeners.size === 0) {
+        this._eventListeners.delete(event);
+      }
+    }
+  }
+
+  public on<TEvent extends ESPToolsEvent>(event: TEvent, listener: EventListener<ESPToolsEventData[TEvent]>): void {
+    if (!this._eventListeners.has(event)) {
+      this._eventListeners.set(event, new Set());
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this._eventListeners.get(event) as Set<EventListener<any>>).add(listener);
+  }
+
+  protected emit<TEvent extends ESPToolsEvent>(event: TEvent, data: ESPToolsEventData[TEvent]): void {
+    const listeners = this._eventListeners.get(event);
+    if (listeners) {
+      listeners.forEach((listener) => {
+        try {
+          listener(data);
+        } catch (error) {
+          console.error(`Error in event listener for ${event}:`, error);
         }
+      });
+    }
+  }
 
-        commandString += '\n';
-
-        const commandBuffer = new TextEncoder().encode(commandString + '\n');
-        console.debug(`Sending command: "${commandString}"`);
-        await transport.write(commandBuffer);
-
-        if (!waitForResponse) {
-          return null;
-        }
-
-        let continueReading = true;
-        let buffer = '';
-
-        const timeoutId = setTimeout(() => {
-          continueReading = false;
-        }, timeout);
-
-        let resolveResult: ((v: string | null) => void) | null = null;
-        const resultPromise = new Promise<string | null>((resolve) => {
-          resolveResult = resolve;
-        });
-
-        transport.rawRead(
-          (value) => {
-            if (!continueReading) return;
-            const chunk = new TextDecoder().decode(value);
-            buffer += chunk;
-
-            const bufferEndsWithNewLine = buffer.endsWith('\n');
-            const lines = buffer.split('\n');
-            if (!bufferEndsWithNewLine) {
-              buffer = lines.pop() || '';
-            } else {
-              buffer = '';
-            }
-
-            for (const line of lines) {
-              const trimmedLine = line.trim();
-              if (!trimmedLine) continue;
-
-              const cleaned = trimmedLine.replace(/^[^\x20-\x7E]*/g, '');
-              console.debug('Cleaned line:', cleaned);
-
-              const respMatch = cleaned.match(/^RESP\s+(\S+)\s+(.+)$/);
-              if (!respMatch) {
-                console.debug('No response match');
-                continue;
-              }
-
-              const responseTopic = respMatch[1];
-              const payload = respMatch[2];
-              console.debug('Response topic:', responseTopic);
-
-              if (responseTopic !== command.topic) {
-                console.debug('Response topic does not match command topic:', responseTopic, '!==', command.topic);
-                continue;
-              }
-
-              clearTimeout(timeoutId);
-              continueReading = false;
-              resolveResult?.(payload ?? null);
-              return;
-            }
-          },
-          () => !continueReading,
-        );
-
-        return await resultPromise;
-      },
-    });
+  public get isConnected(): boolean {
+    return !!this._transport;
   }
 }

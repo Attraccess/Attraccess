@@ -1,22 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AttractapFirmware } from './dtos/firmware.dto';
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+
+import { createReadStream, existsSync, readFileSync, statSync, copyFileSync, mkdirSync, writeFileSync } from 'fs';
+
 import { join } from 'path';
 
-interface FirmwareSymbolEntry {
+import { AttractapFirmware } from './dtos/firmware.dto';
+
+export interface FirmwareSymbolEntry {
   firmware: AttractapFirmware;
   elfPath: string;
 }
 
 @Injectable()
 export class AttractapFirmwareService {
-  private readonly firmwareAssetsDirectory: string;
-  private readonly firmwareSymbolDirectory: string;
-  private readonly logger = new Logger(AttractapFirmwareService.name);
-
-  private firmwares: AttractapFirmware[] = [];
-  private symbolFirmwares: FirmwareSymbolEntry[] = [];
-
   public constructor() {
     this.firmwareAssetsDirectory = join(__dirname, 'assets', 'attractap-firmwares');
     this.firmwareSymbolDirectory = join(
@@ -42,6 +38,16 @@ export class AttractapFirmwareService {
 
     this.logger.debug(`Loaded ${this.firmwares.length} firmware definitions`);
   }
+
+  protected readonly firmwareAssetsDirectory: string;
+
+  protected readonly firmwareSymbolDirectory: string;
+
+  protected readonly logger = new Logger(AttractapFirmwareService.name);
+
+  protected firmwares: AttractapFirmware[] = [];
+
+  protected symbolFirmwares: FirmwareSymbolEntry[] = [];
 
   public async getFirmwares(): Promise<AttractapFirmware[]> {
     this.logger.debug(`Returning ${this.firmwares.length} firmwares`);
@@ -149,7 +155,7 @@ export class AttractapFirmwareService {
     return !!buildId && !!this.getSymbolEntryByBuildId(buildId);
   }
 
-  private getSymbolEntryByBuildId(buildId: string): FirmwareSymbolEntry | undefined {
+  protected getSymbolEntryByBuildId(buildId: string): FirmwareSymbolEntry | undefined {
     const normalized = buildId.trim().toLowerCase();
     if (!normalized) {
       return undefined;
@@ -158,89 +164,6 @@ export class AttractapFirmwareService {
       const candidate = firmware.buildId?.toLowerCase();
       return !!candidate && (candidate.startsWith(normalized) || normalized.startsWith(candidate));
     });
-  }
-
-  private buildBundledSymbolIndex(): FirmwareSymbolEntry[] {
-    return this.firmwares
-      .map((firmware) => this.buildBundledSymbolEntry(firmware))
-      .filter((entry): entry is FirmwareSymbolEntry => !!entry);
-  }
-
-  private buildBundledSymbolEntry(firmware: AttractapFirmware): FirmwareSymbolEntry | null {
-    if (!firmware.elfFilename) {
-      return null;
-    }
-    return {
-      firmware,
-      elfPath: join(this.firmwareAssetsDirectory, firmware.elfFilename),
-    };
-  }
-
-  private archiveBundledSymbols(): void {
-    const archiveEntries = this.readArchivedFirmwareEntries();
-    let changed = false;
-
-    for (const firmware of this.firmwares) {
-      if (!firmware.buildId || !firmware.elfFilename) {
-        continue;
-      }
-
-      const bundledElf = join(this.firmwareAssetsDirectory, firmware.elfFilename);
-      if (!existsSync(bundledElf)) {
-        continue;
-      }
-
-      mkdirSync(this.firmwareSymbolDirectory, { recursive: true });
-      const archivedElfFilename = `${firmware.buildId.toLowerCase()}-${firmware.elfFilename}`;
-      const archivedElfPath = join(this.firmwareSymbolDirectory, archivedElfFilename);
-      if (!existsSync(archivedElfPath)) {
-        copyFileSync(bundledElf, archivedElfPath);
-      }
-
-      if (!archiveEntries.some((entry) => entry.buildId?.toLowerCase() === firmware.buildId?.toLowerCase())) {
-        archiveEntries.push({ ...firmware, elfFilename: archivedElfFilename });
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      writeFileSync(
-        join(this.firmwareSymbolDirectory, 'firmwares.json'),
-        JSON.stringify({ firmwares: archiveEntries }, null, 2),
-      );
-    }
-  }
-
-  private loadArchivedSymbols(): void {
-    const archiveEntries = this.readArchivedFirmwareEntries();
-    for (const firmware of archiveEntries) {
-      if (!firmware.elfFilename || !firmware.buildId) {
-        continue;
-      }
-      const elfPath = join(this.firmwareSymbolDirectory, firmware.elfFilename);
-      if (!existsSync(elfPath)) {
-        continue;
-      }
-      if (this.getSymbolEntryByBuildId(firmware.buildId)) {
-        continue;
-      }
-      this.symbolFirmwares.push({ firmware, elfPath });
-    }
-  }
-
-  private readArchivedFirmwareEntries(): AttractapFirmware[] {
-    const archiveManifest = join(this.firmwareSymbolDirectory, 'firmwares.json');
-    if (!existsSync(archiveManifest)) {
-      return [];
-    }
-
-    try {
-      const parsed = JSON.parse(readFileSync(archiveManifest, 'utf8')) as { firmwares?: AttractapFirmware[] };
-      return Array.isArray(parsed.firmwares) ? parsed.firmwares : [];
-    } catch (error) {
-      this.logger.error(`Failed to read archived firmware symbols manifest: ${(error as Error).message}`);
-      return [];
-    }
   }
 
   public getFirmwareDownloadUrl(firmwareName: string, variantName: string): string {
@@ -326,5 +249,88 @@ export class AttractapFirmwareService {
     const stats = statSync(firmwarePath);
     this.logger.debug(`OTA firmware size: ${stats.size} bytes (file: ${otaFilename})`);
     return { size: stats.size };
+  }
+
+  protected buildBundledSymbolIndex(): FirmwareSymbolEntry[] {
+    return this.firmwares
+      .map((firmware) => this.buildBundledSymbolEntry(firmware))
+      .filter((entry): entry is FirmwareSymbolEntry => !!entry);
+  }
+
+  protected buildBundledSymbolEntry(firmware: AttractapFirmware): FirmwareSymbolEntry | null {
+    if (!firmware.elfFilename) {
+      return null;
+    }
+    return {
+      firmware,
+      elfPath: join(this.firmwareAssetsDirectory, firmware.elfFilename),
+    };
+  }
+
+  protected archiveBundledSymbols(): void {
+    const archiveEntries = this.readArchivedFirmwareEntries();
+    let changed = false;
+
+    for (const firmware of this.firmwares) {
+      if (!firmware.buildId || !firmware.elfFilename) {
+        continue;
+      }
+
+      const bundledElf = join(this.firmwareAssetsDirectory, firmware.elfFilename);
+      if (!existsSync(bundledElf)) {
+        continue;
+      }
+
+      mkdirSync(this.firmwareSymbolDirectory, { recursive: true });
+      const archivedElfFilename = `${firmware.buildId.toLowerCase()}-${firmware.elfFilename}`;
+      const archivedElfPath = join(this.firmwareSymbolDirectory, archivedElfFilename);
+      if (!existsSync(archivedElfPath)) {
+        copyFileSync(bundledElf, archivedElfPath);
+      }
+
+      if (!archiveEntries.some((entry) => entry.buildId?.toLowerCase() === firmware.buildId?.toLowerCase())) {
+        archiveEntries.push({ ...firmware, elfFilename: archivedElfFilename });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      writeFileSync(
+        join(this.firmwareSymbolDirectory, 'firmwares.json'),
+        JSON.stringify({ firmwares: archiveEntries }, null, 2),
+      );
+    }
+  }
+
+  protected loadArchivedSymbols(): void {
+    const archiveEntries = this.readArchivedFirmwareEntries();
+    for (const firmware of archiveEntries) {
+      if (!firmware.elfFilename || !firmware.buildId) {
+        continue;
+      }
+      const elfPath = join(this.firmwareSymbolDirectory, firmware.elfFilename);
+      if (!existsSync(elfPath)) {
+        continue;
+      }
+      if (this.getSymbolEntryByBuildId(firmware.buildId)) {
+        continue;
+      }
+      this.symbolFirmwares.push({ firmware, elfPath });
+    }
+  }
+
+  protected readArchivedFirmwareEntries(): AttractapFirmware[] {
+    const archiveManifest = join(this.firmwareSymbolDirectory, 'firmwares.json');
+    if (!existsSync(archiveManifest)) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(readFileSync(archiveManifest, 'utf8')) as { firmwares?: AttractapFirmware[] };
+      return Array.isArray(parsed.firmwares) ? parsed.firmwares : [];
+    } catch (error) {
+      this.logger.error(`Failed to read archived firmware symbols manifest: ${(error as Error).message}`);
+      return [];
+    }
   }
 }

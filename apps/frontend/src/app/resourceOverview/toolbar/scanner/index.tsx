@@ -44,7 +44,7 @@ export function ResourceScanner(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="md">
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="md" dialogProps={{ 'aria-label': t('title') }}>
         {() => <Scanner onScan={onScan} components={{ tracker: boundingBox }} />}
       </StandardModal>
     </>

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { AddPersonDrawer } from './AddPersonDrawer';
 
 // The embedded UserSearch picker fetches users through the generated client;
@@ -36,6 +36,13 @@ const pickUser = async (pointer: ReturnType<typeof userEvent.setup>, name: RegEx
 };
 
 describe('AddPersonDrawer', () => {
+  it.each(['introducer', 'maintainer', 'introduction'] as const)('names the %s drawer from its title', async (mode) => {
+    renderDrawer({ mode });
+    expect(await screen.findByRole('dialog', { name: `addModal.title.${mode}` })).toHaveAccessibleName(
+      `addModal.title.${mode}`,
+    );
+  });
+
   beforeEach(() => {
     mocks.useUsersServiceFindManyInfinite.mockReturnValue({
       data: { pages: [{ data: [{ id: 1, username: 'alan' }], total: 1, page: 1, limit: 50 }] },

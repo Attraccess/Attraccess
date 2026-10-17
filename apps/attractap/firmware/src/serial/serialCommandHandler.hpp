@@ -3,6 +3,7 @@
 #include <string>
 
 #ifndef ATTRACTAP_HOST
+#include <ArduinoJson.h>
 #include "esp_netif.h"
 #include "../network/wifi/wifi.hpp"
 #endif
@@ -27,6 +28,7 @@ private:
     static Logger logger;
 
     static void processLine(const std::string &line);
+    static void handleAuthorizedCommand(const std::string &topic, JsonObject payloadObj);
     static void handleCommand(const std::string &topic, const std::string &payload);
 
     static bool pinIsSet();

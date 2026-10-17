@@ -1,6 +1,9 @@
-import { FormFieldResponseDto, FormFieldType } from '@attraccess/react-query-client';
+import { FormFieldType, FormFieldResponseDto } from '@attraccess/react-query-client';
 
-export type ResourceFormAction = 'start' | 'takeover' | 'end';
+export interface BooleanFieldOptions {
+  trueLabel?: string;
+  falseLabel?: string;
+}
 
 export interface TextFieldOptions {
   placeholder?: string;
@@ -15,11 +18,6 @@ export interface NumberFieldOptions {
 
 export interface SelectFieldOptions {
   options: string[];
-}
-
-export interface BooleanFieldOptions {
-  trueLabel?: string;
-  falseLabel?: string;
 }
 
 export type FieldOptions = TextFieldOptions | NumberFieldOptions | SelectFieldOptions | BooleanFieldOptions;
@@ -42,7 +40,9 @@ export interface EditableForm {
   fields: EditableFormField[];
 }
 
-const defaultFieldOptions: Record<FormFieldType, FieldOptions> = {
+export type ResourceFormAction = 'start' | 'takeover' | 'end';
+
+export const defaultFieldOptions: Record<FormFieldType, FieldOptions> = {
   [FormFieldType.TEXT]: {
     placeholder: '',
     multiline: false,
@@ -64,6 +64,16 @@ const defaultFieldOptions: Record<FormFieldType, FieldOptions> = {
 export function createDefaultFieldOptions(type: FormFieldType): FieldOptions {
   const template = defaultFieldOptions[type];
   return template ? { ...template } : {};
+}
+
+export function isFiniteNumber(value: unknown): value is number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value);
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    return Number.isFinite(Number(value));
+  }
+  return false;
 }
 
 export function parseFieldOptions(type: FormFieldType, raw?: Record<string, unknown> | string[] | null): FieldOptions {
@@ -125,6 +135,17 @@ export function parseFieldOptions(type: FormFieldType, raw?: Record<string, unkn
   }
 }
 
+export function parseFieldFromResponse(field: FormFieldResponseDto): EditableFormField {
+  return {
+    id: field.id,
+    name: field.name,
+    type: field.type,
+    isRequired: field.isRequired,
+    description: field.description,
+    options: parseFieldOptions(field.type, field.options as Record<string, unknown> | string[]),
+  };
+}
+
 export function serializeFieldOptions(
   type: FormFieldType,
   options: FieldOptions,
@@ -176,25 +197,4 @@ export function serializeFieldOptions(
     default:
       return null;
   }
-}
-
-export function parseFieldFromResponse(field: FormFieldResponseDto): EditableFormField {
-  return {
-    id: field.id,
-    name: field.name,
-    type: field.type,
-    isRequired: field.isRequired,
-    description: field.description,
-    options: parseFieldOptions(field.type, field.options as Record<string, unknown> | string[]),
-  };
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  if (typeof value === 'number') {
-    return Number.isFinite(value);
-  }
-  if (typeof value === 'string' && value.trim() !== '') {
-    return Number.isFinite(Number(value));
-  }
-  return false;
 }

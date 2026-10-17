@@ -20,7 +20,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cmake --build dist/apps/attractap-desktop --target attractap-desktop && open -W dist/apps/attractap-desktop/attractap-desktop.app",
+        "command": "cmake --build dist/apps/attractap-desktop --target attractap-desktop && open -n -W dist/apps/attractap-desktop/attractap-desktop.app",
         "cwd": "."
       },
       "dependsOn": ["build"],
@@ -31,7 +31,7 @@
       "options": {
         "commands": [
           "cmake -S apps/attractap/desktop -B dist/apps/attractap-desktop",
-          "cmake --build dist/apps/attractap-desktop --target attractap-desktop-tests attractap-desktop-display-tests",
+          "cmake --build dist/apps/attractap-desktop --target attractap-desktop-tests attractap-demo-clock-tests attractap-clock-race-tests attractap-demo-session-clock-tests attractap-desktop-display-tests attractap-reader-workflow-tests",
           "ctest --test-dir dist/apps/attractap-desktop --output-on-failure"
         ],
         "parallel": false,

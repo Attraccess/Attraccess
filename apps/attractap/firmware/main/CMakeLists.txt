@@ -11,6 +11,12 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
          "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
          "${CMAKE_CURRENT_LIST_DIR}/../src/*.c")
 
+    if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
+        include("${CMAKE_CURRENT_LIST_DIR}/../tools/latin1_fonts.cmake")
+        attractap_latin1_fonts(ATTRACTAP_LATIN1_FONTS)
+        list(APPEND ATTRACTAP_SRCS ${ATTRACTAP_LATIN1_FONTS})
+    endif()
+
     if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
         list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "${ATTRACTAP_EXCLUDE_REGEX}")
     endif()
@@ -54,7 +60,7 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
 # -Wdeprecated-enum-enum-conversion in C++ only (LVGL core is C, so it is
 # unaffected). Suppress for the app like IDF does for the sibling warning
 # (-Wno-enum-conversion in tools/cmake/build.cmake:193).
-target_compile_options(${COMPONENT_LIB} PRIVATE "-Wno-deprecated-enum-enum-conversion")
+target_compile_options(${COMPONENT_LIB} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>")
 
 if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
     # Generic binary embedding does not align the start symbol. LVGL's RGB565

@@ -20,7 +20,7 @@ and independent output writers still fail closed. See the current
 
 Cleanup reconciles the failed installation and its credentials; it does not undo
 the destructive takeover or re-enable CODESYS. Integrity journals, pinned SSH,
-signed offline artifacts, TLS enrollment, fresh credentials/consent on retry, and
+checksum-checked offline artifacts, TLS enrollment, fresh credentials/consent on retry, and
 management-access recovery remain required. Full management hardening and physical
 acceptance are separate and are **not complete** merely because installation or
 software fixtures succeed.

@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { BillingModule } from './billing.module';
 import { BillingController } from './billing.controller';
-import { BillingService } from './billing.service';
+import { BillingService } from './charges/billing.service';
 import {
   BillingTransaction,
   BillingTransactionItem,
@@ -11,9 +11,9 @@ import {
   Setting,
   User,
 } from '@attraccess/database-entities';
-import { SumUpService } from './sumup.service';
-import { LiveNotificationsService } from './liveNotificationsService';
-import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
+import { SumUpService } from './sumup/sumup.service';
+import { LiveNotificationsService } from './live-notifications/live-notifications.service';
+import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
 import { EmailService } from '../email/email.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -95,7 +95,7 @@ describe('BillingModule', () => {
           },
           {
             provide: SseInstrumentation,
-            useValue: { wrap: <T,>(_s: string, source: Observable<T>) => source },
+            useValue: { wrap: <T>(_s: string, source: Observable<T>) => source },
           },
           {
             provide: LicenseService,

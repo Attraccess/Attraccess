@@ -1,5 +1,48 @@
 # Contributing to Attraccess
 
+## File size limits
+
+Keep code files **at or below 600 lines** and test suites and test helpers
+**at or below 1,000 lines**. The check counts every physical line, including blank
+lines and comments; a final newline does not add an extra line. CRLF and LF count the same.
+
+Run `pnpm lint:files` to check tracked files and unignored new files in your working
+tree. `pnpm lint:files --staged` checks the Git index, including partially staged
+files. Both run before the existing `pnpm precommit` and `pnpm precommit:all`
+checks. The PR and merge-queue workflow runs the check in the required
+`lint-and-typecheck` job, independently of Nx's affected-project selection.
+
+The limits apply to every covered file, including unchanged files and renames.
+Split oversized code by feature or responsibility while preserving behavior.
+Keep related logic together; the limit is a ceiling, not a target for making
+every function or method its own file. Place multi-file implementations in a
+named feature folder, with concise filenames that describe their role (for
+example, `commissioning/transport.ts` and `commissioning/credentials.ts`). Keep
+shared helpers close to their consumers; avoid flat piles of repeated prefixes
+and generic `helpers` or `part-N` files. Keep a normal test suite together,
+including its setup, related cases, and assertions;
+when a test file exceeds 1,000 lines, split it by behavior or feature. Avoid
+single-case files and registration wrappers created only to meet a line count.
+Use shared fixtures when they reduce repeated setup without hiding the tests.
+
+There are no historical allowances, and checking sizes does not require a target
+branch or merge base. `NX_AFFECTED_BASE` does not affect these checks.
+
+The check covers JS/TS (including module variants and declaration files), C/C++
+and Objective-C, Python, shell scripts, SQL, OpenSCAD, stylesheets, and HTML/MJML
+templates. Executable configuration in these languages is also code. Test files
+are identified by `.spec`, `.test`, `.e2e`, `.cy`, `test_` and equivalent filename
+segments, or directories named `test`, `tests`, `__tests__`, `__mocks__`,
+`test-utils`, `fixtures`, `acceptance`, or `e2e`.
+
+Documentation, JSON/YAML, lockfiles, declarative configuration (including CMake
+and Dockerfiles), and binary assets have no line limit. Their natural structure
+often needs larger files, so splitting them just to satisfy a line count adds
+little value. Generated/build output, generated API/WebSocket clients, dependency
+directories, and the vendored OpenSCAD WebAssembly runtime are excluded. Maintained
+public scripts and firmware headers remain covered. Exclusions are centralized
+in `scripts/check-file-size.mjs`.
+
 ## Commit Messages
 
 This repository enforces [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) on every commit (locally via the `commit-msg` Husky hook) and on every pull request title (in CI).
@@ -69,14 +112,14 @@ This skips the local hook but **CI still validates** all commits in the PR range
 
 The `.github/workflows/companion.yml` workflow signs binaries on releases. The following secrets must be configured in the repository settings:
 
-| Secret | Description |
-| --- | --- |
-| `WINDOWS_CERT_BASE64` | Base64-encoded PFX file for Authenticode EV signing (`base64 certificate.pfx`) |
-| `WINDOWS_CERT_PASSWORD` | Password for the PFX file |
-| `APPLE_CERTIFICATE` | Base64-encoded `.p12` Apple Developer ID certificate (`base64 certificate.p12`) |
-| `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12` file |
-| `APPLE_ID` | Apple ID used for notarization (e.g. `developer@example.com`) |
-| `APPLE_ID_PASSWORD` | App-specific password for the Apple ID ([create one here](https://appleid.apple.com/account/manage)) |
-| `APPLE_TEAM_ID` | Apple Developer Team ID (10-character string, found in the Developer portal) |
+| Secret                       | Description                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `WINDOWS_CERT_BASE64`        | Base64-encoded PFX file for Authenticode EV signing (`base64 certificate.pfx`)                       |
+| `WINDOWS_CERT_PASSWORD`      | Password for the PFX file                                                                            |
+| `APPLE_CERTIFICATE`          | Base64-encoded `.p12` Apple Developer ID certificate (`base64 certificate.p12`)                      |
+| `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12` file                                                                         |
+| `APPLE_ID`                   | Apple ID used for notarization (e.g. `developer@example.com`)                                        |
+| `APPLE_ID_PASSWORD`          | App-specific password for the Apple ID ([create one here](https://appleid.apple.com/account/manage)) |
+| `APPLE_TEAM_ID`              | Apple Developer Team ID (10-character string, found in the Developer portal)                         |
 
 PR builds skip code signing entirely — only release builds require these secrets. Without them, release builds will fail at the signing step.

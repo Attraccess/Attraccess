@@ -1,3 +1,4 @@
+import { resolveDateTimePreferences } from '@attraccess/shared';
 import { Body, Controller, Get, Patch, Post, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
@@ -10,6 +11,7 @@ import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { DeleteAccountConfirmDto } from './dtos/deleteAccountConfirm.dto';
 import { UpdateLocaleDto } from './dtos/updateLocale.dto';
 import { mapEmailSendError } from './email-send-error.util';
+import { UpdateDateTimePreferencesDto } from './dtos/updateDateTimePreferences.dto';
 import { CurrentUserDto } from './dtos/current-user.dto';
 
 @ApiTags('Users')
@@ -37,6 +39,7 @@ export class UserProfileController {
       username: user.username,
       email: user.email,
       locale: user.locale,
+      ...resolveDateTimePreferences(user.dateTimeLocale),
       isEmailVerified: user.isEmailVerified,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
@@ -96,6 +99,21 @@ export class UserProfileController {
     } catch (error) {
       throw mapEmailSendError(error);
     }
+  }
+
+  @SessionAuth()
+  @Patch('me/date-time-preferences')
+  @ApiOperation({ summary: 'Update date and time display preferences', operationId: 'updateMyDateTimePreferences' })
+  @ApiResponse({ status: 200, description: 'Preferences updated.', type: CurrentUserDto })
+  async updateMyDateTimePreferences(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: UpdateDateTimePreferencesDto,
+  ): Promise<CurrentUserDto> {
+    const updated = await this.usersService.updateDateTimePreferences(request.user.id, body);
+    return {
+      ...(await this.getCurrent(request)),
+      dateTimeLocale: updated.dateTimeLocale,
+    };
   }
 
   @SessionAuth()

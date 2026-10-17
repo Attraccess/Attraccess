@@ -1,0 +1,121 @@
+/* ===== Attraccess Light Theme (default) ===== */
+:root {
+  color-scheme: light;
+  --theme-color: #256d7b;
+  --theme-color-foreground: #fff;
+
+  /* Cover */
+  --cover-background-image: none;
+  --cover-background-color: #fff;
+  --cover-color: var(--base-color);
+  --cover-heading-color: var(--theme-color);
+  --cover-blockquote-color: var(--blockquote-color);
+  --cover-button-background: transparent;
+  --cover-button-background--hover: var(--table-head-background);
+  --cover-button-border: 1px solid var(--theme-color);
+  --cover-button-color: var(--theme-color);
+  --cover-button-color--hover: var(--link-color--hover);
+  --cover-button-primary-background: var(--theme-color);
+  --cover-button-primary-background--hover: var(--link-color--hover);
+  --cover-button-primary-border: 1px solid var(--theme-color);
+  --cover-button-primary-color: var(--theme-color-foreground);
+  --cover-button-primary-color--hover: var(--theme-color-foreground);
+
+  /* Sidebar */
+  --sidebar-background: #f4f6f6;
+  --sidebar-border-color: #d6dede;
+  --sidebar-width: 260px;
+  --sidebar-name-color: var(--theme-color);
+  --sidebar-name-font-weight: 700;
+  --sidebar-nav-link-color: #364449;
+  --sidebar-nav-link-color--active: var(--theme-color);
+  --sidebar-nav-link-font-weight--active: 600;
+  --sidebar-nav-link-border-color--active: var(--theme-color);
+  --sidebar-toggle-background: var(--theme-color);
+
+  /* Content */
+  --base-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --base-font-size: 16px;
+  --base-line-height: 1.7;
+  --base-color: #202b30;
+  --base-background-color: #ffffff;
+  --heading-color: var(--base-color);
+  --heading-h1-color: var(--base-color);
+  --heading-h2-color: var(--base-color);
+  --heading-h3-color: var(--base-color);
+  --heading-h4-color: var(--base-color);
+  --link-color: var(--theme-color);
+  --link-color--hover: #1c5560;
+  --blockquote-border-color: var(--theme-color);
+  --blockquote-color: #536369;
+
+  /* Code */
+  --code-font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+  --code-inline-background: #eef3f3;
+  --code-inline-color: var(--theme-color);
+  --code-block-background: #f4f6f6;
+  --code-block-color: var(--base-color);
+  --code-block-border-radius: 6px;
+
+  /* Table */
+  --table-head-background: #f4f6f6;
+  --table-head-color: var(--base-color);
+  --table-body-background: #ffffff;
+  --table-row-odd-background: #fafbfb;
+  --table-cell-border-color: #d6dede;
+
+  /* Notice / Alerts */
+  --notice-tip-border-color: #17c964;
+  --notice-important-border-color: var(--theme-color);
+
+  /* Pagination */
+  --pagination-border-color: #d6dede;
+  --pagination-title-color: var(--theme-color);
+
+  /* Search */
+  --search-background: #f4f6f6;
+  --search-input-background: #ffffff;
+  --search-input-border-color: #d6dede;
+  --search-input-border-radius: 4px;
+  --search-result-keyword-color: var(--theme-color);
+}
+
+/* ===== Attraccess Dark Theme ===== */
+/* Applied on html element so :root variables are overridden */
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --theme-color: #79bac6;
+  --theme-color-foreground: #172125;
+
+  /* Cover */
+  --cover-background-color: #172125;
+
+  /* Sidebar */
+  --sidebar-background: #1e2a2f;
+  --sidebar-border-color: #36464c;
+  --sidebar-nav-link-color: #d3dede;
+
+  /* Content */
+  --base-color: #edf2f2;
+  --base-background-color: #172125;
+  --link-color--hover: #a1d2db;
+  --blockquote-color: #b2c1c5;
+
+  /* Code */
+  --code-inline-background: #26363c;
+  --code-block-background: #1e2a2f;
+
+  /* Table */
+  --table-head-background: #26363c;
+  --table-body-background: #172125;
+  --table-row-odd-background: #1e2a2f;
+  --table-cell-border-color: #36464c;
+
+  /* Pagination */
+  --pagination-border-color: #36464c;
+
+  /* Search */
+  --search-background: #1e2a2f;
+  --search-input-background: #26363c;
+  --search-input-border-color: #536369;
+}

@@ -9,7 +9,6 @@
 #include <memory>
 #include <mutex>
 #include <queue>
-#include <stop_token>
 #include <string>
 #include <thread>
 
@@ -60,7 +59,7 @@ private:
     static constexpr size_t MaxQueuedMessages = 64;
     static constexpr size_t MaxInboundMessageBytes = 1024 * 1024;
 
-    void run(std::stop_token stopToken);
+    void run();
     void updateUrlFromSettings();
     void publishState(State state);
     void publishError(const std::string &message);
@@ -74,5 +73,6 @@ private:
     StateCallback stateCallback;
     ErrorCallback errorCallback;
     std::shared_ptr<std::atomic_bool> callbackLifetime = std::make_shared<std::atomic_bool>(false);
-    std::jthread worker;
+    std::atomic_bool stopRequested{false};
+    std::thread worker;
 };

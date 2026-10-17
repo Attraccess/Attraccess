@@ -1,9 +1,9 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../modbus/model';
-import { WagoService } from './wago.service';
-import { canonicalSnapshot, configurationHash, type WagoConfigurationSnapshot } from './configuration';
-import type { WagoConfigurationDraft } from './wago-configuration-draft.entity';
-import type { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { type WagoConfigurationSnapshot, canonicalSnapshot, configurationHash } from './configuration/model';
+import type { WagoConfigurationDraft } from './configuration/draft.entity';
+import type { WagoConfigurationRevision } from './configuration/revision.entity';
+import { WagoService } from './controllers/service';
 
 describe('configuration editor service boundaries', () => {
   const snapshot: WagoConfigurationSnapshot = {
@@ -104,6 +104,33 @@ describe('configuration editor service boundaries', () => {
     );
     expect(JSON.parse(result.snapshot).logicalChannels[0].pulse.durationMs).toBe(500);
     expect(drafts.save).not.toHaveBeenCalled();
+    expect(mqtt.publish).not.toHaveBeenCalled();
+  });
+
+  it('audits persistent preset reapplication using saved editor provenance', async () => {
+    const { service, audit, draft, mqtt } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' };
+    const edited: WagoConfigurationSnapshot = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }],
+    };
+    await service.saveDraft(1, edited, { names: {}, presets: [application] }, principal);
+    audit.record.mockClear();
+    const preview = await service.previewPreset(1, application);
+    await service.applyPreset(
+      1,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+      principal,
+    );
+    expect(JSON.parse(draft()!.snapshot).logicalChannels[0].disconnectPolicy).toEqual({ mode: 'immediate' });
+    expect(draft()!.reviewedHash).toBeNull();
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.preset_reapplication', 'attempted'],
+      ['wago.preset_reapplication', 'succeeded'],
+    ]);
     expect(mqtt.publish).not.toHaveBeenCalled();
   });
 
@@ -296,7 +323,7 @@ describe('configuration editor service boundaries', () => {
       expect(JSON.parse(published.presetProvenance ?? '{}').editor).toEqual(metadata);
       expect(JSON.parse(String(mqtt.publish.mock.calls[0][2]))).toMatchObject({
         contentHash: configurationHash(snapshot),
-        snapshot,
+        snapshot: snapshot,
       });
     },
   );
@@ -498,6 +525,7 @@ describe('configuration editor service boundaries', () => {
       if (change !== 'unchanged') expect(revisions[0]).toEqual(original);
     },
   );
+
   it('binds forced publication to the reviewed references, independent of query order', async () => {
     const { service, flowQuery, mqtt } = fixture();
     await service.saveDraft(1, snapshot);
@@ -736,7 +764,10 @@ describe('configuration editor service boundaries', () => {
     expect(audit.record).not.toHaveBeenCalled();
     await service.saveDraft(
       1,
-      { ...snapshot, logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }] },
+      {
+        ...snapshot,
+        logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }],
+      },
       metadata,
       principal,
     );
@@ -867,6 +898,7 @@ describe('configuration editor service boundaries', () => {
       expect.objectContaining({ details: { sourceRevision: 1, revision: 2 } }),
     );
   });
+
   it('preserves visual names when the persisted preset endpoint changes an existing draft', async () => {
     const { service, draft } = fixture();
     await service.saveDraft(1, snapshot, { names: { output: 'Named output' }, presets: [] });
@@ -883,6 +915,7 @@ describe('configuration editor service boundaries', () => {
       presets: [application],
     });
   });
+
   it('audits validated profile persistence using only the saved profile identity and counts', async () => {
     const { service, audit } = fixture();
     const principal = { userId: 7, authenticationMethod: 'session' as const };

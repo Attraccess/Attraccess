@@ -23,7 +23,7 @@
         "messages": "Messages",
         "billing": "Billing",
         "csvExport": "CSV Export",
-        "attractap": "NFC-Cards",
+        "attractap": "RFID-Cards",
         "users": "Users",
         "settings": "Settings"
       }

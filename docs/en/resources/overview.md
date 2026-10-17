@@ -1,6 +1,6 @@
 # Resources
 
-Resources are the core of Attraccess. A resource is anything that needs to be managed in your workshop – machines, tools, equipment or even doors.
+Resources are the core of Attraccess. A resource is anything whose access and usage you manage at your site – production machines, lab equipment, tools, shared workstations or doors.
 
 ## What is a Resource?
 

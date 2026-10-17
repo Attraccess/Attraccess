@@ -4,13 +4,46 @@ The native SDL app runs the production LVGL screens inside the device's CAD
 render. It requires SDL **3.4 or newer** (for PNG loading), CMake 3.24+, and
 libcurl 8.7+ with WebSocket support. On macOS, the build prefers Homebrew curl.
 
+## Download for macOS
+
+Nightly CI produces separate Apple Silicon (`arm64`) and Intel (`x86_64`) DMGs in
+the **Build Attractap Desktop for macOS** artifacts of the main-branch nightly
+run. Each published GitHub Release also has the two DMGs as release assets.
+The CI downloads target macOS 15 or newer and bundle their libraries, so
+Homebrew and a source checkout are not needed on the user's Mac.
+
+Open the DMG, drag **Attractap Simulator.app** to Applications, then open it.
+Enter the Attraccess server URL in the launch dialog. For the imec demo,
+use `https://detlef.apps.attraccess.org`. The dialog pre-fills that address on
+later launches. Since the current CI has no Apple Developer ID signing or
+notarization credentials, macOS may block the first launch. After trying to
+open it, go to **System Settings → Privacy & Security → Open Anyway** and
+confirm. The app includes the same steps in `START HERE.txt` on the DMG.
+
+To produce a DMG locally on macOS after building:
+
+```sh
+apps/attractap/desktop/package-macos.sh
+```
+
 ```sh
 pnpm nx build attractap-desktop
-open dist/apps/attractap-desktop/attractap-desktop.app
+open -n dist/apps/attractap-desktop/attractap-desktop.app
 pnpm nx test attractap-desktop
 ```
 
-To choose an API endpoint and reader profile, launch the executable directly:
+The automated tests use SDL's dummy audio driver, so card scans and error
+patterns stay silent even when an agent runs tests in the background. The
+interactive simulator still plays its normal beeps. When running test binaries
+directly, set `SDL_AUDIO_DRIVER=dummy` as in the capture commands below.
+
+`pnpm nx serve attractap-desktop` builds and launches a fresh app process. Quit
+the previous simulator before restarting it. On macOS, `open` without `-n`
+only activates an already-running instance, even after its executable has been
+rebuilt, so it can keep displaying an older version of the UI.
+
+To bypass the launch dialog and choose an API endpoint and reader profile,
+launch the executable directly:
 
 ```sh
 dist/apps/attractap-desktop/attractap-desktop.app/Contents/MacOS/attractap-desktop https://your-server.example 42
@@ -34,12 +67,13 @@ The CAD image is embedded in the executable, including the macOS app bundle.
 ## Display interaction checks
 
 The display tests use SDL's headless software renderer and the production LVGL
-startup screen. They cover scaled touches, card hold/release, cancellation,
-clearing data, and resized-window hit testing. To also capture preview images,
+screens. They cover resource selection into the lockscreen with an umlaut in
+the resource name, scaled touches, card hold/release, cancellation, clearing
+data, and resized-window hit testing. To also capture preview images,
 pass an existing output directory:
 
 ```sh
-SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software \
+SDL_AUDIO_DRIVER=dummy SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software \
   dist/apps/attractap-desktop/attractap-desktop-display-tests /path/to/screenshots
 ```
 
@@ -67,7 +101,8 @@ performed through the real application workflows.
 
 The scenarios check exact reader registration, acknowledged resource delivery
 before and after a newly authenticated connection, profile reuse without duplicate
-registration, card enrollment and authentication after restart, unknown and
+registration, a nondefault device PIN loaded after restart without a launch-time
+write, card enrollment and authentication after restart, unknown and
 incorrect card keys, failed writes, removal during a write and recovery. They also
 check project sessions, required start/end forms, missing input, a real server
 validation rejection followed by correction, and a web request that waits for an
@@ -98,3 +133,27 @@ These host workflows do not establish physical RF/card compatibility, device
 hardware timing, embedded memory limits, FreeRTOS scheduling or OTA correctness.
 The desktop network badge follows the actual host connection; it does not
 measure the embedded transport's ping quality.
+
+For reader operation, see the user guide in
+[English](../../../docs/en/attractap/using-the-reader.md) or
+[German](../../../docs/de/attractap/using-the-reader.md).
+
+## Reader workflow checks
+
+`pnpm nx test attractap-desktop` also runs the reader workflows against a
+deterministic server transport. These cover sign-in, resource actions, forms,
+supervision and recovery. The timeout test uses a real clock and takes about
+134 seconds. The tests exercise the application, API parser, NFC verifier and
+screen router; physical NFC, touch hardware and live-network behavior still
+need a device smoke test.
+
+To save packed RGBA8 framebuffers for conversion to PNG, pass an output path:
+
+```sh
+SDL_AUDIO_DRIVER=dummy \
+  dist/apps/attractap-desktop/attractap-reader-workflow-tests /tmp/reader-flow
+apps/attractap/firmware/tests/display-theme/build/display-theme-host --output /tmp/reader-states
+```
+
+The user guide's screenshots are native display captures. The deterministic reader tests use a simulated transport. The connected desktop
+simulator uses the real host connection for its network badge.

@@ -1,22 +1,15 @@
-import { Injectable, Logger, Type } from '@nestjs/common';
-import { Resource, Setting, User } from '@attraccess/database-entities';
+import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sdk';
 import {
   isPluginPermission,
-  MqttServerConnectionConfig,
-  MqttCredentialProvisioningHostProvider,
   PluginContext,
-  PluginFlowsContext,
-  PluginSecretsContext,
   PluginPermission,
   PluginPermissionError,
-  SystemEvent,
-  SystemEventHandler,
-  SystemEventPayload,
-  SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
-import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sdk';
+import { Injectable, Logger } from '@nestjs/common';
+import { createGuardedContext as createGuardedContextImplementation } from './runtime/guarded-context';
+import { Resource, Setting, User } from '@attraccess/database-entities';
 
-const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
+export const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
   ['emit', PluginPermission.EMIT_EVENTS],
   ['emitAsync', PluginPermission.EMIT_EVENTS],
   ['on', PluginPermission.LISTEN_EVENTS],
@@ -34,13 +27,13 @@ const EVENT_METHOD_PERMISSIONS = new Map<string, PluginPermission>([
   ['waitFor', PluginPermission.LISTEN_EVENTS],
 ]);
 
-const ENTITY_PERMISSIONS: Array<{ target: EntityTarget<ObjectLiteral>; permission: PluginPermission }> = [
+export const ENTITY_PERMISSIONS: Array<{ target: EntityTarget<ObjectLiteral>; permission: PluginPermission }> = [
   { target: User, permission: PluginPermission.READ_USERS },
   { target: Resource, permission: PluginPermission.ACCESS_RESOURCES },
   { target: Setting, permission: PluginPermission.READ_SETTINGS },
 ];
 
-function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
+export function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
   if (typeof entity === 'string') {
     return entity;
   }
@@ -51,7 +44,10 @@ function entityLabel<T extends ObjectLiteral>(entity: EntityTarget<T>): string {
   return named.options?.name ?? named.name ?? 'UnknownEntity';
 }
 
-function permissionForEntity<T extends ObjectLiteral>(base: PluginContext, entity: EntityTarget<T>): PluginPermission {
+export function permissionForEntity<T extends ObjectLiteral>(
+  base: PluginContext,
+  entity: EntityTarget<T>,
+): PluginPermission {
   const direct = ENTITY_PERMISSIONS.find((candidate) => candidate.target === entity);
   if (direct) {
     return direct.permission;
@@ -74,6 +70,18 @@ function permissionForEntity<T extends ObjectLiteral>(base: PluginContext, entit
 export class PluginSandboxService {
   private static readonly logger = new Logger(PluginSandboxService.name);
 
+  /** Also called when a repository retained during bootstrap is first resolved. */
+  public static assertRepositoryPermission(
+    base: PluginContext,
+    declared: PluginPermission[],
+    entity: EntityTarget<ObjectLiteral>,
+  ): void {
+    const permission = permissionForEntity(base, entity);
+    if (!declared.includes(permission)) {
+      throw new PluginPermissionError(base.manifest.name, `getRepository(${entityLabel(entity)})`, permission);
+    }
+  }
+
   /**
    * Validates the permissions declared in a manifest. Returns the parsed set or
    * throws guidance on the first unknown value.
@@ -92,7 +100,7 @@ export class PluginSandboxService {
       if (typeof value !== 'string' || !isPluginPermission(value)) {
         throw new Error(
           `Plugin "${pluginName}" declares unknown permission "${String(value)}". ` +
-            `Valid permissions are: ${Object.values(PluginPermission).join(', ')}.`
+            `Valid permissions are: ${Object.values(PluginPermission).join(', ')}.`,
         );
       }
       if (!result.includes(value)) {
@@ -110,76 +118,21 @@ export class PluginSandboxService {
    * deny-by-default: only explicitly modelled capabilities are reachable.
    */
   public static createGuardedContext(base: PluginContext, declared: PluginPermission[]): PluginContext {
-    const pluginName = base.manifest.name;
-    const granted = new Set(declared);
-
-    const require = (permission: PluginPermission, capability: string): void => {
-      if (!granted.has(permission)) {
-        throw new PluginPermissionError(pluginName, capability, permission);
-      }
-    };
-
-    const guardedEvents = PluginSandboxService.guardEvents(base, pluginName, require);
-
-    return {
-      manifest: base.manifest,
-      audit: base.audit,
-      logger: base.logger,
-      mqtt: {
-        subscribe(serverId, topicFilter, handler) {
-          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.subscribe(${serverId}, ${topicFilter})`);
-          return base.mqtt.subscribe(serverId, topicFilter, handler);
-        },
-        publish(serverId, topic, payload, options) {
-          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.publish(${serverId}, ${topic})`);
-          return base.mqtt.publish(serverId, topic, payload, options);
-        },
+    const getContextOwner = () => this;
+    return createGuardedContextImplementation(
+      {
+        guardEvents: getContextOwner().guardEvents.bind(getContextOwner()),
+        assertRepositoryPermission: getContextOwner().assertRepositoryPermission.bind(getContextOwner()),
       },
-      events: guardedEvents,
-      get dataSource() {
-        require(PluginPermission.DATABASE_ACCESS, 'dataSource');
-        return base.dataSource;
-      },
-      getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>) {
-        const permission = permissionForEntity(base, entity);
-        require(permission, `getRepository(${entityLabel(entity)})`);
-        return base.getRepository(entity);
-      },
-      get<T>(token: Type<T> | string | symbol): T {
-        require(PluginPermission.RESOLVE_HOST_PROVIDERS, `get(${String(token)})`);
-        return base.get<T>(token);
-      },
-      onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription {
-        require(PluginPermission.LISTEN_EVENTS, `onEvent(${event})`);
-        return base.onEvent(event, handler);
-      },
-      emitEvent<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
-        require(PluginPermission.EMIT_EVENTS, `emitEvent(${event})`);
-        base.emitEvent(event, payload);
-      },
-      getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
-        require(PluginPermission.ACCESS_MQTT_SERVERS, `getMqttServerConfig(${serverId})`);
-        return base.getMqttServerConfig(serverId);
-      },
-      getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider {
-        require(PluginPermission.ACCESS_MQTT_SERVERS, 'getMqttCredentialProvisioning()');
-        return base.getMqttCredentialProvisioning();
-      },
-      get flows(): PluginFlowsContext {
-        require(PluginPermission.TRIGGER_FLOWS, 'flows.trigger()');
-        return base.flows;
-      },
-      get secrets(): PluginSecretsContext {
-        require(PluginPermission.MANAGE_SECRETS, 'secrets');
-        return base.secrets;
-      },
-    };
+      base,
+      declared,
+    );
   }
 
   private static guardEvents(
     base: PluginContext,
     pluginName: string,
-    require: (permission: PluginPermission, capability: string) => void
+    require: (permission: PluginPermission, capability: string) => void,
   ): PluginContext['events'] {
     const holder: { proxy: PluginContext['events'] | null } = { proxy: null };
 
@@ -203,7 +156,7 @@ export class PluginSandboxService {
         const permission = EVENT_METHOD_PERMISSIONS.get(property);
         if (!permission) {
           throw new Error(
-            `Plugin "${pluginName}" attempted to use "events.${property}", which the plugin sandbox does not expose.`
+            `Plugin "${pluginName}" attempted to use "events.${property}", which the plugin sandbox does not expose.`,
           );
         }
 

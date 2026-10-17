@@ -44,15 +44,15 @@ describe('HealthSetExecutor', () => {
   });
 
   it('reports healthy from static config: reason null, source MANUAL, identifier compiled', async () => {
-    const node = createNode({ identifier: 'Shelly', status: 'healthy', reason: 'should be ignored' }, 7);
+    const node = createNode({ identifier: 'ir-bridge', status: 'healthy', reason: 'should be ignored' }, 7);
     const input = { foo: 'bar' };
 
     const result = await executor.execute(node, input, ctx);
 
-    expect(ctx.compileTemplate).toHaveBeenCalledWith('Shelly', input);
+    expect(ctx.compileTemplate).toHaveBeenCalledWith('ir-bridge', input);
     expect(resourceHealthService.reportHealth).toHaveBeenCalledWith({
       resourceId: 7,
-      identifier: 'Shelly',
+      identifier: 'ir-bridge',
       status: 'healthy',
       reason: null,
       source: 'manual',
@@ -79,14 +79,14 @@ describe('HealthSetExecutor', () => {
   });
 
   it('payload health.status override switches source to PAYLOAD and uses payload reason', async () => {
-    const node = createNode({ identifier: 'Shelly', status: 'healthy', reason: 'fallback' });
+    const node = createNode({ identifier: 'ir-bridge', status: 'healthy', reason: 'fallback' });
     const input = { health: { status: 'unhealthy', reason: 'lost wifi' } };
 
     await executor.execute(node, input, ctx);
 
     expect(resourceHealthService.reportHealth).toHaveBeenCalledWith({
       resourceId: 1,
-      identifier: 'Shelly',
+      identifier: 'ir-bridge',
       status: 'unhealthy',
       reason: 'lost wifi',
       source: 'payload',

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AttractapSessionHandler } from './handlers/session.handler';
+import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { AttractapEventType, AttractapEvent } from './websocket.types';
 import { FlowExecutionError } from '../../resources/flows/errors/flow-execution.error';
@@ -83,9 +83,7 @@ describe('AttractapSessionHandler – door action error propagation', () => {
     });
 
     it('should send stripped FlowExecutionError message on flow error', async () => {
-      mockResourceUsageService.lockDoor.mockRejectedValueOnce(
-        new FlowExecutionError('Access denied for this user'),
-      );
+      mockResourceUsageService.lockDoor.mockRejectedValueOnce(new FlowExecutionError('Access denied for this user'));
 
       await (handler as any).handleLockDoor(mockSocket, eventData);
 
@@ -100,9 +98,7 @@ describe('AttractapSessionHandler – door action error propagation', () => {
     });
 
     it('should send raw error message for non-FlowExecutionError', async () => {
-      mockResourceUsageService.lockDoor.mockRejectedValueOnce(
-        new BadRequestException('Resource is not a door'),
-      );
+      mockResourceUsageService.lockDoor.mockRejectedValueOnce(new BadRequestException('Resource is not a door'));
 
       await (handler as any).handleLockDoor(mockSocket, eventData);
 
@@ -117,21 +113,15 @@ describe('AttractapSessionHandler – door action error propagation', () => {
     });
 
     it('should log the error', async () => {
-      mockResourceUsageService.lockDoor.mockRejectedValueOnce(
-        new FlowExecutionError('Some error'),
-      );
+      mockResourceUsageService.lockDoor.mockRejectedValueOnce(new FlowExecutionError('Some error'));
 
       await (handler as any).handleLockDoor(mockSocket, eventData);
 
-      expect((handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to lock door'),
-      );
+      expect((handler as any).logger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to lock door'));
     });
 
     it('should not include FLOW_EXECUTION_ERROR prefix in logged error', async () => {
-      mockResourceUsageService.lockDoor.mockRejectedValueOnce(
-        new FlowExecutionError('Custom flow error'),
-      );
+      mockResourceUsageService.lockDoor.mockRejectedValueOnce(new FlowExecutionError('Custom flow error'));
 
       await (handler as any).handleLockDoor(mockSocket, eventData);
 
@@ -159,9 +149,7 @@ describe('AttractapSessionHandler – door action error propagation', () => {
     });
 
     it('should send stripped FlowExecutionError message on flow error', async () => {
-      mockResourceUsageService.unlockDoor.mockRejectedValueOnce(
-        new FlowExecutionError('Unlock not permitted'),
-      );
+      mockResourceUsageService.unlockDoor.mockRejectedValueOnce(new FlowExecutionError('Unlock not permitted'));
 
       await (handler as any).handleUnlockDoor(mockSocket, eventData);
 
@@ -191,9 +179,7 @@ describe('AttractapSessionHandler – door action error propagation', () => {
     });
 
     it('should log the error with stripped message for FlowExecutionError', async () => {
-      mockResourceUsageService.unlockDoor.mockRejectedValueOnce(
-        new FlowExecutionError('Unlock denied'),
-      );
+      mockResourceUsageService.unlockDoor.mockRejectedValueOnce(new FlowExecutionError('Unlock denied'));
 
       await (handler as any).handleUnlockDoor(mockSocket, eventData);
 
@@ -221,9 +207,7 @@ describe('AttractapSessionHandler – door action error propagation', () => {
     });
 
     it('should send stripped FlowExecutionError message on flow error', async () => {
-      mockResourceUsageService.unlatchDoor.mockRejectedValueOnce(
-        new FlowExecutionError('Unlatch blocked by flow'),
-      );
+      mockResourceUsageService.unlatchDoor.mockRejectedValueOnce(new FlowExecutionError('Unlatch blocked by flow'));
 
       await (handler as any).handleUnlatchDoor(mockSocket, eventData);
 

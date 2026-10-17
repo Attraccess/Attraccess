@@ -44,7 +44,7 @@ jest.mock('module', () => {
 // Imported after the jest.mock above (which jest hoists). The loader's own
 // static `import * as ... from '@attraccess/plugins-backend-sdk'` is resolved by
 // Jest's module system, not the mocked createRequire, so it still loads.
-import { loadPluginEntryExports } from './plugin-loader';
+import { loadPluginEntryExports } from './runtime/module-loader';
 
 function findRepoRoot(start: string): string {
   let dir = start;
@@ -81,11 +81,7 @@ async function buildPluginArtifact(): Promise<string> {
   // forcing a runtime require('@attraccess/plugins-backend-sdk').
   writeFileSync(
     entrySrc,
-    [
-      `import { Auth } from '${SDK_SPECIFIER}';`,
-      `export default { authType: typeof Auth };`,
-      '',
-    ].join('\n')
+    [`import { Auth } from '${SDK_SPECIFIER}';`, `export default { authType: typeof Auth };`, ''].join('\n'),
   );
 
   await build({

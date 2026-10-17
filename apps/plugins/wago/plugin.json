@@ -6,6 +6,6 @@
     "migrations": { "directory": "dist", "entryPoint": "migrations.js" },
     "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
   },
-  "attraccessVersion": { "min": "1.0.0" },
+  "attraccessVersion": { "min": "1.11.0" },
   "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS", "MANAGE_SECRETS"]
 }

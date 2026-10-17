@@ -44,6 +44,8 @@
     "safetyWarning": "Überprüfen Sie die Quelle und die angeforderten Berechtigungen vor der Installation.",
     "details": "Details",
     "installed": "Installiert",
+    "update": "Plugin aktualisieren",
+    "updateDescription": "Prüfe kompatible veröffentlichte Versionen und aktualisiere dieses installierte Marketplace-Plugin.",
     "install": "Installieren",
     "noResults": "Keine Pakete gefunden. Inkompatible Pakete bleiben mit dem Grund sichtbar.",
     "loadError": "Der Marktplatz konnte nicht geladen werden.",
@@ -83,7 +85,13 @@
     "cancel": "Abbrechen",
     "confirmInstall": "Plugin installieren",
     "installSuccess": "Plugin installiert. Die App startet in wenigen Sekunden zur Aktivierung neu.",
-    "installError": "Das Plugin wurde nicht installiert. Bitte erneut versuchen."
+    "installError": "Das Plugin wurde nicht installiert.",
+    "installPermissionHelp": "Melden Sie sich mit einer Rolle an, die Plugins verwalten darf, und versuchen Sie es erneut.",
+    "installRouteHelp": "Laden Sie Attraccess neu, um den aktuellen Client zu verwenden. Falls der Fehler bleibt, prüfen Sie, ob Frontend und API dieselbe Version haben.",
+    "installCompatibilityHelp": "Wählen Sie eine Plugin-Version, die mit dieser Attraccess-Version kompatibel ist.",
+    "installVersionHelp": "Aktualisieren Sie den Marketplace und wählen Sie eine verfügbare Version.",
+    "installServerHelp": "Prüfen Sie die API-Serverprotokolle auf den Installationsfehler und versuchen Sie es erneut.",
+    "installRetryHelp": "Prüfen Sie die Verbindung zur Registry und versuchen Sie es erneut."
   },
   "columns": {
     "name": "Name",
@@ -123,7 +131,15 @@
     "saved": "Update-Regel gespeichert",
     "saveError": "Update-Regel konnte nicht gespeichert werden",
     "available": "Update verfügbar",
-    "modes": { "off": "Aus", "patch": "Nur Patches", "minor": "Patches und Minor", "follow": "Paketregel folgen" }
+    "availableTitle": "Plugin-Updates sind verfügbar",
+    "availableDescription": "{{count}} installiertes Marketplace-Plugin kann aktualisiert werden. Prüfe die verfügbare Version vor der Installation.",
+    "reviewUpdates": "Updates prüfen",
+    "modes": {
+      "off": "Aus",
+      "patch": "Nur Patches",
+      "minor": "Patches und Minor",
+      "follow": "Paketregel folgen"
+    }
   },
   "deleteTooltip": "Plugin entfernen",
   "aside": {
@@ -188,6 +204,24 @@
     "cancel": "Abbrechen",
     "update": "Aktualisieren",
     "downgrade": "Downgrade",
-    "direction": { "current": "Aktuell", "newer": "Neuer", "older": "Älter" }
+    "direction": {
+      "current": "Aktuell",
+      "newer": "Neuer",
+      "older": "Älter"
+    }
+  },
+  "dependencies": {
+    "title": "Plugin-Abhängigkeiten",
+    "description": "Erforderliche Plugins einschließlich indirekter Abhängigkeiten sind Teil dieses Vorgangs.",
+    "loading": "Abhängigkeiten werden aufgelöst…",
+    "required": "Erforderlich",
+    "optional": "Optional (wird nicht automatisch installiert)",
+    "install": "Wird installiert",
+    "reuse": "Bereits installiert · wird weiterverwendet",
+    "replace": "Wird ersetzt",
+    "requiredBy": "Von installierten Plugins benötigt",
+    "removalDescription": "Behalte dieses Plugin oder entferne die folgenden abhängigen Plugins ausdrücklich zusammen. Plugin-Daten bleiben erhalten.",
+    "removeTogether": "Diese abhängigen Plugins ebenfalls entfernen",
+    "approveChanges": "Ich bestätige die Installation dieser Abhängigkeiten und ihre Berechtigungen"
   }
 }

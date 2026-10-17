@@ -1,53 +1,51 @@
-import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  Chip,
   InputGroup,
   Label,
   ModalBody,
   ModalFooter,
   ModalHeader,
   ModalHeading,
+  Spinner,
+  TextField,
+  Tooltip,
+  TooltipContent,
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Chip,
   NumberField,
   NumberFieldGroup,
   NumberFieldIncrementButton,
   NumberFieldDecrementButton,
   NumberFieldInput,
-  Spinner,
-  TextField,
-  Tooltip,
-  TooltipContent,
   useOverlayState,
 } from '@heroui/react';
 import { ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
+import { SettingsSection } from '../../components/SettingsSection';
+import { SettingsSaveBar } from '../../components/SettingsSaveBar';
+import { Button } from '../../../../components/button/index';
+import { StandardModal } from '../../../../components/standardModal';
+import { SettingsRow } from '../../components/SettingsRow';
+import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
+import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  MetricsTogglesDto,
   useSettingsServiceDeleteMetricsApiKey,
   useSettingsServiceGenerateMetricsApiKey,
   useSettingsServiceGetMetricsSettings,
   UseSettingsServiceGetMetricsSettingsKeyFn,
   useSettingsServiceUpdateMetricsSettings,
+  MetricsTogglesDto,
 } from '@attraccess/react-query-client';
-import { SettingsSection } from '../../components/SettingsSection';
-import { SettingsRow } from '../../components/SettingsRow';
-import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { Button } from '../../../../components/button';
-import { StandardModal } from '../../../../components/standardModal';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useToastMessage } from '../../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
 
-type ToggleKey = keyof MetricsTogglesDto;
+export type ToggleKey = keyof MetricsTogglesDto;
 
-const TOGGLE_ORDER: ToggleKey[] = ['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'];
-
-export function MonitoringSection() {
+export function useMonitoringSectionState() {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
@@ -125,7 +123,10 @@ export function MonitoringSection() {
       // stuck dirty forever).
       queryClient.setQueryData(UseSettingsServiceGetMetricsSettingsKeyFn(), data);
       setThresholdDraft(undefined);
-      toast.success({ title: t('slowQueryThreshold.savedTitle'), description: t('slowQueryThreshold.savedDescription') });
+      toast.success({
+        title: t('slowQueryThreshold.savedTitle'),
+        description: t('slowQueryThreshold.savedDescription'),
+      });
     },
     onError() {
       toast.error({ title: t('slowQueryThreshold.errorTitle'), description: t('slowQueryThreshold.errorDescription') });
@@ -152,6 +153,206 @@ export function MonitoringSection() {
   // Clearing the field yields NaN, which is still a departure from the saved value: the bar has to
   // stay mounted because Discard is the only way back to it. It just must not be committable.
   const isThresholdDirty = isThresholdSavable ? threshold !== savedThreshold : savedThreshold !== undefined;
+  return {
+    t,
+    generatedKey,
+    setGeneratedKey,
+    pendingToggle,
+    setPendingToggle,
+    setThresholdDraft,
+    rerollModal,
+    removeModal,
+    metricsSettings,
+    isLoading,
+    threshold,
+    metricsEndpointUrl,
+    prometheusSnippet,
+    generateApiKey,
+    isGenerating,
+    deleteApiKey,
+    isDeleting,
+    updateToggle,
+    isUpdatingToggles,
+    updateThreshold,
+    isSavingThreshold,
+    copyToClipboard,
+    isThresholdSavable,
+    isThresholdDirty,
+  } as const;
+}
+
+export const TOGGLE_ORDER: ToggleKey[] = ['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'];
+
+type Props = Pick<
+  ReturnType<typeof useMonitoringSectionState>,
+  | 'generatedKey'
+  | 't'
+  | 'copyToClipboard'
+  | 'setGeneratedKey'
+  | 'isGenerating'
+  | 'metricsSettings'
+  | 'rerollModal'
+  | 'generateApiKey'
+  | 'removeModal'
+  | 'isUpdatingToggles'
+  | 'pendingToggle'
+  | 'setPendingToggle'
+  | 'updateToggle'
+  | 'threshold'
+  | 'setThresholdDraft'
+>;
+
+export function MonitoringSectionApiKeyLabel({
+  generatedKey,
+  t,
+  copyToClipboard,
+  setGeneratedKey,
+  isGenerating,
+  metricsSettings,
+  rerollModal,
+  generateApiKey,
+  removeModal,
+  isUpdatingToggles,
+  pendingToggle,
+  setPendingToggle,
+  updateToggle,
+  threshold,
+  setThresholdDraft,
+}: Props) {
+  return (
+    <div className="flex flex-col">
+      <SettingsRow stacked={!!generatedKey} label={t('apiKeyLabel')} hint={t('description')}>
+        {generatedKey ? (
+          <div className="flex w-full flex-col gap-2">
+            {/* HeroUI's own warning surface, not `text-warning-600` — v2's numbered colour
+                  scales compile to nothing under v3 (ATT-858). */}
+            <Alert status="warning">
+              <AlertStatusIcon status="warning" />
+              <AlertContent>
+                <AlertDescription>{t('warning')}</AlertDescription>
+              </AlertContent>
+            </Alert>
+            <TextField value={generatedKey} isReadOnly aria-label={t('apiKeyLabel')}>
+              <InputGroup>
+                <InputGroup.Input className="font-mono text-sm" />
+                <InputGroup.Suffix>
+                  <Tooltip>
+                    <Button
+                      variant="ghost"
+                      isIconOnly
+                      aria-label={t('copyButton')}
+                      onPress={() => copyToClipboard(generatedKey, t('copied.title'), t('copied.description'))}
+                    >
+                      <ClipboardCopyIcon size={16} />
+                    </Button>
+                    <TooltipContent>{t('copyButton')}</TooltipContent>
+                  </Tooltip>
+                </InputGroup.Suffix>
+              </InputGroup>
+            </TextField>
+            <Button variant="secondary" size="sm" onPress={() => setGeneratedKey(null)}>
+              {t('doneButton')}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              isPending={isGenerating}
+              onPress={() => (metricsSettings?.apiKeyConfigured ? rerollModal.open() : generateApiKey())}
+            >
+              {metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
+              {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
+            </Button>
+            {metricsSettings?.apiKeyConfigured && (
+              <Button variant="danger-soft" size="sm" onPress={removeModal.open}>
+                <Trash2Icon size={16} />
+                {t('removeButton')}
+              </Button>
+            )}
+          </div>
+        )}
+      </SettingsRow>
+
+      {metricsSettings?.toggles &&
+        TOGGLE_ORDER.map((subsystem) => (
+          <SettingsRow
+            key={subsystem}
+            data-testid={`metrics-toggle-row-${subsystem}`}
+            label={
+              <span className="flex items-center gap-2">
+                {t(`toggles.${subsystem}.label`)}
+                {subsystem === 'db' && (
+                  <Chip size="sm" color="warning">
+                    {t('toggles.highCostBadge')}
+                  </Chip>
+                )}
+              </span>
+            }
+            hint={t(`toggles.${subsystem}.description`)}
+          >
+            {/* The row owns the layout, so the switch no longer needs the old
+                  `contentClassName="w-full items-start"` workaround to stay put. */}
+            <LabeledSwitch
+              data-testid={`metrics-toggle-${subsystem}`}
+              aria-label={t(`toggles.${subsystem}.label`)}
+              isSelected={metricsSettings.toggles[subsystem]}
+              isDisabled={isUpdatingToggles && pendingToggle !== null}
+              onChange={(value) => {
+                setPendingToggle(subsystem);
+                updateToggle({ requestBody: { toggles: { [subsystem]: value } } });
+              }}
+            />
+          </SettingsRow>
+        ))}
+
+      <SettingsRow label={t('slowQueryThreshold.title')} hint={t('slowQueryThreshold.description')}>
+        <NumberField
+          value={threshold}
+          onChange={setThresholdDraft}
+          minValue={0}
+          step={0.1}
+          aria-label={t('slowQueryThreshold.label')}
+        >
+          <NumberFieldGroup>
+            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+            <NumberFieldInput />
+            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+          </NumberFieldGroup>
+        </NumberField>
+      </SettingsRow>
+    </div>
+  );
+}
+
+export function MonitoringSection() {
+  const {
+    t,
+    generatedKey,
+    setGeneratedKey,
+    pendingToggle,
+    setPendingToggle,
+    setThresholdDraft,
+    rerollModal,
+    removeModal,
+    metricsSettings,
+    isLoading,
+    threshold,
+    metricsEndpointUrl,
+    prometheusSnippet,
+    generateApiKey,
+    isGenerating,
+    deleteApiKey,
+    isDeleting,
+    updateToggle,
+    isUpdatingToggles,
+    updateThreshold,
+    isSavingThreshold,
+    copyToClipboard,
+    isThresholdSavable,
+    isThresholdDirty,
+  } = useMonitoringSectionState();
 
   if (isLoading) {
     return (
@@ -174,7 +375,9 @@ export function MonitoringSection() {
                 variant="ghost"
                 isIconOnly
                 aria-label={t('copyButton')}
-                onPress={() => copyToClipboard(metricsEndpointUrl, t('endpointCopied.title'), t('endpointCopied.description'))}
+                onPress={() =>
+                  copyToClipboard(metricsEndpointUrl, t('endpointCopied.title'), t('endpointCopied.description'))
+                }
               >
                 <ClipboardCopyIcon size={16} />
               </Button>
@@ -202,109 +405,25 @@ export function MonitoringSection() {
 
   return (
     <SettingsSection title={t('title')} description={t('sectionDescription')} aside={aside}>
-      <div className="flex flex-col">
-        <SettingsRow stacked={!!generatedKey} label={t('apiKeyLabel')} hint={t('description')}>
-          {generatedKey ? (
-            <div className="flex w-full flex-col gap-2">
-              {/* HeroUI's own warning surface, not `text-warning-600` — v2's numbered colour
-                  scales compile to nothing under v3 (ATT-858). */}
-              <Alert status="warning">
-                <AlertStatusIcon status="warning" />
-                <AlertContent>
-                  <AlertDescription>{t('warning')}</AlertDescription>
-                </AlertContent>
-              </Alert>
-              <TextField value={generatedKey} isReadOnly aria-label={t('apiKeyLabel')}>
-                <InputGroup>
-                  <InputGroup.Input className="font-mono text-sm" />
-                  <InputGroup.Suffix>
-                    <Tooltip>
-                      <Button
-                        variant="ghost"
-                        isIconOnly
-                        aria-label={t('copyButton')}
-                        onPress={() => copyToClipboard(generatedKey, t('copied.title'), t('copied.description'))}
-                      >
-                        <ClipboardCopyIcon size={16} />
-                      </Button>
-                      <TooltipContent>{t('copyButton')}</TooltipContent>
-                    </Tooltip>
-                  </InputGroup.Suffix>
-                </InputGroup>
-              </TextField>
-              <Button variant="secondary" size="sm" onPress={() => setGeneratedKey(null)}>
-                {t('doneButton')}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                isPending={isGenerating}
-                onPress={() => (metricsSettings?.apiKeyConfigured ? rerollModal.open() : generateApiKey())}
-              >
-                {metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
-                {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
-              </Button>
-              {metricsSettings?.apiKeyConfigured && (
-                <Button variant="danger-soft" size="sm" onPress={removeModal.open}>
-                  <Trash2Icon size={16} />
-                  {t('removeButton')}
-                </Button>
-              )}
-            </div>
-          )}
-        </SettingsRow>
-
-        {metricsSettings?.toggles &&
-          TOGGLE_ORDER.map((subsystem) => (
-            <SettingsRow
-              key={subsystem}
-              data-testid={`metrics-toggle-row-${subsystem}`}
-              label={
-                <span className="flex items-center gap-2">
-                  {t(`toggles.${subsystem}.label`)}
-                  {subsystem === 'db' && (
-                    <Chip size="sm" color="warning">
-                      {t('toggles.highCostBadge')}
-                    </Chip>
-                  )}
-                </span>
-              }
-              hint={t(`toggles.${subsystem}.description`)}
-            >
-              {/* The row owns the layout, so the switch no longer needs the old
-                  `contentClassName="w-full items-start"` workaround to stay put. */}
-              <LabeledSwitch
-                data-testid={`metrics-toggle-${subsystem}`}
-                aria-label={t(`toggles.${subsystem}.label`)}
-                isSelected={metricsSettings.toggles[subsystem]}
-                isDisabled={isUpdatingToggles && pendingToggle !== null}
-                onChange={(value) => {
-                  setPendingToggle(subsystem);
-                  updateToggle({ requestBody: { toggles: { [subsystem]: value } } });
-                }}
-              />
-            </SettingsRow>
-          ))}
-
-        <SettingsRow label={t('slowQueryThreshold.title')} hint={t('slowQueryThreshold.description')}>
-          <NumberField
-            value={threshold}
-            onChange={setThresholdDraft}
-            minValue={0}
-            step={0.1}
-            aria-label={t('slowQueryThreshold.label')}
-          >
-            <NumberFieldGroup>
-              <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-              <NumberFieldInput />
-              <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-            </NumberFieldGroup>
-          </NumberField>
-        </SettingsRow>
-      </div>
+      <MonitoringSectionApiKeyLabel
+        {...{
+          generatedKey,
+          t,
+          copyToClipboard,
+          setGeneratedKey,
+          isGenerating,
+          metricsSettings,
+          rerollModal,
+          generateApiKey,
+          removeModal,
+          isUpdatingToggles,
+          pendingToggle,
+          setPendingToggle,
+          updateToggle,
+          threshold,
+          setThresholdDraft,
+        }}
+      />
 
       <SettingsSaveBar
         isDirty={isThresholdDirty}

@@ -1,3 +1,4 @@
+import { LiveUpdatesModule } from '../live-updates/live-updates.module';
 import { AppController } from './app.controller';
 import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
@@ -13,7 +14,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { resolve } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { AttractapModule } from '../attractap/attractap.module';
 import { CompanionModule } from '../companion/companion.module';
@@ -36,6 +37,8 @@ import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+const logger = new Logger('AppModule');
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -57,14 +60,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
       useFactory: (configService: ConfigService) => {
         const appConfig = configService.get<AppConfigType>('app');
         if (!appConfig || !appConfig.STATIC_DOCS_FILE_PATH) {
-          // eslint-disable-next-line no-console
-          console.error('STATIC_DOCS_FILE_PATH not configured. Docs will not be served.');
+          logger.error('STATIC_DOCS_FILE_PATH not configured. Docs will not be served.');
           return [];
         }
         const resolvedDocsPath = resolve(appConfig.STATIC_DOCS_FILE_PATH);
 
-        // eslint-disable-next-line no-console
-        console.log('Serving docs from (via config): ', resolvedDocsPath);
+        logger.log(`Serving docs from (via config): ${resolvedDocsPath}`);
 
         return [
           {
@@ -81,14 +82,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
       useFactory: (configService: ConfigService) => {
         const storageConfig = configService.get<StorageConfigType>('storage');
         if (!storageConfig || !storageConfig.cdn.root) {
-          // eslint-disable-next-line no-console
-          console.error('CDN_ROOT not configured. CDN will not be served.');
+          logger.error('CDN_ROOT not configured. CDN will not be served.');
           return [];
         }
 
         const cdnRoot = resolve(storageConfig.cdn.root);
-        // eslint-disable-next-line no-console
-        console.log('Serving cdn files from (via config): ', cdnRoot);
+        logger.log(`Serving cdn files from (via config): ${cdnRoot}`);
         return [
           {
             rootPath: cdnRoot,
@@ -103,13 +102,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
       useFactory: (configService: ConfigService) => {
         const appConfig = configService.get<AppConfigType>('app');
         if (!appConfig || !appConfig.STATIC_FRONTEND_FILE_PATH) {
-          // eslint-disable-next-line no-console
-          console.error('STATIC_FRONTEND_FILE_PATH not configured. Frontend will not be served.');
+          logger.error('STATIC_FRONTEND_FILE_PATH not configured. Frontend will not be served.');
           return [];
         }
         const resolvedFrontendPath = resolve(appConfig.STATIC_FRONTEND_FILE_PATH);
-        // eslint-disable-next-line no-console
-        console.log('Serving frontend from (via config): ', resolvedFrontendPath);
+        logger.log(`Serving frontend from (via config): ${resolvedFrontendPath}`);
         return [
           {
             rootPath: resolvedFrontendPath,
@@ -133,6 +130,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     MessagingModule,
     PushModule,
     NotificationsModule,
+    LiveUpdatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -147,16 +145,15 @@ export class AppModule implements OnModuleInit {
     try {
       const licenseKey = await this.settingsService.getLicenseKey();
       if (!licenseKey) {
-        // eslint-disable-next-line no-console
-        console.warn('LICENSE_KEY not configured yet. Skipping initial license validation.');
+        logger.warn('LICENSE_KEY not configured yet. Skipping initial license validation.');
         return;
       }
 
       await this.licenseService.verifyLicense();
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error(error);
-      process.exit(1);
+      logger.error(error);
+      // Let main's bootstrap handler drain configured destinations before exit.
+      throw error;
     }
   }
 }

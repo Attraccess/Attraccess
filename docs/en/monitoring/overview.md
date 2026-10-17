@@ -1,6 +1,6 @@
 # Monitoring & Metrics
 
-Attraccess includes built-in monitoring support using **Prometheus** for metrics collection and **Grafana** for visualization. This gives you real-time insight into how your makerspace is being used, system health, and operational performance.
+Attraccess includes built-in monitoring support using **Prometheus** for metrics collection and **Grafana** for visualization. IT and operations teams can monitor resource usage, application health and operational performance alongside their existing infrastructure.
 
 ## What You Get
 
@@ -11,7 +11,7 @@ Attraccess includes built-in monitoring support using **Prometheus** for metrics
 | **Users** | Total users, new registrations |
 | **Resources** | Active usage sessions, session durations, introductions completed |
 | **Maintenance** | Maintenance events, overdue maintenance alerts |
-| **Attractap Devices** | Connected NFC readers, tap events, firmware updates |
+| **Attractap Devices** | Connected RFID readers, tap events, firmware updates |
 | **Billing** | Transaction counts and amounts |
 | **Infrastructure** | MQTT server health, WebSocket connections, email delivery, plugin status |
 | **Node.js Runtime** | CPU usage, memory (heap/RSS), event loop lag |

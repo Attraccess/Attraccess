@@ -1,8 +1,8 @@
 // Plugin extension-point ids exposed by the MQTT UI.
 //
 // These are generic, host-owned slot ids — plugins target them by string via
-// `AttraccessFrontendPlugin.getSlotContributions()`. No vendor specifics (e.g.
-// RabbitMQ) live here or in the slot contract; the core only knows "render
+// `AttraccessFrontendPlugin.getSlotContributions()`. No vendor or plugin
+// specifics live here or in the slot contract; the core only knows "render
 // whatever plugins contribute for this MQTT server".
 //
 // Contract: both slots receive `{ mqttServerId: number }` as their context so a

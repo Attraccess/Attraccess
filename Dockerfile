@@ -32,26 +32,27 @@ RUN corepack enable && pnpm install --frozen-lockfile
 # Copy the rest of the application
 COPY . .
 
-# Build the application. The Attractap firmware is NOT built here (no ESP-IDF
-# in this image — build_firmwares.py skips itself); CI pre-builds it into
-# apps/attractap/firmware/firmware_output/ before invoking docker build, and
-# the api build bundles it into its assets.
-RUN pnpm nx run-many -t build --projects=api,frontend
+# CI supplies tested installers and firmware. Bundle and validate them without
+# recompiling either deliverable inside the server image.
+RUN node apps/api/copy-companion-into-assets.js && \
+    node apps/api/copy-attractap-firmware-into-assets.js && \
+    node scripts/validate-api-assets.mjs --companion=all --attractap && \
+    pnpm nx run-many -t build --projects=api,frontend
 
 # Fail loudly if the image would ship without any firmware — an empty manifest
 # breaks OTA updates and the /api/attractap/firmwares endpoint (ATT-715).
-RUN node -e "const f = require('/app/dist/apps/api/assets/attractap-firmwares/firmwares.json'); if (!f.firmwares.length) { console.error('No Attractap firmwares bundled. Build them first: cd apps/attractap/firmware && python3 build_firmwares.py (requires ESP-IDF v5.5)'); process.exit(1); }"
+RUN node scripts/validate-api-assets.mjs --assets-dir=dist/apps/api/assets --companion=all --attractap --compare-to=apps/api/src/assets
 
 # Strip stray pnpm config Nx copies into generated dist package.json files;
 # pnpm 10 only respects pnpm.overrides / pnpm.onlyBuiltDependencies at the workspace root.
 RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagger/package.json']) { const fs = require('fs'); if (!fs.existsSync(p)) continue; const j = JSON.parse(fs.readFileSync(p, 'utf8')); delete j.pnpm; fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n'); }"
 
-# pnpm 10 errors on unused patches during deploy; @swc-node/register and
-# ts-api-utils are dev-only tools absent from the API's production dep tree.
+# pnpm 10 errors on unused patches during deploy; @swc-node/register,
+# ts-api-utils and crap-score are dev-only tools absent from the API's production dep tree.
 # Strip them from both pnpm-lock.yaml (patchedDependencies block) and from the
 # root package.json so pnpm deploy sees no stale patch declarations.
-RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  ts-api-utils@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);" && \
-    node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); const d=p.pnpm.patchedDependencies; for (const k of Object.keys(d)) if (k.startsWith('@swc-node/register@') || k.startsWith('ts-api-utils@')) delete d[k]; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  (?:ts-api-utils|crap-score)@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);" && \
+    node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); const d=p.pnpm.patchedDependencies; for (const k of Object.keys(d)) if (k.startsWith('@swc-node/register@') || k.startsWith('ts-api-utils@') || k.startsWith('crap-score@')) delete d[k]; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
 
 # pnpm 10's new deploy requires a workspace shared lockfile; --ignore-workspace
 # strips that, so use --legacy for the self-contained dist/apps/api package.
@@ -102,6 +103,12 @@ ENV ESP_COREDUMP_RISCV_GDB=/opt/esp-gdb/riscv32-esp-elf-gdb/bin/riscv32-esp-elf-
 COPY --from=builder /app/dist dist
 COPY --from=builder /app/docs docs
 COPY --from=builder /app/deploy/api /app/dist/apps/api
+
+# Large controller assets are server-owned, never embedded in the 50 MiB npm
+# plugin package. Missing/mismatched assets fail the server image build.
+COPY --from=builder --chown=appuser:appuser /app/apps/plugins/wago/runtime-assets/cc100-build /app/share/cc100-runtime
+RUN gosu appuser node -e "const fs=require('fs'),crypto=require('crypto'),p='/app/share/cc100-runtime/',r=JSON.parse(fs.readFileSync(p+'release.json'));const b=fs.readFileSync(p+'wago-cc100-runtime.tar');if(r.schemaVersion!==1 || b.length!==r.bundleBytes || crypto.createHash('sha256').update(b).digest('hex')!==r.bundleSha256) throw new Error('Invalid build-owned CC100 assets');"
+ENV WAGO_CC100_BUILD_ASSETS_PATH=/app/share/cc100-runtime
 
 # Bundle sidecar configs (Prometheus rules, Grafana provisioning, dashboards)
 # so they can be copied into shared volumes by a monitoring-init container.

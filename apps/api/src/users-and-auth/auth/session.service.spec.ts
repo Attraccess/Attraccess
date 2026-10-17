@@ -25,7 +25,15 @@ describe('SessionService', () => {
 
   function makeStore(): jest.Mocked<SessionStore> {
     return {
+      getSsoContext: jest.fn().mockResolvedValue(null),
+      revokeSsoSessionsOnce: jest.fn().mockResolvedValue({ fresh: false, count: 0 }),
+      revokeSsoSessions: jest.fn().mockResolvedValue(0),
+      putLogoutState: jest.fn().mockResolvedValue(false),
+      takeLogoutState: jest.fn().mockResolvedValue(null),
+      getLogoutSession: jest.fn().mockResolvedValue(null),
+      revokeLogoutSession: jest.fn().mockResolvedValue(false),
       createSession: jest.fn().mockResolvedValue(undefined),
+      authenticateSession: jest.fn().mockResolvedValue(null),
       validateSession: jest.fn().mockResolvedValue(null),
       rotateSession: jest.fn().mockResolvedValue(false),
       revokeSession: jest.fn().mockResolvedValue(false),
@@ -39,9 +47,9 @@ describe('SessionService', () => {
 
   beforeEach(async () => {
     mockRandomBytes.mockReturnValue({
-      toString: jest.fn().mockImplementation((enc?: string) =>
-        enc === 'base64url' ? 'mocked-random-token' : 'mocked-random-token'
-      ),
+      toString: jest
+        .fn()
+        .mockImplementation((enc?: string) => (enc === 'base64url' ? 'mocked-random-token' : 'mocked-random-token')),
     } as unknown as Buffer);
 
     store = makeStore();
@@ -53,7 +61,7 @@ describe('SessionService', () => {
         { provide: SESSION_STORE, useValue: store },
         { provide: TokenHashService, useValue: { hashToken: jest.fn((t: string) => `hashed:${t}`) } },
         { provide: MetricsService, useValue: metrics },
-        { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
+        { provide: CronTimer, useValue: { time: <T>(_n: string, fn: () => Promise<T>) => fn() } },
       ],
     }).compile();
 
@@ -72,9 +80,9 @@ describe('SessionService', () => {
     store.countActive.mockResolvedValue(0);
 
     mockRandomBytes.mockReturnValue({
-      toString: jest.fn().mockImplementation((enc?: string) =>
-        enc === 'base64url' ? 'mocked-random-token' : 'mocked-random-token'
-      ),
+      toString: jest
+        .fn()
+        .mockImplementation((enc?: string) => (enc === 'base64url' ? 'mocked-random-token' : 'mocked-random-token')),
     } as unknown as Buffer);
   });
 
@@ -90,24 +98,14 @@ describe('SessionService', () => {
     it('should return raw token and delegate to store', async () => {
       const result = await service.createSession(mockUser);
       expect(result).toBe('mocked-random-token');
-      expect(store.createSession).toHaveBeenCalledWith(
-        'hashed:mocked-random-token',
-        1,
-        undefined,
-        expect.any(Date),
-      );
+      expect(store.createSession).toHaveBeenCalledWith('hashed:mocked-random-token', 1, undefined, expect.any(Date));
       expect(metrics.authActiveSessions.inc).toHaveBeenCalled();
     });
 
     it('should pass metadata to store', async () => {
       const metadata: SessionMetadata = { userAgent: 'UA', ipAddress: '1.2.3.4', expiresIn: 3600 };
       await service.createSession(mockUser, metadata);
-      expect(store.createSession).toHaveBeenCalledWith(
-        'hashed:mocked-random-token',
-        1,
-        metadata,
-        expect.any(Date),
-      );
+      expect(store.createSession).toHaveBeenCalledWith('hashed:mocked-random-token', 1, metadata, expect.any(Date));
     });
 
     it('should clamp expiration to 168 hours max', async () => {
@@ -143,11 +141,7 @@ describe('SessionService', () => {
       store.rotateSession.mockResolvedValue(true);
       const result = await service.refreshSession('old-token');
       expect(result).toBe('mocked-random-token');
-      expect(store.rotateSession).toHaveBeenCalledWith(
-        'old-token',
-        'hashed:mocked-random-token',
-        expect.any(Date),
-      );
+      expect(store.rotateSession).toHaveBeenCalledWith('old-token', 'hashed:mocked-random-token', expect.any(Date));
     });
 
     it('should return null when store signals session not found', async () => {

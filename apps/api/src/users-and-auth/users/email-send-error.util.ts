@@ -11,7 +11,13 @@ export function mapEmailSendError(error: unknown): never {
   }
 
   const code = (error as { code?: string })?.code;
-  if (code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || code === 'ECONNRESET') {
+  if (
+    code === 'ECONNREFUSED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'ENOTFOUND' ||
+    code === 'EAI_AGAIN'
+  ) {
     throw new ServiceUnavailableException('EmailSendFailed');
   }
   throw error;

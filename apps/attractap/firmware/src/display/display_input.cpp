@@ -1,6 +1,9 @@
 #include "display.hpp"
 #include <functional>
 
+uint32_t Display::touchPressSequence = 0;
+static bool touchPressed = false;
+
 // Input dispatch and frame flushing: bridges the display driver to LVGL's
 // flush/indev callbacks and forwards touch points to an optional consumer.
 
@@ -19,6 +22,7 @@ void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
 {
     if (!Display::driver)
     {
+        touchPressed = false;
         data->state = LV_INDEV_STATE_RELEASED;
         return;
     }
@@ -26,11 +30,14 @@ void Display::touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data)
     TouchPoint point;
     if (!Display::driver->readTouch(point) || !point.pressed)
     {
+        touchPressed = false;
         data->state = LV_INDEV_STATE_RELEASED;
         Display::handleGestureSample(0, 0, false);
         return;
     }
 
+    if (!touchPressed) ++Display::touchPressSequence;
+    touchPressed = true;
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = point.x;
     data->point.y = point.y;

@@ -5,12 +5,17 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VerifyEmail } from './index';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useMutation } from '@tanstack/react-query';
 import { ToastProvider } from '../../components/toastProvider';
 import { Providers } from '@attraccess/ui';
+import en from './en.json';
+import de from './de.json';
 
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
+const locale = vi.hoisted(() => ({ current: 'en' }));
+const pending = vi.hoisted(() => ({ verify: false, resend: false }));
+const mutationMode = vi.hoisted(() => ({ reactive: false }));
 let verifyOnError: ((error: unknown) => void) | undefined;
 let verifyOnSuccess: (() => void) | undefined;
 let resendOnSuccess: (() => void) | undefined;
@@ -21,28 +26,18 @@ vi.mock('@attraccess/plugins-frontend-ui', async () => {
   );
   return {
     ...actual,
-    useTranslations: () => {
-      const translations: Record<string, string> = {
-        'success.title': 'Email Verified!',
-        'success.message': 'Your email has been successfully verified.',
-        'success.goToLogin': 'Go to Login',
-        'error.title': 'Verification Failed',
-        'error.tryAgain': 'Try Again',
-        'error.backToLogin': 'Back to Login',
-        'error.errorTitle': 'Error',
-        'resend.prompt': 'Need a new verification link?',
-        'resend.emailLabel': 'Email address',
-        'resend.button': 'Resend verification email',
-        'resend.successTitle': 'Email sent!',
-        'resend.successMessage': 'A new verification link has been sent.',
-        'apiErrors.UserEmailInvalidVerificationTokenException': 'Invalid verification token.',
-        'apiErrors.UserEmailVerificationTokenExpiredException': 'Your verification link has expired.',
-        'apiErrors.invalidLink': 'Invalid verification link.',
-        'apiErrors.unexpectedError': 'An unexpected error occurred',
-      };
-
-      const t = (key: string) => translations[key] ?? key;
-      const tExists = (key: string) => Boolean(translations[key]);
+    useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+      const translations = locales[locale.current];
+      const lookup = (key: string) =>
+        key
+          .split('.')
+          .reduce<unknown>(
+            (value, part) =>
+              value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+            translations,
+          );
+      const t = (key: string) => lookup(key) ?? key;
+      const tExists = (key: string) => lookup(key) !== undefined;
       return { t, tExists };
     },
   };
@@ -52,11 +47,15 @@ vi.mock('@attraccess/react-query-client', () => ({
   useUsersServiceVerifyEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
     verifyOnSuccess = options?.onSuccess;
     verifyOnError = options?.onError;
-    return { mutate: verifyMutateMock, isPending: false };
+    const mutation = useMutation({
+      mutationFn: async (variables: { requestBody: { token: string; email: string } }) => verifyMutateMock(variables),
+      ...options,
+    });
+    return mutationMode.reactive ? mutation : { mutate: verifyMutateMock, isPending: pending.verify };
   },
   useUsersServiceResendVerificationEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
     resendOnSuccess = options?.onSuccess;
-    return { mutate: resendMutateMock, isPending: false };
+    return { mutate: resendMutateMock, isPending: pending.resend };
   },
   useUsersServiceGetCurrentKey: 'useUsersServiceGetCurrentKey',
   ApiError: class ApiError extends Error {},
@@ -69,40 +68,66 @@ vi.mock('../../utils/apiError', () => ({
   }),
 }));
 
-function renderWithRoute(initialEntry: string) {
+function renderWithRoute(initialEntry: string, strict = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const content = (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Providers>
           <ToastProvider>
             <Routes>
               <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/" element={<h1>Sign-in destination</h1>} />
             </Routes>
           </ToastProvider>
         </Providers>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  return render(strict ? <React.StrictMode>{content}</React.StrictMode> : content);
 }
 
 describe('VerifyEmail', () => {
   beforeEach(() => {
+    mutationMode.reactive = false;
     verifyMutateMock.mockReset();
     resendMutateMock.mockReset();
     verifyOnError = undefined;
     verifyOnSuccess = undefined;
     resendOnSuccess = undefined;
+    locale.current = 'en';
+    pending.verify = false;
+    pending.resend = false;
   });
 
-  it('calls verifyEmail mutation with token and email from URL params', () => {
+  it('keeps explicit retry available after a failed initial verification in StrictMode', async () => {
+    mutationMode.reactive = true;
+    verifyMutateMock.mockRejectedValue(new Error('expired'));
+    const user = userEvent.setup();
+    renderWithRoute('/verify-email?email=test%40example.com&token=expired', true);
+
+    const retry = await screen.findByRole('button', { name: 'Verify email again' });
+    await waitFor(() => expect(retry).toBeEnabled());
+    expect(verifyMutateMock).toHaveBeenCalledTimes(1);
+
+    await user.click(retry);
+    await waitFor(() => expect(retry).toBeEnabled());
+    expect(verifyMutateMock).toHaveBeenCalledTimes(2);
+    expect(verifyMutateMock).toHaveBeenLastCalledWith({
+      requestBody: { token: 'expired', email: 'test@example.com' },
+    });
+  });
+
+  it('calls verifyEmail mutation with token and email from URL params', async () => {
     renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
 
-    expect(verifyMutateMock).toHaveBeenCalledWith({
-      requestBody: { token: 'abc123', email: 'test@example.com' },
-    });
+    await waitFor(() =>
+      expect(verifyMutateMock).toHaveBeenCalledWith({
+        requestBody: { token: 'abc123', email: 'test@example.com' },
+      }),
+    );
   });
 
   it('shows success card after successful verification', async () => {
@@ -110,8 +135,8 @@ describe('VerifyEmail', () => {
     act(() => verifyOnSuccess?.());
 
     await waitFor(() => {
-      expect(screen.getByText('Email Verified!')).toBeInTheDocument();
-      expect(screen.getByText('Go to Login')).toBeInTheDocument();
+      expect(screen.getByText(en.success.title)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to sign in' })).toBeInTheDocument();
     });
   });
 
@@ -120,19 +145,69 @@ describe('VerifyEmail', () => {
     act(() => verifyOnError?.(new Error('expired')));
 
     await waitFor(() => {
-      expect(screen.getByText('Verification Failed')).toBeInTheDocument();
-      expect(screen.getByText('Need a new verification link?')).toBeInTheDocument();
+      expect(screen.getByText(en.error.title)).toBeInTheDocument();
+      expect(screen.getByText(en.resend.prompt)).toBeInTheDocument();
       expect(screen.getByTestId('resend-email-input')).toBeInTheDocument();
-      expect(screen.getByTestId('resend-verification-button')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Resend verification email' })).toBeInTheDocument();
     });
   });
+
+  it('does not automatically repeat a failed verification and retries only on button press', async () => {
+    const user = userEvent.setup();
+    renderWithRoute('/verify-email?email=test%40example.com&token=expired');
+    await waitFor(() => expect(verifyMutateMock).toHaveBeenCalledTimes(1));
+
+    act(() => verifyOnError?.(new Error('expired')));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Verify email again' })).toBeEnabled();
+    });
+    expect(verifyMutateMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Verify email again' }));
+    expect(verifyMutateMock).toHaveBeenCalledTimes(2);
+    expect(verifyMutateMock).toHaveBeenLastCalledWith({
+      requestBody: { token: 'expired', email: 'test@example.com' },
+    });
+  });
+
+  it('shows the German success action after successful verification', async () => {
+    locale.current = 'de';
+    renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+    act(() => verifyOnSuccess?.());
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Zur Anmeldung' })).toBeInTheDocument();
+    });
+  });
+
+  it.each([
+    ['en', 'Go to sign in', 'Back to sign in'],
+    ['de', 'Zur Anmeldung', 'Zurück zur Anmeldung'],
+  ] as const)(
+    'navigates from %s verification success and failure to sign in',
+    async (language, successLabel, errorLabel) => {
+      locale.current = language;
+      const user = userEvent.setup();
+      const successView = renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+      act(() => verifyOnSuccess?.());
+      await user.click(await screen.findByRole('button', { name: successLabel }));
+      expect(screen.getByRole('heading', { name: 'Sign-in destination' })).toBeInTheDocument();
+      successView.unmount();
+
+      renderWithRoute('/verify-email?email=test%40example.com&token=expired');
+      act(() => verifyOnError?.(new Error('expired')));
+      await user.click(await screen.findByRole('button', { name: errorLabel }));
+      expect(screen.getByRole('heading', { name: 'Sign-in destination' })).toBeInTheDocument();
+    },
+  );
 
   it('pre-fills email from URL in the resend input', async () => {
     renderWithRoute('/verify-email?email=prefilled%40example.com&token=bad');
     act(() => verifyOnError?.(new Error('bad')));
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Email address')).toHaveValue('prefilled@example.com');
+      expect(screen.getByLabelText(en.resend.emailLabel)).toHaveValue('prefilled@example.com');
     });
   });
 
@@ -166,7 +241,7 @@ describe('VerifyEmail', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();
-      expect(screen.getByText('Email sent!')).toBeInTheDocument();
+      expect(screen.getByText(en.resend.successTitle)).toBeInTheDocument();
     });
   });
 
@@ -176,14 +251,46 @@ describe('VerifyEmail', () => {
     expect(verifyMutateMock).not.toHaveBeenCalled();
   });
 
-  it('shows Try Again and Back to Login buttons on error', async () => {
+  it('shows Try Again and Back to sign in buttons on error', async () => {
     renderWithRoute('/verify-email?email=test%40example.com&token=bad');
     act(() => verifyOnError?.(new Error('bad')));
 
     await waitFor(() => {
-      expect(screen.getByText('Try Again')).toBeInTheDocument();
-      expect(screen.getByText('Back to Login')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verify email again' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back to sign in' })).toBeInTheDocument();
     });
+  });
+
+  it('renders German verification and resend controls with descriptive names', async () => {
+    locale.current = 'de';
+    renderWithRoute('/verify-email?email=test%40example.com&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'E-Mail erneut verifizieren' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Zurück zur Anmeldung' })).toBeInTheDocument();
+      expect(screen.getByLabelText(de.resend.emailLabel)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Verifizierungsmail erneut senden' })).toBeInTheDocument();
+    });
+  });
+
+  it('allows editing the prefilled resend address and gates invalid input', async () => {
+    const user = userEvent.setup();
+    renderWithRoute('/verify-email?email=test%40example.com&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+    const input = await screen.findByLabelText(en.resend.emailLabel);
+    const resend = screen.getByRole('button', { name: 'Resend verification email' });
+
+    await user.clear(input);
+    expect(input).toHaveValue('');
+    expect(resend).toBeDisabled();
+    await user.type(input, 'invalid');
+    expect(input).toHaveValue('invalid');
+    expect(resend).toBeDisabled();
+    await user.clear(input);
+    await user.type(input, 'replacement@example.com');
+    await user.click(resend);
+    expect(resendMutateMock).toHaveBeenCalledWith({ requestBody: { email: 'replacement@example.com' } });
   });
 
   it('disables resend button when email format is invalid', async () => {
@@ -231,5 +338,31 @@ describe('VerifyEmail', () => {
       expect(screen.getByTestId('resend-success-alert')).toBeInTheDocument();
       expect(screen.queryByTestId('resend-verification-button')).not.toBeInTheDocument();
     });
+  });
+
+  it.each([
+    ['en', 'Resend verification email'],
+    ['de', 'Verifizierungsmail erneut senden'],
+  ] as const)('keeps the %s resend action named while pending', async (language, label) => {
+    locale.current = language;
+    pending.resend = true;
+    renderWithRoute('/verify-email?email=test%40example.com&token=bad');
+    act(() => verifyOnError?.(new Error('bad')));
+
+    const button = await screen.findByRole('button', { name: label });
+    expect(button).toBeDisabled();
+  });
+
+  it.each(['en', 'de'] as const)('shows the verification pending state in %s', async (language) => {
+    locale.current = language;
+    pending.verify = true;
+    renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+
+    expect(await screen.findByText('Loading...')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(verifyMutateMock).toHaveBeenCalledWith({
+        requestBody: { token: 'abc123', email: 'test@example.com' },
+      }),
+    );
   });
 });

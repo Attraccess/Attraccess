@@ -1,11 +1,7 @@
 import { Logger } from '@nestjs/common';
-import {
-  ResourceFlowNode,
-  GetVariablesNodeDataSchema,
-  ResourceFlowVariableScope,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, GetVariablesNodeDataSchema, ResourceFlowVariableScope } from '@attraccess/database-entities';
 import { set as lodashSet } from 'lodash-es';
-import { ResourceFlowVariablesService } from '../resource-flow-variables.service';
+import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class GetVariablesExecutor implements NodeExecutor {

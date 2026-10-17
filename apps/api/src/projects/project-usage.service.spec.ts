@@ -125,6 +125,7 @@ describe('ProjectUsageService', () => {
       } as GetProjectUsageHistoryQueryDto);
 
       expect(resourceUsageRepository.createQueryBuilder).toHaveBeenCalledWith('usage');
+      expect(qb.andWhere).toHaveBeenCalledWith('usage.lifecyclePending = FALSE');
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(3);
       expect(result.nextPage).toBe(2);

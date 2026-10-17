@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import React, { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PasswordField } from './PasswordField';
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
@@ -18,7 +18,15 @@ vi.mock('../toastProvider', () => ({
 }));
 
 vi.mock('../PasswordInput', () => ({
-  PasswordInput: ({ label, value, onValueChange }: { label: string; value: string; onValueChange: (value: string) => void }) => (
+  PasswordInput: ({
+    label,
+    value,
+    onValueChange,
+  }: {
+    label: string;
+    value: string;
+    onValueChange: (value: string) => void;
+  }) => (
     <label>
       {label}
       <input value={value} onChange={(event) => onValueChange(event.target.value)} />
@@ -47,4 +55,34 @@ describe('PasswordField', () => {
 
     expect(screen.getByTestId('password-policy-hints')).toBeInTheDocument();
   });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+it('generates matching password and confirmation values and copies them to the clipboard', async () => {
+  const change = vi.fn();
+  const confirm = vi.fn();
+  const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+  render(
+    <PasswordField
+      value=""
+      onValueChange={change}
+      showConfirmation
+      confirmationValue=""
+      onConfirmationChange={confirm}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'generate' }));
+  await waitFor(() => expect(copy).toHaveBeenCalledWith('GeneratedStrong-12345!'));
+  expect(change).toHaveBeenCalledWith('GeneratedStrong-12345!');
+  expect(confirm).toHaveBeenCalledWith('GeneratedStrong-12345!');
+});
+it('still generates a password when clipboard copying is denied', async () => {
+  const change = vi.fn();
+  vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('Denied'));
+  render(<PasswordField value="" onValueChange={change} />);
+  fireEvent.click(screen.getByRole('button', { name: 'generate' }));
+  await waitFor(() => expect(change).toHaveBeenCalledWith('GeneratedStrong-12345!'));
 });

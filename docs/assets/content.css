@@ -1,0 +1,131 @@
+/* ===== Content Styling ===== */
+.markdown-section {
+  max-width: 820px;
+}
+.markdown-section h1 {
+  font-weight: 700;
+  color: var(--heading-h1-color) !important;
+  border-bottom: 2px solid var(--theme-color);
+  padding-bottom: 8px;
+}
+.markdown-section h2 {
+  font-weight: 600;
+  color: var(--heading-h2-color) !important;
+  margin-top: 2.5em;
+}
+.markdown-section h3 {
+  font-weight: 600;
+  color: var(--heading-h3-color) !important;
+}
+.markdown-section h4 {
+  font-weight: 600;
+  color: var(--heading-h4-color) !important;
+}
+.markdown-section p,
+.markdown-section li {
+  color: var(--base-color);
+}
+.markdown-section strong {
+  color: var(--heading-color);
+}
+.markdown-section a {
+  color: var(--link-color) !important;
+}
+.markdown-section a:hover {
+  color: var(--link-color--hover) !important;
+}
+.markdown-section table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+.markdown-section table th {
+  font-weight: 600;
+  text-align: left;
+  background: var(--table-head-background);
+  color: var(--table-head-color);
+}
+.markdown-section table td {
+  color: var(--base-color);
+}
+.markdown-section table td,
+.markdown-section table th {
+  padding: 10px 14px;
+  border: 1px solid var(--table-cell-border-color);
+}
+.markdown-section table tr:nth-child(odd) td {
+  background: var(--table-row-odd-background);
+}
+.markdown-section img {
+  border-radius: 6px;
+}
+.markdown-section blockquote {
+  color: var(--blockquote-color);
+  border-left-color: var(--blockquote-border-color);
+}
+.markdown-section code {
+  background: var(--code-inline-background) !important;
+  color: var(--code-inline-color) !important;
+}
+.markdown-section pre code {
+  background: var(--code-block-background) !important;
+  color: var(--code-block-color) !important;
+}
+
+/* Alert/callout boxes */
+.markdown-section .tip,
+.markdown-section .warn,
+.markdown-section .note {
+  border-radius: 6px;
+  padding: 16px 20px;
+}
+
+/* Flexible alerts dark mode */
+html[data-theme='dark'] .markdown-section .alert {
+  background-color: var(--sidebar-background);
+  color: var(--base-color);
+}
+html[data-theme='dark'] .markdown-section .alert p {
+  color: var(--base-color);
+}
+
+/* Sidebar logo */
+.app-name-link img {
+  max-width: 32px;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+/* Dark mode: force sidebar and toggle colors */
+html[data-theme='dark'] .sidebar {
+  background: var(--sidebar-background) !important;
+  border-right-color: var(--sidebar-border-color) !important;
+}
+html[data-theme='dark'] .sidebar-toggle {
+  background: var(--sidebar-background) !important;
+}
+html[data-theme='dark'] .search input {
+  background: var(--search-input-background) !important;
+  border-color: var(--search-input-border-color) !important;
+  color: var(--base-color) !important;
+}
+html[data-theme='dark'] .search .matching-post {
+  border-color: var(--sidebar-border-color) !important;
+}
+
+/* Sidebar top-level nav items — pointer cursor for collapsible sections */
+.sidebar-nav > ul > li > p {
+  cursor: pointer;
+}
+
+/* GitHub corner — move to top-left to avoid overlap with lang/theme toggles */
+.github-corner {
+  position: fixed !important;
+  top: 0;
+  right: auto !important;
+  left: 0;
+  z-index: 30;
+}
+.github-corner svg {
+  transform: scaleX(-1);
+}

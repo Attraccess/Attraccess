@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-custom';
 import { Request } from 'express';
+import { LogoutSession } from '../auth/session-store/session-store';
 import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { RbacService } from '../rbac/rbac.service';
@@ -34,7 +35,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     super();
   }
 
-  async validate(req: Request): Promise<User> {
+  async validate(req: Request & { authSession?: LogoutSession }): Promise<User> {
     const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
@@ -69,12 +70,15 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       }
     }
 
-    const user = await this.sessionService.validateSession(token);
+    const authenticated = await this.sessionService.authenticateSession(token);
 
-    if (!user) {
+    if (!authenticated) {
       this.logger.debug(`Invalid or expired session token: ${token.substring(0, 8)}...`);
       throw new UnauthorizedException('Invalid or expired session');
     }
+
+    const { user, session } = authenticated;
+    req.authSession = session;
 
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
     (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(

@@ -1,5 +1,6 @@
 .idea/
 node_modules/
+__pycache__/
 .vscode/
 build/
 tmp/
@@ -39,12 +40,9 @@ apps/attractap-touch-firmware/.pio/
 apps/api/src/assets/attractap-firmwares/
 secrets/
 
-apps/attractap/hardware/**/dist/
-apps/attractap/hardware/**/.tscircuit/
-apps/attractap/hardware/**/index.circuit.json
-
 # Plugin build staging dir (zip output lives in dist/, covered above)
 apps/plugins/**/package/
+apps/plugins/**/package.zip
 
 bom.json
 .autopilot.json
@@ -58,7 +56,15 @@ docs/superpowers/
 # test coverage output
 coverage/
 
+# browser acceptance evidence (playwright traces, screenshots, page dumps)
+output/
+
+# FW31 shell fixture scratch dirs (leaked by interrupted test runs)
+.wago-fw31-shell-*/
+
 # companion-ws-client — generated at build time
 libs/companion-ws-client/src/lib/
 apps/plugins/*/package.zip
 apps/attractap/firmware/__pycache__/
+# Generated build-owned CC100 Docker assets (never commit bundles or keys).
+apps/plugins/wago/runtime-assets/

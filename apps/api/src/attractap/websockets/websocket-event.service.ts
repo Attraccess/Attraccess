@@ -4,6 +4,7 @@ import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceSessionStartedEvent,
+  ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
@@ -42,6 +43,11 @@ export class WebSocketEventService {
   public async onResourceUsage(event: ResourceSessionStartedEvent) {
     this.logger.debug('Got resource usage started event');
     this.attractapGateway.sendResourceListToReadersWithResources([event.usage.resource.id]);
+  }
+
+  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
+  public async onResourceUsageEnded(event: ResourceUsageSessionEndedEvent) {
+    this.attractapGateway.sendResourceListToReadersWithResources([event.usage.resourceId]);
   }
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)

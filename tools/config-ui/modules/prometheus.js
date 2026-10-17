@@ -1,18 +1,23 @@
 'use strict';
 
 const fs = require('fs');
+
 const path = require('path');
-const http = require('http');
+
+const { writeAtomicFile } = require('./atomic-file.js');
 
 const DATA_DIR = process.env.PROMETHEUS_DATA_DIR || '/data';
+
 const SETTINGS_FILE = path.join(DATA_DIR, 'prometheus-settings.json');
+
 const PROMETHEUS_CONFIG_PATH = process.env.PROMETHEUS_CONFIG_PATH || '/etc/prometheus/prometheus.yml';
-const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
 
 const PRIVATE_FILE_MODE = 0o600;
+
 const SHARED_FILE_MODE = 0o644;
 
 function log(message) {
+  // eslint-disable-next-line no-console -- Standalone container logs go to stdout.
   console.log(`[prometheus] ${message}`);
 }
 
@@ -25,8 +30,7 @@ function loadJson(filePath, fallback) {
 }
 
 function saveJson(filePath, data) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), { encoding: 'utf-8', mode: PRIVATE_FILE_MODE });
+  writeAtomicFile(filePath, JSON.stringify(data, null, 2), PRIVATE_FILE_MODE);
   try {
     fs.chmodSync(filePath, PRIVATE_FILE_MODE);
   } catch {
@@ -107,14 +111,10 @@ function generatePrometheusConfig(settings, apiKey) {
   return lines.join('\n') + '\n';
 }
 
-function writePrometheusConfig(settings, apiKey) {
+function replacePrometheusConfig(content) {
   try {
-    fs.mkdirSync(path.dirname(PROMETHEUS_CONFIG_PATH), { recursive: true });
-    fs.writeFileSync(
-      PROMETHEUS_CONFIG_PATH,
-      generatePrometheusConfig(settings, apiKey),
-      { encoding: 'utf-8', mode: SHARED_FILE_MODE },
-    );
+    if (content === null) fs.unlinkSync(PROMETHEUS_CONFIG_PATH);
+    else writeAtomicFile(PROMETHEUS_CONFIG_PATH, content, SHARED_FILE_MODE);
     try {
       fs.chmodSync(PROMETHEUS_CONFIG_PATH, SHARED_FILE_MODE);
     } catch {
@@ -127,6 +127,31 @@ function writePrometheusConfig(settings, apiKey) {
     return false;
   }
 }
+
+function writePrometheusConfig(settings, apiKey) {
+  return replacePrometheusConfig(generatePrometheusConfig(settings, apiKey));
+}
+
+function getCurrentConfig() {
+  try {
+    return fs.readFileSync(PROMETHEUS_CONFIG_PATH, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+function publicSettings(settings) {
+  return {
+    scrapeInterval: settings.scrapeInterval,
+    evaluationInterval: settings.evaluationInterval,
+    attraccessTarget: settings.attraccessTarget,
+    apiKeyConfigured: Boolean(readApiKeyFromConfig()),
+  };
+}
+
+const http = require('http');
+
+const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
 
 function reloadPrometheus() {
   const url = `${PROMETHEUS_URL}/-/reload`;
@@ -168,26 +193,12 @@ function getPrometheusStatus() {
       resolve({ running: res.statusCode === 200, url: PROMETHEUS_URL });
     });
     req.on('error', () => resolve({ running: false, url: PROMETHEUS_URL }));
-    req.on('timeout', () => { req.destroy(); resolve({ running: false, url: PROMETHEUS_URL }); });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ running: false, url: PROMETHEUS_URL });
+    });
     req.end();
   });
-}
-
-function getCurrentConfig() {
-  try {
-    return fs.readFileSync(PROMETHEUS_CONFIG_PATH, 'utf-8');
-  } catch {
-    return null;
-  }
-}
-
-function publicSettings(settings) {
-  return {
-    scrapeInterval: settings.scrapeInterval,
-    evaluationInterval: settings.evaluationInterval,
-    attraccessTarget: settings.attraccessTarget,
-    apiKeyConfigured: Boolean(readApiKeyFromConfig()),
-  };
 }
 
 const prometheusModule = {
@@ -201,7 +212,9 @@ const prometheusModule = {
     log('initialized');
   },
 
-  shutdown() {},
+  shutdown() {
+    /* Prometheus is managed externally. */
+  },
 
   async handleRequest(method, subPath, subParts, req, res, helpers) {
     if (method === 'GET' && subPath === '/status') {
@@ -221,9 +234,24 @@ const prometheusModule = {
       if (body.scrapeInterval !== undefined) settings.scrapeInterval = body.scrapeInterval;
       if (body.evaluationInterval !== undefined) settings.evaluationInterval = body.evaluationInterval;
       if (body.attraccessTarget !== undefined) settings.attraccessTarget = body.attraccessTarget;
-      saveSettings(settings);
       const apiKey = resolveApiKey(body.metricsApiKey);
-      writePrometheusConfig(settings, apiKey);
+      const previousConfig = getCurrentConfig();
+      if (!writePrometheusConfig(settings, apiKey)) {
+        helpers.sendJson(res, 500, { error: 'Failed to write Prometheus configuration. Settings were not saved.' });
+        return true;
+      }
+      try {
+        saveSettings(settings);
+      } catch (error) {
+        log(`failed to save settings: ${error.message}`);
+        const restored = replacePrometheusConfig(previousConfig);
+        helpers.sendJson(res, 500, {
+          error: restored
+            ? 'Failed to save Prometheus settings. Previous configuration restored.'
+            : 'Failed to save Prometheus settings and restore the configuration. Check storage before retrying.',
+        });
+        return true;
+      }
       reloadPrometheus();
       helpers.sendJson(res, 200, publicSettings(settings));
       return true;
@@ -231,7 +259,10 @@ const prometheusModule = {
 
     if (method === 'DELETE' && subPath === '/api-key') {
       const settings = loadSettings();
-      writePrometheusConfig(settings, '');
+      if (!writePrometheusConfig(settings, '')) {
+        helpers.sendJson(res, 500, { error: 'Failed to write Prometheus configuration. API key was not removed.' });
+        return true;
+      }
       reloadPrometheus();
       helpers.sendJson(res, 200, publicSettings(settings));
       return true;

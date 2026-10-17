@@ -1,6 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PageHeader } from '../../components/pageHeader';
-import { NfcKeychainCard } from './NfcKeychainCard';
+import { RfidKeychainCard } from './RfidKeychainCard';
 import de from './de.json';
 import en from './en.json';
 
@@ -11,7 +11,7 @@ export default function PrintablesPage() {
   return (
     <div>
       <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')} />
-      <NfcKeychainCard />
+      <RfidKeychainCard />
     </div>
   );
 }

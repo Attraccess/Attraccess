@@ -1,169 +1,63 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { EmailTemplateService } from '../email-template/email-template.service';
-import { EmailLayoutService } from '../email-layout/email-layout.service';
-import { createTransport } from 'nodemailer';
 import {
-  User,
-  EmailTemplateType,
-  EmailTemplate,
   BillingTransaction,
-  ResourceUsage,
+  EmailTemplateType,
   Project,
   ProjectInvitation,
+  ResourceUsage,
+  User,
   Resource,
   ResourceHealthStatus,
+  EmailTemplate,
 } from '@attraccess/database-entities';
-import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import * as Handlebars from 'handlebars';
-import { EntityManager } from 'typeorm';
-import { SettingsService } from '../settings/settings.service';
-import { MetricsService } from '../metrics/metrics.service';
-import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+
+import { formatCredits, toExactCredits } from '@attraccess/shared';
+
+import { Injectable, Logger } from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+
+import { Repository, EntityManager } from 'typeorm';
+
+import { EmailLayoutService } from '../email-layout/email-layout.service';
+
+import { EmailTemplateService } from '../email-template/email-template.service';
+
+import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
+
+import { MetricsService } from '../metrics/metrics.service';
+
+import { SettingsService } from '../settings/settings.service';
+
+import * as Handlebars from 'handlebars';
+
+import { createTransport } from 'nodemailer';
+
 import { existsSync } from 'node:fs';
+
 import { join } from 'node:path';
 
-const EMAIL_LOGO_CID = 'attraccess-logo';
-const EMAIL_LOGO_PATH =
+export const EMAIL_LOGO_CID = 'attraccess-logo';
+
+export const EMAIL_LOGO_PATH =
   [join(__dirname, 'assets', 'logo.png'), join(__dirname, '..', 'assets', 'logo.png')].find(existsSync) ??
   join(__dirname, 'assets', 'logo.png');
 
 @Injectable()
 export class EmailService {
-  private readonly logger = new Logger(EmailService.name);
-
   constructor(
-    private readonly settingsService: SettingsService,
-    private readonly emailTemplateService: EmailTemplateService,
-    private readonly emailLayoutService: EmailLayoutService,
-    private readonly metricsService: MetricsService,
-    private readonly externalCallTimer: ExternalCallTimer,
+    protected readonly settingsService: SettingsService,
+    protected readonly emailTemplateService: EmailTemplateService,
+    protected readonly emailLayoutService: EmailLayoutService,
+    protected readonly metricsService: MetricsService,
+    protected readonly externalCallTimer: ExternalCallTimer,
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    protected readonly userRepository: Repository<User>,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
   }
 
-  private async convertTemplate(
-    template: EmailTemplate,
-    context: Record<string, unknown>,
-    locale: string,
-  ) {
-    const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
-
-    const tHelper = (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
-      const safeDefault = typeof defaultValue === 'string' ? defaultValue : '';
-      const raw = translationsMap[key] || safeDefault;
-      const hash = options?.hash ?? {};
-      const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
-        Object.hasOwn(hash, name) ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
-      );
-      return new Handlebars.SafeString(result);
-    };
-
-    const renderOpts = { helpers: { t: tHelper } };
-    const subject = Handlebars.compile(template.subject)(context, renderOpts);
-
-    const bodyHtml = await this.emailLayoutService.renderWithTemplate(template);
-    const body = Handlebars.compile(bodyHtml)(context, renderOpts);
-
-    return { subject, body };
-  }
-
-  private async sendEmail(
-    user: User,
-    templateType: EmailTemplateType,
-    context: Record<string, unknown>,
-    manager?: EntityManager,
-  ) {
-    try {
-      const locale = user.locale ?? 'en';
-      const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
-
-      const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
-      const { transporter, from } = await this.createTransporter();
-
-      this.logger.debug(
-        `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
-      );
-      await this.externalCallTimer.time('smtp', 'send', () =>
-        transporter.sendMail({
-          to: user.email,
-          from,
-          subject,
-          html: body,
-          attachments: [
-            {
-              filename: 'logo.png',
-              path: EMAIL_LOGO_PATH,
-              contentType: 'image/png',
-              cid: EMAIL_LOGO_CID,
-            },
-          ],
-        }),
-      );
-      if (typeof transporter.close === 'function') {
-        transporter.close();
-      }
-      this.metricsService.emailSentTotal.inc({ status: 'success' });
-      this.logger.debug(`Email sent successfully to: ${user.email}`);
-    } catch (error) {
-      this.metricsService.emailSentTotal.inc({ status: 'fail' });
-      this.logger.error(`Failed to send email to: ${user.email}`, error.stack);
-      throw error;
-    }
-  }
-
-  private async getBaseContext(user: User) {
-    const url = await this.settingsService.getUrl();
-    if (!url) {
-      throw new Error('Application URL not configured');
-    }
-    return {
-      user: {
-        username: user.username,
-        email: user.email,
-        id: user.id,
-      },
-      host: {
-        frontend: url,
-        backend: url,
-        notificationPreferencesUrl: `${url}/account`,
-        logoUrl: `cid:${EMAIL_LOGO_CID}`,
-      },
-      url,
-    } as const;
-  }
-
-  async sendVerificationEmail(user: User, verificationToken: string) {
-    const url = await this.settingsService.getUrl();
-    if (!url) throw new Error('Application URL not configured');
-    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(user.email)}&token=${verificationToken}`;
-
-    const context = {
-      ...(await this.getBaseContext(user)),
-      url: verificationUrl,
-    };
-
-    await this.sendEmail(user, EmailTemplateType.VERIFY_EMAIL, context);
-  }
-
-  async sendUserInvitationEmail(user: User, verificationToken: string, manager?: EntityManager) {
-    const url = await this.settingsService.getUrl();
-    if (!url) throw new Error('Application URL not configured');
-    const verificationUrl = `${url}/accept-invitation?email=${encodeURIComponent(
-      user.email,
-    )}&token=${verificationToken}`;
-
-    const context = {
-      ...(await this.getBaseContext(user)),
-      url: verificationUrl,
-    };
-
-    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context, manager);
-  }
+  protected readonly logger = new Logger(EmailService.name);
 
   async sendProjectInvitationEmail(invitedUser: User, project: Project, invitation: ProjectInvitation) {
     const url = await this.settingsService.getUrl();
@@ -191,59 +85,7 @@ export class EmailService {
     await this.sendEmail(invitedUser, EmailTemplateType.PROJECT_INVITATION, context);
   }
 
-  async sendPasswordResetEmail(user: User, resetToken: string) {
-    const url = await this.settingsService.getUrl();
-    if (!url) throw new Error('Application URL not configured');
-    const resetUrl = `${url}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
-
-    const context = {
-      ...(await this.getBaseContext(user)),
-      url: resetUrl,
-    };
-
-    await this.sendEmail(user, EmailTemplateType.RESET_PASSWORD, context);
-  }
-
-  async sendDeleteAccountConfirmationEmail(user: User, token: string) {
-    const url = await this.settingsService.getUrl();
-    if (!url) throw new Error('Application URL not configured');
-    const confirmUrl = `${url}/confirm-delete-account?email=${encodeURIComponent(
-      user.email,
-    )}&token=${encodeURIComponent(token)}`;
-
-    const context = {
-      ...(await this.getBaseContext(user)),
-      url: confirmUrl,
-    };
-
-    await this.sendEmail(user, EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION, context);
-  }
-
-  async sendUsernameChangedEmail(user: User, previousUsername: string) {
-    const base = (await this.getBaseContext(user)) as unknown as {
-      user: { username: string; email: string; id: number };
-      host: { frontend: string; backend: string };
-      url: string;
-    };
-
-    const context = {
-      ...base,
-      user: {
-        ...base.user,
-        previousUsername,
-        newUsername: user.username,
-      },
-    };
-
-    await this.sendEmail(user, EmailTemplateType.USERNAME_CHANGED, context);
-  }
-
-  async sendPasswordChangedEmail(user: User) {
-    const context = await this.getBaseContext(user);
-    await this.sendEmail(user, EmailTemplateType.PASSWORD_CHANGED, context);
-  }
-
-  async sendResourceUsageBillingSummaryEmail(
+  public async sendResourceUsageBillingSummaryEmail(
     user: User,
     transaction: BillingTransaction,
     usage: ResourceUsage,
@@ -253,16 +95,49 @@ export class EmailService {
       return;
     }
 
-    const roundedMinutes = Math.ceil(usage.usageInMinutes ?? 0);
+    // Receipts describe the settled transaction, including its original rounding.
+    const roundedMinutes = transaction.items?.find(
+      (item) => item.name === 'PER_MINUTE' && item.meterQuantity == null && item.meterCreditsPerUnit == null,
+    )?.quantity;
+    const secondsFormatOptions = { maximumFractionDigits: 3 };
+    let secondsFormatter: Intl.NumberFormat;
+    try {
+      secondsFormatter = new Intl.NumberFormat(user.locale ?? 'en', secondsFormatOptions);
+    } catch {
+      // Persisted locales are not restricted to valid Intl tags. Match the default email language.
+      secondsFormatter = new Intl.NumberFormat('en', secondsFormatOptions);
+    }
 
     const items = (transaction.items ?? []).map((item) => ({
       name: item.name,
-      quantity: item.quantity,
-      unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
-      total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
+      description: item.description,
+      quantity:
+        item.meterCreditsPerUnit != null && item.meterQuantity == null ? '—' : (item.meterQuantity ?? item.quantity),
+      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null,
+      unitPrice:
+        item.meterCreditsPerUnit != null
+          ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
+          : formatCredits(item.unitPrice, currencyMinorUnit, { useGrouping: false }),
+      total: formatCredits(toExactCredits(item.unitPrice) * toExactCredits(item.quantity), currencyMinorUnit, {
+        useGrouping: false,
+      }),
+      isFixedFee: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_SESSION',
+      isSessionDuration: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'PER_MINUTE',
+      isOperatingDuration:
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      isBillingFactor: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'BILLING_FACTOR',
+      isDuration:
+        item.meterQuantity == null &&
+        item.meterCreditsPerUnit == null &&
+        (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),
+      durationMs: item.durationMs,
+      hasDuration: item.durationMs != null,
+      durationSeconds: item.durationMs == null ? undefined : secondsFormatter.format(item.durationMs / 1000),
     }));
 
-    const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit);
+    const totalCredits = formatCredits(-transaction.amount, currencyMinorUnit, { useGrouping: false });
 
     const context = {
       ...(await this.getBaseContext(user)),
@@ -274,13 +149,118 @@ export class EmailService {
         startTime: usage.startTime?.toISOString?.() ?? usage.startTime,
         endTime: usage.endTime?.toISOString?.() ?? usage.endTime,
         roundedMinutes,
+        billingFactor: usage.billingFactor == null ? undefined : `${usage.billingFactor}%`,
       },
       items,
       totalCredits,
-      newBalance: dbCurrencyToUserCurrency(user.creditBalance, currencyMinorUnit),
+      newBalance: formatCredits(user.creditBalance, currencyMinorUnit, { useGrouping: false }),
     };
 
     await this.sendEmail(user, EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY, context);
+  }
+
+  async sendResourceUsageNoteEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    note: { content: string; phase: 'start' | 'end'; authorName: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      note: {
+        content: note.content,
+        isStart: note.phase === 'start',
+        authorName: note.authorName,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, context);
+  }
+
+  async sendResourceTakeoverEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    takeover: { actorName: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      takeover,
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
+  }
+
+  async sendNewMessageEmail(recipient: User, message: { conversationId: number; senderName: string; preview: string }) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const conversationUrl = `${base.host.frontend}/messages?conversation=${message.conversationId}`;
+    const preview = message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
+
+    const context = {
+      ...base,
+      message: {
+        senderName: message.senderName,
+        preview,
+        conversationUrl,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.MESSAGE_RECEIVED, context);
+  }
+
+  async sendResourceSessionEndedEmail(
+    recipient: User,
+    resource: Pick<Resource, 'id' | 'name'>,
+    session: { id: number; endedAt: Date | string | null; endedBy: string },
+  ) {
+    if (!recipient?.email) {
+      return;
+    }
+
+    const base = await this.getBaseContext(recipient);
+    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+
+    const context = {
+      ...base,
+      resource: {
+        id: resource.id,
+        name: resource.name,
+        url: resourceUrl,
+      },
+      session: {
+        id: session.id,
+        endedAt: session.endedAt instanceof Date ? session.endedAt.toISOString() : session.endedAt,
+        endedBy: session.endedBy,
+      },
+    };
+
+    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_SESSION_ENDED, context);
   }
 
   async sendResourceHealthChangedEmail(
@@ -380,64 +360,7 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.MAINTENANCE_REQUEST_CREATED, context);
   }
 
-  async sendResourceUsageNoteEmail(
-    recipient: User,
-    resource: Pick<Resource, 'id' | 'name'>,
-    note: { content: string; phase: 'start' | 'end'; authorName: string },
-  ) {
-    if (!recipient?.email) {
-      return;
-    }
-
-    const base = await this.getBaseContext(recipient);
-    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
-
-    const context = {
-      ...base,
-      resource: {
-        id: resource.id,
-        name: resource.name,
-        url: resourceUrl,
-      },
-      note: {
-        content: note.content,
-        isStart: note.phase === 'start',
-        authorName: note.authorName,
-      },
-    };
-
-    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_USAGE_NOTE_ADDED, context);
-  }
-
-  async sendResourceTakeoverEmail(
-    recipient: User,
-    resource: Pick<Resource, 'id' | 'name'>,
-    takeover: { actorName: string },
-  ) {
-    if (!recipient?.email) {
-      return;
-    }
-
-    const base = await this.getBaseContext(recipient);
-    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
-
-    const context = {
-      ...base,
-      resource: {
-        id: resource.id,
-        name: resource.name,
-        url: resourceUrl,
-      },
-      takeover,
-    };
-
-    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
-  }
-
-  async sendAccessChangeEmail(
-    recipient: User,
-    accessChange: { title: string; body: string; url?: string },
-  ) {
+  async sendAccessChangeEmail(recipient: User, accessChange: { title: string; body: string; url?: string }) {
     const resolvedRecipient = recipient?.email
       ? recipient
       : await this.userRepository.findOne({ where: { id: recipient.id } });
@@ -447,9 +370,7 @@ export class EmailService {
     }
 
     const base = await this.getBaseContext(resolvedRecipient);
-    const url = accessChange.url
-      ? new URL(accessChange.url, base.host.frontend).toString()
-      : undefined;
+    const url = accessChange.url ? new URL(accessChange.url, base.host.frontend).toString() : undefined;
 
     const context = {
       ...base,
@@ -463,64 +384,178 @@ export class EmailService {
     await this.sendEmail(resolvedRecipient, EmailTemplateType.ACCESS_CHANGE, context);
   }
 
-  async sendNewMessageEmail(
-    recipient: User,
-    message: { conversationId: number; senderName: string; preview: string },
-  ) {
-    if (!recipient?.email) {
-      return;
-    }
-
-    const base = await this.getBaseContext(recipient);
-    const conversationUrl = `${base.host.frontend}/messages?conversation=${message.conversationId}`;
-    const preview = message.preview.length > 200 ? `${message.preview.slice(0, 200).trimEnd()}…` : message.preview;
+  async sendVerificationEmail(user: User, verificationToken: string) {
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(user.email)}&token=${verificationToken}`;
 
     const context = {
-      ...base,
-      message: {
-        senderName: message.senderName,
-        preview,
-        conversationUrl,
-      },
+      ...(await this.getBaseContext(user)),
+      url: verificationUrl,
     };
 
-    await this.sendEmail(recipient, EmailTemplateType.MESSAGE_RECEIVED, context);
+    await this.sendEmail(user, EmailTemplateType.VERIFY_EMAIL, context);
   }
 
-  async sendResourceSessionEndedEmail(
-    recipient: User,
-    resource: Pick<Resource, 'id' | 'name'>,
-    session: { id: number; endedAt: Date | string | null; endedBy: string },
-  ) {
-    if (!recipient?.email) {
-      return;
-    }
+  async sendUserInvitationEmail(user: User, verificationToken: string, manager?: EntityManager) {
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const verificationUrl = `${url}/accept-invitation?email=${encodeURIComponent(
+      user.email,
+    )}&token=${verificationToken}`;
 
-    const base = await this.getBaseContext(recipient);
-    const resourceUrl = `${base.host.frontend}/resources/${resource.id}`;
+    const context = {
+      ...(await this.getBaseContext(user)),
+      url: verificationUrl,
+    };
+
+    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context, manager);
+  }
+
+  async sendPasswordResetEmail(user: User, resetToken: string) {
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const resetUrl = `${url}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
+
+    const context = {
+      ...(await this.getBaseContext(user)),
+      url: resetUrl,
+    };
+
+    await this.sendEmail(user, EmailTemplateType.RESET_PASSWORD, context);
+  }
+
+  async sendDeleteAccountConfirmationEmail(user: User, token: string) {
+    const url = await this.settingsService.getUrl();
+    if (!url) throw new Error('Application URL not configured');
+    const confirmUrl = `${url}/confirm-delete-account?email=${encodeURIComponent(
+      user.email,
+    )}&token=${encodeURIComponent(token)}`;
+
+    const context = {
+      ...(await this.getBaseContext(user)),
+      url: confirmUrl,
+    };
+
+    await this.sendEmail(user, EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION, context);
+  }
+
+  async sendUsernameChangedEmail(user: User, previousUsername: string) {
+    const base = (await this.getBaseContext(user)) as unknown as {
+      user: { username: string; email: string; id: number };
+      host: { frontend: string; backend: string };
+      url: string;
+    };
 
     const context = {
       ...base,
-      resource: {
-        id: resource.id,
-        name: resource.name,
-        url: resourceUrl,
-      },
-      session: {
-        id: session.id,
-        endedAt: session.endedAt instanceof Date ? session.endedAt.toISOString() : session.endedAt,
-        endedBy: session.endedBy,
+      user: {
+        ...base.user,
+        previousUsername,
+        newUsername: user.username,
       },
     };
 
-    await this.sendEmail(recipient, EmailTemplateType.RESOURCE_SESSION_ENDED, context);
+    await this.sendEmail(user, EmailTemplateType.USERNAME_CHANGED, context);
+  }
+
+  async sendPasswordChangedEmail(user: User) {
+    const context = await this.getBaseContext(user);
+    await this.sendEmail(user, EmailTemplateType.PASSWORD_CHANGED, context);
+  }
+
+  protected async convertTemplate(template: EmailTemplate, context: Record<string, unknown>, locale: string) {
+    const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
+
+    const tHelper = (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
+      const safeDefault = typeof defaultValue === 'string' ? defaultValue : '';
+      const raw = translationsMap[key] || safeDefault;
+      const hash = options?.hash ?? {};
+      const result = raw.replace(/\{(\w+(?:\.\w+)*)\}/g, (_: string, name: string) =>
+        Object.hasOwn(hash, name) ? Handlebars.escapeExpression(String(hash[name] ?? '')) : `{${name}}`,
+      );
+      return new Handlebars.SafeString(result);
+    };
+
+    const renderOpts = { helpers: { t: tHelper } };
+    const subject = Handlebars.compile(template.subject)(context, renderOpts);
+
+    const bodyHtml = await this.emailLayoutService.renderWithTemplate(template);
+    const body = Handlebars.compile(bodyHtml)(context, renderOpts);
+
+    return { subject, body };
+  }
+
+  protected async sendEmail(
+    user: User,
+    templateType: EmailTemplateType,
+    context: Record<string, unknown>,
+    manager?: EntityManager,
+  ) {
+    try {
+      const locale = user.locale ?? 'en';
+      const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
+
+      const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
+      const { transporter, from } = await this.createTransporter();
+
+      this.logger.debug(
+        `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
+      );
+      await this.externalCallTimer.time('smtp', 'send', () =>
+        transporter.sendMail({
+          to: user.email,
+          from,
+          subject,
+          html: body,
+          attachments: [
+            {
+              filename: 'logo.png',
+              path: EMAIL_LOGO_PATH,
+              contentType: 'image/png',
+              cid: EMAIL_LOGO_CID,
+            },
+          ],
+        }),
+      );
+      if (typeof transporter.close === 'function') {
+        transporter.close();
+      }
+      this.metricsService.emailSentTotal.inc({ status: 'success' });
+      this.logger.debug(`Email sent successfully to: ${user.email}`);
+    } catch (error) {
+      this.metricsService.emailSentTotal.inc({ status: 'fail' });
+      this.logger.error(`Failed to send email to: ${user.email}`, error.stack);
+      throw error;
+    }
+  }
+
+  protected async getBaseContext(user: User) {
+    const url = await this.settingsService.getUrl();
+    if (!url) {
+      throw new Error('Application URL not configured');
+    }
+    return {
+      user: {
+        username: user.username,
+        email: user.email,
+        id: user.id,
+      },
+      host: {
+        frontend: url,
+        backend: url,
+        notificationPreferencesUrl: `${url}/account`,
+        logoUrl: `cid:${EMAIL_LOGO_CID}`,
+      },
+      url,
+    } as const;
   }
 
   async assertSmtpConfigured(): Promise<void> {
     await this.createTransporter();
   }
 
-  private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
+  protected async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
     const smtpConfig = await this.settingsService.getSmtpConfiguration();
     if (!smtpConfig) {
       throw new Error('SMTP configuration not set');

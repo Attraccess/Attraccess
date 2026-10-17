@@ -2,7 +2,7 @@
   "success": {
     "toast": {
       "title": "Installation successful",
-      "description": "You can now set up and use the NFC reader."
+      "description": "You can now set up and use the RFID reader."
     }
   },
   "action": {
@@ -16,7 +16,7 @@
     "FLASH_FAILED": "Installation failed",
     "DEVICE_NOT_FOUND": "Device not found",
     "FIRMWARE_READ_FAILED": "Firmware could not be read",
-    "RESET_FAILED": "NFC reader restart failed",
+    "RESET_FAILED": "RFID reader restart failed",
     "UNKNOWN_ERROR": "Unknown error"
   },
   "downloading": {

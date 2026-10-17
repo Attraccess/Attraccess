@@ -15,7 +15,11 @@ export function configSummary(schedule: ResourceMaintenanceSchedule, t: Translat
           : config.unit === 'HOURS'
             ? 'configSummary.usageHoursHours'
             : 'configSummary.usageHoursDays';
-      return t(key, { duration: config.duration });
+      const durationBasis = (schedule as { durationBasis?: string }).durationBasis ?? 'SESSION_DURATION';
+      return t(key, {
+        duration: config.duration,
+        durationBasis: t(`form.durationBasis.${durationBasis}`),
+      });
     }
     case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT:
       return schedule.usageCountConfig

@@ -24,12 +24,13 @@
   },
   "peerDependencies": {
     "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0"
+    "@attraccess/plugins-frontend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-ui": "^1.11.0"
   },
   "attraccess": {
     "displayName": "WAGO CC100",
     "description": "Discover, claim, and monitor WAGO CC100 controllers.",
-    "host": "^1.9.0",
+    "host": "^1.11.0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "migrations": "dist/migrations.js",
@@ -37,7 +38,8 @@
     "permissions": [
       "DATABASE_ACCESS",
       "ACCESS_MQTT_SERVERS",
-      "TRIGGER_FLOWS"
+      "TRIGGER_FLOWS",
+      "MANAGE_SECRETS"
     ],
     "sdk": {
       "backend": "^1.9.0",

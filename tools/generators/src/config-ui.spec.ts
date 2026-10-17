@@ -4,7 +4,20 @@ import * as path from 'path';
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 
 function readFile(relativePath: string): string {
-  return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8').trim();
+  const filename = path.join(ROOT, relativePath);
+  const readBundle = (file: string, seen = new Set<string>()): string => {
+    if (seen.has(file)) return '';
+    seen.add(file);
+    const source = fs.readFileSync(file, 'utf-8');
+    const dependencies = [...source.matchAll(/require\(['"](\.\/[^'"]+)['"]\)/g)]
+      .map((match) => path.resolve(path.dirname(file), match[1].replace(/\.js$/, '') + '.js'));
+    if (file.endsWith('public/index.html')) {
+      dependencies.push(...['app.js', 'dns.js', 'prometheus.js'].map((name) => path.join(path.dirname(file), name)));
+    }
+    return source + dependencies.filter((dependency) => fs.existsSync(dependency))
+      .map((dependency) => readBundle(dependency, seen)).join('\n');
+  };
+  return readBundle(filename).trim();
 }
 
 function fileExists(relativePath: string): boolean {
@@ -50,10 +63,10 @@ describe('config-ui', () => {
       expect(content).toMatch(/chmod\s+\+x\s+.*entrypoint\.sh/);
     });
 
-    it('should COPY server.js, modules/, and public/index.html', () => {
+    it('should COPY server modules and all public assets', () => {
       expect(content).toMatch(/COPY\s+server\.js\b/);
       expect(content).toMatch(/COPY\s+modules\//);
-      expect(content).toMatch(/COPY\s+public\/index\.html\b/);
+      expect(content).toMatch(/COPY\s+public\//);
     });
 
     it('should EXPOSE DNS ports 53/udp and 53/tcp', () => {

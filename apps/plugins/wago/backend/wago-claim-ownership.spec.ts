@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { WagoService } from './wago.service';
+import { WagoService } from './controllers/service';
 
 describe('commissioning ownership through WAGO broker continuations', () => {
   function fixture(claimed = false) {

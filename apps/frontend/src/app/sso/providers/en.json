@@ -110,5 +110,18 @@
   },
   "table": {
     "ariaLabel": "SSO Providers"
-  }
+  },
+  "endSessionURL": "End-session URL (optional)",
+  "jwksURL": "JWKS URL (optional)",
+  "signingAlgorithms": "Allowed signing algorithms",
+  "oidcLogoutHint": "Empty endpoints use trusted issuer discovery. Signing algorithms default to RS256. HTTPS is required except for local development.",
+  "idpIssuer": "Identity Provider entity ID",
+  "logoutURL": "Identity Provider logout URL (optional)",
+  "samlLogoutHint": "Single Logout requires the IdP entity ID, logout URL, and Service Provider signing certificate and private key. Every logout message must be signed.",
+  "postLogoutUrl": "Post-logout redirect URI",
+  "backchannelLogoutUrl": "Back-channel logout URI",
+  "frontchannelLogoutUrl": "Front-channel logout URI",
+  "samlSloUrl": "Single Logout Service URL",
+  "logoutRegistrationHint": "Register these exact URLs at the provider. Enable signed back-channel notifications for reliable delivery. Front-channel notifications with session ID are supported; cookie-only notifications may be blocked by browser privacy settings.",
+  "samlLogoutRegistrationHint": "Register this URL for HTTP-Redirect and HTTP-POST Single Logout. Attraccess sends signed Redirect messages. Configure the IdP signing certificate and trust the Attraccess signing certificate."
 }

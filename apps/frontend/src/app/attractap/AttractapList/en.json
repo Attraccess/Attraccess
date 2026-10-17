@@ -3,7 +3,7 @@
     "title": "Attractaps",
     "actions": {
       "menu": "Hardware Setup",
-      "openHardwareSetup": "Setup NFC-Reader",
+      "openHardwareSetup": "Setup RFID-Reader",
       "openSerialConsole": "Serial Console"
     }
   },

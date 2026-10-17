@@ -4,6 +4,9 @@ Part B (network) of [ATT-471](https://linear.app/attraccess/issue/ATT-471). A
 controllable "chaos" network between an Attractap reader and the Attraccess
 server, checked into the repo for repeatability.
 
+Copy `chaos-ap.sh` and its three sibling `*-helpers.sh` / `*-presets.sh` modules
+together when installing the tool.
+
 `chaos-ap.sh` runs **on the AP / gateway** that sits between the reader and the
 server and uses `iptables`, `tc`/`netem`, and (on OpenWRT) `wifi` + `uci` to
 deterministically reproduce one network failure class at a time. Each preset is

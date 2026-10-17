@@ -3,7 +3,7 @@
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
 #include "settings/settings.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 #include "utils.hpp"
 
 #include <cassert>
@@ -81,6 +81,24 @@ int main()
     nfcContract.resetCardPresence();
     nfcContract.loop();
     assert(detected == 4);
+
+    // OTA suspension survives the normal reconnect path enabling detection.
+    const int detectionsBeforeOta = detected;
+    const int removalsBeforeOta = removed;
+    assert(nfcContract.suspend());
+    assert(nfcContract.suspend());
+    nfc.setPresent(1, false);
+    nfcContract.enableCardDetection();
+    nfc.setPresent(0, true);
+    nfcContract.loop();
+    assert(detected == detectionsBeforeOta);
+    assert(removed == removalsBeforeOta);
+    assert(!nfcContract.isCardPresent());
+    assert(!nfcContract.authenticate(0, nfcContract.getFactoryKey()));
+    assert(!nfcContract.getAvailableKeyNo(nullptr, nullptr, &availableKey));
+    assert(!nfcContract.changeKey(1, nfcContract.getFactoryKey(), nfcContract.getFactoryKey(),
+                                  const_cast<uint8_t *>(enrolledKey.data())));
+    assert(nfc.card(0).keys[1] == VirtualNfc::factoryKey());
 
     VirtualNfc persisted(first);
     for (size_t index = 0; index < VirtualNfc::CardCount; ++index)

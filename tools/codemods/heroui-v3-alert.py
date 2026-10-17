@@ -1,28 +1,7 @@
 #!/usr/bin/env python3
-# Codemod migrating HeroUI v2 Alert props to v3 compound AlertContent/Title/Description
-# FEATURE: HeroUI v3 migration tooling for Alert component refactor
-
 import re
+
 from pathlib import Path
-
-ROOT = Path(__file__).parents[2]
-SEARCH_DIRS = [
-    ROOT / "apps" / "frontend" / "src",
-    ROOT / "libs",
-]
-EXCLUDE_DIRS = {"node_modules", ".nx", "dist", "__pycache__"}
-
-V2_ONLY_PROPS = {"variant", "icon"}
-
-
-def find_tsx_files(dirs):
-    for d in dirs:
-        if not d.exists():
-            continue
-        for p in d.rglob("*.tsx"):
-            if not any(ex in p.parts for ex in EXCLUDE_DIRS):
-                yield p
-
 
 def scan_alert_tags(text):
     search_re = re.compile(r'<Alert\b')
@@ -88,7 +67,6 @@ def scan_alert_tags(text):
         yield start, close_pos[1], attrs_str, False, body
         i = close_pos[1]
 
-
 def find_close_tag(text, pos):
     depth = 1
     i = pos
@@ -106,7 +84,6 @@ def find_close_tag(text, pos):
             depth += 1
         i = m.end()
     return None
-
 
 def extract_attr_value(attrs_str, attr_name):
     dq_re = re.compile(r'(?<!\w)' + re.escape(attr_name) + r'="([^"]*)"')
@@ -147,7 +124,6 @@ def extract_attr_value(attrs_str, attr_name):
         pos += 1
     return None
 
-
 def remove_attr(attrs_str, attr_name):
     dq_re = re.compile(r'\s+' + re.escape(attr_name) + r'="[^"]*"')
     sq_re = re.compile(r"\s+" + re.escape(attr_name) + r"='[^']*'")
@@ -186,6 +162,7 @@ def remove_attr(attrs_str, attr_name):
         pos += 1
     return result
 
+V2_ONLY_PROPS = {"variant", "icon"}
 
 def value_to_child(val):
     if val is None:
@@ -194,7 +171,6 @@ def value_to_child(val):
     if kind == 'string':
         return raw
     return raw
-
 
 def get_indent(text, pos):
     line_start = text.rfind('\n', 0, pos) + 1
@@ -206,14 +182,11 @@ def get_indent(text, pos):
             break
     return spaces
 
-
 def has_compound_children(body):
     return bool(re.search(r'<AlertContent\b|<AlertTitle\b|<AlertDescription\b', body))
 
-
 def body_is_effectively_empty(body):
     return body.strip() == ''
-
 
 def build_compound(attrs_str, self_close, body, indent):
     color_val = extract_attr_value(attrs_str, 'color')
@@ -280,6 +253,22 @@ def build_compound(attrs_str, self_close, body, indent):
 
     return f'<Alert{new_attrs} />'
 
+ROOT = Path(__file__).parents[2]
+
+SEARCH_DIRS = [
+    ROOT / "apps" / "frontend" / "src",
+    ROOT / "libs",
+]
+
+EXCLUDE_DIRS = {"node_modules", ".nx", "dist", "__pycache__"}
+
+def find_tsx_files(dirs):
+    for d in dirs:
+        if not d.exists():
+            continue
+        for p in d.rglob("*.tsx"):
+            if not any(ex in p.parts for ex in EXCLUDE_DIRS):
+                yield p
 
 def process_file(path):
     original = path.read_text(encoding='utf-8')
@@ -338,7 +327,6 @@ def process_file(path):
 
     return rewrites, skipped
 
-
 def main():
     total_rewrites = 0
     total_skipped = 0
@@ -367,7 +355,6 @@ def main():
     print(f'  Files changed:   {total_files}')
     print(f'  Alerts rewritten: {total_rewrites}')
     print(f'  Alerts skipped (already compound): {total_skipped}')
-
 
 if __name__ == '__main__':
     main()

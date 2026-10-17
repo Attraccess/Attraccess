@@ -47,7 +47,7 @@ Each hardware variant requires its own firmware build:
 A reader is only ever offered the build matching the variant it reports, so a reader cannot be updated with the wrong image.
 
 > [!TIP]
-> All readers of a variant follow the release together -- there is no per-reader rollout. To try a new firmware before your members meet it, point a single spare reader at a test instance running the new Attraccess version.
+> All readers of a variant follow the release together -- there is no per-reader rollout. To try a new firmware before deploying it to operators, point a single spare reader at a test instance running the new Attraccess version.
 
 ## Troubleshooting
 

@@ -94,8 +94,8 @@ attraccess_resource_maintenance_overdue > 0
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `attraccess_attractap_devices_connected` | Gauge | -- | Number of connected Attractap NFC readers |
-| `attraccess_attractap_nfc_taps_total` | Counter | -- | Total NFC tap events |
+| `attraccess_attractap_devices_connected` | Gauge | -- | Number of connected Attractap RFID readers |
+| `attraccess_attractap_nfc_taps_total` | Counter | -- | Total RFID tap events |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Total firmware update events |
 | `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Crash reports received from readers. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
 

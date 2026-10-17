@@ -1,31 +1,32 @@
 // Conversation thread with paginated history and a reply composer
 // FEATURE: Messaging thread view and composer
+
+import { Spinner, TextArea, cn } from '@heroui/react';
+import { Link } from 'react-router-dom';
+import { SendIcon, BoxIcon, XIcon } from 'lucide-react';
+import { Button } from '../../components/button/index';
 import {
   MessageReferenceType,
   useMessagingServiceMessagingListMessages,
   useMessagingServiceMessagingSendMessage,
   useResourcesServiceGetOneResourceById,
 } from '@attraccess/react-query-client';
-import { Spinner, TextArea, cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { SendIcon, BoxIcon, XIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { Button } from '../../components/button';
 import { applyIncomingMessage } from './messageCache';
 
-interface Props {
+export interface Props {
   conversationId: number;
   currentUserId: number;
   pendingResourceId?: number;
 }
 
-const PAGE_SIZE = 20;
+export const PAGE_SIZE = 20;
 
-export function MessageThread(props: Props) {
+export function useMessageThreadState(props: Props) {
   const { conversationId, currentUserId, pendingResourceId } = props;
 
   const { t } = useTranslations({ en, de });
@@ -104,6 +105,44 @@ export function MessageThread(props: Props) {
     viewport.addEventListener('resize', scrollToBottom);
     return () => viewport.removeEventListener('resize', scrollToBottom);
   }, []);
+  return {
+    currentUserId,
+    t,
+    draft,
+    setDraft,
+    setLimit,
+    attachedResourceId,
+    setAttachedResourceId,
+    bottomRef,
+    attachedResource,
+    isLoading,
+    messages,
+    hasOlder,
+    isSending,
+    handleSubmit,
+    handleKeyDown,
+  } as const;
+}
+
+export function MessageThread(props: Props) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const {
+    currentUserId,
+    t,
+    draft,
+    setDraft,
+    setLimit,
+    attachedResourceId,
+    setAttachedResourceId,
+    bottomRef,
+    attachedResource,
+    isLoading,
+    messages,
+    hasOlder,
+    isSending,
+    handleSubmit,
+    handleKeyDown,
+  } = useMessageThreadState(props);
 
   return (
     <div className="flex h-full flex-col">
@@ -158,9 +197,7 @@ export function MessageThread(props: Props) {
                     <span className="truncate">{message.referenceLabel}</span>
                   </Link>
                 )}
-                <span className="mt-0.5 text-tiny text-muted">
-                  {new Date(message.createdAt).toLocaleString()}
-                </span>
+                <span className="mt-0.5 text-tiny text-muted">{formatDateTime(message.createdAt)}</span>
               </div>
             );
           })}
@@ -191,10 +228,7 @@ export function MessageThread(props: Props) {
 
       <form
         onSubmit={handleSubmit}
-        className={cn(
-          'flex items-end gap-2 p-3',
-          attachedResourceId ? '' : 'border-t border-border',
-        )}
+        className={cn('flex items-end gap-2 p-3', attachedResourceId ? '' : 'border-t border-border')}
       >
         <TextArea
           value={draft}

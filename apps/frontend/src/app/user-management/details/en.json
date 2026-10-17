@@ -44,5 +44,8 @@
       "title": "User deleted",
       "description": "Deleted {{username}}."
     }
+  },
+  "rfidCards": {
+    "manage": "Manage RFID Cards"
   }
 }

@@ -1,4 +1,5 @@
 import {
+  Link,
   Spinner,
   Table,
   TableBody,
@@ -75,7 +76,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
           >
             {(row) => (
               <TableRow key={row.user.id} id={row.user.id}>
-                <TableCell className="w-full">
+                <TableCell>
                   <AttraccessUser user={row.user} />
                 </TableCell>
                 <TableCell>
@@ -97,19 +98,26 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
-                  {row.hasValidIntroduction && row.introductionLastEventAt ? (
-                    <span className="inline-flex items-center gap-1 text-success">
-                      <CheckIcon className="w-4 h-4" />
-                      <DateTimeDisplay date={row.introductionLastEventAt} />
-                    </span>
-                  ) : row.introduction && row.introductionLastEventAt ? (
-                    <span className="text-danger text-sm">
-                      <DateTimeDisplay date={row.introductionLastEventAt} />
-                    </span>
-                  ) : (
-                    <span className="text-foreground-400">{t('value.no')}</span>
-                  )}
+                <TableCell className="min-w-64">
+                  <div className="flex flex-col gap-1">
+                    {row.introduction && row.introductionLastEventAt && (
+                      <span className={row.hasValidDirectIntroduction ? 'text-success' : 'text-danger'}>
+                        {target.type === 'resource' && <span className="block text-sm">{t('sources.direct')}</span>}
+                        <span className="inline-flex items-center gap-1">
+                          {row.hasValidDirectIntroduction && <CheckIcon className="w-4 h-4" />}
+                          <DateTimeDisplay date={row.introductionLastEventAt} />
+                        </span>
+                      </span>
+                    )}
+                    {row.inheritedIntroductions.map((introduction) => (
+                      <Link key={introduction.id} href={`/resource-groups/${introduction.resourceGroupId}`}>
+                        {t('sources.group', { group: introduction.resourceGroup.name })}
+                      </Link>
+                    ))}
+                    {!row.introduction && !row.inheritedIntroductions.length && (
+                      <span className="text-foreground-400">{t('value.no')}</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <PeopleRowActions

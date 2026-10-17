@@ -13,9 +13,16 @@
     "endTime": "End Time",
     "usageInMinutes": "Usage in Minutes",
     "usageInHours": "Usage in Hours",
+    "sessionDurationMs": "Exact Session Duration (ms)",
+    "operatingDurationMs": "Operating Duration (ms, session)",
+    "durationStatus": "Operating Data Status",
     "startNotes": "Start Notes",
     "endNotes": "End Notes",
     "supervisorId": "Supervisor ID",
     "supervisorUsername": "Supervisor Name"
+  },
+  "status": {
+    "provisional": "Provisional",
+    "unavailable": "Unavailable"
   }
 }

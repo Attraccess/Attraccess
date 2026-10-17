@@ -6,7 +6,7 @@
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
 #include "sdl_display.hpp"
-#include "virtual_nfc.hpp"
+#include "virtual_rfid.hpp"
 
 #include <cstdint>
 #include <filesystem>

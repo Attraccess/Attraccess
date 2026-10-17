@@ -10,7 +10,7 @@ Jeder angemeldete Benutzer kann Projekte erstellen.
 
 | Feld | Pflicht | Beschreibung |
 |------|---------|-------------|
-| **Name** | Ja | Ein aussagekräftiger Projektname (z.B. "Werkstatt-Renovierung 2025") |
+| **Name** | Ja | Ein aussagekräftiger Projektname (z.B. "Entwicklung einer CNC-Spannvorrichtung") |
 | **Beschreibung** | Nein | Eine ausführlichere Beschreibung des Projektzwecks und der Ziele |
 
 4. Klicken Sie auf **Speichern**

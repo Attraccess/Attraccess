@@ -1,6 +1,6 @@
-import { Controller, Delete, Get, HttpCode, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
 import { CanManageMaintenance } from '../maintenances/canManageMaintenance.decorator';
@@ -44,7 +44,12 @@ export class ResourceHealthController {
   async clearResourceHealthEntry(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('entryId', ParseIntPipe) entryId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    await this.healthService.clearEntry(resourceId, entryId);
+    await this.healthService.clearEntry(resourceId, entryId, {
+      actorId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+    });
   }
 }

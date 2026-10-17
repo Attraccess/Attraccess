@@ -1,7 +1,7 @@
 // CSV export page composition — date range picker, type cards, configure drawer
 // FEATURE: CSV export — top level page for /csv-export route
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DateValue, DrawerHeader, RangeValue } from '@heroui/react';
+import { DateValue, DrawerHeader, DrawerHeading, RangeValue } from '@heroui/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { DateRangeSection } from './date-range-section';
@@ -44,10 +44,7 @@ export function CsvExport() {
     return null;
   }, [activeExportKey]);
 
-  const { start: startDate, end: endDate } = useMemo(
-    () => rangeToDateBounds(dateRange, now.current),
-    [dateRange],
-  );
+  const { start: startDate, end: endDate } = useMemo(() => rangeToDateBounds(dateRange, now.current), [dateRange]);
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 md:px-6 lg:px-8 py-6 flex flex-col gap-6">
@@ -74,7 +71,9 @@ export function CsvExport() {
       >
         <div data-cy="csv-export-modal" className="contents">
           <DrawerHeader className="flex w-full flex-col items-start gap-2">
-            <h2 className="text-lg font-semibold">{activeExportKey && t(`exports.${activeExportKey}.title`)}</h2>
+            <DrawerHeading className="text-lg font-semibold">
+              {activeExportKey && t(`exports.${activeExportKey}.title`)}
+            </DrawerHeading>
             <SelectedRangePill
               range={dateRange}
               emptyLabel={t('range.empty')}

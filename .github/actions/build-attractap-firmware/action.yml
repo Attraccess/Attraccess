@@ -1,36 +1,19 @@
-name: 'Build Attractap Firmware'
+name: 'Build and Test Attractap Firmware'
 description: >
-  Install Python, esptool, and the ESP-IDF v6.0.2 toolchain (cached), then build
-  all Attractap firmware variants into apps/attractap/firmware/firmware_output.
-  Image builds (Docker/Balena) must run this first: the Dockerfile itself has no
-  ESP-IDF, so the in-container firmware build is skipped and the pre-built
-  firmware_output from the build context is bundled into the API assets instead.
+  Test host firmware code and build all active variants once with the cached
+  ESP-IDF toolchain and Nx build cache. Image jobs download the output artifacts.
 
 runs:
   using: 'composite'
   steps:
-    - name: Setup Python
-      uses: actions/setup-python@v7
+    - uses: ./.github/actions/setup
       with:
-        # Pinned: the IDF virtualenv is named after the interpreter
-        # (idf6.0_py3.13_env), so `3.x` drifting to 3.14 no longer matches the
-        # cached env and breaks the firmware build.
-        python-version: '3.13'
-
-    - name: Install ESP tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install esptool
-      shell: bash
-
-    - uses: ./.github/actions/esp-idf-toolchain
+        esp-idf: 'true'
 
     - name: Build all firmware variants
-      run: |
-        cd apps/attractap/firmware
-        python3 build_firmwares.py
+      run: pnpm nx run attractap-firmware:build
       shell: bash
 
-    - name: Copy firmware into API assets
-      run: node apps/api/copy-attractap-firmware-into-assets.js
+    - name: Test firmware
+      run: pnpm nx run attractap-firmware:test
       shell: bash

@@ -1,0 +1,10 @@
+{
+  "title": "CC100-Laufzeitversion",
+  "description": "Die CC100-Laufzeit wird mit dem Server gebaut und gebündelt. Inbetriebnahme und Laufzeitupdates verwenden diese Version automatisch.",
+  "loading": "Gebündelte Laufzeit wird geladen…",
+  "selected": "Ausgewählt: {{version}} · WAGO {{model}} · Firmware {{firmware}} · {{size}} MiB",
+  "required": "Die CC100-Laufzeit wurde für diesen lokalen Server noch nicht gebaut. Führe pnpm nx run plugin-wago:install-runtime-dev aus, um sie zu bauen und zu installieren, und versuche es erneut. Produktionsimages bündeln sie automatisch.",
+  "details": "Versionsdetails",
+  "retry": "Laufzeit erneut prüfen",
+  "loadError": "Laufzeitversionen konnten nicht geladen werden. Prüfe die Verbindung und versuche es erneut."
+}

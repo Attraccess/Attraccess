@@ -1,5 +1,6 @@
 #include "display.hpp"
-#include "display/theme.hpp"
+#include "theme.hpp"
+#include "fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <cstdlib>
@@ -9,6 +10,16 @@
 // store the overlay in Display::activePopup so hidePopup can tear it down.
 
 void Display::showErrorPopup(const std::string &title, const std::string &message)
+{
+    Display::showMessagePopup(title, message, true);
+}
+
+void Display::showBillingSummary(const std::string &total)
+{
+    Display::showMessagePopup("Gesamtkosten dieser Sitzung", total, false);
+}
+
+void Display::showMessagePopup(const std::string &title, const std::string &message, bool error)
 {
     // Close existing popup if any
     Display::hidePopup();
@@ -44,14 +55,15 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     // Title
     lv_obj_t *titleLbl = lv_label_create(dialog);
     lv_label_set_text(titleLbl, title.c_str());
+    lv_obj_set_width(titleLbl, lv_pct(100));
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Message
     lv_obj_t *msgLbl = lv_label_create(dialog);
     lv_label_set_text(msgLbl, message.c_str());
     lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(msgLbl, error ? &attractap_font_montserrat_latin1_14 : &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
     // Footer with OK button
@@ -65,7 +77,7 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     lv_obj_t *okBtn = lv_button_create(footer);
     lv_obj_set_height(okBtn, LV_SIZE_CONTENT);
     lv_obj_set_width(okBtn, LV_SIZE_CONTENT);
-    DisplayTheme::button(okBtn, DisplayTheme::danger());
+    DisplayTheme::button(okBtn, error ? DisplayTheme::danger() : DisplayTheme::primary());
 
     lv_obj_t *okLbl = lv_label_create(okBtn);
     lv_label_set_text(okLbl, "OK");
@@ -79,6 +91,56 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
 
     Display::activePopup = overlay;
 }
+
+void Display::hidePopup()
+{
+    if (Display::activePopup)
+    {
+        lv_obj_del(Display::activePopup);
+        Display::activePopup = nullptr;
+    }
+    if (Display::popupAutoCloseTimer)
+    {
+        lv_timer_del(Display::popupAutoCloseTimer);
+        Display::popupAutoCloseTimer = nullptr;
+    }
+}
+
+lv_obj_t *createBalanceAmountInput(lv_obj_t *dialog)
+{
+    // Title
+    lv_obj_t *titleLbl = lv_label_create(dialog);
+    lv_label_set_text(titleLbl, "Unzureichendes Guthaben");
+    lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Message
+    lv_obj_t *msgLbl = lv_label_create(dialog);
+    lv_label_set_text(msgLbl, "Ihr Guthaben reicht nicht aus, um die Aktion auszuführen. Bitte laden Sie Ihr Guthaben auf.");
+    lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(msgLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_width(msgLbl, lv_pct(100));
+
+    // Amount label
+    lv_obj_t *amountLbl = lv_label_create(dialog);
+    lv_label_set_text(amountLbl, "Betrag (EUR)");
+    lv_obj_set_style_text_color(amountLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(amountLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Amount input
+    lv_obj_t *amountTa = lv_textarea_create(dialog);
+    lv_textarea_set_one_line(amountTa, true);
+    lv_textarea_set_max_length(amountTa, 6); // e.g., up to 999999
+    lv_textarea_set_accepted_chars(amountTa, "0123456789");
+    lv_obj_set_width(amountTa, lv_pct(100));
+    DisplayTheme::field(amountTa);
+    lv_obj_set_style_pad_left(amountTa, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_right(amountTa, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    return amountTa;
+}
+
+#include "display_balance_input.hpp"
 
 void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel)
 {
@@ -113,40 +175,12 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_set_flex_flow(dialog, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
 
-    // Title
-    lv_obj_t *titleLbl = lv_label_create(dialog);
-    lv_label_set_text(titleLbl, "Unzureichendes Guthaben");
-    lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    // Message
-    lv_obj_t *msgLbl = lv_label_create(dialog);
-    lv_label_set_text(msgLbl, "Ihr Guthaben reicht nicht aus, um die Aktion auszuführen. Bitte laden Sie Ihr Guthaben auf.");
-    lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_width(msgLbl, lv_pct(100));
-
-    // Amount label
-    lv_obj_t *amountLbl = lv_label_create(dialog);
-    lv_label_set_text(amountLbl, "Betrag (EUR)");
-    lv_obj_set_style_text_color(amountLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(amountLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    // Amount input
-    lv_obj_t *amountTa = lv_textarea_create(dialog);
-    lv_textarea_set_one_line(amountTa, true);
-    lv_textarea_set_max_length(amountTa, 6); // e.g., up to 999999
-    lv_textarea_set_accepted_chars(amountTa, "0123456789");
-    lv_obj_set_width(amountTa, lv_pct(100));
-    DisplayTheme::field(amountTa);
-    lv_obj_set_style_pad_left(amountTa, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_right(amountTa, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-
+    lv_obj_t *amountTa = createBalanceAmountInput(dialog);
     // Inline error label (initially empty)
     lv_obj_t *errorLbl = lv_label_create(dialog);
     lv_label_set_text(errorLbl, "");
     lv_obj_set_style_text_color(errorLbl, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(errorLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(errorLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Footer with buttons
     lv_obj_t *footer = lv_obj_create(dialog);
@@ -262,9 +296,9 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         lv_obj_t *dialog = lv_obj_get_parent(footer);
         lv_obj_clean(dialog);
         lv_obj_t *infoLbl = lv_label_create(dialog);
-        lv_label_set_text(infoLbl, "Bitte am Zahlungsterminal fortfahren …");
+        lv_label_set_text(infoLbl, "Bitte am Zahlungsterminal fortfahren ...");
         lv_obj_set_style_text_color(infoLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_font(infoLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(infoLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         if (c->onStart) c->onStart(amountCents);
         // Close after short delay
@@ -272,18 +306,4 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         (void)Display::popupAutoCloseTimer; }, LV_EVENT_CLICKED, ctx);
 
     Display::activePopup = overlay;
-}
-
-void Display::hidePopup()
-{
-    if (Display::activePopup)
-    {
-        lv_obj_del(Display::activePopup);
-        Display::activePopup = nullptr;
-    }
-    if (Display::popupAutoCloseTimer)
-    {
-        lv_timer_del(Display::popupAutoCloseTimer);
-        Display::popupAutoCloseTimer = nullptr;
-    }
 }

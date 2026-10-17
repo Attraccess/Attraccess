@@ -134,8 +134,8 @@ time_t parseIso8601ToTimeT(const std::string &iso8601);
  *
  * Known keys map to fixed German strings; unknown values (including free-form
  * server messages) are returned unchanged so the raw error is still surfaced.
- * Strings avoid umlauts (ae/oe/ue/ss) so they render with the reader's bitmap
- * fonts on every screen.
+ * Strings use German umlauts where appropriate; the reader fonts include the
+ * required Latin-1 glyphs.
  *
  * @param errorKey The error key/string received from the server
  * @return Human-readable German error message

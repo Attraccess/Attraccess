@@ -54,7 +54,9 @@ bool SdlDisplay::begin()
 
     SDL_Surface *device = SDL_LoadPNG_IO(SDL_IOFromConstMem(deviceImageStart, deviceImageEnd - deviceImageStart), true);
     if (!device) throw std::runtime_error(SDL_GetError());
+#if !defined(__APPLE__)
     SDL_SetWindowIcon(window, device);
+#endif
     deviceTexture = SDL_CreateTextureFromSurface(renderer, device);
     SDL_DestroySurface(device);
     if (!deviceTexture) throw std::runtime_error(SDL_GetError());

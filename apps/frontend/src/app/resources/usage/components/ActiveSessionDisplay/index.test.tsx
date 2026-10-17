@@ -21,12 +21,22 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn: () => [],
   UseResourcesServiceResourceUsageGetHistoryKeyFn: () => [],
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn(), resetQueries: vi.fn() }) }));
-vi.mock('../../../../../components/toastProvider', () => ({ useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn() }) }));
-vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
-  useResourceFormsSubmission: () => ({ requestForms: () => Promise.resolve([]), modal: null }),
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn(), resetQueries: vi.fn() }),
 }));
-vi.mock('../SessionStatusCard', () => ({ SessionStatusCard: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
+vi.mock('../../../../../components/toastProvider', () => ({
+  useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn() }),
+}));
+vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
+  useResourceFormsSubmission: () => ({
+    requestForms: () => Promise.resolve([]),
+    modal: null,
+    clearFormsDraft: vi.fn(),
+  }),
+}));
+vi.mock('../SessionStatusCard', () => ({
+  SessionStatusCard: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
 vi.mock('../SessionTimer', () => ({ SessionTimer: () => null }));
 vi.mock('../SessionNotesModal', () => ({ SessionModalMode: { END: 'end' }, SessionNotesModal: () => null }));
 vi.mock('./flowButtons', () => ({ FlowButtons: () => null }));

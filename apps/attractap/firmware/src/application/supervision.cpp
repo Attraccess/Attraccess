@@ -2,7 +2,7 @@
 
 #ifdef HAS_LVGL_DISPLAY
 #ifndef SUPERVISION_FLOW_TEST
-#include "platform.hpp"
+#include "../platform.hpp"
 #include "../display/display.hpp"
 #endif
 
@@ -63,7 +63,7 @@ void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_
     resetActiveTransaction();
     resourceId = id;
     const uint32_t now = millis();
-    enter(requester.c_str(), "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen", now,
+    enter(requester.c_str(), "Aufsichts-Karte auflegen oder per\nApp/Web bestätigen", now,
           now + TIMEOUT_MS);
     api.requestSupervision(resourceId);
 }
@@ -165,6 +165,14 @@ void SupervisionFlow::onResolved(const API::SupervisionResolvedResult &result) {
     strlcpy(event.error, result.error.c_str(), sizeof(event.error));
     enqueueEvent(event);
 }
+
+#endif
+
+#ifdef HAS_LVGL_DISPLAY
+#ifndef SUPERVISION_FLOW_TEST
+#include "../platform.hpp"
+#include "../display/display.hpp"
+#endif
 
 void SupervisionFlow::enqueueEvent(const Event &event) {
     if (eventQueue == nullptr) {
@@ -269,12 +277,12 @@ void SupervisionFlow::processEvent(const Event &event) {
         if (phase == Phase::Idle || phase == Phase::Success || webInitiated) break;
         if (!event.success) {
             strlcpy(errorMessage, strcmp(event.error, "NO_SUPERVISORS_AVAILABLE") == 0
-                                        ? "Keine Aufsicht verfuegbar"
+                                        ? "Keine Aufsicht verfügbar"
                                         : translateReaderError(event.error).c_str(), sizeof(errorMessage));
             publishTerminalEvent(TerminalEvent::Failed);
             break;
         }
-        strlcpy(hintMessage, "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen", sizeof(hintMessage));
+        strlcpy(hintMessage, "Aufsichts-Karte auflegen oder per\nApp/Web bestätigen", sizeof(hintMessage));
         for (uint8_t i = 0; i < event.supervisorCount; ++i) {
             strlcat(hintMessage, i == 0 ? "\n" : ", ", sizeof(hintMessage));
             strlcat(hintMessage, event.supervisorNames[i], sizeof(hintMessage));
@@ -320,6 +328,14 @@ void SupervisionFlow::processEvent(const Event &event) {
         break;
     }
 }
+
+#endif
+
+#ifdef HAS_LVGL_DISPLAY
+#ifndef SUPERVISION_FLOW_TEST
+#include "../platform.hpp"
+#include "../display/display.hpp"
+#endif
 
 void SupervisionFlow::showError(bool terminal, uint32_t now) {
     beeper.errorBeep();
@@ -401,4 +417,5 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
     }
     return Outcome::None;
 }
+
 #endif

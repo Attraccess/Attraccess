@@ -1,6 +1,6 @@
 # Monitoring & Metriken
 
-Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur Metrik-Erfassung und **Grafana** zur Visualisierung. So erhalten Sie Echtzeit-Einblicke in die Nutzung Ihres Makerspaces, die Systemgesundheit und die betriebliche Leistung.
+Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur Metrik-Erfassung und **Grafana** zur Visualisierung. IT- und Betriebsteams können Ressourcennutzung, Anwendungszustand und betriebliche Leistung gemeinsam mit ihrer bestehenden Infrastruktur überwachen.
 
 ## Was Sie erhalten
 
@@ -11,7 +11,7 @@ Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur M
 | **Benutzer** | Gesamtbenutzer, neue Registrierungen |
 | **Ressourcen** | Aktive Nutzungssitzungen, Sitzungsdauern, abgeschlossene Einweisungen |
 | **Wartung** | Wartungsereignisse, überfällige Wartungswarnungen |
-| **Attractap-Geräte** | Verbundene NFC-Leser, Tap-Ereignisse, Firmware-Updates |
+| **Attractap-Geräte** | Verbundene RFID-Leser, Tap-Ereignisse, Firmware-Updates |
 | **Abrechnung** | Transaktionsanzahl und -beträge |
 | **Infrastruktur** | MQTT-Server-Status, WebSocket-Verbindungen, E-Mail-Zustellung, Plugin-Status |
 | **Node.js-Laufzeit** | CPU-Nutzung, Speicher (Heap/RSS), Event-Loop-Verzögerung |

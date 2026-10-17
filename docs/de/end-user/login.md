@@ -2,7 +2,7 @@
 
 Diese Seite erklärt die verschiedenen Möglichkeiten, sich bei Attraccess anzumelden.
 
-## Anmeldung mit Benutzername und Passwort
+## Anmeldung mit E-Mail oder Benutzername und Passwort
 
 1. Öffnen Sie Attraccess in Ihrem Browser
 2. Geben Sie Ihren **Benutzernamen oder Ihre E-Mail-Adresse** ein
@@ -13,7 +13,7 @@ Diese Seite erklärt die verschiedenen Möglichkeiten, sich bei Attraccess anzum
 
 ## Anmeldung mit SSO
 
-Wenn Ihre Werkstatt einen Single-Sign-On-(SSO-)Anbieter konfiguriert hat, sehen Sie zusätzliche Schaltflächen auf der Anmeldeseite (z. B. "Mit Google anmelden" oder "Mit Keycloak anmelden").
+Wenn Ihre Organisation einen Single-Sign-On-(SSO-)Anbieter konfiguriert hat, sehen Sie zusätzliche Schaltflächen auf der Anmeldeseite für den Identitätsanbieter Ihres Unternehmens oder Ihrer Hochschule (z. B. Microsoft Entra ID oder Keycloak).
 
 1. Klicken Sie auf die **SSO-Schaltfläche** Ihres Anbieters
 2. Sie werden zur Anmeldeseite Ihres Anbieters weitergeleitet
@@ -24,9 +24,9 @@ Wenn Ihre Werkstatt einen Single-Sign-On-(SSO-)Anbieter konfiguriert hat, sehen 
 
 ## Zwei-Faktor-Authentifizierung (2FA)
 
-Wenn die Zwei-Faktor-Authentifizierung für Ihr Konto aktiviert ist, werden Sie nach der Passworteingabe nach einem zusätzlichen Code gefragt.
+Wenn die Zwei-Faktor-Authentifizierung für Ihr Konto aktiviert ist, werden Sie nach dem Absenden Ihrer Zugangsdaten nach einem zusätzlichen Code gefragt.
 
-1. Geben Sie Ihren Benutzernamen und Ihr Passwort wie gewohnt ein
+1. Geben Sie Ihre E-Mail-Adresse oder Ihren Benutzernamen und Ihr Passwort ein und klicken Sie auf **Anmelden**
 2. Öffnen Sie Ihre **Authenticator-App** (z. B. Google Authenticator, Microsoft Authenticator, Authy)
 3. Geben Sie den **sechsstelligen Code** ein, der in der App angezeigt wird
 4. Klicken Sie auf **Bestätigen**
@@ -44,7 +44,7 @@ Wenn die Selbstregistrierung aktiviert ist, können Sie ein neues Konto erstelle
 4. Möglicherweise müssen Sie Ihre E-Mail-Adresse bestätigen, bevor Sie sich anmelden können
 
 > [!NOTE]
-> Manche Werkstätten deaktivieren die Selbstregistrierung. In diesem Fall bitten Sie Ihren Administrator, ein Konto für Sie zu erstellen.
+> Manche Organisationen deaktivieren die Selbstregistrierung. Fragen Sie in diesem Fall Ihren Administrator, wie Sie Zugang erhalten.
 
 ## Passwort vergessen
 
@@ -57,7 +57,7 @@ Wenn Sie Ihr Passwort vergessen haben:
 5. Klicken Sie auf den Link und legen Sie ein neues Passwort fest
 
 > [!WARNING]
-> Wenn Sie die E-Mail nicht erhalten, prüfen Sie Ihren Spam-Ordner. Wenn das Problem weiterhin besteht, wenden Sie sich an Ihren Werkstattadministrator.
+> Wenn Sie die E-Mail nicht erhalten, prüfen Sie Ihren Spam-Ordner. Wenn das Problem weiterhin besteht, wenden Sie sich an Ihren Administrator.
 
 ## Siehe auch
 

@@ -17,6 +17,21 @@ describe('SseInstrumentation.wrap', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
+  it('keeps logical topic metrics distinct from physical stream metrics', async () => {
+    const { registry, instr } = setup();
+    const source = new Subject();
+    const physical = instr.wrap('live_updates', source).subscribe();
+    const first = instr.wrapTopic('resource', source).subscribe();
+    const second = instr.wrapTopic('resource', source).subscribe();
+    const text = await registry.metrics();
+    expect(text).toContain('attraccess_sse_active_connections{stream="live_updates"} 1');
+    expect(text).toContain('attraccess_live_update_active_topics{topic="resource"} 2');
+    physical.unsubscribe();
+    first.unsubscribe();
+    second.unsubscribe();
+    expect(await registry.metrics()).toContain('attraccess_live_update_active_topics{topic="resource"} 0');
+  });
+
   it('increments active connections gauge to 1 on subscribe', async () => {
     const { registry, instr } = setup();
     const source = new Subject<{ data: object }>();

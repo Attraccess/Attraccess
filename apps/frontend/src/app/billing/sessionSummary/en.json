@@ -1,0 +1,9 @@
+{
+  "title": "Session billing summary",
+  "total": "Total spent this session",
+  "historyHint": "You can find the billing details in your payment history.",
+  "close": "Done",
+  "loading": "Loading billing total",
+  "loadError": "Could not load the billing currency.",
+  "retry": "Try again"
+}

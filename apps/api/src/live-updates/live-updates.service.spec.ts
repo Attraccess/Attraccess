@@ -1,0 +1,285 @@
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
+import { Subject } from 'rxjs';
+import { LiveTopicsService } from './live-topics.service';
+import { LiveUpdatesService } from './live-updates.service';
+import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
+import { ForbiddenException } from '@nestjs/common';
+
+const id = '00000000-0000-4000-8000-000000000001';
+const user = { id: 1, jwtTokenId: 'session-a', effectivePermissions: new Set() } as AuthenticatedUser;
+
+describe('bundled server lifecycle', () => {
+  let service: LiveUpdatesService;
+  let topics: LiveTopicsService;
+  let authorize: jest.Mock;
+  let sourceFor: jest.Mock;
+  let presence: jest.Mock;
+  let source: Subject<{ data: object }>;
+  let packets: LivePacket[];
+  beforeEach(() => {
+    jest.useFakeTimers();
+    packets = [];
+    source = new Subject();
+    topics = new LiveTopicsService();
+    authorize = jest.fn(async () => new Map<string, string>());
+    sourceFor = jest.fn(async () => source.asObservable());
+    presence = jest.fn();
+    topics.register({
+      topics: [
+        { topic: 'resource', scope: 'resource' },
+        { topic: 'flow-logs', scope: 'resource' },
+      ],
+      authorize,
+      source: sourceFor,
+    });
+    for (const topic of ['billing', 'messaging', 'notifications', 'supervision'] as const) {
+      topics.register({
+        topics: [{ topic, scope: 'user' }],
+        authorize,
+        source: sourceFor,
+        setPresence: topic === 'notifications' ? (_subscription, ...args) => presence(...args) : undefined,
+      });
+    }
+    const metrics = { wrapTopic: jest.fn((_topic, observable) => observable) } as unknown as SseInstrumentation;
+    service = new LiveUpdatesService(topics, metrics);
+  });
+  afterEach(() => {
+    service.onModuleDestroy();
+    jest.useRealTimers();
+  });
+  const body = (subscriptions: LiveSubscription[], revision = 0) => ({ subscriptions, revision });
+
+  it.each([
+    null,
+    [],
+    {},
+    { subscriptions: [] },
+    { subscriptions: [], revision: -1 },
+    { subscriptions: [], revision: 1.1 },
+    { subscriptions: [], revision: '1' },
+    { subscriptions: [], revision: Number.MAX_SAFE_INTEGER + 1 },
+    { subscriptions: {}, revision: 0 },
+    { subscriptions: Array.from({ length: 257 }, () => ({ topic: 'messaging' })), revision: 0 },
+    { subscriptions: [], revision: 0, present: 1 },
+  ])('rejects an invalid subscription set %j before authorization', (value) => {
+    service.open(id, user).subscribe();
+    expect(() => service.update(id, user, value)).toThrow('Invalid subscription set');
+    expect(authorize).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed individual subscriptions while retaining the valid ones', async () => {
+    service.open(id, user).subscribe(({ data }) => packets.push(data));
+    const malformed = { topic: 'resource', resourceId: '1' };
+    await service.update(id, user, { revision: 0, subscriptions: [malformed, { topic: 'messaging' }] });
+    expect(sourceFor).toHaveBeenCalledTimes(1);
+    expect(sourceFor).toHaveBeenCalledWith({ topic: 'messaging' }, user);
+    expect(packets).toContainEqual({ type: 'rejected', subscription: malformed, reason: 'Invalid topic' });
+  });
+
+  it('serializes concurrent updates and still ignores stale revisions', async () => {
+    let resolve!: (rejected: Map<string, string>) => void;
+    let started!: () => void;
+    const authorizationStarted = new Promise<void>((r) => {
+      started = r;
+    });
+    authorize.mockImplementationOnce(() => {
+      started();
+      return new Promise<Map<string, string>>((r) => {
+        resolve = r;
+      });
+    });
+    service.open(id, user).subscribe();
+    const first = service.update(id, user, body([{ topic: 'resource', resourceId: 1 }], 1));
+    await authorizationStarted;
+    const next = service.update(id, user, body([{ topic: 'resource', resourceId: 2 }], 2));
+    const stale = service.update(id, user, body([], 1));
+    expect(authorize).toHaveBeenCalledTimes(1);
+    expect(sourceFor).not.toHaveBeenCalled();
+    resolve(new Map());
+    await Promise.all([first, next, stale]);
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(sourceFor.mock.calls.map(([subscription]) => subscription.resourceId)).toEqual([1, 2]);
+    expect(source.observed).toBe(true);
+  });
+
+  it('releases the update lock after a failed operation', async () => {
+    service.open(id, user).subscribe();
+    jest.spyOn(topics, 'authorize').mockRejectedValueOnce(new Error('Unexpected authorization failure'));
+    await expect(service.update(id, user, body([{ topic: 'messaging' }]))).rejects.toThrow('authorization failure');
+    await service.update(id, user, body([{ topic: 'messaging' }]));
+    expect(source.observed).toBe(true);
+  });
+
+  it('deduplicates topics, changes sets in place, filters keepalives and releases on final disconnect', async () => {
+    const connection = service.open(id, user).subscribe(({ data }) => packets.push(data));
+    await service.update(id, user, body([{ topic: 'messaging' }, { topic: 'messaging' }]));
+    expect(sourceFor).toHaveBeenCalledTimes(1);
+    expect(source.observed).toBe(true);
+    source.next({ data: { keepalive: true } });
+    source.next({ data: { id: 3 } });
+    expect(packets.filter((p) => p.type === 'event')).toEqual([
+      { type: 'event', event: { topic: 'messaging', eventType: 'update', payload: { id: 3 } } },
+    ]);
+    await service.update(id, user, body([{ topic: 'messaging' }, { topic: 'billing' }], 1));
+    expect(sourceFor).toHaveBeenCalledTimes(2);
+    await service.update(id, user, body([{ topic: 'messaging' }], 2));
+    expect(sourceFor).toHaveBeenCalledTimes(2);
+    connection.unsubscribe();
+    expect(source.observed).toBe(false);
+    expect(() => service.update(id, user, body([]))).toThrow('Live connection not found');
+  });
+
+  it('rejects cross-user and cross-session controls without changing delivery', async () => {
+    service.open(id, user).subscribe();
+    await service.update(id, user, body([{ topic: 'billing' }]));
+    for (const [requestUser, expectedCode] of [
+      [{ ...user, id: 2 }, undefined],
+      [{ ...user, jwtTokenId: 'other' }, 'LIVE_UPDATES_SESSION_CHANGED'],
+    ] as const) {
+      try {
+        service.update(id, requestUser, body([]));
+        throw new Error('Control unexpectedly accepted');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect(error.getStatus()).toBe(403);
+        expect(error.getResponse().code).toBe(expectedCode);
+        expect(JSON.stringify(error.getResponse())).not.toContain('session-a');
+      }
+    }
+    expect(source.observed).toBe(true);
+    expect(authorize).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['sync', new Error('secret source credential')],
+    ['async', new ForbiddenException('secret source credential')],
+    ['sync', 'secret source credential'],
+    ['async', { message: 'secret source credential' }],
+  ])('redacts %s source creation failures and keeps independent topics alive', async (mode, error) => {
+    service.open(id, user).subscribe(({ data }) => packets.push(data));
+    sourceFor.mockImplementation((subscription: LiveSubscription) => {
+      if (subscription.topic === 'billing') {
+        if (mode === 'sync') throw error;
+        return Promise.reject(error);
+      }
+      return source.asObservable();
+    });
+    await service.update(id, user, body([{ topic: 'billing' }, { topic: 'messaging' }]));
+    source.next({ data: { id: 5 } });
+    expect(packets).toContainEqual({
+      type: 'rejected',
+      subscription: { topic: 'billing' },
+      reason: 'Topic unavailable',
+    });
+    expect(packets).toContainEqual({
+      type: 'event',
+      event: { topic: 'messaging', eventType: 'update', payload: { id: 5 } },
+    });
+    expect(JSON.stringify(packets)).not.toContain('secret');
+  });
+
+  it('redacts unexpected parse failures while preserving known public validation and business reasons', async () => {
+    service.open(id, user).subscribe(({ data }) => packets.push(data));
+    jest.spyOn(topics, 'parse').mockImplementationOnce(() => {
+      throw new ForbiddenException('secret parse credential');
+    });
+    authorize.mockResolvedValueOnce(new Map([['resource:2', 'Resource not found']]));
+    await service.update(id, user, {
+      revision: 0,
+      subscriptions: [
+        { topic: 'billing' },
+        { topic: 'resource', resourceId: -1 },
+        { topic: 'resource', resourceId: 2 },
+      ],
+    });
+    expect(packets.filter((p) => p.type === 'rejected').map((p) => p.reason)).toEqual([
+      'Topic unavailable',
+      'Invalid topic',
+      'Resource not found',
+    ]);
+    expect(JSON.stringify(packets)).not.toContain('secret');
+  });
+
+  it('retains authorized subscriptions in a mixed set and revokes forbidden ones on renewal', async () => {
+    service.open(id, user).subscribe(({ data }) => packets.push(data));
+    authorize.mockImplementation(
+      async (subscriptions: LiveSubscription[]) =>
+        new Map(subscriptions.filter((s) => s.topic === 'flow-logs').map((s) => [liveSubscriptionKey(s), 'Forbidden'])),
+    );
+    await service.update(id, user, body([{ topic: 'messaging' }, { topic: 'flow-logs', resourceId: 1 }]));
+    expect(sourceFor).toHaveBeenCalledTimes(1);
+    expect(packets).toContainEqual({
+      type: 'rejected',
+      subscription: { topic: 'flow-logs', resourceId: 1 },
+      reason: 'Forbidden',
+    });
+    authorize.mockImplementation(() => {
+      throw new Error('Revoked');
+    });
+    await service.update(id, user, body([{ topic: 'messaging' }]));
+    expect(source.observed).toBe(false);
+  });
+
+  it('ignores stale revisions and removes subjects on lease expiry', async () => {
+    service.open(id, user).subscribe();
+    await service.update(id, user, body([{ topic: 'messaging' }], 2));
+    await service.update(id, user, body([], 1));
+    expect(source.observed).toBe(true);
+    jest.advanceTimersByTime(30_000);
+    expect(source.observed).toBe(false);
+    expect(() => service.update(id, user, body([]))).toThrow('not found');
+  });
+
+  it('does not subscribe after asynchronous resource validation finishes on a disconnected tab', async () => {
+    let resolve!: (rejected: Map<string, string>) => void;
+    authorize.mockReturnValue(
+      new Promise<Map<string, string>>((r) => {
+        resolve = r;
+      }),
+    );
+    const connection = service.open(id, user).subscribe();
+    const pending = service.update(id, user, body([{ topic: 'resource', resourceId: 1 }]));
+    await Promise.resolve();
+    connection.unsubscribe();
+    resolve(new Map());
+    await pending;
+    expect(sourceFor).not.toHaveBeenCalled();
+    expect(source.observed).toBe(false);
+  });
+
+  it('tracks notification visibility by connection and clears it on topic removal, revocation and disconnect', async () => {
+    const otherId = '00000000-0000-4000-8000-000000000002';
+    const first = service.open(id, user).subscribe();
+    const second = service.open(otherId, user).subscribe();
+    await service.update(id, user, { ...body([{ topic: 'notifications' }]), present: true });
+    await service.update(otherId, user, { ...body([{ topic: 'notifications' }]), present: false });
+    expect(presence).toHaveBeenCalledWith(user.id, id, true);
+    expect(presence).toHaveBeenCalledWith(user.id, otherId, false);
+    await service.update(id, user, body([{ topic: 'messaging' }], 1));
+    expect(presence).toHaveBeenLastCalledWith(user.id, id, false);
+    await service.update(id, user, { ...body([{ topic: 'notifications' }], 2), present: true });
+    authorize.mockImplementation(() => {
+      throw new Error('Revoked');
+    });
+    await service.update(id, user, body([{ topic: 'notifications' }], 2));
+    expect(presence).toHaveBeenLastCalledWith(user.id, id, false);
+    second.unsubscribe();
+    expect(presence).toHaveBeenLastCalledWith(user.id, otherId, false);
+    first.unsubscribe();
+  });
+
+  it.each(['complete', 'error'] as const)('clears provider presence when its source emits %s', async (end) => {
+    service.open(id, user).subscribe();
+    await service.update(id, user, { ...body([{ topic: 'notifications' }]), present: true });
+    expect(presence).toHaveBeenLastCalledWith(user.id, id, true);
+    if (end === 'error') source.error(new Error('Unavailable'));
+    else source.complete();
+    expect(presence).toHaveBeenLastCalledWith(user.id, id, false);
+    // Renewal of a synchronously closed source must not restore presence.
+    presence.mockClear();
+    await service.update(id, user, { ...body([{ topic: 'notifications' }]), present: true });
+    expect(presence).toHaveBeenCalledTimes(1);
+    expect(presence).toHaveBeenCalledWith(user.id, id, false);
+  });
+});

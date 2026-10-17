@@ -14,8 +14,20 @@
   "perMinute": {
     "label": "Pro Minute"
   },
+  "perOperatingMinute": {
+    "label": "Pro zugeordneter Betriebsminute"
+  },
+  "perKwh": {
+    "label": "Pro kWh"
+  },
   "example": {
-    "label": "Beispielkosten ({{minutes}} Min)"
+    "label": "Beispielkosten",
+    "sessionDuration": {
+      "label": "Sitzungsdauer (Min)"
+    },
+    "operatingDuration": {
+      "label": "Zugeordnete Betriebsdauer (Min)"
+    }
   },
   "simulator": {
     "minutesLabel": "Minuten simulieren"

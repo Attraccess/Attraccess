@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -6,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfuegbar. Wartungsarbeiten duerfen nur von den unten aufgefuehrten Personen durchgefuehrt werden.";
+#include "resourceDetailsCopy.hpp"
 
 void ResourceDetailsScreen::init()
 {
@@ -15,7 +16,10 @@ void ResourceDetailsScreen::init()
       return;
    }
    this->screen = lv_obj_create(NULL);
-   lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
+   // Detail panels can exceed the display height, especially with many tutors.
+   lv_obj_add_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_scroll_dir(this->screen, LV_DIR_VER);
+   lv_obj_set_scrollbar_mode(this->screen, LV_SCROLLBAR_MODE_AUTO);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    DisplayTheme::applyScreen(this->screen);
@@ -24,451 +28,201 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *loginContainer = lv_obj_create(this->screen);
-   lv_obj_remove_style_all(loginContainer);
-   lv_obj_set_width(loginContainer, lv_pct(100));
-   lv_obj_set_height(loginContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(loginContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(loginContainer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(loginContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(loginContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(loginContainer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(loginContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(loginContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   sessionHeader.create(this->screen, [this] {
+      if (!this->actionInProgress && this->buttonClickCallback)
+         this->buttonClickCallback({this, BUTTON_CLICK_TYPE_LOGOUT, {}});
+   }, [this] {
+      if (!this->actionInProgress && this->buttonClickCallback)
+         this->buttonClickCallback({this, BUTTON_CLICK_TYPE_BACK, {}});
+   });
+   sessionHeader.setUser(this->loginUsernameCache);
 
-   lv_obj_t *logoutButton = lv_button_create(loginContainer);
-   lv_obj_set_width(logoutButton, 70);
-   lv_obj_set_height(logoutButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(logoutButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(logoutButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(logoutButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(logoutButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
-   lv_obj_add_event_cb(logoutButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOGOUT, {}});
+   this->createResourceHeader();
 
-   lv_obj_t *labelForLogoutButton = lv_label_create(logoutButton);
-   lv_obj_set_width(labelForLogoutButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForLogoutButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForLogoutButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForLogoutButton, "Abmelden");
-   lv_obj_set_style_text_align(labelForLogoutButton, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(labelForLogoutButton, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->createSessionDetails();
 
-   lv_obj_t *userAndTimeoutContainer = lv_obj_create(loginContainer);
-   lv_obj_remove_style_all(userAndTimeoutContainer);
-   lv_obj_set_width(userAndTimeoutContainer, 340);
-   lv_obj_set_height(userAndTimeoutContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(userAndTimeoutContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(userAndTimeoutContainer, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(userAndTimeoutContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(userAndTimeoutContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(userAndTimeoutContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->createSessionControls();
 
-   this->loginUserLabel = lv_label_create(userAndTimeoutContainer);
-   lv_obj_set_width(this->loginUserLabel, lv_pct(100));
-   lv_obj_set_height(this->loginUserLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->loginUserLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
-   lv_obj_set_style_text_font(this->loginUserLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->loginUserLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(this->loginUserLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->createDoorControls();
 
-   this->sessionTimeoutIndicator = lv_bar_create(userAndTimeoutContainer);
-   lv_bar_set_mode(this->sessionTimeoutIndicator, LV_BAR_MODE_SYMMETRICAL);
-   lv_bar_set_range(this->sessionTimeoutIndicator, 0, 30);
-   lv_bar_set_value(this->sessionTimeoutIndicator, 25, LV_ANIM_OFF);
-   lv_bar_set_start_value(this->sessionTimeoutIndicator, 30, LV_ANIM_OFF);
-   lv_obj_set_height(this->sessionTimeoutIndicator, 10);
-   lv_obj_set_width(this->sessionTimeoutIndicator, lv_pct(100));
-   lv_obj_set_align(this->sessionTimeoutIndicator, LV_ALIGN_CENTER);
-
-   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, DisplayTheme::primarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->sessionTimeoutIndicator, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-
-   // Compensating for LVGL9.1 draw crash with bar/slider max value when top-padding is nonzero and right-padding is 0
-   if (lv_obj_get_style_pad_top(this->sessionTimeoutIndicator, LV_PART_MAIN) > 0)
-      lv_obj_set_style_pad_right(this->sessionTimeoutIndicator, lv_obj_get_style_pad_right(this->sessionTimeoutIndicator, LV_PART_MAIN) + 1, LV_PART_MAIN);
-
-   lv_obj_t *header = lv_obj_create(this->screen);
-   lv_obj_remove_style_all(header);
-   lv_obj_set_width(header, lv_pct(100));
-   lv_obj_set_height(header, LV_SIZE_CONTENT);
-   lv_obj_set_align(header, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(header, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-
-   lv_obj_t *resouceDetails = lv_obj_create(header);
-   lv_obj_remove_style_all(resouceDetails);
-   lv_obj_set_width(resouceDetails, lv_pct(100));
-   lv_obj_set_height(resouceDetails, LV_SIZE_CONTENT);
-   lv_obj_set_align(resouceDetails, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(resouceDetails, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(resouceDetails, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(resouceDetails, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(resouceDetails, LV_OBJ_FLAG_SCROLLABLE);
-
-   this->resourceName = lv_label_create(resouceDetails);
-   lv_obj_set_width(this->resourceName, lv_pct(100));
-   lv_label_set_long_mode(this->resourceName, LV_LABEL_LONG_SCROLL);
-   lv_obj_set_height(this->resourceName, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->resourceName, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(this->resourceName, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_text_font(this->resourceName, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->resourceName, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->resourceDescription = lv_label_create(resouceDetails);
-   lv_obj_set_height(this->resourceDescription, 28);
-   lv_obj_set_width(this->resourceDescription, lv_pct(100));
-   lv_label_set_long_mode(this->resourceDescription, LV_LABEL_LONG_SCROLL);
-   lv_obj_set_align(this->resourceDescription, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_text_color(this->resourceDescription, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->sessionDetailsContainer = lv_obj_create(this->screen);
-   lv_obj_remove_style_all(this->sessionDetailsContainer);
-   lv_obj_set_width(this->sessionDetailsContainer, lv_pct(100));
-   lv_obj_set_height(this->sessionDetailsContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->sessionDetailsContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->sessionDetailsContainer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(this->sessionDetailsContainer, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_SCROLLABLE);
-
-   lv_obj_t *sessionStartTimeContainer = lv_obj_create(this->sessionDetailsContainer);
-   lv_obj_remove_style_all(sessionStartTimeContainer);
-   lv_obj_set_width(sessionStartTimeContainer, LV_SIZE_CONTENT);
-   lv_obj_set_height(sessionStartTimeContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(sessionStartTimeContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(sessionStartTimeContainer, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(sessionStartTimeContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(sessionStartTimeContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(sessionStartTimeContainer, LV_OBJ_FLAG_SCROLLABLE);
-
-   lv_obj_t *labelForSessionStartTime = lv_label_create(sessionStartTimeContainer);
-   lv_obj_set_width(labelForSessionStartTime, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForSessionStartTime, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForSessionStartTime, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForSessionStartTime, "Startzeit");
-   lv_obj_set_style_text_color(labelForSessionStartTime, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(labelForSessionStartTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->sessionStartTimeLabel = lv_label_create(sessionStartTimeContainer);
-   lv_obj_set_width(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->sessionStartTimeLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->sessionStartTimeLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->sessionStartTimeLabel, "??.??. ??:??");
-   lv_obj_set_style_text_font(this->sessionStartTimeLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->sessionStartTimeLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *currentUserContainer = lv_obj_create(this->sessionDetailsContainer);
-   lv_obj_remove_style_all(currentUserContainer);
-   lv_obj_set_flex_grow(currentUserContainer, 1);
-   lv_obj_set_style_pad_left(currentUserContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(currentUserContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_height(currentUserContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(currentUserContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(currentUserContainer, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(currentUserContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_remove_flag(currentUserContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(currentUserContainer, LV_OBJ_FLAG_SCROLLABLE);
-
-   lv_obj_t *labelForCurrentUser = lv_label_create(currentUserContainer);
-   lv_obj_set_width(labelForCurrentUser, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForCurrentUser, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForCurrentUser, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(labelForCurrentUser, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(labelForCurrentUser, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_label_set_text(labelForCurrentUser, "Nutzer");
-   lv_obj_set_style_text_color(labelForCurrentUser, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(labelForCurrentUser, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->currentUser = lv_label_create(currentUserContainer);
-   lv_obj_set_width(this->currentUser, lv_pct(100));
-   lv_obj_set_height(this->currentUser, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->currentUser, LV_ALIGN_CENTER);
-   lv_label_set_long_mode(this->currentUser, LV_LABEL_LONG_SCROLL_CIRCULAR);
-   lv_obj_set_style_text_align(this->currentUser, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_text(this->currentUser, "JappyJan");
-   lv_obj_set_style_text_font(this->currentUser, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->currentUser, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *elapsedTimeContainer = lv_obj_create(this->sessionDetailsContainer);
-   lv_obj_remove_style_all(elapsedTimeContainer);
-   lv_obj_set_width(elapsedTimeContainer, LV_SIZE_CONTENT);
-   lv_obj_set_height(elapsedTimeContainer, LV_SIZE_CONTENT);
-   lv_obj_set_align(elapsedTimeContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(elapsedTimeContainer, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(elapsedTimeContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
-   lv_obj_remove_flag(elapsedTimeContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(elapsedTimeContainer, LV_OBJ_FLAG_SCROLLABLE);
-
-   lv_obj_t *labelForElapsedTime = lv_label_create(elapsedTimeContainer);
-   lv_obj_set_width(labelForElapsedTime, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForElapsedTime, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForElapsedTime, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForElapsedTime, "Dauer");
-   lv_obj_set_style_text_color(labelForElapsedTime, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(labelForElapsedTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->elapsedTime = lv_label_create(elapsedTimeContainer);
-   lv_obj_set_width(this->elapsedTime, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->elapsedTime, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->elapsedTime, LV_ALIGN_CENTER);
-   lv_label_set_text(this->elapsedTime, "00:23:46");
-   lv_obj_set_style_text_font(this->elapsedTime, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->elapsedTime, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->sessionControls = lv_obj_create(this->screen);
-   lv_obj_remove_style_all(this->sessionControls);
-   lv_obj_set_width(this->sessionControls, lv_pct(100));
-   lv_obj_set_height(this->sessionControls, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->sessionControls, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->sessionControls, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(this->sessionControls, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(this->sessionControls, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(this->sessionControls, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_row(this->sessionControls, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(this->sessionControls, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->projectSelectionRow = lv_obj_create(this->sessionControls);
-   lv_obj_remove_style_all(this->projectSelectionRow);
-   lv_obj_set_width(this->projectSelectionRow, lv_pct(100));
-   lv_obj_set_height(this->projectSelectionRow, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->projectSelectionRow, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->projectSelectionRow, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(this->projectSelectionRow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_column(this->projectSelectionRow, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_remove_flag(this->projectSelectionRow, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(this->projectSelectionRow, LV_OBJ_FLAG_SCROLLABLE);
-
-   this->projectsButton = lv_button_create(this->projectSelectionRow);
-   lv_obj_set_height(this->projectsButton, 50);
-   lv_obj_set_align(this->projectsButton, LV_ALIGN_CENTER);
-   lv_obj_set_flex_grow(this->projectsButton, 1);
-   lv_obj_add_flag(this->projectsButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(this->projectsButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(this->projectsButton);
-   lv_obj_add_event_cb(this->projectsButton, &ResourceDetailsScreen::onProjectsButtonClick, LV_EVENT_CLICKED, this);
-
-   this->projectsButtonLabel = lv_label_create(this->projectsButton);
-   lv_label_set_text(this->projectsButtonLabel, "Projekt waehlen");
-   lv_obj_set_align(this->projectsButtonLabel, LV_ALIGN_CENTER);
-   lv_obj_set_style_text_align(this->projectsButtonLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->clearProjectButton = lv_button_create(this->projectSelectionRow);
-   lv_obj_set_height(this->clearProjectButton, 50);
-   lv_obj_set_width(this->clearProjectButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->clearProjectButton, LV_ALIGN_CENTER);
-   lv_obj_remove_flag(this->clearProjectButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(this->clearProjectButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
-   lv_obj_add_event_cb(this->clearProjectButton, &ResourceDetailsScreen::onClearProjectSelectionClick, LV_EVENT_CLICKED, this);
-
-   lv_obj_t *clearProjectLabel = lv_label_create(this->clearProjectButton);
-   lv_label_set_text(clearProjectLabel, "X");
-   lv_obj_set_align(clearProjectLabel, LV_ALIGN_CENTER);
-   lv_obj_set_style_text_align(clearProjectLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   this->updateClearProjectButtonState();
-
-   this->startSessionButton = lv_button_create(this->sessionControls);
-   lv_obj_set_height(this->startSessionButton, 50);
-   lv_obj_set_width(this->startSessionButton, lv_pct(100));
-   lv_obj_set_align(this->startSessionButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(this->startSessionButton);
-   lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION, {}});
-
-   this->startSessionButtonLabel = lv_label_create(this->startSessionButton);
-   lv_obj_set_width(this->startSessionButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->startSessionButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->startSessionButtonLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->startSessionButtonLabel, "Ressource verwenden");
-
-   this->stopOtherUserNote = lv_label_create(this->sessionControls);
-   lv_obj_set_width(this->stopOtherUserNote, lv_pct(100));
-   lv_obj_set_height(this->stopOtherUserNote, LV_SIZE_CONTENT);
-   lv_label_set_long_mode(this->stopOtherUserNote, LV_LABEL_LONG_WRAP);
-   lv_label_set_text(this->stopOtherUserNote, "Achtung: Sie beenden die laufende Sitzung eines anderen Nutzers.");
-   lv_obj_set_style_text_color(this->stopOtherUserNote, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->stopOtherUserNote, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN);
-
-   this->stopSessionButton = lv_button_create(this->sessionControls);
-   lv_obj_set_height(this->stopSessionButton, 50);
-   lv_obj_set_width(this->stopSessionButton, lv_pct(100));
-   lv_obj_set_align(this->stopSessionButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(this->stopSessionButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(this->stopSessionButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
-   lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION, {}});
-
-   this->stopSessionButtonLabel = lv_label_create(this->stopSessionButton);
-   lv_obj_set_width(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->stopSessionButtonLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->stopSessionButtonLabel, "Sitzung beenden");
-
-   this->doorControls = lv_obj_create(this->sessionControls);
-   lv_obj_remove_style_all(this->doorControls);
-   lv_obj_set_height(this->doorControls, 50);
-   lv_obj_set_width(this->doorControls, lv_pct(100));
-   lv_obj_set_align(this->doorControls, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->doorControls, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(this->doorControls, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(this->doorControls, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(this->doorControls, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_add_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
-
-   lv_obj_t *lockDoorButton = lv_button_create(this->doorControls);
-   lv_obj_set_height(lockDoorButton, 50);
-   lv_obj_set_width(lockDoorButton, lv_pct(30));
-   lv_obj_set_align(lockDoorButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(lockDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(lockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(lockDoorButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
-   lv_obj_add_event_cb(lockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOCK_DOOR, {}});
-
-   lv_obj_t *labelForLockDoorButton = lv_label_create(lockDoorButton);
-   lv_obj_set_width(labelForLockDoorButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForLockDoorButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForLockDoorButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForLockDoorButton, "Abschliessen");
-
-   lv_obj_t *unlockDoorButton = lv_button_create(this->doorControls);
-   lv_obj_set_height(unlockDoorButton, 50);
-   lv_obj_set_width(unlockDoorButton, lv_pct(30));
-   lv_obj_set_align(unlockDoorButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(unlockDoorButton);
-   lv_obj_add_event_cb(unlockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLOCK_DOOR, {}});
-
-   lv_obj_t *labelForUnlockDoorButton = lv_label_create(unlockDoorButton);
-   lv_obj_set_width(labelForUnlockDoorButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForUnlockDoorButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForUnlockDoorButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForUnlockDoorButton, "Aufschliessen");
-
-   lv_obj_t *unlatchDoorButton = lv_button_create(this->doorControls);
-   lv_obj_set_height(unlatchDoorButton, 50);
-   lv_obj_set_width(unlatchDoorButton, lv_pct(30));
-   lv_obj_set_align(unlatchDoorButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::button(unlatchDoorButton);
-   lv_obj_add_event_cb(unlatchDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLATCH_DOOR, {}});
-
-   lv_obj_t *labelForUnlatchDoorButton = lv_label_create(unlatchDoorButton);
-   lv_obj_set_width(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
-   lv_obj_set_height(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
-   lv_obj_set_align(labelForUnlatchDoorButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForUnlatchDoorButton, "Falle oeffnen");
-
-   this->flowButtonsContainer = lv_obj_create(this->sessionControls);
-   lv_obj_remove_style_all(this->flowButtonsContainer);
-   lv_obj_set_height(this->flowButtonsContainer, LV_SIZE_CONTENT);
-   lv_obj_set_width(this->flowButtonsContainer, lv_pct(100));
-   lv_obj_set_align(this->flowButtonsContainer, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->flowButtonsContainer, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(this->flowButtonsContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_pad_row(this->flowButtonsContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(this->flowButtonsContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_remove_flag(this->flowButtonsContainer, LV_OBJ_FLAG_SCROLLABLE);
-
-   this->noIntroductionPanel = lv_obj_create(this->screen);
-   lv_obj_set_width(this->noIntroductionPanel, lv_pct(100));
-   lv_obj_set_height(this->noIntroductionPanel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->noIntroductionPanel, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->noIntroductionPanel, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(this->noIntroductionPanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(this->noIntroductionPanel, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::applySurface(this->noIntroductionPanel);
-   lv_obj_set_style_bg_color(this->noIntroductionPanel, DisplayTheme::warningSoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_border_color(this->noIntroductionPanel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->noIntroductionPanel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *noIntroductionInfoLabel = lv_label_create(this->noIntroductionPanel);
-   lv_obj_set_width(noIntroductionInfoLabel, lv_pct(100));
-   lv_obj_set_height(noIntroductionInfoLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(noIntroductionInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(noIntroductionInfoLabel, "Sie benoetigen eine Einweisung, bevor Sie diese Ressource nutzen koennen. Bitte wenden Sie sich an einen der unten aufgefuehrten Einweiser.");
-   lv_obj_set_style_text_color(noIntroductionInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(noIntroductionInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->introducersListLabel = lv_label_create(this->noIntroductionPanel);
-   lv_obj_set_width(this->introducersListLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->introducersListLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->introducersListLabel, "???");
-
-   this->maintenancePanel = lv_obj_create(this->screen);
-   lv_obj_set_width(this->maintenancePanel, lv_pct(100));
-   lv_obj_set_height(this->maintenancePanel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->maintenancePanel, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->maintenancePanel, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(this->maintenancePanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(this->maintenancePanel, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::applySurface(this->maintenancePanel);
-   lv_obj_set_style_bg_color(this->maintenancePanel, DisplayTheme::dangerSoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_border_color(this->maintenancePanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->maintenancePanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_flag(this->maintenancePanel, LV_OBJ_FLAG_HIDDEN);
-
-   lv_obj_t *maintenanceInfoLabel = lv_label_create(this->maintenancePanel);
-   lv_obj_set_width(maintenanceInfoLabel, lv_pct(100));
-   lv_obj_set_height(maintenanceInfoLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(maintenanceInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(maintenanceInfoLabel, MAINTENANCE_INFO_TEXT);
-   lv_obj_set_style_text_color(maintenanceInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(maintenanceInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->maintenanceIntroducersLabel = lv_label_create(this->maintenancePanel);
-   lv_obj_set_width(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
-   lv_obj_set_height(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->maintenanceIntroducersLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->maintenanceIntroducersLabel, "???");
-
-   this->healthPanel = lv_obj_create(this->screen);
-   lv_obj_set_width(this->healthPanel, lv_pct(100));
-   lv_obj_set_height(this->healthPanel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->healthPanel, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(this->healthPanel, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(this->healthPanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_remove_flag(this->healthPanel, LV_OBJ_FLAG_SCROLLABLE);
-   DisplayTheme::applySurface(this->healthPanel);
-   lv_obj_set_style_bg_color(this->healthPanel, DisplayTheme::dangerSoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_border_color(this->healthPanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->healthPanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_flag(this->healthPanel, LV_OBJ_FLAG_HIDDEN);
-
-   lv_obj_t *healthInfoLabel = lv_label_create(this->healthPanel);
-   lv_obj_set_width(healthInfoLabel, lv_pct(100));
-   lv_obj_set_height(healthInfoLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(healthInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(healthInfoLabel, "Diese Ressource ist derzeit nicht betriebsbereit und kann nicht verwendet werden.");
-   lv_obj_set_style_text_color(healthInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(healthInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->healthReasonLabel = lv_label_create(this->healthPanel);
-   lv_obj_set_width(this->healthReasonLabel, lv_pct(100));
-   lv_obj_set_height(this->healthReasonLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->healthReasonLabel, LV_ALIGN_CENTER);
-   lv_label_set_long_mode(this->healthReasonLabel, LV_LABEL_LONG_WRAP);
-   lv_label_set_text(this->healthReasonLabel, "");
-   lv_obj_set_style_text_color(this->healthReasonLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->createStatusPanels();
 
    this->applyCachedState();
+   if (this->actionInProgress) this->showActionProgress(this->actionTitle.c_str());
 }
+void ResourceDetailsScreen::loop()
+{
+   this->updateUsageStatsDisplay();
+   this->updateElapsedTimeDisplay();
+   this->updateSessionTimeoutIndicator();
+}
+lv_obj_t *ResourceDetailsScreen::getScreen()
+{
+   return this->screen;
+}
+void ResourceDetailsScreen::setButtonClickCallback(std::function<void(ButtonClickEventData)> callback)
+{
+   this->buttonClickCallback = callback;
+}
+void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
+{
+   ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
+   if (!evt->self || evt->self->actionInProgress)
+      return;
+
+   if (!evt->self->buttonClickCallback)
+      return;
+
+   if (evt->buttonClickType != BUTTON_CLICK_TYPE_LOGOUT)
+   {
+      evt->self->activeActionButton = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
+      evt->self->activeActionLabel = lv_obj_get_child(evt->self->activeActionButton, 0);
+      evt->self->activeActionSpinner = lv_obj_get_child_count(evt->self->activeActionButton) > 1
+                                          ? lv_obj_get_child(evt->self->activeActionButton, 1)
+                                          : nullptr;
+   }
+   evt->self->buttonClickCallback(*evt);
+}
+void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
+{
+   ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
+   if (evt && evt->self && lv_event_get_target(e) == evt->self->activeActionButton)
+   {
+      // Flow buttons are rebuilt during resource refreshes while their request may still be pending.
+      evt->self->activeActionButton = nullptr;
+      evt->self->activeActionLabel = nullptr;
+      evt->self->activeActionSpinner = nullptr;
+   }
+   if (evt)
+   {
+      delete evt;
+   }
+}
+std::string ResourceDetailsScreen::getName()
+{
+   return "ResourceDetailsScreen";
+}
+void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
+{
+   this->logger.debugf("Setting signed in username: %s", userDetails.username.c_str());
+   this->loginUsernameCache = userDetails.username;
+   this->userDetailsCache = userDetails;
+   this->userDetailsInitialized = true;
+
+   sessionHeader.setUser(userDetails.username);
+
+   this->refreshAccessState();
+   this->updateUsageStatsDisplay();
+}
+void ResourceDetailsScreen::onScreenLeave()
+{
+   this->hideActionProgressVisual();
+   if (this->successToast)
+   {
+      lv_obj_add_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);
+   }
+   this->hideProjectsModal();
+}
+
+void ResourceDetailsScreen::destroy()
+{
+   this->disposeProjectsModal();
+   this->disposeFormsModal();
+   this->disposeSuccessToast();
+
+   if (this->screen)
+   {
+      lv_obj_del(this->screen);
+   }
+
+   this->screen = nullptr;
+   sessionHeader.detach();
+   actionOverlay.detach();
+   this->sessionDetailsContainer = nullptr;
+   this->resourceName = nullptr;
+   this->resourceDescription = nullptr;
+   this->sessionStartTimeLabel = nullptr;
+   this->currentUser = nullptr;
+   this->sessionControls = nullptr;
+   this->projectSelectionRow = nullptr;
+   this->projectsButton = nullptr;
+   this->projectsButtonLabel = nullptr;
+   this->clearProjectButton = nullptr;
+   this->projectsModalPanel = nullptr;
+   this->projectsListContainer = nullptr;
+   this->projectsPaginationLabel = nullptr;
+   this->projectsPrevButton = nullptr;
+   this->projectsNextButton = nullptr;
+   this->startSessionButton = nullptr;
+   this->startSessionButtonLabel = nullptr;
+   this->stopSessionButton = nullptr;
+   this->stopSessionButtonLabel = nullptr;
+   this->stopOtherUserNote = nullptr;
+   this->doorControls = nullptr;
+   this->flowButtonsContainer = nullptr;
+   this->formsModalPanel = nullptr;
+   this->formsModalContent = nullptr;
+   this->formsModalList = nullptr;
+   this->formsModalErrorLabel = nullptr;
+   this->formsModalProgressLabel = nullptr;
+   this->formsEditorOverlay = nullptr;
+   this->formsEditorTitleLabel = nullptr;
+   this->formsEditorTextarea = nullptr;
+   this->formsEditorSpacer = nullptr;
+   this->formsEditorKeyboard = nullptr;
+   this->formsBackButton = nullptr;
+   this->formsNextButton = nullptr;
+   this->formsNextLabel = nullptr;
+   this->formsNextSpinner = nullptr;
+   this->elapsedTime = nullptr;
+   this->usageStatsContainer = nullptr;
+   this->meterValue = nullptr;
+   this->operatingValue = nullptr;
+
+   this->noIntroductionPanel = nullptr;
+   this->introducersListLabel = nullptr;
+   this->maintenancePanel = nullptr;
+   this->maintenanceIntroducersLabel = nullptr;
+   this->healthPanel = nullptr;
+   this->healthReasonLabel = nullptr;
+   this->activeActionButton = nullptr;
+   this->activeActionLabel = nullptr;
+   this->activeActionSpinner = nullptr;
+   this->successToast = nullptr;
+   this->formsModalMeta = nullptr;
+   this->formsModalPage = nullptr;
+   this->formFieldWidgetCount = 0;
+}
+void ResourceDetailsScreen::applyCachedState()
+{
+   if (!this->screen)
+   {
+      return;
+   }
+
+   sessionHeader.setUser(this->loginUsernameCache);
+
+   if (this->resourceCacheValid)
+   {
+      this->setResourceAndUsageDetails(this->resourceCache);
+   }
+
+   if (this->userDetailsInitialized)
+   {
+      this->setUserDetails(this->userDetailsCache);
+   }
+
+   this->refreshProjectsButtonLabel();
+   this->updateClearProjectButtonState();
+   this->updateSessionTimeoutIndicator();
+   this->updateElapsedTimeDisplay();
+}
+
 void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief &resource)
 {
+   if (!this->resourceCacheValid || this->resourceCache.id != resource.id ||
+       this->resourceCache.activeUsageId != resource.activeUsageId || !resource.hasActiveUsage)
+      this->usageStatsValid = false;
    this->resourceCache = resource;
    this->resourceCacheValid = true;
 
@@ -477,7 +231,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       return;
    }
    lv_label_set_text(this->resourceName, resource.name);
-   lv_label_set_text(this->resourceDescription, resource.description);
+   lv_label_set_text(this->resourceDescription, resource.description.c_str());
 
    // Update introducer/maintainer panel lists (same set of allowed users)
    std::string introducersText = this->buildIntroducersText(resource);
@@ -559,13 +313,16 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_t *labelForFlowButton = lv_label_create(flowButton);
       lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
       lv_obj_set_height(labelForFlowButton, LV_SIZE_CONTENT);
-      lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
-      lv_label_set_text(labelForFlowButton, fb.label);
+       lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
+       lv_label_set_text(labelForFlowButton, fb.label);
+       lv_obj_set_style_text_font(labelForFlowButton, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    this->updateElapsedTimeDisplay();
+   this->updateUsageStatsDisplay();
    this->refreshAccessState();
 }
+
 std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
 {
    std::string list;
@@ -579,7 +336,7 @@ std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief
    }
    if (list.length() == 0)
    {
-      list = "-- kein Einweiser verfuegbar --";
+      list = "-- kein Einweiser verfügbar --";
    }
    return list;
 }
@@ -604,7 +361,8 @@ void ResourceDetailsScreen::refreshAccessState()
    }
 
    const UserDetails &user = this->userDetailsCache;
-   bool isMaintainer = user.isIntroducer || user.canManageResource;
+   bool isMaintainer = this->resourceCache.accessKnown ? this->resourceCache.canManageMaintenance
+                                                        : user.isIntroducer || user.canManageResource;
 
    // Resource is blocked when it is under maintenance or reporting an unhealthy state.
    bool blocked = underMaintenance || isUnhealthy;
@@ -626,7 +384,7 @@ void ResourceDetailsScreen::refreshAccessState()
                  supervisedStartAvailable || ownsActiveUsage;
    if (blocked)
    {
-      canUse = isMaintainer;
+      canUse = isMaintainer || ownsActiveUsage;
    }
    if (this->sessionControls)
    {
@@ -692,7 +450,7 @@ void ResourceDetailsScreen::refreshAccessState()
          if (this->startSessionButtonLabel)
          {
             lv_label_set_text(this->startSessionButtonLabel,
-                              isTakeover ? "Uebernehmen" : "Ressource verwenden");
+                              isTakeover ? "Übernehmen" : "Ressource verwenden");
          }
          // Takeover retains its warning role; starting is a primary action.
          lv_color_t startBgColor = isTakeover ? DisplayTheme::warning() : DisplayTheme::primary();
@@ -705,181 +463,4 @@ void ResourceDetailsScreen::refreshAccessState()
    {
       lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !ownsActiveUsage);
    }
-}
-void ResourceDetailsScreen::loop()
-{
-   this->updateElapsedTimeDisplay();
-   this->updateSessionTimeoutIndicator();
-}
-void ResourceDetailsScreen::destroy()
-{
-   this->disposeProjectsModal();
-   this->disposeFormsModal();
-   this->disposeSuccessToast();
-
-   if (this->screen)
-   {
-      lv_obj_del(this->screen);
-   }
-
-   this->screen = nullptr;
-   this->loginUserLabel = nullptr;
-   this->sessionDetailsContainer = nullptr;
-   this->resourceName = nullptr;
-   this->resourceDescription = nullptr;
-   this->sessionStartTimeLabel = nullptr;
-   this->currentUser = nullptr;
-   this->sessionControls = nullptr;
-   this->projectSelectionRow = nullptr;
-   this->projectsButton = nullptr;
-   this->projectsButtonLabel = nullptr;
-   this->clearProjectButton = nullptr;
-   this->projectsModalPanel = nullptr;
-   this->projectsListContainer = nullptr;
-   this->projectsPaginationLabel = nullptr;
-   this->projectsPrevButton = nullptr;
-   this->projectsNextButton = nullptr;
-   this->startSessionButton = nullptr;
-   this->startSessionButtonLabel = nullptr;
-   this->stopSessionButton = nullptr;
-   this->stopSessionButtonLabel = nullptr;
-   this->stopOtherUserNote = nullptr;
-   this->doorControls = nullptr;
-   this->flowButtonsContainer = nullptr;
-   this->formsModalPanel = nullptr;
-   this->formsModalContent = nullptr;
-   this->formsModalList = nullptr;
-   this->formsModalErrorLabel = nullptr;
-   this->formsModalProgressLabel = nullptr;
-   this->formsEditorOverlay = nullptr;
-   this->formsEditorTitleLabel = nullptr;
-   this->formsEditorTextarea = nullptr;
-   this->formsEditorSpacer = nullptr;
-   this->formsEditorKeyboard = nullptr;
-   this->formsBackButton = nullptr;
-   this->formsNextButton = nullptr;
-   this->formsNextLabel = nullptr;
-   this->formsNextSpinner = nullptr;
-   this->elapsedTime = nullptr;
-   this->sessionTimeoutIndicator = nullptr;
-   this->noIntroductionPanel = nullptr;
-   this->introducersListLabel = nullptr;
-   this->maintenancePanel = nullptr;
-   this->maintenanceIntroducersLabel = nullptr;
-   this->healthPanel = nullptr;
-   this->healthReasonLabel = nullptr;
-   this->activeActionButton = nullptr;
-   this->activeActionLabel = nullptr;
-   this->activeActionSpinner = nullptr;
-   this->actionInProgress = false;
-   this->successToast = nullptr;
-   this->formsModalMeta = nullptr;
-   this->formsModalPage = nullptr;
-   this->formFieldWidgetCount = 0;
-}
-void ResourceDetailsScreen::applyCachedState()
-{
-   if (!this->screen)
-   {
-      return;
-   }
-
-   if (this->loginUserLabel && this->loginUsernameCache.length() > 0)
-   {
-      lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
-   }
-
-   if (this->resourceCacheValid)
-   {
-      this->setResourceAndUsageDetails(this->resourceCache);
-   }
-
-   if (this->userDetailsInitialized)
-   {
-      this->setUserDetails(this->userDetailsCache);
-   }
-
-   this->refreshProjectsButtonLabel();
-   this->updateClearProjectButtonState();
-   this->updateSessionTimeoutIndicator();
-   this->updateElapsedTimeDisplay();
-}
-lv_obj_t *ResourceDetailsScreen::getScreen()
-{
-   return this->screen;
-}
-void ResourceDetailsScreen::setButtonClickCallback(std::function<void(ButtonClickEventData)> callback)
-{
-   this->buttonClickCallback = callback;
-}
-void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
-{
-   ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
-   if (!evt->self || evt->self->actionInProgress)
-      return;
-
-   if (!evt->self->buttonClickCallback)
-      return;
-
-   if (evt->buttonClickType != BUTTON_CLICK_TYPE_LOGOUT)
-   {
-      evt->self->activeActionButton = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
-      evt->self->activeActionLabel = lv_obj_get_child(evt->self->activeActionButton, 0);
-      evt->self->activeActionSpinner = lv_obj_get_child_count(evt->self->activeActionButton) > 1
-                                          ? lv_obj_get_child(evt->self->activeActionButton, 1)
-                                          : nullptr;
-   }
-   evt->self->buttonClickCallback(*evt);
-}
-void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
-{
-   ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
-   if (evt && evt->self && lv_event_get_target(e) == evt->self->activeActionButton)
-   {
-      // Flow buttons are rebuilt during resource refreshes while their request may still be pending.
-      evt->self->activeActionButton = nullptr;
-      evt->self->activeActionLabel = nullptr;
-      evt->self->activeActionSpinner = nullptr;
-   }
-   if (evt)
-   {
-      delete evt;
-   }
-}
-std::string ResourceDetailsScreen::getName()
-{
-   return "ResourceDetailsScreen";
-}
-void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
-{
-   this->logger.debugf("Setting signed in username: %s", userDetails.username.c_str());
-   this->loginUsernameCache = userDetails.username;
-   this->userDetailsCache = userDetails;
-   this->userDetailsInitialized = true;
-
-   if (!this->loginUserLabel)
-   {
-      return;
-   }
-
-   if (userDetails.username.length() == 0)
-   {
-      this->logger.debug("No login user label found");
-      lv_label_set_text(this->loginUserLabel, "???");
-      return;
-   }
-
-   this->logger.debugf("Setting login user label text: %s", userDetails.username.c_str());
-   lv_label_set_text(this->loginUserLabel, userDetails.username.c_str());
-
-   this->refreshAccessState();
-}
-void ResourceDetailsScreen::onScreenLeave()
-{
-   this->hideActionProgressVisual();
-   if (this->successToast)
-   {
-      lv_obj_add_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);
-   }
-   this->hideProjectsModal();
 }

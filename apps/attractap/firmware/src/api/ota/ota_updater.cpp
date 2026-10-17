@@ -3,7 +3,7 @@
 
 #include "ota_updater.hpp"
 #include "esp_app_format.h"
-#include "platform.hpp"
+#include "../../platform.hpp"
 #include <string>
 
 void OtaUpdater::begin(JsonObject firmwareMeta)
@@ -62,11 +62,17 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
         this->ota.inProgress = false;
         return;
     }
+    // Quiesce NFC before flash preparation or the first chunk request. The
+    // metadata callback also owns the application's update-screen transition.
+    if (!this->metaCallback || !this->metaCallback(availableVersion))
+    {
+        this->abortFirmwareUpdate("NFC RF shutdown failed");
+        return;
+    }
     esp_err_t err = esp_ota_begin(this->ota.updatePartition, OTA_SIZE_UNKNOWN, &this->ota.otaHandle);
     if (err != ESP_OK)
     {
-        this->logger.error((std::string("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
-        this->ota.inProgress = false;
+        this->abortFirmwareUpdate((std::string("esp_ota_begin failed: ") + esp_err_to_name(err)).c_str());
         return;
     }
     this->ota.lastReportedPercent = -1;
@@ -74,15 +80,96 @@ void OtaUpdater::begin(JsonObject firmwareMeta)
     this->consecutiveChunkFailures = 0;
     this->lastChunkRequestSendFailed = false;
 
-    if (this->metaCallback)
-    {
-        this->logger.debugf("Firmware update available: %s > %s", FIRMWARE_VERSION, availableVersion.c_str());
-        this->metaCallback(availableVersion.c_str());
-    }
-
     this->updateFirmwareProgress(0);
 
     this->readyForNextFirmwareChunk = true;
+}
+
+void OtaUpdater::tick()
+{
+    if (this->firmwareUpdateFailedTimeMs != 0)
+    {
+        if (millis() - this->firmwareUpdateFailedTimeMs > 3000)
+        {
+            esp_restart();
+        }
+        return;
+    }
+
+    if (this->readyForNextFirmwareChunk)
+    {
+        // consecutiveChunkFailures is NOT reset here: onChunk() already clears it
+        // per fragment, and the resume-accepted path must keep counting so reconnect
+        // cycles that never deliver a byte still hit the abort backstop.
+        this->requestNextFirmwareChunk();
+        return;
+    }
+
+    if (this->lastFirmwareChunkRequestTimeMs != 0)
+    {
+        const uint32_t waitMs = this->lastChunkRequestSendFailed
+                                    ? this->FIRMWARE_CHUNK_SEND_RETRY_DELAY_MS
+                                    : this->FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS;
+        if (millis() - this->lastFirmwareChunkRequestTimeMs > waitMs)
+        {
+            if (this->consecutiveChunkFailures >= MAX_CONSECUTIVE_CHUNK_FAILURES)
+            {
+                this->abortFirmwareUpdate("Firmware chunk request timeout");
+                return;
+            }
+            this->consecutiveChunkFailures++;
+            if (this->lastChunkRequestSendFailed)
+            {
+                // TX failed (queue full/alloc): re-request on the same socket
+                this->logger.errorf("Firmware chunk send failed at offset %u, retry %u/%u",
+                                    (unsigned)this->ota.bytesWritten,
+                                    (unsigned)this->consecutiveChunkFailures,
+                                    (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
+                this->requestNextFirmwareChunk();
+            }
+            else
+            {
+                // Response timeout: force a fresh socket so any stale in-flight
+                // response from the previous request cannot arrive and be written
+                // out-of-sequence. begin() resumes from bytesWritten after re-auth.
+                this->logger.errorf("Firmware chunk timeout at offset %u, reconnecting (retry %u/%u)",
+                                    (unsigned)this->ota.bytesWritten,
+                                    (unsigned)this->consecutiveChunkFailures,
+                                    (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
+                this->lastFirmwareChunkRequestTimeMs = millis(); // give reconnect time to complete
+                this->forceReconnect("OTA chunk timeout");
+            }
+        }
+    }
+}
+
+void OtaUpdater::abortFirmwareUpdate(const char *reason)
+{
+    this->logger.error((std::string("OTA aborted: ") + reason).c_str());
+    if (this->ota.otaHandle)
+    {
+        esp_ota_abort(this->ota.otaHandle);
+    }
+
+    if (this->errorCallback)
+    {
+        this->errorCallback("Firmware update failed", reason);
+    }
+
+    this->firmwareUpdateFailedTimeMs = millis();
+}
+
+void OtaUpdater::updateFirmwareProgress(int percent)
+{
+    if (this->progressCallback)
+    {
+        this->logger.debugf("calling firmware update progress handler %d", percent);
+        this->progressCallback(percent);
+    }
+    else
+    {
+        this->logger.error("firmware update progress callback not set");
+    }
 }
 
 void OtaUpdater::requestNextFirmwareChunk()
@@ -207,91 +294,4 @@ void OtaUpdater::onChunk(esp_websocket_event_data_t data)
     this->logger.info("Firmware update complete, restarting...");
     delay(250);
     esp_restart();
-}
-
-void OtaUpdater::tick()
-{
-    if (this->firmwareUpdateFailedTimeMs != 0)
-    {
-        if (millis() - this->firmwareUpdateFailedTimeMs > 3000)
-        {
-            esp_restart();
-        }
-        return;
-    }
-
-    if (this->readyForNextFirmwareChunk)
-    {
-        // consecutiveChunkFailures is NOT reset here: onChunk() already clears it
-        // per fragment, and the resume-accepted path must keep counting so reconnect
-        // cycles that never deliver a byte still hit the abort backstop.
-        this->requestNextFirmwareChunk();
-        return;
-    }
-
-    if (this->lastFirmwareChunkRequestTimeMs != 0)
-    {
-        const uint32_t waitMs = this->lastChunkRequestSendFailed
-                                    ? this->FIRMWARE_CHUNK_SEND_RETRY_DELAY_MS
-                                    : this->FIRMWARE_CHUNK_REQUEST_RESPONSE_TIMEOUT_MS;
-        if (millis() - this->lastFirmwareChunkRequestTimeMs > waitMs)
-        {
-            if (this->consecutiveChunkFailures >= MAX_CONSECUTIVE_CHUNK_FAILURES)
-            {
-                this->abortFirmwareUpdate("Firmware chunk request timeout");
-                return;
-            }
-            this->consecutiveChunkFailures++;
-            if (this->lastChunkRequestSendFailed)
-            {
-                // TX failed (queue full/alloc): re-request on the same socket
-                this->logger.errorf("Firmware chunk send failed at offset %u, retry %u/%u",
-                                    (unsigned)this->ota.bytesWritten,
-                                    (unsigned)this->consecutiveChunkFailures,
-                                    (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
-                this->requestNextFirmwareChunk();
-            }
-            else
-            {
-                // Response timeout: force a fresh socket so any stale in-flight
-                // response from the previous request cannot arrive and be written
-                // out-of-sequence. begin() resumes from bytesWritten after re-auth.
-                this->logger.errorf("Firmware chunk timeout at offset %u, reconnecting (retry %u/%u)",
-                                    (unsigned)this->ota.bytesWritten,
-                                    (unsigned)this->consecutiveChunkFailures,
-                                    (unsigned)MAX_CONSECUTIVE_CHUNK_FAILURES);
-                this->lastFirmwareChunkRequestTimeMs = millis(); // give reconnect time to complete
-                this->forceReconnect("OTA chunk timeout");
-            }
-        }
-    }
-}
-
-void OtaUpdater::abortFirmwareUpdate(const char *reason)
-{
-    this->logger.error((std::string("OTA aborted: ") + reason).c_str());
-    if (this->ota.otaHandle)
-    {
-        esp_ota_abort(this->ota.otaHandle);
-    }
-
-    if (this->errorCallback)
-    {
-        this->errorCallback("Firmware update failed", reason);
-    }
-
-    this->firmwareUpdateFailedTimeMs = millis();
-}
-
-void OtaUpdater::updateFirmwareProgress(int percent)
-{
-    if (this->progressCallback)
-    {
-        this->logger.debugf("calling firmware update progress handler %d", percent);
-        this->progressCallback(percent);
-    }
-    else
-    {
-        this->logger.error("firmware update progress callback not set");
-    }
 }

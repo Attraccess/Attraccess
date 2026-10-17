@@ -1,5 +1,5 @@
 import React from 'react';
-import { SSOProviderType } from '@attraccess/react-query-client';
+import { SSOProviderType, useSsoServiceGetSsoLogoutUrls } from '@attraccess/react-query-client';
 import { getBaseUrl } from '../../../api';
 import { escapeRegex } from './formDefaults';
 
@@ -11,6 +11,10 @@ export interface SSOProviderSetupUrls {
   oidcCallbackUrl: string;
   authentikRedirectRegexPattern: string;
   hasSetupUrls: boolean;
+  postLogoutUrl: string;
+  backchannelLogoutUrl: string;
+  frontchannelLogoutUrl: string;
+  samlSloUrl: string;
 }
 
 const buildCallbackUrl = (ssoBaseUrl: string | undefined, type: SSOProviderType, providerId?: number) => {
@@ -33,13 +37,21 @@ const buildCallbackUrl = (ssoBaseUrl: string | undefined, type: SSOProviderType,
 };
 
 export const useSSOProviderSetupUrls = (providerId?: number): SSOProviderSetupUrls => {
+  const { data: logoutUrls } = useSsoServiceGetSsoLogoutUrls({ providerId: providerId ?? 0 }, undefined, {
+    enabled: !!providerId,
+    retry: false,
+  });
   const ssoBaseUrl = React.useMemo(() => {
+    // The API's public origin can differ from the browser's frontend origin.
+    if (logoutUrls?.postLogoutUrl) {
+      return new URL(logoutUrls.postLogoutUrl).origin;
+    }
     if (typeof window === 'undefined') {
       return undefined;
     }
 
     return getBaseUrl() ?? window.location.origin;
-  }, []);
+  }, [logoutUrls?.postLogoutUrl]);
 
   const docsSsoProvidersUrl = React.useMemo(() => {
     if (!ssoBaseUrl) {
@@ -71,7 +83,7 @@ export const useSSOProviderSetupUrls = (providerId?: number): SSOProviderSetupUr
     return `^${baseUrl}/api/auth/sso/OIDC/${id}/callback(\\?.*)?$`;
   }, [providerId, ssoBaseUrl]);
 
-  const hasSetupUrls = Boolean(providerId && ssoBaseUrl);
+  const hasSetupUrls = Boolean(providerId && logoutUrls?.postLogoutUrl);
 
   return {
     ssoBaseUrl,
@@ -81,5 +93,9 @@ export const useSSOProviderSetupUrls = (providerId?: number): SSOProviderSetupUr
     oidcCallbackUrl,
     authentikRedirectRegexPattern,
     hasSetupUrls,
+    postLogoutUrl: logoutUrls?.postLogoutUrl ?? '',
+    backchannelLogoutUrl: logoutUrls?.backchannelLogoutUrl ?? '',
+    frontchannelLogoutUrl: logoutUrls?.frontchannelLogoutUrl ?? '',
+    samlSloUrl: logoutUrls?.samlSloUrl ?? '',
   };
 };

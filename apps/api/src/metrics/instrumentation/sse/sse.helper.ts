@@ -6,7 +6,8 @@ import { SSE_METRICS } from '../../definitions/tokens';
 import { SseMetrics } from '../../definitions/sse.metrics';
 import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 
-export type SseStream = 'resource_usage' | 'billing' | 'resource_flows' | 'messaging' | 'supervision' | 'notifications';
+export type SseStream =
+  'resource_usage' | 'billing' | 'resource_flows' | 'messaging' | 'supervision' | 'notifications' | 'live_updates';
 
 @Injectable()
 export class SseInstrumentation {
@@ -14,6 +15,18 @@ export class SseInstrumentation {
     @Inject(SSE_METRICS) private readonly metrics: SseMetrics,
     private readonly toggle: MetricsToggleService,
   ) {}
+
+  wrapTopic<T>(topic: string, source: Observable<T>): Observable<T> {
+    if (!this.toggle.isEnabledCached('sse')) return source;
+    return new Observable<T>((subscriber) => {
+      this.metrics.activeTopics.inc({ topic });
+      const sub = source.subscribe(subscriber);
+      return () => {
+        sub.unsubscribe();
+        this.metrics.activeTopics.dec({ topic });
+      };
+    });
+  }
 
   wrap<T>(stream: SseStream, source: Observable<T>): Observable<T> {
     if (!this.toggle.isEnabledCached('sse')) return source;
@@ -33,10 +46,7 @@ export class SseInstrumentation {
       return () => {
         sub.unsubscribe();
         this.metrics.activeConnections.dec({ stream });
-        this.metrics.connectionDuration.observe(
-          { stream },
-          Number(process.hrtime.bigint() - start) / 1e9,
-        );
+        this.metrics.connectionDuration.observe({ stream }, Number(process.hrtime.bigint() - start) / 1e9);
       };
     });
   }

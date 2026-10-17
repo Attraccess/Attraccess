@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { createMock } from '@golevelup/ts-jest';
 import type { PluginContext, PluginMqttMessage, Repository } from '@attraccess/plugins-backend-sdk';
-import { WagoService } from './wago.service';
-import { WagoController } from './wago-controller.entity';
-import { WagoEnrollment } from './wago-enrollment.entity';
-import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { WagoService } from './controllers/service';
+import { WagoController } from './controllers/entity';
+import { WagoEnrollment } from './controllers/enrollment.entity';
+import { WagoConfigurationRevision } from './configuration/revision.entity';
 
 const principal = { userId: 42, authenticationMethod: 'api-token' as const, apiTokenId: 17 };
 const privateValue = 'private-fixture-password';

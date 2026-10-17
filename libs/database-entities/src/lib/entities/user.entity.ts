@@ -1,71 +1,47 @@
+import { ApiProperty } from '@nestjs/swagger';
+
+import { Exclude } from 'class-transformer';
+
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  OneToMany,
   DeleteDateColumn,
+  Entity,
   Index,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
-import { ResourceIntroduction } from './resourceIntroduction.entity';
-import { ResourceUsage } from './resourceUsage.entity';
-import { AuthenticationDetail } from './authenticationDetail.entity';
-import { ResourceIntroducer } from './resourceIntroducer.entity';
-import { NFCCard } from './nfcCard.entity';
-import { Session } from './session.entity';
-import { BillingTransaction } from './billing-transaction.entity';
-import { Project } from './project';
-import { ProjectMember } from './project-member.entity';
-import { ProjectInvitation } from './project-invitation.entity';
-import { FormSubmission } from './form';
-import { UserRole } from './user-role.entity';
+
 import { ApiToken } from './api-token.entity';
 
+import { AuthenticationDetail } from './authenticationDetail.entity';
+
+import { BillingTransaction } from './billing-transaction.entity';
+
+import { FormSubmission } from './form';
+
+import { Project } from './project';
+
+import { ProjectInvitation } from './project-invitation.entity';
+
+import { ProjectMember } from './project-member.entity';
+
+import { ResourceIntroducer } from './resourceIntroducer.entity';
+
+import { ResourceIntroduction } from './resourceIntroduction.entity';
+
+import { ResourceUsage } from './resourceUsage.entity';
+
+import { NFCCard } from './rfidCard.entity';
+
+import { Session } from './session.entity';
+
+import { UserRole } from './user-role.entity';
 
 @Index('IDX_user_deleteAccountToken', ['deleteAccountToken'])
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn()
-  @ApiProperty({
-    description: 'The unique identifier of the user',
-    example: 1,
-  })
-  id!: number;
-
-  @Column({
-    unique: true,
-    type: 'text',
-  })
-  @ApiProperty({
-    description: 'The username of the user',
-    example: 'johndoe',
-  })
-  username!: string;
-
-  @Column({ unique: true, type: 'text' })
-  @Exclude()
-  email!: string;
-
-  @Column({ type: 'varchar', length: 35, default: 'en' })
-  @ApiProperty({
-    description: "The user's preferred locale (BCP 47 language tag)",
-    example: 'en',
-  })
-  locale!: string;
-
-  @Column({ default: false, type: 'boolean' })
-  @ApiProperty({
-    description: 'Whether the user has verified their email address',
-    example: true,
-  })
-  isEmailVerified!: boolean;
-
-  @Column({ default: false, type: 'boolean' })
-  isDisabled!: boolean;
-
   @Column({ type: 'text', nullable: true })
   @Exclude()
   emailVerificationToken!: string | null;
@@ -81,25 +57,6 @@ export class User {
   @Column({ type: 'datetime', nullable: true })
   @Exclude()
   passwordResetTokenExpiresAt!: Date | null;
-
-  @CreateDateColumn()
-  @ApiProperty({
-    description: 'When the user was created',
-  })
-  createdAt!: Date;
-
-  @UpdateDateColumn()
-  @ApiProperty({
-    description: 'When the user was last updated',
-  })
-  updatedAt!: Date;
-
-  @DeleteDateColumn({ type: 'datetime' })
-  @ApiProperty({
-    description: 'When the user was soft-deleted',
-    required: false,
-  })
-  deletedAt?: Date | null;
 
   @Column({ type: 'datetime', nullable: true })
   @Exclude()
@@ -128,6 +85,71 @@ export class User {
   @Column({ type: 'datetime', nullable: true })
   @Exclude()
   deleteAccountRequestedAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  @Exclude()
+  nfcKeySeedToken!: string | null;
+
+  @PrimaryGeneratedColumn()
+  @ApiProperty({
+    description: 'The unique identifier of the user',
+    example: 1,
+  })
+  id!: number;
+
+  @Column({
+    unique: true,
+    type: 'text',
+  })
+  @ApiProperty({
+    description: 'The username of the user',
+    example: 'johndoe',
+  })
+  username!: string;
+
+  @Column({ unique: true, type: 'text' })
+  @Exclude()
+  email!: string;
+
+  @Column({ type: 'varchar', length: 35, default: 'en' })
+  @ApiProperty({
+    description: "The user's preferred locale (BCP 47 language tag)",
+    example: 'en',
+  })
+  locale!: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  @ApiProperty({ type: String, nullable: true, description: 'Formatting locale; null follows app language' })
+  dateTimeLocale!: string | null;
+
+  @Column({ default: false, type: 'boolean' })
+  @ApiProperty({
+    description: 'Whether the user has verified their email address',
+    example: true,
+  })
+  isEmailVerified!: boolean;
+
+  @Column({ default: false, type: 'boolean' })
+  isDisabled!: boolean;
+
+  @CreateDateColumn()
+  @ApiProperty({
+    description: 'When the user was created',
+  })
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  @ApiProperty({
+    description: 'When the user was last updated',
+  })
+  updatedAt!: Date;
+
+  @DeleteDateColumn({ type: 'datetime' })
+  @ApiProperty({
+    description: 'When the user was soft-deleted',
+    required: false,
+  })
+  deletedAt?: Date | null;
 
   @OneToMany(() => ResourceIntroduction, (introduction) => introduction.receiverUser, {
     onDelete: 'CASCADE',
@@ -167,10 +189,6 @@ export class User {
     onDelete: 'CASCADE',
   })
   nfcCards!: NFCCard[];
-
-  @Column({ type: 'text', nullable: true })
-  @Exclude()
-  nfcKeySeedToken!: string | null;
 
   @OneToMany(() => Session, (session) => session.user, {
     onDelete: 'CASCADE',

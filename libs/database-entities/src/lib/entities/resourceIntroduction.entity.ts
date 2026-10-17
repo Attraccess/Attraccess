@@ -63,6 +63,9 @@ export class ResourceIntroduction {
   })
   retrainingNotifiedAt!: Date | null;
 
+  @Column({ type: 'datetime', nullable: true })
+  retrainingRequiredAuditedAt!: Date | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the introduction record was created',
@@ -99,5 +102,6 @@ export class ResourceIntroduction {
 
   @ManyToOne(() => ResourceGroup, (group) => group.introductions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'resourceGroupId' })
+  @ApiProperty({ description: 'The group providing this introduction', type: () => ResourceGroup, required: false })
   resourceGroup!: ResourceGroup;
 }

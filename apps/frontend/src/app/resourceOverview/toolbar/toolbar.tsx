@@ -1,9 +1,7 @@
 import { Button, TextField, InputGroup } from '@heroui/react';
-import { ListFilterIcon, PlusIcon, ScanQrCodeIcon, SearchIcon } from 'lucide-react';
-import { useAuth } from '../../../hooks/useAuth';
+import { ListFilterIcon, ScanQrCodeIcon, SearchIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ResourceEditModal } from '../../resources/editModal/resourceEditModal';
-import { useNavigate } from 'react-router-dom';
+import { CreateResourceButton } from '../createResourceButton';
 import en from './toolbar.en.json';
 import de from './toolbar.de.json';
 import { ResourceScanner } from './scanner';
@@ -13,21 +11,19 @@ import { cn } from '@heroui/react';
 import { PageHeader } from '../../../components/pageHeader';
 
 interface ToolbarProps {
+  onOpenCreate: () => void;
   searchIsLoading?: boolean;
   highlightSearch?: boolean;
   highlightFilter?: boolean;
 }
 
 export function Toolbar({
+  onOpenCreate,
   searchIsLoading,
   highlightSearch,
   highlightFilter,
   ...filterProps
 }: Readonly<ToolbarProps & FilterProps>) {
-  const { hasPermission } = useAuth();
-  const canUpdateResources = hasPermission('resources.update');
-  const navigate = useNavigate();
-
   const { t } = useTranslations({
     en,
     de,
@@ -74,18 +70,7 @@ export function Toolbar({
             </Button>
           )}
         </ResourceScanner>
-        {canUpdateResources && (
-          <div className="flex items-center gap-2">
-            <ResourceEditModal onUpdated={(resource) => navigate(`/resources/${resource.id}`)} closeOnSuccess>
-              {(onOpen: () => void) => (
-                <Button variant="primary" onPress={onOpen} data-cy="toolbar-open-create-resource-modal-button">
-                  <PlusIcon size={18} />
-                  {t('addResource')}
-                </Button>
-              )}
-            </ResourceEditModal>
-          </div>
-        )}
+        <CreateResourceButton testId="toolbar-open-create-resource-modal-button" onOpen={onOpenCreate} />
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { ResourceMeteringModule } from '../metering/resource-metering.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
@@ -9,11 +10,11 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceFlowsController } from './resource-flows.controller';
 import { ResourceFlowsService } from './resource-flows.service';
-import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
-import { FlowLogRecorderService } from './flow-log-recorder.service';
-import { ResourceFlowVariablesController } from './resource-flow-variables.controller';
-import { ResourceFlowVariablesService } from './resource-flow-variables.service';
-import { ResourceFlowVariableTriggerService } from './resource-flow-variable-trigger.service';
+import { ResourceFlowsExecutorService } from './execution/resource-flows-executor.service';
+import { FlowLogRecorderService } from './logs/flow-log-recorder.service';
+import { ResourceFlowVariablesController } from './variables/resource-flow-variables.controller';
+import { ResourceFlowVariablesService } from './variables/resource-flow-variables.service';
+import { ResourceFlowVariableTriggerService } from './variables/resource-flow-variable-trigger.service';
 import { MqttModule } from '../../mqtt/mqtt.module';
 import { ResourceUsageModule } from '../usage/resourceUsage.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
@@ -31,6 +32,7 @@ import { ResourceOperatingIntervalModule } from '../operating-intervals/resource
     ]),
     MqttModule,
     forwardRef(() => ResourceUsageModule),
+    forwardRef(() => ResourceMeteringModule),
     ResourceHealthModule,
     CompanionModule,
     ResourceOperatingIntervalModule,

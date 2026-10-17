@@ -2,7 +2,7 @@
 #include <string>
 #include <functional>
 
-#include "platform.hpp"
+#include "../../../platform.hpp"
 
 // PIN-lock overlay: unlock flow and its callbacks.
 

@@ -7,6 +7,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 get_filename_component(FIRMWARE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../firmware" ABSOLUTE)
 
+include("${FIRMWARE_DIR}/tools/latin1_fonts.cmake")
+attractap_latin1_fonts(ATTRACTAP_LATIN1_FONTS)
+
 set(LVGL_SOURCE_DIR "" CACHE PATH "Existing LVGL 9.3.0 source tree (never modified)")
 set(LV_BUILD_CONF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h" CACHE PATH "" FORCE)
 set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
@@ -52,17 +55,17 @@ FetchContent_MakeAvailable(ArduinoJson)
 
 file(GLOB_RECURSE ATTRACTAP_FIRMWARE_SOURCES "${FIRMWARE_DIR}/src/*.cpp")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/main\\.cpp$")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/nfc/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/rfid/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/websocket/")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/demo_websocket\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/demo/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/ota/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/display/driver/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/network/(wifi|ethernet)/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/ioexpander/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/led/")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/beeper/beeper\\.cpp$")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/serial/serialCommandHandler\\.cpp$")
-list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/utils\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/serial/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/utils[^/]*\\.cpp$")
 
 set(ATTRACTAP_IMAGE_DIR "${FIRMWARE_DIR}/src/display/images")
 configure_file("${ATTRACTAP_IMAGE_DIR}/logos.S.in" "${CMAKE_CURRENT_BINARY_DIR}/logos.S" @ONLY)
@@ -71,6 +74,7 @@ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
 
 add_library(attractap-production-host
     ${ATTRACTAP_FIRMWARE_SOURCES}
+    ${ATTRACTAP_LATIN1_FONTS}
     src/host_beeper.cpp
     src/host_utils.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S")
@@ -100,8 +104,11 @@ add_library(attractap-desktop-runtime
     src/desktop_simulator.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
+    src/host_websocket_worker.cpp
     src/profile_store.cpp
-    src/virtual_nfc.cpp
+    src/virtual_rfid.cpp
+    src/virtual_rfid_encoding.cpp
+    src/virtual_rfid_cards.cpp
     src/sdl_display.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/device_shell.S")
 target_include_directories(attractap-desktop-runtime PUBLIC
@@ -114,9 +121,13 @@ target_compile_options(attractap-desktop-runtime PRIVATE "$<$<COMPILE_LANGUAGE:C
 add_executable(attractap-desktop MACOSX_BUNDLE src/main.cpp)
 target_link_libraries(attractap-desktop PRIVATE attractap-desktop-runtime attractap-production-host)
 set_target_properties(attractap-desktop PROPERTIES
-    MACOSX_BUNDLE_BUNDLE_NAME "Attractap Desktop"
+    MACOSX_BUNDLE_BUNDLE_NAME "Attractap Simulator"
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.attraccess.attractap-desktop")
 if(APPLE)
+    enable_language(OBJCXX)
+    target_sources(attractap-desktop PRIVATE src/endpoint_prompt.mm)
+    target_compile_options(attractap-desktop PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+    target_link_libraries(attractap-desktop PRIVATE "-framework Cocoa")
     target_sources(attractap-desktop PRIVATE assets/attractap.icns)
     set_source_files_properties(assets/attractap.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     set_target_properties(attractap-desktop PROPERTIES MACOSX_BUNDLE_ICON_FILE attractap.icns)
@@ -127,8 +138,11 @@ add_executable(attractap-desktop-tests
     src/api_endpoint.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
+    src/host_websocket_worker.cpp
     src/profile_store.cpp
-    src/virtual_nfc.cpp)
+    src/virtual_rfid.cpp
+    src/virtual_rfid_encoding.cpp
+    src/virtual_rfid_cards.cpp)
 target_include_directories(attractap-desktop-tests PRIVATE src "${FIRMWARE_DIR}/src")
 target_compile_definitions(attractap-desktop-tests PRIVATE ATTRACTAP_HOST)
 target_link_libraries(attractap-desktop-tests PRIVATE CURL::libcurl Threads::Threads attractap-production-host)
@@ -137,7 +151,32 @@ target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 enable_testing()
 add_test(NAME attractap-desktop-tests COMMAND attractap-desktop-tests)
 
-add_executable(attractap-desktop-display-tests tests/sdl_display.cpp)
+add_executable(attractap-demo-clock-tests tests/demo-clock.test.cpp "${FIRMWARE_DIR}/src/clock/wall_clock.cpp")
+target_include_directories(attractap-demo-clock-tests PRIVATE "${FIRMWARE_DIR}/src")
+target_compile_options(attractap-demo-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+target_link_libraries(attractap-demo-clock-tests PRIVATE Threads::Threads)
+add_test(NAME attractap-demo-clock-tests COMMAND attractap-demo-clock-tests)
+add_test(NAME attractap-api-clock-set-failure COMMAND attractap-demo-clock-tests api-set-failure)
+add_test(NAME attractap-demo-clock-set-failure COMMAND attractap-demo-clock-tests demo-set-failure)
+add_test(NAME attractap-sntp-clock-set-failure COMMAND attractap-demo-clock-tests sntp-set-failure)
+
+add_executable(attractap-clock-race-tests tests/clock-race.test.cpp "${FIRMWARE_DIR}/src/clock/wall_clock.cpp")
+target_include_directories(attractap-clock-race-tests PRIVATE "${FIRMWARE_DIR}/src")
+target_compile_options(attractap-clock-race-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+target_link_libraries(attractap-clock-race-tests PRIVATE Threads::Threads)
+add_test(NAME attractap-clock-race-tests COMMAND attractap-clock-race-tests)
+
+add_executable(attractap-demo-session-clock-tests
+    tests/demo-session-clock.test.cpp tests/controlled-clock.cpp src/profile_store.cpp
+    "${FIRMWARE_DIR}/src/api/demo/websocket.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/sessions.cpp"
+    "${FIRMWARE_DIR}/src/demo/demo_store.cpp")
+target_compile_definitions(attractap-demo-session-clock-tests PRIVATE DEMO_MODE)
+target_compile_options(attractap-demo-session-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+target_link_libraries(attractap-demo-session-clock-tests PRIVATE attractap-production-host)
+add_test(NAME attractap-demo-session-clock-tests COMMAND attractap-demo-session-clock-tests)
+
+add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
@@ -148,3 +187,26 @@ set_tests_properties(attractap-desktop-display-tests PROPERTIES
 add_executable(attractap-desktop-real-api tests/real_api.cpp)
 target_link_libraries(attractap-desktop-real-api PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-real-api PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+
+file(GLOB ATTRACTAP_READER_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/reader/*.cpp")
+add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES} tests/controlled-clock.cpp)
+target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
+target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
+add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
+add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
+set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
+set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
+
+add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 180)
+
+# Exercise the production beeper without playing sound on the developer's machine.
+set_property(TEST
+    attractap-desktop-tests
+    attractap-desktop-display-tests
+    attractap-reader-workflow-tests
+    attractap-ota-interrupt-enrollment
+    attractap-ota-interrupt-reset
+    attractap-reader-timeout-tests
+    APPEND PROPERTY ENVIRONMENT "SDL_AUDIO_DRIVER=dummy")

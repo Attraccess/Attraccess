@@ -1,0 +1,109 @@
+{
+  "controllers": {
+    "title": "WAGO controllers",
+    "description": "Manage your CC100 controllers, configuration and software updates.",
+    "loadError": "Could not load WAGO controllers",
+    "commission": "Commission controller",
+    "table": "WAGO controllers and commissioning sessions",
+    "controller": "Device",
+    "runtime": "Software",
+    "heartbeat": "Last seen",
+    "actions": "Actions",
+    "claim": "Enroll",
+    "configure": "Configure",
+    "progress": "Setup progress",
+    "resume": "Continue setup",
+    "empty": "No controllers or commissioning sessions yet.",
+    "never": "Not seen yet",
+    "enrollment": "CC100 setup",
+    "enrolling": "Setting up",
+    "inProgress": "In progress",
+    "updated": "Updated {{date}}",
+    "verified": "Setup complete",
+    "pending": "Configuration pending",
+    "unavailable": "Status unavailable",
+    "runtimeUpdatePending": "Software update pending",
+    "status": "Status",
+    "registration": "Enrollment",
+    "setupPending": "Setup pending",
+    "attention": "Needs attention",
+    "details": "Details",
+    "detailsFor": "Details for {{name}}",
+    "hardwareId": "Device ID",
+    "address": "IP address",
+    "systemFirmware": "WAGO firmware",
+    "search": "Search by name, device ID or IP address",
+    "noResults": "No matching controllers.",
+    "pagination": "Controller pages",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "pageSummary": "{{from}}–{{to}} of {{total}} devices",
+    "pageNumber": "Page {{page}} of {{total}}"
+  },
+  "trust": {
+    "claimed": "Enrolled",
+    "untrusted": "Not enrolled"
+  },
+  "connectivity": {
+    "untrusted": "not enrolled",
+    "online": "online",
+    "offline": "offline",
+    "stale": "Not responding",
+    "unknown": "Status unknown",
+    "runtime_check": "Checking software",
+    "runtime_update": "Software update"
+  },
+  "commissioning": {
+    "awaiting_delivery": "Waiting to install",
+    "delivering": "Installing software",
+    "awaiting_identity_confirmation": "Confirm device identity",
+    "awaiting_codesys_confirmation": "Approve installation",
+    "delivery_failed": "Installation failed",
+    "awaiting_discovery": "Waiting for connection",
+    "awaiting_claim": "Completing enrollment",
+    "completed": "Enrolled",
+    "awaiting_verification": "Checking setup",
+    "claim_interrupted": "Enrollment interrupted",
+    "recovery_revocation_pending": "Finishing recovery",
+    "revoked": "Enrollment cancelled"
+  },
+  "settings": {
+    "title": "WAGO settings",
+    "description": "Choose the MQTT server used for new WAGO commissioning sessions. Change it before commissioning a controller.",
+    "select": "Select an MQTT server",
+    "server": "Default MQTT server",
+    "empty": "No MQTT servers configured.",
+    "save": "Save settings"
+  },
+  "claim": {
+    "title": "Enroll controller",
+    "description": "Verify physical access to this controller before it can receive commands.",
+    "name": "Controller name",
+    "verifier": "Physical pairing code or fingerprint",
+    "submit": "Verify and enroll"
+  },
+  "remove": {
+    "title": "Remove controller",
+    "question": "Remove {{name}} from Attraccess?",
+    "description": "This revokes MQTT access and removes the controller registration and configuration. Commissioning records with unfinished installation cleanup or management access recovery are retained. The runtime remains installed on the CC100. Removing a registration does not restore preexisting applications or data, or re-enable CODESYS. An active operation blocks removal.",
+    "error": "Could not remove the controller.",
+    "keep": "Keep controller"
+  },
+  "configuration": {
+    "invalidController": "Invalid controller.",
+    "empty": "No configuration changes.",
+    "before": "Before:",
+    "after": "After:",
+    "metadata": "Names and presets",
+    "nameFor": "Name for {{name}}",
+    "presetApplication": "Preset application"
+  },
+  "common": {
+    "settings": "Settings",
+    "refresh": "Refresh",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "retry": "Please try again.",
+    "close": "Close"
+  }
+}

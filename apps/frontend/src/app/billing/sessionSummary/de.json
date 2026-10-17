@@ -1,0 +1,9 @@
+{
+  "title": "Abrechnung deiner Sitzung",
+  "total": "Gesamtkosten dieser Sitzung",
+  "historyHint": "Die Abrechnungsdetails findest du in deinem Zahlungsverlauf.",
+  "close": "Fertig",
+  "loading": "Abrechnung wird geladen",
+  "loadError": "Die Abrechnungswährung konnte nicht geladen werden.",
+  "retry": "Erneut versuchen"
+}

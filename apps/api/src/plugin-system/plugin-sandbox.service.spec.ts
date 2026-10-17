@@ -30,6 +30,7 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     mqtt: {
       subscribe: () => Promise.resolve({ unsubscribe: () => undefined }),
       publish: () => Promise.resolve(),
+      refreshConnection: () => Promise.resolve(),
     },
     getRepository: (entity) => ({ entity } as never),
     get: (token) => ({ token } as never),
@@ -222,6 +223,18 @@ describe('PluginSandboxService', () => {
       const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
       expect(() => denied.getMqttServerConfig(1)).toThrow(PluginPermissionError);
       expect(() => denied.getMqttServerConfig(1)).toThrow(/ACCESS_MQTT_SERVERS/);
+    });
+
+    it('gates MQTT connection refresh behind ACCESS_MQTT_SERVERS', async () => {
+      const base = buildBaseContext(events);
+      const refresh = jest.fn(async () => undefined);
+      base.mqtt.refreshConnection = refresh;
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.mqtt.refreshConnection?.(1)).toThrow(PluginPermissionError);
+      expect(refresh).not.toHaveBeenCalled();
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.ACCESS_MQTT_SERVERS]);
+      await granted.mqtt.refreshConnection?.(1);
+      expect(refresh).toHaveBeenCalledWith(1);
     });
 
     it('returns the resolved MQTT config with ACCESS_MQTT_SERVERS', async () => {

@@ -14,11 +14,13 @@
     "initiator": "Ausgelöst von",
     "resourceUsage": "Ressource / Nutzung",
     "refundOf": "Erstattung von",
+    "correctionOf": "Korrektur zu",
     "externalReference": "Externe Referenz",
     "type": "Art"
   },
   "type": {
     "refund": "Erstattung",
+    "correction": "Zählerkorrektur",
     "resourceUsage": "Ressourcen-Nutzung",
     "manual": "Manuelle Transaktion",
     "sumupTopup": "SumUp-Aufladung",
@@ -31,17 +33,26 @@
       "description": "Beschreibung",
       "quantity": "Menge",
       "unitPrice": "Einzelpreis",
-      "subtotal": "Zwischensumme"
+      "subtotal": "Zwischensumme",
+      "rateShort": "Preis",
+      "totalShort": "Summe"
     },
     "system": {
       "PER_SESSION": "Pro Sitzung",
       "PER_MINUTE": "Pro Minute",
+      "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Pro zugeordneter Betriebsminute",
       "BILLING_FACTOR": "Zahlungsfaktor"
     },
     "empty": "Keine Positionen",
-    "total": "Summe Positionen"
+    "total": "Summe Positionen",
+    "meterDescription": "{{value}} zu {{rate}} pro Messwert",
+    "unavailable": "Nicht verfügbar",
+    "meterUnavailable": "Endwert nicht verfügbar; keine Zählergebühr enthalten. Erfasster Preis: {{rate}} pro Messwert."
   },
   "actions": {
-    "refund": "Erstattung"
-  }
+    "refund": "Erstattung",
+    "openUsage": "Nutzungsdetails öffnen"
+  },
+  "loadError": "Abrechnungsdetails konnten nicht geladen werden.",
+  "retry": "Erneut versuchen"
 }

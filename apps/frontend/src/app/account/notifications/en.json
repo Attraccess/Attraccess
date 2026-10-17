@@ -46,8 +46,8 @@
       "description": "When someone else or the system ends your active resource session (not when you end it yourself)."
     },
     "nfc_cards": {
-      "label": "NFC cards",
-      "description": "When one of your NFC cards is registered, activated, deactivated, or deleted."
+      "label": "RFID cards",
+      "description": "When one of your RFID cards is registered, activated, deactivated, or deleted."
     },
     "project_invitations": {
       "label": "Project invitations",
@@ -59,7 +59,7 @@
     }
   },
   "description": {
-    "push": "Push preferences are saved for your account. Supported browsers are subscribed automatically when you use the app."
+    "push": "Push preferences are saved for your account. Enable notifications separately on each device with your permission."
   },
   "messagesEmailOnOffline": {
     "label": "Email me about messages when I'm offline",
@@ -72,7 +72,9 @@
     "permissionDenied": "Notifications are blocked for this site. Allow them in your browser settings to enable push notifications.",
     "errors": {
       "subscribeFailed": "Could not enable push notifications. Please check your browser notification permissions."
-    }
+    },
+    "enable": "Enable on this device",
+    "enabled": "Push notifications are enabled on this device."
   },
   "toggleAll": {
     "label": "All notifications",

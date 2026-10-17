@@ -1,0 +1,49 @@
+<mj-section background-color="#FFFFFF" padding="32px 20px 8px 20px">
+  <mj-column>
+    <mj-text padding="0 0 12px 0">{{t 'greeting' 'Hello {name},' name=user.username}}</mj-text>
+    <mj-text padding="0 0 8px 0">
+      {{t 'body' 'Your session on <strong>{resource}</strong> has ended. Here is your receipt:' resource=resource.name}}
+    </mj-text>
+    <mj-text font-size="14px" color="#4B5563" padding="0 0 4px 0">
+      {{t 'start_label' 'Start: {time}' time=usage.startTime}}<br/>
+      {{t 'end_label' 'End: {time}' time=usage.endTime}}
+      {{#if usage.billingFactor}}<br/>{{t 'billing_factor_applied' 'Applied billing factor: {factor}' factor=usage.billingFactor}}{{/if}}
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#FFFFFF" padding="0 20px 24px 20px">
+  <mj-column>
+    <mj-table>
+      <tr><th align="left">{{t 'col_item' 'Item'}}</th><th align="right">{{t 'col_qty' 'Qty'}}</th><th align="right">{{t 'col_rate' 'Rate'}}</th><th align="right">{{t 'col_total' 'Total'}}</th></tr>
+      {{#each items}}
+      <tr>
+        <td>
+          {{#if this.isSessionDuration}}{{t 'item_session_duration' 'Session time'}}
+          {{else if this.isOperatingDuration}}{{t 'item_operating_duration' 'Attributable operating time'}}
+          {{else if this.isFixedFee}}{{t 'item_fixed_fee' 'Fixed session fee'}}
+          {{else if this.isBillingFactor}}{{t 'item_billing_factor' 'Billing factor adjustment'}}
+          {{else if this.isEnergy}}{{t 'item_energy' 'Energy'}}
+          {{else}}{{this.name}}{{/if}}
+          {{#if this.description}}<br/>{{this.description}}{{/if}}
+          {{#if this.energyKwh}}<br/>{{t 'energy_amount' '{kwh} kWh' kwh=this.energyKwh}}{{/if}}
+          {{#if this.isDuration}}<br/>
+            {{#if this.hasDuration}}{{t 'duration_measured' 'Measured: {seconds} s' seconds=this.durationSeconds}}<br/>{{/if}}
+            {{t 'duration_billed' 'Billed: {minutes} min' minutes=this.quantity}}
+          {{/if}}
+        </td>
+        <td align="right">{{this.quantity}}</td>
+        <td align="right">{{#if this.isDuration}}{{t 'duration_rate' '{credits} credits/min' credits=this.unitPrice}}{{else}}{{this.unitPrice}}{{/if}}</td>
+        <td align="right">{{this.total}}</td>
+      </tr>
+      {{/each}}
+      <tr>
+        <td colspan="3" align="right"><strong>{{t 'total_credits' 'Total Credits'}}</strong></td>
+        <td align="right"><strong>{{totalCredits}}</strong></td>
+      </tr>
+      <tr>
+        <td colspan="3" align="right">{{t 'new_balance' 'New Balance'}}</td>
+        <td align="right">{{newBalance}}</td>
+      </tr>
+    </mj-table>
+  </mj-column>
+</mj-section>

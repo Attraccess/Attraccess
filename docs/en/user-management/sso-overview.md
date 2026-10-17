@@ -56,3 +56,13 @@ You can configure multiple SSO providers simultaneously. Users see buttons for e
 - [SAML Setup](user-management/sso-saml.md)
 - [Permissions](user-management/permissions.md)
 - [SSL Setup](installation/ssl-setup.md)
+
+## Local logout and central logout
+
+**Logout** ends only the current Attraccess session. **Logout everywhere** also asks the SSO provider to end its session and propagate logout to other applications. The provider decides which applications participate. Cancelling a provider page or a failed exchange never restores the Attraccess session, and does not confirm sign-out from other applications.
+
+Both actions are available in the account menu and on authenticated kiosk screens. Central logout is disabled with an explanation for local logins, sessions created before this feature, or providers without usable logout configuration. Sign in through SSO again after configuring central logout. Kiosk inactivity logout remains local.
+
+Provider notifications end only matching SSO sessions. A session-specific notification preserves other devices, local sessions, API tokens, and other provider identities. A user-wide notification ends sessions for that provider identity only. Existing provisioning logout APIs retain their account-wide behavior.
+
+The configured application URL determines public API callbacks. For a frontend on a separate host, set `ATTRACCESS_FRONTEND_URL` to its trusted public URL; completed exchanges return to its root. Register the exact API URLs shown by the provider form. Client-supplied return destinations are not accepted.

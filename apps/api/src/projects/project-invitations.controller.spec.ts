@@ -40,7 +40,7 @@ describe('ProjectInvitationsController', () => {
 
     const result = await controller.acceptInvitation(req, 3);
 
-    expect(projectsService.acceptInvitation).toHaveBeenCalledWith(2, 3);
+    expect(projectsService.acceptInvitation).toHaveBeenCalledWith(2, 3, 'session', undefined);
     expect(result).toBe(invitation);
   });
 
@@ -51,7 +51,7 @@ describe('ProjectInvitationsController', () => {
 
     const result = await controller.declineInvitation(req, 5);
 
-    expect(projectsService.declineInvitation).toHaveBeenCalledWith(4, 5);
+    expect(projectsService.declineInvitation).toHaveBeenCalledWith(4, 5, 'session', undefined);
     expect(result).toBe(invitation);
   });
 });

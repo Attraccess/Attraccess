@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ApiToken } from '@attraccess/database-entities';
 import { ApiTokenService } from './api-token.service';
+import { IsNull } from 'typeorm';
 
 describe('ApiTokenService', () => {
   const repository = {
@@ -46,9 +47,7 @@ describe('ApiTokenService', () => {
     });
 
     expect(result.token).toHaveLength(43);
-    expect(repository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ tokenHash: `hashed:${result.token}` }),
-    );
+    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ tokenHash: `hashed:${result.token}` }));
     expect(result.apiToken).not.toHaveProperty('token');
   });
 
@@ -82,7 +81,7 @@ describe('ApiTokenService', () => {
     await expect(service.list(3, 2, 10)).resolves.toEqual({ data: [], total: 12, page: 2, limit: 10 });
 
     expect(repository.findAndCount).toHaveBeenCalledWith({
-      where: { userId: 3, revokedAt: null },
+      where: { userId: 3, revokedAt: IsNull() },
       order: { createdAt: 'DESC', id: 'DESC' },
       relations: { apiTokenPermissions: true },
       skip: 10,
@@ -91,9 +90,9 @@ describe('ApiTokenService', () => {
   });
 
   it('refuses permissions no longer held by the owner', async () => {
-    await expect(
-      service.create(3, { name: 'Script', permissionKeys: ['resources.write'] }),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(service.create(3, { name: 'Script', permissionKeys: ['resources.write'] })).rejects.toThrow(
+      ForbiddenException,
+    );
     expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(3, true);
   });
 

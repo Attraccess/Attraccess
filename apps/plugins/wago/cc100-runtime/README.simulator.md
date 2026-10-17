@@ -63,7 +63,7 @@ Pulse and guard behavior are configured through the desired configuration and ar
 ## Isolated broker integration tests (no Docker required)
 
 ```sh
-pnpm nx run wago-cc100-runtime:test-simulator-integration
+pnpm nx run plugin-wago:test-cc100-simulator-integration
 ```
 
 This builds the executable simulator, installs pinned Aedes 0.51.3 into a fresh
@@ -125,8 +125,9 @@ node apps/plugins/wago/cc100-runtime/integration/run.mjs \
   --runtime-ref=<producer-commit> --flow-ref=<flow-commit>
 ```
 
-`--runtime-ref` stages the exact committed runtime modules in temporary storage,
-overlays only the owned simulator entrypoint and device adapter, typechecks that
+`--runtime-ref` stages the exact committed runtime modules and their plugin
+contracts in temporary storage, overlays the owned simulator entrypoint, device
+adapter and simulator helpers, and typechecks that
 combination, then builds it. It does not merge any runtime into this worktree or
 modify another worktree. The strict test sends commands with
 `expectedConfigurationRevision` and `expiresAt`; it expects physical percent 42

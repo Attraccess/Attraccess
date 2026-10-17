@@ -17,34 +17,37 @@ import {
   TooltipTrigger,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button';
-import { useCallback, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '../../../../../components/button/index';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useTranslations, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import {
+  ResourceFlowVariableScope,
   ApiError,
   FlowVariableDto,
-  ResourceFlowVariableScope,
   UseFlowVariablesServiceListFlowVariablesKeyFn,
   useFlowVariablesServiceDeleteFlowVariable,
   useFlowVariablesServiceListFlowVariables,
   useFlowVariablesServiceUpsertFlowVariable,
 } from '@attraccess/react-query-client';
+import { VariableEditor, EditorMode, VariableFormValues, ValueType } from './editor';
+import { StandardModal } from '../../../../../components/standardModal';
+import { useCallback, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
-import { EditorMode, VariableEditor, VariableFormValues, ValueType } from './editor';
-import { StandardModal } from '../../../../../components/standardModal';
 import de from './de.json';
 import en from './en.json';
 
-interface Props {
-  resourceId: number;
-  children: (open: () => void) => React.ReactNode;
+export function fullValue(value: unknown): string {
+  try {
+    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
-function previewValue(value: unknown): string {
+export function previewValue(value: unknown): string {
   let s: string;
   try {
     s = typeof value === 'string' ? value : JSON.stringify(value);
@@ -55,15 +58,12 @@ function previewValue(value: unknown): string {
   return s.length > 80 ? s.slice(0, 77) + '…' : s;
 }
 
-function fullValue(value: unknown): string {
-  try {
-    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
+export interface Props {
+  resourceId: number;
+  children: (open: () => void) => React.ReactNode;
 }
 
-export function VariablesModal(props: Props) {
+export function useVariablesModalState(props: Props) {
   const { resourceId } = props;
   const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
@@ -163,6 +163,54 @@ export function VariablesModal(props: Props) {
   );
 
   const rowKey = (row: FlowVariableDto) => `${row.scope}:${row.key}`;
+  return {
+    isOpen,
+    open,
+    setOpen,
+    close,
+    t,
+    formatDateTime,
+    activeScope,
+    setActiveScope,
+    pendingDeleteKey,
+    setPendingDeleteKey,
+    editor,
+    setEditor,
+    upsert,
+    remove,
+    rows,
+    handleAdd,
+    handleEdit,
+    handleSubmit,
+    handleDelete,
+    rowKey,
+    props,
+  } as const;
+}
+
+export function VariablesModal(props: Props) {
+  const {
+    isOpen,
+    open,
+    setOpen,
+    close,
+    t,
+    formatDateTime,
+    activeScope,
+    setActiveScope,
+    pendingDeleteKey,
+    setPendingDeleteKey,
+    editor,
+    setEditor,
+    upsert,
+    remove,
+    rows,
+    handleAdd,
+    handleEdit,
+    handleSubmit,
+    handleDelete,
+    rowKey,
+  } = useVariablesModalState(props);
 
   return (
     <>
@@ -237,15 +285,11 @@ export function VariablesModal(props: Props) {
                                   <span className="font-mono text-sm">{previewValue(row.value as unknown)}</span>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <pre className="max-w-md whitespace-pre-wrap">
-                                    {fullValue(row.value as unknown)}
-                                  </pre>
+                                  <pre className="max-w-md whitespace-pre-wrap">{fullValue(row.value as unknown)}</pre>
                                 </TooltipContent>
                               </Tooltip>
                             </TableCell>
-                            <TableCell className="text-sm text-default-500">
-                              {formatDateTime(row.updatedAt)}
-                            </TableCell>
+                            <TableCell className="text-sm text-default-500">{formatDateTime(row.updatedAt)}</TableCell>
                             <TableCell>
                               <div className="flex flex-row justify-end gap-1">
                                 <Button

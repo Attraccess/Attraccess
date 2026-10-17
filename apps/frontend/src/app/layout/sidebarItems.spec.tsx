@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSidebarEndItems, SIDEBAR_ITEMS, type SidebarItem } from './sidebarItems';
+import { buildSidebarEndItems, SIDEBAR_ITEMS, type SidebarItem } from './sidebar/navigation';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 
@@ -31,9 +31,7 @@ describe('sidebar items', () => {
   });
 
   it('links every navigable entry to exactly one path', () => {
-    const paths = navigableItems
-      .filter((item): item is SidebarItem => !item.isGroup)
-      .map((item) => item.path);
+    const paths = navigableItems.filter((item): item is SidebarItem => !item.isGroup).map((item) => item.path);
 
     expect(new Set(paths).size).toBe(paths.length);
   });

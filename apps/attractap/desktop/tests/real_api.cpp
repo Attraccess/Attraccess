@@ -83,13 +83,13 @@ bool validCommand(JsonDocument &command)
 {
     if (!command.is<JsonObject>() || !command["action"].is<const char *>()) return false;
     const std::string action = command["action"].as<std::string>();
-    const std::vector<std::string> actions = {"wait-text", "wait-screen", "click", "edit", "present", "remove", "faults", "corrupt-key", "snapshot", "reconnect", "inspect", "quit"};
+    const std::vector<std::string> actions = {"wait-text", "wait-screen", "click", "edit", "present", "remove", "faults", "corrupt-key", "snapshot", "reconnect", "inspect", "set-pin", "quit"};
     if (std::find(actions.begin(), actions.end(), action) == actions.end()) return false;
     for (JsonPair field : command.as<JsonObject>())
     {
         const std::string key = field.key().c_str();
         if (key == "action") continue;
-        if (key == "text" && (action == "wait-text" || action == "wait-screen" || action == "click" || action == "edit" || action == "snapshot"))
+        if (key == "text" && (action == "wait-text" || action == "wait-screen" || action == "click" || action == "edit" || action == "snapshot" || action == "set-pin"))
         {
             if (!field.value().is<const char *>() || field.value().as<std::string>().size() > 512) return false;
         }
@@ -189,6 +189,11 @@ bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::file
         card.keys.at(slot)[0] ^= 0xff;
         simulator.nfc().setCard(cardIndex, card);
     }
+    else if (action == "set-pin")
+    {
+        if (text.size() != 4 || !std::all_of(text.begin(), text.end(), [](unsigned char c) { return std::isdigit(c); })) return false;
+        Settings::setDevicePin(text);
+    }
     else if (action == "snapshot")
     {
         lv_refr_now(nullptr);
@@ -218,7 +223,6 @@ int main(int argc, char **argv)
     const auto screenshots = control / "screenshots";
     std::filesystem::create_directories(screenshots);
     DesktopSimulator simulator(argv[1], 0, argv[3]);
-    Settings::setDevicePin("1234");
     if (!waitFor([&] { return simulator.authenticated(); }, simulator, 15000)) return 1;
     std::ofstream(control / "ready") << "authenticated\n";
 
@@ -241,6 +245,7 @@ int main(int argc, char **argv)
         JsonDocument result;
         result["ok"] = ok;
         result["screen"] = screenName();
+        result["devicePin"] = Settings::getDeviceConfig().passCode;
         result["readerId"] = Settings::getAttraccessAuthConfig().readerId;
         result["authenticationGeneration"] = simulator.authenticationGeneration();
         result["authenticated"] = simulator.authenticated();

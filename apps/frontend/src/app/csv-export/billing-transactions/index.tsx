@@ -39,10 +39,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
     }
   }, [fetchAll, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const billingTransactions = useMemo(
-    () => data?.pages.flatMap((page) => page.data) ?? [],
-    [data],
-  );
+  const billingTransactions = useMemo(() => data?.pages.flatMap((page) => page.data) ?? [], [data]);
 
   const isFetchingAllPages = fetchAll && (hasNextPage || isFetchingNextPage);
 
@@ -78,6 +75,11 @@ export function BillingTransactionsExport(props: ExporterProps) {
         getter: (item) => item.resourceUsage?.resource?.name ?? '',
       },
       { label: t('columns.refundOf'), key: 'refundOf', getter: (item) => item.refundOfId?.toString() ?? '' },
+      {
+        label: t('columns.correctionOf'),
+        key: 'correctionOf',
+        getter: (item) => item.correctionOfId?.toString() ?? '',
+      },
       {
         label: t('columns.externalReference'),
         key: 'externalReference',

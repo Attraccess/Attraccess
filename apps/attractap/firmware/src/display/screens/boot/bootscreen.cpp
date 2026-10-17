@@ -1,5 +1,5 @@
 #include "bootscreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
 #include <string>
 
 void BootScreen::init()

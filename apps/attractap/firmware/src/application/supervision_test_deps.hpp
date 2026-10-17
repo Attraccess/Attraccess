@@ -30,7 +30,7 @@ inline std::string translateReaderError(const std::string &error) { return error
 class API {
 public:
     static constexpr size_t MAX_INTRODUCERS = 8;
-    static constexpr size_t MAX_USERNAME_LEN = 32;
+    static constexpr size_t MAX_USERNAME_LEN = 33;
     struct SupervisionRequestResult {
         bool success = false;
         std::string error;
@@ -78,6 +78,7 @@ public:
     void resetCardPresence() override {}
     void enableCardDetection() override { ++enabled; }
     void disableCardDetection() override { ++disabled; }
+    bool suspend() override { ++disabled; return true; }
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)>) override {}
     void setCardRemovalCallback(std::function<void(uint32_t)>) override {}
     bool getAvailableKeyNo(uint8_t *, uint8_t *, uint8_t *) override { return false; }

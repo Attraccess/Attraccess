@@ -11,10 +11,18 @@ const hoisted = vi.hoisted(() => ({
   user: { id: 1 },
 }));
 
-vi.mock('../../utils/sse', () => ({
-  useSSE: ({ path, onUpdate, enabled }: { path: string; onUpdate: (event: unknown) => void; enabled?: boolean }) => {
+vi.mock('../../utils/live-updates', () => ({
+  useLiveUpdates: ({
+    topic,
+    onUpdate,
+    enabled,
+  }: {
+    topic: string;
+    onUpdate: (event: unknown) => void;
+    enabled?: boolean;
+  }) => {
     hoisted.onUpdate = onUpdate;
-    return { path, enabled };
+    return { topic, enabled };
   },
 }));
 

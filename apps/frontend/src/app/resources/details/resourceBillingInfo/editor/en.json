@@ -8,6 +8,15 @@
     "creditsPerMinute": {
       "label": "{{currency}} per minute",
       "description": "This amount will be deducted per minute of the session duration."
+    },
+    "creditsPerOperatingMinute": {
+      "label": "{{currency}} per operating minute",
+      "description": "This amount will be deducted per minute attributed to machine operation."
+    },
+    "meterRate": {
+      "label": "per measured value ({{currency}})",
+      "description": "0 disables billing. The rate is captured when a session starts.",
+      "invalid": "Enter a valid price with up to {{digits}} decimal places."
     }
   },
   "actions": {

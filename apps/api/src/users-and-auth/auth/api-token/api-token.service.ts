@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
 import { ApiToken, ApiTokenPermission, User } from '@attraccess/database-entities';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { RbacService } from '../../rbac/rbac.service';
 
@@ -17,9 +17,13 @@ export class ApiTokenService {
     private readonly rbacService: RbacService,
   ) {}
 
-  async list(userId: number, page: number, limit: number): Promise<{ data: ApiToken[]; total: number; page: number; limit: number }> {
+  async list(
+    userId: number,
+    page: number,
+    limit: number,
+  ): Promise<{ data: ApiToken[]; total: number; page: number; limit: number }> {
     const [data, total] = await this.apiTokenRepository.findAndCount({
-      where: { userId, revokedAt: null },
+      where: { userId, revokedAt: IsNull() },
       order: { createdAt: 'DESC', id: 'DESC' },
       relations: { apiTokenPermissions: true },
       skip: (page - 1) * limit,
@@ -109,7 +113,7 @@ export class ApiTokenService {
 
   private async findOwned(userId: number, tokenId: number): Promise<ApiToken> {
     const apiToken = await this.apiTokenRepository.findOne({
-      where: { id: tokenId, userId, revokedAt: null },
+      where: { id: tokenId, userId, revokedAt: IsNull() },
       relations: { apiTokenPermissions: true },
     });
     if (!apiToken) throw new NotFoundException('ApiTokenNotFound');
@@ -125,7 +129,11 @@ export class ApiTokenService {
     }
   }
 
-  private async createPermissions(manager: EntityManager, apiTokenId: number, permissionKeys: string[]): Promise<ApiTokenPermission[]> {
+  private async createPermissions(
+    manager: EntityManager,
+    apiTokenId: number,
+    permissionKeys: string[],
+  ): Promise<ApiTokenPermission[]> {
     const permissionRepository = manager.getRepository(ApiTokenPermission);
     return permissionRepository.save(
       [...new Set(permissionKeys)].map((permissionKey) => permissionRepository.create({ apiTokenId, permissionKey })),

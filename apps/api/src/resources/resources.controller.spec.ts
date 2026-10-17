@@ -5,14 +5,16 @@ import { Resource, DocumentationType, ResourceType } from '@attraccess/database-
 import { createMockResource } from '../test-utils/resource.fixtures';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, type ExecutionContext } from '@nestjs/common';
 import { PaginatedResponse } from '../types/response';
 import { ResourceImageService } from './resourceImage.service';
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import supertest from 'supertest';
 
 describe('ResourcesController', () => {
   let controller: ResourcesController;
   let service: ResourcesService;
+  const request = { user: { id: 9 } } as AuthenticatedRequest;
 
   beforeEach(async () => {
     const mockResourcesService = {
@@ -140,10 +142,10 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'createResource').mockResolvedValue(newResource);
 
-      const result = await controller.createOne(createDto);
+      const result = await controller.createOne(createDto, request);
 
       expect(result).toEqual(newResource);
-      expect(service.createResource).toHaveBeenCalledWith(createDto, undefined);
+      expect(service.createResource).toHaveBeenCalledWith(createDto, undefined, request.user);
     });
   });
 
@@ -171,10 +173,10 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'updateResource').mockResolvedValue(updatedResource);
 
-      const result = await controller.updateOne(1, updateDto);
+      const result = await controller.updateOne(1, updateDto, request);
 
       expect(result).toEqual(updatedResource);
-      expect(service.updateResource).toHaveBeenCalledWith(1, updateDto, undefined);
+      expect(service.updateResource).toHaveBeenCalledWith(1, updateDto, undefined, request.user);
     });
 
     it('should throw NotFoundException if resource not found', async () => {
@@ -185,23 +187,55 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'updateResource').mockRejectedValue(new NotFoundException());
 
-      await expect(controller.updateOne(999, updateDto)).rejects.toThrow(NotFoundException);
+      await expect(controller.updateOne(999, updateDto, request)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('deleteOne', () => {
+    it('rejects update-only users at the HTTP endpoint and allows delete-authorized users', async () => {
+      const permissions = new Set(['resources.update']);
+      const module = await Test.createTestingModule({
+        controllers: [ResourcesController],
+        providers: [
+          { provide: ResourcesService, useValue: service },
+          { provide: ResourceImageService, useValue: {} },
+        ],
+      })
+        .overrideGuard(DualAuthGuard)
+        .useValue({
+          canActivate: (context: ExecutionContext) => {
+            context.switchToHttp().getRequest().user = { id: 9, effectivePermissions: permissions };
+            return true;
+          },
+        })
+        .compile();
+      const app = module.createNestApplication();
+      await app.init();
+      try {
+        await supertest(app.getHttpServer()).delete('/resources/1').expect(403);
+        expect(service.deleteResource).not.toHaveBeenCalled();
+        permissions.clear();
+        permissions.add('resources.delete');
+        await supertest(app.getHttpServer()).delete('/resources/1').expect(200);
+        expect(service.deleteResource).toHaveBeenCalledTimes(1);
+        expect(service.deleteResource).toHaveBeenCalledWith(1, expect.objectContaining({ id: 9 }));
+      } finally {
+        await app.close();
+      }
+    });
+
     it('should delete a resource', async () => {
       jest.spyOn(service, 'deleteResource').mockResolvedValue(undefined);
 
-      await controller.deleteOne(1);
+      await controller.deleteOne(1, request);
 
-      expect(service.deleteResource).toHaveBeenCalledWith(1);
+      expect(service.deleteResource).toHaveBeenCalledWith(1, request.user);
     });
 
     it('should throw NotFoundException if resource not found', async () => {
       jest.spyOn(service, 'deleteResource').mockRejectedValue(new NotFoundException());
 
-      await expect(controller.deleteOne(999)).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteOne(999, request)).rejects.toThrow(NotFoundException);
     });
   });
 });

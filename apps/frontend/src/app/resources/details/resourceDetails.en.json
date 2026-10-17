@@ -14,10 +14,11 @@
     "maintenance": "Maintenance",
     "flows": "Flows",
     "forms": "Forms",
+    "diagnostics": "Diagnostics",
     "mobilePickerLabel": "Section"
   },
   "actions": {
-    "edit": "Edit",
+    "edit": "Settings",
     "delete": "Delete",
     "documentation": "Documentation",
     "maintenance": "Maintenance",

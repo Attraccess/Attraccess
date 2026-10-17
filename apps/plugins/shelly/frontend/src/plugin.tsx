@@ -11,7 +11,7 @@ import type {
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { IPluginStore } from 'react-pluggable';
-import { DevicesPage } from './DevicesPage';
+import { DevicesPage } from './devices/DevicesPage';
 
 export default class ShellyPlugin implements AttraccessFrontendPlugin {
   getPluginName(): string {

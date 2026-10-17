@@ -6,6 +6,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   Form,
   TextArea,
   useOverlayState,
@@ -77,7 +78,7 @@ export function MarkDoneModal(props: Props) {
       {children(open)}
       <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChangeHandler}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{t('actions.markDone.modal.title')}</h2>
+          <DrawerHeading className="text-lg font-semibold">{t('actions.markDone.modal.title')}</DrawerHeading>
         </DrawerHeader>
         <DrawerBody>
           <Form

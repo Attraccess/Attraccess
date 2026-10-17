@@ -92,6 +92,19 @@ describe('BruteForceProtectionService', () => {
   });
 
   describe('account lockout', () => {
+    it('allows other accounts while an attempt is pending and releases queued attempts after a failure', async () => {
+      let rejectAttempt: (error: Error) => void;
+      const pending = service.runAccountAttempt(7, () => new Promise<void>((_resolve, reject) => {
+        rejectAttempt = reject;
+      }));
+      await expect(service.runAccountAttempt(8, async () => 'other account')).resolves.toBe('other account');
+      const next = service.runAccountAttempt(7, async () => 'next attempt');
+      const error = new Error('invalid credentials');
+      rejectAttempt(error);
+      await expect(pending).rejects.toBe(error);
+      await expect(next).resolves.toBe('next attempt');
+    });
+
     it('persists lockedUntil after threshold', async () => {
       for (let i = 0; i < 3; i += 1) {
         await service.recordFailure('login', '1.1.1.1', 42);

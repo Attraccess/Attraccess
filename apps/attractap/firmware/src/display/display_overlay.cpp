@@ -1,5 +1,6 @@
 #include "display.hpp"
-#include "display/theme.hpp"
+#include "fonts/attractap_fonts.hpp"
+#include "theme.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -42,7 +43,7 @@ void Display::initDeviceOverlay()
 
     lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(Display::deviceNameLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(Display::deviceNameLabel, &attractap_font_montserrat_latin1_10, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *firmwareLabel = lv_label_create(deviceInfoContainer);
     lv_obj_set_width(firmwareLabel, LV_SIZE_CONTENT);
@@ -82,6 +83,14 @@ void Display::updateNetworkQualityOverlay()
         return;
     }
 
+    // The goodbye is a plain full-screen view. Connectivity still controls the
+    // application state; restore the badge when ordinary routing resumes.
+    if (Display::activeScreen == &Display::sessionSummaryScreen)
+    {
+        lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+        Display::networkQualityOverlayInitialized = false;
+        return;
+    }
     State::NetworkQualityState qualityState = State::getNetworkQualityState();
     if (Display::networkQualityOverlayInitialized && qualityState.quality == Display::networkQualityOverlayValue)
     {
@@ -94,7 +103,7 @@ void Display::updateNetworkQualityOverlay()
     switch (qualityState.quality)
     {
     case State::NETWORK_QUALITY_GOOD:
-        lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_label_set_text(Display::networkQualityLabel, "OK NET");
         break;

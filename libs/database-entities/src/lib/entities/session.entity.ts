@@ -1,12 +1,15 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, Index } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiHideProperty, ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { User } from './user.entity';
+import { SsoSessionContext } from '../types/sso-session-context';
 
 @Entity()
 @Index(['token'], { unique: true })
 @Index(['userId'])
 @Index(['expiresAt'])
+@Index(['ssoProviderId', 'ssoProtocol', 'ssoSubject'])
+@Index(['ssoProviderId', 'ssoProtocol', 'ssoSessionId'])
 export class Session {
   @PrimaryGeneratedColumn()
   @ApiProperty({
@@ -46,6 +49,31 @@ export class Session {
     nullable: true,
   })
   ipAddress!: string | null;
+
+  @Column({ type: 'integer', nullable: true, select: false })
+  @Exclude()
+  @ApiHideProperty()
+  ssoProviderId?: number | null;
+
+  @Column({ type: 'text', nullable: true, select: false })
+  @Exclude()
+  @ApiHideProperty()
+  ssoProtocol?: string | null;
+
+  @Column({ type: 'text', nullable: true, select: false })
+  @Exclude()
+  @ApiHideProperty()
+  ssoSubject?: string | null;
+
+  @Column({ type: 'text', nullable: true, select: false })
+  @Exclude()
+  @ApiHideProperty()
+  ssoSessionId?: string | null;
+
+  @Column({ type: 'simple-json', nullable: true, select: false })
+  @Exclude()
+  @ApiHideProperty()
+  ssoContext?: SsoSessionContext | null;
 
   @Column({ type: 'datetime' })
   @ApiProperty({

@@ -4,6 +4,7 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceGroup } from '@attraccess/database-entities';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
 import { UpdateResourceGroupDto } from './dto/updateGroup.dto';
+import { VisibleResourcesExistDto } from './dto/visibleResourcesExist.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('Resources')
@@ -26,8 +27,8 @@ export class ResourceGroupsController {
     type: ResourceGroup,
   })
   @Auth('resources.update')
-  async createOne(@Body() createDto: CreateResourceGroupDto): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.createOne(createDto);
+  async createOne(@Body() createDto: CreateResourceGroupDto, @Req() req: AuthenticatedRequest): Promise<ResourceGroup> {
+    return await this.resourceGroupsService.createOne(createDto, req.user);
   }
 
   @Get()
@@ -40,6 +41,17 @@ export class ResourceGroupsController {
   })
   async getAll(@Req() req: AuthenticatedRequest): Promise<ResourceGroup[]> {
     return await this.resourceGroupsService.getMany(this.getVisibilityContext(req));
+  }
+
+  @Get('resources-exist')
+  @Auth()
+  @ApiOperation({
+    summary: 'Check whether any resources belong to visible groups or are ungrouped',
+    operationId: 'resourceGroupsResourcesExist',
+  })
+  @ApiResponse({ status: 200, type: VisibleResourcesExistDto })
+  async resourcesExist(@Req() req: AuthenticatedRequest): Promise<VisibleResourcesExistDto> {
+    return { hasResources: await this.resourceGroupsService.hasVisibleResources(this.getVisibilityContext(req)) };
   }
 
   @Get(':id')
@@ -74,9 +86,10 @@ export class ResourceGroupsController {
   })
   async updateOne(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: UpdateResourceGroupDto
+    @Body() updateDto: UpdateResourceGroupDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.updateOneById(id, updateDto);
+    return await this.resourceGroupsService.updateOneById(id, updateDto, req.user);
   }
 
   @Post(':groupId/resources/:resourceId')
@@ -90,9 +103,10 @@ export class ResourceGroupsController {
   })
   async addResource(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Param('resourceId', ParseIntPipe) resourceId: number
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    return await this.resourceGroupsService.addResource(groupId, resourceId);
+    return await this.resourceGroupsService.addResource(groupId, resourceId, req.user);
   }
 
   @Delete(':groupId/resources/:resourceId')
@@ -106,9 +120,10 @@ export class ResourceGroupsController {
   })
   async removeResource(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Param('resourceId', ParseIntPipe) resourceId: number
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    return await this.resourceGroupsService.removeResource(groupId, resourceId);
+    return await this.resourceGroupsService.removeResource(groupId, resourceId, req.user);
   }
 
   @Delete(':groupId')
@@ -119,8 +134,11 @@ export class ResourceGroupsController {
     status: 200,
     description: 'The resource group has been successfully deleted.',
   })
-  async deleteOne(@Param('groupId', ParseIntPipe) groupId: number): Promise<{ OK: true }> {
-    await this.resourceGroupsService.deleteOne(groupId);
+  async deleteOne(
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ OK: true }> {
+    await this.resourceGroupsService.deleteOne(groupId, req.user);
 
     return {
       OK: true,

@@ -25,4 +25,16 @@ export class UpdateResourceBillingConfigurationDto {
   @IsOptional()
   @Min(0)
   creditsPerMinute?: number | null;
+
+  @ApiProperty({
+    description: 'The credit cost per attributable operating minute',
+    example: 0.2,
+    required: false,
+    type: Number,
+    nullable: true,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  creditsPerOperatingMinute?: number | null;
 }

@@ -1,43 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { create } from 'zustand';
-import { get } from 'lodash-es';
 import * as Handlebars from 'handlebars';
-
-// Customize Handlebars escaping: keep quotes/apostrophes as-is, escape only &, <, >
-// This ensures names like Jappy's render correctly while still preventing HTML injection.
-Handlebars.Utils.escapeExpression = (input: unknown): string => {
-  const str = String(input ?? '');
-  // Order matters: escape & first to avoid double escaping
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-};
-
-export const I18N_LANGUAGE_STORAGE_KEY = 'language';
-type TranslationRecord = Record<string, unknown>;
-
-interface TranslationModules<T extends TranslationRecord = TranslationRecord> {
-  en: T;
-  de: T;
-}
-
-type Language = keyof TranslationModules;
-
-interface TranslationState {
-  language: Language;
-  setLanguage: (language: Language) => void;
-}
-export const useTranslationState = create<TranslationState>((set) => ({
-  language: 'en',
-  setLanguage: (language) => {
-    set({ language });
-    localStorage.setItem(I18N_LANGUAGE_STORAGE_KEY, language);
-  },
-}));
-
-export type TFunction = (key: string, data?: Record<string, unknown>) => string;
-interface TExistsOptions {
-  succeedIfKeyIsObject?: boolean;
-}
-export type TExists = (key: string, options?: TExistsOptions) => boolean;
+import { get } from 'lodash-es';
+import { useCallback, useEffect, useState } from 'react';
+import { create } from 'zustand';
 
 // Pluralization helpers
 interface PluralObject {
@@ -60,71 +24,7 @@ const resolvePlural = (value: PluralObject, count: number): string => {
   return count === 1 ? value.one : value.many;
 };
 
-interface UseTranslationsResponse {
-  t: TFunction;
-  tExists: TExists;
-  language: Language;
-  setLanguage: (language: Language) => void;
-}
-
-export function useTranslations(translations: TranslationModules): UseTranslationsResponse {
-  const { language, setLanguage } = useTranslationState();
-
-  // Keep a stable reference to the provided translations so callers
-  // can safely pass inline objects without causing re-renders.
-  const translationsRef = useRef(translations);
-
-  const activeTranslations = useMemo(() => {
-    return translationsRef.current[language];
-  }, [language]);
-
-  const fallbackTranslations = useMemo(() => {
-    return translationsRef.current['en'];
-  }, []);
-
-  const getTranslationRaw = useCallback(
-    (key: string) => {
-      const fallbackTranslation = get(fallbackTranslations, key);
-      const translation = get(activeTranslations, key, fallbackTranslation);
-      return translation;
-    },
-    [activeTranslations, fallbackTranslations],
-  );
-
-  const t = useCallback(
-    (key: string, data?: Record<string, unknown>) => {
-      const ABSOLUTE_FALLBACK_TRANSLATION = `!!! ${key} !!!`;
-      let translation = getTranslationRaw(key);
-
-      // Handle pluralization
-      if (isPluralObject(translation) && data && typeof data.count === 'number') {
-        translation = resolvePlural(translation, data.count);
-      }
-
-      if (translation === undefined || typeof translation !== 'string') {
-        console.error(`Missing translation for key: ${key}`);
-        return ABSOLUTE_FALLBACK_TRANSLATION;
-      }
-
-      const template = Handlebars.compile(translation);
-      return template(data);
-    },
-    [getTranslationRaw],
-  );
-
-  const tExists = useCallback(
-    (key: string, options?: TExistsOptions) => {
-      const translation = getTranslationRaw(key);
-      return (
-        translation !== undefined &&
-        (typeof translation === 'string' ||
-          isPluralObject(translation) ||
-          (options?.succeedIfKeyIsObject && typeof translation === 'object'))
-      );
-    },
-    [getTranslationRaw],
-  ) as TExists;
-
+function useTranslationDiagnostics(initialTranslations: { en: Record<string, unknown>; de: Record<string, unknown> }) {
   const nestedObjectToDotNotatedKeys = (obj: Record<string, unknown>): string[] => {
     const keys: string[] = [];
 
@@ -152,7 +52,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
     }
 
     const keyLangMap = new Map<string, Set<string>>();
-    Object.entries(translationsRef.current).forEach(([lang, translations]) => {
+    Object.entries(initialTranslations).forEach(([lang, translations]) => {
       const keys = nestedObjectToDotNotatedKeys(translations);
       keys.forEach((key) => {
         let keySet = keyLangMap.get(key);
@@ -165,7 +65,7 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       });
     });
 
-    const expectedLangs = Object.keys(translationsRef.current);
+    const expectedLangs = Object.keys(initialTranslations);
 
     // log keys that are not in all languages together with the languages that are missing them
     keyLangMap.forEach((keySet, key) => {
@@ -176,10 +76,133 @@ export function useTranslations(translations: TranslationModules): UseTranslatio
       const missingLangs = expectedLangs.filter((lang) => !keySet.has(lang));
       console.error('Missing i18n Translation Key:', key, 'in languages:', missingLangs);
     });
-  }, []);
+  }, [initialTranslations]);
+}
+
+// Customize Handlebars escaping: keep quotes/apostrophes as-is, escape only &, <, >
+// This ensures names like Jappy's render correctly while still preventing HTML injection.
+Handlebars.Utils.escapeExpression = (input: unknown): string => {
+  const str = String(input ?? '');
+  // Order matters: escape & first to avoid double escaping
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+};
+
+export const I18N_LANGUAGE_STORAGE_KEY = 'language';
+type TranslationRecord = Record<string, unknown>;
+
+interface TranslationModules<T extends TranslationRecord = TranslationRecord> {
+  en: T;
+  de: T;
+}
+
+export type Language = keyof TranslationModules;
+
+interface TranslationState {
+  language: Language;
+  setLanguage: (language: Language) => void;
+}
+export const useTranslationState = create<TranslationState>((set) => ({
+  language: 'en',
+  setLanguage: (language) => {
+    const supportedLanguage = language === 'de' ? 'de' : 'en';
+    set({ language: supportedLanguage });
+    try {
+      globalThis.localStorage?.setItem(I18N_LANGUAGE_STORAGE_KEY, supportedLanguage);
+    } catch {
+      // Language switching must still work when browser storage is unavailable.
+    }
+  },
+}));
+
+export type TFunction = (key: string, data?: Record<string, unknown>) => string;
+/** Retained translations stay reactive; literal API errors remain intact. */
+export interface TranslationMessage {
+  key: string;
+  data?: Record<string, unknown>;
+}
+interface TranslationOptions {
+  /** Disable only for React text rendering, never for messages rendered as HTML. */
+  escapeValues?: boolean;
+}
+interface TExistsOptions {
+  succeedIfKeyIsObject?: boolean;
+}
+export type TExists = (key: string, options?: TExistsOptions) => boolean;
+
+interface UseTranslationsResponse {
+  t: TFunction;
+  tMessage: (message: TranslationMessage | string) => string;
+  tExists: TExists;
+  language: Language;
+  setLanguage: (language: Language) => void;
+}
+
+export function useTranslations(
+  translations: TranslationModules,
+  options: TranslationOptions = {},
+): UseTranslationsResponse {
+  const { language, setLanguage } = useTranslationState();
+
+  // Keep a stable reference to the provided translations so callers
+  // can safely pass inline objects without causing re-renders.
+  const [initialTranslations] = useState(translations);
+
+  const activeTranslations = initialTranslations[language];
+  const fallbackTranslations = initialTranslations.en;
+
+  const getTranslationRaw = useCallback(
+    (key: string) => {
+      const fallbackTranslation = get(fallbackTranslations, key);
+      const translation = get(activeTranslations, key, fallbackTranslation);
+      return translation;
+    },
+    [activeTranslations, fallbackTranslations],
+  );
+
+  const t = useCallback(
+    (key: string, data?: Record<string, unknown>) => {
+      const ABSOLUTE_FALLBACK_TRANSLATION = `!!! ${key} !!!`;
+      let translation = getTranslationRaw(key);
+
+      // Handle pluralization
+      if (isPluralObject(translation) && data && typeof data.count === 'number') {
+        translation = resolvePlural(translation, data.count);
+      }
+
+      if (translation === undefined || typeof translation !== 'string') {
+        console.error(`Missing translation for key: ${key}`);
+        return ABSOLUTE_FALLBACK_TRANSLATION;
+      }
+
+      const template = Handlebars.compile(translation, { noEscape: options.escapeValues === false });
+      return template(data);
+    },
+    [getTranslationRaw, options.escapeValues],
+  );
+
+  const tMessage = useCallback(
+    (message: TranslationMessage | string) => (typeof message === 'string' ? message : t(message.key, message.data)),
+    [t],
+  );
+
+  const tExists = useCallback(
+    (key: string, options?: TExistsOptions) => {
+      const translation = getTranslationRaw(key);
+      return (
+        translation !== undefined &&
+        (typeof translation === 'string' ||
+          isPluralObject(translation) ||
+          (options?.succeedIfKeyIsObject && typeof translation === 'object'))
+      );
+    },
+    [getTranslationRaw],
+  ) as TExists;
+
+  useTranslationDiagnostics(initialTranslations);
 
   return {
     t,
+    tMessage,
     tExists,
     language,
     setLanguage,
@@ -195,5 +218,5 @@ export function detectAndSetLanguage() {
   }
 
   const language = localStorageLanguage || sessionStorageLanguage || navigatorLanguage;
-  useTranslationState.getState().setLanguage(language as Language);
+  useTranslationState.getState().setLanguage(language === 'de' ? 'de' : 'en');
 }

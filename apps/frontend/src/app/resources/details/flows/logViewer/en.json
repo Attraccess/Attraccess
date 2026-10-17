@@ -1,6 +1,7 @@
 {
   "title": "Flow Logs",
-  "subtitle": "Logs are only collected while recording and are deleted when it stops",
+  "subtitle": "Logs are collected only while recording and remain visible until you leave this page or reload",
+  "confetti": "Enable confetti for this visit",
   "recording": {
     "start": "Start recording",
     "stop": "Stop recording",

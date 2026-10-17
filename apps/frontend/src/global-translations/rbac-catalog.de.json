@@ -29,6 +29,12 @@
       "create": { "label": "Benutzer erstellen", "description": "Erlaubt das Anlegen neuer Benutzer" },
       "update": { "label": "Benutzer bearbeiten", "description": "Erlaubt das Bearbeiten bestehender Benutzer" },
       "delete": { "label": "Benutzer löschen", "description": "Erlaubt das Löschen von Benutzern" },
+      "rfid-cards": {
+        "manage": {
+          "label": "RFID-Karten von Benutzern verwalten",
+          "description": "Erlaubt das Anzeigen, Registrieren, Aktivieren, Deaktivieren und Löschen von RFID-Karten für beliebige Benutzer"
+        }
+      },
       "roles": {
         "manage": {
           "label": "Benutzerrollen verwalten",

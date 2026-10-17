@@ -1,6 +1,6 @@
 services:
   mqtt:
-    image: rabbitmq:4.3.4-management
+    image: rabbitmq:4.3.6-management
     command: /bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt; rabbitmq-server"
     environment:
       RABBITMQ_DEFAULT_USER: attraccess

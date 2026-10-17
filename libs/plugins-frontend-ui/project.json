@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/plugins-frontend-ui/src",
   "projectType": "library",
-  "tags": [],
+  "tags": ["type:lib", "scope:plugin-sdk"],
   "// targets": "to see all targets run: nx show project plugins-frontend-ui --web",
   "targets": {
     "nx-release-publish": {
@@ -25,6 +25,12 @@
       "dependsOn": ["react-query-client:generate"],
       "options": {
         "command": "pnpm exec tsc --noEmit -p libs/plugins-frontend-ui/tsconfig.spec.json"
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/plugins-frontend-ui"
       }
     }
   }

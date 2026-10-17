@@ -6,6 +6,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  DrawerHeading,
   TextArea,
   useOverlayState,
 } from '@heroui/react';
@@ -148,7 +149,9 @@ export function UpsertProjectModal(props: Props) {
       {children(open)}
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
         <DrawerHeader>
-          <h2 className="text-lg font-semibold">{projectId ? t('title.update') : t('title.create')}</h2>
+          <DrawerHeading className="text-lg font-semibold">
+            {projectId ? t('title.update') : t('title.create')}
+          </DrawerHeading>
         </DrawerHeader>
 
         <DrawerBody>

@@ -6,14 +6,28 @@ Firmware for the Attractap NFC readers (ESP32-S3), built on **ESP-IDF v6.0.2** (
 
 One firmware per hardware flavor, defined by a file in `variants/`:
 
-| Variant | Board | Hardware |
-| --- | --- | --- |
-| `attractap-touch` | ESP32-S3 DevKitC (V3 hardware) | ST7701 480x480 RGB panel, GT911 touch, TCA9554 IO expander, PN532 NFC, WiFi |
-| `attractap-touch-v2` | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64 |
-| `attractap-touch-ethernet` | Adafruit Qualia S3 RGB666 | TL040WVS03 panel via XCA9554 expander, FocalTech touch, W5500 ethernet |
-| `attractap-lite-ethernet` | Adafruit Qualia S3 | headless, WS2812 24-LED ring, W5500 ethernet |
-| `attractap-touch-demo` | V3 display hardware | Offline demo API and demo settings |
-| `attractap-touch-v2-demo` | V4 display hardware | Offline demo API, demo settings and power button |
+| Variant                    | Board                          | Hardware                                                                    |
+| -------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| `attractap-touch`          | ESP32-S3 DevKitC (V3 hardware) | ST7701 480x480 RGB panel, GT911 touch, TCA9554 IO expander, PN532 NFC, WiFi |
+| `attractap-touch-v2`       | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64             |
+| `attractap-touch-ethernet` | Adafruit Qualia S3 RGB666      | TL040WVS03 panel via XCA9554 expander, FocalTech touch, W5500 ethernet      |
+| `attractap-lite-ethernet`  | Adafruit Qualia S3             | headless, WS2812 24-LED ring, W5500 ethernet                                |
+| `attractap-touch-demo`     | V3 display hardware            | Offline demo API and demo settings                                          |
+| `attractap-touch-v2-demo`  | V4 display hardware            | Offline demo API, demo settings and power button                            |
+
+Offline demos preserve an already set device clock, including dates before 2025.
+An unset clock is at zero or still counting uptime from the Unix epoch. On a cold
+boot with unset time, demos start at 1 January 2026, 12:00 UTC, so the clock and session
+timestamps share a plausible timeline. This is a demonstration date, not the
+actual current time; demo firmware does not start SNTP.
+Demo presets are trusted local time and may display without a server sample.
+
+Network clock samples support UTC dates from 1 January 2025 (inclusive) to
+1 January 2100 (exclusive), with timezone offsets from -840 to +840 minutes.
+This range covers the reader's intended operating lifetime while rejecting
+corrupted future timestamps that still fit a signed 64-bit integer. A rejected
+sample leaves both UTC and the timezone offset unchanged, before and after
+SNTP synchronization. Trusted offline demo presets use their separate path.
 
 Each variant file sets the compile definitions (pins, feature flags, firmware
 name) and the source subtrees excluded for that hardware. The firmware version
@@ -22,11 +36,11 @@ this).
 
 ## Building
 
-Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh`. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
+Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
 
 NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
-Build every shipped variant (also what CI and `pnpm nx run attractap-firmware:build` run):
+Build the active `attractap-touch` and `attractap-touch-v2` variants (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
 
 ```bash
 python3 build_firmwares.py
@@ -103,6 +117,30 @@ hardware before deployment.
 - **OTA:** upload `firmware_output` via the Attraccess server; updates stream to
   the readers over the websocket.
 
+## Latin-1 Font Smoke Test
+
+CMake generates uncompressed Montserrat fonts in each build directory for sizes
+10, 14, 16, 18, 20, 24, 26, 28, 32, and 36. The original configured sizes remain
+unchanged. The wall clock adds digit-only fonts at 56 and 88 px. Firmware,
+desktop, and host rendering tests share
+`tools/latin1_fonts.cmake`. Builds require Node.js/npm (`npx`) and curl; the first
+build downloads the pinned LVGL 9.3.0 font source (SHA-256 verified) and
+`lv_font_conv@1.5.3`. Subsequent builds reuse their generated files. Do not commit
+the generated C files. For standalone generation, run
+`tools/generate_latin1_fonts.sh` (outputs to the ignored `.cache/latin1-fonts/`).
+
+On a touch device, verify `ÄÖÜ äöü ß | München, Größe, für` in resource names and
+descriptions, form labels/descriptions/placeholders, select options, text editors
+and value previews, project names, popup messages, introducer lists, health
+reasons, and flow-button labels. Also verify a signed-in username at 10px and an
+enrollment, reset, or supervision username at 36px. Check card statuses at 32px,
+supervision statuses and reset titles at 28px, empty-resource messages at 26px,
+and the PIN title at 32px. Compare ASCII text, hierarchy, wrapping, and clipping
+with the previous firmware. Confirm no missing-glyph boxes, preserved multiline
+layout, and that selecting an option such as `Size™` still submits its original
+value while displaying `SizeTM`. Host rendering checks do not replace this
+on-device smoke test.
+
 ## Serial provisioning console
 
 The firmware speaks a line protocol on the USB console (115200 8N1):
@@ -115,19 +153,19 @@ The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a use
 
 ### LED States (for developers)
 
-| State | Color | Circular Animation | When used |
-|-------|-------|--------------------|-----------|
-| `LED_STATE_CONFIG_REQUIRED` | Red / Orange | 3 dots alternating red ↔ orange every 12 phases | Device needs configuration |
-| `LED_STATE_INIT` | Blue | 8-LED fading tail moving around ring | Booting / connecting |
-| `LED_STATE_WAIT_FOR_CARD` | Green | 6 segments breathing in/out of phase | Ready for card tap |
-| `LED_STATE_AUTHENTICATE_CARD` | Cyan | 6-LED fading tail at double speed | Card being read |
-| `LED_STATE_NO_RESOURCES` | Orange | Full-ring on/off flash every 10 phases | No resources assigned |
-| `LED_STATE_FIRMWARE_UPDATE` | Blue / White | Static alternating blue/white pixels | Firmware update in progress |
+| State                         | Color        | Circular Animation                              | When used                   |
+| ----------------------------- | ------------ | ----------------------------------------------- | --------------------------- |
+| `LED_STATE_CONFIG_REQUIRED`   | Red / Orange | 3 dots alternating red ↔ orange every 12 phases | Device needs configuration  |
+| `LED_STATE_INIT`              | Blue         | 8-LED fading tail moving around ring            | Booting / connecting        |
+| `LED_STATE_WAIT_FOR_CARD`     | Green        | 6 segments breathing in/out of phase            | Ready for card tap          |
+| `LED_STATE_AUTHENTICATE_CARD` | Cyan         | 6-LED fading tail at double speed               | Card being read             |
+| `LED_STATE_NO_RESOURCES`      | Orange       | Full-ring on/off flash every 10 phases          | No resources assigned       |
+| `LED_STATE_FIRMWARE_UPDATE`   | Blue / White | Static alternating blue/white pixels            | Firmware update in progress |
 
 ### LED Triggers
 
-| Trigger | Color | When used |
-|---------|-------|-----------|
-| `triggerSuccess()` | Green | Auth succeeded |
-| `triggerError()` | Red flash | Auth failed |
+| Trigger             | Color        | When used          |
+| ------------------- | ------------ | ------------------ |
+| `triggerSuccess()`  | Green        | Auth succeeded     |
+| `triggerError()`    | Red flash    | Auth failed        |
 | `triggerIndicate()` | Yellow flash | Card held too long |

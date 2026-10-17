@@ -28,7 +28,7 @@ import { bootstrap } from '../main.bootstrap';
 import { existsSync, realpathSync } from 'fs';
 import { relative, isAbsolute } from 'path';
 import { DesktopFixture, buildProbe, waitFor } from './desktop-simulator.fixture';
-import { disposeStorage, storageRoot } from '../test/desktop-real-api.setup';
+import { disposeStorage, storageRoot } from '../test/desktop-real-api.test-fixture';
 
 const nonProfitLicense =
   'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md';
@@ -91,6 +91,8 @@ describe('desktop simulator against an isolated real API', () => {
     const observed = await fixture.command('inspect');
     expect(observed.authenticated).toBe(true);
     expect(observed.networkAvailable).toBe(true);
+    expect(observed.devicePin).toBe('0000');
+    await fixture.command('set-pin', { text: '1234' });
     reader = await db.getRepository(Attractap).findOneByOrFail({ id: observed.readerId });
     resource = await db.getRepository(Resource).save({ name: `Desktop Mill ${reader.id}`, type: ResourceType.Machine });
     const alternate = await db
@@ -154,14 +156,14 @@ describe('desktop simulator against an isolated real API', () => {
     return result;
   }
 
-  async function request(user: User, path: string, body: object) {
+  async function request(user: User, path: string, body: object, signal = AbortSignal.timeout(40_000)) {
     const token = await api().get(SessionService).createSession(user);
     // Authentication and authorization are real; no guard or workflow handler is replaced.
     return fetch(`${endpoint}${prefix}${path}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(40_000),
+      signal,
     });
   }
 
@@ -215,10 +217,13 @@ describe('desktop simulator against an isolated real API', () => {
     await pushWithAck();
     await desktop().text(resource.name);
     await desktop().snapshot('reconnected');
+    expect((await desktop().command('set-pin', { text: '7391' })).devicePin).toBe('7391');
     const readerCount = await db.getRepository(Attractap).count();
     await desktop().stop();
     await desktop().start();
-    expect((await desktop().command('inspect')).readerId).toBe(reader.id);
+    const restarted = await desktop().command('inspect');
+    expect(restarted.devicePin).toBe('7391');
+    expect(restarted.readerId).toBe(reader.id);
     expect(await db.getRepository(Attractap).count()).toBe(readerCount);
     await desktop().screen('resources');
     await desktop().click(resource.name);
@@ -242,6 +247,7 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().authenticationFailure();
     expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
     await desktop().snapshot('incorrect-key');
+    await desktop().click('OK');
     await desktop().remove();
     await desktop().command('corrupt-key', { card: 0, slot: card.keyNo });
     await authenticate();
@@ -302,14 +308,14 @@ describe('desktop simulator against an isolated real API', () => {
     });
     await enroll(owner);
     await authenticate();
-    await desktop().click('Projekt waehlen');
+    await desktop().click('Projekt wählen');
     await desktop().click(project.name);
     await desktop().text(`Projekt: ${project.name}`);
     await desktop().snapshot('project-selected');
     await desktop().click('Ressource verwenden');
     await desktop().text('Work note *');
     await desktop().click('Weiter');
-    await desktop().text('Bitte markierte Felder ausfuellen.');
+    await desktop().text('Bitte markierte Felder ausfüllen.');
     expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
     await desktop().snapshot('required-start-form');
     await desktop().click('Antippen zum Eingeben');
@@ -345,7 +351,7 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().click('Sitzung beenden');
     await desktop().text('Work note *');
     await desktop().click('Weiter');
-    await desktop().text('Bitte markierte Felder ausfuellen.');
+    await desktop().text('Bitte markierte Felder ausfüllen.');
     expect((await db.getRepository(ResourceUsage).findOneByOrFail({ id: usage.id })).endTime).toBeNull();
     await desktop().snapshot('required-end-form');
     await desktop().click('Antippen zum Eingeben');
@@ -367,46 +373,80 @@ describe('desktop simulator against an isolated real API', () => {
     }
   }, 120_000);
 
-  it('keeps the web supervision request pending until an eligible supervisor authenticates at the reader', async () => {
-    await start('supervision');
-    const supervisor = await user('supervisor');
-    const requester = await user('requester', false);
-    await db.getRepository(ResourceIntroducer).save({ resourceId: resource.id, userId: supervisor.id });
-    await db.getRepository(Resource).update(resource.id, { supervisionMode: SupervisionMode.SUPERVISION_ALLOWED });
-    await enroll(supervisor);
-    await desktop().screen('locked');
-    let settled = false;
-    const pending = request(requester, `/resources/${resource.id}/usage/supervision/request`, { readerId: reader.id });
-    void pending.then(() => {
-      settled = true;
-    });
-    try {
-      await desktop().screen('supervision');
-      expect(settled).toBe(false);
-      expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
-      await desktop().snapshot('supervision-request');
-      await desktop().present(3);
-      await desktop().text('CARD_NOT_FOUND');
-      expect(settled).toBe(false);
-      expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
-      await desktop().remove(3);
-      await desktop().present();
-      const response = await pending;
-      expect(response.status).toBe(201);
-      const approved = await response.json();
-      const usage = await db.getRepository(ResourceUsage).findOneByOrFail({ id: approved.id });
-      expect(usage.userId).toBe(requester.id);
-      expect(usage.supervisorUserId).toBe(supervisor.id);
-      expect(usage.resourceId).toBe(resource.id);
-      expect(usage.endTime).toBeNull();
-      await desktop().text('Freigegeben!');
-      await desktop().snapshot('supervision-approved');
-    } finally {
-      // Always consume the bounded HTTP request, including if a screen assertion fails.
-      await desktop().remove();
-      await pending;
-    }
-  }, 60_000);
+  it.each([false, true])(
+    'handles web supervision approval and request failure (abort=%s)',
+    async (abort) => {
+      await start('supervision');
+      const supervisor = await user('supervisor');
+      const requester = await user('requester', false);
+      await db.getRepository(ResourceIntroducer).save({ resourceId: resource.id, userId: supervisor.id });
+      await db.getRepository(Resource).update(resource.id, { supervisionMode: SupervisionMode.SUPERVISION_ALLOWED });
+      await enroll(supervisor);
+      await desktop().screen('locked');
+      let settled = false;
+      const controller = new AbortController();
+      const pending = request(
+        requester,
+        `/resources/${resource.id}/usage/supervision/request`,
+        { readerId: reader.id },
+        AbortSignal.any([controller.signal, AbortSignal.timeout(40_000)]),
+      ).then(
+        (response) => {
+          settled = true;
+          return { response, error: undefined };
+        },
+        (error: unknown) => {
+          settled = true;
+          return { response: undefined, error };
+        },
+      );
+      try {
+        await desktop().screen('supervision');
+        expect(settled).toBe(false);
+        expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+        await desktop().snapshot('supervision-request');
+        if (abort) {
+          controller.abort(new Error('Injected supervision request failure'));
+          expect((await pending).error).toBeDefined();
+          expect(settled).toBe(true);
+          return;
+        }
+        await desktop().present(3);
+        await desktop().text('CARD_NOT_FOUND');
+        expect(settled).toBe(false);
+        expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+        await desktop().remove(3);
+        await desktop().present();
+        const outcome = await pending;
+        if (!outcome.response) throw outcome.error;
+        const response = outcome.response;
+        expect(response.status).toBe(201);
+        const approved = await response.json();
+        const usage = await db.getRepository(ResourceUsage).findOneByOrFail({ id: approved.id });
+        expect(usage.userId).toBe(requester.id);
+        expect(usage.supervisorUserId).toBe(supervisor.id);
+        expect(usage.resourceId).toBe(resource.id);
+        expect(usage.endTime).toBeNull();
+        await desktop().text('Freigegeben!');
+        await desktop().snapshot('supervision-approved');
+      } finally {
+        // Always consume the bounded HTTP request, including if a screen assertion fails.
+        try {
+          if (abort) {
+            const root = desktop().root;
+            await desktop().dispose();
+            expect(existsSync(root)).toBe(false);
+          } else {
+            await desktop().remove();
+          }
+        } finally {
+          controller.abort();
+          await pending;
+        }
+      }
+    },
+    60_000,
+  );
 
   it('cleans up after failed startup and a failing scenario assertion', async () => {
     const failed = new DesktopFixture('invalid-endpoint', 'startup-failure');

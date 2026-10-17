@@ -28,7 +28,7 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
       throw new BadRequestException('Username cannot be empty');
     }
 
-    const user = await this.authService.getUserByUsernameAndAuthenticationDetails(username, {
+    const user = await this.authService.getUserByLoginIdentifierAndAuthenticationDetails(username, {
       type: AuthenticationType.LOCAL_PASSWORD,
       details: {
         password,

@@ -1,198 +1,195 @@
 import {
+  Controller,
+  Logger,
   BadRequestException,
   Body,
-  Controller,
   Delete,
   Get,
-  Logger,
   NotFoundException,
   Param,
-  ParseArrayPipe,
   Post,
-  Query,
+  Req,
   StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+
+import { ApiTags, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
+
+import { AuditService } from '../audit/audit.service';
+
+import { installInheritedMethods } from '../common/inherited-implementation';
+
+import { NpmPluginService, InstalledNpmPlugin, NpmPluginAuditState } from './npm-plugin.service';
+
 import { PluginService } from './plugin.service';
-import { PluginModule } from './plugin.module';
-import { createReadStream, existsSync } from 'fs';
-import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { LoadedPluginManifest } from './plugin.manifest';
-import { join } from 'path';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { FileUpload } from '../common/types/file-upload.types';
-import { Auth } from '@attraccess/plugins-backend-sdk';
-import { UploadPluginDto } from './dto/uploadPlugin.dto';
-import { NpmPluginService } from './npm-plugin.service';
+
+import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+
 import { randomUUID } from 'crypto';
+
+import {
+  auditSubjectKeyId,
+  recordAdministrationSafely,
+  safeAuditOrigin,
+  safeRequestedSpec,
+} from '../audit/policies/administration';
+
+import { FileInterceptor } from '@nestjs/platform-express';
+
+import { createReadStream, existsSync } from 'fs';
+
+import { join } from 'path';
+
+import { FileUpload } from '../common/types/file-upload.types';
+
 import { PluginSystemStatusDto } from './dto/plugin-system-status.dto';
+
 import { RetryPluginResponseDto } from './dto/retry-plugin-response.dto';
 
-const PLUGIN_SYSTEM_INSTANCE_ID = randomUUID();
+import { UploadPluginDto } from './dto/uploadPlugin.dto';
+
+import { PackageManagementRoutes } from './packages/package-management.routes';
+
+import { PLUGIN_SYSTEM_INSTANCE_ID } from './packages/package-management.routes';
+
+import { LoadedPluginManifest } from './plugin.manifest';
+
+import { PluginModule } from './plugin.module';
 
 @ApiTags('Plugins')
 @Controller('plugins')
-export class PluginController {
-  private readonly logger = new Logger(PluginController.name);
-
+export class PluginController extends PackageManagementRoutes {
   constructor(
-    private readonly pluginService: PluginService,
-    private readonly npmPluginService: NpmPluginService,
-  ) {}
-
-  @Get('registries')
-  @Auth('system.plugins.manage')
-  listRegistries() {
-    return this.npmPluginService.listRegistries();
-  }
-
-  @Post('registries')
-  @Auth('system.plugins.manage')
-  addRegistry(@Body() body: { name: string; url: string; token?: string | null }) {
-    return this.npmPluginService.addRegistry(body);
-  }
-
-  @Post('registries/:registryId/test')
-  @Auth('system.plugins.manage')
-  async testRegistry(@Param('registryId') registryId: string) {
-    await this.npmPluginService.testRegistry(registryId);
-    return { ok: true };
-  }
-
-  @Delete('registries/:registryId')
-  @Auth('system.plugins.manage')
-  removeRegistry(@Param('registryId') registryId: string) {
-    return this.npmPluginService.removeRegistry(registryId);
-  }
-
-  @Get('npm/:packageName/metadata')
-  @Auth('system.plugins.manage')
-  packageMetadata(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
-    return this.npmPluginService.packageMetadata(packageName, registryId);
-  }
-
-  @Get('npm/:packageName/versions')
-  @Auth('system.plugins.manage')
-  packageVersions(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
-    return this.npmPluginService.packageVersions(packageName, registryId);
-  }
-
-  @Get('marketplace/search')
-  @Auth('system.plugins.manage')
-  searchMarketplace(@Query('query') query = '', @Query('registryId') registryId?: string) {
-    return this.npmPluginService.searchMarketplace(query, registryId);
-  }
-
-  @Get('marketplace/:packageName')
-  @Auth('system.plugins.manage')
-  marketplacePackage(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
-    return this.npmPluginService.marketplacePackage(packageName, registryId);
-  }
-
-  @Post('npm/:packageName/versions/:version')
-  @Auth('system.plugins.manage')
-  installPackage(
-    @Param('packageName') packageName: string,
-    @Param('version') version: string,
-    @Body('registryId') registryId?: string,
+    protected readonly pluginService: PluginService,
+    protected readonly npmPluginService: NpmPluginService,
+    protected readonly audit: AuditService,
   ) {
-    return this.npmPluginService.install(packageName, version, registryId);
+    super();
   }
 
-  @Post('npm/:packageName')
-  @Auth('system.plugins.manage')
-  installPackageSpec(
-    @Param('packageName') packageName: string,
-    @Body('spec') spec = 'latest',
-    @Body('registryId') registryId?: string,
+  protected readonly logger = new Logger(PluginController.name);
+
+  // Also add support for loading the index.js file
+
+  protected async installWithAudit(
+    req: AuthenticatedRequest | undefined,
+    action: string,
+    packageName: string,
+    requestedSpec: string,
+    operation: (state: NpmPluginAuditState) => Promise<InstalledNpmPlugin>,
+    before?: InstalledNpmPlugin,
   ) {
-    return this.npmPluginService.install(packageName, spec, registryId);
-  }
-
-  @Delete('installed/:packageName')
-  @Auth('system.plugins.manage')
-  async removeInstalledPackage(@Param('packageName') packageName: string) {
-    await this.npmPluginService.removeInstalled(packageName);
-    return { ok: true };
-  }
-
-  @Get('installed')
-  @Auth('system.plugins.manage')
-  installedPackages() {
-    return this.npmPluginService.listInstalled();
-  }
-
-  @Get('update-policy')
-  @Auth('system.plugins.manage')
-  updatePolicy() {
-    return this.npmPluginService.getUpdatePolicy();
-  }
-
-  @Post('update-policy')
-  @Auth('system.plugins.manage')
-  setUpdatePolicy(@Body() body: Record<string, unknown>) {
-    return this.npmPluginService.setUpdatePolicy(body);
-  }
-
-  @Post('installed/check')
-  @Auth('system.plugins.manage')
-  checkAllInstalledPackages() {
-    return this.npmPluginService.checkAllInstalled();
-  }
-
-  @Post('installed/:packageName/check')
-  @Auth('system.plugins.manage')
-  checkInstalledPackage(@Param('packageName') packageName: string) {
-    return this.npmPluginService.checkInstalled(packageName);
-  }
-
-  @Post('installed/:packageName/spec')
-  @Auth('system.plugins.manage')
-  updateInstalledPackageSpec(@Param('packageName') packageName: string, @Body('requestedSpec') requestedSpec: string) {
-    return this.npmPluginService.updateRequestedSpec(packageName, requestedSpec);
-  }
-
-  @Post('installed/:packageName/update-override')
-  @Auth('system.plugins.manage')
-  updateInstalledPackageOverride(
-    @Param('packageName') packageName: string,
-    @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
-  ) {
-    return this.npmPluginService.updateOverride(packageName, updateOverride);
-  }
-
-  @Post('installed/:packageName/update-policy')
-  @Auth('system.plugins.manage')
-  updateInstalledPackagePolicy(
-    @Param('packageName') packageName: string,
-    @Body('requestedSpec') requestedSpec: string,
-    @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
-  ) {
-    return this.npmPluginService.updateVersionPolicy(packageName, requestedSpec, updateOverride);
-  }
-
-  @Get('installed/:packageName/versions')
-  @Auth('system.plugins.manage')
-  installedPackageVersions(@Param('packageName') packageName: string) {
-    return this.npmPluginService.installedVersionCandidates(packageName);
-  }
-
-  @Post('installed/:packageName/versions/:version')
-  @Auth('system.plugins.manage')
-  replaceInstalledPackage(
-    @Param('packageName') packageName: string,
-    @Param('version') version: string,
-    @Body('approvedPermissionAdditions', new ParseArrayPipe({ items: String, optional: true }))
-    approvedPermissionAdditions?: string[],
-    @Body('approvedMajorVersion') approvedMajorVersion?: boolean,
-  ) {
-    return this.npmPluginService.replaceInstalled(
+    const state: NpmPluginAuditState = {
+      ...(req
+        ? {
+            context: {
+              operationId: randomUUID(),
+              actorId: req.user.id,
+              authenticationMethod: req.user.authenticationMethod,
+              apiTokenId: req.user.apiTokenId,
+            },
+          }
+        : {}),
       packageName,
-      version,
-      approvedPermissionAdditions ?? [],
-      approvedMajorVersion === true,
-    );
+      requestedSpec: safeRequestedSpec(requestedSpec),
+      ...(before ? { oldVersion: before.version } : {}),
+      integrityResult: 'not-checked',
+      provenanceResult: 'not-verified',
+      migrationOutcome: 'not-run',
+      activationOutcome: 'not-attempted',
+      restartRequested: 0,
+      rollbackOutcome: 'not-needed',
+    };
+    try {
+      const installed = await operation(state);
+      if (req)
+        await this.record(
+          req,
+          action,
+          auditSubjectKeyId(packageName),
+          'plugin-package',
+          {
+            ...this.lifecycleDetails(state),
+            ...(state.registryUrl ? { registryUrl: safeAuditOrigin(state.registryUrl) } : {}),
+          },
+          installed.state === 'quarantined' ? 'failed' : 'succeeded',
+          state.context?.operationId,
+        );
+      if (state.context && state.restartRequested) this.pluginService.requestRestart();
+      return installed;
+    } catch (error) {
+      if (req)
+        await this.record(
+          req,
+          action,
+          auditSubjectKeyId(packageName),
+          'plugin-package',
+          {
+            ...this.lifecycleDetails(state),
+            ...(state.registryUrl ? { registryUrl: safeAuditOrigin(state.registryUrl) } : {}),
+          },
+          'failed',
+          state.context?.operationId,
+        );
+      if (state.context && state.restartRequested) this.pluginService.requestRestart();
+      throw error;
+    }
+  }
+
+  protected lifecycleDetails(state: NpmPluginAuditState): Record<string, string | number> {
+    const { context, ...details } = state;
+    void context;
+    return details;
+  }
+
+  protected async recordPackage(req: AuthenticatedRequest, action: string, installed: InstalledNpmPlugin) {
+    if (!req?.user) return;
+    const removed = action === 'plugin.removed';
+    await this.record(req, action, auditSubjectKeyId(installed.name), 'plugin-package', {
+      packageName: installed.name,
+      ...(removed ? { oldVersion: installed.version } : { newVersion: installed.version }),
+      requestedSpec: safeRequestedSpec(installed.requestedSpec),
+      registryId: installed.registryId,
+      registryUrl: safeAuditOrigin(installed.registryUrl),
+      updateOverride: installed.updateOverride ?? 'inherit',
+      ...(removed
+        ? {
+            activationOutcome: 'removed',
+            restartRequested: 1,
+            migrationOutcome: 'not-applicable',
+            rollbackOutcome: 'not-needed',
+            permissionAdditions: '[]',
+            permissionRemovals: JSON.stringify(installed.permissions),
+          }
+        : {}),
+      ...(installed.updateCheck
+        ? { candidate: installed.updateCheck.candidate ?? '', checkState: installed.updateCheck.state }
+        : {}),
+    });
+  }
+
+  protected async record(
+    req: AuthenticatedRequest,
+    action: string,
+    subjectId: number,
+    subjectType: string,
+    details: Record<string, string | number>,
+    outcome: 'succeeded' | 'failed' = 'succeeded',
+    operationId?: string,
+  ) {
+    if (!req?.user) return;
+    await recordAdministrationSafely(this.audit, {
+      action,
+      actorId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
+      subjectType,
+      subjectId,
+      details,
+      outcome,
+      operationId,
+    });
   }
 
   @Get()
@@ -218,7 +215,10 @@ export class PluginController {
   @Auth('system.plugins.manage')
   @ApiOperation({ summary: 'Retry a failed plugin on restart', operationId: 'retryPlugin' })
   @ApiResponse({ status: 201, type: RetryPluginResponseDto })
-  retryPlugin(@Param('pluginId') pluginId: string): RetryPluginResponseDto {
+  async retryPlugin(
+    @Param('pluginId') pluginId: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<RetryPluginResponseDto> {
     const plugin = PluginService.getManifestById(pluginId);
     if (!plugin) {
       throw new NotFoundException('Plugin not found');
@@ -228,6 +228,10 @@ export class PluginController {
     }
 
     PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+    await this.record(req, 'plugin.retry_requested', auditSubjectKeyId(plugin.name), 'plugin-package', {
+      pluginId,
+      restartRequested: 1,
+    });
     this.pluginService.requestRestart();
     return { ok: true };
   }
@@ -275,10 +279,20 @@ export class PluginController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('pluginZip'))
   @Auth('system.plugins.manage')
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async uploadPlugin(@UploadedFile() file: FileUpload, @Body() body: UploadPluginDto) {
+  async uploadPlugin(
+    @UploadedFile() file: FileUpload,
+    @Body() body: UploadPluginDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     this.logger.log(`Uploading plugin ${file.originalname}`);
-    return await this.pluginService.uploadPlugin(file);
+    const plugin = await this.pluginService.uploadPlugin(file, Boolean(req));
+    await this.record(req, 'plugin.zip_uploaded', auditSubjectKeyId(plugin.name), 'plugin-package', {
+      pluginName: plugin.name,
+      pluginVersion: plugin.version,
+      restartRequested: 1,
+    });
+    if (req) this.pluginService.requestRestart();
+    return plugin;
   }
 
   @Delete(':pluginId')
@@ -288,7 +302,7 @@ export class PluginController {
     description: 'The plugin has been deleted',
   })
   @Auth('system.plugins.manage')
-  async deletePlugin(@Param('pluginId') pluginId: string) {
+  async deletePlugin(@Param('pluginId') pluginId: string, @Req() req: AuthenticatedRequest) {
     const plugin = PluginService.getManifestById(pluginId);
     const installed =
       this.npmPluginService.findInstalledByPluginId(pluginId) ??
@@ -296,9 +310,53 @@ export class PluginController {
         ? this.npmPluginService.listInstalled().find(({ installPath }) => installPath === plugin.pluginDirectory)
         : undefined);
     if (installed) {
-      await this.npmPluginService.removeInstalled(installed.name);
+      await this.npmPluginService.removeInstalled(installed.name, Boolean(req));
+      await this.recordPackage(req, 'plugin.removed', installed);
+      if (req) this.pluginService.requestRestart();
       return;
     }
-    return this.pluginService.deletePlugin(pluginId);
+    await this.pluginService.deletePlugin(pluginId, Boolean(req));
+    await this.record(req, 'plugin.zip_deleted', auditSubjectKeyId(plugin?.name ?? pluginId), 'plugin-package', {
+      pluginId,
+      restartRequested: 1,
+    });
+    if (req) this.pluginService.requestRestart();
   }
 }
+
+installInheritedMethods(PluginController, [
+  'listRegistries',
+  'addRegistry',
+  'testRegistry',
+  'removeRegistry',
+  'packageMetadata',
+  'packageVersions',
+  'searchMarketplace',
+  'marketplacePackage',
+  'dependencyPlan',
+  'removalPlan',
+  'removePackageGraph',
+  'installPackage',
+  'installPackageSpec',
+  'removeInstalledPackage',
+  'installedPackages',
+  'updatePolicy',
+  'setUpdatePolicy',
+  'checkAllInstalledPackages',
+  'checkInstalledPackage',
+  'updateInstalledPackageSpec',
+  'updateInstalledPackageOverride',
+  'updateInstalledPackagePolicy',
+  'installedPackageVersions',
+  'replaceInstalledPackage',
+  'getAllPlugins',
+  'getPluginSystemStatus',
+  'retryPlugin',
+  'getFrontendPluginFile',
+  'uploadPlugin',
+  'deletePlugin',
+  'installWithAudit',
+  'lifecycleDetails',
+  'recordPackage',
+  'record',
+]);

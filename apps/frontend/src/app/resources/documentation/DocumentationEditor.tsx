@@ -1,13 +1,12 @@
 import { memo, useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import {
+  Spinner,
   FieldError,
   Form,
   Input,
   Label,
   Radio,
   RadioGroup,
-  Spinner,
   Tab,
   TabList,
   TabPanel,
@@ -15,24 +14,25 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button } from '../../../components/button/index';
 import { ArrowLeft, Save } from 'lucide-react';
-import { useToastMessage } from '../../../components/toastProvider';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageHeader } from '../../../components/pageHeader/index';
 import {
+  DocumentationType,
   useResourcesServiceGetOneResourceById,
   useResourcesServiceUpdateOneResource,
   UseResourcesServiceGetOneResourceByIdKeyFn,
-  DocumentationType,
   useResourcesServiceGetAllResourcesKey,
 } from '@attraccess/react-query-client';
+import { Markdown } from '../../../components/markdown/index';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useToastMessage } from '../../../components/toastProvider';
 import en from './documentationEditor.en.json';
 import de from './documentationEditor.de.json';
 import { useQueryClient } from '@tanstack/react-query';
-import { Markdown } from '../../../components/markdown';
 
-function DocumentationEditorComponent() {
+export function useDocumentationEditorComponentState() {
   const { id } = useParams<{ id: string }>();
   const resourceId = parseInt(id || '', 10);
   const navigate = useNavigate();
@@ -137,64 +137,71 @@ function DocumentationEditorComponent() {
       e.preventDefault();
       handleSave();
     },
-    [handleSave]
+    [handleSave],
   );
+  return {
+    id,
+    resourceId,
+    navigate,
+    t,
+    documentationType,
+    setDocumentationType,
+    markdownContent,
+    setMarkdownContent,
+    urlContent,
+    setUrlContent,
+    selectedTab,
+    setSelectedTab,
+    validationErrors,
+    resource,
+    isLoadingResource,
+    isResourceError,
+    resourceError,
+    refetchResource,
+    updateResource,
+    handleSave,
+    handleSubmit,
+  } as const;
+}
 
-  if (isLoadingResource) {
-    return (
-      <div className="flex justify-center items-center h-[50vh]">
-        <Spinner data-cy="documentation-editor-loading-spinner" />
-      </div>
-    );
-  }
+type Props = Pick<
+  ReturnType<typeof useDocumentationEditorComponentState>,
+  | 't'
+  | 'resource'
+  | 'resourceId'
+  | 'updateResource'
+  | 'handleSave'
+  | 'handleSubmit'
+  | 'documentationType'
+  | 'setDocumentationType'
+  | 'selectedTab'
+  | 'setSelectedTab'
+  | 'markdownContent'
+  | 'setMarkdownContent'
+  | 'validationErrors'
+  | 'urlContent'
+  | 'setUrlContent'
+  | 'navigate'
+>;
 
-  if (isResourceError) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-error">
-        <PageHeader title={t('error.title')} backTo="/resources" />
-        <div className="flex flex-col items-center gap-4 mt-6">
-          <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
-          <div className="flex gap-4">
-            <Button
-              variant="primary"
-              onPress={() => refetchResource()}
-              data-cy="documentation-editor-error-retry-button"
-            >
-              {t('actions.retry')}
-            </Button>
-            <Button
-              variant="secondary"
-              onPress={() => navigate('/resources')}
-              data-cy="documentation-editor-error-back-to-resources-button"
-            >
-              <ArrowLeft size={16} />
-              {t('actions.backToResources')}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!resource) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-not-found">
-        <PageHeader title={t('notFound.title')} backTo="/resources" />
-        <div className="flex flex-col items-center gap-4 mt-6">
-          <p>{t('notFound.message')}</p>
-          <Button
-            variant="secondary"
-            onPress={() => navigate('/resources')}
-            data-cy="documentation-editor-not-found-back-to-resources-button"
-          >
-            <ArrowLeft size={16} />
-            {t('actions.backToResources')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+export function DocumentationEditorComponentDocumentationEditorPage({
+  t,
+  resource,
+  resourceId,
+  updateResource,
+  handleSave,
+  handleSubmit,
+  documentationType,
+  setDocumentationType,
+  selectedTab,
+  setSelectedTab,
+  markdownContent,
+  setMarkdownContent,
+  validationErrors,
+  urlContent,
+  setUrlContent,
+  navigate,
+}: Props) {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-page">
       <PageHeader
@@ -334,6 +341,109 @@ function DocumentationEditorComponent() {
         </div>
       </Form>
     </div>
+  );
+}
+
+function DocumentationEditorComponent() {
+  const {
+    resourceId,
+    navigate,
+    t,
+    documentationType,
+    setDocumentationType,
+    markdownContent,
+    setMarkdownContent,
+    urlContent,
+    setUrlContent,
+    selectedTab,
+    setSelectedTab,
+    validationErrors,
+    resource,
+    isLoadingResource,
+    isResourceError,
+    resourceError,
+    refetchResource,
+    updateResource,
+    handleSave,
+    handleSubmit,
+  } = useDocumentationEditorComponentState();
+
+  if (isLoadingResource) {
+    return (
+      <div className="flex justify-center items-center h-[50vh]">
+        <Spinner data-cy="documentation-editor-loading-spinner" />
+      </div>
+    );
+  }
+
+  if (isResourceError) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-error">
+        <PageHeader title={t('error.title')} backTo="/resources" />
+        <div className="flex flex-col items-center gap-4 mt-6">
+          <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
+          <div className="flex gap-4">
+            <Button
+              variant="primary"
+              onPress={() => refetchResource()}
+              data-cy="documentation-editor-error-retry-button"
+            >
+              {t('actions.retry')}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => navigate('/resources')}
+              data-cy="documentation-editor-error-back-to-resources-button"
+            >
+              <ArrowLeft size={16} />
+              {t('actions.backToResources')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!resource) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8" data-cy="documentation-editor-not-found">
+        <PageHeader title={t('notFound.title')} backTo="/resources" />
+        <div className="flex flex-col items-center gap-4 mt-6">
+          <p>{t('notFound.message')}</p>
+          <Button
+            variant="secondary"
+            onPress={() => navigate('/resources')}
+            data-cy="documentation-editor-not-found-back-to-resources-button"
+          >
+            <ArrowLeft size={16} />
+            {t('actions.backToResources')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <DocumentationEditorComponentDocumentationEditorPage
+      {...{
+        t,
+        resource,
+        resourceId,
+        updateResource,
+        handleSave,
+        handleSubmit,
+        documentationType,
+        setDocumentationType,
+        selectedTab,
+        setSelectedTab,
+        markdownContent,
+        setMarkdownContent,
+        validationErrors,
+        urlContent,
+        setUrlContent,
+        navigate,
+      }}
+    />
   );
 }
 

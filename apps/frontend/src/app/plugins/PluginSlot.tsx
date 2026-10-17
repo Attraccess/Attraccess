@@ -1,4 +1,8 @@
-import { PluginSlotContext, PluginSlotContribution } from '@attraccess/plugins-frontend-sdk';
+import {
+  PluginLiveUpdatesIdentityProvider,
+  PluginSlotContext,
+  PluginSlotContribution,
+} from '@attraccess/plugins-frontend-sdk';
 import { Component, ErrorInfo, PropsWithChildren, ReactNode, useMemo } from 'react';
 import usePluginState from './plugin.state';
 
@@ -30,7 +34,7 @@ class PluginSlotBoundary extends Component<PluginSlotBoundaryProps, { hasError: 
         this.props.contributionKey ?? 'unknown'
       }" from plugin "${this.props.pluginName ?? 'unknown'}" crashed`,
       error,
-      info
+      info,
     );
   }
 
@@ -81,13 +85,17 @@ export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext
       } catch (error) {
         console.error(
           `Attraccess Plugin System: getSlotContributions() of plugin "${manifest.plugin.getPluginName()}" threw`,
-          error
+          error,
         );
         return [];
       }
       return (all ?? [])
         .filter((contribution) => contribution.slotId === slotId)
-        .map((contribution) => ({ contribution, pluginName: manifest.plugin.getPluginName() }));
+        .map((contribution) => ({
+          contribution,
+          pluginName: manifest.plugin.getPluginName(),
+          manifestName: manifest.name,
+        }));
     });
   }, [plugins, slotId]);
 
@@ -99,14 +107,16 @@ export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext
 
   return (
     <>
-      {contributions.map(({ contribution, pluginName }, index) => (
+      {contributions.map(({ contribution, pluginName, manifestName }, index) => (
         <PluginSlotBoundary
           key={contribution.key ?? `${pluginName}-${index}`}
           pluginName={pluginName}
           slotId={slotId}
           contributionKey={contribution.key}
         >
-          <SlotContribution contribution={contribution} context={slotContext} />
+          <PluginLiveUpdatesIdentityProvider name={manifestName}>
+            <SlotContribution contribution={contribution} context={slotContext} />
+          </PluginLiveUpdatesIdentityProvider>
         </PluginSlotBoundary>
       ))}
     </>

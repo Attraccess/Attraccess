@@ -1,35 +1,55 @@
-import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
-import { Unauthorized } from './unauthorized/unauthorized';
-import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
-import { Layout } from './layout/layout';
+import { LiveUpdatesProvider } from '../utils/live-updates';
+import { TwoFactorGate } from './two-factor-gate/index';
+import { KioskGuard } from './kiosk/KioskGuard';
+import { useNavigate, Outlet, Route, Routes } from 'react-router-dom';
+import { PropsWithChildren, useMemo, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useAllRoutes } from './routes';
-import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
-import { OpenAPI } from '@attraccess/react-query-client';
-import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
-import { hasRequiredPermissions } from './routes/routeAccess';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './app.de.json';
 import en from './app.en.json';
-import { ResetPassword } from './reset-password/resetPassword';
-import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
-import { BootScreen } from '../components/bootScreen';
 import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
-import { AccessDenied } from './unauthorized/accessDenied';
-import { getBaseUrl } from '../api';
-import { AcceptInvitation } from './accept-invitation';
-import { TwoFactorGate } from './two-factor-gate';
-import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge';
+import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge/index';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
-import { KioskGuard } from './kiosk/KioskGuard';
-import { useLocaleSync } from '../hooks/useLocaleSync';
-import { NotFound } from './not-found';
 import { ThemeToggle } from '../components/themeToggle';
+import { SessionBillingSummary } from './billing/sessionSummary/index';
+import { Layout } from './layout/layout';
+import { useAllRoutes } from './routes/index';
+import { VerifyEmail } from './verify-email/index';
+import { ResetPassword } from './reset-password/resetPassword';
+import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
+import { AcceptInvitation } from './accept-invitation/index';
+import { NotFound } from './not-found/index';
+import { BootScreen } from '../components/bootScreen/index';
+import { configureApiClient } from '../api/index';
+import { useLocaleSync } from '../hooks/useLocaleSync';
+import { useDateTimePreferencesSync } from '../hooks/useDateTimePreferencesSync';
+import { Unauthorized } from './unauthorized/unauthorized';
+import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { hasRequiredPermissions } from './routes/routeAccess';
+import { AccessDenied } from './unauthorized/accessDenied';
+
+export function useIsTouchDevice() {
+  const [isTouch, setIsTouch] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia('(pointer: coarse)');
+    const handler = (event: MediaQueryListEvent) => setIsTouch(event.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  return isTouch;
+}
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
@@ -70,82 +90,6 @@ export function useRoutesWithAuthElements(routes: RouteConfig[]) {
         <Route key={route.path} path={route.path} element={route.element} />
       )),
     [routesWithAuthElements],
-  );
-}
-
-function useIsTouchDevice() {
-  const [isTouch, setIsTouch] = useState(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia('(pointer: coarse)').matches
-      : false,
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia('(pointer: coarse)');
-    const handler = (event: MediaQueryListEvent) => setIsTouch(event.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-
-  return isTouch;
-}
-
-function AppLayout(props: PropsWithChildren) {
-  const { isAuthenticated, needsTwoFactorSetup } = useAuth();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-
-  const { t, language } = useTranslations({ de, en });
-
-  const { pullToRefreshIsEnabled } = usePtrStore();
-  const isTouchDevice = useIsTouchDevice();
-  const isPullToRefreshActive = pullToRefreshIsEnabled && isTouchDevice;
-
-  const content = (
-    <RouterProvider navigate={navigate}>
-      <I18nProvider locale={language}>
-        <ToastProvider>
-          {(!isAuthenticated || needsTwoFactorSetup) && (
-            <div className="fixed top-4 right-4 z-30">
-              <ThemeToggle />
-            </div>
-          )}
-          <ReactFlowProvider>
-            <AttraccessUserActionsBridge>
-              {props.children}
-              {isAuthenticated && <SupervisorApprovalListener />}
-            </AttraccessUserActionsBridge>
-          </ReactFlowProvider>
-        </ToastProvider>
-      </I18nProvider>
-    </RouterProvider>
-  );
-
-  if (!isPullToRefreshActive) {
-    return content;
-  }
-
-  return (
-    <PullToRefresh
-      className="[&_.ptr__pull-down]:z-10"
-      onRefresh={() => queryClient.invalidateQueries()}
-      pullDownThreshold={90}
-      refreshingContent={
-        <div className="flex h-[90px] items-center justify-center pt-[env(safe-area-inset-top)]">
-          <Spinner size="sm" />
-        </div>
-      }
-      pullingContent={
-        <div className="flex flex-col items-center gap-2 p-2">
-          <div className="text-sm">{t('pullToRefresh')}</div>
-          <div className="text-2xl leading-none">↓</div>
-        </div>
-      }
-      isPullable
-    >
-      {content}
-    </PullToRefresh>
   );
 }
 
@@ -198,7 +142,7 @@ export function AppRoutes() {
   );
 }
 
-function AppContent() {
+export function AppContent() {
   return (
     <TwoFactorGate>
       <KioskGuard />
@@ -207,13 +151,79 @@ function AppContent() {
   );
 }
 
-export function App() {
-  const { isInitialized } = useAuth();
-  useLocaleSync();
+export function AppLayout(props: PropsWithChildren) {
+  const { isAuthenticated, needsTwoFactorSetup, user } = useAuth();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  OpenAPI.BASE = getBaseUrl();
+  const { t, language } = useTranslations({ de, en });
 
-  return <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>;
+  const { pullToRefreshIsEnabled } = usePtrStore();
+  const isTouchDevice = useIsTouchDevice();
+  const isPullToRefreshActive = pullToRefreshIsEnabled && isTouchDevice;
+
+  const content = (
+    <RouterProvider navigate={navigate}>
+      <I18nProvider locale={language}>
+        <ToastProvider>
+          {(!isAuthenticated || needsTwoFactorSetup) && (
+            <div className="fixed top-4 right-4 z-30">
+              <ThemeToggle />
+            </div>
+          )}
+          <ReactFlowProvider>
+            <AttraccessUserActionsBridge>
+              {props.children}
+              {isAuthenticated && <SupervisorApprovalListener />}
+              {isAuthenticated && <SessionBillingSummary key={user?.id} />}
+            </AttraccessUserActionsBridge>
+          </ReactFlowProvider>
+        </ToastProvider>
+      </I18nProvider>
+    </RouterProvider>
+  );
+
+  if (!isPullToRefreshActive) {
+    return content;
+  }
+
+  return (
+    <PullToRefresh
+      className="[&_.ptr__pull-down]:z-10"
+      onRefresh={() => queryClient.invalidateQueries()}
+      pullDownThreshold={90}
+      refreshingContent={
+        <div className="flex h-[90px] items-center justify-center pt-[env(safe-area-inset-top)]">
+          <Spinner size="sm" />
+        </div>
+      }
+      pullingContent={
+        <div className="flex flex-col items-center gap-2 p-2">
+          <div className="text-sm">{t('pullToRefresh')}</div>
+          <div className="text-2xl leading-none">↓</div>
+        </div>
+      }
+      isPullable
+    >
+      {content}
+    </PullToRefresh>
+  );
 }
 
+export function App() {
+  const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
+  useLocaleSync();
+  useDateTimePreferencesSync();
+
+  configureApiClient();
+
+  return (
+    <LiveUpdatesProvider userId={!isTwoFactorStatusLoading && !needsTwoFactorSetup ? user?.id : undefined}>
+      <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>
+    </LiveUpdatesProvider>
+  );
+}
+
+// Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
+// Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
 export default App;

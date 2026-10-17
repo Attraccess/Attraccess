@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Resource,
@@ -15,6 +15,7 @@ import { ResourceGroupsIntroductionsService } from './introductions/resourceGrou
 import { ResourceGroupsIntroducersService } from './introducers/resourceGroups.introducers.service';
 import { IsResourceGroupIntroducerGuard } from './introductions/isIntroducerGuard';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
       ResourceIntroducer,
     ]),
     NotificationsModule,
+    forwardRef(() => ResourceRetrainingModule),
   ],
   controllers: [ResourceGroupsController, ResourceGroupsIntroductionsController, ResourceGroupsIntroducersController],
   providers: [

@@ -1,8 +1,8 @@
+import type { PluginMqttMessage, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 import { Injectable, LoggerService } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttMessageEvent } from '../mqtt/mqtt-message.event';
-import type { PluginMqttMessage, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 
 const MAX_QUEUED_MESSAGES_PER_SUBSCRIPTION = 100;
 
@@ -90,6 +90,10 @@ export class PluginMqttService {
     options?: { qos?: 0 | 1 | 2; retain?: boolean },
   ): Promise<void> {
     await this.mqtt.publish(serverId, topic, payload, options);
+  }
+
+  async refreshConnection(serverId: number): Promise<void> {
+    await this.mqtt.refreshConnection(serverId);
   }
 
   clearPlugin(pluginId: string): void {

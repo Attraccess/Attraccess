@@ -1,21 +1,21 @@
 import { useCallback, useMemo } from 'react';
-import { useTranslationState } from '../i18n';
+import { useDateTimeLocale } from './dateTimePreferences';
 
 export interface DateTimeOptions {
   showTime?: boolean;
   showDate?: boolean;
   showSeconds?: boolean;
+  dateTimeLocale?: string | null;
 }
 
 export function useDateTimeFormatter(options?: DateTimeOptions) {
   const { showTime = true, showDate = true, showSeconds = false } = options ?? {};
-  const { language } = useTranslationState();
+  const locale = useDateTimeLocale(options?.dateTimeLocale);
 
   const formatter = useMemo(() => {
     const formatOptions: Intl.DateTimeFormatOptions = {};
 
     if (showTime) {
-      formatOptions.hour12 = false;
       formatOptions.hour = '2-digit';
       formatOptions.minute = '2-digit';
 
@@ -30,8 +30,9 @@ export function useDateTimeFormatter(options?: DateTimeOptions) {
       formatOptions.year = 'numeric';
     }
 
-    return new Intl.DateTimeFormat(language, formatOptions);
-  }, [showDate, showTime, showSeconds, language]);
+    const intlFormatter = new Intl.DateTimeFormat(locale, formatOptions);
+    return (date: Date) => (!showDate && !showTime ? '' : intlFormatter.format(date));
+  }, [showDate, showTime, showSeconds, locale]);
 
   return useCallback(
     (date?: Date | string | number | null, fallback?: string | React.ReactNode) => {
@@ -44,7 +45,7 @@ export function useDateTimeFormatter(options?: DateTimeOptions) {
         return fallback ?? '-';
       }
 
-      return formatter.format(dateAsDate);
+      return formatter(dateAsDate);
     },
     [formatter],
   );

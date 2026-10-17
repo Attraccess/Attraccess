@@ -2,7 +2,7 @@
 // FEATURE: Messaging inbox conversation list
 import { ConversationListItemDto } from '@attraccess/react-query-client';
 import { Chip, Skeleton, cn } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { EmptyState } from '../../components/emptyState';
@@ -15,6 +15,7 @@ interface Props {
 }
 
 export function ConversationList(props: Props) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { conversations, isLoading, selectedConversationId, onSelect } = props;
 
   const { t } = useTranslations({ en, de });
@@ -87,7 +88,7 @@ export function ConversationList(props: Props) {
                 <p className="truncate font-medium">{username}</p>
                 {conversation.lastMessage && (
                   <span className="shrink-0 text-tiny text-zinc-400">
-                    {new Date(conversation.lastMessage.createdAt).toLocaleString()}
+                    {formatDateTime(conversation.lastMessage.createdAt)}
                   </span>
                 )}
               </div>

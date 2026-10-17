@@ -5,6 +5,8 @@
 #include "../../images/logo_40h.hpp"
 #include "../IScreen.hpp"
 #include "../../../api/api.hpp"
+#include "../../shared/actionOverlay.hpp"
+#include <functional>
 
 class Lockscreen : public IScreen
 {
@@ -15,6 +17,9 @@ public:
     void loop() override;
     std::string getName() override;
     void destroy() override;
+    void setBackCallback(std::function<void()> callback) { backCallback = std::move(callback); }
+    void showActionProgress() { authenticating = true; overlay.show(screen, "Karte wird geprüft", resourceName); }
+    void hideActionProgress() { authenticating = false; overlay.hide(); }
 
     /* The lockscreen is re-entered on every card removal / session end, so
      * keeping its LVGL tree alive avoids the destroy+rebuild cost per
@@ -25,10 +30,19 @@ public:
     void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance);
 
 private:
+    ActionOverlay overlay;
+    bool authenticating = false;
+    std::function<void()> backCallback;
     lv_obj_t *screen = nullptr;
 
     lv_obj_t *resourceNameLabel = nullptr;
     lv_obj_t *usageInfoLabel = nullptr;
+    lv_obj_t *promptLabel = nullptr;
+    lv_obj_t *clockContainer = nullptr;
+    lv_obj_t *clockTimeLabel = nullptr;
+    lv_obj_t *clockDateLabel = nullptr;
+    lv_obj_t *cardPrompt = nullptr;
+    int64_t shownClockMinute = -2;
 
     char resourceName[API::MAX_RESOURCE_NAME_LEN];
     char username[API::MAX_USERNAME_LEN];
@@ -36,4 +50,6 @@ private:
     bool isUnderMaintenance;
 
     void updateUsageInfo();
+    void initWallClock();
+    void updateWallClock();
 };

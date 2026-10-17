@@ -1,7 +1,6 @@
 // Address-book style user picker: a "Choose user" button that opens a searchable,
 // alphabetically grouped, infinitely scrolling modal of all users.
 // FEATURE: User selection via a phone-address-book modal
-import { HTMLAttributes, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Header,
@@ -22,52 +21,35 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { SearchIcon, UserPlusIcon, XIcon } from 'lucide-react';
-import { InfiniteData } from '@tanstack/react-query';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from '../../i18n';
-import { useDebounce } from '../../hooks/useDebounce';
-import { AttraccessUser, type UserIdentity } from '../attraccess-user/AttraccessUser';
-import { groupUsersByLetter } from './UserSearch.utils';
+import { AttraccessUser } from '../attraccess-user/AttraccessUser';
+
 import { PaginatedUsersResponseDto, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
-
-import en from './en.json';
+import { InfiniteData } from '@tanstack/react-query';
+import type { HTMLAttributes } from 'react';
+import { useDebounce } from '../../hooks/useDebounce';
+import type { TFunction } from '../../i18n';
+import { type UserIdentity } from '../attraccess-user/AttraccessUser';
 import de from './de.json';
-
-interface UserSearchProps {
-  label?: string;
-  placeholder?: string;
-  size?: 'sm' | 'md' | 'lg';
-  /** Clears the current selection and search whenever this value changes identity
-   * (e.g. pass a drawer's isOpen so the picker resets on every open/close). */
-  resetSignal?: unknown;
-  onSelectionChange?: (user: UserIdentity | null) => void;
-  wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
-  afterAutocomplete?: React.ReactNode;
-  afterSelection?: React.ReactNode;
-}
+import en from './en.json';
+import { groupUsersByLetter } from './UserSearch.utils';
 
 const PAGE_SIZE = 50;
+
 const SEARCH_DEBOUNCE_MS = 300;
 
-// Mirrors the app's StandardModal chrome (bg-surface-secondary + field-contrast
-// vars) so fields inside this modal match every other modal in the app. The lib
-// cannot import the app-level StandardModal (apps depend on libs, not vice versa).
-const FIELD_CONTRAST_STYLE: React.CSSProperties = {
-  ['--field-border' as never]: 'var(--border-secondary)',
-  ['--border-width-field' as never]: '1px',
-};
-
-export function UserSearch(props: Readonly<UserSearchProps>) {
-  const { label, placeholder, size, resetSignal, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } =
-    props;
-
-  const { t } = useTranslations({ en, de });
-
-  // Associate the standalone field label with the trigger button so screen
-  // readers announce e.g. "User, Choose user, button" instead of the bare button text.
-  const labelId = useId();
-  const triggerId = useId();
-
-  const { isOpen, open, close } = useOverlayState();
+function useUserSearch({
+  isOpen,
+  open,
+  close,
+  resetSignal,
+  onSelectionChange,
+}: {
+  isOpen: boolean;
+  open: () => void;
+  close: () => void;
+} & Pick<UserSearchProps, 'resetSignal' | 'onSelectionChange'>) {
   const [selectedUser, setSelectedUser] = useState<UserIdentity | null>(null);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
@@ -174,54 +156,159 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
     // retry clears the error, the effect must re-run to observe the fresh sentinel.
   }, [isOpen, isError]);
 
+  return {
+    selectedUser,
+    setSelectedUser,
+    search,
+    setSearch,
+    users,
+    groups,
+    handleSelect,
+    handleOpenChange,
+    listRef,
+    sentinelRef,
+    isError,
+    isLoading,
+    isFetching,
+    refetch,
+    isFetchingNextPage,
+    fetchNextPage,
+  };
+}
+
+export interface UserSearchProps {
+  label?: string;
+  placeholder?: string;
+  size?: 'sm' | 'md' | 'lg';
+  /** Clears the current selection and search whenever this value changes identity
+   * (e.g. pass a drawer's isOpen so the picker resets on every open/close). */
+  resetSignal?: unknown;
+  onSelectionChange?: (user: UserIdentity | null) => void;
+  wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
+  afterAutocomplete?: React.ReactNode;
+  afterSelection?: React.ReactNode;
+}
+
+function UserSearchTrigger({
+  selectedUser,
+  size,
+  open,
+  setSelectedUser,
+  labelId,
+  triggerId,
+  t,
+  afterAutocomplete,
+  afterSelection,
+}: Pick<UserSearchProps, 'size' | 'afterAutocomplete' | 'afterSelection'> & {
+  selectedUser: UserIdentity | null;
+  open: () => void;
+  setSelectedUser: (user: UserIdentity | null) => void;
+  labelId: string;
+  triggerId: string;
+  t: TFunction;
+}) {
+  return (
+    <div className="flex gap-2 items-center">
+      {selectedUser ? (
+        <>
+          <Button
+            variant="ghost"
+            size={size}
+            onPress={open}
+            className="justify-start px-2"
+            id={triggerId}
+            aria-labelledby={`${labelId} ${triggerId}`}
+            data-cy="user-picker-selected"
+          >
+            <AttraccessUser user={selectedUser} interactive={false} />
+          </Button>
+          <Button
+            variant="ghost"
+            size={size ?? 'sm'}
+            isIconOnly
+            onPress={() => setSelectedUser(null)}
+            aria-label={t('clear')}
+            data-cy="user-picker-clear"
+          >
+            <XIcon className="w-4 h-4" />
+          </Button>
+        </>
+      ) : (
+        <Button
+          variant="secondary"
+          size={size}
+          onPress={open}
+          className="flex-1 justify-start"
+          id={triggerId}
+          aria-labelledby={`${labelId} ${triggerId}`}
+          data-cy="user-picker-open"
+        >
+          <UserPlusIcon className="w-4 h-4" />
+          {t('chooseUser')}
+        </Button>
+      )}
+      {afterAutocomplete}
+      {afterSelection}
+    </div>
+  );
+}
+
+// Mirrors the app's StandardModal chrome (bg-surface-secondary + field-contrast
+// vars) so fields inside this modal match every other modal in the app. The lib
+// cannot import the app-level StandardModal (apps depend on libs, not vice versa).
+const FIELD_CONTRAST_STYLE: React.CSSProperties = {
+  ['--field-border' as never]: 'var(--border-secondary)',
+  ['--border-width-field' as never]: '1px',
+};
+
+export function UserSearch(props: Readonly<UserSearchProps>) {
+  const { label, placeholder, size, resetSignal, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } =
+    props;
+
+  const { t } = useTranslations({ en, de });
+
+  // Associate the standalone field label with the trigger button so screen
+  // readers announce e.g. "User, Choose user, button" instead of the bare button text.
+  const labelId = useId();
+  const triggerId = useId();
+
+  const { isOpen, open, close } = useOverlayState();
+  const {
+    selectedUser,
+    setSelectedUser,
+    search,
+    setSearch,
+    users,
+    groups,
+    handleSelect,
+    handleOpenChange,
+    listRef,
+    sentinelRef,
+    isError,
+    isLoading,
+    isFetching,
+    refetch,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useUserSearch({ isOpen, open, close, resetSignal, onSelectionChange });
+
   return (
     <div {...wrapperProps}>
       <Label id={labelId} className="mb-1 block">
         {label ?? t('label')}
       </Label>
 
-      <div className="flex gap-2 items-center">
-        {selectedUser ? (
-          <>
-            <Button
-              variant="ghost"
-              size={size}
-              onPress={open}
-              className="justify-start px-2"
-              id={triggerId}
-              aria-labelledby={`${labelId} ${triggerId}`}
-              data-cy="user-picker-selected"
-            >
-              <AttraccessUser user={selectedUser} interactive={false} />
-            </Button>
-            <Button
-              variant="ghost"
-              size={size ?? 'sm'}
-              isIconOnly
-              onPress={() => setSelectedUser(null)}
-              aria-label={t('clear')}
-              data-cy="user-picker-clear"
-            >
-              <XIcon className="w-4 h-4" />
-            </Button>
-          </>
-        ) : (
-          <Button
-            variant="secondary"
-            size={size}
-            onPress={open}
-            className="flex-1 justify-start"
-            id={triggerId}
-            aria-labelledby={`${labelId} ${triggerId}`}
-            data-cy="user-picker-open"
-          >
-            <UserPlusIcon className="w-4 h-4" />
-            {t('chooseUser')}
-          </Button>
-        )}
-        {afterAutocomplete}
-        {afterSelection}
-      </div>
+      <UserSearchTrigger
+        selectedUser={selectedUser}
+        size={size}
+        open={open}
+        setSelectedUser={setSelectedUser}
+        labelId={labelId}
+        triggerId={triggerId}
+        t={t}
+        afterAutocomplete={afterAutocomplete}
+        afterSelection={afterSelection}
+      />
 
       <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
         <ModalBackdrop>
@@ -294,7 +381,12 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
                     // retry instead of discarding the list for the full error screen.
                     <div className="flex items-center justify-center gap-3 py-3" data-cy="user-picker-load-more-error">
                       <p className="text-sm text-muted">{t('loadError')}</p>
-                      <Button variant="secondary" size="sm" isPending={isFetchingNextPage} onPress={() => fetchNextPage()}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        isPending={isFetchingNextPage}
+                        onPress={() => fetchNextPage()}
+                      >
                         {t('retry')}
                       </Button>
                     </div>

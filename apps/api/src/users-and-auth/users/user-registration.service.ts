@@ -1,32 +1,41 @@
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { AuthenticationType, User } from '@attraccess/database-entities';
-import { EntityManager } from 'typeorm';
-import { UsersService } from './users.service';
-import { AuthService } from '../auth/auth.service';
+
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+
 import { EmailService } from '../../email/email.service';
-import { PasswordPolicyService } from '../password-policy/password-policy.service';
+
+import { AuthService } from '../auth/auth.service';
+
 import { PasswordPolicyViolationException } from '../password-policy/password-policy.errors';
-import { SignupDomainService } from './signup-domain.service';
-import { CreateUserDto } from './dtos/createUser.dto';
+
+import { PasswordPolicyService } from '../password-policy/password-policy.service';
+
 import { AcceptInvitationDto } from './dtos/acceptInvitation.dto';
+
+import { CreateUserDto } from './dtos/createUser.dto';
+
 import { mapEmailSendError } from './email-send-error.util';
 
-/**
- * Self-service registration, email verification and invitation acceptance flows.
- */
+import { SignupDomainService } from './signup-domain.service';
+
+import { UsersService } from './users.service';
+
+import { EntityManager } from 'typeorm';
+
 @Injectable()
 export class UserRegistrationService {
-  private readonly logger = new Logger(UserRegistrationService.name);
-  private firstTimeSetupOverwriteLock = Promise.resolve();
-
   constructor(
-    private readonly usersService: UsersService,
+    protected readonly usersService: UsersService,
     @Inject(forwardRef(() => AuthService))
-    private readonly authService: AuthService,
-    private readonly emailService: EmailService,
-    private readonly passwordPolicyService: PasswordPolicyService,
-    private readonly signupDomainService: SignupDomainService,
+    protected readonly authService: AuthService,
+    protected readonly emailService: EmailService,
+    protected readonly passwordPolicyService: PasswordPolicyService,
+    protected readonly signupDomainService: SignupDomainService,
   ) {}
+
+  protected readonly logger = new Logger(UserRegistrationService.name);
+
+  protected firstTimeSetupOverwriteLock = Promise.resolve();
 
   public async createOne(body: CreateUserDto, locale?: string): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
@@ -56,7 +65,58 @@ export class UserRegistrationService {
     return body.overwriteFirstTimeAdmin ? await this.withFirstTimeSetupOverwriteLock(register) : await register();
   }
 
-  private async registerUser(
+  public async verifyEmail(email: string, token: string): Promise<void> {
+    this.logger.debug(`Verifying email for: ${email} with token: ${token.substring(0, 5)}...`);
+    await this.authService.verifyEmail(email, token);
+    this.logger.debug(`Email verified successfully for: ${email}`);
+  }
+
+  public async resendVerificationEmail(email: string): Promise<void> {
+    this.logger.debug(`Resend verification email requested for: ${email}`);
+
+    const user = await this.usersService.findOne({ email });
+    if (!user || user.isEmailVerified) {
+      this.logger.debug(`No unverified user found for: ${email}`);
+      return;
+    }
+
+    try {
+      const verificationToken = await this.authService.generateEmailVerificationToken(user);
+      await this.emailService.sendVerificationEmail(user, verificationToken);
+      this.logger.debug(`Verification email resent to: ${email}`);
+    } catch (e) {
+      this.logger.error(`Error resending verification email for: ${email}`, e.stack);
+      throw mapEmailSendError(e);
+    }
+  }
+
+  public async acceptInvitation(body: AcceptInvitationDto): Promise<User> {
+    this.logger.debug(`Accepting invitation for: ${body.email} with token: ${body.token.substring(0, 5)}...`);
+
+    await this.authService.verifyEmail(body.email, body.token);
+
+    const user = await this.usersService.findOne({ email: body.email });
+
+    const policyResult = await this.passwordPolicyService.validate(
+      body.password,
+      { username: user.username, email: user.email },
+      { role: await this.passwordPolicyService.resolveRole(user) },
+    );
+    if (!policyResult.ok) {
+      throw new PasswordPolicyViolationException(policyResult.errors);
+    }
+
+    await this.authService.addAuthenticationDetails(user.id, {
+      type: AuthenticationType.LOCAL_PASSWORD,
+      details: {
+        password: body.password,
+      },
+    });
+    this.logger.debug(`Invitation accepted successfully for: ${body.email}`);
+    return user;
+  }
+
+  protected async registerUser(
     body: CreateUserDto,
     locale: string | undefined,
     hashedPassword: string | undefined,
@@ -148,7 +208,7 @@ export class UserRegistrationService {
     return user;
   }
 
-  private async withFirstTimeSetupOverwriteLock<T>(handler: () => Promise<T>): Promise<T> {
+  protected async withFirstTimeSetupOverwriteLock<T>(handler: () => Promise<T>): Promise<T> {
     const previous = this.firstTimeSetupOverwriteLock;
     let release!: () => void;
     this.firstTimeSetupOverwriteLock = new Promise((resolve) => {
@@ -161,56 +221,5 @@ export class UserRegistrationService {
     } finally {
       release();
     }
-  }
-
-  public async verifyEmail(email: string, token: string): Promise<void> {
-    this.logger.debug(`Verifying email for: ${email} with token: ${token.substring(0, 5)}...`);
-    await this.authService.verifyEmail(email, token);
-    this.logger.debug(`Email verified successfully for: ${email}`);
-  }
-
-  public async resendVerificationEmail(email: string): Promise<void> {
-    this.logger.debug(`Resend verification email requested for: ${email}`);
-
-    const user = await this.usersService.findOne({ email });
-    if (!user || user.isEmailVerified) {
-      this.logger.debug(`No unverified user found for: ${email}`);
-      return;
-    }
-
-    try {
-      const verificationToken = await this.authService.generateEmailVerificationToken(user);
-      await this.emailService.sendVerificationEmail(user, verificationToken);
-      this.logger.debug(`Verification email resent to: ${email}`);
-    } catch (e) {
-      this.logger.error(`Error resending verification email for: ${email}`, e.stack);
-      throw mapEmailSendError(e);
-    }
-  }
-
-  public async acceptInvitation(body: AcceptInvitationDto): Promise<User> {
-    this.logger.debug(`Accepting invitation for: ${body.email} with token: ${body.token.substring(0, 5)}...`);
-
-    await this.authService.verifyEmail(body.email, body.token);
-
-    const user = await this.usersService.findOne({ email: body.email });
-
-    const policyResult = await this.passwordPolicyService.validate(
-      body.password,
-      { username: user.username, email: user.email },
-      { role: await this.passwordPolicyService.resolveRole(user) },
-    );
-    if (!policyResult.ok) {
-      throw new PasswordPolicyViolationException(policyResult.errors);
-    }
-
-    await this.authService.addAuthenticationDetails(user.id, {
-      type: AuthenticationType.LOCAL_PASSWORD,
-      details: {
-        password: body.password,
-      },
-    });
-    this.logger.debug(`Invitation accepted successfully for: ${body.email}`);
-    return user;
   }
 }

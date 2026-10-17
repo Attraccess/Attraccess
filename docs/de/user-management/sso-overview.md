@@ -56,3 +56,13 @@ Sie können mehrere SSO-Anbieter gleichzeitig konfigurieren. Benutzer sehen auf 
 - [SAML einrichten](user-management/sso-saml.md)
 - [Berechtigungen](user-management/permissions.md)
 - [SSL einrichten](installation/ssl-setup.md)
+
+## Lokale und zentrale Abmeldung
+
+**Abmelden** beendet nur die aktuelle Attraccess-Sitzung. **Überall abmelden** fordert zusätzlich den SSO-Anbieter auf, seine Sitzung zu beenden und die Abmeldung an andere Anwendungen weiterzugeben. Der Anbieter entscheidet, welche Anwendungen teilnehmen. Ein Abbruch oder Fehler beim Anbieter stellt die Attraccess-Sitzung niemals wieder her und bestätigt keine Abmeldung von anderen Anwendungen.
+
+Beide Aktionen stehen im Kontomenü und auf angemeldeten Kioskbildschirmen bereit. Bei lokalen Anmeldungen, älteren Sitzungen oder fehlender Abmeldekonfiguration ist die zentrale Abmeldung mit einer Erklärung deaktiviert. Melden Sie sich nach der Einrichtung erneut über SSO an. Die automatische Kioskabmeldung bei Inaktivität bleibt lokal.
+
+Anbieternachrichten beenden nur passende SSO-Sitzungen. Eine sitzungsspezifische Nachricht erhält andere Geräte, lokale Sitzungen, API-Tokens und andere Anbieteridentitäten. Eine benutzerweite Nachricht beendet nur Sitzungen dieser Anbieteridentität. Die bestehenden Provisioning-Abmelde-APIs behalten ihr kontoweites Verhalten.
+
+Die konfigurierte Anwendungs-URL bestimmt die öffentlichen API-Callbacks. Liegt das Frontend auf einem anderen Host, setzen Sie `ATTRACCESS_FRONTEND_URL` auf dessen vertrauenswürdige öffentliche URL. Abgeschlossene Austauschvorgänge kehren zu dessen Startseite zurück. Registrieren Sie die exakten API-URLs aus dem Anbieterformular. Vom Client vorgegebene Rücksprungziele werden nicht akzeptiert.

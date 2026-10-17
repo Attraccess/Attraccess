@@ -30,6 +30,7 @@ import { MaintenanceRequestNotificationListener } from './maintenance-request-no
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { LicenseModule } from '../../license/license.module';
 import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
+import { ResourceOperatingAttributionModule } from '../operating-intervals/resource-operating-attribution.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
       ResourceUsage,
       User,
     ]),
+    ResourceOperatingAttributionModule,
     NotificationsModule,
     LicenseModule,
     RbacModule,
@@ -60,4 +62,4 @@ import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
   ],
   exports: [ResourceMaintenanceService, CanManageMaintenanceGuard, MaintenanceRequestService],
 })
-export class ResourceMaintenanceModule { }
+export class ResourceMaintenanceModule {}

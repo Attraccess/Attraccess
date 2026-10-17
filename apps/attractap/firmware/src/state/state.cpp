@@ -4,26 +4,7 @@
 #include "state.hpp"
 #include <string>
 
-struct StateLock
-{
-    StateLock(SemaphoreHandle_t mutex) : handle(mutex)
-    {
-        if (handle)
-        {
-            xSemaphoreTakeRecursive(handle, portMAX_DELAY);
-        }
-    }
-
-    ~StateLock()
-    {
-        if (handle)
-        {
-            xSemaphoreGiveRecursive(handle);
-        }
-    }
-
-    SemaphoreHandle_t handle;
-};
+#include "state_lock.hpp"
 
 SemaphoreHandle_t State::state_mutex = xSemaphoreCreateRecursiveMutex();
 
@@ -58,6 +39,73 @@ bool State::websocket_cert_locked = false;
 int State::websocket_next_attempt_seconds = 0;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
+
+void State::setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL)
+{
+    StateLock lock(state_mutex);
+    websocket_connected = connected;
+    websocket_hostname = hostname;
+    websocket_port = port;
+    websocket_use_ssl = useSSL;
+}
+
+void State::setWebsocketPhase(WebsocketPhase phase)
+{
+    StateLock lock(state_mutex);
+    websocket_phase = phase;
+}
+
+void State::setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount, bool certLocked)
+{
+    StateLock lock(state_mutex);
+    websocket_cert_name = certName;
+    websocket_cert_index = certIndex;
+    websocket_cert_count = certCount;
+    websocket_remembered_retry_count = rememberedRetryCount;
+    websocket_cert_locked = certLocked;
+}
+
+void State::setWebsocketNextAttemptSeconds(int seconds)
+{
+    StateLock lock(state_mutex);
+    websocket_next_attempt_seconds = seconds;
+}
+
+State::WebsocketState State::getWebsocketState()
+{
+    StateLock lock(state_mutex);
+    WebsocketState state;
+    state.connected = websocket_connected;
+    state.hostname = websocket_hostname;
+    state.port = websocket_port;
+    state.useSSL = websocket_use_ssl;
+    state.phase = websocket_phase;
+    state.certName = websocket_cert_name;
+    state.certIndex = websocket_cert_index;
+    state.certCount = websocket_cert_count;
+    state.rememberedRetryCount = websocket_remembered_retry_count;
+    state.certLocked = websocket_cert_locked;
+    state.secondsUntilNextAttempt = websocket_next_attempt_seconds;
+
+    return state;
+}
+
+void State::setApiState(bool authenticated, std::string deviceName)
+{
+    StateLock lock(state_mutex);
+    api_authenticated = authenticated;
+    api_device_name = deviceName;
+}
+
+State::ApiState State::getApiState()
+{
+    StateLock lock(state_mutex);
+    ApiState state;
+    state.authenticated = api_authenticated;
+    state.deviceName = api_device_name;
+
+    return state;
+}
 
 void State::setEthernetState(bool connected, esp_ip4_addr_t ip)
 {
@@ -135,73 +183,6 @@ State::NetworkQualityState State::getNetworkQualityState()
     state.pongTimeoutsLastMinute = network_quality_pong_timeouts_last_minute;
     state.pongProbeLossPercentLastMinute = network_quality_pong_probe_loss_percent_last_minute;
     state.missedHeartbeatsLastMinute = network_quality_missed_heartbeats_last_minute;
-
-    return state;
-}
-
-void State::setWebsocketState(bool connected, std::string hostname, uint16_t port, bool useSSL)
-{
-    StateLock lock(state_mutex);
-    websocket_connected = connected;
-    websocket_hostname = hostname;
-    websocket_port = port;
-    websocket_use_ssl = useSSL;
-}
-
-void State::setWebsocketPhase(WebsocketPhase phase)
-{
-    StateLock lock(state_mutex);
-    websocket_phase = phase;
-}
-
-void State::setWebsocketCertProgress(std::string certName, int certIndex, int certCount, int rememberedRetryCount, bool certLocked)
-{
-    StateLock lock(state_mutex);
-    websocket_cert_name = certName;
-    websocket_cert_index = certIndex;
-    websocket_cert_count = certCount;
-    websocket_remembered_retry_count = rememberedRetryCount;
-    websocket_cert_locked = certLocked;
-}
-
-void State::setWebsocketNextAttemptSeconds(int seconds)
-{
-    StateLock lock(state_mutex);
-    websocket_next_attempt_seconds = seconds;
-}
-
-State::WebsocketState State::getWebsocketState()
-{
-    StateLock lock(state_mutex);
-    WebsocketState state;
-    state.connected = websocket_connected;
-    state.hostname = websocket_hostname;
-    state.port = websocket_port;
-    state.useSSL = websocket_use_ssl;
-    state.phase = websocket_phase;
-    state.certName = websocket_cert_name;
-    state.certIndex = websocket_cert_index;
-    state.certCount = websocket_cert_count;
-    state.rememberedRetryCount = websocket_remembered_retry_count;
-    state.certLocked = websocket_cert_locked;
-    state.secondsUntilNextAttempt = websocket_next_attempt_seconds;
-
-    return state;
-}
-
-void State::setApiState(bool authenticated, std::string deviceName)
-{
-    StateLock lock(state_mutex);
-    api_authenticated = authenticated;
-    api_device_name = deviceName;
-}
-
-State::ApiState State::getApiState()
-{
-    StateLock lock(state_mutex);
-    ApiState state;
-    state.authenticated = api_authenticated;
-    state.deviceName = api_device_name;
 
     return state;
 }

@@ -108,6 +108,22 @@ export class SSOProviderOIDCConfiguration {
   })
   roleMappings?: Record<string, string[]> | null;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Provider end-session endpoint', required: false, nullable: true })
+  endSessionURL?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Trusted provider JWKS endpoint', required: false, nullable: true })
+  jwksURL?: string | null;
+
+  @Column({ type: 'simple-array', nullable: true })
+  @ApiProperty({
+    description: 'Allowed asymmetric ID/logout token signing algorithms; defaults to RS256',
+    required: false,
+    type: [String],
+  })
+  signingAlgorithms?: string[] | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the user was created',

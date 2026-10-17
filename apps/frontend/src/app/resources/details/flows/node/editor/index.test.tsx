@@ -1,15 +1,20 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, screen, render, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, vi, expect, it } from 'vitest';
 import type { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { NodeEditor } from './index';
-
-const mocks = vi.hoisted(() => ({ update: vi.fn(), current: { data: {} as Record<string, unknown> } }));
+import userEvent from '@testing-library/user-event';
+const mocks = vi.hoisted(() => ({
+  update: vi.fn(),
+  current: { data: {} as Record<string, unknown> },
+  resolveNodeSchema: vi.fn(),
+}));
 vi.mock('@xyflow/react', () => ({ useNodeId: () => 'node', useNodesData: () => mocks.current }));
-vi.mock('../../flowContext', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1 }) }));
-vi.mock('../../../../../../api', () => ({ getBaseUrl: () => 'http://localhost' }));
+vi.mock('../../context/index', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1 }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
+  useResourceFlowsServiceResolveNodeSchema: () => ({
+    mutateAsync: mocks.resolveNodeSchema,
+  }),
 }));
 vi.mock('../../../../../../../components/mqttServerSelect', () => ({ MqttServerSelect: () => null }));
 vi.mock('../../../../../../../components/companionDeviceSelect', () => ({ CompanionDeviceSelect: () => null }));
@@ -39,9 +44,12 @@ function editor(schema = base) {
   );
 }
 
-const pending: Array<(response: Response) => void> = [];
+const pending: Array<{
+  resolve: (schema: ResourceFlowNodeSchemaDto) => void;
+  reject: (error: Error) => void;
+}> = [];
 async function respond(index: number, schema = base, ok = true) {
-  await act(async () => pending[index]({ ok, json: async () => schema, text: async () => 'failed' } as Response));
+  await act(async () => (ok ? pending[index].resolve(schema) : pending[index].reject(new Error('failed'))));
 }
 function submit() {
   const form = screen.getByLabelText('Command').closest('form');
@@ -54,15 +62,14 @@ beforeEach(() => {
   mocks.update.mockClear();
   mocks.current = { data: {} };
   pending.length = 0;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve))),
+  mocks.resolveNodeSchema.mockImplementation(
+    () => new Promise<ResourceFlowNodeSchemaDto>((resolve, reject) => pending.push({ resolve, reject })),
   );
 });
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
-  vi.unstubAllGlobals();
+  mocks.resolveNodeSchema.mockReset();
 });
 
 describe('dynamic node editor', () => {
@@ -129,8 +136,8 @@ describe('dynamic node editor', () => {
       expect(screen.getByText('editor.buttons.save')).toBeDisabled();
       submit();
       expect(mocks.update).not.toHaveBeenCalled();
-      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(requestCount));
-      return JSON.parse(vi.mocked(fetch).mock.calls[requestCount - 1][1]?.body as string).config;
+      await waitFor(() => expect(mocks.resolveNodeSchema).toHaveBeenCalledTimes(requestCount));
+      return mocks.resolveNodeSchema.mock.calls[requestCount - 1][0].requestBody.config;
     }
 
     render(editor(commandSchema(false)));
@@ -174,7 +181,10 @@ describe('dynamic node editor', () => {
   it('blocks save when a resolved schema requires a field absent from its properties', async () => {
     render(editor());
     fireEvent.click(screen.getByText('Open'));
-    await respond(0, { ...base, configSchema: { ...base.configSchema, required: ['missingChannel'] } });
+    await respond(0, {
+      ...base,
+      configSchema: { ...base.configSchema, required: ['missingChannel'] },
+    });
     expect(screen.getByText('editor.buttons.save')).toBeDisabled();
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
@@ -183,14 +193,16 @@ describe('dynamic node editor', () => {
   it('allows an optional defaulted numeric field to be cleared before saving', async () => {
     vi.useRealTimers();
     const user = userEvent.setup();
-    render(editor({
-      ...base,
-      configSchema: {
-        ...base.configSchema,
-        dynamic: false,
-        properties: { ...baseProperties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
-      },
-    }));
+    render(
+      editor({
+        ...base,
+        configSchema: {
+          ...base.configSchema,
+          dynamic: false,
+          properties: { ...baseProperties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
+        },
+      }),
+    );
     fireEvent.click(screen.getByText('Open'));
     const timeout = screen.getByRole('textbox', { name: /Optional timeout/ });
     await user.clear(timeout);
@@ -217,7 +229,7 @@ describe('dynamic node editor', () => {
     mocks.current = { data: { command: 'first', nested: { saved: 'keep' }, removed: 'old' } };
     render(editor());
     fireEvent.click(screen.getByText('Open'));
-    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]?.body as string).config.nested).toEqual({ saved: 'keep' });
+    expect(mocks.resolveNodeSchema.mock.calls[0][0].requestBody.config.nested).toEqual({ saved: 'keep' });
     await respond(0, {
       ...base,
       configSchema: {
@@ -246,18 +258,21 @@ describe('dynamic node editor', () => {
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Retry'));
-    expect(JSON.parse(vi.mocked(fetch).mock.calls[2][1]?.body as string)).toEqual({ config: { command: 'second' } });
+    expect(mocks.resolveNodeSchema.mock.calls[2][0].requestBody).toEqual({ config: { command: 'second' } });
     await respond(2);
     submit();
     expect(mocks.update).toHaveBeenCalledWith('node', { command: 'second' });
   });
 
-  it('ignores responses after close/reopen, even when fetch ignores abort', async () => {
+  it('ignores responses after close/reopen when an older resolution completes', async () => {
     render(editor());
     fireEvent.click(screen.getByText('Open'));
     fireEvent.click(screen.getByText('editor.buttons.cancel'));
     fireEvent.click(screen.getByText('Open'));
-    await respond(0, { ...base, configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } } });
+    await respond(0, {
+      ...base,
+      configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } },
+    });
     expect(screen.queryByLabelText('Stale')).not.toBeInTheDocument();
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
@@ -273,13 +288,16 @@ describe('dynamic node editor', () => {
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'second' } });
     await act(async () => vi.advanceTimersByTime(300));
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'third' } });
-    await respond(1, { ...base, configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } } });
+    await respond(1, {
+      ...base,
+      configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } },
+    });
     expect(screen.queryByLabelText('Stale')).not.toBeInTheDocument();
     submit();
     expect(mocks.update).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('editor.buttons.cancel'));
     await act(async () => vi.advanceTimersByTime(300));
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.resolveNodeSchema).toHaveBeenCalledTimes(2);
   });
 
   it('invalidates an in-flight request when the schema changes', async () => {
@@ -287,7 +305,10 @@ describe('dynamic node editor', () => {
     fireEvent.click(screen.getByText('Open'));
     const next = { ...base, type: 'next' };
     view.rerender(editor(next));
-    await respond(0, { ...base, configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } } });
+    await respond(0, {
+      ...base,
+      configSchema: { properties: { stale: { type: 'string', title: 'Stale' } } },
+    });
     expect(screen.queryByLabelText('Stale')).not.toBeInTheDocument();
     await respond(1, next);
     submit();
@@ -330,7 +351,7 @@ describe('dynamic node editor', () => {
       nested: { count: 0, deeper: { text: 'nested' } },
       fixed: 'locked',
     });
-    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.resolveNodeSchema).not.toHaveBeenCalled();
   });
 
   it('blocks incompatible enum values even through form submit', async () => {

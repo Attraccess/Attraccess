@@ -1,4 +1,4 @@
-import { AppEnvSchema, DEFAULT_PLUGIN_DIR, resolveAppVersion, resolvePluginDir } from './app.config';
+import appConfig, { AppEnvSchema, DEFAULT_PLUGIN_DIR, resolveAppVersion, resolvePluginDir } from './app.config';
 
 describe('plugin directory configuration', () => {
   it('defaults PLUGIN_DIR when it is not configured', () => {
@@ -34,15 +34,11 @@ describe('resolveAppVersion', () => {
   });
 
   it('falls back to env.ATTRACCESS_VERSION when build-time version is undefined', () => {
-    expect(
-      resolveAppVersion({ ATTRACCESS_VERSION: '1.5.2' }, undefined),
-    ).toBe('1.5.2');
+    expect(resolveAppVersion({ ATTRACCESS_VERSION: '1.5.2' }, undefined)).toBe('1.5.2');
   });
 
   it('falls back to env.ATTRACCESS_VERSION when build-time version is the 0.0.0 placeholder', () => {
-    expect(
-      resolveAppVersion({ ATTRACCESS_VERSION: '1.5.2' }, '0.0.0'),
-    ).toBe('1.5.2');
+    expect(resolveAppVersion({ ATTRACCESS_VERSION: '1.5.2' }, '0.0.0')).toBe('1.5.2');
   });
 
   it('prefers ATTRACCESS_VERSION when set to a real semver', () => {
@@ -147,5 +143,38 @@ describe('resolveAppVersion', () => {
       if (originalNpm === undefined) delete process.env.npm_package_version;
       else process.env.npm_package_version = originalNpm;
     }
+  });
+});
+
+describe('application configuration factory', () => {
+  const originalEnv = process.env;
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.restoreAllMocks();
+  });
+  it('resolves legacy URL defaults and constants', () => {
+    process.env = { AUTH_SESSION_SECRET: 'test-secret', VITE_ATTRACCESS_URL: 'https://legacy.example' };
+    expect(appConfig()).toMatchObject({
+      ATTRACCESS_URL: 'https://legacy.example',
+      ATTRACCESS_PUBLIC_INTERNET_URL: 'https://legacy.example',
+      GLOBAL_PREFIX: 'api',
+      PLUGIN_DIR: DEFAULT_PLUGIN_DIR,
+    });
+  });
+  it('prefers explicit URLs and surfaces invalid environment values', () => {
+    process.env = {
+      AUTH_SESSION_SECRET: 'test-secret',
+      ATTRACCESS_URL: 'https://api.example',
+      VITE_ATTRACCESS_URL: 'https://unused.example',
+      ATTRACCESS_PUBLIC_INTERNET_URL: 'https://public.example',
+    };
+    expect(appConfig()).toMatchObject({
+      ATTRACCESS_URL: 'https://api.example',
+      ATTRACCESS_PUBLIC_INTERNET_URL: 'https://public.example',
+    });
+    process.env.PORT = 'invalid';
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(() => appConfig()).toThrow();
+    expect(error).toHaveBeenCalled();
   });
 });

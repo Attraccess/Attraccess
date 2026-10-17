@@ -19,7 +19,7 @@ Bevor Sie beginnen, benoetigen Sie:
 
 | Feld | Beschreibung | Beispiel |
 |------|-------------|---------|
-| **Name** | Ein beschreibender Name fuer diese Verbindung | `Werkstatt-Broker` |
+| **Name** | Ein beschreibender Name fuer diese Verbindung | `Produktions-Broker` |
 | **Host** | Hostname oder IP-Adresse des MQTT-Brokers | `mqtt.example.com` |
 | **Port** | MQTT-Port | `1883` (Standard) oder `8883` (TLS) |
 | **Benutzername** | Anmelde-Benutzername (falls erforderlich) | `attraccess` |
@@ -89,7 +89,7 @@ Sie koennen Attraccess mit mehreren MQTT-Brokern verbinden. Dies ist nuetzlich, 
 
 - Verschiedene Maschinen unterschiedliche Broker verwenden
 - Sie separate Broker fuer Produktion und Tests haben
-- Verschiedene Bereiche Ihres Makerspaces separate Netzwerke verwenden
+- Produktionsbereiche oder Labore separate Netzwerke verwenden
 
 ## Verbindungsstatus
 

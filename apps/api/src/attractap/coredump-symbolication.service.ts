@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
+
 import { execFile } from 'child_process';
-import { existsSync } from 'fs';
+
 import { mkdtemp, rm, writeFile } from 'fs/promises';
+
 import { tmpdir } from 'os';
-import { delimiter, join } from 'path';
+
+import { join, delimiter } from 'path';
 import { AttractapFirmwareService } from './firmware.service';
 
+import { existsSync } from 'fs';
 export type SymbolicationStatus = 'success' | 'failed' | 'skipped' | 'unavailable';
 
 export interface SymbolicationResult {
@@ -14,26 +18,41 @@ export interface SymbolicationResult {
   buildId: string | null;
 }
 
-const SYMBOLICATION_TIMEOUT_MS = 30000;
-const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+export const SYMBOLICATION_TIMEOUT_MS = 30000;
 
-// ELF note name written by esp-idf's core dump component (esp_core_dump_elf.c).
+export const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+
+export // ELF note name written by esp-idf's core dump component (esp_core_dump_elf.c).
 // Its note payload contains the truncated app ELF SHA256 as a plain ASCII hex string.
 const ESP_CORE_DUMP_INFO_MARKER = Buffer.from('ESP_CORE_DUMP_INFO', 'ascii');
-// Note payload: u32 version + zero-terminated ASCII sha. Scan a small window after the
+
+export // Note payload: u32 version + zero-terminated ASCII sha. Scan a small window after the
 // marker so we never pick up unrelated hex sequences elsewhere in the dump.
 const BUILD_ID_SCAN_WINDOW_BYTES = 128;
-// esp-idf truncates the app ELF SHA256 to CONFIG_APP_RETRIEVE_LEN_ELF_SHA hex chars
+
+export // esp-idf truncates the app ELF SHA256 to CONFIG_APP_RETRIEVE_LEN_ELF_SHA hex chars
 // (Kconfig range 8..64; idf 5.x defaults to 9, older versions used 16).
 const BUILD_ID_PATTERN = /[0-9a-fA-F]{8,64}/;
-const RISCV_CHIPS = new Set(['esp32c2', 'esp32c3', 'esp32c5', 'esp32c6', 'esp32c61', 'esp32h2', 'esp32h21', 'esp32h4', 'esp32p4']);
+
+export const RISCV_CHIPS = new Set([
+  'esp32c2',
+  'esp32c3',
+  'esp32c5',
+  'esp32c6',
+  'esp32c61',
+  'esp32h2',
+  'esp32h21',
+  'esp32h4',
+  'esp32p4',
+]);
 
 @Injectable()
 export class CoredumpSymbolicationService {
-  private readonly logger = new Logger(CoredumpSymbolicationService.name);
-  private readonly toolCommand = process.env.ESP_COREDUMP_CMD || 'esp-coredump';
+  public constructor(protected readonly firmwareService: AttractapFirmwareService) {}
 
-  public constructor(private readonly firmwareService: AttractapFirmwareService) {}
+  protected readonly logger = new Logger(CoredumpSymbolicationService.name);
+
+  protected readonly toolCommand = process.env.ESP_COREDUMP_CMD || 'esp-coredump';
 
   public async symbolicate(
     coredump: Buffer | null,
@@ -123,7 +142,7 @@ export class CoredumpSymbolicationService {
     return match ? match[0].toLowerCase() : null;
   }
 
-  private runTool(elfPath: string, corePath: string, chip: string | null): Promise<string> {
+  protected runTool(elfPath: string, corePath: string, chip: string | null): Promise<string> {
     const gdbPath = this.resolveGdbPath(chip);
     const args = [
       ...(chip ? ['--chip', chip] : []),
@@ -161,7 +180,15 @@ export class CoredumpSymbolicationService {
     });
   }
 
-  private resolveGdbPath(chip: string | null): string | null {
+  protected isToolMissing(message: string): boolean {
+    return message.includes('ENOENT') || message.includes('not found');
+  }
+
+  protected isToolchainMissing(message: string): boolean {
+    return message.includes('GDB executable not found') || message.includes('Please install GDB');
+  }
+
+  protected resolveGdbPath(chip: string | null): string | null {
     if (process.env.ESP_COREDUMP_GDB) {
       return process.env.ESP_COREDUMP_GDB;
     }
@@ -187,7 +214,7 @@ export class CoredumpSymbolicationService {
     return null;
   }
 
-  private findExecutableOnPath(command: string): string | null {
+  protected findExecutableOnPath(command: string): string | null {
     if (command.includes('/')) {
       return existsSync(command) ? command : null;
     }
@@ -203,13 +230,5 @@ export class CoredumpSymbolicationService {
     }
 
     return null;
-  }
-
-  private isToolMissing(message: string): boolean {
-    return message.includes('ENOENT') || message.includes('not found');
-  }
-
-  private isToolchainMissing(message: string): boolean {
-    return message.includes('GDB executable not found') || message.includes('Please install GDB');
   }
 }

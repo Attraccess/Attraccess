@@ -6,7 +6,6 @@ import unittest
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import Mock
-
 from playwright.sync_api import sync_playwright, expect
 from browser_fixture import ARTIFACTS
 from isolated_browser_fixture import IsolatedWagoFixture, ORIGIN
@@ -108,14 +107,6 @@ class ConfigurationBrowser(unittest.TestCase):
         self.dialog.locator("summary", has_text="Wiring label").click()
         self.dialog.get_by_role("textbox", name=re.compile(r"^Physical\ point\ label\*?$")).fill("Cabinet output A")
 
-    def test_long_channel_names_fit_list_and_terminal_map(self):
-        name = "Workshop" * 15
-        self.add_channel(name)
-        for view in ["Channel list", "Terminal map"]:
-            self.button(view).click()
-            self.assertLessEqual(self.page.locator("html").evaluate("el => el.scrollWidth - el.clientWidth"), 1)
-        expect(self.button("DO1: " + name)).to_be_visible()
-
     def save(self):
         self.button("Save draft").click()
         expect(self.dialog.get_by_text("Draft saved. Review and publish separately to send it to the controller.", exact=True)).to_be_visible()
@@ -146,6 +137,8 @@ class ConfigurationBrowser(unittest.TestCase):
 
     def custom_profile(self):
         self.external("Device profiles")
+        # The focused editor opens the first profile; select the legacy map used by these scenarios.
+        self.choose("Edit profile", "WAGO 879-3000 — UNQUALIFIED / map unverified v1")
         self.dialog.get_by_role("button", name=re.compile("^Duplicate WAGO 879-3000")).click()
         return self.dialog.locator("details").filter(has=self.page.locator("summary", has_text="(custom)"))
 
@@ -268,6 +261,14 @@ class ConfigurationBrowser(unittest.TestCase):
         self.assertEqual(self.fixture.count("/draft"), 0)
         self.assertEqual(self.fixture.count("/publish"), 0)
 
+    def test_long_channel_names_fit_list_and_terminal_map(self):
+        name = "Workshop" * 15
+        self.add_channel(name)
+        for view in ["Channel list", "Terminal map"]:
+            self.button(view).click()
+            self.assertLessEqual(self.page.locator("html").evaluate("el => el.scrollWidth - el.clientWidth"), 1)
+        expect(self.button("DO1: " + name)).to_be_visible()
+
     def test_first_digital_setup_save_and_reload(self):
         self.add_output()
         self.add_channel("Door sensor", "Monitor an input", "DI4")
@@ -299,13 +300,21 @@ class ConfigurationBrowser(unittest.TestCase):
         copy = self.button("Copy selected changes to local edits")
         expect(copy).to_be_enabled()
         self.assertEqual(self.fixture.draft, saved)
-        self.dialog.get_by_text("Workshop light · Preset profile", exact=True).click()
+        pulse_row = self.dialog.get_by_role("checkbox", name="Workshop light · Pulse", exact=True)
+        expect(pulse_row).to_be_checked()
+        pulse_label = self.dialog.get_by_text("Workshop light · Pulse", exact=True)
+        pulse_label.click()
+        expect(pulse_row).not_to_be_checked()
+        self.assertEqual(self.fixture.draft, saved)
+        pulse_label.click()
+        expect(pulse_row).to_be_checked()
         copy.click()
         self.dialog.get_by_role("spinbutton", name=re.compile(r"^Pulse\ duration\ \(ms\)\*?$")).fill("750")
         self.assertEqual(self.fixture.draft, saved)
         self.save()
         channel = json.loads(self.fixture.draft["snapshot"])["logicalChannels"][0]
-        self.assertEqual(channel["profile"], "generic-digital-output")
+        # Copying the preset's "Setup preset" row applies the preset profile itself.
+        self.assertEqual(channel["profile"], "pulsed-lock-bank")
         self.assertEqual(channel["pulse"]["durationMs"], 750)
         self.button("Preview preset").click()
         copy.click()
@@ -354,7 +363,7 @@ class ConfigurationBrowser(unittest.TestCase):
         self.publish()
         original = self.fixture.revisions[0].copy()
         self.section("Channels")
-        self.dialog.get_by_text("Pulse output", exact=True).click()
+        self.choose("Output behavior", "Pulsed — trigger for a duration")
         self.save()
         self.publish()
         expected_identity = self.fixture.draft_identity()

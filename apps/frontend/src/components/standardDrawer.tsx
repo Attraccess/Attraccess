@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import {
   DrawerBackdrop,
   DrawerContent,
@@ -19,6 +19,7 @@ interface Props {
 
 const DEFAULT_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-overlay';
 
+/** Render DrawerHeading for the title, or name headerless content via dialogProps['aria-label']. */
 export function StandardDrawer(props: Props) {
   const { isOpen, onOpenChange, children, backdropProps, contentProps, dialogProps } = props;
 

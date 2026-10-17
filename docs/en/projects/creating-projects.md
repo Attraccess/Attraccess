@@ -10,7 +10,7 @@ Any logged-in user can create projects.
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| **Name** | Yes | A descriptive project name (e.g. "Workshop Renovation 2025") |
+| **Name** | Yes | A descriptive project name (e.g. "CNC Fixture Development") |
 | **Description** | No | A longer description of the project's purpose and goals |
 
 4. Click **Save**

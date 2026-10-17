@@ -9,39 +9,40 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button } from '../../../../components/button';
+import { Button } from '../../../../components/button/index';
+import { Select } from '../../../../components/select/index';
+import { EmptyState } from '../../../../components/emptyState';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Select } from '../../../../components/select';
-import { parse as parseCsv } from 'csv-parse/browser/esm';
+import { readPreviewFromFile as readPreview } from './csv-preview';
 import {
   CsvInviteUploadDto,
   useUsersServiceInviteUsersFromCsv,
   ApiError,
   useRbacServiceListRoles,
+  useUsersServiceFindManyKey,
 } from '@attraccess/react-query-client';
-import { EmptyState } from '../../../../components/emptyState';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUsersServiceFindManyKey } from '@attraccess/react-query-client';
 
-const PREVIEW_ROW_COUNT = 5;
+export const PREVIEW_ROW_COUNT = 5;
 
-type CsvRowError = {
+export type CsvRowError = {
   row: number;
   field?: string;
   message: string;
   value?: string;
 };
 
-interface Props {
+export interface Props {
   onSuccess?: () => void;
   onError?: (error: ApiError) => void;
 }
 
-export function CsvInvite({ onSuccess, onError }: Props) {
+export function useCsvInviteState({ onSuccess, onError }: Props) {
+  const readPreviewFromFile = readPreview;
   const { t } = useTranslations({
     en,
     de,
@@ -66,37 +67,6 @@ export function CsvInvite({ onSuccess, onError }: Props) {
     file.onchange = (e) => setSelectedFile((e.target as HTMLInputElement).files?.[0] || null);
     file.click();
   }, [setSelectedFile]);
-
-  const readPreviewFromFile = useCallback(async (file: File, recordCount: number) => {
-    const fileText = await file.text();
-
-    return await new Promise<string[][]>((resolve, reject) => {
-      parseCsv(
-        fileText,
-        {
-          bom: true,
-          relax_column_count: true,
-          skip_empty_lines: false,
-          trim: false,
-          to_line: recordCount + 1, // only parse what we need for the preview
-        },
-        (error, output) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          resolve(
-            (output ?? []).map((record) =>
-              (record as Array<string | number | null | undefined>).map((value) =>
-                typeof value === 'string' ? value.replace(/\r$/, '') : `${value ?? ''}`,
-              ),
-            ),
-          );
-        },
-      );
-    });
-  }, []);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -216,6 +186,43 @@ export function CsvInvite({ onSuccess, onError }: Props) {
     },
     [buildConfig, ignoredRows, inviteUsers, rowErrors, selectedFile, t, toast, validateReady],
   );
+  return {
+    t,
+    selectedFile,
+    csvHeaders,
+    emailKey,
+    setEmailKey,
+    usernameKey,
+    setUsernameKey,
+    roleKeyColumn,
+    setRoleKeyColumn,
+    availableRoles,
+    selectFile,
+    previewUsers,
+    rowErrors,
+    isPending,
+    submit,
+  } as const;
+}
+
+export function CsvInvite({ onSuccess, onError }: Props) {
+  const {
+    t,
+    selectedFile,
+    csvHeaders,
+    emailKey,
+    setEmailKey,
+    usernameKey,
+    setUsernameKey,
+    roleKeyColumn,
+    setRoleKeyColumn,
+    availableRoles,
+    selectFile,
+    previewUsers,
+    rowErrors,
+    isPending,
+    submit,
+  } = useCsvInviteState({ onSuccess, onError });
 
   return (
     <div className="flex flex-col gap-4">
@@ -250,10 +257,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
           label={t('inputs.fieldMapping.roleKeyColumn')}
           value={roleKeyColumn ?? ''}
           onChange={(v) => setRoleKeyColumn(v || undefined)}
-          items={[
-            { label: '—', key: '' },
-            ...csvHeaders.map((header) => ({ label: header, key: header })),
-          ]}
+          items={[{ label: '—', key: '' }, ...csvHeaders.map((header) => ({ label: header, key: header }))]}
         />
       )}
 
@@ -281,9 +285,7 @@ export function CsvInvite({ onSuccess, onError }: Props) {
       {rowErrors.length > 0 && (
         <div className="flex flex-col gap-2 border border-default-200 rounded-medium p-3">
           <Badge.Anchor>
-            <h3 className="text-sm font-semibold">
-              {t('errors.title')}
-            </h3>
+            <h3 className="text-sm font-semibold">{t('errors.title')}</h3>
             <Badge color="danger" variant="soft">
               {rowErrors.length}
             </Badge>

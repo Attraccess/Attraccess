@@ -1,4 +1,5 @@
 {
+  "title": "Ressourcen-QR-Code scannen",
   "scan": {
     "error": {
       "wrongOrigin": {

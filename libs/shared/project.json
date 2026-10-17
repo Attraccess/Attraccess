@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/shared/src",
   "projectType": "library",
-  "tags": [],
+  "tags": ["type:lib", "scope:core"],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
@@ -14,6 +14,12 @@
         "packageJson": "libs/shared/package.json",
         "main": "libs/shared/src/index.ts",
         "assets": ["libs/shared/*.md"]
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/shared"
       }
     }
   }

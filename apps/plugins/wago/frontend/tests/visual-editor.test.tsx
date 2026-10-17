@@ -1,203 +1,187 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+// Register API mocks before the editor and its fixture helpers are imported.
+import { state } from './visual-editor.test.state';
+import { PluginLiveUpdatesProvider, type PluginLiveUpdatesClient } from '@attraccess/plugins-frontend-sdk';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
-import { ConfigurationEditor } from '../src/ConfigurationEditor';
-import { ConfigurationMetadataChanges } from '../src/ConfigurationChanges';
-import type { WagoConfigurationSnapshot } from '../src/api';
-import { validateEditorSnapshot } from '../../backend/configuration-editor';
-import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
-import type { WagoDiagnostics } from '../src/diagnostics';
-
-const state = vi.hoisted(() => ({
-  snapshot: {
-    version: 1,
-    physicalPoints: [{ id: 'point', hardwareProfile: '751-9301', channel: 0 }],
-    logicalChannels: [
-      {
-        id: 'output',
-        physicalPointId: 'point',
-        profile: 'generic-digital-output',
-        capabilities: ['output'],
-        disconnectPolicy: { mode: 'immediate' },
-      },
-    ],
-  },
-  save: vi.fn(),
-  preview: vi.fn(),
-  apply: vi.fn(),
-  publish: vi.fn(),
-  review: vi.fn(),
-  history: vi.fn(),
-  revisionPreview: vi.fn(),
-  getDraft: vi.fn(),
-  baseline: vi.fn(),
-  rollback: vi.fn(),
-  acknowledge: vi.fn(),
-  diagnostics: vi.fn(),
-  validate: vi.fn(),
-}));
-vi.mock('../src/api', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../src/api')>()),
-  getDraft: state.getDraft,
-  getConfigurationBaseline: state.baseline,
-  listPresets: vi.fn(async () => [
-    { id: 'pulsed-lock-bank', name: 'Pulsed lock bank', description: 'Pulse output' },
-    { id: 'generic-digital-output', name: 'Generic digital output', description: 'Output' },
-  ]),
-  listConfigurationRevisions: state.history,
-  validateConfiguration: state.validate,
-  saveDraft: state.save,
-  previewPreset: state.preview,
-  applyPreset: state.apply,
-  publishConfiguration: state.publish,
-  reviewConfiguration: state.review,
-  previewConfigurationRevision: state.revisionPreview,
-  rollbackConfiguration: state.rollback,
-  acknowledgeConfigurationRejection: state.acknowledge,
-}));
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-}
-
-function diagnosticsFixture(controllerId = 1): WagoDiagnostics {
-  return {
-    controllerId,
-    generatedAt: new Date().toISOString(),
-    name: `Fixture controller ${controllerId}`,
-    connectivity: 'online',
-    heartbeatAt: new Date().toISOString(),
-    heartbeatFreshness: 'fresh',
-    runtimeVersion: '1.0.0',
-    protocolVersion: '1.0.0',
-    capabilities: [],
-    incompatible: false,
-    sequenceGaps: null,
-    sequenceExplanation: 'Fixture source',
-    activeStream: null,
-    trackingExhausted: false,
-    stateConnected: true,
-    stateHardwareAvailable: null,
-    stateSourceAt: null,
-    configuration: {
-      draftUpdatedAt: null,
-      draftChanged: false,
-      validationErrorCount: 0,
-      validationCodes: [],
-      validationErrors: [],
-      rejectionErrors: [],
-      publishedRevision: 1,
-      publishedState: 'applied',
-      appliedRevision: 1,
-      reportedRevision: 1,
-      revisionMismatch: false,
-      rejected: false,
-    },
-    hardwareReadiness: 'unknown',
-    hardwareReadinessReason: 'An applied revision is not physical I/O proof.',
-    channels: [],
-    faults: [],
-    references: [],
-    referencesTruncated: false,
-    events: [],
-    limitations: [],
-  };
-}
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { validateEditorSnapshot } from '../../backend/configuration/editor';
+import type { WagoConfigurationSnapshot } from '../src/api/client';
+import { ConfigurationEditor } from '../src/configuration/ConfigurationEditor';
+import { ConfigurationMetadataChanges } from '../src/configuration/ConfigurationChanges';
+import { deferred, diagnosticsFixture, resetTestFixture } from './visual-editor.setup.test-fixture.helpers';
+import { section } from './visual-editor.test.external.helpers';
 
 let client: QueryClient;
-const originalScrollTo = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTo');
-beforeAll(() => {
-  // JSDOM has no layout scrolling; React Aria calls this when opening a collection.
-  Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() });
-});
-afterAll(() => {
-  if (originalScrollTo) Object.defineProperty(Element.prototype, 'scrollTo', originalScrollTo);
-  else Reflect.deleteProperty(Element.prototype, 'scrollTo');
-});
-beforeEach(() => {
-  vi.clearAllMocks();
-  state.baseline.mockResolvedValue(null);
-  state.validate.mockResolvedValue({ valid: true, errors: [] });
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {
-        /* No layout observer in this DOM fixture. */
-      }
-      unobserve() {
-        /* No layout observer in this DOM fixture. */
-      }
-      disconnect() {
-        /* No layout observer in this DOM fixture. */
-      }
-    },
-  );
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, options?: RequestInit) => {
-      if (/\/api\/wago\/controllers\/\d+\/diagnostics$/.test(url) && !options?.method)
-        return state.diagnostics(url, options);
-      throw new Error('Unexpected network access in visual editor test');
-    }),
-  );
-  client = new QueryClient({
-    defaultOptions: { queries: { retry: false, retryDelay: 0 }, mutations: { retry: false } },
-  });
-  state.diagnostics.mockImplementation(async (url: string) => {
-    const controllerId = Number(/controllers\/(\d+)/.exec(url)?.[1]);
-    return new Response(JSON.stringify(diagnosticsFixture(controllerId)));
-  });
-  state.history.mockResolvedValue({ revisions: [], offset: 0, limit: 20 });
-  state.getDraft.mockResolvedValue({
-    controllerId: 1,
-    snapshot: JSON.stringify(state.snapshot),
-    reviewedHash: null,
-    presetProvenance: JSON.stringify({ editor: { names: { output: 'Door lock', point: 'DO1' }, presets: [] } }),
-    updatedAt: '2026-09-05',
-  });
-  state.save.mockImplementation(async (_id, snapshot, metadata) => ({
-    controllerId: 1,
-    snapshot: JSON.stringify(snapshot),
-    presetProvenance: JSON.stringify({ editor: metadata }),
-    reviewedHash: null,
-    updatedAt: '2026-09-05',
-  }));
-});
-afterEach(() => {
-  cleanup();
-  client.clear();
-  vi.unstubAllGlobals();
-});
 
-function mount() {
+function mount(liveClient: PluginLiveUpdatesClient | null = null) {
   const close = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <ConfigurationEditor controllerId={1} onOpenChange={close} />
+      <PluginLiveUpdatesProvider client={liveClient}>
+        <ConfigurationEditor controllerId={1} onOpenChange={close} />
+      </PluginLiveUpdatesProvider>
     </QueryClientProvider>,
   );
   return close;
 }
 
-async function section(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const button = await screen.findByRole('button', { name, exact: true });
-  await waitFor(() => expect(button).toBeEnabled());
-  await user.click(button);
-}
-async function external(user: ReturnType<typeof userEvent.setup>, name: string) {
-  await section(user, 'External devices');
-  await user.click(await screen.findByRole('button', { name: new RegExp(`^${name} `) }));
+function getSetupScope() {
+  return {
+    get state() {
+      return state;
+    },
+    get client() {
+      return client;
+    },
+    set client(value: typeof client) {
+      client = value;
+    },
+    diagnosticsFixture,
+  };
 }
 
+const originalScrollTo = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTo');
+
+beforeAll(() => {
+  // JSDOM has no layout scrolling; React Aria calls this when opening a collection.
+  Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() });
+});
+
+afterAll(() => {
+  if (originalScrollTo) Object.defineProperty(Element.prototype, 'scrollTo', originalScrollTo);
+  else Reflect.deleteProperty(Element.prototype, 'scrollTo');
+});
+
+beforeEach(() => {
+  resetTestFixture(getSetupScope());
+});
+
+afterEach(() => {
+  cleanup();
+  useTranslationState.setState({ language: 'en' });
+  client.clear();
+  vi.unstubAllGlobals();
+});
+
 describe('visual configuration workflow', () => {
-  it('embeds real diagnostics polling without saving local edits or duplicating configuration controls', async () => {
+  it('switches diagnostic status values with the host language while preserving source identifiers', async () => {
+    const diagnostics = diagnosticsFixture();
+    diagnostics.capabilities = ['input', 'measurement', 'vendor.capability-v2'];
+    diagnostics.hardwareReadinessReason =
+      'Reported hardware availability is shown when supplied; it does not prove physical I/O readiness. Applied configuration and cached output state are not physical proof.';
+    diagnostics.channels = [
+      {
+        id: 'sensor.v1',
+        profile: 'generic-digital-output',
+        capabilities: ['output', 'pulse', 'vendor.channel-v2'],
+        disconnectPolicy: { mode: 'hold' },
+        safeState: 'off (runtime default)',
+        samples: [
+          {
+            kind: 'output',
+            value: true,
+            sourceAt: null,
+            sourceFreshness: 'stale',
+            receivedAt: '2026-09-06T18:00:00.000Z',
+            streamId: 'boot.v1',
+            sequence: 1,
+            current: false,
+            availabilityReason: 'vendor.diagnostic-v2',
+          },
+          {
+            kind: 'measurement',
+            value: 12.4,
+            unit: 'volt',
+            measurementKind: 'live',
+            sourceAt: null,
+            sourceFreshness: 'fresh',
+            receivedAt: '2026-09-06T18:00:00.000Z',
+            streamId: 'boot.v1',
+            sequence: 2,
+            current: false,
+            availabilityReason: 'configuration-mismatch',
+          },
+        ],
+        current: false,
+        fault: null,
+        acknowledgement: null,
+      },
+    ];
+    state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostics)));
     mount();
+    await section(userEvent.setup(), 'Diagnostics');
+    expect(await screen.findByText(/Permanent heartbeat:.*\(fresh\)/)).toBeInTheDocument();
+    expect(screen.getByText('Capabilities: input, measurement, vendor.capability-v2')).toBeInTheDocument();
+    expect(
+      screen.getByText('Setup preset: Generic digital output · Capabilities: output, pulse, vendor.channel-v2'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Latest output:/)).toBeInTheDocument();
+    expect(screen.getByText(/Latest measurement: 12.4 volt live/)).toBeInTheDocument();
+    expect(screen.getByText('Safe state: off (runtime default). Disconnect: hold.')).toBeInTheDocument();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText(/Dauerhaftes Lebenszeichen:.*\(Aktuell\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Quellzeit:.*\(Veraltet\)/)).toBeInTheDocument();
+    expect(screen.getByText('Funktionen: Eingang, Messwert, vendor.capability-v2')).toBeInTheDocument();
+    expect(screen.getByText(/Funktionen: Ausgang, Impuls, vendor.channel-v2/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Einrichtungsvorlage: Allgemeiner digitaler Ausgang · Funktionen: Ausgang, Impuls, vendor.channel-v2',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Letzter Wert für Ausgang:/)).toBeInTheDocument();
+    expect(screen.getByText(/Letzter Wert für Messwert: 12.4 Volt Aktuell/)).toBeInTheDocument();
+    expect(screen.getByText(/nicht aktuell: Konfigurationsabweichung/)).toBeInTheDocument();
+    expect(screen.getByText(/Gemeldete Hardware-Verfügbarkeit/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Sicherer Zustand: Aus (Standard der Laufzeitumgebung). Bei Verbindungsabbruch: Halten.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('sensor.v1')).toBeInTheDocument();
+    expect(screen.getByText(/vendor\.diagnostic-v2/)).toBeInTheDocument();
+    expect(screen.getAllByText(/boot\.v1/)).toHaveLength(2);
+    expect(state.diagnostics).toHaveBeenCalledTimes(1);
+  });
+
+  it('localizes acknowledgement and protocol event dates when the host language changes', async () => {
+    const diagnostics = diagnosticsFixture();
+    diagnostics.channels = [
+      {
+        id: 'sensor.v1',
+        profile: 'generic-digital-output',
+        capabilities: ['output'],
+        disconnectPolicy: { mode: 'hold' },
+        safeState: 'on',
+        samples: [],
+        current: false,
+        fault: null,
+        acknowledgement: { id: 'command.v1', status: 'accepted', receivedAt: '2026-09-06T18:24:00.000Z' },
+      },
+    ];
+    diagnostics.events = [{ kind: 'state.changed', receivedAt: '2026-09-06T18:25:00.000Z' }];
+    state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostics)));
+    mount();
+    await section(userEvent.setup(), 'Diagnostics');
+    expect(await screen.findByText(/command\.v1/)).toHaveTextContent('9/6/2026');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('9/6/2026');
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getByText(/command\.v1/)).toHaveTextContent('6.9.2026');
+    expect(screen.getByText(/command\.v1/)).toHaveTextContent('Akzeptiert');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('6.9.2026');
+    expect(state.diagnostics).toHaveBeenCalledTimes(1);
+  });
+
+  it('receives live diagnostic snapshots without HTTP polling, saving local edits or duplicating controls', async () => {
+    const callbacks = new Set<(payload: unknown) => void>();
+    mount({
+      subscribe: (subscription, callback) => {
+        if (subscription.topic === 'plugin:wago:diagnostics') callbacks.add(callback);
+        return () => {
+          callbacks.delete(callback);
+        };
+      },
+    });
     const user = userEvent.setup();
     expect(await screen.findByText('Fixture controller 1: online')).toBeInTheDocument();
     expect(screen.getAllByText(/Hardware readiness: unknown/)).toHaveLength(1);
@@ -208,12 +192,15 @@ describe('visual configuration workflow', () => {
     );
     const name = await screen.findByRole('textbox', { name: 'Channel name' });
     await user.clear(name);
-    await user.type(name, 'Unsaved diagnostic session');
-    state.diagnostics.mockClear();
-    await section(user, 'Diagnostics');
-    await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
-    await waitFor(() => expect(state.diagnostics).toHaveBeenCalledTimes(1));
-    expect(name).toHaveValue('Unsaved diagnostic session');
+    await user.type(name, 'Live draft');
+    act(() =>
+      callbacks.forEach((callback) =>
+        callback({ eventType: 'snapshot', value: { ...diagnosticsFixture(), name: 'Streamed controller' } }),
+      ),
+    );
+    expect(await screen.findByText('Streamed controller: online')).toBeInTheDocument();
+    expect(state.diagnostics).toHaveBeenCalledTimes(1);
+    expect(name).toHaveValue('Live draft');
     expect(screen.getByText(/Unsaved local edits/)).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
     expect(state.publish).not.toHaveBeenCalled();
@@ -270,19 +257,21 @@ describe('visual configuration workflow', () => {
     ).toBe(0);
   });
 
-  it('renders literal editor names in metadata changes', () => {
-    render(
-      <ConfigurationMetadataChanges
-        changes={[{ path: '$.names.output', previous: 'Pump-A', current: 'Pump A' }]}
-        names={{ output: 'Pump A' }}
-      />,
-    );
+  {
+    it('renders literal editor names in metadata changes', () => {
+      render(
+        <ConfigurationMetadataChanges
+          changes={[{ path: '$.names.output', previous: 'Pump-A', current: 'Pump A' }]}
+          names={{ output: 'Pump A' }}
+        />,
+      );
 
-    expect(screen.getByText('Before: Pump-A')).toBeInTheDocument();
-    expect(screen.getByText('After: Pump A')).toBeInTheDocument();
-  });
+      expect(screen.getByText('Before: Pump-A')).toBeInTheDocument();
+      expect(screen.getByText('After: Pump A')).toBeInTheDocument();
+    });
+  }
 
-  it.each(['success', 'delivery failure', 'refresh failure'] as const)(
+  it.each(['success', 'delivery failure', 'refresh failure', 'unsupported refresh'] as const)(
     'reconciles rollback after %s and sends the previewed draft identity',
     async (outcome) => {
       const revision = {
@@ -304,13 +293,23 @@ describe('visual configuration workflow', () => {
       });
       state.rollback.mockImplementation(async () => {
         if (outcome === 'refresh failure') state.getDraft.mockRejectedValue(new Error('refresh unavailable'));
+        else if (outcome === 'unsupported refresh')
+          state.getDraft.mockResolvedValue({
+            controllerId: 1,
+            snapshot: '{"version":2}',
+            updatedAt: '2026-09-05',
+          });
         else
           state.getDraft.mockResolvedValue({
             controllerId: 1,
             snapshot: JSON.stringify({
               ...state.snapshot,
               logicalChannels: [
-                { ...state.snapshot.logicalChannels[0], pulse: { durationMs: 250 }, capabilities: ['output', 'pulse'] },
+                {
+                  ...state.snapshot.logicalChannels[0],
+                  pulse: { durationMs: 250 },
+                  capabilities: ['output', 'pulse'],
+                },
               ],
             }),
             presetProvenance: JSON.stringify({
@@ -336,11 +335,22 @@ describe('visual configuration workflow', () => {
       await waitFor(() =>
         expect(state.rollback).toHaveBeenCalledWith(1, 1, false, 'historical', 'historical', 'snapshot-and-metadata'),
       );
-      if (outcome === 'refresh failure') {
-        expect(await screen.findByText(/Could not reconcile the saved draft after rollback/)).toBeInTheDocument();
+      if (outcome === 'refresh failure' || outcome === 'unsupported refresh') {
+        expect(
+          await screen.findByText(
+            outcome === 'unsupported refresh'
+              ? /unsupported configuration structure/
+              : /Could not reconcile the saved draft after rollback/,
+          ),
+        ).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
         expect(screen.queryByRole('textbox', { name: 'Channel name' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'WAGO controllers' })).toBeEnabled();
+        if (outcome === 'unsupported refresh') {
+          act(() => useTranslationState.setState({ language: 'de' }));
+          expect(screen.getByText(/nicht unterstützt/)).toBeInTheDocument();
+          expect(screen.queryByText(/unsupported/)).not.toBeInTheDocument();
+        }
       } else {
         await section(user, 'Channels');
         await waitFor(() =>
@@ -483,7 +493,12 @@ describe('visual configuration workflow', () => {
     await user.click(screen.getByRole('button', { name: 'Preview preset' }));
     expect(await screen.findByRole('button', { name: 'Reapply preset to local edits' })).toBeDisabled();
     expect(state.apply).toHaveBeenCalledTimes(1);
-    state.preview.mockResolvedValue({ draftHash: 'unchanged-preview', snapshot: candidate, diff: [], errors: [] });
+    state.preview.mockResolvedValue({
+      draftHash: 'unchanged-preview',
+      snapshot: candidate,
+      diff: [],
+      errors: [],
+    });
     state.apply.mockResolvedValue({ snapshot: JSON.stringify(candidate) });
     await user.click(screen.getByRole('button', { name: 'Preview preset' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reapply preset to local edits' })).toBeEnabled());
@@ -566,387 +581,6 @@ describe('visual configuration workflow', () => {
     await waitFor(() => expect(state.acknowledge).toHaveBeenCalledWith(1, 2, 'rejected', '2026-09-05'));
     expect(await screen.findByText(/Rejection acknowledged by user 7/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Acknowledge rejection of revision 2' })).not.toBeInTheDocument();
-  });
-});
-
-describe('mounted Modbus configuration', () => {
-  async function addMeter() {
-    mount();
-    const user = userEvent.setup();
-    await external(user, 'Connections');
-    await user.click(await screen.findByRole('button', { name: 'Add connection' }));
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await user.type(screen.getByRole('textbox', { name: 'Host' }), 'meter.fixture.invalid');
-    await external(user, 'Devices');
-    await user.click(screen.getByRole('button', { name: 'Add device' }));
-    await user.clear(screen.getByRole('textbox', { name: 'Device name' }));
-    await user.type(screen.getByRole('textbox', { name: 'Device name' }), 'Workshop meter');
-    await user.click(screen.getByRole('button', { name: 'Add Active power from Workshop meter' }));
-    await section(user, 'Channels');
-    return user;
-  }
-
-  it('mounts named bindings and saves exact Modbus configuration with stable identities', async () => {
-    const user = await addMeter();
-    expect(screen.queryByRole('textbox', { name: 'Device ID' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Connection ID' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Modbus device/ })).toHaveTextContent('Workshop meter');
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
-    const [, first] = state.save.mock.calls[0];
-    expect(validateEditorSnapshot(first)).toEqual([]);
-    expect(first.modbus.devices[0]).toMatchObject({
-      name: 'Workshop meter',
-      profileId: 'wago-879-3000-unverified',
-      profileVersion: 1,
-    });
-    expect(first.physicalPoints[1]).toMatchObject({
-      hardwareProfile: 'modbus',
-      channel: 0,
-      modbus: { deviceId: first.modbus.devices[0].id, measurementId: 'active-power' },
-    });
-    expect(first.logicalChannels[1]).toMatchObject({
-      physicalPointId: first.physicalPoints[1].id,
-      capabilities: ['input', 'measurement'],
-      measurement: { unit: 'watt', kind: 'live', scale: 1, offset: 0 },
-    });
-    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
-    const [, second] = state.save.mock.calls[1];
-    expect(second.physicalPoints[1].id).toBe(first.physicalPoints[1].id);
-    expect(second.logicalChannels[1].id).toBe(first.logicalChannels[1].id);
-    expect(second.physicalPoints[1].modbus.measurementId).toBe('import-energy');
-    expect(second.logicalChannels[1].measurement).toEqual({
-      unit: 'watt-hour',
-      kind: 'cumulative',
-      scale: 1,
-      offset: 0,
-    });
-    expect(second.logicalChannels[0]).toEqual(first.logicalChannels[0]);
-    expect(state.publish).not.toHaveBeenCalled();
-  });
-
-  it('blocks invalid transport and binding edits and displays server validation', async () => {
-    const user = await addMeter();
-    await external(user, 'Connections');
-    const port = screen.getByRole('textbox', { name: 'Port' });
-    await user.clear(port);
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await user.type(port, '502');
-    state.validate.mockResolvedValue({
-      valid: false,
-      errors: [{ path: 'modbus.devices[0].unitId', code: 'invalid_modbus', message: 'Fixture unit is unavailable' }],
-    });
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(await screen.findByText('Workshop meter · unit Id: Fixture unit is unavailable')).toBeInTheDocument();
-    expect(state.save).not.toHaveBeenCalled();
-    await external(user, 'Devices');
-    await user.click(screen.getByRole('button', { name: 'Remove device' }));
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    expect(screen.getByText(/existing device and named measurement\/action required/)).toBeInTheDocument();
-  });
-
-  it('freezes Modbus controls and rejects saving a dirty editor over a refreshed draft', async () => {
-    const user = await addMeter();
-    await external(user, 'Connections');
-    const fresh = {
-      controllerId: 1,
-      snapshot: JSON.stringify(state.snapshot),
-      presetProvenance: null,
-      reviewedHash: null,
-      updatedAt: '2026-09-07',
-    };
-    await act(async () => {
-      client.setQueryData(['wago', 'configuration-draft', 1], fresh);
-    });
-    expect(await screen.findByText('Saved draft changed')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Host' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(state.save).not.toHaveBeenCalled();
-  });
-});
-
-describe('Modbus output and serial composition', () => {
-  it('binds a named action and live measurement, retaining output controls and valid metered payloads', async () => {
-    const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'fixture-map');
-    profile.actions = [
-      {
-        id: 'switch',
-        name: 'Relay',
-        functionCode: 5,
-        address: 0,
-        addressBase: 0,
-        dataType: 'uint16',
-        byteOrder: 'big',
-        wordOrder: 'big',
-        scale: 1,
-        offset: 0,
-        onValue: 1,
-        offValue: 0,
-      },
-    ];
-    const snapshot = {
-      ...state.snapshot,
-      modbus: {
-        profiles: [profile],
-        connections: [
-          {
-            id: 'connection',
-            transport: 'tcp',
-            host: 'meter.fixture.invalid',
-            port: 502,
-            timeoutMs: 1000,
-            reconnectMs: 250,
-            queueLimit: 16,
-          },
-        ],
-        devices: [
-          {
-            id: 'meter',
-            name: 'Meter',
-            connectionId: 'connection',
-            unitId: 1,
-            profileId: profile.id,
-            profileVersion: 1,
-          },
-        ],
-      },
-    };
-    state.getDraft.mockResolvedValue({
-      controllerId: 1,
-      snapshot: JSON.stringify(snapshot),
-      presetProvenance: null,
-      reviewedHash: null,
-      updatedAt: 'initial',
-    });
-    mount();
-    const user = userEvent.setup();
-    await external(user, 'Devices');
-    await user.click(await screen.findByRole('button', { name: 'Add Relay from Meter' }));
-    await section(user, 'Channels');
-    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: /Active power/ }));
-    await user.click(screen.getByRole('button', { name: /Output behavior/ }));
-    await user.click(await screen.findByRole('option', { name: /Pulsed —/ }));
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
-    const [, saved] = state.save.mock.calls[0];
-    expect(validateEditorSnapshot(saved)).toEqual([]);
-    expect(saved.modbus).toEqual(snapshot.modbus);
-    expect(saved.physicalPoints[1].modbus).toEqual({
-      deviceId: 'meter',
-      actionId: 'switch',
-      measurementId: 'active-power',
-    });
-    expect(saved.logicalChannels[1]).toMatchObject({
-      profile: 'metered-switched-load',
-      capabilities: ['output', 'measurement', 'pulse'],
-      pulse: { durationMs: 500 },
-      disconnectPolicy: { mode: 'immediate' },
-    });
-    await user.click(screen.getByRole('button', { name: /Named action/ }));
-    await user.click(await screen.findByRole('option', { name: 'None' }));
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    expect(screen.getByRole('spinbutton', { name: 'Pulse duration (ms)' })).toHaveValue(500);
-    await user.click(screen.getByRole('button', { name: /Named action/ }));
-    await user.click(await screen.findByRole('option', { name: 'Relay' }));
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
-    expect(state.save.mock.calls[1][1]).toEqual(saved);
-  });
-
-  it('uses the actual transport selector to replace TCP fields with valid serial configuration', async () => {
-    mount();
-    const user = userEvent.setup();
-    await external(user, 'Connections');
-    await user.click(await screen.findByRole('button', { name: 'Add connection' }));
-    await user.click(screen.getByRole('button', { name: /Transport/ }));
-    await user.click(await screen.findByRole('option', { name: 'rtu' }));
-    expect(screen.queryByRole('textbox', { name: 'Host' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
-    const [, saved] = state.save.mock.calls[0];
-    expect(validateEditorSnapshot(saved)).toEqual([]);
-    expect(saved.modbus.connections[0]).toMatchObject({
-      transport: 'rtu',
-      path: '/dev/serial',
-      baudRate: 19200,
-      parity: 'even',
-      stopBits: 1,
-    });
-    expect(saved.modbus.connections[0]).not.toHaveProperty('host');
-    expect(saved.modbus.connections[0]).not.toHaveProperty('port');
-  });
-});
-
-describe('Modbus review regressions', () => {
-  function fixture(orphan = false): WagoConfigurationSnapshot {
-    const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'custom-map');
-    profile.name = 'Fixture map';
-    profile.actions = [
-      {
-        id: 'relay',
-        name: 'Relay',
-        functionCode: 5,
-        address: 0,
-        addressBase: 0,
-        dataType: 'uint16',
-        byteOrder: 'big',
-        wordOrder: 'big',
-        scale: 1,
-        offset: 0,
-        onValue: 1,
-        offValue: 0,
-      },
-    ];
-    return {
-      version: 1,
-      modbus: {
-        connections: [
-          {
-            id: 'bus',
-            transport: 'tcp',
-            host: 'old.fixture.invalid',
-            port: 502,
-            timeoutMs: 1000,
-            reconnectMs: 250,
-            queueLimit: 16,
-          },
-        ],
-        devices: [
-          { id: 'meter', name: 'Meter', connectionId: 'bus', unitId: 1, profileId: profile.id, profileVersion: 1 },
-        ],
-        profiles: [profile],
-      },
-      physicalPoints: [
-        {
-          id: 'meter-point',
-          hardwareProfile: 'modbus',
-          channel: 0,
-          modbus: { deviceId: 'meter', measurementId: 'active-power' },
-        },
-      ],
-      logicalChannels: orphan
-        ? []
-        : [
-            {
-              id: 'reading',
-              physicalPointId: 'meter-point',
-              profile: 'generic-monitored-input',
-              capabilities: ['input', 'measurement'],
-              measurement: { unit: 'watt', kind: 'live', scale: 1, offset: 0 },
-              disconnectPolicy: { mode: 'watchdog', timeoutMs: 2345 },
-              range: { minimum: 0, maximum: 1000 },
-            },
-          ],
-    };
-  }
-  function draftRecord(snapshot: WagoConfigurationSnapshot, updatedAt = 'initial') {
-    return {
-      controllerId: 1,
-      snapshot: JSON.stringify(snapshot),
-      presetProvenance: JSON.stringify({
-        editor: { names: { 'meter-point': 'Spare meter point', reading: 'Meter reading' }, presets: [] },
-      }),
-      reviewedHash: null,
-      updatedAt,
-    };
-  }
-  function start(snapshot: WagoConfigurationSnapshot) {
-    state.getDraft.mockResolvedValue(draftRecord(snapshot));
-    // Exercise the full backend validator as a read-only oracle for the submitted candidate.
-    state.validate.mockImplementation(async (_id, candidate) => {
-      const errors = validateEditorSnapshot(candidate);
-      return { valid: errors.length === 0, errors };
-    });
-    mount();
-    return userEvent.setup();
-  }
-
-  it('replaces a clean focused host authoritatively before the next keystroke', async () => {
-    const snapshot = fixture();
-    const user = start(snapshot);
-    await external(user, 'Connections');
-    const host = await screen.findByRole('textbox', { name: 'Host' });
-    await user.click(host);
-    const refreshed = fixture();
-    const connection = refreshed.modbus!.connections[0];
-    if (connection.transport === 'tcp') connection.host = 'new.fixture.invalid';
-    await act(async () => {
-      client.setQueryData(['wago', 'configuration-draft', 1], draftRecord(refreshed, 'refreshed'));
-    });
-    expect(host).toHaveFocus();
-    await waitFor(() => expect(host).toHaveValue('new.fixture.invalid'));
-    await user.keyboard('{End}-edited');
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
-    expect(state.save.mock.calls[0][1].modbus.connections[0].host).toBe('new.fixture.invalid-edited');
-  });
-
-  it('converts a ranged measurement into a plain output without a hidden invalid range', async () => {
-    const user = start(fixture());
-    await user.click(await screen.findByRole('button', { name: /Named action/ }));
-    await user.click(await screen.findByRole('option', { name: 'Relay' }));
-    expect(screen.getByRole('spinbutton', { name: 'Maximum' })).toHaveValue(1000);
-    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: 'None' }));
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
-    const saved = state.save.mock.calls[0][1];
-    expect(validateEditorSnapshot(saved)).toEqual([]);
-    expect(saved.logicalChannels[0]).toMatchObject({
-      id: 'reading',
-      physicalPointId: 'meter-point',
-      profile: 'generic-digital-output',
-      capabilities: ['output'],
-    });
-    expect(saved.logicalChannels[0]).not.toHaveProperty('range');
-    expect(saved.logicalChannels[0]).not.toHaveProperty('measurement');
-  });
-
-  it('retains the customized input disconnect policy when selecting another measurement', async () => {
-    const user = start(fixture());
-    await user.click(await screen.findByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
-    expect(screen.getByRole('spinbutton', { name: 'Watchdog timeout (ms)' })).toHaveValue(2345);
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
-    expect(state.save.mock.calls[0][1].logicalChannels[0]).toMatchObject({
-      id: 'reading',
-      disconnectPolicy: { mode: 'watchdog', timeoutMs: 2345 },
-      range: { minimum: 0, maximum: 1000 },
-    });
-  });
-
-  it('exposes an orphan binding for repair after map deletion and release after device deletion', async () => {
-    const user = start(fixture(true));
-    await external(user, 'Device profiles');
-    await user.click(screen.getByRole('button', { name: /Edit profile/ }));
-    await user.click(await screen.findByRole('option', { name: 'Fixture map v1' }));
-    await user.click(screen.getByText('Measurement: Active power', { selector: 'summary' }));
-    await user.click(screen.getAllByRole('button', { name: 'Remove measurement' })[0]);
-    await section(user, 'Channels');
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
-    expect(state.save.mock.calls[0][1].physicalPoints[0]).toMatchObject({
-      id: 'meter-point',
-      modbus: { measurementId: 'import-energy' },
-    });
-    expect(state.save.mock.calls[0][1].logicalChannels).toEqual([]);
-    await external(user, 'Devices');
-    await user.click(screen.getByRole('button', { name: 'Remove device' }));
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await section(user, 'Channels');
-    await user.click(screen.getByRole('button', { name: /Release Spare meter point/ }));
-    await user.click(screen.getByRole('button', { name: 'Save draft' }));
-    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
-    expect(state.save.mock.calls[1][1].physicalPoints).toEqual([]);
   });
 });
 
@@ -1067,4 +701,147 @@ describe('configuration workspace', () => {
     });
     expect(screen.queryByText('Saved draft changed')).not.toBeInTheDocument();
   });
+});
+
+it('recovers from an initial draft read failure through the retry control', async () => {
+  state.getDraft.mockRejectedValueOnce(new Error('draft temporarily unavailable'));
+  mount();
+  expect(await screen.findByText(/Could not load draft: draft temporarily unavailable/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Retry loading draft' }));
+  expect(await screen.findByRole('button', { name: 'Save draft' })).toBeEnabled();
+  expect(await screen.findByText('Draft is saved')).toBeInTheDocument();
+});
+
+it('recovers an applied baseline after a failed initial fetch without claiming a saved draft', async () => {
+  state.getDraft.mockResolvedValue(null);
+  state.baseline.mockRejectedValueOnce(new Error('baseline temporarily unavailable')).mockResolvedValue({
+    revision: 3,
+    snapshot: JSON.stringify(state.snapshot),
+    presetProvenance: null,
+  });
+  mount();
+  expect(
+    await screen.findByText(/Could not load applied configuration: baseline temporarily unavailable/),
+  ).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Retry loading configuration' }));
+  expect(await screen.findByText('Starting from applied revision 3')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled());
+  expect(state.save).not.toHaveBeenCalled();
+});
+
+it('shows field validation failures and prevents persistence until the draft is valid', async () => {
+  state.validate.mockResolvedValue({
+    valid: false,
+    errors: [{ path: 'logicalChannels[0].profile', code: 'invalid_profile', message: 'Choose a supported profile' }],
+  });
+  mount();
+  const save = await screen.findByRole('button', { name: 'Save draft' });
+  await waitFor(() => expect(save).toBeEnabled());
+  await userEvent.click(save);
+  expect(await screen.findByText('Resolve these configuration fields')).toBeInTheDocument();
+  expect(screen.getAllByText(/Choose a supported profile/).length).toBeGreaterThan(0);
+  expect(state.save).not.toHaveBeenCalled();
+});
+
+it('renders reported configuration, hardware faults, and channel samples without treating them as readiness proof', async () => {
+  const diagnostic = diagnosticsFixture();
+  Object.assign(diagnostic, {
+    stateHardwareAvailable: false,
+    trackingExhausted: true,
+    incompatible: true,
+    faults: [{ channelId: 'output', code: 'io-unavailable', receivedAt: '2026-09-22T10:00:00Z' }],
+  });
+  Object.assign(diagnostic.configuration, {
+    draftUpdatedAt: '2026-09-22T10:00:00Z',
+    draftChanged: true,
+    revisionMismatch: true,
+    rejected: true,
+    validationErrorCount: 1,
+    validationCodes: ['invalid_channel'],
+    validationErrors: [{ path: 'logicalChannels[0]', code: 'invalid_channel' }],
+    rejectionErrors: [{ path: 'physicalPoints[0]', code: 'unavailable' }],
+  });
+  diagnostic.channels = [
+    {
+      id: 'output',
+      profile: 'generic-digital-output',
+      capabilities: ['output'],
+      disconnectPolicy: { mode: 'watchdog', timeoutMs: 800 },
+      safeState: 'off',
+      current: false,
+      fault: null,
+      samples: [
+        {
+          kind: 'output',
+          value: false,
+          sourceAt: null,
+          receivedAt: '2026-09-22T10:00:00Z',
+          streamId: 'boot-1',
+          sequence: 3,
+          sourceFreshness: 'stale',
+          current: false,
+          availabilityReason: 'source stale',
+        },
+      ],
+      acknowledgement: { id: 'cmd-1', status: 'accepted', receivedAt: '2026-09-22T10:00:01Z' },
+    },
+  ];
+  state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostic)));
+  mount();
+  expect(await screen.findByText(/Runtime reports hardware unavailable/)).toBeInTheDocument();
+  expect(screen.getByText(/Stream tracking limit reached/)).toBeInTheDocument();
+  expect(screen.getByText(/controller rejected publication/)).toBeInTheDocument();
+  expect(screen.getByText(/Recent fault on output: io-unavailable/)).toBeInTheDocument();
+  expect(screen.getByText(/Latest output: false/)).toHaveTextContent('not current: source stale');
+  expect(screen.getByText(/Last correlated acknowledgement:/)).toHaveTextContent('accepted · cmd-1');
+  expect(screen.getByText(/Hardware readiness: unknown/)).toBeInTheDocument();
+});
+
+it('requires a selected input for a guarded output and preserves its watchdog configuration', async () => {
+  const snapshot: WagoConfigurationSnapshot = {
+    version: 1,
+    physicalPoints: [{ id: 'input-point', hardwareProfile: '751-9301', channel: 4 }],
+    logicalChannels: [
+      {
+        id: 'guard-input',
+        physicalPointId: 'input-point',
+        profile: 'generic-monitored-input',
+        capabilities: ['input'],
+        disconnectPolicy: { mode: 'hold' },
+      },
+    ],
+  };
+  state.getDraft.mockResolvedValue({
+    controllerId: 1,
+    snapshot: JSON.stringify(snapshot),
+    reviewedHash: null,
+    updatedAt: '2026-09-05',
+    presetProvenance: JSON.stringify({ editor: { names: { 'guard-input': 'Door contact' }, presets: [] } }),
+  });
+  mount();
+  const user = userEvent.setup();
+  const add = await screen.findByRole('button', { name: 'Add channel' });
+  await waitFor(() => expect(add).toBeEnabled());
+  await user.click(add);
+  await user.click(screen.getByRole('button', { name: /Request an enable/ }));
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.type(screen.getByRole('textbox', { name: 'New channel name' }), 'Guarded lock');
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: /Guard input/ }));
+  await user.click(screen.getByRole('option', { name: 'Door contact' }));
+  await user.click(screen.getByRole('button', { name: /On disconnect/ }));
+  await user.click(screen.getByRole('option', { name: 'Off after watchdog timeout' }));
+  await user.clear(screen.getByRole('spinbutton', { name: 'Watchdog timeout (ms)' }));
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await user.type(screen.getByRole('spinbutton', { name: 'Watchdog timeout (ms)' }), '2000');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(screen.getByRole('button', { name: 'Add to configuration' }));
+  await user.click(screen.getByRole('button', { name: 'Save draft' }));
+  await waitFor(() => expect(state.save).toHaveBeenCalledOnce());
+  const saved = state.save.mock.calls[0][1] as WagoConfigurationSnapshot;
+  expect(saved.logicalChannels.find((channel) => channel.profile === 'guarded-enable-request')).toMatchObject({
+    guard: { channelId: 'guard-input', when: 'on' },
+    disconnectPolicy: { mode: 'watchdog', timeoutMs: 2000 },
+  });
+  expect(validateEditorSnapshot(saved)).toEqual([]);
 });

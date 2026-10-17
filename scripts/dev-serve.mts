@@ -3,10 +3,19 @@
 
 import { spawn } from 'node:child_process';
 import { writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { findFreePort, isPortFree } from './lib/find-free-port.mts';
 
 type Target = 'api' | 'frontend' | 'both';
+
+interface LaunchOptions {
+  only: Target;
+  tui: boolean;
+  kiosk: boolean;
+  attractap: boolean;
+  passthroughArgs: string[];
+}
 
 interface Resolved {
   apiPort?: number;
@@ -34,9 +43,11 @@ function removePortsFile(): void {
   rmSync(PORTS_FILE, { force: true });
 }
 
-function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArgs: string[] } {
+export function parseArgs(argv: string[]): LaunchOptions {
   let only: Target = 'both';
   let tui = false;
+  let kiosk = false;
+  let attractap = false;
   const passthroughArgs: string[] = [];
   const args = argv.slice(2);
   let sawDelimiter = false;
@@ -53,6 +64,14 @@ function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArg
       tui = true;
       continue;
     }
+    if (arg === '--with-kiosk' || arg === '--with-companion') {
+      kiosk = true;
+      continue;
+    }
+    if (arg === '--with-attractap') {
+      attractap = true;
+      continue;
+    }
     const m = arg.match(/^--only=(.+)$/);
     if (m) {
       if (m[1] === 'api' || m[1] === 'frontend' || m[1] === 'both') {
@@ -66,10 +85,13 @@ function parseArgs(argv: string[]): { only: Target; tui: boolean; passthroughArg
       passthroughArgs.push(arg);
     }
   }
-  return { only, tui, passthroughArgs };
+  if (only === 'frontend' && (kiosk || attractap)) {
+    throw new Error('Asset build flags require the API. Use --only=api or omit --only=frontend.');
+  }
+  return { only, tui, kiosk, attractap, passthroughArgs };
 }
 
-async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
+export async function resolvePort(envName: string, defaultStart: number, label: string): Promise<number> {
   const explicit = process.env[envName];
   if (explicit !== undefined && explicit !== '') {
     const port = Number(explicit);
@@ -95,8 +117,8 @@ function banner(r: Resolved): string {
   return lines.join('\n');
 }
 
-async function main() {
-  const { only, tui, passthroughArgs } = parseArgs(process.argv);
+export async function main() {
+  const { only, tui, kiosk, attractap, passthroughArgs } = parseArgs(process.argv);
   const resolved: Resolved = {};
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
 
@@ -128,15 +150,38 @@ async function main() {
     // NX_TUI=true forces it on. The terminal is still a real TTY, so it renders.
     childEnv.NX_TUI = 'true';
   }
-  const nxArgs = ['run-many', '-t', 'serve', `--projects=${projects}`, ...outputArgs, ...passthroughArgs];
-  const child = spawn('pnpm', ['nx', ...nxArgs], { stdio: 'inherit', env: childEnv });
-
+  let child: ReturnType<typeof spawn> | undefined;
   const forward = (sig: NodeJS.Signals) => {
-    if (!child.killed) child.kill(sig);
+    if (child && !child.killed) child.kill(sig);
   };
   process.on('SIGINT', () => forward('SIGINT'));
   process.on('SIGTERM', () => forward('SIGTERM'));
 
+  const assetTarget =
+    kiosk && attractap
+      ? 'prepare-all-assets'
+      : kiosk
+        ? 'prepare-kiosk-assets'
+        : attractap
+          ? 'prepare-attractap-assets'
+          : undefined;
+  if (assetTarget) {
+    const preparation = spawn('pnpm', ['nx', 'run-many', '-t', assetTarget, '--projects=api', ...outputArgs], {
+      stdio: 'inherit',
+      env: childEnv,
+    });
+    child = preparation;
+    await new Promise<void>((resolveBuild, rejectBuild) => {
+      preparation.once('error', rejectBuild);
+      preparation.once('exit', (code, signal) => {
+        if (code === 0 && !signal) resolveBuild();
+        else rejectBuild(new Error(`Asset build failed (${signal ?? code ?? 'unknown exit'}).`));
+      });
+    });
+  }
+
+  const nxArgs = ['run-many', '-t', 'serve', `--projects=${projects}`, ...outputArgs, ...passthroughArgs];
+  child = spawn('pnpm', ['nx', ...nxArgs], { stdio: 'inherit', env: childEnv });
   child.on('exit', (code, signal) => {
     if (signal) {
       removePortsFile();
@@ -149,7 +194,9 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error(`[dev-serve] ${err.message}`);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((err) => {
+    console.error(`[dev-serve] ${err.message}`);
+    process.exit(1);
+  });
+}

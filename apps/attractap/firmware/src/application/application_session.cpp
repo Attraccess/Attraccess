@@ -2,7 +2,7 @@
 // FEATURE: application-session
 
 #include "application.hpp"
-#include "platform.hpp"
+#include "../platform.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -50,23 +50,23 @@ void Application::handleResourceListUpdate(
   this->resourceList = resourceList;
   this->resourceCount = resourceList.count;
   this->resourceListUpdated = true;
-
-  // If a resource is already selected, try to find it in the new list and
-  // refresh the details screen.
-  if (this->resourceIsSelected) {
-    this->logger.info(
-        "Resource is selected, trying to find it in the new list");
-    for (uint16_t i = 0; i < this->resourceList.count; ++i) {
-      const auto &obj = this->resourceList.items[i];
-      if (obj.id == this->selectedResourceId) {
-        this->logger.infof(
-            "Resource found in the new list, refreshing the details screen: %s",
-            obj.name);
-        this->selectResource(obj);
-        break;
-      }
+  if (this->waitingForResourceRefresh && resourceList.requestId == this->resourceRefreshRequestId &&
+      this->cardAuthenticationData.username == resourceList.authenticatedUsername) {
+    this->waitingForResourceRefresh = false;
+    this->endActionPause();
+    Display::resourceListScreen.hideActionProgress();
+    Display::resourceDetailsScreen.hideActionProgress();
+    if (!this->actionCompletionMessage.empty()) {
+      if (this->returnToListAfterAction) Display::resourceListScreen.showSuccessToast(this->actionCompletionMessage.c_str());
+      else Display::resourceDetailsScreen.showSuccessToast(this->actionCompletionMessage.c_str());
     }
+    this->returnToListAfterAction = false;
+    this->actionCompletionMessage.clear();
   }
+
+  // Permissions belong to the resource, not the resource used to authenticate.
+  if (this->selectedResourceId != 0) this->selectedResourceChanged = true;
+
 }
 
 void Application::selectResource(const API::ResourceBrief &resource) {
@@ -85,8 +85,7 @@ void Application::requestProjectsPage(uint32_t page) {
 }
 
 void Application::clearProjectSelection() {
-  this->selectedProjectId = 0;
-  this->selectedProjectName = "";
+  this->clearSelectedProject();
   this->projectsCurrentPage = 1;
   this->projectsTotalCount = 0;
   this->projectsHasMore = false;
@@ -96,9 +95,11 @@ void Application::clearProjectSelection() {
   this->projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
   this->projectsOfUserResponse.hasMore = false;
   this->projectsOfUserResponseUpdated = true;
-  // Reached from the websocket task (card auth response) as well as from LVGL
-  // event callbacks; rendering runs on its own task now, so guard the LVGL
-  // mutation explicitly (lv_lock is recursive).
+ }
+
+void Application::clearSelectedProject() {
+  this->selectedProjectId = 0;
+  this->selectedProjectName.clear();
   lv_lock();
   Display::resourceDetailsScreen.setSelectedProject(0, nullptr);
   lv_unlock();
@@ -113,147 +114,41 @@ void Application::handleProjectSelection(uint32_t projectId,
 }
 
 void Application::handleTouch(int16_t x, int16_t y) {
-  if (this->state == APPLICATION_STATE_UNLOCKED) {
+  if (this->sessionSummaryActive) {
+    if (this->sessionSummaryVisible && Display::touchPressSequence != this->sessionSummaryTouchSequence)
+      this->sessionSummaryDismissRequested = true;
+    return;
+  }
+  if (this->unlocked && this->actionInProgressCount == 0 && this->pendingUiAction.empty() && !this->waitingForResourceRefresh) {
     this->restartSessionTimeout();
   }
 }
 
 void Application::restartSessionTimeout() {
   uint32_t now = millis();
-  Display::resourceDetailsScreen.setSessionTimeoutTime(
-      now + this->UNLOCKED_TIMEOUT_MS);
+  Display::resourceDetailsScreen.setSessionTimeoutTime(now + this->UNLOCKED_TIMEOUT_MS);
+  Display::resourceListScreen.setSessionTimeoutTime(now + this->UNLOCKED_TIMEOUT_MS);
   this->timeOfUnlockedMs = now;
   this->resetPauseAccounting();
 }
 
-void Application::handleResourceDetailsButtonClick(
-    ResourceDetailsScreen::ButtonClickEventData evt) {
-  this->logger.infof("Resource details button clicked: %d",
-                     evt.buttonClickType);
+#endif
 
-  if (this->state != APPLICATION_STATE_UNLOCKED) {
-    return;
-  }
+// Session coordination: resource/project selection, action buttons, pause timing
+// FEATURE: application-session
 
-  switch (evt.buttonClickType) {
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION: {
-    // Detect takeover: another user has an active session and the resource allows it
-    bool isTakeover = false;
-    for (uint16_t i = 0; i < this->resourceList.count; ++i) {
-      if (this->resourceList.items[i].id == this->selectedResourceId) {
-        const auto &res = this->resourceList.items[i];
-        isTakeover = res.hasActiveUsage && res.allowTakeOver &&
-                     strcmp(res.activeUser,
-                            this->cardAuthenticationData.username.c_str()) != 0;
-        break;
-      }
-    }
-
-    if (this->cardAuthenticationData.requiresSupervisor && !isTakeover) {
-      this->supervision.beginReaderInitiated(this->cardAuthenticationData.username,
-                                             this->selectedResourceId);
-      this->state = APPLICATION_STATE_SUPERVISION;
-      this->externalState = EXTERNAL_STATE_NONE;
-      break;
-    }
-
-    Display::resourceDetailsScreen.showActionProgress(
-        isTakeover ? "Uebernehme Sitzung" : "Starte Sitzung");
-    this->beginActionPause();
-    this->pendingActionType = PENDING_ACTION_START_SESSION;
-    this->pendingActionResourceId = this->selectedResourceId;
-    this->pendingActionProjectId = isTakeover ? 0 : this->selectedProjectId;
-    this->pendingActionIsTakeover = isTakeover;
-    this->hasPendingFormRequest = false;
-    this->formFlowSubmitted = false;
-    this->api.startResourceUsageSession(this->selectedResourceId,
-                                        isTakeover ? 0 : this->selectedProjectId,
-                                        isTakeover);
-    break;
-  }
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
-    Display::resourceDetailsScreen.showActionProgress("Beende Sitzung");
-    this->beginActionPause();
-    this->pendingActionType = PENDING_ACTION_STOP_SESSION;
-    this->pendingActionResourceId = this->selectedResourceId;
-    this->pendingActionProjectId = 0;
-    this->pendingActionIsTakeover = false;
-    this->hasPendingFormRequest = false;
-    this->formFlowSubmitted = false;
-    this->api.stopResourceUsageSession(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Sperre Tuer");
-    this->beginActionPause();
-    this->api.lockDoor(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Entsperre Tuer");
-    this->beginActionPause();
-    this->api.unlockDoor(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Oeffne Tuer-Riegel");
-    this->beginActionPause();
-    this->api.unlatchDoor(this->selectedResourceId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
-    Display::resourceDetailsScreen.showActionProgress("Aktion Ausfuehren");
-    this->beginActionPause();
-    this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
-    break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
-    if (this->resourceCount > 1) {
-      this->resourceIsSelected = false;
-    }
-    this->unlocked = false;
-    this->currentProjectsUser = "";
-    this->clearProjectSelection();
-    this->handleFormsCancel();
-    break;
-  }
-}
-
-void Application::restartResourceSelectionTimeout() {
-  uint32_t now = millis();
-  this->timeOfResourceSelectionMs = now;
-}
-
-void Application::beginActionPause() {
-  this->actionInProgressCount++;
-  if (this->actionInProgressCount == 1) {
-    this->pauseStartMs = millis();
-    // Freeze the UI indicator
-    Display::resourceDetailsScreen.setSessionTimeoutPaused(true);
-  }
-}
-
-void Application::endActionPause() {
-  if (this->actionInProgressCount == 0) {
-    return;
-  }
-  this->actionInProgressCount--;
-  if (this->actionInProgressCount == 0) {
-    uint32_t now = millis();
-    uint32_t delta =
-        (now >= this->pauseStartMs) ? (now - this->pauseStartMs) : 0;
-    this->accumulatedPauseMs += delta;
-    // Extend the UI deadline by the same delta and unfreeze
-    Display::resourceDetailsScreen.extendSessionTimeoutBy(delta);
-    Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
-  }
-}
-
+#ifdef HAS_LVGL_DISPLAY
 void Application::resetPauseAccounting() {
   this->pauseStartMs = 0;
   this->accumulatedPauseMs = 0;
   this->actionInProgressCount = 0;
   // Ensure not paused visually
   Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+  Display::resourceListScreen.setSessionTimeoutPaused(false);
 }
 
 void Application::resetSessionOnDisconnect() {
-  bool sessionActive = this->unlocked || this->resourceIsSelected ||
+  bool sessionActive = this->unlocked || this->resourceIsSelected || this->cardAuthenticationPending ||
                        this->pendingActionType != PENDING_ACTION_NONE ||
                        this->hasPendingFormRequest ||
                        this->hasPendingServerFormFlow ||
@@ -263,10 +158,24 @@ void Application::resetSessionOnDisconnect() {
     return;
   }
 
+  this->sessionSummaryActive = false;
+  this->sessionSummaryVisible = false;
+  this->sessionSummaryDismissRequested = false;
+  Display::sessionSummaryScreen.clearSummary();
   this->logger.info("Connectivity lost; resetting session state");
+  Display::hidePopup();
 
   // Ensure any in-progress UI overlays are dismissed
   Display::resourceDetailsScreen.hideActionProgress();
+  Display::resourceListScreen.hideActionProgress();
+  Display::resourceListScreen.setAuthenticatedUser("");
+  Display::lockscreen.hideActionProgress();
+  this->cardAuthenticationPending = false;
+  this->api.cancelResourceAction();
+  this->pendingUiAction.clear();
+  this->returnToListAfterAction = false;
+  this->waitingForResourceRefresh = false;
+  this->actionCompletionMessage.clear();
   Display::resourceDetailsScreen.hideFormsModal();
   this->resetPauseAccounting();
 
@@ -294,4 +203,202 @@ void Application::resetSessionOnDisconnect() {
   this->externalState = EXTERNAL_STATE_NONE;
   this->nfc.enableCardDetection();
 }
+
+void Application::updateSelectedResourceDetails() {
+  for (uint16_t i = 0; i < this->resourceList.count; ++i) {
+    const auto &resource = this->resourceList.items[i];
+    if (resource.id != this->selectedResourceId) continue;
+    Display::lockscreen.setResourceName(resource.name);
+    Display::lockscreen.setUsageInfo(resource.hasActiveUsage, resource.activeUser, resource.isUnderMaintenance);
+    Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+    const bool personalized = resource.accessKnown && this->cardAuthenticationData.username == this->resourceList.authenticatedUsername;
+    const bool legacy = !resource.accessKnown && this->authenticationResourceId == resource.id;
+    Display::resourceDetailsScreen.setUserDetails({
+      this->cardAuthenticationData.username,
+      personalized ? resource.canManageResource : legacy && this->cardAuthenticationData.canManageResource,
+      personalized ? resource.hasIntroduction : legacy && this->cardAuthenticationData.hasIntroduction,
+      personalized ? resource.isIntroducer : legacy && this->cardAuthenticationData.isIntroducer,
+      personalized ? resource.requiresSupervisor : legacy && this->cardAuthenticationData.requiresSupervisor});
+    return;
+  }
+  // The selected resource was removed while the user was looking at it.
+  if (this->pendingUiAction.empty()) { this->resourceIsSelected = false; this->selectedResourceId = 0; }
+}
+
+void Application::handleResourceListAction(const API::ResourceBrief &resource, ResourceListAction action) {
+  if (!this->unlocked || !this->pendingUiAction.empty() || this->waitingForResourceRefresh || this->resourceIsSelected ||
+      this->cardAuthenticationData.username != this->resourceList.authenticatedUsername) return;
+  // Re-resolve against the latest application list, not a row's earlier snapshot.
+  const API::ResourceBrief *current = nullptr;
+  for (uint16_t i = 0; i < this->resourceList.count; ++i)
+    if (this->resourceList.items[i].id == resource.id) current = &this->resourceList.items[i];
+  if (!current || action != resourceListAction(*current, this->cardAuthenticationData.username)) return;
+  this->selectResource(*current);
+  this->updateSelectedResourceDetails();
+  this->clearSelectedProject();
+  if (action == ResourceListAction::Takeover) return;
+  this->resourceIsSelected = false;
+  this->returnToListAfterAction = true;
+  auto type = ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION;
+  if (action == ResourceListAction::Stop) type = ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION;
+  if (action == ResourceListAction::OpenDoor)
+    type = current->separateUnlockAndUnlatch ? ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR : ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR;
+  this->handleResourceDetailsButtonClick({&Display::resourceDetailsScreen, type, {}});
+}
+
+void Application::showReaderActionProgress(const char *title) {
+  if (this->returnToListAfterAction && !this->resourceIsSelected) {
+    const char *name = "";
+    for (uint16_t i = 0; i < this->resourceList.count; ++i)
+      if (this->resourceList.items[i].id == this->pendingUiResourceId) name = this->resourceList.items[i].name;
+    Display::resourceListScreen.showActionProgress(title, name);
+  } else Display::resourceDetailsScreen.showActionProgress(title);
+}
+
+#endif
+
+// Session coordination: resource/project selection, action buttons, pause timing
+// FEATURE: application-session
+
+#ifdef HAS_LVGL_DISPLAY
+void Application::handleResourceDetailsButtonClick(
+    ResourceDetailsScreen::ButtonClickEventData evt) {
+  this->logger.infof("Resource details button clicked: %d",
+                     evt.buttonClickType);
+
+  if (!this->unlocked || !this->pendingUiAction.empty() || this->waitingForResourceRefresh) {
+    return;
+  }
+
+  if (evt.buttonClickType != ResourceDetailsScreen::BUTTON_CLICK_TYPE_BACK &&
+      evt.buttonClickType != ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT) {
+    this->pendingUiResourceId = this->selectedResourceId;
+    this->pendingUiStartedAt = millis();
+  }
+  switch (evt.buttonClickType) {
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION: {
+    this->pendingUiAction = "START_RESOURCE_USAGE_SESSION";
+    // Detect takeover: another user has an active session and the resource allows it
+    bool isTakeover = false;
+    for (uint16_t i = 0; i < this->resourceList.count; ++i) {
+      if (this->resourceList.items[i].id == this->selectedResourceId) {
+        const auto &res = this->resourceList.items[i];
+        isTakeover = res.hasActiveUsage && res.allowTakeOver &&
+                     strcmp(res.activeUser,
+                            this->cardAuthenticationData.username.c_str()) != 0;
+        break;
+      }
+    }
+
+    // Resource-first authentication can finish before its personalized list.
+    // Match the same verified-card fallback used by the details screen.
+    bool requiresSupervisor = this->authenticationResourceId == this->selectedResourceId &&
+                              this->cardAuthenticationData.requiresSupervisor;
+    for (uint16_t i = 0; i < this->resourceList.count; ++i)
+      if (this->resourceList.items[i].id == this->selectedResourceId && this->resourceList.items[i].accessKnown &&
+          this->cardAuthenticationData.username == this->resourceList.authenticatedUsername)
+        requiresSupervisor = this->resourceList.items[i].requiresSupervisor;
+    if (requiresSupervisor && !isTakeover) {
+      this->beginActionPause();
+      this->supervision.beginReaderInitiated(this->cardAuthenticationData.username,
+                                             this->selectedResourceId);
+      this->state = APPLICATION_STATE_SUPERVISION;
+      this->externalState = EXTERNAL_STATE_NONE;
+      break;
+    }
+
+    this->showReaderActionProgress(
+        isTakeover ? "Übernehme Sitzung" : "Starte Sitzung");
+    this->beginActionPause();
+    this->pendingActionType = PENDING_ACTION_START_SESSION;
+    this->pendingActionResourceId = this->selectedResourceId;
+    this->pendingActionProjectId = isTakeover ? 0 : this->selectedProjectId;
+    this->pendingActionIsTakeover = isTakeover;
+    this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
+    this->api.startResourceUsageSession(this->selectedResourceId,
+                                        isTakeover ? 0 : this->selectedProjectId,
+                                        isTakeover);
+    break;
+  }
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+    this->pendingUiAction = "STOP_RESOURCE_USAGE_SESSION";
+    this->showReaderActionProgress("Nutzung wird beendet");
+    this->beginActionPause();
+    this->pendingActionType = PENDING_ACTION_STOP_SESSION;
+    this->pendingActionResourceId = this->selectedResourceId;
+    this->pendingActionProjectId = 0;
+    this->pendingActionIsTakeover = false;
+    this->hasPendingFormRequest = false;
+    this->formFlowSubmitted = false;
+    this->api.stopResourceUsageSession(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
+    this->pendingUiAction = "LOCK_DOOR";
+    this->showReaderActionProgress("Sperre Tür");
+    this->beginActionPause();
+    this->api.lockDoor(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+    this->pendingUiAction = "UNLOCK_DOOR";
+    this->showReaderActionProgress("Entsperre Tür");
+    this->beginActionPause();
+    this->api.unlockDoor(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
+    this->pendingUiAction = "UNLATCH_DOOR";
+    this->showReaderActionProgress("Öffne Tür-Riegel");
+    this->beginActionPause();
+    this->api.unlatchDoor(this->selectedResourceId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
+    this->pendingUiAction = "TRIGGER_FLOW_BUTTON";
+    this->showReaderActionProgress("Aktion Ausführen");
+    this->beginActionPause();
+    this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
+    this->logoutReader();
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_BACK:
+    this->resourceIsSelected = false;
+    this->selectedResourceId = 0;
+    this->returnToListAfterAction = false;
+    this->clearSelectedProject();
+    break;
+  }
+}
+
+void Application::restartResourceSelectionTimeout() {
+  uint32_t now = millis();
+  this->timeOfResourceSelectionMs = now;
+}
+
+void Application::beginActionPause() {
+  this->actionInProgressCount++;
+  if (this->actionInProgressCount == 1) {
+    this->pauseStartMs = millis();
+    // Freeze the UI indicator
+    Display::resourceDetailsScreen.setSessionTimeoutPaused(true);
+    Display::resourceListScreen.setSessionTimeoutPaused(true);
+  }
+}
+
+void Application::endActionPause() {
+  if (this->actionInProgressCount == 0) {
+    return;
+  }
+  this->actionInProgressCount--;
+  if (this->actionInProgressCount == 0) {
+    uint32_t now = millis();
+    uint32_t delta = now - this->pauseStartMs;
+    this->accumulatedPauseMs += delta;
+    // Extend the UI deadline by the same delta and unfreeze
+    Display::resourceDetailsScreen.extendSessionTimeoutBy(delta);
+    Display::resourceListScreen.extendSessionTimeoutBy(delta);
+    Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+  Display::resourceListScreen.setSessionTimeoutPaused(false);
+  }
+}
+
 #endif

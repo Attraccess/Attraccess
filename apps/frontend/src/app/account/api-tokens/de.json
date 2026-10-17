@@ -1,4 +1,6 @@
 {
+  "clearExpiry": "Ablaufdatum löschen",
+  "invalidDate": "Vervollständige das Ablaufdatum oder lösche es.",
   "title": "API-Token",
   "description": "Erstelle Tokens mit minimalen Berechtigungen für die REST API. Ein Token kann nur die ausgewählten Berechtigungen nutzen, die du aktuell besitzt.",
   "empty": "Du hast noch keinen API-Token erstellt.",

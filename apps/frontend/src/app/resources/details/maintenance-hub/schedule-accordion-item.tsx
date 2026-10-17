@@ -1,11 +1,4 @@
-import {
-  AccordionBody,
-  AccordionHeading,
-  AccordionItem,
-  AccordionPanel,
-  AccordionTrigger,
-  Chip,
-} from '@heroui/react';
+import { AccordionBody, AccordionHeading, AccordionItem, AccordionPanel, AccordionTrigger, Chip } from '@heroui/react';
 import { Button } from '../../../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ClockIcon, GaugeIcon, HashIcon, PencilIcon, TrashIcon } from 'lucide-react';
@@ -17,12 +10,14 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { configSummary } from './config-summary';
+import { OperatingTrackingReadiness, OperatingTrackingStatus } from '../operating-readiness';
 import de from './de.json';
 import en from './en.json';
 
 interface Props {
   schedule: ResourceMaintenanceSchedule;
   resourceId: number;
+  trackingReadiness: OperatingTrackingReadiness;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -34,7 +29,7 @@ function TriggerIcon({ type }: { type: ResourceMaintenanceScheduleTriggerType })
 }
 
 export function ScheduleAccordionItem(props: Props) {
-  const { schedule, resourceId, onEdit, onDelete } = props;
+  const { schedule, resourceId, trackingReadiness, onEdit, onDelete } = props;
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
 
@@ -55,15 +50,15 @@ export function ScheduleAccordionItem(props: Props) {
     <AccordionItem id={schedule.id}>
       <AccordionHeading>
         <AccordionTrigger>
-          <div className="flex items-center gap-3 w-full">
+          <div className="flex flex-wrap items-center gap-3 w-full">
             <TriggerIcon type={schedule.triggerType} />
             <span className="font-medium">{schedule.name ?? t(`schedules.triggerType.${schedule.triggerType}`)}</span>
             <span className="text-default-500 text-sm ml-auto">{configSummary(schedule, t)}</span>
-            <Chip
-              size="sm"
-              color={schedule.enabled ? 'success' : 'warning'}
-              variant="soft"
-            >
+            {schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
+              (schedule as { durationBasis?: string }).durationBasis === 'ATTRIBUTABLE_OPERATING_DURATION' && (
+                <OperatingTrackingStatus readiness={trackingReadiness} />
+              )}
+            <Chip size="sm" color={schedule.enabled ? 'success' : 'warning'} variant="soft">
               {schedule.enabled ? t('schedules.status.on') : t('schedules.status.paused')}
             </Chip>
           </div>
@@ -74,7 +69,7 @@ export function ScheduleAccordionItem(props: Props) {
           <div className="text-sm text-default-600 mb-3">
             {t(`schedules.triggerType.${schedule.triggerType}`)} · {configSummary(schedule, t)}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="ghost" onPress={onEdit}>
               <PencilIcon className="w-4 h-4" />
               {t('schedules.actions.edit')}

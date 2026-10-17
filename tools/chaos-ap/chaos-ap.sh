@@ -87,6 +87,8 @@ rand_between() {
   awk -v a="$1" -v b="$2" 'BEGIN { srand(); print a + int(rand() * (b - a + 1)) }'
 }
 
+CHAOS_AP_SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Shared firewall setup for chaos-ap presets.
 ipt_ensure_chain() {
   chain="$1"
   iptables -N "$chain" 2>/dev/null || true
@@ -223,7 +225,7 @@ add_reader_scoped_statistic_drop() {
     iptables -A "$chain" -m statistic --mode random --probability "$probability" -j DROP
   fi
 }
-
+# Blackhole and latency/loss presets.
 # ----------------------------------------------------------------------------
 # blackhole — silent DROP, no RST. Reader keeps a half-open socket. (ATT-464)
 # ----------------------------------------------------------------------------
@@ -314,7 +316,7 @@ netem_off() {
   fi
   log "netem OFF: dev $IFACE"
 }
-
+# WiFi flapping and DHCP-wedge presets.
 # ----------------------------------------------------------------------------
 # flap — kill the SSID and bring it back on a randomized interval. (ATT-465/467)
 # ----------------------------------------------------------------------------

@@ -30,6 +30,9 @@ export class HibpClient {
   }
 
   public async check(password: string): Promise<HibpLookupResult> {
+    // Protocol lookup only: send five hex characters, compare the suffix locally,
+    // and never persist this digest. Application passwords are stored with bcrypt.
+    // https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange
     const sha1 = createHash('sha1').update(password, 'utf8').digest('hex').toUpperCase();
     const prefix = sha1.slice(0, 5);
     const suffix = sha1.slice(5);

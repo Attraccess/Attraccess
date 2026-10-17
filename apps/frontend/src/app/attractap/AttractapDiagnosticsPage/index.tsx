@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAttractapServiceGetReaderById } from '@attraccess/react-query-client';
 import { PageHeader } from '../../../components/pageHeader';
-import { AttractapDiagnostics } from '../AttractapEditor/AttractapDiagnostics';
+import { AttractapDiagnostics } from '../AttractapEditor/diagnostics/index';
 import de from './de.json';
 import en from './en.json';
 

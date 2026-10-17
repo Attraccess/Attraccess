@@ -86,9 +86,11 @@ export function ResourceSelector(props: Readonly<Props>) {
               <TableColumn className="pr-0 w-0">
                 {multiple ? (
                   <Checkbox aria-label={t('table.ariaLabel')} slot="selection">
-                    <Checkbox.Control>
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
+                    <Checkbox.Content>
+                      <Checkbox.Control>
+                        <Checkbox.Indicator />
+                      </Checkbox.Control>
+                    </Checkbox.Content>
                   </Checkbox>
                 ) : null}
               </TableColumn>
@@ -101,9 +103,11 @@ export function ResourceSelector(props: Readonly<Props>) {
                 <TableRow key={resource.id} id={String(resource.id)}>
                   <TableCell className="pr-0">
                     <Checkbox aria-label={resource.name} slot="selection" variant="secondary">
-                      <Checkbox.Control>
-                        <Checkbox.Indicator />
-                      </Checkbox.Control>
+                      <Checkbox.Content>
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
+                      </Checkbox.Content>
                     </Checkbox>
                   </TableCell>
                   <TableCell>{resource.name}</TableCell>

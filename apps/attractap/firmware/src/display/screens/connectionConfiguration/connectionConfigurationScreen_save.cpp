@@ -1,5 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
-#include "display/theme.hpp"
+#include "../../theme.hpp"
 #include <string>
 #include <functional>
 #include <cstring>
@@ -177,7 +177,7 @@ void ConnectionConfigurationScreen::onResetCertificateButtonEvent(lv_event_t *e)
    // One-shot feedback: relabel and disable until the screen is rebuilt.
    if (self->resetCertLabel)
    {
-      lv_label_set_text(self->resetCertLabel, "Zurueckgesetzt");
+      lv_label_set_text(self->resetCertLabel, "Zurückgesetzt");
    }
    if (self->resetCertButton)
    {

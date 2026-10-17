@@ -1,27 +1,14 @@
-import {
-  Description,
-  Input,
-  InputGroup,
-  Label,
-  TextArea,
-  TextField,
-  Tooltip,
-  TooltipContent,
-} from '@heroui/react';
+import { Description, Input, InputGroup, Label, TextArea, TextField, Tooltip, TooltipContent } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Button } from '../../../../components/button';
+import { Button } from '../../../../components/button/index';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
 import de from '../de.json';
 
-interface SAMLConfigFormProps {
-  form: SSOProviderFormApi;
-}
-
-export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
+export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
   const { t } = useTranslations({ en, de });
   const {
     formValues,
@@ -37,6 +24,43 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
     roles,
     isLoadingRoles,
   } = form;
+  return {
+    t,
+    formValues,
+    setSaml,
+    emailAttributeKeysInput,
+    setEmailAttributeKeysInput,
+    showSamlProvisioningSecret,
+    setShowSamlProvisioningSecret,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
+    handleSamlToggleChange,
+    providerDetails,
+    roles,
+    isLoadingRoles,
+  } as const;
+}
+
+export interface SAMLConfigFormProps {
+  form: SSOProviderFormApi;
+}
+
+export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
+  const {
+    t,
+    formValues,
+    setSaml,
+    emailAttributeKeysInput,
+    setEmailAttributeKeysInput,
+    showSamlProvisioningSecret,
+    setShowSamlProvisioningSecret,
+    samlRoleMappingEntries,
+    setSamlRoleMappingEntries,
+    handleSamlToggleChange,
+    providerDetails,
+    roles,
+    isLoadingRoles,
+  } = useSAMLConfigFormState({ form });
 
   return (
     <>
@@ -44,6 +68,20 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
         <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
           {t('sections.samlIdentityProvider')}
         </h3>
+        <TextField
+          isRequired={!!formValues.samlConfiguration?.logoutURL}
+          value={formValues.samlConfiguration?.idpIssuer ?? ''}
+          onChange={(v) => setSaml('idpIssuer', v)}
+        >
+          <Label>{t('idpIssuer')}</Label>
+          <Input placeholder="https://idp.example.com/entity" />
+        </TextField>
+        <TextField value={formValues.samlConfiguration?.logoutURL ?? ''} onChange={(v) => setSaml('logoutURL', v)}>
+          <Label>{t('logoutURL')}</Label>
+          <Input placeholder="https://idp.example.com/slo" />
+        </TextField>
+        <p className="text-sm text-muted">{t('samlLogoutHint')}</p>
+
         <TextField
           isRequired
           value={formValues.samlConfiguration?.entryPoint ?? ''}
@@ -56,11 +94,7 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
           />
         </TextField>
 
-        <TextField
-          isRequired
-          value={formValues.samlConfiguration?.issuer ?? ''}
-          onChange={(v) => setSaml('issuer', v)}
-        >
+        <TextField isRequired value={formValues.samlConfiguration?.issuer ?? ''} onChange={(v) => setSaml('issuer', v)}>
           <Label>{t('issuer')}</Label>
           <Input placeholder={window.location.origin ?? ''} data-cy="sso-provider-form-saml-issuer-input" />
         </TextField>
@@ -163,7 +197,8 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
             data-cy="sso-provider-form-saml-sp-private-key-input"
           />
           <p className="text-xs text-default-500">
-            {providerDetails?.samlConfiguration?.spSigningKeyEncrypted
+            {(providerDetails?.samlConfiguration?.spSigningKeyEncryptionKeyId ??
+            providerDetails?.samlConfiguration?.spSigningKeyEncrypted)
               ? t('spSigningPrivateKeyHintExisting')
               : t('spSigningPrivateKeyHint')}
           </p>
@@ -202,4 +237,4 @@ export const SAMLConfigForm = ({ form }: SAMLConfigFormProps) => {
       </section>
     </>
   );
-};
+}

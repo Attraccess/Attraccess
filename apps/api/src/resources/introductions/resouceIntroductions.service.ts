@@ -4,55 +4,49 @@ import {
   ResourceIntroductionHistoryItem,
   User,
 } from '@attraccess/database-entities';
+
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
-import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
+
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { EntityManager, Repository } from 'typeorm';
+
+import { AuditService } from '../../audit/audit.service';
+
 import { MetricsService } from '../../metrics/metrics.service';
+
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
+
+import { ResourceAuditOrigin } from '../../audit/audit-policy';
+
 import { NotificationCategory } from '../../notifications/notification-types';
+
+import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
+
+import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
 
 @Injectable()
 export class ResourceIntroductionsService {
-  private readonly logger = new Logger(ResourceIntroductionsService.name);
-
   constructor(
     @InjectRepository(ResourceIntroduction)
-    private readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
+    protected readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
     @InjectRepository(ResourceIntroductionHistoryItem)
-    private readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
+    protected readonly resourceIntroductionHistoryItemRepository: Repository<ResourceIntroductionHistoryItem>,
     @Inject(EventEmitter2)
-    private readonly eventEmitter: EventEmitter2,
-    private readonly metricsService: MetricsService,
-    private readonly notifications: NotificationDispatchService,
+    protected readonly eventEmitter: EventEmitter2,
+    protected readonly metricsService: MetricsService,
+    protected readonly notifications: NotificationDispatchService,
+    protected readonly retraining: ResourceRetrainingService,
+    protected readonly audit: AuditService,
   ) {}
 
-  private notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
-    const title = 'Your resource access changed';
-    const body = granted
-      ? `You received an introduction for resource #${resourceId}.`
-      : `Your introduction for resource #${resourceId} was revoked.`;
-    const url = `/resources/${resourceId}`;
+  protected readonly logger = new Logger(ResourceIntroductionsService.name);
 
-    void this.notifications.dispatch({
-      category: NotificationCategory.ACCESS_CHANGES,
-      recipients: [{ id: userId } as User],
-      title,
-      body,
-      url,
-      dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
-      sendEmail: (recipient) =>
-        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-          accessChange: { title, body, url },
-        }),
-    }).catch((error) => {
-      this.logger.error(`Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`);
-    });
-  }
-
-  private async getIntroductionOfUser(
+  protected async getIntroductionOfUser(
     resourceId: number,
     userId: number,
     transactionalEntityManager?: EntityManager,
@@ -73,7 +67,7 @@ export class ResourceIntroductionsService {
     return introduction;
   }
 
-  private async getLastHistoryItemOfIntroduction(
+  protected async getLastHistoryItemOfIntroduction(
     introductionId: number,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceIntroductionHistoryItem> {
@@ -89,6 +83,7 @@ export class ResourceIntroductionsService {
       },
       order: {
         createdAt: 'DESC',
+        id: 'DESC',
       },
     });
 
@@ -98,7 +93,7 @@ export class ResourceIntroductionsService {
     return historyItem;
   }
 
-  private async getLastHistoryItemOfUser(
+  protected async getLastHistoryItemOfUser(
     resourceId: number,
     userId: number,
     transactionalEntityManager?: EntityManager,
@@ -118,7 +113,72 @@ export class ResourceIntroductionsService {
     return historyItem;
   }
 
-  private async createOne(resourceId: number, userId: number, tutorUserId?: number): Promise<ResourceIntroduction> {
+  public async hasValidIntroduction(
+    resourceId: number,
+    userId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean> {
+    this.logger.debug(`Checking if user ${userId} has valid introduction for resource ${resourceId}`);
+
+    const lastHistoryItem = await this.getLastHistoryItemOfUser(resourceId, userId, transactionalEntityManager);
+    const hasValid = lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
+    this.logger.debug(`User has valid introduction: ${hasValid}`);
+    return hasValid;
+  }
+
+  public async getMany(resourceId: number, includeGroups = false): Promise<ResourceIntroduction[]> {
+    this.logger.debug(`Getting all introductions for resourceId: ${resourceId}`);
+    const introductions = await this.resourceIntroductionRepository.find({
+      where: includeGroups
+        ? [{ resource: { id: resourceId } }, { resourceGroup: { resources: { id: resourceId } } }]
+        : { resource: { id: resourceId } },
+      relations: ['receiverUser', 'tutorUser', 'history', ...(includeGroups ? ['resourceGroup'] : [])],
+      cache: false,
+    });
+    this.logger.debug(`Found ${introductions.length} introductions for resource ${resourceId}`);
+    return introductions;
+  }
+
+  public async getHistoryByResourceIdAndUserId(
+    resourceId: number,
+    userId: number,
+  ): Promise<ResourceIntroductionHistoryItem[]> {
+    this.logger.debug(`Getting history for resourceId: ${resourceId}, userId: ${userId}`);
+    const history = await this.resourceIntroductionHistoryItemRepository.find({
+      where: { introduction: { resource: { id: resourceId }, receiverUser: { id: userId } } },
+    });
+    this.logger.debug(`Found ${history.length} history items for resourceId: ${resourceId}, userId: ${userId}`);
+    return history;
+  }
+
+  protected notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
+    const title = 'Your resource access changed';
+    const body = granted
+      ? `You received an introduction for resource #${resourceId}.`
+      : `Your introduction for resource #${resourceId} was revoked.`;
+    const url = `/resources/${resourceId}`;
+
+    void this.notifications
+      .dispatch({
+        category: NotificationCategory.ACCESS_CHANGES,
+        recipients: [{ id: userId } as User],
+        title,
+        body,
+        url,
+        dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+            accessChange: { title, body, url },
+          }),
+      })
+      .catch((error) => {
+        this.logger.error(
+          `Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`,
+        );
+      });
+  }
+
+  protected async createOne(resourceId: number, userId: number, tutorUserId?: number): Promise<ResourceIntroduction> {
     this.logger.debug(`Creating new introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const introduction = this.resourceIntroductionRepository.create({
       resource: { id: resourceId },
@@ -132,13 +192,15 @@ export class ResourceIntroductionsService {
     return savedIntroduction;
   }
 
-  private async updateIntroductionStatus(
+  protected async updateIntroductionStatus(
     resourceId: number,
     userId: number,
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
-    performedByUserId = userId,
+    performedByUserId?: number | null,
+    authenticationMethod?: 'session' | 'api-token' | null,
+    apiTokenId?: number | null,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
@@ -153,13 +215,16 @@ export class ResourceIntroductionsService {
     }
 
     const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(resourceIntroduction.id);
+    const retrainingWasDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: { id: resourceIntroduction.id },
       action: nextStatus,
       comment: data?.comment,
-      performedByUser: { id: performedByUserId },
+      performedByUser: { id: performedByUserId ?? userId },
     });
 
     const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
@@ -169,43 +234,55 @@ export class ResourceIntroductionsService {
       ResourceIntroductionChangedEvent.EVENT_NAME,
       new ResourceIntroductionChangedEvent(resourceIntroduction.id),
     );
-    if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
+    if (
+      previousHistoryItem?.action !== nextStatus &&
+      (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)
+    ) {
       this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
     }
+    const retrainingIsDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
+    if (retrainingWasDue && !retrainingIsDue) {
+      const retrainingOrigin: ResourceAuditOrigin =
+        performedByUserId === null
+          ? { actorId: null }
+          : {
+              actorId: performedByUserId ?? userId,
+              authenticationMethod: authenticationMethod === undefined ? 'session' : authenticationMethod,
+              ...(apiTokenId === undefined || apiTokenId === null ? {} : { apiTokenId }),
+            };
+      await this.audit.recordResource({
+        action: 'retraining.cleared',
+        ...retrainingOrigin,
+        subjectId: resourceId,
+        details: { introductionId: resourceIntroduction.id, usageUserId: userId },
+      });
+    }
 
+    if (performedByUserId !== undefined) {
+      await this.audit.recordResource({
+        action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
+        actorId: performedByUserId,
+        authenticationMethod,
+        apiTokenId,
+        subjectId: resourceId,
+        details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
+      });
+    }
     return savedHistoryItem;
-  }
-
-  public async hasValidIntroduction(
-    resourceId: number,
-    userId: number,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<boolean> {
-    this.logger.debug(`Checking if user ${userId} has valid introduction for resource ${resourceId}`);
-
-    const lastHistoryItem = await this.getLastHistoryItemOfUser(resourceId, userId, transactionalEntityManager);
-    const hasValid = lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
-    this.logger.debug(`User has valid introduction: ${hasValid}`);
-    return hasValid;
-  }
-
-  public async getMany(resourceId: number): Promise<ResourceIntroduction[]> {
-    this.logger.debug(`Getting all introductions for resourceId: ${resourceId}`);
-    const introductions = await this.resourceIntroductionRepository.find({
-      where: {
-        resource: { id: resourceId },
-      },
-      relations: ['receiverUser', 'tutorUser', 'history'],
-    });
-    this.logger.debug(`Found ${introductions.length} introductions for resource ${resourceId}`);
-    return introductions;
   }
 
   public async grant(
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { tutorUserId?: number; performedByUserId?: number },
+    options?: {
+      tutorUserId?: number;
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -215,6 +292,8 @@ export class ResourceIntroductionsService {
       data,
       options?.tutorUserId,
       options?.performedByUserId,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);
@@ -225,7 +304,11 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { performedByUserId?: number },
+    options?: {
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Revoking introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -235,20 +318,10 @@ export class ResourceIntroductionsService {
       data,
       undefined,
       options?.performedByUserId,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
     this.logger.debug(`Revoke operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;
-  }
-
-  public async getHistoryByResourceIdAndUserId(
-    resourceId: number,
-    userId: number,
-  ): Promise<ResourceIntroductionHistoryItem[]> {
-    this.logger.debug(`Getting history for resourceId: ${resourceId}, userId: ${userId}`);
-    const history = await this.resourceIntroductionHistoryItemRepository.find({
-      where: { introduction: { resource: { id: resourceId }, receiverUser: { id: userId } } },
-    });
-    this.logger.debug(`Found ${history.length} history items for resourceId: ${resourceId}, userId: ${userId}`);
-    return history;
   }
 }

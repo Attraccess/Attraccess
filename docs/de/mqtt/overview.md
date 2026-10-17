@@ -1,6 +1,6 @@
 # MQTT & IoT
 
-MQTT ist ein leichtgewichtiges Nachrichtenprotokoll, das haeufig in IoT-Anwendungen (Internet of Things) eingesetzt wird. Attraccess kann sich mit MQTT-Brokern verbinden, um mit Maschinen, Sensoren und anderen Geraeten in Ihrem Makerspace zu kommunizieren.
+MQTT ist ein leichtgewichtiges Nachrichtenprotokoll, das häufig in IoT-Anwendungen (Internet of Things) eingesetzt wird. Attraccess kann sich mit MQTT-Brokern verbinden, um Befehle und Statusmeldungen mit Maschinensteuerungen, Sensoren und anderen Geräten in Produktionsbetrieben und Laboren auszutauschen.
 
 ## Was ist MQTT?
 
@@ -12,7 +12,7 @@ MQTT (Message Queuing Telemetry Transport) ist ein Protokoll zum Senden und Empf
 
 ## Warum MQTT mit Attraccess verwenden?
 
-MQTT ermoeglicht es Attraccess, mit physischer Hardware in Ihrem Makerspace zu interagieren:
+MQTT ermöglicht es Attraccess, mit Geräten an Ihrem Standort zu interagieren:
 
 | Anwendungsfall | Beschreibung |
 |----------------|-------------|
@@ -42,7 +42,7 @@ MQTT ist tief in das [Flow-System](flows/overview.md) integriert. Sie koennen MQ
 - **Kombinieren** von MQTT mit anderen Flow-Knoten (Bedingungen, Verzoegerungen, HTTP-Anfragen)
 
 > [!TIP]
-> Beginnen Sie mit einem einfachen Setup -- verbinden Sie ein intelligentes Relais mit Ihrem MQTT-Broker und erstellen Sie einen Flow, der es einschaltet, wenn ein Benutzer eine Maschine nutzt.
+> Verbinden Sie für einen Pilotbetrieb eine Maschinensteuerung oder ein Relais mit Ihrem MQTT-Broker und erstellen Sie einen Flow, der die Maschine während einer autorisierten Nutzungssitzung freigibt.
 
 ## Erste Schritte
 

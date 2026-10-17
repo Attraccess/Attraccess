@@ -2,7 +2,7 @@
 
 This page explains the different ways to log in to Attraccess.
 
-## Login with Username and Password
+## Login with Email or Username and Password
 
 1. Open Attraccess in your browser
 2. Enter your **username or email address**
@@ -13,7 +13,7 @@ This page explains the different ways to log in to Attraccess.
 
 ## Login with SSO
 
-If your workshop has configured a Single Sign-On (SSO) provider, you will see additional buttons on the login page (e.g., "Log in with Google" or "Log in with Keycloak").
+If your organization has configured a Single Sign-On (SSO) provider, you will see additional buttons on the login page for your company or university identity provider (e.g., Microsoft Entra ID or Keycloak).
 
 1. Click the **SSO button** for your provider
 2. You will be redirected to your provider's login page
@@ -24,9 +24,9 @@ If your workshop has configured a Single Sign-On (SSO) provider, you will see ad
 
 ## Two-Factor Authentication (2FA)
 
-If two-factor authentication is enabled on your account, you will be asked for an additional code after entering your password.
+If two-factor authentication is enabled on your account, you will be asked for an additional code after submitting your email or username and password.
 
-1. Enter your username and password as usual
+1. Enter your email or username and password, then click **Log In**
 2. Open your **authenticator app** (e.g., Google Authenticator, Microsoft Authenticator, Authy)
 3. Enter the **six-digit code** displayed in the app
 4. Click **Verify**
@@ -44,7 +44,7 @@ If self-registration is enabled, you can create a new account:
 4. You may need to verify your email address before you can log in
 
 > [!NOTE]
-> Some workshops disable self-registration. In that case, ask your administrator to create an account for you.
+> Some organizations disable self-registration. In that case, ask your administrator how to get access.
 
 ## Forgot Password
 
@@ -57,7 +57,7 @@ If you have forgotten your password:
 5. Click the link and set a new password
 
 > [!WARNING]
-> If you do not receive the email, check your spam folder. If the problem persists, contact your workshop administrator.
+> If you do not receive the email, check your spam folder. If the problem persists, contact your administrator.
 
 ## See Also
 

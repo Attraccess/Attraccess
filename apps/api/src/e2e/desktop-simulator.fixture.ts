@@ -63,6 +63,7 @@ export async function buildProbe() {
 }
 
 export interface ProbeResult {
+  devicePin: string;
   readerId: number;
   authenticationGeneration: number;
   authenticated: boolean;
@@ -121,7 +122,7 @@ export class DesktopFixture {
       [this.endpoint, this.control, join(this.root, 'profile')],
       {
         cwd: repositoryRoot,
-        env: { ...process.env, SDL_VIDEODRIVER: 'dummy', SDL_RENDER_DRIVER: 'software' },
+        env: { ...process.env, SDL_VIDEODRIVER: 'dummy', SDL_RENDER_DRIVER: 'software', SDL_AUDIO_DRIVER: 'dummy' },
         stdio: 'pipe',
       },
     );

@@ -1,25 +1,29 @@
 // Layout shell for resource detail pages with persistent tab navigation bar
 // FEATURE: ATT-386 Resource details page full redesign tabbed hub layout
-import { useParams, useNavigate, useLocation, Outlet, Navigate } from 'react-router-dom';
+
+import { useParams, Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Button, Spinner, Tabs, TabList, Tab, useOverlayState } from '@heroui/react';
-import { useAuth } from '../../../../hooks/useAuth';
-import { useToastMessage } from '../../../../components/toastProvider';
 import {
   ArrowLeft,
-  FolderIcon,
-  Gauge,
-  History as HistoryIcon,
-  ListChecks,
-  PenSquareIcon,
+  Settings2Icon,
   QrCodeIcon,
   ShapesIcon,
   Trash,
+  Gauge,
+  History as HistoryIcon,
   Users,
-  WorkflowIcon,
   WrenchIcon,
 } from 'lucide-react';
-import { memo, ReactNode, useMemo, useRef } from 'react';
-import type { JSX } from 'react';
+import { memo, ReactNode, JSX, useMemo, useRef } from 'react';
+import { PageHeader, PageAction } from '../../../../components/pageHeader/index';
+import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal/index';
+import { ResourceQrCode } from '../qrcode/index';
+import { filenameToUrl } from '../../../../api/index';
+import { ResourceHealthWarning } from '../health-state/index';
+import { Select } from '../../../../components/select/index';
+import { ResourceTabKey, useResourceTabs } from './useResourceTabs';
+import { useAuth } from '../../../../hooks/useAuth';
+import { useToastMessage } from '../../../../components/toastProvider';
 import {
   useResourcesServiceDeleteOneResource,
   useResourcesServiceGetOneResourceById,
@@ -27,40 +31,24 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader, PageAction } from '../../../../components/pageHeader';
-import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
-import { ResourceEditModal } from '../../editModal/resourceEditModal';
-import { ResourceQrCode } from '../qrcode';
 import { useQrCodeAction } from '../useQrCodeAction';
-import { filenameToUrl } from '../../../../api';
-import { ResourceHealthWarning } from '../health-state';
-import { Select } from '../../../../components/select';
-import { useResourceTabs, ResourceTabKey } from './useResourceTabs';
 import de from '../resourceDetails.de.json';
 import en from '../resourceDetails.en.json';
 
-const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
+export const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   overview: <Gauge className="w-4 h-4" />,
   history: <HistoryIcon className="w-4 h-4" />,
   people: <Users className="w-4 h-4" />,
-  groups: <FolderIcon className="w-4 h-4" />,
   maintenance: <WrenchIcon className="w-4 h-4" />,
-  flows: <WorkflowIcon className="w-4 h-4" />,
-  forms: <ListChecks className="w-4 h-4" />,
 };
 
-function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
-  const { id } = useParams<{ id: string }>();
-  const resourceId = Number.parseInt(id ?? '', 10);
-
-  if (!Number.isFinite(resourceId)) {
-    return <Navigate to="/resources" replace />;
-  }
-
-  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
-}
-
-function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
+export function useResourceTabsLayoutInnerState({
+  resourceId,
+  children,
+}: {
+  resourceId: number;
+  children?: ReactNode;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -73,6 +61,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   const { t } = useTranslations({ en, de });
 
   const canUpdateResources = hasPermission('resources.update');
+  const canDeleteResources = hasPermission('resources.delete');
 
   const {
     data: resource,
@@ -82,7 +71,6 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   const deleteResource = useResourcesServiceDeleteOneResource();
 
-  const editOpenRef = useRef<() => void>(() => undefined);
   const qrOpenRef = useRef<() => void>(() => undefined);
 
   const { tabs } = useResourceTabs(resourceId);
@@ -97,6 +85,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   }, [location.pathname, resourceId, tabs]);
 
   const handleDelete = async () => {
+    if (!canDeleteResources) return;
     try {
       await deleteResource.mutateAsync({ id: resourceId });
       success({
@@ -113,6 +102,54 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       throw err;
     }
   };
+  return {
+    navigate,
+    isOpen,
+    open,
+    closeDeleteModal,
+    t,
+    canUpdateResources,
+    canDeleteResources,
+    resource,
+    isLoadingResource,
+    resourceError,
+    qrOpenRef,
+    tabs,
+    activeTabKey,
+    handleDelete,
+    resourceId,
+    children,
+  };
+}
+
+function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
+  const { id } = useParams<{ id: string }>();
+  const resourceId = Number.parseInt(id ?? '', 10);
+
+  if (!Number.isFinite(resourceId)) {
+    return <Navigate to="/resources" replace />;
+  }
+
+  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
+}
+
+function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
+  const {
+    navigate,
+    isOpen,
+    open,
+    closeDeleteModal,
+    t,
+    canUpdateResources,
+    canDeleteResources,
+    resource,
+    isLoadingResource,
+    resourceError,
+    qrOpenRef,
+    tabs,
+    activeTabKey,
+    handleDelete,
+  } = useResourceTabsLayoutInnerState({ resourceId, children });
 
   if (isLoadingResource) {
     return (
@@ -147,9 +184,9 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
     {
       key: 'edit',
       label: t('actions.edit'),
-      icon: <PenSquareIcon className="w-4 h-4" />,
+      icon: <Settings2Icon className="w-4 h-4" />,
       isHidden: !canUpdateResources,
-      onPress: () => editOpenRef.current(),
+      onPress: () => navigate(`/resources/${resourceId}/settings`),
       dataCy: 'edit-resource-button',
     },
     {
@@ -157,7 +194,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       label: t('actions.delete'),
       icon: <Trash className="w-4 h-4" />,
       variant: 'destructive',
-      isHidden: !canUpdateResources,
+      isHidden: !canDeleteResources,
       onPress: open,
       dataCy: 'delete-resource-button',
     },
@@ -222,29 +259,23 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
 
+      {canDeleteResources && (
+        <DeleteConfirmationModal
+          isOpen={isOpen}
+          onClose={closeDeleteModal}
+          onConfirm={handleDelete}
+          itemName={resource.name}
+          data-cy="delete-confirmation-modal"
+        />
+      )}
       {canUpdateResources && (
-        <>
-          <DeleteConfirmationModal
-            isOpen={isOpen}
-            onClose={closeDeleteModal}
-            onConfirm={handleDelete}
-            itemName={resource.name}
-            data-cy="delete-confirmation-modal"
-          />
-          <ResourceEditModal resourceId={resourceId} closeOnSuccess>
-            {(onOpen) => {
-              editOpenRef.current = onOpen;
-              return null;
-            }}
-          </ResourceEditModal>
-          <ResourceQrCode
-            resourceId={resourceId}
-            renderTrigger={(onOpen) => {
-              qrOpenRef.current = onOpen;
-              return null;
-            }}
-          />
-        </>
+        <ResourceQrCode
+          resourceId={resourceId}
+          renderTrigger={(onOpen) => {
+            qrOpenRef.current = onOpen;
+            return null;
+          }}
+        />
       )}
 
       {tabs.find((tab) => tab.key === activeTabKey) ? null : <Navigate to={`/resources/${resourceId}`} replace />}

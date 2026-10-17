@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigType } from '../config/app.config';
 import { LicenseDataDto } from './dtos/license.dto';
@@ -32,6 +32,7 @@ interface LicenseRequirements {
 
 @Injectable()
 export class LicenseService {
+  private readonly logger = new Logger(LicenseService.name);
   constructor(
     private readonly configService: ConfigService,
     private readonly settingsService: SettingsService,
@@ -74,11 +75,7 @@ export class LicenseService {
         const { verifyLicense } = await import('@licenso/client');
         const url = await this.settingsService.getUrl();
         const licensoDeviceId = this.buildLicensoDeviceId(url ?? null);
-        const licenseData = await verifyLicense(
-          licenseKey,
-          appConfig.LICENSO_PUBLIC_KEY,
-          licensoDeviceId,
-        );
+        const licenseData = await verifyLicense(licenseKey, appConfig.LICENSO_PUBLIC_KEY, licensoDeviceId);
 
         response = {
           valid: licenseData.valid,
@@ -90,8 +87,7 @@ export class LicenseService {
           isNonProfit: false,
         };
       } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error(error);
+        this.logger.error(error);
         throw new LicenseError(
           'Failed to verify license, did you provide a valid license key? Maybe there is a typo? Check your brackets ;)',
         );

@@ -10,9 +10,6 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { useMemo, useCallback, useEffect, useState } from 'react';
-import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
-import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
 import {
   ResponsiveContainer,
   LineChart,
@@ -26,31 +23,40 @@ import {
   Bar,
   Rectangle,
 } from 'recharts';
-import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
-import type { Payload as TooltipPayload } from 'recharts/types/component/DefaultTooltipContent';
-import en from './en.json';
-import de from './de.json';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { EmptyState } from '../../../../../components/emptyState';
+import { useMemo, useCallback, useEffect, useState } from 'react';
+import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
+import en from './en.json';
+import de from './de.json';
+import type { Payload as TooltipPayload } from 'recharts/types/component/DefaultTooltipContent';
+import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
 
-type ProjectUsageChartsProps = {
+export type ChartTooltipPayload = TooltipPayload;
+
+export type ChartTooltipProps = TooltipContentProps;
+
+export type ProjectUsageChartsProps = {
   projectId: number;
 };
 
-const TOOLTIP_CONTAINER_CLASS =
-  'rounded-lg border border-border bg-surface/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
-const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-muted';
-const TOOLTIP_DOT_CLASS = 'h-2 w-2 rounded-full';
-const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
-const CHART_COLORS = {
+export const CHART_COLORS = {
   sessions: { base: 'var(--chart-sessions)', active: 'var(--chart-sessions-active)' },
   minutes: { base: 'var(--chart-minutes)', active: 'var(--chart-minutes-active)' },
   spend: 'var(--chart-spend)',
 };
-type ChartTooltipProps = TooltipContentProps;
-type ChartTooltipPayload = TooltipPayload;
 
-export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
+export const TOOLTIP_CONTAINER_CLASS =
+  'rounded-lg border border-border bg-surface/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
+
+export const TOOLTIP_DOT_CLASS = 'h-2 w-2 rounded-full';
+
+export const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-muted';
+
+export const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
+
+export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProps) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
   const formatDate = useDateTimeFormatter({ showTime: false });
@@ -151,6 +157,31 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
     },
     [data, formatNumber],
   );
+  return {
+    t,
+    formatNumber,
+    data,
+    isLoading,
+    canRenderCharts,
+    chartData,
+    topResources,
+    renderTimeSeriesTooltip,
+    renderTopResourcesTooltip,
+  } as const;
+}
+
+export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
+  const {
+    t,
+    formatNumber,
+    data,
+    isLoading,
+    canRenderCharts,
+    chartData,
+    topResources,
+    renderTimeSeriesTooltip,
+    renderTopResourcesTooltip,
+  } = useProjectUsageChartsState({ projectId });
 
   return (
     <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">

@@ -1,0 +1,14 @@
+{
+  "description": "Choose how dates and times appear, independently of the app language. These preferences are saved to your account.",
+  "languageDefault": "Use app language",
+  "preview": "Preview",
+  "save": "Save",
+  "saved": "Date and time preferences saved",
+  "error": "Could not save date and time preferences",
+  "mode": "Formatting",
+  "custom": "Custom locale",
+  "locale": "Formatting locale code",
+  "examples": "Examples: en-GB, en-US, de-DE",
+  "invalid": "Enter a valid locale code, such as en-GB.",
+  "unsupported": "Your browser does not support this locale."
+}

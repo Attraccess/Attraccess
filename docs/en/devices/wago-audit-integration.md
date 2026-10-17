@@ -62,7 +62,10 @@ to 50 and is bounded to 1..100; invalid or unknown query fields are rejected.
 Supported filters are `domain=wago`, exact `action`, `eventPrefix` (for example
 `wago.commissioning.`), `outcome`, `operationId`, `actorId`, `subjectType`,
 `subjectId`, and inclusive ISO timestamp bounds `from`/`to`. Subject types are
-`wago.controller` and `wago.commissioning`. Dates are returned as ISO timestamps.
+`wago.controller` and `wago.commissioning`. `GET /api/admin/audit-log/meta`
+enumerates the domains, actions and subject types currently known to the host —
+core values plus the contributions of loaded plugins — so clients never hardcode
+the WAGO vocabulary. Dates are returned as ISO timestamps.
 Rows retain identifiers and explicitly safe metadata, not actor names, command
 values, credential values, arbitrary error strings or raw configuration snapshots.
 
@@ -70,11 +73,12 @@ values, credential values, arbitrary error strings or raw configuration snapshot
 `system.settings.manage` permission. Settings use `SettingsStoreService` with
 parent `audit` and the following JSON-encoded keys:
 
-| Key | Default | Bounds |
-| --- | --- | --- |
-| `enabled` | `true` | Boolean master switch. |
-| `domains` | `["wago"]` | All currently registered domains; `[]` disables capture. |
-| `retention_days` | `90` | Integer 1..3650. |
+| Key                       | Default      | Bounds                                                                                                                                                    |
+| ------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`                 | `true`       | Boolean master switch.                                                                                                                                    |
+| `domains`                 | Core domains | Allowlist of core (host-owned) domains only.                                                                                                              |
+| `plugin_domains_disabled` | `[]`         | Blocklist of plugin-contributed domains. The `wago` domain records while the plugin is loaded and absent from this list; administrators turn it off here. |
+| `retention_days`          | `90`         | Integer 1..3650.                                                                                                                                          |
 
 PATCH accepts these fields, for example `{ "retention_days": 30 }`. Invalid
 persisted settings fail closed rather than silently enabling capture or purging
@@ -84,12 +88,19 @@ minute to refresh on another process. No environment-only second settings store
 is introduced.
 
 The sink admits at most eight outstanding writes and retains no retry queue.
-Details are bounded to 4 KiB and validated against per-action allowlists. Caller
-objects are snapshotted once from data properties; accessors, custom prototypes,
-unknown fields and unsupported events are rejected before persistence. Extending
-the generic store to another domain requires an explicit reviewed event policy,
-not permission to submit arbitrary JSON. In particular, telemetry events are not
-accepted.
+Details are bounded to 4 KiB and validated against per-action allowlists that the
+plugin itself declares. The WAGO backend module exports its policy as
+`WAGO_AUDIT_DOMAIN` (`apps/plugins/wago/backend/audit/policy.ts`) through
+`PluginBackendModule.auditDomains`; the host registers the declaration at plugin
+load and enforces it on every recorded event. The core application contains no
+WAGO-specific audit code: an event is admitted only when its action prefix
+resolves to a domain registered by the recording plugin, the action and subject
+type are declared, and every detail field passes its declared field policy.
+Caller objects are snapshotted once from data properties; accessors, custom
+prototypes, unknown fields, foreign plugin identities and unsupported events are
+rejected before persistence. Extending audit coverage requires an explicit
+reviewed declaration in the plugin, not permission to submit arbitrary JSON. In
+particular, telemetry events are not accepted.
 
 Retention runs at startup and hourly, deleting expired rows in batches of 1,000
 and yielding between batches until the backlog is drained. Only deletion counts
@@ -99,12 +110,12 @@ currently retained history.
 
 ## Wired HTTP lifecycles
 
-| Route | Action | Success boundary |
-| --- | --- | --- |
-| `POST controllers/:id/claim` | `wago.claim` | Existing `claim` service resolves after credential dispatch; does not assert controller acknowledgement. |
-| `DELETE controllers/:id` | `wago.unclaim` | Existing `remove` resolves after revocation/removal. Later commissioning-history cleanup failure does not erase successful unclaim. |
-| `POST controllers/:id/configuration/publish` | `wago.publication` | Existing publication resolves; completion includes returned `revision`. Does not assert controller application. |
-| `POST controllers/:id/configuration/rollback/:revision` | `wago.rollback` | Publication resolves; includes requested `sourceRevision` and newly returned `revision`. |
+| Route                                                   | Action             | Success boundary                                                                                                                    |
+| ------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `POST controllers/:id/claim`                            | `wago.claim`       | Existing `claim` service resolves after credential dispatch; does not assert controller acknowledgement.                            |
+| `DELETE controllers/:id`                                | `wago.unclaim`     | Existing `remove` resolves after revocation/removal. Later commissioning-history cleanup failure does not erase successful unclaim. |
+| `POST controllers/:id/configuration/publish`            | `wago.publication` | Existing publication resolves; completion includes returned `revision`. Does not assert controller application.                     |
+| `POST controllers/:id/configuration/rollback/:revision` | `wago.rollback`    | Publication resolves; includes requested `sourceRevision` and newly returned `revision`.                                            |
 
 Each operation records `attempted` followed by `succeeded` or `failed`, sharing
 one generated UUID operation ID. A service rejection is rethrown unchanged to the
@@ -116,7 +127,7 @@ link at the actual mutation boundary.
 
 ## Reusable integration contract for remaining owners
 
-`apps/plugins/wago/backend/wago-audit.ts` exports `WagoAudit`, lifecycle/result
+`apps/plugins/wago/backend/audit/index.ts` exports `WagoAudit`, lifecycle/result
 interfaces and safe summary/projection functions. No other-owner service needs
 to import core audit implementation details.
 
@@ -124,7 +135,10 @@ to import core audit implementation details.
 const audit = new WagoAudit(context);
 const principal = wagoAuditPrincipal(request); // authenticated request only
 const result = await audit.run(
-  principal, controllerId, 'forced_publication', {},
+  principal,
+  controllerId,
+  'forced_publication',
+  {},
   () => serviceOperation(), // Promise<WagoRevisionAuditResult>
   (value) => ({ revision: value.revision }),
 );
@@ -142,15 +156,15 @@ Repeated attempt/finish calls on the same handle emit at most one attempt and
 one terminal event; the first terminal call wins. Finishing implicitly awaits
 the attempt. The handle is process-local, not persisted correlation state.
 
-| Operation owner | Action and required integration data |
-| --- | --- |
-| Commissioning automatic claim | Call `claim` lifecycle around the actual automatic claim, carrying the authenticated initiating principal through the session/job. The existing service-internal call bypasses the HTTP claim hook. Never synthesize an actor from controller data. |
-| Credential rotation/manual enrollment | `credential_rotation` / `manual_credential_fallback`; begin with persisted controller ID and authenticated principal, finish only after actual rotation/fallback completion. A `Promise<void>` operation needs no completion projector. Never pass provisioned credentials or manual instructions. |
-| Forced publication | `forced_publication`; operation returns `WagoRevisionAuditResult` (`{ revision: number }`). |
-| Rejection acknowledgement | `rejection_acknowledgement`; begin with `{ revision }`, finish when the operator acknowledgement is persisted. This is an authenticated operator action, not a raw MQTT rejection/telemetry callback. |
-| Preset apply/reapply | Select `preset_application` or `preset_reapplication` from actual persisted provenance under the configuration lock. Return `WagoPresetAuditResult` (`presetId`, `channelId`, `before`, `after`) and project those fields. |
-| Hardware Profile create/change | `profile_creation` / `profile_change`; return `WagoProfileAuditResult` (`profileId: string`, `profileVersion: number`, `before`, `after`). Capture identity from the validated profile embedded in `snapshot.modbus.profiles` at the owning configuration draft/publication persistence boundary, not a separate profile record or a local preview. |
-| Manual command | `manual_command`; allocate the real command UUID before `begin`, pass `{ channelId, operation, commandId }`, and finish with a result from `WagoManualCommandAuditResult`. For dispatch-only semantics use `dispatched`; for acknowledgement semantics wait for `acknowledged`, `rejected`, `timeout`, or `transport_failure`. The last three finish as `failed`. Never record command values or broker payloads. |
+| Operation owner                       | Action and required integration data                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Commissioning automatic claim         | Call `claim` lifecycle around the actual automatic claim, carrying the authenticated initiating principal through the session/job. The existing service-internal call bypasses the HTTP claim hook. Never synthesize an actor from controller data.                                                                                                                                                               |
+| Credential rotation/manual enrollment | `credential_rotation` / `manual_credential_fallback`; begin with persisted controller ID and authenticated principal, finish only after actual rotation/fallback completion. A `Promise<void>` operation needs no completion projector. Never pass provisioned credentials or manual instructions.                                                                                                                |
+| Forced publication                    | `forced_publication`; operation returns `WagoRevisionAuditResult` (`{ revision: number }`).                                                                                                                                                                                                                                                                                                                       |
+| Rejection acknowledgement             | `rejection_acknowledgement`; begin with `{ revision }`, finish when the operator acknowledgement is persisted. This is an authenticated operator action, not a raw MQTT rejection/telemetry callback.                                                                                                                                                                                                             |
+| Preset apply/reapply                  | Select `preset_application` or `preset_reapplication` from actual persisted provenance under the configuration lock. Return `WagoPresetAuditResult` (`presetId`, `channelId`, `before`, `after`) and project those fields.                                                                                                                                                                                        |
+| Hardware Profile create/change        | `profile_creation` / `profile_change`; return `WagoProfileAuditResult` (`profileId: string`, `profileVersion: number`, `before`, `after`). Capture identity from the validated profile embedded in `snapshot.modbus.profiles` at the owning configuration draft/publication persistence boundary, not a separate profile record or a local preview.                                                               |
+| Manual command                        | `manual_command`; allocate the real command UUID before `begin`, pass `{ channelId, operation, commandId }`, and finish with a result from `WagoManualCommandAuditResult`. For dispatch-only semantics use `dispatched`; for acknowledgement semantics wait for `acknowledged`, `rejected`, `timeout`, or `transport_failure`. The last three finish as `failed`. Never record command values or broker payloads. |
 
 `before` and `after` use `WagoAuditSummary`: only `physicalPointCount` and
 `logicalChannelCount`. Compute both within the owner’s mutation lock from the
@@ -163,8 +177,8 @@ The profile contract matches ATT-1059 / Modbus commit `20ef1db4`: `profileId` is
 string with a nonempty `trim()` result and original JavaScript `.length` at most
 160 (UTF-16 code units); `profileVersion` is a safe integer in `1..1000000`.
 Accepted IDs are preserved verbatim, never trimmed, truncated, coerced or
-restricted to UUID/ASCII syntax. Built-in references include
-`wago-879-3000-unverified` and `wago-879-1300-unverified`, version 1; custom IDs
+restricted to UUID/ASCII syntax. The sole built-in reference is
+`wago-879-3020`, version 1; custom IDs
 are user-editable strings. Invalid fields and extra keys at every level are
 dropped, not copied into error metadata. The length check is not secret detection:
 IDs must come from validated domain identities, never arbitrary request text or
@@ -218,7 +232,7 @@ Commissioning PR #1817 at `f136365b` emits through the same host bridge. Its
 `auditCommissioning` helper uses `wago.commissioning` subjects (the persisted
 session ID) for `wago.commissioning.install`, `recover`, `security_inspect`,
 `security_review`, `security_apply`, `security_recover`, `platform_inspect`,
-`platform_activate`, `platform_recover`, and `lease_recover`. Details are empty.
+`platform_activate` and `platform_recover`. Details are empty.
 Automatic claim instead emits `wago.claim` against the real `wago.controller` ID.
 The authenticated initiating principal is persisted in commissioning sessions;
 legacy sessions without a valid initiator must not invent one.
@@ -232,9 +246,7 @@ wrapper inside its safe-removal callback:
 ```ts
 const principal = wagoAuditPrincipal(request);
 await this.commissioning.removeControllerSafely(id, (assertOwned) =>
-  this.audit.run(principal, id, 'unclaim', {}, () =>
-    this.wago.remove(id, assertOwned),
-  ),
+  this.audit.run(principal, id, 'unclaim', {}, () => this.wago.remove(id, assertOwned)),
 );
 ```
 

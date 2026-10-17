@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DrawerBody, DrawerHeader, useOverlayState } from '@heroui/react';
+import { DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 
 import de from './de.json';
@@ -24,7 +24,9 @@ export function ResourceFilter(props: Props & Omit<FilterProps, 'onSearchChanged
     <>
       {children({ onOpen: open })}
       <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
-        <DrawerHeader>{t('drawer.title')}</DrawerHeader>
+        <DrawerHeader>
+          <DrawerHeading>{t('drawer.title')}</DrawerHeading>
+        </DrawerHeader>
         <DrawerBody className="flex flex-col gap-4">
           <LabeledSwitch isSelected={filterProps.onlyInUseByMe} onChange={filterProps.onOnlyInUseByMeChanged}>
             {t('drawer.options.onlyInUseByMe')}

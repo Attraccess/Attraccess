@@ -145,6 +145,18 @@ export class SSOProviderSAMLConfiguration {
   })
   spSigningKeyEncryptionKeyId?: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Identity Provider entity ID (distinct from the Service Provider issuer)',
+    required: false,
+    nullable: true,
+  })
+  idpIssuer?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Identity Provider Single Logout endpoint', required: false, nullable: true })
+  logoutURL?: string | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the configuration was created',

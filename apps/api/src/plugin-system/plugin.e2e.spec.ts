@@ -1,13 +1,10 @@
+import { AuditService } from '../audit/audit.service';
 import 'reflect-metadata';
 import { Global, INestApplication, Module } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { Column, DataSource, Entity, PrimaryGeneratedColumn } from 'typeorm';
-import {
-  PluginContext,
-  PluginPermission,
-  PluginPermissionError,
-} from '@attraccess/plugins-backend-sdk';
+import { PluginContext, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
 import { build } from 'esbuild';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import { dirname, join, resolve } from 'path';
@@ -24,10 +21,11 @@ let hostDataSource: DataSource;
 @Global()
 @Module({
   providers: [
+    { provide: AuditService, useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
     { provide: DataSource, useFactory: () => hostDataSource },
     { provide: 'POC_HOST_GREETER', useValue: { greet: () => 'hello from host' } },
   ],
-  exports: [DataSource, 'POC_HOST_GREETER'],
+  exports: [AuditService, DataSource, 'POC_HOST_GREETER'],
 })
 class HostModule {}
 
@@ -119,7 +117,11 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
       .spyOn(PluginService.prototype as unknown as { restartApp: () => void }, 'restartApp')
       .mockImplementation(() => undefined);
     const realSetTimeout = global.setTimeout;
-    jest.spyOn(global, 'setTimeout').mockImplementation(((fn: (...a: unknown[]) => void, delay?: number, ...rest: unknown[]) => {
+    jest.spyOn(global, 'setTimeout').mockImplementation(((
+      fn: (...a: unknown[]) => void,
+      delay?: number,
+      ...rest: unknown[]
+    ) => {
       if (delay === 1000) return 0 as unknown as NodeJS.Timeout;
       return realSetTimeout(fn, delay as number, ...rest);
     }) as unknown as typeof setTimeout);

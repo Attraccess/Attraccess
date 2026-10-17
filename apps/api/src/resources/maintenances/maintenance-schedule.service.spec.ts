@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   Resource,
+  ResourceType,
   ResourceMaintenance,
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
@@ -11,6 +13,7 @@ import {
 } from '@attraccess/database-entities';
 import { MaintenanceScheduleService } from './maintenance-schedule.service';
 import { AuditService } from '../../audit/audit.service';
+import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 
 describe('MaintenanceScheduleService', () => {
   let service: MaintenanceScheduleService;
@@ -41,6 +44,7 @@ describe('MaintenanceScheduleService', () => {
     delete: jest.fn(),
   };
   const resourceRepository = { findOne: jest.fn() };
+  const evaluator = { evaluateResource: jest.fn().mockResolvedValue(undefined) };
   const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
@@ -69,11 +73,21 @@ describe('MaintenanceScheduleService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceScheduleService,
+        { provide: MaintenanceScheduleEvaluatorService, useValue: evaluator },
         { provide: getRepositoryToken(ResourceMaintenanceSchedule), useValue: scheduleRepository },
         { provide: getRepositoryToken(ResourceMaintenance), useValue: maintenanceRepository },
-        { provide: getRepositoryToken(ResourceMaintenanceScheduleUsageHoursConfig), useValue: usageHoursConfigRepository },
-        { provide: getRepositoryToken(ResourceMaintenanceScheduleUsageCountConfig), useValue: usageCountConfigRepository },
-        { provide: getRepositoryToken(ResourceMaintenanceScheduleTimeIntervalConfig), useValue: timeIntervalConfigRepository },
+        {
+          provide: getRepositoryToken(ResourceMaintenanceScheduleUsageHoursConfig),
+          useValue: usageHoursConfigRepository,
+        },
+        {
+          provide: getRepositoryToken(ResourceMaintenanceScheduleUsageCountConfig),
+          useValue: usageCountConfigRepository,
+        },
+        {
+          provide: getRepositoryToken(ResourceMaintenanceScheduleTimeIntervalConfig),
+          useValue: timeIntervalConfigRepository,
+        },
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },
         { provide: AuditService, useValue: audit },
       ],
@@ -116,12 +130,14 @@ describe('MaintenanceScheduleService', () => {
     expect(usageCountConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
     expect(timeIntervalConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
     expect(transactionalScheduleRepository.remove).toHaveBeenCalledWith(scheduleToDelete);
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'maintenance_schedule.deleted',
-      actorId: 7,
-      subjectId: 1,
-      details: expect.objectContaining({ scheduleId: 10, enabled: 1, usageThreshold: 12 }),
-    }));
+    expect(audit.recordResource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance_schedule.deleted',
+        actorId: 7,
+        subjectId: 1,
+        details: expect.objectContaining({ scheduleId: 10, enabled: 1, usageThreshold: 12 }),
+      }),
+    );
   });
 
   it('records the intended state when creating a schedule', async () => {
@@ -140,12 +156,15 @@ describe('MaintenanceScheduleService', () => {
     );
 
     expect(usageCountConfigRepository.save).toHaveBeenCalledWith({ scheduleId: 11, thresholdSessions: 12 });
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'maintenance_schedule.created',
-      actorId: 7,
-      subjectId: 1,
-      details: expect.objectContaining({ scheduleId: 11, enabled: 1, usageThreshold: 12 }),
-    }));
+    expect(evaluator.evaluateResource).toHaveBeenCalledWith(1);
+    expect(audit.recordResource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance_schedule.created',
+        actorId: 7,
+        subjectId: 1,
+        details: expect.objectContaining({ scheduleId: 11, enabled: 1, usageThreshold: 12 }),
+      }),
+    );
   });
 
   it('records the intended state when updating a schedule', async () => {
@@ -155,11 +174,84 @@ describe('MaintenanceScheduleService', () => {
 
     await service.update(1, 10, { enabled: false }, 7);
 
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'maintenance_schedule.updated',
-      actorId: 7,
-      subjectId: 1,
-      details: expect.objectContaining({ scheduleId: 10, enabled: 0, usageThreshold: 12 }),
-    }));
+    expect(audit.recordResource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance_schedule.updated',
+        actorId: 7,
+        subjectId: 1,
+        details: expect.objectContaining({ scheduleId: 10, enabled: 0, usageThreshold: 12 }),
+      }),
+    );
+  });
+  it('reevaluates the unchanged service cycle when a schedule is reenabled', async () => {
+    const disabled = { ...schedule, enabled: false } as ResourceMaintenanceSchedule;
+    const enabled = { ...schedule, enabled: true } as ResourceMaintenanceSchedule;
+    scheduleRepository.findOne.mockResolvedValueOnce(disabled).mockResolvedValueOnce(enabled);
+    scheduleRepository.save = jest.fn().mockResolvedValue(enabled);
+
+    await service.update(1, 10, { enabled: true }, 7);
+
+    expect(evaluator.evaluateResource).toHaveBeenCalledWith(1);
+    expect(maintenanceRepository.update).not.toHaveBeenCalled();
+  });
+
+  describe('operating duration resource validation', () => {
+    const operatingBasis = ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION;
+
+    it('rejects operating-duration schedules on doors before creating a schedule', async () => {
+      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
+      await expect(
+        service.create(
+          1,
+          {
+            triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+            durationBasis: operatingBasis,
+          },
+          7,
+        ),
+      ).rejects.toThrow('Operating duration is only supported for machine resources');
+      expect(scheduleRepository.save).not.toHaveBeenCalled();
+      expect(evaluator.evaluateResource).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        existingBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
+        update: { durationBasis: operatingBasis },
+      },
+      { existingBasis: operatingBasis, update: { enabled: true } },
+    ])('rejects an effective operating basis on a door when updating: $update', async ({ existingBasis, update }) => {
+      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
+      scheduleRepository.findOne.mockResolvedValue({ ...schedule, durationBasis: existingBasis });
+      await expect(service.update(1, 10, update, 7)).rejects.toThrow(
+        'Operating duration is only supported for machine resources',
+      );
+      expect(scheduleRepository.save).not.toHaveBeenCalled();
+      expect(evaluator.evaluateResource).not.toHaveBeenCalled();
+    });
+
+    it('allows the operating basis for a machine', async () => {
+      const machineSchedule = { ...schedule, durationBasis: operatingBasis };
+      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Machine });
+      scheduleRepository.findOne.mockResolvedValue(machineSchedule);
+      scheduleRepository.save = jest.fn().mockResolvedValue(machineSchedule);
+
+      await expect(service.update(1, 10, { durationBasis: operatingBasis }, 7)).resolves.toEqual(machineSchedule);
+      expect(scheduleRepository.save).toHaveBeenCalledWith(machineSchedule);
+    });
+
+    it('allows a door schedule to switch back to session duration', async () => {
+      const doorSchedule = { ...schedule, durationBasis: operatingBasis };
+      resourceRepository.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
+      scheduleRepository.findOne.mockResolvedValue(doorSchedule);
+      scheduleRepository.save = jest.fn().mockResolvedValue(doorSchedule);
+
+      await service.update(1, 10, { durationBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION }, 7);
+      expect(scheduleRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          durationBasis: ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
+        }),
+      );
+    });
   });
 });

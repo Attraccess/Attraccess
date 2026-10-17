@@ -3,18 +3,18 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "tools/generators/src",
   "projectType": "library",
-  "tags": [],
-  "implicitDependencies": [
-    "frontend",
-    "companion",
-    "ui",
-    "plugins-frontend-ui",
-    "plugins-frontend-sdk",
-    "plugin-shelly",
-    "plugin-rabbitmq",
-    "plugin-wago"
-  ],
+  "tags": ["type:tool", "scope:core"],
+  "implicitDependencies": ["frontend", "companion", "ui", "plugins-frontend-ui", "plugins-frontend-sdk"],
   "targets": {
+    "test": {
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        { "externalDependencies": ["jest"] }
+      ]
+    },
     "build": {
       "executor": "@nx/js:tsc",
       "dependsOn": [],
@@ -46,6 +46,13 @@
             "output": "."
           }
         ]
+      },
+      "inputs": ["production", "!{projectRoot}/src/**/*.test-utils.ts", "^production"]
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs tools/generators"
       }
     }
   }

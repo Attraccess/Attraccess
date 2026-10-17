@@ -4,7 +4,7 @@ import { Button } from '@heroui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@heroui/styles/css';
 import '../../src/styles.css';
-import { ConfigurationEditor } from '../../src/ConfigurationEditor';
+import { ConfigurationEditor } from '../../src/configuration/ConfigurationEditor';
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 

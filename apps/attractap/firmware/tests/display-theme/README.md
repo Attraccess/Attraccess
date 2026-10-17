@@ -1,7 +1,7 @@
 # Firmware Display Theme Host Harness
 
 Headless **real LVGL 9.3.0** software rendering at 480 x 480. This compiles the
-production `DisplayTheme` and screen `.cpp` files directly. There is no SDL,
+production `DisplayTheme` and screen `.cpp` files directly. The introducer parser test also uses real ArduinoJson 7.0.4. There is no SDL,
 browser rendering, copied screen implementation, ESP-IDF build, or device access.
 
 ## Run
@@ -60,6 +60,7 @@ warnings may also appear in a host build.
 | Keyboard | Real LVGL keyboard and button matrix, automatic and helper styles, pressed/checked/disabled item styles; real per-key controls and framebuffer fill samples |
 | Logos | Both production descriptors and embedded RGB565+A8 files, word alignment, byte counts, no recolor, every fully opaque/transparent pixel against the rendered framebuffer |
 | Restored backgrounds | RAL5020 RGB565 artwork on production lockscreen (available/in-use/maintenance), resource list and no-resources screens; alignment, byte count, unrecolored framebuffer samples and resource selection callback |
+| Wall clock | Lockscreen clock/date and card prompt versus unknown time, minute and month updates, signed-out resource list header replacing the logo |
 | Boot | Production title and deterministic firmware info |
 | Init | Pending network, connected WLAN/certificate search warning, authenticated API state, settings event callback |
 | NFC Enrollment / Reset | Waiting, writing, success, error; cached username; phase colors; cancel visibility/callback; deterministic countdown and expiry |
@@ -67,7 +68,7 @@ warnings may also appear in a host build.
 | PIN | Production field/numeric keyboard, real keyboard value-change callbacks entering `1234`, valid/rejected/short PIN and cancel behavior, per-key state rendering |
 
 Production `IScreen::init()` idempotence and normal screen teardown are exercised.
-There are **12 test groups and 30 rendered fixtures**. The reported check count
+There are **17 test groups and 60 rendered fixtures**. The reported check count
 includes individual logo pixels, not just behavioral assertions. Widget gallery
 frames are labeled `widgets-*`; they exercise the production theme but are not
 claimed to be firmware screens. All other screen fixtures use production layouts.
@@ -156,3 +157,20 @@ ffmpeg -f rawvideo -pixel_format rgba -video_size 480x480 \
   -i apps/attractap/firmware/tests/display-theme/output/boot.rgba \
   -frames:v 1 -update 1 apps/attractap/firmware/tests/display-theme/output/boot.png
 ```
+
+## Introducer list regression (ATT-1113)
+
+The production resource details screen renders 30 long tutor names for an ordinary
+unintroduced user, both available and occupied. The test scrolls to the last name,
+checks wrapping, and replaces the list with a refreshed assignment. The four
+`introducers-{available,occupied}-{top,bottom}.rgba` fixtures show those states.
+Pending actions cover the full viewport when opened at the bottom of the list
+and while scrolling back to the top, in both occupancy states. The two
+`introducers-{available,occupied}-pending.rgba` fixtures show the fixed overlay.
+Clock formatting is deterministic in this host harness; device input and transport
+still require a physical reader check.
+
+`resource-introducers-parser` compiles the production parsing helper with real
+ArduinoJson and round-trips 40 long UTF-8 names through serialized JSON, excludes
+invalid entries, and verifies empty/replacement lists. Its pinned dependency is
+fetched into the host build directory, separately from the screen header shims.

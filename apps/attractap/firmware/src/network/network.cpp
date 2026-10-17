@@ -13,16 +13,26 @@ void Network::loop() {}
 void Network::initSharedComponents() {}
 
 #else
-#include "platform.hpp"
+#include "../platform.hpp"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_sntp.h"
+#include "../clock/wall_clock.hpp"
 #include <string>
 #include <time.h>
 
 // Static member definitions
 bool Network::_sharedComponentsInitialized = false;
 Logger Network::logger("Network");
+
+// ESP-IDF's weak SNTP hook normally writes UTC before notifying the app.
+// Own the write so it shares the lock with the API fallback and cannot be
+// overwritten by an API sample that was checked before SNTP synchronized.
+extern "C" void sntp_sync_time(struct timeval *sample)
+{
+    esp_sntp_set_sync_status(WallClock::onSntpTime(*sample)
+        ? SNTP_SYNC_STATUS_COMPLETED : SNTP_SYNC_STATUS_RESET);
+}
 
 void Network::setup()
 {

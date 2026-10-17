@@ -16,7 +16,7 @@
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
 #include "../utils.hpp"
-#include "platform.hpp"
+#include "../platform.hpp"
 
 std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
@@ -107,6 +107,39 @@ void SerialCommandHandler::processLine(const std::string &line)
     handleCommand(topic, payload);
 }
 
+void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std::string &payload)
+{
+    // Exact wire format "RESP <topic> <payload>\n" — the provisioning tooling parses it.
+    printf("RESP %s %s\n", topic.c_str(), payload.c_str());
+}
+
+void SerialCommandHandler::sendErrorResponse(const std::string &topic, const char *error)
+{
+    DynamicJsonDocument resp(128);
+    resp["error"] = error ? error : "UNKNOWN_ERROR";
+    std::string json;
+    serializeJson(resp, json);
+    sendJsonResponse(topic, json);
+}
+
+#ifndef ATTRACTAP_HOST
+
+#include <ArduinoJson.h>
+#include <lwip/inet.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/usb_serial_jtag.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
+#include "../settings/settings.hpp"
+#include "../network/wifi/wifi.hpp"
+#include "../state/state.hpp"
+#include "../utils.hpp"
+#include "../platform.hpp"
+
 bool SerialCommandHandler::pinIsSet()
 {
     return Settings::getDeviceConfig().passCode != "0000";
@@ -186,6 +219,26 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
         return "UNKNOWN";
     }
 }
+
+#endif
+
+#ifndef ATTRACTAP_HOST
+
+#include <ArduinoJson.h>
+#include <lwip/inet.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/usb_serial_jtag.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
+#include "../settings/settings.hpp"
+#include "../network/wifi/wifi.hpp"
+#include "../state/state.hpp"
+#include "../utils.hpp"
+#include "../platform.hpp"
 
 void SerialCommandHandler::handleCommand(const std::string &topic, const std::string &payload)
 {
@@ -273,6 +326,30 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
         return;
     }
 
+    handleAuthorizedCommand(topic, payloadObj);
+}
+#endif
+
+#ifndef ATTRACTAP_HOST
+
+#include <ArduinoJson.h>
+#include <lwip/inet.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/usb_serial_jtag.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+
+#include "../settings/settings.hpp"
+#include "../network/wifi/wifi.hpp"
+#include "../state/state.hpp"
+#include "../utils.hpp"
+#include "../platform.hpp"
+
+void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, JsonObject payloadObj)
+{
     if (topic == "network.status.get")
     {
         auto net = State::getNetworkState();
@@ -406,17 +483,4 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
     sendErrorResponse(topic, "UNKNOWN_TOPIC");
 }
 
-void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std::string &payload)
-{
-    // Exact wire format "RESP <topic> <payload>\n" — the provisioning tooling parses it.
-    printf("RESP %s %s\n", topic.c_str(), payload.c_str());
-}
-
-void SerialCommandHandler::sendErrorResponse(const std::string &topic, const char *error)
-{
-    DynamicJsonDocument resp(128);
-    resp["error"] = error ? error : "UNKNOWN_ERROR";
-    std::string json;
-    serializeJson(resp, json);
-    sendJsonResponse(topic, json);
-}
+#endif

@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/frontend/src",
   "projectType": "application",
-  "tags": [],
+  "tags": ["type:app", "scope:core"],
   "targets": {
     "build": {
       "dependsOn": ["react-query-client:build", "copy-dependency-list"],
@@ -76,6 +76,13 @@
       "options": {
         "command": "pnpm exec tsc --noEmit -p apps/frontend/tsconfig.spec.json"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/frontend"
+      },
+      "dependsOn": ["react-query-client:generate"]
     }
   },
   "targetDefaults": {

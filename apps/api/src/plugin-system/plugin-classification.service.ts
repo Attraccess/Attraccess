@@ -5,17 +5,16 @@ export type PluginClassification = {
   reason: string;
 };
 
-export type OfficialPluginPackage = { name: string };
-
 const NPM_REGISTRY_URL = 'https://registry.npmjs.org';
 const OFFICIAL_PLUGIN_PREFIX = '@attraccess/plugin-';
 const OFFICIAL_PUBLISHER = 'attraccess';
-const OFFICIAL_PACKAGES = [
-  { name: '@attraccess/plugin-shelly' },
-  { name: '@attraccess/plugin-rabbitmq' },
-  { name: '@attraccess/plugin-wago' },
-] as const satisfies ReadonlyArray<OfficialPluginPackage>;
 
+/**
+ * Classification is purely rule-based: a package is official when it is published
+ * by the Attraccess account on the public npm registry under the official scope.
+ * The host keeps no per-plugin list; discovery happens through registry search
+ * (keyword `attraccess-plugin`), which every official package carries.
+ */
 @Injectable()
 export class PluginClassificationService {
   classify(name: string, registryUrl: string, publisher?: string | null): PluginClassification {
@@ -28,9 +27,5 @@ export class PluginClassificationService {
     }
 
     return { kind: 'community', reason: 'Not published by Attraccess on npm' };
-  }
-
-  officialPackages(): ReadonlyArray<OfficialPluginPackage> {
-    return OFFICIAL_PACKAGES;
   }
 }

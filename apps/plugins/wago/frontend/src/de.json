@@ -1,0 +1,109 @@
+{
+  "controllers": {
+    "title": "WAGO-Steuerungen",
+    "description": "Verwalte deine CC100-Steuerungen, ihre Konfiguration und Software-Updates.",
+    "loadError": "WAGO-Steuerungen konnten nicht geladen werden",
+    "commission": "Steuerung in Betrieb nehmen",
+    "table": "WAGO-Steuerungen und Inbetriebnahmen",
+    "controller": "Gerät",
+    "runtime": "Software",
+    "heartbeat": "Zuletzt gesehen",
+    "actions": "Aktionen",
+    "claim": "Registrieren",
+    "configure": "Konfigurieren",
+    "progress": "Einrichtung ansehen",
+    "resume": "Einrichtung fortsetzen",
+    "empty": "Noch keine Steuerungen oder Inbetriebnahmen vorhanden.",
+    "never": "Noch nicht verbunden",
+    "enrollment": "CC100 einrichten",
+    "enrolling": "Wird eingerichtet",
+    "inProgress": "In Bearbeitung",
+    "updated": "Aktualisiert {{date}}",
+    "verified": "Einrichtung abgeschlossen",
+    "pending": "Konfiguration ausstehend",
+    "unavailable": "Status nicht verfügbar",
+    "runtimeUpdatePending": "Software-Update ausstehend",
+    "status": "Status",
+    "registration": "Registrierung",
+    "setupPending": "Einrichtung ausstehend",
+    "attention": "Prüfung erforderlich",
+    "details": "Details",
+    "detailsFor": "Details zu {{name}}",
+    "hardwareId": "Geräte-ID",
+    "address": "IP-Adresse",
+    "systemFirmware": "WAGO-Firmware",
+    "search": "Nach Name, Geräte-ID oder IP-Adresse suchen",
+    "noResults": "Keine passenden Steuerungen gefunden.",
+    "pagination": "Steuerungen durchblättern",
+    "previousPage": "Zurück",
+    "nextPage": "Weiter",
+    "pageSummary": "{{from}}–{{to}} von {{total}} Geräten",
+    "pageNumber": "Seite {{page}} von {{total}}"
+  },
+  "trust": {
+    "claimed": "Registriert",
+    "untrusted": "Nicht registriert"
+  },
+  "connectivity": {
+    "untrusted": "Nicht registriert",
+    "online": "Online",
+    "offline": "Offline",
+    "stale": "Keine Rückmeldung",
+    "unknown": "Status unbekannt",
+    "runtime_check": "Software wird geprüft",
+    "runtime_update": "Software-Update"
+  },
+  "commissioning": {
+    "awaiting_delivery": "Installation ausstehend",
+    "delivering": "Software wird installiert",
+    "awaiting_identity_confirmation": "Geräteidentität bestätigen",
+    "awaiting_codesys_confirmation": "Installation freigeben",
+    "delivery_failed": "Installation fehlgeschlagen",
+    "awaiting_discovery": "Warten auf Verbindung",
+    "awaiting_claim": "Registrierung wird abgeschlossen",
+    "completed": "Registriert",
+    "awaiting_verification": "Einrichtung wird geprüft",
+    "claim_interrupted": "Registrierung unterbrochen",
+    "recovery_revocation_pending": "Wiederherstellung wird abgeschlossen",
+    "revoked": "Registrierung abgebrochen"
+  },
+  "settings": {
+    "title": "WAGO-Einstellungen",
+    "description": "Wähle den MQTT-Server für neue WAGO-Inbetriebnahmen. Ändere diese Einstellung vor der Inbetriebnahme einer Steuerung.",
+    "select": "MQTT-Server auswählen",
+    "server": "Standard-MQTT-Server",
+    "empty": "Keine MQTT-Server konfiguriert.",
+    "save": "Einstellungen speichern"
+  },
+  "claim": {
+    "title": "Steuerung registrieren",
+    "description": "Bestätige den physischen Zugriff auf diese Steuerung, bevor sie Befehle empfangen kann.",
+    "name": "Name der Steuerung",
+    "verifier": "Physischer Kopplungscode oder Fingerabdruck",
+    "submit": "Prüfen und registrieren"
+  },
+  "remove": {
+    "title": "Steuerung entfernen",
+    "question": "{{name}} aus Attraccess entfernen?",
+    "description": "Dies widerruft den MQTT-Zugriff und entfernt die Registrierung und Konfiguration der Steuerung. Inbetriebnahmen mit ausstehender Installationsbereinigung oder Wiederherstellung des Verwaltungszugriffs bleiben erhalten. Die Laufzeitumgebung bleibt auf dem CC100 installiert. Das Entfernen stellt vorherige Anwendungen oder Daten nicht wieder her und aktiviert CODESYS nicht erneut. Ein aktiver Vorgang verhindert das Entfernen.",
+    "error": "Steuerung konnte nicht entfernt werden.",
+    "keep": "Steuerung behalten"
+  },
+  "configuration": {
+    "invalidController": "Ungültige Steuerung.",
+    "empty": "Keine Konfigurationsänderungen.",
+    "before": "Vorher:",
+    "after": "Nachher:",
+    "metadata": "Namen und Vorlagen",
+    "nameFor": "Name für {{name}}",
+    "presetApplication": "Anwendung einer Vorlage"
+  },
+  "common": {
+    "settings": "Einstellungen",
+    "refresh": "Aktualisieren",
+    "cancel": "Abbrechen",
+    "remove": "Entfernen",
+    "retry": "Bitte versuche es erneut.",
+    "close": "Schließen"
+  }
+}

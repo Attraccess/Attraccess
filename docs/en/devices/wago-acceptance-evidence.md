@@ -18,7 +18,7 @@ For each required check, record the observed behavior and link a timestamped rec
 
 ## Required Evidence
 
-The offline completeness checker exports the authoritative list as `requiredChecks` in `scripts/check-wago-acceptance.mjs`. It includes commissioning/hardening, permanent enrollment/revocation, visual digital I/O and Modbus, configuration readiness, first flow with acknowledgement, packed-bit independence and concurrent outputs, restart/reboot, rejection/rollback, expired/duplicate commands, operational policies/guards, interrupted commissioning and credential recovery, re-enrollment, Modbus failure and stale waits, desktop/mobile, shared conformance, and audit redaction.
+The offline completeness checker exports the authoritative list as `requiredChecks` in `apps/plugins/wago/scripts/check-acceptance.mjs`. It includes commissioning/hardening, permanent enrollment/revocation, visual digital I/O and Modbus, configuration readiness, first flow with acknowledgement, packed-bit independence and concurrent outputs, restart/reboot, rejection/rollback, expired/duplicate commands, operational policies/guards, interrupted commissioning and credential recovery, re-enrollment, Modbus failure and stale waits, desktop/mobile, shared conformance, and audit redaction.
 
 For the current guided deployment, restart/reboot and interrupted-installation
 evidence must exercise the host gate with Docker restart policy `no`: CODESYS
@@ -35,7 +35,7 @@ Retain one JSON evidence record outside the source tree with these fields:
 | `schemaVersion` | `1` |
 | `environment` | `physical`; simulator-only evidence is rejected |
 | `controller` | `model: "751-9301"`, `firmware: "31"`, `hardwareId`, `startingState`, `wiringEvidence` |
-| `build` | Full 40-character `pluginCommit` and `runtimeCommit`; `frontendDigest`, `backendDigest`, `runtimeDigest` in `sha256:<64 hex>` form; `protocolVersion`, `signedBundleEvidence`, `visualArtifactProvisioningEvidence` |
+| `build` | Full 40-character `pluginCommit` and `runtimeCommit`; `frontendDigest`, `backendDigest`, `runtimeDigest` in `sha256:<64 hex>` form; `protocolVersion`, `bundleChecksumEvidence`, `visualArtifactProvisioningEvidence` |
 | `modbus` | Actual `model`, `transport`, `profileVersion`, `qualificationEvidence`; do not substitute an unqualified reference assembly |
 | `participant` | Non-secret participant `id` and `experience` (`nontechnical` or `lightly-technical`) |
 | `implementerId` | Distinct from participant |
@@ -51,14 +51,14 @@ Retain one JSON evidence record outside the source tree with these fields:
 Release engineers, not the operator participant, can run the offline check:
 
 ```sh
-node --test scripts/check-wago-acceptance.test.mjs
-node scripts/check-wago-acceptance.mjs /path/to/reviewed-evidence.json
+node --test apps/plugins/wago/scripts/check-acceptance.test.mjs
+node apps/plugins/wago/scripts/check-acceptance.mjs /path/to/reviewed-evidence.json
 ```
 
 The checker never connects to hardware, changes Linear, signs artifacts or publishes anything. Its tests use synthetic fixtures and are not ATT-984 hardware evidence. A successful result means required fields are present, **not** that the observations are true or the release is authorized. A human reviewer must inspect every linked artifact, verify matching builds and resolve participant obstacles before approving the gate.
 
 ## Publication Boundary
 
-ATT-985 remains blocked by physical/nontechnical acceptance and ATT-983 audit coverage. Attach the reviewed evidence to those tickets. Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and signed ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
+ATT-985 remains blocked by physical/nontechnical acceptance and ATT-983 audit coverage. Attach the reviewed evidence to those tickets. Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and checksum-checked ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
 
 Broader four-assembly qualification, billing, telemetry history and arbitration are deferred. They must not be advertised as proven capabilities of this first slice.

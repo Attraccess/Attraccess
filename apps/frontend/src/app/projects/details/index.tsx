@@ -1,3 +1,13 @@
+import { Skeleton, Chip } from '@heroui/react';
+import { Button } from '../../../components/button/index';
+import { filenameToUrl } from '../../../api/index';
+import { PageHeader, PageAction } from '../../../components/pageHeader/index';
+import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
+import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal/index';
+import { UpsertProjectModal } from '../upsertModal/index';
+import { ProjectSummaryCards } from './components/projectSummaryCards/index';
+import { ProjectUsageCharts } from './components/projectUsageCharts/index';
+import { ProjectUsageHistory } from './components/projectUsageHistory/index';
 import {
   ApiError,
   useProjectsServiceArchiveProject,
@@ -7,13 +17,7 @@ import {
   useProjectsServiceFindOneProjectKey,
   useProjectsServiceUnarchiveProject,
 } from '@attraccess/react-query-client';
-import { Skeleton, Chip } from '@heroui/react';
-import { Button } from '../../../components/button';
-import { filenameToUrl } from '../../../api';
-import { PageHeader, PageAction } from '../../../components/pageHeader';
-import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,11 +26,8 @@ import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
-import { UpsertProjectModal } from '../upsertModal';
-import { ProjectSummaryCards } from './components/projectSummaryCards';
-import { ProjectUsageCharts } from './components/projectUsageCharts';
-import { ProjectUsageHistory } from './components/projectUsageHistory';
-export function ProjectDetailsPage() {
+
+export function useProjectDetailsPageState() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id || '', 10);
   const hasValidProjectId = Number.isFinite(projectId);
@@ -120,6 +121,38 @@ export function ProjectDetailsPage() {
   const onDeleteProject = useCallback(() => {
     deleteProject({ id: projectId });
   }, [deleteProject, projectId]);
+  return {
+    id,
+    projectId,
+    hasValidProjectId,
+    navigate,
+    t,
+    project,
+    showDeleteConfirmationModal,
+    setShowDeleteConfirmationModal,
+    archiveProject,
+    isArchiving,
+    unarchiveProject,
+    isUnarchiving,
+    onDeleteProject,
+  } as const;
+}
+
+export function ProjectDetailsPage() {
+  const {
+    projectId,
+    hasValidProjectId,
+    navigate,
+    t,
+    project,
+    showDeleteConfirmationModal,
+    setShowDeleteConfirmationModal,
+    archiveProject,
+    isArchiving,
+    unarchiveProject,
+    isUnarchiving,
+    onDeleteProject,
+  } = useProjectDetailsPageState();
 
   return (
     <>
@@ -129,7 +162,8 @@ export function ProjectDetailsPage() {
             <span className="flex items-center gap-2">
               {project.name}
               {project.archivedAt && (
-                <Chip variant="soft" color="warning"><ArchiveIcon className="size-3" />
+                <Chip variant="soft" color="warning">
+                  <ArchiveIcon className="size-3" />
                   {t('archivedBadge')}
                 </Chip>
               )}

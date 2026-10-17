@@ -1,38 +1,15 @@
-import { ResourceFlowLogType, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-
-import { NodeProps } from '@xyflow/react';
 import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
-import { Handle, NodeToolbar, Position, useNodeId } from '@xyflow/react';
+import { Handle, NodeToolbar, Position, useNodeId, NodeProps } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
-import { useFlowContext } from '../flowContext';
+import { DeleteConfirmationModal } from '../../../../../components/deleteConfirmationModal/index';
+import { NodeEditor } from './editor/index';
+import { ResourceFlowLogType, ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { useFlowContext } from '../context/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { DeleteConfirmationModal } from '../../../../../components/deleteConfirmationModal';
-import { ResourceFlowLog } from '@attraccess/react-query-client';
-import { useNodePreviewRows } from './preview';
-import { NodeEditor } from './editor';
+import { useNodePreviewRows } from './preview/index';
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
-interface Props {
-  tNodeTranslations: TFunction;
-  tNodeExists?: TExists;
-  schema: ResourceFlowNodeSchemaDto;
-  node?: NodeProps;
-  previewMode?: boolean;
-  data?: {
-    forceToolbarVisible?: boolean;
-    toolbarPosition?: Position;
-  };
-  validationError?: string;
-}
-
-enum ProcessingState {
-  IDLE = 'idle',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-}
-
-export function AttraccessNode(props: Props) {
+export function useAttraccessNodeState(props: Props) {
   const { schema, previewMode, tNodeTranslations: t, tNodeExists, data, validationError } = props;
 
   const nodeId = useNodeId();
@@ -67,7 +44,7 @@ export function AttraccessNode(props: Props) {
     [nodeId],
   );
 
-  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode } = useFlowContext();
+  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode, resourceId } = useFlowContext();
 
   useEffect(() => {
     if (!nodeId || previewMode) {
@@ -110,7 +87,10 @@ export function AttraccessNode(props: Props) {
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: inputName,
-        label: t('nodes.' + schema.type + '.inputs.' + inputName),
+        label:
+          tNodeExists?.('nodes.' + schema.type + '.inputs.' + inputName) !== false
+            ? t('nodes.' + schema.type + '.inputs.' + inputName)
+            : inputName,
         style: {
           left: `${leftPercentage}%`,
           top: 0,
@@ -118,7 +98,7 @@ export function AttraccessNode(props: Props) {
         },
       };
     });
-  }, [schema, t]);
+  }, [schema, t, tNodeExists]);
 
   const sourceHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
     return schema.outputs.map((outputName, index) => {
@@ -126,7 +106,10 @@ export function AttraccessNode(props: Props) {
       const leftPercentage = totalHandles === 1 ? 50 : (index / (totalHandles - 1)) * 100;
       return {
         id: outputName,
-        label: t('nodes.' + schema.type + '.outputs.' + outputName),
+        label:
+          tNodeExists?.('nodes.' + schema.type + '.outputs.' + outputName) !== false
+            ? t('nodes.' + schema.type + '.outputs.' + outputName)
+            : outputName,
         style: {
           left: `${leftPercentage}%`,
           bottom: 0,
@@ -134,7 +117,7 @@ export function AttraccessNode(props: Props) {
         },
       };
     });
-  }, [schema, t]);
+  }, [schema, t, tNodeExists]);
 
   const isEditable = useMemo(() => {
     if (previewMode) {
@@ -154,7 +137,7 @@ export function AttraccessNode(props: Props) {
     return true;
   }, [previewMode, schema]);
 
-  const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t });
+  const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t, resourceId });
 
   // Plugin-contributed node types have no entries in the static i18n JSON files.
   // Fall back to the label/description the plugin declared in its schema definition.
@@ -162,6 +145,68 @@ export function AttraccessNode(props: Props) {
   const descriptionKey = 'nodes.' + schema.type + '.description';
   const nodeTitle = tNodeExists?.(titleKey) ? t(titleKey) : (schema.label ?? schema.type);
   const nodeDescription = tNodeExists?.(descriptionKey) ? t(descriptionKey) : (schema.description ?? '');
+  return {
+    schema,
+    previewMode,
+    t,
+    tNodeExists,
+    data,
+    validationError,
+    processingState,
+    remove,
+    showDeleteConfirmation,
+    userWantsToDelete,
+    userDoesNotWantToDelete,
+    cardClasses,
+    targetHandlesWithStyles,
+    sourceHandlesWithStyles,
+    isEditable,
+    previewRows,
+    nodeTitle,
+    nodeDescription,
+  } as const;
+}
+
+export interface Props {
+  tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
+  schema: ResourceFlowNodeSchemaDto;
+  node?: NodeProps;
+  previewMode?: boolean;
+  data?: {
+    forceToolbarVisible?: boolean;
+    toolbarPosition?: Position;
+  };
+  validationError?: string;
+}
+export enum ProcessingState {
+  IDLE = 'idle',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
+export function AttraccessNode(props: Props) {
+  const {
+    schema,
+    previewMode,
+    t,
+    tNodeExists,
+    data,
+    validationError,
+    processingState,
+    remove,
+    showDeleteConfirmation,
+    userWantsToDelete,
+    userDoesNotWantToDelete,
+    cardClasses,
+    targetHandlesWithStyles,
+    sourceHandlesWithStyles,
+    isEditable,
+    previewRows,
+    nodeTitle,
+    nodeDescription,
+  } = useAttraccessNodeState(props);
 
   return (
     <NodeEditor schema={schema} tNodeTranslations={t} tNodeExists={tNodeExists}>

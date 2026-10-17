@@ -1,32 +1,56 @@
+import { User } from '@attraccess/database-entities';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '@attraccess/database-entities';
-import { SettingsService } from '../../settings/settings.service';
 import { FixedWindowCounterStore, WindowCounterEntry } from '../../common/rate-limiting/fixed-window-counter';
+import { SettingsService } from '../../settings/settings.service';
+import { recordFailure as recordFailureImplementation } from './brute-force-failure';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
-
 export type RateLimitScope =
-  | 'login'
-  | 'register'
-  | 'password_reset_request'
-  | 'password_reset_complete'
-  | 'delete_account_confirm';
+  'login' | 'register' | 'password_reset_request' | 'password_reset_complete' | 'delete_account_confirm';
 
-interface CounterEntry extends WindowCounterEntry {
+export interface CounterEntry extends WindowCounterEntry {
   lockoutUntil: number;
   lockoutCount: number;
 }
 
-const MAX_COUNTER_ENTRIES = 10_000;
-// ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
+export const MAX_COUNTER_ENTRIES = 10_000;
+
+export // ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
 const COARSE_IP_MULTIPLIER = 10;
+
+export function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
+  if (entry.lockoutUntil > now) return false;
+  return now - entry.firstAt > windowMs;
+}
+
+export function ipKey(scope: RateLimitScope, ip: string, username: string | null = null): string {
+  return `${scope}:${ip}:${username ?? ''}`;
+}
+
+export function ipCoarseKey(scope: RateLimitScope, ip: string): string {
+  return `${scope}:${ip}`;
+}
+
+export function computeLockoutMs(
+  policy: { lockoutDurationSeconds: number; exponentialBackoff: boolean; backoffMultiplier: number },
+  priorLockouts: number,
+): number {
+  const baseMs = policy.lockoutDurationSeconds * 1000;
+  if (!policy.exponentialBackoff || priorLockouts <= 0) {
+    return baseMs;
+  }
+  return Math.floor(baseMs * Math.pow(policy.backoffMultiplier, priorLockouts));
+}
+
+// ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
 
 @Injectable()
 export class BruteForceProtectionService {
   private readonly ipCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly ipCoarseCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly accountCounters = new FixedWindowCounterStore<number, CounterEntry>(MAX_COUNTER_ENTRIES);
+  private readonly accountAttempts = new Map<number, Promise<void>>();
   private readonly nowFn: () => number = () => Date.now();
 
   constructor(
@@ -53,6 +77,11 @@ export class BruteForceProtectionService {
   }
 
   async assertAccountAllowed(user: User): Promise<void> {
+    const entry = this.accountCounters.get(user.id);
+    if (entry) {
+      const remaining = this.remainingLockoutSeconds(entry);
+      if (remaining > 0) throw new AccountLockedException(remaining);
+    }
     if (!user?.lockedUntil) {
       return;
     }
@@ -64,64 +93,55 @@ export class BruteForceProtectionService {
     }
   }
 
-  async recordFailure(scope: RateLimitScope, ip: string, userId: number | null, username: string | null = null): Promise<void> {
-    const policy = await this.settingsService.getRateLimitPolicy();
-    const windowMs = policy.windowSeconds * 1000;
-    const now = this.nowFn();
-
-    this.evictStale(now, windowMs);
-
-    const ipEntry = this.upsertCounter(this.ipCounters, ipKey(scope, ip, username), now, windowMs);
-    if (ipEntry.count >= policy.maxAttempts) {
-      const durationMs = computeLockoutMs(policy, ipEntry.lockoutCount);
-      ipEntry.lockoutUntil = now + durationMs;
-      ipEntry.lockoutCount += 1;
-      ipEntry.count = 0;
-      ipEntry.firstAt = now;
+  /** Serialize admission, authentication and failure recording for one account. */
+  async runAccountAttempt<T>(userId: number | null, attempt: () => Promise<T>): Promise<T> {
+    if (userId == null) return attempt();
+    const previous = this.accountAttempts.get(userId) ?? Promise.resolve();
+    let release: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.accountAttempts.set(userId, current);
+    await previous;
+    try {
+      return await attempt();
+    } finally {
+      release();
+      if (this.accountAttempts.get(userId) === current) this.accountAttempts.delete(userId);
     }
+  }
 
-    const coarseEntry = this.upsertCounter(this.ipCoarseCounters, ipCoarseKey(scope, ip), now, windowMs);
-    if (coarseEntry.count >= policy.maxAttempts * COARSE_IP_MULTIPLIER) {
-      const durationMs = computeLockoutMs(policy, coarseEntry.lockoutCount);
-      coarseEntry.lockoutUntil = now + durationMs;
-      coarseEntry.lockoutCount += 1;
-      coarseEntry.count = 0;
-      coarseEntry.firstAt = now;
-    }
-
-    if (userId == null) {
-      return;
-    }
-
-    const accountEntry = this.upsertCounter(this.accountCounters, userId, now, windowMs);
-    if (accountEntry.count >= policy.maxAttempts) {
-      const durationMs = computeLockoutMs(policy, accountEntry.lockoutCount);
-      const lockedUntil = new Date(now + durationMs);
-      accountEntry.lockoutUntil = now + durationMs;
-      accountEntry.lockoutCount += 1;
-      accountEntry.count = 0;
-      accountEntry.firstAt = now;
-      await this.userRepository.update(
-        { id: userId },
-        {
-          lockedUntil,
-          failedLoginAttempts: 0,
-          firstFailedLoginAt: null,
-        },
-      );
-      return;
-    }
-
-    await this.userRepository.update(
-      { id: userId },
+  async recordFailure(
+    scope: RateLimitScope,
+    ip: string,
+    userId: number | null,
+    username: string | null = null,
+  ): Promise<void> {
+    const getContextOwner = () => this;
+    return recordFailureImplementation(
       {
-        failedLoginAttempts: accountEntry.count,
-        firstFailedLoginAt: new Date(accountEntry.firstAt),
+        settingsService: getContextOwner().settingsService,
+        nowFn: getContextOwner().nowFn,
+        evictStale: getContextOwner().evictStale.bind(getContextOwner()),
+        upsertCounter: getContextOwner().upsertCounter.bind(getContextOwner()),
+        ipCounters: getContextOwner().ipCounters,
+        ipCoarseCounters: getContextOwner().ipCoarseCounters,
+        accountCounters: getContextOwner().accountCounters,
+        userRepository: getContextOwner().userRepository,
       },
+      scope,
+      ip,
+      userId,
+      username,
     );
   }
 
-  async recordSuccess(scope: RateLimitScope, ip: string, userId: number | null, username: string | null = null): Promise<void> {
+  async recordSuccess(
+    scope: RateLimitScope,
+    ip: string,
+    userId: number | null,
+    username: string | null = null,
+  ): Promise<void> {
     this.ipCounters.delete(ipKey(scope, ip, username));
     if (userId == null) {
       return;
@@ -188,28 +208,4 @@ export class BruteForceProtectionService {
     this.ipCoarseCounters.evict((entry) => isStale(entry, now, windowMs));
     this.accountCounters.evict((entry) => isStale(entry, now, windowMs));
   }
-}
-
-function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
-  if (entry.lockoutUntil > now) return false;
-  return now - entry.firstAt > windowMs;
-}
-
-function ipKey(scope: RateLimitScope, ip: string, username: string | null = null): string {
-  return `${scope}:${ip}:${username ?? ''}`;
-}
-
-function ipCoarseKey(scope: RateLimitScope, ip: string): string {
-  return `${scope}:${ip}`;
-}
-
-function computeLockoutMs(
-  policy: { lockoutDurationSeconds: number; exponentialBackoff: boolean; backoffMultiplier: number },
-  priorLockouts: number,
-): number {
-  const baseMs = policy.lockoutDurationSeconds * 1000;
-  if (!policy.exponentialBackoff || priorLockouts <= 0) {
-    return baseMs;
-  }
-  return Math.floor(baseMs * Math.pow(policy.backoffMultiplier, priorLockouts));
 }

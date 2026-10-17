@@ -3,22 +3,37 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/rabbitmq",
-  "tags": ["type:plugin"],
+  "tags": ["type:plugin", "scope:plugin"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
+    "install-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node apps/plugins/scripts/install-dev-plugin.mjs --src apps/plugins/rabbitmq/package"
+      }
+    },
     "lint": {
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/frontend/src/**/*", "{workspaceRoot}/eslint.config.cjs"],
       "outputs": [],
       "options": {
-        "cwd": "apps/plugins/rabbitmq",
-        "command": "eslint backend frontend/src --max-warnings=0 && prettier --check backend frontend/src"
+        "command": "eslint apps/plugins/rabbitmq/backend apps/plugins/rabbitmq/frontend/src --max-warnings=0 && prettier --check apps/plugins/rabbitmq/backend apps/plugins/rabbitmq/frontend/src"
       }
     },
     "test": {
       "executor": "@nx/jest:jest",
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq"],
       "options": {
         "jestConfig": "apps/plugins/rabbitmq/jest.config.ts",
@@ -32,7 +47,9 @@
         "default",
         "^production",
         "{workspaceRoot}/jest.preset.js",
-        { "externalDependencies": ["jest", "testcontainers", "mqtt"] }
+        {
+          "externalDependencies": ["jest", "testcontainers", "mqtt"]
+        }
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq-e2e"],
       "options": {
@@ -53,7 +70,11 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
+      ],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
@@ -104,7 +125,8 @@
       ],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
+        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
       }
     },
     "publish": {
@@ -114,6 +136,20 @@
       "options": {
         "cwd": "apps/plugins/rabbitmq",
         "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/rabbitmq"
+      }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"],
+      "options": {
+        "command": "vitest run --config apps/plugins/rabbitmq/frontend/vitest.config.ts"
       }
     }
   }
