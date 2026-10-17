@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS, MessageAdmission } from '../../shared/protocol-limits';
 import {
   compatibilityError,
   parseHeartbeat,
@@ -200,11 +201,24 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     return !this.destroyed && generation === this.activeSubscriptionGeneration;
   }
 
+  get messageStatistics() {
+    return { pending: this.mqttAdmission.pending, rejected: this.mqttAdmission.rejected };
+  }
+
+  private readonly mqttAdmission = new MessageAdmission(MESSAGE_LIMITS.pendingBackend);
+
   protected async subscribeMqtt(
     ...args: Parameters<PluginContext['mqtt']['subscribe']>
   ): Promise<PluginMqttSubscription> {
     try {
-      return await this.context.mqtt.subscribe(...args);
+      const [serverId, topic, handler, ...options] = args;
+      return await this.context.mqtt.subscribe(
+        serverId,
+        topic,
+        (message) =>
+          this.mqttAdmission.dispatch(message.payload.length, MESSAGE_LIMITS.operationalBytes, () => handler(message)),
+        ...options,
+      );
     } catch (error) {
       throw new MqttSubscriptionError(error);
     }
@@ -291,7 +305,11 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
                   if (this.isActiveSubscriptionGeneration(generation) && !this.networkSubscriptions.has(controller.id))
                     this.diagnostics.ingest(controller.id, suffix, message.payload);
                   // MQTT may deliver a retained snapshot before the generation swap completes.
-                  else if (!this.destroyed && suffix === 'state' && message.payload.length <= 65_536)
+                  else if (
+                    !this.destroyed &&
+                    suffix === 'state' &&
+                    message.payload.length <= MESSAGE_LIMITS.operationalBytes
+                  )
                     retainedStates.set(controller.id, Buffer.from(message.payload));
                 },
               ),

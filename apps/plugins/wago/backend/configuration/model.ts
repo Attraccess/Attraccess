@@ -1,3 +1,4 @@
+import { structureLimitError, stateBudgetError, isIdentifier, MESSAGE_LIMITS } from '../../shared/protocol-limits';
 import { createHash } from 'node:crypto';
 import { pulseBehaviorError } from '../../channel-behavior';
 import type { EngineeringUnit } from '../../measurement-contract';
@@ -246,7 +247,7 @@ export function validateMeasurement(
 }
 
 export function addId(value: unknown, path: string, ids: Set<string>, errors: ConfigurationValidationError[]): void {
-  if (typeof value !== 'string' || !value.trim()) {
+  if (!isIdentifier(value)) {
     errors.push({ path, code: 'invalid_id', message: 'id must be a non-empty string' });
     return;
   }
@@ -379,6 +380,7 @@ export function isConfigurationValidationError(value: unknown): value is Configu
 }
 
 export function parseConfigurationReport(value: unknown): WagoConfigurationReport | null {
+  if (structureLimitError(value)) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const report = value as Record<string, unknown>;
   if (
@@ -443,9 +445,14 @@ export function validateRange(
 }
 
 export function validateSnapshot(snapshot: unknown): ConfigurationValidationError[] {
+  const limitError = structureLimitError(snapshot) ?? stateBudgetError(snapshot);
+  if (limitError) return [{ path: '$', code: 'message_limit', message: limitError }];
   let value: Record<string, unknown>;
   try {
-    value = JSON.parse(canonicalSnapshot(snapshot)) as Record<string, unknown>;
+    const serialized = canonicalSnapshot(snapshot);
+    if (new TextEncoder().encode(serialized).byteLength > MESSAGE_LIMITS.configurationBytes - 1024)
+      return [{ path: '$', code: 'message_limit', message: 'configuration exceeds supported byte limit' }];
+    value = JSON.parse(serialized) as Record<string, unknown>;
   } catch (error) {
     return [
       { path: '$', code: 'invalid_snapshot', message: error instanceof Error ? error.message : 'invalid snapshot' },

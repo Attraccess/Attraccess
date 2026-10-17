@@ -1,9 +1,23 @@
+import {
+  MESSAGE_LIMITS,
+  MessageAdmission,
+  structureLimitError,
+  isIdentifier,
+} from '../../../../shared/protocol-limits';
 import { supportsOutputAction } from '../../../../channel-behavior';
 import { RuntimeConfiguration } from '../configuration/configuration';
 import { WriteAdmissionError } from '../types';
 
 export abstract class RuntimeCommands extends RuntimeConfiguration {
-  async receiveCommand(payload: Buffer): Promise<void> {
+  protected readonly receiveCommandAdmission = new MessageAdmission(MESSAGE_LIMITS.pendingCommands);
+
+  receiveCommand(payload: Buffer): Promise<void> {
+    return this.receiveCommandAdmission.run(payload.length, MESSAGE_LIMITS.controlBytes, () =>
+      this.processCommand(payload),
+    );
+  }
+
+  private async processCommand(payload: Buffer): Promise<void> {
     let command: {
       id: string;
       expiresAt?: unknown;
@@ -15,16 +29,16 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
     };
     try {
       command = JSON.parse(payload.toString('utf8'));
+      if (structureLimitError(command)) return this.rejectRuntimeMessage('structure');
     } catch {
-      return;
+      return this.rejectRuntimeMessage('parsing');
     }
     if (
-      typeof command?.id !== 'string' ||
-      !command.id ||
-      !command.channelId ||
+      !isIdentifier(command?.id) ||
+      !isIdentifier(command.channelId) ||
       !['set', 'pulse', 'release'].includes(command.action)
     )
-      return;
+      return this.rejectRuntimeMessage('validation');
     if (
       (command.source !== undefined && command.source !== 'manual') ||
       (command.action === 'release' && command.source !== 'manual')
@@ -52,7 +66,10 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
         'runtime_update',
       );
     this.pruneCommandExpiries();
-    if (this.state.commandIds.includes(command.id) || this.state.commandExpiries?.[command.id])
+    if (
+      this.state.commandIds.includes(command.id) ||
+      (this.state.commandExpiries && Object.prototype.hasOwnProperty.call(this.state.commandExpiries, command.id))
+    )
       return this.acknowledge(command.id, 'duplicate');
     if (this.inFlightCommandIds.has(command.id)) return this.acknowledge(command.id, 'duplicate');
     this.inFlightCommandIds.add(command.id);
@@ -76,6 +93,15 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
           'command does not match the configured output behavior',
           'unsupported_operation',
         );
+
+      // Never evict unexpired (or legacy unknown-expiry) replay protection.
+      // Reserve synchronously before the first persistence await so concurrent
+      // channels cannot exceed the persistent history budget.
+      if (
+        new Set([...this.state.commandIds, ...Object.keys(this.state.commandExpiries ?? {})]).size >=
+        MESSAGE_LIMITS.retainedCommands
+      )
+        return this.acknowledge(command.id, 'rejected', 'command replay history is full', 'replay_history_full');
 
       // Keep the reservation through an unexpected exit after the physical write.
       // Unknown legacy expiries cannot safely be evicted; known IDs are pruned at expiry.

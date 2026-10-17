@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS } from '../../../shared/protocol-limits';
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningReadiness } from './readiness';
 
@@ -136,9 +137,17 @@ describe('bounded commissioning runtime readiness', () => {
     expect(service.observe(1, 'fixture', 'attraccess/wago')?.ready).toBe(false);
   });
 
+  it('accepts a valid state above the former 64 KiB limit', () => {
+    const outputs = Object.fromEntries(Array.from({ length: 600 }, (_, i) => ['x'.repeat(120) + i, false]));
+    const value = { ...payload, outputs };
+    expect(Buffer.byteLength(JSON.stringify(value))).toBeGreaterThan(65_536);
+    send(value);
+    expect(service.observe(1, 'fixture', 'attraccess/wago')?.ready).toBe(true);
+  });
+
   it('invalidates oversized input without forgetting the admitted sequence', () => {
     send(payload);
-    receive({ serverId: 1, topic, payload: Buffer.alloc(65_537) });
+    receive({ serverId: 1, topic, payload: Buffer.alloc(MESSAGE_LIMITS.operationalBytes + 1) });
     send(payload);
     expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
     send({ ...payload, sequence: 2 });

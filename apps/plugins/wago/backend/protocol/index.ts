@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS, isIdentifier, structureLimitError } from '../../shared/protocol-limits';
 import type { Measurement } from '../../measurement-contract';
 import { parseMeasurement } from '../../measurement-contract';
 
@@ -71,7 +72,11 @@ export function normalizeOperationalPrefix(prefix: string): string {
   while (trimmed[start] === '/') start += 1;
   while (trimmed[end - 1] === '/') end -= 1;
   const normalized = trimmed.slice(start, end);
-  if (!normalized || normalized.split('/').some((segment) => !segment || /[+#]/.test(segment)))
+  if (
+    normalized.length > 512 ||
+    !normalized ||
+    normalized.split('/').some((segment) => !segment || /[+#]/.test(segment))
+  )
     throw new Error('MQTT prefix must contain non-empty segments without wildcards');
   return normalized;
 }
@@ -81,12 +86,11 @@ export function acknowledgementHardwareId(prefix: string, topic: string): string
   const topicSuffix = '/acknowledgements';
   if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
   const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
-  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
+  return isIdentifier(hardwareId) ? hardwareId : null;
 }
 
 export function acknowledgementTopic(prefix: string, hardwareId: string): string {
-  if (!hardwareId || /[+/]/.test(hardwareId))
-    throw new Error('hardware ID must not be empty or contain MQTT wildcards');
+  if (!isIdentifier(hardwareId)) throw new Error('hardware ID must not be empty or contain MQTT wildcards');
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/acknowledgements`;
 }
 
@@ -121,7 +125,7 @@ export function configurationReportedHardwareId(prefix: string, topic: string): 
   const topicSuffix = '/configuration/reported';
   if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
   const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
-  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
+  return isIdentifier(hardwareId) ? hardwareId : null;
 }
 
 export function configurationReportedTopic(prefix: string, hardwareId: string): string {
@@ -145,7 +149,7 @@ export function isBooleanRecord(value: unknown): boolean {
     Boolean(value) &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
-    Object.values(value).every((item) => typeof item === 'boolean')
+    Object.entries(value).every(([key, item]) => isIdentifier(key) && typeof item === 'boolean')
   );
 }
 
@@ -162,6 +166,7 @@ export function operationalWildcardTopic(prefix: string): string {
 }
 
 export function parseObject(payload: Buffer, label: string): Record<string, unknown> {
+  if (payload.length > MESSAGE_LIMITS.operationalBytes) throw new Error('message exceeds supported byte limit');
   let value: unknown;
   try {
     value = JSON.parse(payload.toString('utf8'));
@@ -169,11 +174,13 @@ export function parseObject(payload: Buffer, label: string): Record<string, unkn
     throw new Error(`${label} is not valid JSON`);
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  if (structureLimitError(value)) throw new Error('message structure exceeds supported limits');
   return value as Record<string, unknown>;
 }
 
 export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
   const input = parseObject(payload, 'announcement');
+  if (!isIdentifier(input.hardwareId)) throw new Error('announcement hardwareId is invalid');
   const required = ['hardwareId', 'protocolVersion', 'runtimeVersion'];
   for (const key of required)
     if (typeof input[key] !== 'string' || !input[key].trim()) throw new Error(`announcement ${key} is required`);
@@ -268,8 +275,7 @@ export function parseOperationalMessage(
   if (!topic.startsWith(root)) return null;
   const [hardwareId, suffix, extra] = topic.slice(root.length).split('/');
   if (
-    !hardwareId ||
-    /[+#]/.test(hardwareId) ||
+    !isIdentifier(hardwareId) ||
     extra !== undefined ||
     !['state', 'measurements', 'faults', 'acknowledgements'].includes(suffix)
   )
@@ -284,6 +290,7 @@ export function parseOperationalMessage(
     return { hardwareId, message: parseStateMessage(value, { timestamp, streamId, sequence }) };
   }
   if (suffix === 'measurements') {
+    if (!isIdentifier(value.channelId)) throw new Error('invalid measurement channelId');
     return {
       hardwareId,
       message: {
@@ -296,7 +303,7 @@ export function parseOperationalMessage(
     };
   }
   if (suffix === 'faults') {
-    if (typeof value.channelId !== 'string' || typeof value.code !== 'string' || typeof value.message !== 'string')
+    if (!isIdentifier(value.channelId) || typeof value.code !== 'string' || typeof value.message !== 'string')
       throw new Error('invalid fault message');
     return {
       hardwareId,
@@ -312,7 +319,7 @@ export function parseOperationalMessage(
     };
   }
   if (
-    typeof value.id !== 'string' ||
+    !isIdentifier(value.id) ||
     !['accepted', 'duplicate', 'rejected'].includes(value.status as string) ||
     (value.error !== undefined && typeof value.error !== 'string')
   )

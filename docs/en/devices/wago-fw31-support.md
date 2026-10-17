@@ -1,5 +1,10 @@
 # CC100 FW31 software support boundaries
 
+See [production assurance preparation](/devices/wago-production-assurance.md) for current
+software evidence and support boundaries, and [recovery procedures](/devices/wago-recovery.md)
+for coordinated backups, compromise, outages, replacement and upgrade recovery.
+Physical qualification and independent security/safety reviews remain separate.
+
 ## 2026-09-06 supersession: destructive commissioning
 
 The product decision on **2026-09-06** supersedes the prior-workload preservation
@@ -15,8 +20,8 @@ verify prevents enrollment/runtime launch. This applies even when CODESYS was
 already stopped. Supported vendor Docker activation/install and persistent narrow
 I/O preparation are part of delivery; unsupported components, missing registers,
 and independent output writers still fail closed. See the current
-[platform contract](wago-commissioning-platform.md) and
-[operator walkthrough](wago-cc100-commissioning.md).
+[platform contract](/devices/wago-commissioning-platform.md) and
+[operator walkthrough](/devices/wago-cc100-commissioning.md).
 
 Cleanup reconciles the failed installation and its credentials; it does not undo
 the destructive takeover or re-enable CODESYS. Integrity journals, pinned SSH,
@@ -47,7 +52,7 @@ the boot hook after any supervisor failure. Ordinary daemon-only restart permits
 checked startup only while enablement remains present. Containment removes that
 enablement; hook `start` currently exits `0` without restarting, and reboot does
 not clear the latch. Current guided sessions retain the tokened
-[wizard cleanup/recommissioning route](wago-cc100-commissioning.md#recover-after-latched-containment):
+[wizard cleanup/recommissioning route](/devices/wago-cc100-commissioning.md#recover-after-latched-containment):
 cleanup, then retry an unclaimed installation or remove the claimed registration
 and commission anew. Only installation recreates enablement; no manual marker
 creation or new UI/API re-enable operation is claimed. Missing recovery ownership
