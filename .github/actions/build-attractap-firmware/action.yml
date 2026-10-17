@@ -14,6 +14,13 @@ runs:
       run: pnpm nx run attractap-firmware:build
       shell: bash
 
+    - name: Generate firmware test certificates
+      # A cached build restores firmware_output, but not generated CA headers.
+      # Host websocket tests include those headers even when no build ran here.
+      run: python3 tools/build_individual_ca_certs.py
+      working-directory: apps/attractap/firmware
+      shell: bash
+
     - name: Test firmware
       run: pnpm nx run attractap-firmware:test
       shell: bash
