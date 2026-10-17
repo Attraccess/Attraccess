@@ -49,6 +49,13 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
       for (const [release, valid] of [
         ['999.0.0', true],
         ['999.0.0-rc.1', true],
+        ['0.1.0+build.1', true],
+        ['0.1.0-rc.1+build.1', true],
+        ['0.1.0+001.a-b', true],
+        ['0.1.0+', false],
+        ['0.1.0+build..1', false],
+        ['0.1.0+build.1+extra', false],
+        ['0.1.0+build.1\n', false],
         ['not-a-version', false],
         ['', false],
       ] as const) {

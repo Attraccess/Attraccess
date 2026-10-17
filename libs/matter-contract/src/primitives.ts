@@ -7,9 +7,12 @@ export const Id = z.uuid();
 export const UInt64 = z.string().regex(/^[0-9a-f]{16}$/);
 export const Timestamp = z.iso.datetime({ precision: 3 });
 export const Sequence = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+// Preserve build metadata in diagnostics; operational compatibility still uses exact release strings.
 export const Release = z
   .string()
-  .regex(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/)
+  .regex(
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/,
+  )
   .max(100);
 export const ReleaseTuple = z.strictObject({ attraccess: Release, plugin: Release, sidecar: Release });
 export const Correlation = z.strictObject({ requestId: Id.nullable(), operationId: Id.nullable() });
