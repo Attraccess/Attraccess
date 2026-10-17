@@ -52,7 +52,13 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
   }
 
   protected reportRejected(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
-    this.rejectRuntimeMessage(errors.some((error) => error.code === 'invalid_json') ? 'parsing' : 'validation');
+    this.rejectRuntimeMessage(
+      errors.some((error) => error.code === 'structure_limit')
+        ? 'structure'
+        : errors.some((error) => error.code === 'invalid_json')
+          ? 'parsing'
+          : 'validation',
+    );
     return this.publishReport(revision, contentHash, errors);
   }
 

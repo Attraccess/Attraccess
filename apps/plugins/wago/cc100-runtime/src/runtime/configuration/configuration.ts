@@ -24,7 +24,10 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
     };
     try {
       desired = JSON.parse(payload.toString('utf8'));
-      if (structureLimitError(desired)) return this.rejectRuntimeMessage('structure');
+      if (structureLimitError(desired))
+        return this.reportRejected(0, '', [
+          { path: '$', code: 'structure_limit', message: 'desired configuration exceeds supported structure limits' },
+        ]);
     } catch {
       return this.reportRejected(0, '', [
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },

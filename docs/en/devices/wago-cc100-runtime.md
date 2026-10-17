@@ -558,6 +558,8 @@ These are operational controls only, not safety controls. Restore broker connect
 
 Leave the runtime running. Inspect Reported Configuration for field-level errors, correct the complete Desired Configuration snapshot, and publish a new revision with its matching content hash. A rejected snapshot must not be worked around by manually changing the persistent state file.
 
+A configuration that exceeds structural limits returns a fixed `structure_limit` error with revision `0` and an empty content hash. These defaults avoid echoing untrusted fields; the accepted configuration and outputs stay unchanged. Packets dropped at the earlier byte or pending-message limit do not receive a report.
+
 ### Container crash
 
 ```sh

@@ -50,7 +50,7 @@ it('counts runtime parsing, structure and validation drops separately without ch
   expect(store.save).not.toHaveBeenCalled();
   expect(write).not.toHaveBeenCalled();
   // Only desired configuration failures retain their existing rejection reports.
-  expect(transport.publish).toHaveBeenCalledTimes(2);
+  expect(transport.publish).toHaveBeenCalledTimes(3);
   expect(transport.publish.mock.calls.every(([topic]) => topic.endsWith('/configuration/reported'))).toBe(true);
   // Statistics are snapshots, and byte admission is a separate processing boundary.
   runtime.messageStatistics.runtimeRejected.parsing = 0;
@@ -61,3 +61,75 @@ it('counts runtime parsing, structure and validation drops separately without ch
     runtimeRejected: { parsing: 4, structure: 4, validation: 4 },
   });
 });
+
+it.each([
+  ['string', { secret: 'private-'.repeat(MESSAGE_LIMITS.stringLength) }],
+  ['key', { ['private-'.repeat(MESSAGE_LIMITS.identifierLength)]: true }],
+  ['collection', { values: Array(MESSAGE_LIMITS.collectionEntries + 1).fill(0) }],
+  ['depth', { nested: Array.from({ length: MESSAGE_LIMITS.depth + 1 }).reduce((value) => ({ nested: value }), {}) }],
+  ['nodes', { values: Array.from({ length: 256 }, () => Array(256).fill(0)) }],
+])(
+  'reports a bounded configuration rejection for excessive %s without changing state or outputs',
+  async (_limit, extra) => {
+    const state: RuntimeState = {
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: {},
+      commandIds: [],
+    };
+    const store = { load: async () => state, save: jest.fn(async () => undefined) };
+    const transport = {
+      publish: jest.fn(async (_topic: string, _payload: unknown, _options?: { retain?: boolean }) => undefined),
+      subscribe: async () => undefined,
+    };
+    const device = new MemoryDeviceAdapter();
+    const runtime = new WagoRuntime({
+      hardwareId: 'fixture',
+      prefix: 'fixture',
+      pairingCode: 'fixture',
+      store,
+      transport,
+      device,
+    });
+    await runtime.start();
+    await device.write(snapshot.physicalPoints[0], true);
+    const before = structuredClone(state);
+    const outputValues = structuredClone(device.values);
+    store.save.mockClear();
+    transport.publish.mockClear();
+    const write = jest.spyOn(device, 'write');
+    const payload = Buffer.from(
+      JSON.stringify({
+        protocolVersion: 1,
+        revision: { untrusted: 'private-revision' },
+        contentHash: 'private-hash',
+        snapshot,
+        ...extra,
+      }),
+    );
+    expect(payload.length).toBeLessThan(MESSAGE_LIMITS.configurationBytes);
+    await runtime.receiveDesired(payload);
+    expect(transport.publish.mock.calls).toEqual([
+      [
+        'fixture/v1/controllers/fixture/configuration/reported',
+        {
+          revision: 0,
+          contentHash: '',
+          errors: [
+            { path: '$', code: 'structure_limit', message: 'desired configuration exceeds supported structure limits' },
+          ],
+        },
+        { retain: true },
+      ],
+    ]);
+    expect(Buffer.byteLength(JSON.stringify(transport.publish.mock.calls[0][1]))).toBeLessThan(256);
+    expect(runtime.messageStatistics).toEqual({
+      pending: 0,
+      rejected: 0,
+      runtimeRejected: { parsing: 0, structure: 1, validation: 0 },
+    });
+    expect(state).toEqual(before);
+    expect(store.save).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    expect(device.values).toEqual(outputValues);
+  },
+);
