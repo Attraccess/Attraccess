@@ -91,6 +91,12 @@ int main()
     assert(persisted.card(1).keys[availableKey] == enrolledKey);
     assert(persisted.card(0).keys[availableKey] == VirtualNfc::factoryKey());
     persisted.setPresent(1, true);
+    persisted.setRemoveOnWrite(true);
+    assert(!persisted.changeKey(availableKey, persisted.getFactoryKey(), const_cast<uint8_t *>(enrolledKey.data()), persisted.getFactoryKey()));
+    assert(persisted.removedOnWrite());
+    assert(!persisted.isCardPresent());
+    assert(persisted.card(1).keys[availableKey] == enrolledKey);
+    persisted.setPresent(1, true);
     persisted.resetKeySlot(availableKey);
     assert(persisted.authenticate(availableKey, persisted.getFactoryKey()));
     assert(persisted.card(1).keyVersions[availableKey] == 0);

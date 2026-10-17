@@ -48,6 +48,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   beforeEach(async () => {
     const qb = createQueryBuilderMock();
     const scheduleRepoMock = {
+      existsBy: jest.fn().mockResolvedValue(true),
       find: jest.fn(),
       findOne: jest.fn(),
       manager: {
@@ -138,6 +139,16 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   });
 
   describe('evaluateResource', () => {
+    it('does not open a SQLite transaction for resources without enabled schedules', async () => {
+      jest.spyOn(scheduleRepository, 'existsBy').mockResolvedValue(false);
+      jest
+        .spyOn(scheduleRepository.manager, 'transaction')
+        .mockRejectedValue(new Error('Unused transaction interfered with a concurrent session'));
+
+      await expect(service.evaluateResource(resourceId)).resolves.toBeUndefined();
+      expect(scheduleRepository.manager.transaction).not.toHaveBeenCalled();
+    });
+
     it('should not create maintenance when resource has active maintenance', async () => {
       jest.spyOn(maintenanceService, 'hasActiveMaintenance').mockResolvedValue(true);
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
@@ -797,10 +808,13 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         .spyOn(resourceRepository, 'find')
         .mockResolvedValue([{ id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource]);
 
-      jest.spyOn(scheduleRepository.manager, 'transaction').mockImplementation(async (callback) => {
-        await callback({ query: jest.fn().mockResolvedValue([]) } as never);
-        throw new Error('transaction commit failed');
-      });
+      jest
+        .spyOn(scheduleRepository.manager, 'transaction')
+        .mockImplementation(async (isolationOrCallback, callback) => {
+          const run = typeof isolationOrCallback === 'function' ? isolationOrCallback : callback;
+          await run({ query: jest.fn().mockResolvedValue([]) } as never);
+          throw new Error('transaction commit failed');
+        });
 
       await expect(service.evaluateAll()).resolves.toBeUndefined();
 

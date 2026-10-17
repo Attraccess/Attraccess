@@ -48,6 +48,9 @@ public:
     void resetKeySlot(uint8_t keyNumber);
     void setKeyVersion(uint8_t keyNumber, uint8_t keyVersion);
 
+    void setRemoveOnWrite(bool enabled) { removeOnWrite = enabled; didRemoveOnWrite = false; }
+    bool removedOnWrite() const { return didRemoveOnWrite; }
+
     bool authenticate(uint8_t keyNumber, uint8_t *key) override;
     bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey,
                    uint8_t *newKey, uint8_t keyVersion = 1) override;
@@ -77,6 +80,8 @@ private:
     void save(size_t index);
     void reconcileCardPresence();
 
+    bool removeOnWrite = false;
+    bool didRemoveOnWrite = false;
     ProfileStore &profile;
     std::array<Card, CardCount> cards;
     size_t presentedCard = CardCount;

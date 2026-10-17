@@ -1,96 +1,453 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { Resource, ResourceType, Attractap } from '@attraccess/database-entities';
+import {
+  Resource,
+  ResourceType,
+  Attractap,
+  User,
+  NFCCard,
+  ResourceIntroduction,
+  ResourceIntroductionHistoryItem,
+  IntroductionHistoryAction,
+  Project,
+  ProjectMember,
+  Form,
+  FormField,
+  FormFieldType,
+  FormSubmission,
+  ResourceUsage,
+  SupervisionMode,
+  ResourceIntroducer,
+} from '@attraccess/database-entities';
 import { SettingsService } from '../settings/settings.service';
 import { AttractapGateway } from '../attractap/websockets/websocket.gateway';
+import { WebsocketService } from '../attractap/websockets/websocket.service';
+import { AttractapEventType, AuthenticatedWebSocket } from '../attractap/websockets/websocket.types';
+import { SessionService } from '../users-and-auth/auth/session.service';
 import { bootstrap } from '../main.bootstrap';
-import { ChildProcess, execFileSync, spawn } from 'child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join, resolve } from 'path';
+import { existsSync, realpathSync } from 'fs';
+import { relative, isAbsolute } from 'path';
+import { DesktopFixture, buildProbe, waitFor } from './desktop-simulator.fixture';
+import { disposeStorage, storageRoot } from '../test/desktop-real-api.setup';
 
-const repositoryRoot = resolve(__dirname, '../../../..');
-const buildDirectory = join(repositoryRoot, 'dist/apps/attractap-desktop');
-const probe = join(buildDirectory, 'attractap-desktop-real-api');
 const nonProfitLicense =
   'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md';
 
-function waitFor(condition: () => Promise<boolean> | boolean, timeoutMs = 15_000): Promise<void> {
-  return new Promise((resolveWait, reject) => {
-    const deadline = Date.now() + timeoutMs;
-    const check = async () => {
-      if (await condition()) return resolveWait();
-      if (Date.now() >= deadline) return reject(new Error('Timed out waiting for desktop simulator fixture'));
-      setTimeout(check, 25);
-    };
-    void check();
-  });
-}
-
-function waitForExit(process: ChildProcess): Promise<number> {
-  return new Promise((resolveExit, reject) => {
-    process.once('error', reject);
-    process.once('exit', (code) => resolveExit(code ?? 1));
-  });
-}
-
-describe('desktop simulator against a real API', () => {
-  let app: INestApplication;
-  let fixtureRoot: string;
-  let simulator: ChildProcess | undefined;
+describe('desktop simulator against an isolated real API', () => {
+  let app: INestApplication | undefined;
+  let db: DataSource;
+  let endpoint: string;
+  let prefix: string;
+  let fixture: DesktopFixture | undefined;
+  let reader: Attractap;
+  let resource: Resource;
 
   beforeAll(async () => {
-    // Build only the native probe; it links the same DesktopSimulator used by the app.
-    execFileSync('cmake', ['-S', 'apps/attractap/desktop', '-B', buildDirectory], { cwd: repositoryRoot });
-    execFileSync('cmake', ['--build', buildDirectory, '--target', 'attractap-desktop-real-api'], { cwd: repositoryRoot });
-
-    ({ app } = await bootstrap());
-    await app.init();
+    await buildProbe();
+    const boot = await bootstrap();
+    app = boot.app;
+    prefix = `/${boot.globalPrefix}`;
+    db = app.get(DataSource);
+    const database = db.options.database;
+    if (typeof database !== 'string') throw new Error('Expected an owned SQLite database');
+    const location = relative(realpathSync(storageRoot), realpathSync(database));
+    if (location.startsWith('..') || isAbsolute(location)) throw new Error('API database escaped isolated storage');
     await app.get(SettingsService).updateAppSettings({ licenseKey: nonProfitLicense });
     await app.listen(0, '127.0.0.1');
+    const address = app.getHttpServer().address();
+    if (!address || typeof address === 'string') throw new Error('API did not bind TCP');
+    endpoint = `http://127.0.0.1:${address.port}`;
+  }, 420_000);
+
+  afterEach(async () => {
+    await fixture?.dispose();
+    fixture = undefined;
+    // Virtual cards have stable physical UIDs across fresh profiles. Retire the
+    // previous scenario's cards only after its reader has stopped.
+    if (db?.isInitialized) await db.getRepository(NFCCard).clear();
+  });
+  afterAll(async () => {
+    try {
+      await app?.close();
+    } finally {
+      if (db?.isInitialized) await db.destroy();
+      disposeStorage();
+    }
+  });
+
+  function api() {
+    if (!app) throw new Error('API has not started');
+    return app;
+  }
+
+  function desktop() {
+    if (!fixture) throw new Error('Desktop fixture has not started');
+    return fixture;
+  }
+
+  async function start(scenario: string) {
+    fixture = new DesktopFixture(endpoint, scenario);
+    await fixture.start();
+    const observed = await fixture.command('inspect');
+    expect(observed.authenticated).toBe(true);
+    expect(observed.networkAvailable).toBe(true);
+    reader = await db.getRepository(Attractap).findOneByOrFail({ id: observed.readerId });
+    resource = await db.getRepository(Resource).save({ name: `Desktop Mill ${reader.id}`, type: ResourceType.Machine });
+    const alternate = await db
+      .getRepository(Resource)
+      .save({ name: `Desktop Lathe ${reader.id}`, type: ResourceType.Machine });
+    reader.resources = [resource, alternate];
+    await db.getRepository(Attractap).save(reader);
+    await pushWithAck();
+    await fixture.screen('resources');
+    await fixture.text(resource.name);
+    await fixture.snapshot('resource-list');
+    await fixture.click(resource.name);
+    await fixture.screen('locked');
+    return observed;
+  }
+
+  function socket(): AuthenticatedWebSocket {
+    const connections = [...api().get(WebsocketService).sockets.values()].filter((item) => item.readerId === reader.id);
+    if (connections.length !== 1)
+      throw new Error(`Expected one connection for reader ${reader.id}, got ${connections.length}`);
+    return connections[0];
+  }
+
+  async function pushWithAck() {
+    const connection = socket();
+    const original = connection.sendMessage;
+    const outcomes: { connectionId: string; messageType: AttractapEventType; result: Promise<boolean> }[] = [];
+    connection.sendMessage = function (message) {
+      const outcome = original.call(this, message);
+      if (message.data.type === AttractapEventType.RESOURCE_LIST)
+        outcomes.push({ connectionId: connection.id, messageType: message.data.type, result: outcome });
+      return outcome;
+    };
+    try {
+      await api().get(AttractapGateway).sendResourceList(reader.id);
+      expect(outcomes.length).toBeGreaterThan(0);
+      for (const delivery of outcomes) {
+        const acknowledged = await delivery.result;
+        desktop().recordDelivery(reader.id, delivery.connectionId, delivery.messageType, acknowledged);
+        expect(acknowledged).toBe(true);
+      }
+    } finally {
+      connection.sendMessage = original;
+    }
+  }
+
+  async function user(name: string, introduced = true) {
+    const result = await db
+      .getRepository(User)
+      .save({ username: `${name}-${reader.id}`, email: `${name}-${reader.id}@example.invalid`, isEmailVerified: true });
+    if (introduced) {
+      const introduction = await db
+        .getRepository(ResourceIntroduction)
+        .save({ resourceId: resource.id, receiverUserId: result.id });
+      await db.getRepository(ResourceIntroductionHistoryItem).save({
+        introductionId: introduction.id,
+        action: IntroductionHistoryAction.GRANT,
+        performedByUserId: result.id,
+      });
+    }
+    return result;
+  }
+
+  async function request(user: User, path: string, body: object) {
+    const token = await api().get(SessionService).createSession(user);
+    // Authentication and authorization are real; no guard or workflow handler is replaced.
+    return fetch(`${endpoint}${prefix}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(40_000),
+    });
+  }
+
+  async function enroll(user: User, card = 0) {
+    expect((await request(user, '/attractap/readers/enroll-nfc-card', { readerId: reader.id })).status).toBe(201);
+    await desktop().screen('enrollment');
+    await desktop().present(card);
+    await waitFor(
+      async () => db.getRepository(NFCCard).exists({ where: { user: { id: user.id }, isActive: true } }),
+      'card enrollment',
+    );
+    const stored = await db.getRepository(NFCCard).findOneOrFail({ where: { user: { id: user.id }, isActive: true } });
+    expect((await desktop().command('inspect', { card })).keyVersions[stored.keyNo]).toBeGreaterThan(0);
+    await desktop().text('Karte registriert!');
+    await desktop().snapshot(`enrolled-${card}`);
+    await desktop().remove(card);
+    return stored;
+  }
+
+  async function authenticate(card = 0) {
+    let observed = await desktop().command('inspect');
+    await waitFor(async () => {
+      observed = await desktop().command('inspect');
+      return observed.screen === 'resources' || observed.screen === 'locked';
+    }, 'card entry screen');
+    if (observed.screen === 'resources') await desktop().click(resource.name);
+    await desktop().screen('locked');
+    await desktop().present(card);
+    await desktop().screen('details');
+    await desktop().text(resource.name);
+    await desktop().remove(card);
+  }
+
+  it('registers the exact reader, observes ACKs on both connections and preserves its profile', async () => {
+    const original = await start('registration-reconnect');
+    const user1 = await user('reader');
+    await enroll(user1);
+    await authenticate();
+    await desktop().snapshot('resources');
+    const connection = socket();
+    const recovered = await desktop().command('reconnect');
+    expect(recovered.authenticationGeneration).toBeGreaterThan(original.authenticationGeneration);
+    expect(recovered.readerId).toBe(reader.id);
+    expect(recovered.networkAvailable).toBe(true);
+    await waitFor(() => {
+      const active = [...api().get(WebsocketService).sockets.values()].filter((item) => item.readerId === reader.id);
+      return active.length === 1 && active[0] !== connection;
+    }, 'replacement reader connection');
+    resource.name = `Recovered Mill ${reader.id}`;
+    await db.getRepository(Resource).save(resource);
+    await pushWithAck();
+    await desktop().text(resource.name);
+    await desktop().snapshot('reconnected');
+    const readerCount = await db.getRepository(Attractap).count();
+    await desktop().stop();
+    await desktop().start();
+    expect((await desktop().command('inspect')).readerId).toBe(reader.id);
+    expect(await db.getRepository(Attractap).count()).toBe(readerCount);
+    await desktop().screen('resources');
+    await desktop().click(resource.name);
+    await authenticate();
+    expect(socket().state.lastAuthenticatedUserId).toBe(user1.id);
+  }, 90_000);
+
+  it('enrolls cards, rejects unknown and incorrect keys, and recovers from write failure and removal', async () => {
+    await start('cards');
+    await desktop().present(3);
+    await desktop().text('CARD_NOT_FOUND');
+    await desktop().snapshot('unknown-card');
+    await desktop().click('OK');
+    await desktop().screen('locked');
+    expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+    await desktop().remove(3);
+    const owner = await user('card-owner');
+    const card = await enroll(owner);
+    await desktop().screen('locked');
+    await desktop().command('corrupt-key', { card: 0, slot: card.keyNo });
+    await desktop().authenticationFailure();
+    expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+    await desktop().snapshot('incorrect-key');
+    await desktop().remove();
+    await desktop().command('corrupt-key', { card: 0, slot: card.keyNo });
+    await authenticate();
+    await desktop().click('Abmelden');
+    for (const [index, fault] of [
+      [1, 'write'],
+      [2, 'removeOnWrite'],
+    ] as const) {
+      const candidate = await user(`failed-${index}`);
+      await desktop().command('faults', { card: index, [fault]: true });
+      expect((await request(candidate, '/attractap/readers/enroll-nfc-card', { readerId: reader.id })).status).toBe(
+        201,
+      );
+      await desktop().screen('enrollment');
+      await desktop().present(index);
+      await desktop().text('Karte konnte nicht\ngeschrieben werden');
+      expect(await db.getRepository(NFCCard).count({ where: { user: { id: candidate.id }, isActive: true } })).toBe(0);
+      if (fault === 'removeOnWrite') expect((await desktop().command('inspect')).removedOnWrite).toBe(true);
+      await desktop().snapshot(`failed-enrollment-${index}`);
+      await desktop().remove(index);
+      await desktop().command('faults', { card: index });
+      await desktop().text('Karte an den Leser halten');
+      await desktop().present(index);
+      await desktop().text('Karte registriert!');
+      await waitFor(
+        () => db.getRepository(NFCCard).exists({ where: { user: { id: candidate.id }, isActive: true } }),
+        'recovered enrollment',
+      );
+      await desktop().remove(index);
+      await authenticate(index);
+      await desktop().click('Abmelden');
+    }
+    expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
   }, 120_000);
 
-  afterEach(() => {
-    simulator?.kill();
-    simulator = undefined;
-    if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true });
-  });
-
-  afterAll(async () => {
-    await app.close();
-  });
-
-  it('registers, receives a live resource list, captures frames, and reconnects', async () => {
-    fixtureRoot = mkdtempSync(join(tmpdir(), 'attractap-desktop-real-api-'));
-    const ready = join(fixtureRoot, 'ready');
-    const release = join(fixtureRoot, 'release');
-    const screenshots = join(fixtureRoot, 'screenshots');
-    const server = app.getHttpServer().address();
-    if (!server || typeof server === 'string') throw new Error('Test API did not bind a TCP port');
-
-    simulator = spawn(probe, [`http://127.0.0.1:${server.port}`, ready, release, screenshots], {
-      cwd: repositoryRoot,
-      env: { ...process.env, SDL_VIDEODRIVER: 'dummy', SDL_RENDER_DRIVER: 'software' },
-      stdio: 'pipe',
+  it('starts and ends a project session only after required forms, including server rejection and correction', async () => {
+    await start('sessions-forms');
+    const owner = await user('operator');
+    const projectOwner = await user('project-owner');
+    const project = await db.getRepository(Project).save({ name: `Desktop Project ${reader.id}`, owner: projectOwner });
+    await db.getRepository(ProjectMember).save({ userId: owner.id, projectId: project.id });
+    const form = await db.getRepository(Form).save({
+      name: 'Safety check',
+      resourceId: resource.id,
+      isRequiredOnResourceUsageStart: true,
+      isRequiredOnResourceUsageEnd: true,
     });
-    const exit = waitForExit(simulator);
-
-    await waitFor(() => existsSync(ready));
-
-    const dataSource = app.get(DataSource);
-    const resource = await dataSource.getRepository(Resource).save({
-      name: 'Desktop E2E Mill',
-      type: ResourceType.Machine,
+    const text = await db
+      .getRepository(FormField)
+      .save({ formId: form.id, name: 'Work note', type: FormFieldType.TEXT, isRequired: true, position: 0 });
+    const choice = await db.getRepository(FormField).save({
+      formId: form.id,
+      name: 'Material',
+      type: FormFieldType.SELECT,
+      isRequired: true,
+      options: ['Wood', 'Metal'],
+      position: 1,
     });
-    const [reader] = await dataSource.getRepository(Attractap).find({ relations: ['resources'], take: 1 });
-    if (!reader) throw new Error('Desktop simulator did not register a reader');
-    reader.resources = [resource];
-    await dataSource.getRepository(Attractap).save(reader);
-    await app.get(AttractapGateway).sendResourceList(reader.id);
+    await enroll(owner);
+    await authenticate();
+    await desktop().click('Projekt waehlen');
+    await desktop().click(project.name);
+    await desktop().text(`Projekt: ${project.name}`);
+    await desktop().snapshot('project-selected');
+    await desktop().click('Ressource verwenden');
+    await desktop().text('Work note *');
+    await desktop().click('Weiter');
+    await desktop().text('Bitte markierte Felder ausfuellen.');
+    expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+    await desktop().snapshot('required-start-form');
+    await desktop().click('Antippen zum Eingeben');
+    await desktop().command('edit', { text: 'Prototype' });
+    await desktop().click('Weiter');
+    await desktop().text('Material *');
+    await desktop().click('Wood');
+    // The client has the original option list. Changing the real server's
+    // constraint makes the next submission fail validation at the actual handler.
+    await db.getRepository(FormField).update(choice.id, { options: ['Metal'] });
+    await desktop().click('Absenden');
+    await desktop().text('Bitte Eingabe korrigieren.');
+    expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+    await desktop().snapshot('server-rejected-form');
+    await desktop().click('Metal');
+    await desktop().click('Absenden');
+    await waitFor(
+      () =>
+        db
+          .getRepository(ResourceUsage)
+          .exists({ where: { resourceId: resource.id, userId: owner.id, projectId: project.id } }),
+      'project usage start',
+    );
+    const usage = await db.getRepository(ResourceUsage).findOneByOrFail({ resourceId: resource.id, userId: owner.id });
+    expect(usage.endTime).toBeNull();
+    expect(socket().state.lastAuthenticatedUserId).toBe(owner.id);
+    const persistedReader = await db
+      .getRepository(Attractap)
+      .findOneOrFail({ where: { id: reader.id }, relations: ['resources'] });
+    expect(persistedReader.resources.map((item) => item.id)).toContain(usage.resourceId);
+    await desktop().text('Sitzung beenden');
+    await desktop().snapshot('project-session');
+    await desktop().click('Sitzung beenden');
+    await desktop().text('Work note *');
+    await desktop().click('Weiter');
+    await desktop().text('Bitte markierte Felder ausfuellen.');
+    expect((await db.getRepository(ResourceUsage).findOneByOrFail({ id: usage.id })).endTime).toBeNull();
+    await desktop().snapshot('required-end-form');
+    await desktop().click('Antippen zum Eingeben');
+    await desktop().command('edit', { text: 'Finished' });
+    await desktop().click('Weiter');
+    await desktop().click('Metal');
+    await desktop().click('Absenden');
+    await waitFor(
+      async () => Boolean((await db.getRepository(ResourceUsage).findOneByOrFail({ id: usage.id })).endTime),
+      'usage end',
+    );
+    const submissions = await db.getRepository(FormSubmission).findBy({ resourceUsageId: usage.id });
+    expect(submissions).toHaveLength(2);
+    for (const submission of submissions) {
+      expect(submission.userId).toBe(owner.id);
+      expect(submission.formId).toBe(form.id);
+      expect(submission.data[String(text.id)].value).toBe(submission.action === 'start' ? 'Prototype' : 'Finished');
+      expect(submission.data[String(choice.id)].value).toBe('Metal');
+    }
+  }, 120_000);
 
-    writeFileSync(release, 'resource list attached\n');
-    await expect(exit).resolves.toBe(0);
-    expect(existsSync(join(screenshots, 'resource-list.png'))).toBe(true);
-    expect(existsSync(join(screenshots, 'reconnected.png'))).toBe(true);
+  it('keeps the web supervision request pending until an eligible supervisor authenticates at the reader', async () => {
+    await start('supervision');
+    const supervisor = await user('supervisor');
+    const requester = await user('requester', false);
+    await db.getRepository(ResourceIntroducer).save({ resourceId: resource.id, userId: supervisor.id });
+    await db.getRepository(Resource).update(resource.id, { supervisionMode: SupervisionMode.SUPERVISION_ALLOWED });
+    await enroll(supervisor);
+    await desktop().screen('locked');
+    let settled = false;
+    const pending = request(requester, `/resources/${resource.id}/usage/supervision/request`, { readerId: reader.id });
+    void pending.then(() => {
+      settled = true;
+    });
+    try {
+      await desktop().screen('supervision');
+      expect(settled).toBe(false);
+      expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+      await desktop().snapshot('supervision-request');
+      await desktop().present(3);
+      await desktop().text('CARD_NOT_FOUND');
+      expect(settled).toBe(false);
+      expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
+      await desktop().remove(3);
+      await desktop().present();
+      const response = await pending;
+      expect(response.status).toBe(201);
+      const approved = await response.json();
+      const usage = await db.getRepository(ResourceUsage).findOneByOrFail({ id: approved.id });
+      expect(usage.userId).toBe(requester.id);
+      expect(usage.supervisorUserId).toBe(supervisor.id);
+      expect(usage.resourceId).toBe(resource.id);
+      expect(usage.endTime).toBeNull();
+      await desktop().text('Freigegeben!');
+      await desktop().snapshot('supervision-approved');
+    } finally {
+      // Always consume the bounded HTTP request, including if a screen assertion fails.
+      await desktop().remove();
+      await pending;
+    }
+  }, 60_000);
+
+  it('cleans up after failed startup and a failing scenario assertion', async () => {
+    const failed = new DesktopFixture('invalid-endpoint', 'startup-failure');
+    try {
+      await expect(failed.start()).rejects.toThrow();
+    } finally {
+      await failed.dispose();
+    }
+    expect(existsSync(failed.root)).toBe(false);
+    await start('assertion-cleanup');
+    const ownedRoot = desktop().root;
+    await expect(
+      (async () => {
+        try {
+          const observed = await desktop().command('inspect');
+          expect(observed.readerId).toBe(-1); // Deliberate scenario assertion failure.
+        } finally {
+          await desktop().dispose();
+        }
+      })(),
+    ).rejects.toThrow();
+    expect(existsSync(ownedRoot)).toBe(false);
+  }, 30_000);
+
+  it('rejects malformed commands, unsafe captures, invalid indices and bounded waits without stopping', async () => {
+    await start('control-failures');
+    for (const input of [
+      '{',
+      '{}',
+      '{"action":"unknown"}',
+      '{"action":"present","card":-1}',
+      '{"action":"corrupt-key","slot":6}',
+      '{"action":"snapshot","text":"../escape"}',
+      '{"action":"faults","write":"yes"}',
+      ' '.repeat(4097),
+    ]) {
+      expect((await desktop().exchange(input, 'malformed command')).ok).toBe(false);
+    }
+    expect(
+      (await desktop().exchange('{"action":"wait-text","text":"never displayed"}', 'bounded missing text')).ok,
+    ).toBe(false);
+    expect((await desktop().command('inspect')).authenticated).toBe(true);
   }, 45_000);
 });

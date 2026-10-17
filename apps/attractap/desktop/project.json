@@ -42,7 +42,7 @@
     "test-real-api": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec jest --config apps/api/jest.e2e.config.ts --runInBand apps/api/src/e2e/desktop-simulator.real-api.spec.ts",
+        "command": "pnpm exec jest --config apps/api/jest.desktop-real-api.config.ts --runInBand --no-cache",
         "cwd": "."
       },
       "cache": false

@@ -282,6 +282,11 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    * Evaluate all enabled schedules for a resource. If any triggers and there is no active maintenance, create one (first trigger wins).
    */
   async evaluateResource(resourceId: number): Promise<void> {
+    // Most usage events have no schedules to evaluate. Do not open a no-op
+    // transaction on SQLite's shared connection while a session may be saving.
+    // Configured schedules are still re-read inside the transaction below.
+    if (!(await this.scheduleRepository.existsBy({ resourceId, enabled: true }))) return;
+
     await this.scheduleRepository.manager.transaction(async (transactionalEntityManager) => {
       const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);
       const schedules = await scheduleRepo.find({

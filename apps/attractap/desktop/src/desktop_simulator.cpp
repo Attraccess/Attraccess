@@ -31,6 +31,11 @@ DesktopSimulator::DesktopSimulator(const std::string &endpoint, uint32_t readerI
         const auto config = Settings::getAttraccessApiConfig();
         const bool connected = state == HostWebsocket::State::Connected;
         State::setWebsocketState(connected, config.hostname, config.port, config.useSSL);
+        // The host transport has no embedded ping-quality task. Publish its
+        // observed connection state so the real screen does not retain the
+        // initial offline badge after a successful desktop connection.
+        State::setNetworkQualityState(connected ? State::NETWORK_QUALITY_GOOD : State::NETWORK_QUALITY_OFFLINE,
+                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         State::setWebsocketPhase(state == HostWebsocket::State::Connected ? State::WS_CONNECTED
                                  : state == HostWebsocket::State::Connecting ? State::WS_CONNECTING
                                                                                : State::WS_INIT);
