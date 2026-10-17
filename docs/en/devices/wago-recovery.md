@@ -3,7 +3,7 @@
 These runbooks use existing configuration, credential, commissioning and signed
 runtime-update services. They are preparation procedures with software fixture
 exercises; physical recovery and independent reviews remain outstanding. See
-[assurance and evidence boundaries](wago-production-assurance.md).
+[assurance and evidence boundaries](/devices/wago-production-assurance.md).
 
 Every procedure requires an authorized Attraccess/broker administrator and a
 qualified local operator when hardware is involved. Put the connected equipment

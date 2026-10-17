@@ -70,6 +70,7 @@ export class AssuranceFixture {
     runtimeWrites: 0,
   };
   readonly sequences = new Map<string, number>();
+  readonly backendSubscriptions = new Set<string>();
   readonly errors: string[] = [];
   retiredStaleDiscarded = 0;
   retiredWireRejected = 0;
@@ -162,6 +163,7 @@ export class AssuranceFixture {
           };
           this.backendClient.on('message', handler);
           await this.backendClient.subscribeAsync(filter, { qos: 1 });
+          this.backendSubscriptions.add(filter);
           return { unsubscribe: () => this.backendClient.off('message', handler) };
         },
       },
@@ -307,6 +309,14 @@ export class AssuranceFixture {
   }
 
   async fresh() {
+    // MQTT CONNECT can precede automatic resubscription acknowledgements. With
+    // clean sessions, a one-shot heartbeat sent then can miss the backend.
+    // Establish the receive boundary before generating recovery evidence.
+    await this.backendClient.subscribeAsync(
+      Object.assign(Object.fromEntries([...this.backendSubscriptions].map((filter) => [filter, { qos: 1 as const }])), {
+        resubscribe: true,
+      }),
+    );
     const after = Date.now();
     await Promise.all(this.devices.map((device) => device.runtime.publishHeartbeat()));
     await eventually(() =>

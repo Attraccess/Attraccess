@@ -227,7 +227,6 @@ jobs:
       NX_LOAD_DOT_ENV_FILES: 'false'
       NX_DAEMON: 'false'
       WAGO_ASSURANCE_PROFILE: ci
-      WAGO_ASSURANCE_OUTPUT: ${{ runner.temp }}/wago-assurance
       WAGO_FLEET_DOCKER_CONTEXT: wago-assurance-ci
     steps:
       - uses: actions/checkout@v7
@@ -239,6 +238,8 @@ jobs:
       - name: Select isolated runner Docker context
         run: docker context create wago-assurance-ci --docker host=unix:///var/run/docker.sock
       - name: Run uncached WAGO software assurance
+        env:
+          WAGO_ASSURANCE_OUTPUT: ${{ runner.temp }}/wago-assurance
         run: pnpm nx run plugin-wago:production-assurance --skip-nx-cache
       - name: Retain assurance evidence including failed runs
         if: always()

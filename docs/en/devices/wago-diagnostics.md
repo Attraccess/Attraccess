@@ -1,7 +1,7 @@
 # WAGO diagnostics
 
-See [production assurance preparation](wago-production-assurance.md) for current
-software evidence and support boundaries, and [recovery procedures](wago-recovery.md)
+See [production assurance preparation](/devices/wago-production-assurance.md) for current
+software evidence and support boundaries, and [recovery procedures](/devices/wago-recovery.md)
 for coordinated backups, compromise, outages, replacement and upgrade recovery.
 Physical qualification and independent security/safety reviews remain separate.
 

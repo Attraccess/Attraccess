@@ -4,7 +4,7 @@ As of **2026-09-06**, commissioning is destructive. Existing applications and
 workloads may stop working or be erased. Attraccess does not preserve, back up,
 or restore preexisting CODESYS applications, retained PLC data, other workloads,
 or their host settings. The [earlier preservation decision and vendor-source
-findings](wago-fw31-support.md) remain history. Tests use temporary files and fake
+findings](/devices/wago-fw31-support.md) remain history. Tests use temporary files and fake
 device transports; **no physical I/O, firmware-reboot or management-hardening
 acceptance is claimed**. ATT-984 remains a release gate.
 
@@ -48,7 +48,7 @@ reinstalled. Before vendor install/activation, preparation independently checks
 the boot medium and rejects an empty result or `sd-card`. It verifies that the
 executable `S99_docker` resolves to `/etc/init.d/dockerd`, the activation getter
 returns `active`, and the daemon reports Docker `25.0.4`.
-See the [exact-source findings](wago-fw31-support.md#exact-extension-source-and-captured-fw31-evidence)
+See the [exact-source findings](/devices/wago-fw31-support.md#exact-extension-source-and-captured-fw31-evidence)
 for captured behavior and the remaining dependency-provenance limits.
 
 ## Hardware and reboot boundary
@@ -93,7 +93,7 @@ Hook `start` currently exits `0` without starting when enablement is absent; thi
 is a disabled no-op, not a successful runtime start.
 
 Resolve the cause and use the existing
-[wizard cleanup/recommissioning route](wago-cc100-commissioning.md#recover-after-latched-containment).
+[wizard cleanup/recommissioning route](/devices/wago-cc100-commissioning.md#recover-after-latched-containment).
 For current guided sessions, the UI exposes cleanup only with retained runtime
 ownership; `/recover` reconciles its tokened journal and credentials. An unclaimed
 session can then retry delivery, while a claimed session requires registration
@@ -101,7 +101,7 @@ removal and a new session. Only a fresh approved installation recreates enableme
 There is no re-enable button or marker-edit step. Missing ownership or failed
 cleanup remains a blocker. Boot ordering and fixture success do not establish
 physical reboot behavior. The
-[2026-09-06 security supersession](wago-fw31-support.md#security-follow-up-on-2026-09-06)
+[2026-09-06 security supersession](/devices/wago-fw31-support.md#security-follow-up-on-2026-09-06)
 records the replaced intermediate restart policy.
 
 Preflight verifies permissions as UID/GID 10001, without supplementary groups or
@@ -227,7 +227,7 @@ provides the vendor Docker, runtime and boot contracts inspected during the
 original review. That revision is FW30-V04.08.09, not blanket FW31 evidence.
 The later exact-source audit separately inspected hashed, captured FW31 Docker,
 runtime and boot files. Its findings supersede assumptions about archive extraction
-from the older SDK variants; the current [support ledger](wago-fw31-support.md#exact-extension-source-and-captured-fw31-evidence)
+from the older SDK variants; the current [support ledger](/devices/wago-fw31-support.md#exact-extension-source-and-captured-fw31-evidence)
 records the capture provenance and distinguishes it from the unofficial extension.
 
 Vendor activation can change boot links, routing, firewall and storage; the
@@ -235,5 +235,5 @@ vendor deactivate/remove actions are not general inverses. The destructive
 product decision removes the obligation to restore old workloads/settings. It
 does not remove component compatibility checks, durable operation ownership,
 postcondition verification, minimum I/O privileges or physical acceptance.
-The [FW31 support record](wago-fw31-support.md) preserves the original findings
+The [FW31 support record](/devices/wago-fw31-support.md) preserves the original findings
 and explicitly identifies their supersession.

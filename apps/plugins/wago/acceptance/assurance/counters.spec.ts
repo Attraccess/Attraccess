@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import type { MqttClient } from 'mqtt';
-import { WagoRuntime } from '../../cc100-runtime/src/runtime';
-import { AssuranceFixture, type Device } from './fixture';
+import { WagoRuntime, hash } from '../../cc100-runtime/src/runtime';
+import { AssuranceFixture, snapshot, type Device } from './fixture';
 
 it('counts malformed operational ingress independently of parser and diagnostics rejections', () => {
   const fixture = new AssuranceFixture();
@@ -48,4 +48,46 @@ it('retains MQTT acknowledgement timeouts across transport replacement', async (
     connect.mockRestore();
     jest.useRealTimers();
   }
+});
+
+it('waits for restored backend subscriptions before requesting fresh telemetry', async () => {
+  const fixture = new AssuranceFixture();
+  fixture.backendSubscriptions.add('fixture/+/heartbeat');
+  let subscribed = false;
+  let release!: () => void;
+  const subscription = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  fixture.backendClient = {
+    subscribeAsync: jest.fn(async () => {
+      await subscription;
+      subscribed = true;
+    }),
+  } as unknown as MqttClient;
+  const publishHeartbeat = jest.fn(async () => {
+    expect(subscribed).toBe(true);
+  });
+  fixture.devices.push({ id: 1, runtime: { publishHeartbeat } } as unknown as Device);
+  fixture.backend = {
+    diagnostics: {
+      read: () => ({
+        heartbeatAt: new Date().toISOString(),
+        stateSourceAt: new Date().toISOString(),
+        connected: true,
+        revision: 1,
+        contentHash: hash(snapshot),
+        hardwareAvailable: true,
+      }),
+    },
+  } as unknown as AssuranceFixture['backend'];
+  const fresh = fixture.fresh();
+  await Promise.resolve();
+  expect(publishHeartbeat).not.toHaveBeenCalled();
+  release();
+  await fresh;
+  expect(fixture.backendClient.subscribeAsync).toHaveBeenCalledWith({
+    'fixture/+/heartbeat': { qos: 1 },
+    resubscribe: true,
+  });
+  expect(publishHeartbeat).toHaveBeenCalledTimes(1);
 });

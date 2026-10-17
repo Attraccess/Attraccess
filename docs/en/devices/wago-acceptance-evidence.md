@@ -12,7 +12,7 @@ Record the starting controller state and the explicit destructive-install approv
 
 A nontechnical or lightly technical participant other than the implementer must perform the journey. Record obstacles, failed attempts and any developer intervention rather than correcting them silently. A terminal, JSON editor, API client or manual secret-copy step is a failure of the required no-code journey, even if an engineer can make the hardware work afterwards.
 
-Use only controls present in the exact tested build. The existing [commissioning walkthrough](wago-cc100-commissioning.md) documents its source baseline; its limitations must be reconciled after integrating commissioning, visual configuration, diagnostics and hardware changes. Do not use screenshots or instructions for unmerged or absent screens as acceptance evidence.
+Use only controls present in the exact tested build. The existing [commissioning walkthrough](/devices/wago-cc100-commissioning.md) documents its source baseline; its limitations must be reconciled after integrating commissioning, visual configuration, diagnostics and hardware changes. Do not use screenshots or instructions for unmerged or absent screens as acceptance evidence.
 
 For each required check, record the observed behavior and link a timestamped recording, screenshot, test report or reviewer-approved artifact. Include both desktop and mobile. Explain how the selected input, output and physical Modbus measurement were independently observed. An output acknowledgement alone is not physical feedback.
 
@@ -59,6 +59,6 @@ The checker never connects to hardware, changes Linear, signs artifacts or publi
 
 ## Publication Boundary
 
-ATT-985 was canceled and is historical publication context. Physical/nontechnical acceptance remains with ATT-984; ATT-988 prepares additional software assurance and independent review procedures. Neither ticket state nor software fixtures replace reviewed physical evidence. See [assurance boundaries](wago-production-assurance.md) and [recovery procedures](wago-recovery.md). Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and checksum-checked ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
+ATT-985 was canceled and is historical publication context. Physical/nontechnical acceptance remains with ATT-984; ATT-988 prepares additional software assurance and independent review procedures. Neither ticket state nor software fixtures replace reviewed physical evidence. See [assurance boundaries](/devices/wago-production-assurance.md) and [recovery procedures](/devices/wago-recovery.md). Publish only the device/profile/transport combinations actually qualified, compatible frontend/backend and checksum-checked ARMv7 runtime artifacts, and documentation checked against the tested screens. Normal operator installation must provide the runtime bundle through packaging or visual import, not server environment variables or shell/file-path instructions.
 
 Broader four-assembly qualification, billing, telemetry history and arbitration are deferred. They must not be advertised as proven capabilities of this first slice.

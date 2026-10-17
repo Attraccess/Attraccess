@@ -10,6 +10,7 @@
   section.content {
     padding-left: 40px !important;
     padding-right: 8px !important;
+    padding-top: 64px !important;
   }
   .markdown-section {
     padding: 0 8px !important;
@@ -69,7 +70,7 @@
 
   /* Cover page refinements */
   section.cover {
-    padding: 20px 16px !important;
+    padding: 64px 16px 20px !important;
   }
   section.cover .cover-main {
     max-width: 100%;
@@ -89,12 +90,12 @@
     padding: 12px 20px;
   }
 
-  /* Lang switcher + theme toggle: bottom bar on mobile */
+  /* Reserve the page top for controls; they scroll away with the document. */
   .lang-switcher,
   .theme-toggle {
-    position: fixed;
-    top: auto;
-    bottom: 16px;
+    position: absolute;
+    top: 12px;
+    bottom: auto;
     z-index: 100;
   }
   .lang-switcher {
@@ -119,11 +120,6 @@
     margin-left: 0;
     margin-right: 0;
     padding: 8px 14px;
-  }
-
-  /* Bottom padding so pagination clears the floating toggles */
-  .docsify-pagination-container {
-    margin-bottom: 56px !important;
   }
 }
 

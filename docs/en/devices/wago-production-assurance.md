@@ -485,8 +485,8 @@ to treat missing qualification as complete.
 Support covers the combinations actually demonstrated in revision-bound software
 reports and, separately, the combinations qualified by reviewed physical evidence.
 No fixed response-time, maintenance-period or availability guarantee is made here.
-See [FW31 boundaries](wago-fw31-support.md), [physical acceptance](wago-acceptance-evidence.md)
-and [recovery procedures](wago-recovery.md).
+See [FW31 boundaries](/devices/wago-fw31-support.md), [physical acceptance](/devices/wago-acceptance-evidence.md)
+and [recovery procedures](/devices/wago-recovery.md).
 
 For escalation provide non-secret revision/image IDs, exact model/firmware,
 broker and TLS mode, namespace shape without credentials, sanitized validation
