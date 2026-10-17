@@ -1,3 +1,5 @@
+import { Select } from '../../../../components/select';
+import { normalizeDeviceLanguage } from '@attraccess/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -5,7 +7,9 @@ import {
   useSettingsServiceApplyFirstTimeSetupSettings,
   UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
   useSettingsServiceGetSystemSettings,
+  useSettingsServiceGetSystemLanguage,
   UseSettingsServiceGetSystemSettingsKeyFn,
+  UseSettingsServiceGetSystemLanguageKeyFn,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
@@ -35,18 +39,33 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
+  const hasEditedLanguage = useRef(false);
+  const hasEditedUrl = useRef(false);
+  const hasEditedPublicInternetUrl = useRef(false);
 
   const [url, setUrl] = useState(window.location.origin);
   const [publicInternetUrl, setPublicInternetUrl] = useState(window.location.origin);
   const [licenseKey, setLicenseKey] = useState('');
+  const [defaultLanguage, setDefaultLanguage] = useState<'en' | 'de'>(() =>
+    normalizeDeviceLanguage(navigator.language),
+  );
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, { enabled: variant === 'standalone' });
+  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, {
+    enabled: variant === 'standalone',
+  });
+
+  const { data: systemLanguage } = useSettingsServiceGetSystemLanguage(undefined, { enabled: variant === 'wizard' });
+  useEffect(() => {
+    if (variant === 'wizard' && systemLanguage?.configured && !hasEditedLanguage.current) {
+      setDefaultLanguage(systemLanguage.defaultLanguage);
+    }
+  }, [variant, systemLanguage]);
 
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;
-    setUrl(settings.app.url ?? '');
-    setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
-    setLicenseKey('');
+    if (!hasEditedUrl.current) setUrl(settings.app.url ?? '');
+    if (!hasEditedPublicInternetUrl.current) setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
+    if (!hasEditedLanguage.current) setDefaultLanguage(settings.app.defaultLanguage ?? 'de');
   }, [variant, settings]);
 
   const mutateConfig = useMemo(() => {
@@ -57,9 +76,13 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           description: t('success.description'),
         });
         queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemSettingsKeyFn() });
+        queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemLanguageKeyFn() });
         if (endpoint === 'first-time-setup') {
           queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
         }
+        hasEditedLanguage.current = false;
+        hasEditedUrl.current = false;
+        hasEditedPublicInternetUrl.current = false;
         setLicenseKey('');
         if (variant === 'wizard') onNext?.();
       },
@@ -71,16 +94,17 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           baseTranslationKey: 'api',
         });
       },
-    }
+    };
   }, [endpoint, variant, t, tExists, toast, queryClient, onNext]);
 
   const { mutate: saveSettings, isPending: isSavingNormal } = useSettingsServiceUpdateSystemSettings(mutateConfig);
-  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } = useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
+  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } =
+    useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
 
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
 
   const handleSubmit = useCallback(() => {
-    if (!formRef.current?.checkValidity()) return;
+    if (isSaving || !formRef.current?.checkValidity()) return;
 
     const payload = {
       requestBody: {
@@ -88,6 +112,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           url: url.trim(),
           publicInternetUrl: publicInternetUrl.trim() ? publicInternetUrl.trim() : undefined,
           licenseKey: licenseKey.trim() ? licenseKey.trim() : undefined,
+          defaultLanguage,
         },
       },
     };
@@ -97,7 +122,16 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     } else {
       saveSettings(payload);
     }
-  }, [url, publicInternetUrl, licenseKey, saveSettings, saveSettingsFirstTimeSetup, endpoint]);
+  }, [
+    url,
+    publicInternetUrl,
+    licenseKey,
+    defaultLanguage,
+    saveSettings,
+    saveSettingsFirstTimeSetup,
+    endpoint,
+    isSaving,
+  ]);
 
   const showLoading = variant === 'standalone' && isLoading;
 
@@ -119,19 +153,52 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
       }}
       className="flex flex-col gap-4"
     >
-      <TextField isRequired value={url} onChange={setUrl}>
+      <TextField
+        isDisabled={isSaving}
+        isRequired
+        value={url}
+        onChange={(value) => {
+          hasEditedUrl.current = true;
+          setUrl(value);
+        }}
+      >
         <Label>{t('inputs.url.label')}</Label>
         <Input type="url" />
         <Description>{t('inputs.url.description')}</Description>
       </TextField>
-      <TextField value={publicInternetUrl} onChange={setPublicInternetUrl}>
+      <TextField
+        isDisabled={isSaving}
+        value={publicInternetUrl}
+        onChange={(value) => {
+          hasEditedPublicInternetUrl.current = true;
+          setPublicInternetUrl(value);
+        }}
+      >
         <Label>{t('inputs.publicInternetUrl.label')}</Label>
         <Input type="url" />
         <Description>{t('inputs.publicInternetUrl.description')}</Description>
       </TextField>
+      <Select
+        label={t('inputs.defaultLanguage.label')}
+        popoverProps={{ placement: 'top', offset: 32 }}
+        value={defaultLanguage}
+        onChange={(next) => {
+          if (next === 'en' || next === 'de') {
+            hasEditedLanguage.current = true;
+            setDefaultLanguage(next);
+          }
+        }}
+        items={[
+          { key: 'en', label: 'English' },
+          { key: 'de', label: 'Deutsch' },
+        ]}
+        isDisabled={isSaving}
+        fullWidth
+      />
       {variant === 'standalone' && (
         <>
           <PasswordInput
+            isDisabled={isSaving}
             label={t('inputs.licenseKey.label')}
             description={t('inputs.licenseKey.description')}
             value={licenseKey}
@@ -141,11 +208,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           <CommunityLicenseButton onAccept={setLicenseKey} isDisabled={isSaving} />
         </>
       )}
-      <Button variant="primary"
-        onPress={handleSubmit}
-        isPending={isSaving}
-        isDisabled={showLoading}
-      >
+      <Button variant="primary" onPress={handleSubmit} isPending={isSaving} isDisabled={showLoading}>
         {variant === 'wizard' ? t('actions.next') : t('actions.save')}
       </Button>
       <input type="submit" hidden />

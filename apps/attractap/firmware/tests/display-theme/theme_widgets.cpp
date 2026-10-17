@@ -1,3 +1,4 @@
+#include "demo/demo_localization.hpp"
 #include "render_harness.hpp"
 
 void testInputs(Renderer &renderer)
@@ -86,6 +87,108 @@ void testInputs(Renderer &renderer)
         expect(lv_area_get_width(&area) > 10 && lv_area_get_height(&area) > 20, "Real per-key fill task recorded");
         renderer.expectPixel((area.x1 + area.x2) / 2, area.y1 + 4,
                              keyColors[key], "Rendered matrix key " + std::to_string(key));
+    }
+}
+
+void testDemoFixtureLocales(Renderer &renderer)
+{
+    auto *root = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(root, 400, 220);
+    lv_obj_center(root);
+    auto *resource = lv_label_create(root);
+    lv_obj_align(resource, LV_ALIGN_TOP_MID, 0, 24);
+    auto *project = lv_label_create(root);
+    lv_obj_align(project, LV_ALIGN_TOP_MID, 0, 84);
+
+    FirmwareI18n::setDynamicLabel(resource, DemoLocalization::resourceName(1, true));
+    FirmwareI18n::setDynamicLabel(project, DemoLocalization::projectName(0, true));
+    expect(std::string(lv_label_get_text(resource)) == "CNC Router" &&
+               std::string(lv_label_get_text(project)) == "Oak Furniture",
+           "English demo resource and project fixtures reach the display labels");
+    renderer.capture("demo-english-fixtures");
+
+    FirmwareI18n::setDynamicLabel(resource, DemoLocalization::resourceName(1, false));
+    FirmwareI18n::setDynamicLabel(project, DemoLocalization::projectName(0, false));
+    expect(std::string(lv_label_get_text(resource)) == "CNC Fraese" &&
+               std::string(lv_label_get_text(project)) == "Möbelbau Eiche",
+           "German demo resource and project fixtures reach the display labels");
+    renderer.capture("demo-german-fixtures");
+    lv_obj_delete(root);
+}
+
+void testDemoResourceListLocales(Renderer &renderer)
+{
+    ResourceListScreen list;
+    API::ResourceList resources{};
+    resources.count = 3;
+    std::strcpy(resources.authenticatedUsername, "Demo User");
+    for (int i = 0; i < 3; ++i) {
+        resources.items[i].id = i + 1;
+        resources.items[i].isHealthy = true;
+        resources.items[i].accessKnown = true;
+        resources.items[i].hasIntroduction = true;
+        std::strcpy(resources.items[i].name, DemoLocalization::resourceName(i + 1, false));
+    }
+    list.setResourceList(resources);
+    list.setAuthenticatedUser("Demo User");
+    list.setSessionTimeoutTime(Fixtures::nowMs + 30000);
+    list.init();
+    ScreenGuard screen(list.getScreen(), &list);
+
+    expect(requireObject(screen.root, &lv_label_class, "CNC Fraese") != nullptr,
+           "Production demo resource list displays its German CNC fixture");
+    expect(requireObject(screen.root, &lv_label_class, "3D Drucker") != nullptr,
+           "Production demo resource list displays its German printer fixture");
+    requireObject(screen.root, &lv_label_class, "Ressource links: Details · Aktion rechts");
+    renderer.capture("demo-resource-list-german");
+
+    for (int i = 0; i < 3; ++i)
+        std::strcpy(resources.items[i].name, DemoLocalization::resourceName(i + 1, true));
+    std::strcpy(resources.authenticatedUsername, "Demo User");
+    list.setResourceList(resources);
+    Fixtures::activeLanguage = "en";
+    list.loop();
+    expect(requireObject(screen.root, &lv_label_class, "CNC Router") != nullptr,
+           "Production demo resource list displays its English CNC fixture");
+    expect(requireObject(screen.root, &lv_label_class, "3D Printer") != nullptr,
+           "Production demo resource list displays its English printer fixture");
+    requireObject(screen.root, &lv_label_class, "Resource on the left: details · action on the right");
+    renderer.capture("demo-resource-list-english");
+}
+
+void testCatalogLocales(Renderer &renderer)
+{
+    constexpr size_t labelsPerFrame = 12;
+    auto *root = lv_obj_create(nullptr);
+    lv_obj_set_size(root, Renderer::width, Renderer::height);
+    ScreenGuard screen(root);
+    for (const char *locale : {"de", "en"}) {
+        for (size_t offset = 0; offset < std::size(FirmwareI18n::catalog); offset += labelsPerFrame) {
+            lv_obj_clean(root);
+            const size_t count = std::min(labelsPerFrame, std::size(FirmwareI18n::catalog) - offset);
+            for (size_t i = 0; i < count; ++i) {
+                const auto &entry = FirmwareI18n::catalog[offset + i];
+                auto *item = lv_label_create(root);
+                lv_obj_set_width(item, 220);
+                lv_obj_set_height(item, 34);
+                lv_obj_set_pos(item, (i % 2) * 230, (i / 2) * 72);
+                lv_label_set_long_mode(item, LV_LABEL_LONG_MODE_WRAP);
+                const char *rendered = std::strcmp(locale, "en") == 0 ? entry.en : entry.de;
+                const char *translated = FirmwareI18n::messageText(entry.id, "en");
+                expect(std::strcmp(translated, entry.en) == 0,
+                       std::string("English catalog entry translates: ") + entry.de);
+                if (std::strcmp(locale, "de") == 0) {
+                    const char *reverse = FirmwareI18n::messageText(entry.id, "de");
+                    const bool validReverse = std::any_of(std::begin(FirmwareI18n::catalog),
+                        std::end(FirmwareI18n::catalog), [&](const auto &candidate) {
+                            return std::strcmp(candidate.en, entry.en) == 0 && std::strcmp(candidate.de, reverse) == 0;
+                        });
+                    expect(validReverse, std::string("German catalog reverse mapping is valid: ") + entry.en);
+                }
+                lv_label_set_text(item, rendered);
+            }
+            renderer.capture(std::string("catalog-") + locale + "-" + std::to_string(offset / labelsPerFrame));
+        }
     }
 }
 

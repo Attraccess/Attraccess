@@ -70,6 +70,18 @@ void testFormDrafts()
     assert(submit);
     lv_obj_send_event(lv_obj_get_parent(submit), LV_EVENT_CLICKED, nullptr);
     assert(submitted == "Size™");
+    // A normal reader must preserve supplied options even when their IDs and
+    // wording happen to match the built-in demo form.
+    page.resourceId = 1;
+    page.formId = 10;
+    field.id = 101;
+    field.options.select.count = 1;
+    field.options.select.values[0] = "Holz";
+    screen.renderFormField(page, false, true, 1, 1);
+    FirmwareI18n::refreshTree(lv_layer_top(), "en");
+    assert(findLabel(lv_layer_top(), "Holz"));
+    assert(!findLabel(lv_layer_top(), "Wood"));
+    FirmwareI18n::refreshTree(lv_layer_top(), "de");
     screen.hideFormsModal();
     screen.setFormPageNextCallback({});
     Display::transitionToScreen(&Display::initScreen);

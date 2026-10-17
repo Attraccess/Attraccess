@@ -2,8 +2,12 @@
 // FEATURE: application-card-flow
 
 #include "application.hpp"
+#include "../state/state.hpp"
 
 void Application::processCardAuthenticationData() {
+  // A card that fails NFC verification must not inherit the language of the
+  // previous cardholder while its error screen is shown.
+  State::setUserLanguage(false);
   this->logger.infof("Trying to authenticate with keyNo: %u",
                      this->cardAuthenticationData.keyNo);
   if (this->cardAuthenticationData.keyLen != 16) {
@@ -15,7 +19,7 @@ void Application::processCardAuthenticationData() {
     this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
     this->finishCardAuthentication(false);
-    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige RFID-Karte auflegen.");
+    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
 #endif
@@ -35,7 +39,7 @@ void Application::processCardAuthenticationData() {
     this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
     this->finishCardAuthentication(false);
-    Display::showErrorPopup("Anmeldung fehlgeschlagen", "Bitte eine gültige RFID-Karte auflegen.");
+    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
 #endif
@@ -51,6 +55,7 @@ void Application::processCardAuthenticationData() {
   this->externalState = EXTERNAL_STATE_NONE;
 
   this->unlocked = true;
+  State::setUserLanguage(true, this->cardAuthenticationData.language);
 #ifdef HAS_LVGL_DISPLAY
   this->finishCardAuthentication(true);
 #endif

@@ -37,7 +37,7 @@ export class SettingsStoreService {
     }
 
     const existing = await this.settingRepository.findOneBy({ parent, key });
-    if (existing?.value) {
+    if (existing) {
       this.setCache(cacheKey, existing.value, true);
       return existing.value;
     }

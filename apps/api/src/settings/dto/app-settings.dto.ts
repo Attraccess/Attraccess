@@ -20,4 +20,7 @@ export class AppSettingsDto {
     example: true,
   })
   licenseKeyConfigured!: boolean;
+
+  @ApiProperty({ description: 'Default system language', enum: ['en', 'de'], example: 'de' })
+  defaultLanguage!: 'en' | 'de';
 }

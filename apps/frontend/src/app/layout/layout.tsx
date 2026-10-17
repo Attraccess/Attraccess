@@ -49,10 +49,20 @@ export function Layout({ children }: LayoutProps) {
   };
 
   // Desktop-only: collapse the sidebar to an icon rail for more content space
-  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true');
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const toggleCollapsed = useCallback(() => {
     setIsCollapsed((prev) => {
-      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(!prev));
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(!prev));
+      } catch {
+        // Keep the sidebar usable in memory when browser storage is unavailable.
+      }
       return !prev;
     });
   }, []);

@@ -80,13 +80,17 @@ export class EmailTemplateService {
     return this.findOne(type);
   }
 
+  async getExactTranslationsMap(type: EmailTemplateType, locale: string): Promise<Record<string, string>> {
+    const rows = await this.translationRepository.findBy({ templateType: type, locale });
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  }
+
   async getTranslationsMap(type: EmailTemplateType, locale: string): Promise<Record<string, string>> {
     const baseLocale = locale.split('-')[0];
     const hasRegion = baseLocale !== locale;
 
     if (!hasRegion) {
-      const rows = await this.translationRepository.findBy({ templateType: type, locale });
-      return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      return this.getExactTranslationsMap(type, locale);
     }
 
     // BCP-47 merge: base translations first, then regional overrides per key.
