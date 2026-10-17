@@ -45,6 +45,17 @@ it('exports deterministic, reference-complete OpenAPI/JSON Schema with runtime-e
   addFormats(ajv);
   for (const [name, schema] of Object.entries(doc.$defs)) {
     const validate = ajv.compile(schema as object);
+    if (name === 'UInt64' || name === 'NodeIdentity') {
+      const validateApi = ajv.compile(api.components.schemas[name]);
+      for (const ending of ['', '\n', '\r', '\r\n', '\u2028', '\u2029']) {
+        const id = 'ffffffffffffffff' + ending;
+        const value = name === 'UInt64' ? id : { fabricId: id, nodeId: id };
+        const valid = ending === '';
+        expect(schemas[name].safeParse(value).success).toBe(valid);
+        expect(validate(value)).toBe(valid);
+        expect(validateApi(value)).toBe(valid);
+      }
+    }
     if (name === 'VersionResponse') {
       for (const [release, valid] of [
         ['999.0.0', true],

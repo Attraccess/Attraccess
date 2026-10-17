@@ -81,6 +81,71 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
       verifyError(response.body);
     },
   );
+  it.each([false, true])('returns 404 for unknown HTTP routes and wrong methods (metadata: %s)', async (metadata) => {
+    const { url } = await start();
+    for (const [path, method] of [
+      ['/v1/missing', 'GET'],
+      ['/v1', 'GET'],
+      ['/v1/capabilities', 'POST'],
+      ['/version', 'POST'],
+    ]) {
+      const response = await fetch(url + path, { method, headers: metadata ? headers : {} });
+      expect(response.status).toBe(404);
+      expect(ErrorEnvelope.parse(await response.json()).error.code).toBe('NOT_FOUND');
+    }
+  });
+  it.each([false, true])(
+    'returns structured 404 for unknown upgrade routes and wrong methods (metadata: %s)',
+    async (metadata) => {
+      const { url } = await start();
+      for (const [path, method] of [
+        ['/v1/missing', 'GET'],
+        ['/v1/events', 'POST'],
+      ]) {
+        const result = await new Promise<{ status: number; body: unknown }>((resolve, reject) => {
+          const req = request(
+            url + path,
+            {
+              method,
+              headers: {
+                ...(metadata ? headers : {}),
+                connection: 'Upgrade',
+                upgrade: 'websocket',
+                'sec-websocket-version': '13',
+                'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
+              },
+            },
+            (res) => {
+              let body = '';
+              res.on('data', (chunk) => (body += chunk));
+              res.once('end', () => {
+                try {
+                  resolve({ status: res.statusCode ?? 0, body: JSON.parse(body) });
+                } catch (error) {
+                  reject(error);
+                }
+              });
+            },
+          );
+          req.on('error', reject);
+          req.end();
+        });
+        expect(result.status).toBe(404);
+        expect(ErrorEnvelope.parse(result.body).error.code).toBe('NOT_FOUND');
+      }
+    },
+  );
+  it('preserves Origin and unsupported-version rejection before route lookup', async () => {
+    const { url } = await start();
+    for (const [path, requestHeaders, code, status] of [
+      ['/v1/missing', { origin: 'https://example.org' }, 'FORBIDDEN_ORIGIN', 403],
+      ['/v2/missing', {}, 'UNSUPPORTED_WIRE_VERSION', 426],
+    ] as const) {
+      const response = await fetch(url + path, { headers: requestHeaders });
+      expect(response.status).toBe(status);
+      expect(ErrorEnvelope.parse(await response.json()).error.code).toBe(code);
+    }
+  });
   it('contains a rejected upgrade socket reset and continues serving HTTP and WebSocket clients', async () => {
     const { app, port, url } = await start();
     const resetHandled = new Promise<void>((resolve) => {
@@ -324,16 +389,58 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     const requestId = '11111111-1111-4111-8111-111111111111';
     client.ws.send(JSON.stringify({ type: 'resume', requestId, ...fields }));
     await once(client.ws, 'close');
-    expect(ErrorEnvelope.parse(client.messages[0]).error.requestId).toBe(requestId);
+    expect(ErrorEnvelope.parse(client.messages[0]).error).toMatchObject({
+      requestId,
+      code: fields.schemaVersion === 2 ? 'UNSUPPORTED_WIRE_VERSION' : 'RECONCILIATION_REQUIRED',
+    });
   });
   it.each([undefined, null, 'invalid-id', { secret: 'must not be reflected' }])(
     'retains connection correlation when a rejected message has an invalid request ID: %j',
     async (requestId) => {
       const { url } = await start();
       const client = await connect(url);
-      client.ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId, cursor: 'bad' }));
+      client.ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId, cursor: null }));
       await once(client.ws, 'close');
-      expect(ErrorEnvelope.parse(client.messages[0]).error.requestId).toBe(headers['x-request-id']);
+      expect(ErrorEnvelope.parse(client.messages[0]).error).toMatchObject({
+        requestId: headers['x-request-id'],
+        code: 'VALIDATION_ERROR',
+      });
+      expect(JSON.stringify(client.messages)).not.toContain('must not be reflected');
+    },
+  );
+  it('uses connection correlation for an invalid request ID after a valid resume', async () => {
+    const { url } = await start();
+    const client = await connect(url);
+    client.ws.send(
+      JSON.stringify({
+        schemaVersion: 1,
+        type: 'resume',
+        requestId: '11111111-1111-4111-8111-111111111111',
+        cursor: null,
+      }),
+    );
+    await waitFor(() => client.messages.length === 1);
+    client.ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: null, cursor: null }));
+    await once(client.ws, 'close');
+    expect(ErrorEnvelope.parse(client.messages[1]).error).toMatchObject({
+      requestId: headers['x-request-id'],
+      code: 'VALIDATION_ERROR',
+    });
+  });
+  it.each([{ type: 'unknown' }, { extra: 'must not be reflected' }])(
+    'rejects non-cursor schema errors as validation errors: %j',
+    async (fields) => {
+      const { url } = await start();
+      const client = await connect(url);
+      client.ws.send(
+        JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor: null, ...fields }),
+      );
+      await once(client.ws, 'close');
+      expect(ErrorEnvelope.parse(client.messages[0]).error).toMatchObject({
+        requestId: fixtureId,
+        code: 'VALIDATION_ERROR',
+      });
+      expect(JSON.stringify(client.messages)).not.toContain('must not be reflected');
     },
   );
   it('validates message versions after initial subscription and closes idle streams', async () => {
@@ -515,6 +622,40 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
     expect(output).toContain('503');
     expect(output).toContain('"ready":false');
     expect(output).toContain('"fabricInitialized":false');
+  });
+  it.each([
+    ['GET /v1/missing', false],
+    ['POST /v1/capabilities', false],
+    ['GET /v1/missing', true],
+    ['POST /v1/events', true],
+  ] as const)('keeps route errors at 404 during draining: %s (upgrade: %s)', async (target, upgrade) => {
+    for (const metadata of [false, true]) {
+      const { app, port } = await start({ shutdownMs: 1000 });
+      const socket = createConnection({ host: '127.0.0.1', port });
+      await once(socket, 'connect');
+      let output = '';
+      socket.on('data', (data) => (output += data.toString()));
+      const closed = once(socket, 'close');
+      const received = once(app.server, 'request');
+      const metadataLines = Object.entries(headers)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\r\n');
+      socket.write(
+        `POST /v1/commands HTTP/1.1\r\nHost: localhost\r\n${metadataLines}\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{`,
+      );
+      await received;
+      const stopping = app.shutdown();
+      const upgradeLines = upgrade
+        ? 'Connection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+        : 'Connection: close\r\n';
+      socket.write(
+        `}${target} HTTP/1.1\r\nHost: localhost\r\n${metadata ? metadataLines + '\r\n' : ''}${upgradeLines}\r\n`,
+      );
+      await closed;
+      await stopping;
+      expect(output).toContain('"code":"NOT_FOUND"');
+      expect(output).toMatch(/HTTP\/1\.1 404 /);
+    }
   });
   it('contains initialization failures, rejects remote bind, and bounds disposal', async () => {
     expect(() => Config.parse({ host: '0.0.0.0' })).toThrow();

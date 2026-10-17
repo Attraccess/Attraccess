@@ -114,17 +114,19 @@ export function createApplication(options: ApplicationOptions) {
         const path = new URL(req.url ?? '/', 'http://localhost').pathname;
         const operational = /^\/v\d+(?:\/|$)/.test(path);
         if (operational) {
-          if (!path.startsWith('/v1/'))
+          if (!/^\/v1(?:\/|$)/.test(path))
             throw new ProtocolError(
               'UNSUPPORTED_WIRE_VERSION',
               'Only /v1 is supported. Upgrade or downgrade to the supported release combination.',
               { supportedWireVersions: [1] },
             );
-          checkCompatibility(req.headers, version.sidecarRelease);
-          if (!ready) throw new ProtocolError('UNAVAILABLE', 'Sidecar is not ready or is shutting down.');
         }
         const route = routes.find((route) => route.path === path && route.method === req.method);
         if (!route) throw new ProtocolError('NOT_FOUND', 'Unknown route or method.');
+        if (operational) {
+          checkCompatibility(req.headers, version.sidecarRelease);
+          if (!ready) throw new ProtocolError('UNAVAILABLE', 'Sidecar is not ready or is shutting down.');
+        }
         if ('request' in route) {
           const body = await readBody(req);
           if (res.writableEnded) return;
@@ -200,13 +202,16 @@ export function createApplication(options: ApplicationOptions) {
     socket.on('error', () => socket.destroy());
     const requestId = correlationId(req.headers);
     try {
+      if (req.headers.origin !== undefined)
+        throw new ProtocolError('FORBIDDEN_ORIGIN', 'Browser Origin requests are not allowed. Use the host plugin.');
       const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-      if (/^\/v\d+/.test(path) && !path.startsWith('/v1/'))
+      if (/^\/v\d+(?:\/|$)/.test(path) && !/^\/v1(?:\/|$)/.test(path))
         throw new ProtocolError('UNSUPPORTED_WIRE_VERSION', 'Only /v1/events is supported.', {
           supportedWireVersions: [1],
         });
+      if (path !== '/v1/events' || req.method !== 'GET')
+        throw new ProtocolError('NOT_FOUND', 'WebSocket route is GET /v1/events.');
       checkCompatibility(req.headers, version.sidecarRelease);
-      if (path !== '/v1/events') throw new ProtocolError('NOT_FOUND', 'WebSocket route is /v1/events.');
       if (!ready) throw new ProtocolError('UNAVAILABLE', 'Sidecar is not ready or is shutting down.');
       wss.handleUpgrade(req, socket, head, (ws) => attachClient(ws, requestId, stream, config));
     } catch (error) {

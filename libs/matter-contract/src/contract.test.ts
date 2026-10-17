@@ -40,7 +40,14 @@ describe('one authoritative Matter contract', () => {
   });
   it('rejects unsafe identifiers, numbers, timestamps, versions, deadlines and missing correlation', () => {
     for (const [name, values] of Object.entries({
-      UInt64: [1, Number('18446744073709551615'), '0x123', 'FFFFFFFFFFFFFFFF', '123'],
+      UInt64: [
+        1,
+        Number('18446744073709551615'),
+        '0x123',
+        'FFFFFFFFFFFFFFFF',
+        '123',
+        ...['\n', '\r', '\r\n', '\u2028', '\u2029'].map((end) => 'ffffffffffffffff' + end),
+      ],
       Timestamp: ['2026-02-30T00:00:00.000Z', 'today', '2026-01-01T00:00:00+01:00'],
       Id: ['request1'],
       Sequence: [Infinity, NaN, -1, Number.MAX_SAFE_INTEGER + 1],

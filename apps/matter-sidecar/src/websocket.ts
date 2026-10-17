@@ -5,6 +5,7 @@ import { ProtocolError } from './errors.js';
 import type { SidecarConfig } from './config.js';
 
 export function attachClient(ws: WebSocket, requestId: string, stream: EventStream, config: SidecarConfig): void {
+  const connectionRequestId = requestId;
   let unsubscribe: (() => void) | undefined;
   let subscribed = false;
   let closing = false;
@@ -48,6 +49,7 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
   );
   initialDeadline.unref();
   ws.on('message', (bytes, isBinary) => {
+    requestId = connectionRequestId;
     try {
       if (isBinary) throw new ProtocolError('VALIDATION_ERROR', 'Only JSON text WebSocket messages are supported.');
       let value: unknown;
@@ -68,7 +70,12 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
           throw new ProtocolError('UNSUPPORTED_WIRE_VERSION', 'Only schemaVersion 1 is supported.', {
             supportedWireVersions: [1],
           });
-        throw stream.reconcile('malformed');
+        const messageId =
+          typeof value === 'object' && value !== null && 'requestId' in value ? value.requestId : undefined;
+        if (!Id.safeParse(messageId).success)
+          throw new ProtocolError('VALIDATION_ERROR', 'A UUID requestId is required.');
+        if (parsed.error.issues.every((issue) => issue.path[0] === 'cursor')) throw stream.reconcile('malformed');
+        throw new ProtocolError('VALIDATION_ERROR', 'Message does not match the stream request schema.');
       }
       if (subscribed)
         throw new ProtocolError(
