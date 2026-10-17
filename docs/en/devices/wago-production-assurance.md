@@ -187,6 +187,32 @@ cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
 substitutes for sustained evidence.
 
+## Structural configuration rejection validation on 2026-10-17
+
+Commit `614eebb6d57ee4785bdfe652e5f72d3faeb049f9` restores a bounded reported
+error for structurally excessive configurations. Five regression cases cover
+strings, keys, collections, nesting and total nodes. They verify fixed report
+fields, exactly one structure rejection, unchanged accepted state and active
+output values, and no persistence or device writes. The earlier byte-admission
+drop remains silent.
+
+Both assurance profiles passed all 20 tests with source fingerprint
+`190bafed10b110d3d9f50bdde0bcce1d3e413550d8a30c13f69867d3dabf4c13`.
+The short profile tested the uncommitted implementation; the sustained profile
+tested the clean commit above. All 19,800 offered commands were acknowledged
+over 3,600.007 seconds, including the repeated 8 commands/second stage. There
+were no generation failures, command failures, timeouts, overload discards or
+missing acknowledgements. Runtime, plugin and broker recovery passed. Both
+profiles removed their owned broker and temporary state.
+
+Reports are `review-fix-round6-short` and `review-fix-round6-sustained` in
+Factory run `9ec4136d-070f-4f85-ab23-d75f9da50a64`; check receipts are in
+`review-fix-round6/fix-validation.json`. Complete backend, frontend and runtime
+tests, type checks, lint, builds, simulator, fleet and commissioning checks also
+passed. These software fixtures do not establish physical qualification, real
+SSH recovery or independent penetration and safety review. Those remain
+outstanding, along with pending ticket synchronization.
+
 ## Transport timeout reporting validation on 2026-10-16
 
 The sustained profile passed all 20 assurance tests on clean commit
