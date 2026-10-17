@@ -1,3 +1,5 @@
+import { MaintenanceSchedulePersistence } from './persistence/port';
+import { TypeormMaintenanceSchedulePersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -73,6 +75,7 @@ describe('MaintenanceScheduleService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceScheduleService,
+        { provide: MaintenanceSchedulePersistence, useClass: TypeormMaintenanceSchedulePersistence },
         { provide: MaintenanceScheduleEvaluatorService, useValue: evaluator },
         { provide: getRepositoryToken(ResourceMaintenanceSchedule), useValue: scheduleRepository },
         { provide: getRepositoryToken(ResourceMaintenance), useValue: maintenanceRepository },
@@ -100,6 +103,7 @@ describe('MaintenanceScheduleService', () => {
     const scheduleToDelete = { ...schedule } as ResourceMaintenanceSchedule;
     const transactionalScheduleRepository = {
       remove: jest.fn().mockImplementation((entity: ResourceMaintenanceSchedule) => {
+        expect(entity.id).toBe(10);
         delete entity.id;
       }),
     };
@@ -129,7 +133,8 @@ describe('MaintenanceScheduleService', () => {
     expect(usageHoursConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
     expect(usageCountConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
     expect(timeIntervalConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
-    expect(transactionalScheduleRepository.remove).toHaveBeenCalledWith(scheduleToDelete);
+    expect(transactionalScheduleRepository.remove).toHaveBeenCalledTimes(1);
+    expect(scheduleToDelete.id).toBe(10);
     expect(audit.recordResource).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'maintenance_schedule.deleted',

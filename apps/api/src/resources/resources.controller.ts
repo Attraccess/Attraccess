@@ -1,3 +1,5 @@
+import { Resource } from '../transport/models/resource.dto';
+import { mapResponse } from '../transport/response-mapper';
 import {
   Controller,
   Get,
@@ -18,8 +20,8 @@ import { ResourcesService } from './resources.service';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { ListResourcesDto } from './dtos/listResources.dto';
-import { Resource } from '@attraccess/database-entities';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { PaginatedResponse } from '../types/response';
 import { FileUpload } from '../common/types/file-upload.types';
 import { PaginatedResourceResponseDto } from './dtos/paginatedResourceResponse.dto';
@@ -34,12 +36,12 @@ export class ResourcesController {
   ) {}
 
   private transformResource(resource: Resource): Resource {
-    return {
+    return mapResponse(Resource, {
       ...resource,
       imageFilename: resource.imageFilename
         ? this.resourceImageService.getPublicPath(resource.id, resource.imageFilename)
         : null,
-    };
+    });
   }
 
   @Post()
@@ -52,7 +54,11 @@ export class ResourcesController {
   @Auth('resources.create')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('image'))
-  async createOne(@Body() createDto: CreateResourceDto, @Req() req: AuthenticatedRequest, @UploadedFile() image?: FileUpload): Promise<Resource> {
+  async createOne(
+    @Body() createDto: CreateResourceDto,
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() image?: FileUpload,
+  ): Promise<Resource> {
     const resource = await this.resourcesService.createResource(createDto, image, req.user);
     return this.transformResource(resource);
   }

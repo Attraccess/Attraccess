@@ -1,5 +1,2 @@
-export enum AuthenticationType {
-  LOCAL_PASSWORD = 'local_password',
-  SSO = 'sso',
-  TOTP = 'totp',
-}
+// Historical SQLite/schema import path; shared values have one neutral owner.
+export { AuthenticationType } from '@attraccess/application-models';

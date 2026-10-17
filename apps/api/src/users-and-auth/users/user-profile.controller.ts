@@ -1,8 +1,10 @@
+import { User } from '../../transport/models/user.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { resolveDateTimePreferences } from '@attraccess/shared';
 import { Body, Controller, Get, Patch, Post, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { User } from '@attraccess/database-entities';
-import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
+
+import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk/v2';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
 import { UsersService } from './users.service';
@@ -86,7 +88,7 @@ export class UserProfileController {
   @ApiOperation({ summary: 'Change current user username (limit once per day)', operationId: 'changeMyUsername' })
   @ApiResponse({ status: 200, description: 'Username changed.', type: User })
   async changeMyUsername(@Req() request: AuthenticatedRequest, @Body() body: ChangeUsernameDto): Promise<User> {
-    return await this.usersService.changeUsername(request.user.id, body.username, request.user);
+    return mapResponse(User, await this.usersService.changeUsername(request.user.id, body.username, request.user));
   }
 
   @SessionAuth()
@@ -95,7 +97,7 @@ export class UserProfileController {
   @ApiResponse({ status: 200, description: 'Email changed.', type: User })
   async changeMyEmail(@Req() request: AuthenticatedRequest, @Body() body: ChangeEmailDto): Promise<User> {
     try {
-      return await this.usersService.changeEmail(request.user.id, body.email, request.user);
+      return mapResponse(User, await this.usersService.changeEmail(request.user.id, body.email, request.user));
     } catch (error) {
       throw mapEmailSendError(error);
     }
@@ -124,6 +126,6 @@ export class UserProfileController {
   })
   @ApiResponse({ status: 200, description: 'Locale updated.', type: User })
   async updateMyLocale(@Req() request: AuthenticatedRequest, @Body() body: UpdateLocaleDto): Promise<User> {
-    return this.usersService.updateLocale(request.user.id, body.locale);
+    return mapResponse(User, await this.usersService.updateLocale(request.user.id, body.locale));
   }
 }

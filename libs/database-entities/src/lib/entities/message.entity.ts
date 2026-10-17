@@ -2,11 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index, C
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { Conversation } from './conversation.entity';
-
-export enum MessageReferenceType {
-  RESOURCE = 'RESOURCE',
-  ACTIVITY = 'ACTIVITY',
-}
+import { MessageReferenceType } from '@attraccess/application-models';
 
 @Entity()
 @Index(['conversationId', 'createdAt'])
@@ -78,3 +74,5 @@ export class Message {
   @ApiProperty({ description: 'The user who sent this message', type: () => User })
   sender!: User;
 }
+
+export { MessageReferenceType } from '@attraccess/application-models';

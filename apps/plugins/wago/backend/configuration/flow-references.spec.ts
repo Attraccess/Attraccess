@@ -1,3 +1,4 @@
+import { createWagoRegistryPersistence } from '../controllers/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { configurationFlowImpacts } from './flow-references';
 import type { WagoConfigurationSnapshot } from './model';
@@ -50,7 +51,7 @@ describe('configuration flow impacts', () => {
       ...previous,
       physicalPoints: previous.physicalPoints.map((point) => (point.id === 'in' ? { ...point, channel: 5 } : point)),
     };
-    const impacts = await configurationFlowImpacts(context, 1, previous, current);
+    const impacts = await configurationFlowImpacts(createWagoRegistryPersistence(context)[1], 1, previous, current);
     expect(impacts).toEqual([
       expect.objectContaining({ channelId: 'contact', references: [] }),
       expect.objectContaining({
@@ -63,7 +64,9 @@ describe('configuration flow impacts', () => {
 
   it('warns about revision-pinned commands even when the snapshot is unchanged', async () => {
     query.getMany.mockClear();
-    await expect(configurationFlowImpacts(context, 1, previous, previous)).resolves.toEqual([
+    await expect(
+      configurationFlowImpacts(createWagoRegistryPersistence(context)[1], 1, previous, previous),
+    ).resolves.toEqual([
       expect.objectContaining({
         channelId: 'lock',
         message: expect.stringContaining('Reopen and save'),

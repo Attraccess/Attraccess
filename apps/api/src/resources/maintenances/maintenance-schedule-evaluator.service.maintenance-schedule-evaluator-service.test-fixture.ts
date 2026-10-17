@@ -1,3 +1,6 @@
+import { sqliteRepositoryFixture } from '../../database/conformance/sqlite-fixture';
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import { MaintenanceEvaluationPersistence } from './persistence/port';
 import {
   Resource,
   ResourceMaintenance,
@@ -16,6 +19,8 @@ import { ResourceMaintenanceService } from './maintenance.service';
 
 // emitUsageEvent() fires ResourceSessionStartedEvent on session end too, with endTime set.
 const usageEndedEvent = (usage: Record<string, unknown>) => new ResourceSessionStartedEvent(usage as never);
+
+const PERSISTENCE_FIXTURE = Symbol('maintenance evaluator fixture');
 
 const createQueryBuilderMock = () => ({
   where: jest.fn().mockReturnThis(),
@@ -78,6 +83,37 @@ export function registerMaintenanceScheduleEvaluatorServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceScheduleEvaluatorService,
+        {
+          provide: PERSISTENCE_FIXTURE,
+          useFactory: (schedules: object, maintenance: object, resources: object, usage: object) =>
+            sqliteRepositoryFixture(
+              (entity) =>
+                entity === ResourceMaintenanceSchedule
+                  ? schedules
+                  : entity === ResourceMaintenance
+                    ? maintenance
+                    : entity === Resource
+                      ? resources
+                      : usage,
+              (work) => scheduleRepoMock.manager.transaction(work),
+            ),
+          inject: [
+            getRepositoryToken(ResourceMaintenanceSchedule),
+            getRepositoryToken(ResourceMaintenance),
+            getRepositoryToken(Resource),
+            getRepositoryToken(ResourceUsage),
+          ],
+        },
+        {
+          provide: MaintenanceEvaluationPersistence,
+          useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.maintenanceEvaluation,
+          inject: [PERSISTENCE_FIXTURE],
+        },
+        {
+          provide: DatabaseTransactions,
+          useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.transactions,
+          inject: [PERSISTENCE_FIXTURE],
+        },
         { provide: ResourceOperatingAttributionService, useValue: operatingAttribution },
         {
           provide: getRepositoryToken(ResourceMaintenanceSchedule),

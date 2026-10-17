@@ -1,4 +1,4 @@
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { LiveSubscription } from '@attraccess/shared';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { defer } from 'rxjs';

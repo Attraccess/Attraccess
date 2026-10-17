@@ -1,3 +1,6 @@
+import { sqliteRepositoryFixture } from '../../../../database/conformance/sqlite-fixture';
+import { DatabaseTransactions } from '../../../../database/transaction-scope';
+import { UsagePersistence } from '../../persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceUsageService } from '../resource-usage.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -28,10 +31,42 @@ import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { VALKEY_CLIENT } from '../../../../valkey/valkey.module';
 import { AuditService } from '../../../../audit/audit.service';
 import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
+const PERSISTENCE_FIXTURE = Symbol('usage persistence fixture');
+
 export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       ResourceUsageService,
+      {
+        provide: PERSISTENCE_FIXTURE,
+        useFactory: (
+          resources: object,
+          usages: { manager: { transaction: (work: (manager: never) => Promise<unknown>) => Promise<unknown> } },
+          users: object,
+        ) =>
+          sqliteRepositoryFixture(
+            (entity) =>
+              entity === Resource
+                ? resources
+                : entity === ResourceUsage
+                  ? usages
+                  : entity === ResourceUsageLifecycleAttempt
+                    ? { find: async () => [...scope.lifecycleAttempts.values()] }
+                    : users,
+            (work) => usages.manager.transaction(work),
+          ),
+        inject: [getRepositoryToken(Resource), getRepositoryToken(ResourceUsage), getRepositoryToken(User)],
+      },
+      {
+        provide: UsagePersistence,
+        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.usage,
+        inject: [PERSISTENCE_FIXTURE],
+      },
+      {
+        provide: DatabaseTransactions,
+        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.transactions,
+        inject: [PERSISTENCE_FIXTURE],
+      },
       {
         provide: getRepositoryToken(Resource),
         useFactory: scope.mockRepository,
@@ -171,13 +206,13 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
     // Ensure code paths that use getRepository(Entity).findOne work in tests
     getRepository: jest.fn((entity) => {
       if (entity === Resource) {
-        return { findOne: scope.resourceRepository.findOne } as unknown as Repository<Resource>;
+        return scope.resourceRepository;
       }
       if (entity === ResourceUsage) {
-        return { findOne: scope.resourceUsageRepository.findOne } as unknown as Repository<ResourceUsage>;
+        return scope.resourceUsageRepository;
       }
       if (entity === User) {
-        return { findOne: scope.userRepository.findOne } as unknown as Repository<User>;
+        return scope.userRepository;
       }
       return { findOne: jest.fn() } as unknown as Repository<unknown>;
     }),
@@ -193,7 +228,7 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
         );
       }
       if (entity === ResourceUsage) {
-        if (opts.where.lifecyclePending && !opts.where.userId) return null; // Reservation gate.
+        if (opts.where.lifecyclePending && !opts.where.userId && !opts.where.id) return null; // Reservation gate.
         return scope.resourceUsageRepository.findOne(opts as never);
       }
       if (entity === Resource) {

@@ -1,3 +1,5 @@
+import { AttractapResourceReader } from '../persistence/port';
+import { TypeormAttractapResourceReader } from '../persistence/typeorm-adapter';
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -94,6 +96,7 @@ export function registerAttractapGatewayFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AttractapGateway,
+        { provide: AttractapResourceReader, useClass: TypeormAttractapResourceReader },
         WebsocketService,
         { provide: AttractapService, useValue: attractapService },
         { provide: UsersService, useValue: {} },

@@ -1,3 +1,5 @@
+import { sqliteRepositoryFixture } from '../../../database/conformance/sqlite-fixture';
+import { TypeormFlowEventPersistence } from '../persistence/typeorm-adapter';
 import {
   BillingTransactionItem,
   Resource,
@@ -263,17 +265,25 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         findOneBy: jest.fn(),
         save: jest.fn(async (_e: unknown, data: unknown) => data),
         update: jest.fn(),
+        transaction: jest.fn(async (work) => work(billingItemRepoMock.manager)),
       },
     } as unknown as Repository<BillingTransactionItem>;
 
+    const persistenceFixture = sqliteRepositoryFixture(
+      (entity) =>
+        (entity === ResourceFlowNode
+          ? flowNodeRepository
+          : entity === ResourceFlowEdge
+            ? flowEdgeRepository
+            : resourceRepository) as object,
+      (work) => Reflect.get(billingItemRepoMock.manager, 'transaction')(work),
+    );
     service = new ResourceFlowsExecutorService(
-      flowNodeRepository as Repository<ResourceFlowNode>,
-      flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-      resourceRepository as Repository<Resource>,
+      persistenceFixture.flows,
+      persistenceFixture.transactions,
       flowLogs,
       mqttClientService,
       resourceUsageService,
-      billingItemRepoMock,
       eventEmitter,
       resourceHealthService,
       variablesService,
@@ -288,6 +298,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       } as unknown as CompanionGatewayService,
       { transition: jest.fn() } as never,
       { report: jest.fn() } as never,
+      new TypeormFlowEventPersistence(flowNodeRepository as never),
     );
   });
 

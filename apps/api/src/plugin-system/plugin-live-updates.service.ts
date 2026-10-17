@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import type { PluginLiveTopic, PluginLiveSubscription } from '@attraccess/plugins-backend-sdk';
+import type { PluginLiveTopic, PluginLiveSubscription } from '@attraccess/plugins-backend-sdk/v2';
 import { liveSubscriptionKey } from '@attraccess/shared';
 import { defer, Subject, takeUntil } from 'rxjs';
 import { LiveTopicsService } from '../live-updates/live-topics.service';

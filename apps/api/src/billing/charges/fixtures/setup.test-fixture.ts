@@ -1,3 +1,6 @@
+import { sqliteRepositoryFixture } from '../../../database/conformance/sqlite-fixture';
+import { DatabaseTransactions } from '../../../database/transaction-scope';
+import { BillingPersistence } from '../../persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -17,10 +20,52 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuditService } from '../../../audit/audit.service';
 import { BillingServiceTestScope } from '../billing.service.spec';
+const PERSISTENCE_FIXTURE = Symbol('billing persistence fixture');
+
 export async function resetTestFixture(scope: BillingServiceTestScope) {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       BillingService,
+      {
+        provide: PERSISTENCE_FIXTURE,
+        useFactory: (
+          transactions: object,
+          users: object,
+          configuration: object,
+          settings: object,
+          items: { manager: { transaction: (work: (manager: never) => Promise<unknown>) => Promise<unknown> } },
+        ) =>
+          sqliteRepositoryFixture(
+            (entity) =>
+              entity === BillingTransaction
+                ? transactions
+                : entity === User
+                  ? users
+                  : entity === ResourceBillingConfiguration
+                    ? configuration
+                    : entity === Setting
+                      ? settings
+                      : items,
+            (work) => items.manager.transaction(work),
+          ),
+        inject: [
+          getRepositoryToken(BillingTransaction),
+          getRepositoryToken(User),
+          getRepositoryToken(ResourceBillingConfiguration),
+          getRepositoryToken(Setting),
+          getRepositoryToken(BillingTransactionItem),
+        ],
+      },
+      {
+        provide: BillingPersistence,
+        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.billing,
+        inject: [PERSISTENCE_FIXTURE],
+      },
+      {
+        provide: DatabaseTransactions,
+        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.transactions,
+        inject: [PERSISTENCE_FIXTURE],
+      },
       { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
       { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       // Provide BillingTransactionItem repo with a manager.transaction for internal use
@@ -108,4 +153,8 @@ export async function resetTestFixture(scope: BillingServiceTestScope) {
     Repository<BillingTransactionItem>
   >;
   scope.auditService = module.get(AuditService);
+  Reflect.get(scope.billingTransactionItemRepository.manager, 'transaction').mockImplementation(
+    (work: (manager: unknown) => Promise<unknown>) =>
+      work(module.get<ReturnType<typeof sqliteRepositoryFixture>>(PERSISTENCE_FIXTURE).manager),
+  );
 }

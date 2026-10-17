@@ -1,3 +1,5 @@
+import { ProjectUsagePersistence } from './persistence/port';
+import { TypeormProjectUsagePersistence } from './persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
 import { ProjectUsageService } from './project-usage.service';
 import { Repository } from 'typeorm';
@@ -78,6 +80,7 @@ describe('ProjectUsageService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ProjectUsageService,
+        { provide: ProjectUsagePersistence, useClass: TypeormProjectUsagePersistence },
         {
           provide: getRepositoryToken(ResourceUsage),
           useValue: {

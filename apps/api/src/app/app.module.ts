@@ -3,8 +3,7 @@ import { AppController } from './app.controller';
 import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { dataSourceConfig } from '../database/datasource';
+import { DatabaseBackendModule } from '../database/backend.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import storageConfigObject, { StorageConfigType } from '../config/storage.config';
@@ -51,7 +50,7 @@ const logger = new Logger('AppModule');
     ScheduleModule.forRoot(),
     UsersAndAuthModule,
     SettingsModule,
-    TypeOrmModule.forRoot(dataSourceConfig),
+    DatabaseBackendModule,
     AuditModule,
     ResourcesModule,
     ServeStaticModule.forRootAsync({

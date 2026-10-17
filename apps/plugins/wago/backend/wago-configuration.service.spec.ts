@@ -1,3 +1,5 @@
+import { bindWagoPersistenceFixture } from './wago-service.test-fixture';
+import { createWagoRegistryPersistence } from './controllers/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../modbus/model';
 import { type WagoConfigurationSnapshot, canonicalSnapshot, configurationHash } from './configuration/model';
@@ -53,7 +55,7 @@ describe('configuration editor service boundaries', () => {
       getMany: jest.fn().mockResolvedValue([]),
     };
     const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
-    const service = new WagoService({
+    const service = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))({
       mqtt,
       audit,
       logger: { warn: jest.fn() },
@@ -73,6 +75,9 @@ describe('configuration editor service boundaries', () => {
       drafts,
       revisions: revisionRepository,
     });
+    bindWagoPersistenceFixture(service, {
+      dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
+    } as unknown as PluginContext);
     jest
       .spyOn(service, 'getSettings')
       .mockResolvedValue({ id: 1, defaultMqttServerId: 1, operationalPrefix: 'test/wago' });

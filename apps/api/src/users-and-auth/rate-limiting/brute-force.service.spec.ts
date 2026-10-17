@@ -1,3 +1,5 @@
+import { RateLimitPersistence } from './persistence/port';
+import { TypeormRateLimitPersistence } from './persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
@@ -24,6 +26,7 @@ describe('BruteForceProtectionService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         BruteForceProtectionService,
+        { provide: RateLimitPersistence, useClass: TypeormRateLimitPersistence },
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: SettingsService, useValue: settings },
       ],
@@ -66,7 +69,9 @@ describe('BruteForceProtectionService', () => {
       for (let i = 0; i < 3; i += 1) {
         await service.recordFailure('login', '10.0.0.1', null, 'attacker');
       }
-      await expect(service.assertIpAllowed('login', '10.0.0.1', 'attacker')).rejects.toBeInstanceOf(TooManyAuthAttemptsException);
+      await expect(service.assertIpAllowed('login', '10.0.0.1', 'attacker')).rejects.toBeInstanceOf(
+        TooManyAuthAttemptsException,
+      );
       await expect(service.assertIpAllowed('login', '10.0.0.1', 'admin')).resolves.toBeUndefined();
       await expect(service.assertIpAllowed('login', '10.0.0.1', null)).resolves.toBeUndefined();
     });
@@ -76,7 +81,9 @@ describe('BruteForceProtectionService', () => {
       for (let i = 0; i < 30; i += 1) {
         await service.recordFailure('login', '10.0.0.2', null, `user${i}`);
       }
-      await expect(service.assertIpAllowed('login', '10.0.0.2', 'victim')).rejects.toBeInstanceOf(TooManyAuthAttemptsException);
+      await expect(service.assertIpAllowed('login', '10.0.0.2', 'victim')).rejects.toBeInstanceOf(
+        TooManyAuthAttemptsException,
+      );
     });
 
     it('per-username isolation preserved below coarse threshold', async () => {
@@ -86,7 +93,9 @@ describe('BruteForceProtectionService', () => {
         await service.recordFailure('login', '10.0.0.3', null, `userB`);
         await service.recordFailure('login', '10.0.0.3', null, `userC`);
       }
-      await expect(service.assertIpAllowed('login', '10.0.0.3', 'userA')).rejects.toBeInstanceOf(TooManyAuthAttemptsException);
+      await expect(service.assertIpAllowed('login', '10.0.0.3', 'userA')).rejects.toBeInstanceOf(
+        TooManyAuthAttemptsException,
+      );
       await expect(service.assertIpAllowed('login', '10.0.0.3', 'innocent')).resolves.toBeUndefined();
     });
   });
@@ -94,9 +103,13 @@ describe('BruteForceProtectionService', () => {
   describe('account lockout', () => {
     it('allows other accounts while an attempt is pending and releases queued attempts after a failure', async () => {
       let rejectAttempt: (error: Error) => void;
-      const pending = service.runAccountAttempt(7, () => new Promise<void>((_resolve, reject) => {
-        rejectAttempt = reject;
-      }));
+      const pending = service.runAccountAttempt(
+        7,
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectAttempt = reject;
+          }),
+      );
       await expect(service.runAccountAttempt(8, async () => 'other account')).resolves.toBe('other account');
       const next = service.runAccountAttempt(7, async () => 'next attempt');
       const error = new Error('invalid credentials');
@@ -109,25 +122,21 @@ describe('BruteForceProtectionService', () => {
       for (let i = 0; i < 3; i += 1) {
         await service.recordFailure('login', '1.1.1.1', 42);
       }
-      const lockoutCall = userRepo.update.mock.calls.find(
-        ([, update]) => update?.lockedUntil instanceof Date,
-      );
+      const lockoutCall = userRepo.update.mock.calls.find(([, update]) => update?.lockedUntil instanceof Date);
       expect(lockoutCall).toBeDefined();
       expect((lockoutCall as [unknown, unknown])[0]).toEqual({ id: 42 });
     });
 
     it('rejects when assertAccountAllowed sees future lockedUntil', async () => {
       const future = new Date(Date.now() + 60_000);
-      await expect(
-        service.assertAccountAllowed({ id: 1, lockedUntil: future } as User),
-      ).rejects.toBeInstanceOf(AccountLockedException);
+      await expect(service.assertAccountAllowed({ id: 1, lockedUntil: future } as User)).rejects.toBeInstanceOf(
+        AccountLockedException,
+      );
     });
 
     it('passes when lockedUntil is in the past', async () => {
       const past = new Date(Date.now() - 60_000);
-      await expect(
-        service.assertAccountAllowed({ id: 1, lockedUntil: past } as User),
-      ).resolves.toBeUndefined();
+      await expect(service.assertAccountAllowed({ id: 1, lockedUntil: past } as User)).resolves.toBeUndefined();
     });
 
     it('unlocks an account', async () => {

@@ -1,3 +1,5 @@
+import { withWagoPersistenceFixture } from '../wago-service.test-fixture';
+import { TypeormWagoFlowPersistence } from './persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import plugin from '../plugin';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
@@ -54,7 +56,14 @@ describe('WagoFlowService schemas and dispatch', () => {
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
     return {
-      service: new WagoFlowService(context),
+      service: new WagoFlowService(
+        context,
+        new TypeormWagoFlowPersistence(
+          () => context.getRepository(WagoController),
+          () => context.getRepository(WagoConfigurationRevision),
+          () => context.getRepository(WagoSettings),
+        ),
+      ),
       trigger,
       context,
       revisionQuery,
@@ -132,7 +141,7 @@ describe('WagoFlowService schemas and dispatch', () => {
       throw new Error('Host DataSource is not available yet');
     });
     getRepository.mockClear();
-    expect(() => plugin.register(context)).not.toThrow();
+    expect(() => plugin.register(withWagoPersistenceFixture(context))).not.toThrow();
     expect(getRepository).not.toHaveBeenCalled();
   });
 

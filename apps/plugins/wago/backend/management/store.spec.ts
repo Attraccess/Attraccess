@@ -1,7 +1,8 @@
 import { DataSource } from 'typeorm';
 import { WagoManagementEntity } from './entity';
 import { WagoManagement1780000000010 } from './migration';
-import { RepositoryManagementStore } from './store';
+import { PersistentManagementStore } from './store';
+import { TypeormWagoManagementPersistence } from './persistence/typeorm-adapter';
 import type { ManagementRecord } from './model';
 
 // Entity decorators use the actual TypeORM copy, without loading unrelated host application services.
@@ -25,7 +26,7 @@ describe('persistent management repository and migration', () => {
 
   it('stores ciphertext separately, excludes it from ordinary entity queries, and fences stale writers', async () => {
     const repository = database.getRepository(WagoManagementEntity);
-    const store = new RepositoryManagementStore(repository);
+    const store = new PersistentManagementStore(new TypeormWagoManagementPersistence(() => repository));
     const record: ManagementRecord = {
       target: { controllerId: 1, host: '10.88.0.1', hostKeyFingerprint: `SHA256:${'a'.repeat(43)}` },
       state: 'preparing',
@@ -43,7 +44,7 @@ describe('persistent management repository and migration', () => {
     expect(await store.acquire(1, 'first', 1000, 2000)).toBe(true);
     expect(await store.acquire(1, 'other-process', 1001, 2001)).toBe(false);
     await store.save(1, 'first', record, 1002);
-    const freshStore = new RepositoryManagementStore(repository);
+    const freshStore = new PersistentManagementStore(new TypeormWagoManagementPersistence(() => repository));
     expect(await freshStore.load(1)).toEqual(record);
     const entity = await repository.findOneByOrFail({ controllerId: 1 });
     expect(entity.encryptedPrivateKey).toBeUndefined();
@@ -57,7 +58,9 @@ describe('persistent management repository and migration', () => {
   });
 
   it('refuses a downgrade that would erase a management key or recovery lease', async () => {
-    const store = new RepositoryManagementStore(database.getRepository(WagoManagementEntity));
+    const store = new PersistentManagementStore(
+      new TypeormWagoManagementPersistence(() => database.getRepository(WagoManagementEntity)),
+    );
     await store.acquire(1, 'owner', 1000, 2000);
     await expect(database.undoLastMigration()).rejects.toThrow('Recover management transitions');
     await store.release(1, 'owner');

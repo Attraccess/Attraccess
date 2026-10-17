@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { FlowVariablePersistence } from '../persistence/port';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { In, IsNull, Repository } from 'typeorm';
 import {
   ResourceFlowVariable,
   ResourceFlowVariableScope,
   ResourceFlowVariableValueType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 
 function classifyValueType(value: unknown): ResourceFlowVariableValueType {
@@ -26,8 +25,7 @@ export class ResourceFlowVariablesService {
   private readonly logger = new Logger(ResourceFlowVariablesService.name);
 
   constructor(
-    @InjectRepository(ResourceFlowVariable)
-    private readonly repository: Repository<ResourceFlowVariable>,
+    private readonly persistence: FlowVariablePersistence,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -37,9 +35,7 @@ export class ResourceFlowVariablesService {
 
   async get(scope: ResourceFlowVariableScope, resourceId: number | null, key: string): Promise<unknown> {
     const ownerId = this.resolveResourceId(scope, resourceId);
-    const row = await this.repository.findOne({
-      where: { scope, resourceId: ownerId ?? IsNull(), key },
-    });
+    const row = await this.persistence.findValue(scope, ownerId, key);
     return row ? this.deserialize(row) : undefined;
   }
 
@@ -50,21 +46,14 @@ export class ResourceFlowVariablesService {
   ): Promise<Record<string, unknown>> {
     if (keys.length === 0) return {};
     const ownerId = this.resolveResourceId(scope, resourceId);
-    const rows = await this.repository.find({
-      where: { scope, resourceId: ownerId ?? IsNull(), key: In(keys) },
-    });
+    const rows = await this.persistence.findValues(scope, ownerId, keys);
     return Object.fromEntries(rows.map((r) => [r.key, this.deserialize(r)]));
   }
 
   async getAll(
     resourceId: number | null,
   ): Promise<{ resource: Record<string, unknown>; global: Record<string, unknown> }> {
-    const rows = await this.repository.find({
-      where: [
-        { scope: ResourceFlowVariableScope.GLOBAL, resourceId: IsNull() },
-        ...(resourceId == null ? [] : [{ scope: ResourceFlowVariableScope.RESOURCE, resourceId }]),
-      ],
-    });
+    const rows = await this.persistence.visibleValues(resourceId, false);
     const out = { resource: {} as Record<string, unknown>, global: {} as Record<string, unknown> };
     for (const r of rows) {
       const target = r.scope === ResourceFlowVariableScope.GLOBAL ? out.global : out.resource;
@@ -81,9 +70,7 @@ export class ResourceFlowVariablesService {
     sourceResourceId: number | null,
   ): Promise<void> {
     const ownerId = this.resolveResourceId(scope, resourceId);
-    const existing = await this.repository.findOne({
-      where: { scope, resourceId: ownerId ?? IsNull(), key },
-    });
+    const existing = await this.persistence.findValue(scope, ownerId, key);
     const previousValue = existing ? this.deserialize(existing) : undefined;
 
     if (existing && deepEqual(previousValue, value)) {
@@ -91,7 +78,7 @@ export class ResourceFlowVariablesService {
     }
 
     const serialized = JSON.stringify(value);
-    const row = await this.repository.save({
+    const row = await this.persistence.storeValue({
       ...(existing ?? {}),
       scope,
       resourceId: ownerId,
@@ -115,21 +102,11 @@ export class ResourceFlowVariablesService {
   }
 
   async delete(scope: ResourceFlowVariableScope, resourceId: number | null, key: string): Promise<void> {
-    await this.repository.delete({
-      scope,
-      resourceId: this.resolveResourceId(scope, resourceId),
-      key,
-    });
+    await this.persistence.removeValue(scope, this.resolveResourceId(scope, resourceId), key);
   }
 
   async listForResource(resourceId: number): Promise<ResourceFlowVariable[]> {
-    return this.repository.find({
-      where: [
-        { scope: ResourceFlowVariableScope.GLOBAL, resourceId: IsNull() },
-        { scope: ResourceFlowVariableScope.RESOURCE, resourceId },
-      ],
-      order: { scope: 'ASC', key: 'ASC' },
-    });
+    return this.persistence.visibleValues(resourceId, true);
   }
 
   parseValue(row: ResourceFlowVariable): unknown {

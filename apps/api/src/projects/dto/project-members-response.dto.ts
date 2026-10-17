@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProjectMember, User } from '@attraccess/database-entities';
+import { ProjectMember } from '../../transport/models/project-member.dto';
+import { User } from '../../transport/models/user.dto';
 
 export class ProjectMembersResponseDto {
   @ApiProperty({ type: () => User })

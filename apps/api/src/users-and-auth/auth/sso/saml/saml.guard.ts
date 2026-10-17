@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { SettingsService } from '../../../../settings/settings.service';
 import { SSOService } from '../sso.service';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import {
   InvalidSSOProviderIdException,
   InvalidSSOProviderTypeException,

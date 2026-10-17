@@ -1,3 +1,4 @@
+import { TypeormResourceRetrainingPersistence } from './persistence/typeorm-adapter';
 import { registerResourceRetrainingServiceEvaluateFixture } from './resourceRetraining.service.resource-retraining-service-evaluate.test-fixture';
 import { registerResourceRetrainingServiceStatusAggregationFixture } from './resourceRetraining.service.resource-retraining-service-status-aggregation.test-fixture';
 import { ResourceRetrainingService } from './resourceRetraining.service';
@@ -101,7 +102,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   it('records a system-origin required transition when the scheduled evaluation first notifies', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
-    const service = new ResourceRetrainingService(
+    const service = makeRetrainingService(
       {
         findOne: jest.fn().mockResolvedValue({
           id: 1,
@@ -145,7 +146,7 @@ describe('ResourceRetrainingService.evaluate', () => {
         .mockRejectedValueOnce(new Error('SMTP unavailable'))
         .mockResolvedValueOnce(undefined),
     };
-    const service = new ResourceRetrainingService(
+    const service = makeRetrainingService(
       {
         findOne: jest.fn().mockResolvedValue({
           id: 1,
@@ -195,7 +196,7 @@ describe('ResourceRetrainingService.evaluate', () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn() };
     const email = { sendUserRetrainingEmail: jest.fn() };
-    const service = new ResourceRetrainingService(
+    const service = makeRetrainingService(
       {
         findOne: jest.fn().mockResolvedValue({
           id: 1,
@@ -235,7 +236,7 @@ describe('ResourceRetrainingService.evaluate', () => {
 
   it('does not record retraining for a revoked introduction', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
-    const service = new ResourceRetrainingService(
+    const service = makeRetrainingService(
       null as never,
       null as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
@@ -256,7 +257,7 @@ describe('ResourceRetrainingService.evaluate', () => {
 
   it('uses the introduction marker after audit retention has removed the audit row', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
-    const service = new ResourceRetrainingService(
+    const service = makeRetrainingService(
       {
         findOne: jest.fn().mockResolvedValue({
           id: 1,
@@ -353,3 +354,18 @@ describe('ResourceRetrainingService status aggregation', () => {
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
   });
 });
+
+function makeRetrainingService(
+  ...args: [
+    ...ConstructorParameters<typeof TypeormResourceRetrainingPersistence>,
+    ConstructorParameters<typeof ResourceRetrainingService>[1],
+    ConstructorParameters<typeof ResourceRetrainingService>[2],
+    ConstructorParameters<typeof ResourceRetrainingService>[3],
+  ]
+): ResourceRetrainingService {
+  const [resources, groups, usages, introductions, history, ...services] = args;
+  return new ResourceRetrainingService(
+    new TypeormResourceRetrainingPersistence(resources, groups, usages, introductions, history),
+    ...services,
+  );
+}

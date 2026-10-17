@@ -1,5 +1,5 @@
-import { EntityManager } from 'typeorm';
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { TransactionScope } from '../../../database/transaction-scope';
+import { ResourceFlowNode } from '@attraccess/application-models';
 
 export interface NodeProcessingResult {
   payload: object;
@@ -42,7 +42,7 @@ export interface NodeExecutionContext {
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;
-  transactionManager?: EntityManager;
+  transactionManager?: TransactionScope;
   compileTemplate(template: string, data: object): string;
   getTemplateVariables(data: object): TemplateVariables | undefined;
   setTemplateVariables(data: object, variables: TemplateVariables): void;

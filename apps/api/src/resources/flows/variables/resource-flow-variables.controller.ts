@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Put } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, ResourceFlowVariableScope } from '@attraccess/plugins-backend-sdk';
+import { Auth, ResourceFlowVariableScope } from '@attraccess/plugins-backend-sdk/v2';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { FlowVariableDto, FlowVariableUpsertDto } from '../dto/flow-variable.dto';
 

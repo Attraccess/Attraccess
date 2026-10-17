@@ -10,5 +10,9 @@ module.exports = {
   maxWorkers: 2,
   transform: { '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }] },
   moduleFileExtensions: ['ts', 'tsx', 'js'],
-  moduleNameMapper: { '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts' },
+  moduleNameMapper: {
+    '^@attraccess/plugins-backend-sdk/v2$': '<rootDir>/../../../libs/plugins-backend-sdk/src/v2.ts',
+    '^@attraccess/plugins-backend-sdk/adapter$': '<rootDir>/../../../libs/plugins-backend-sdk/src/adapter.ts',
+    '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
+  },
 };

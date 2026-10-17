@@ -1,3 +1,6 @@
+import { TransactionScope, operationToken } from '../../../../database/transaction-scope';
+import { BILLING_OPERATIONS } from '../../../../billing/persistence/port';
+import { sqliteResourceFixture } from '../../../../database/conformance/sqlite-fixture';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import {
@@ -6,19 +9,13 @@ import {
   BillingTransactionStatus,
   Resource,
   ResourceMeter,
-  ResourceFlowEdge,
-  ResourceFlowNode,
   ResourceFlowNodeType,
-  ResourceMeteringOperation,
-  ResourceMeteringSession,
-  ResourceOperatingInterval,
   ResourceType,
   ResourceUsage,
-  ResourceUsageLifecycleAttempt,
   SupervisionMode,
   User,
 } from '@attraccess/database-entities';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -87,33 +84,18 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     .getRepository(ResourceMeter)
     .save({ id: 1, resourceId: 1, name: 'Energy (kWh)', creditsPerUnit: 30 });
   scope.metering = new ResourceMeteringService(
-    scope.source.getRepository(ResourceMeter),
-    scope.source.getRepository(ResourceMeteringSession),
-    scope.source.getRepository(ResourceMeteringOperation),
-    scope.source.getRepository(ResourceFlowNode),
-    scope.source.getRepository(ResourceFlowEdge),
+    sqliteResourceFixture(scope.source).metering,
+    sqliteResourceFixture(scope.source).transactions,
     scope.flows as never,
     scope.audit as never,
     scope.liveNotifications as never,
   );
-  const billing = {
-    getResourceBillingConfiguration: jest.fn(async () => ({
-      creditsPerUsage: 0,
-      creditsPerMinute: 0,
-      creditsPerOperatingMinute: 0,
-    })),
-    validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
-    handleResourceUsageStart: jest.fn(async (_id: number, session: ResourceUsage, user: User, manager: EntityManager) =>
-      manager.save(BillingTransaction, {
-        resourceUsageId: session.id,
-        userId: user.id,
-        amount: 0,
-        status: BillingTransactionStatus.Pending,
-      }),
-    ),
-    // The real charge sums the items already on the transaction; that is all these tests need from it.
-    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, manager: EntityManager) => {
-      scope.log.push('charge');
+  const ledger = operationToken<{ charge(session: ResourceUsage): Promise<BillingTransaction> }>(
+    'fixture item ledger',
+    ['charge'],
+  );
+  sqliteResourceFixture(scope.source).driver.register(ledger, (manager) => ({
+    charge: async (session) => {
       const transaction = await manager.findOneByOrFail(BillingTransaction, { resourceUsageId: session.id });
       const rows = await manager.find(BillingTransactionItem, { where: { billingTransactionId: transaction.id } });
       const total = rows.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -122,13 +104,34 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
         status: BillingTransactionStatus.Completed,
       });
       return transaction;
+    },
+  }));
+  const billing = {
+    getResourceBillingConfiguration: jest.fn(async () => ({
+      creditsPerUsage: 0,
+      creditsPerMinute: 0,
+      creditsPerOperatingMinute: 0,
+    })),
+    validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
+    handleResourceUsageStart: jest.fn(
+      async (_id: number, session: ResourceUsage, user: User, manager: TransactionScope) =>
+        manager.resolve(BILLING_OPERATIONS).createTransaction({
+          resourceUsageId: session.id,
+          userId: user.id,
+          amount: 0,
+          status: BillingTransactionStatus.Pending,
+        }),
+    ),
+    // The real charge sums the items already on the transaction; that is all these tests need from it.
+    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, manager: TransactionScope) => {
+      scope.log.push('charge');
+      return manager.resolve(ledger).charge(session);
     }),
     notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
   };
   scope.usage = new ResourceUsageService(
-    scope.source.getRepository(Resource),
-    scope.source.getRepository(ResourceUsage),
-    scope.source.getRepository(User),
+    sqliteResourceFixture(scope.source).usage,
+    sqliteResourceFixture(scope.source).transactions,
     {} as never,
     {} as never,
     {} as never,
@@ -140,11 +143,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     } as never,
     new EventEmitter2(),
     billing as never,
-    new ResourceOperatingAttributionService(
-      scope.source.getRepository(ResourceOperatingInterval),
-      scope.source.getRepository(ResourceUsage),
-      scope.source.getRepository(ResourceUsageLifecycleAttempt),
-    ),
+    new ResourceOperatingAttributionService(sqliteResourceFixture(scope.source).attribution),
     scope.flows as never,
     {} as never,
     { prepareRequiredSubmissions: jest.fn().mockResolvedValue([]) } as never,

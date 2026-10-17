@@ -5,15 +5,13 @@ import {
   Resource,
   User,
   AttractapFirmwareVersion,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, FindManyOptions, In, DeleteResult } from 'typeorm';
+import { AttractapPersistence, CardDeletion } from './persistence/port';
 
 import { AuditService } from '../audit/audit.service';
 
@@ -50,18 +48,8 @@ export const t = createTranslator({ en, de });
 @Injectable()
 export class AttractapService {
   public constructor(
-    @InjectRepository(NFCCard)
-    protected readonly nfcCardRepository: Repository<NFCCard>,
-    @InjectRepository(Attractap)
-    protected readonly readerRepository: Repository<Attractap>,
-    @InjectRepository(AttractapCrashReport)
-    protected readonly crashReportRepository: Repository<AttractapCrashReport>,
-    @Inject(EventEmitter2)
-    protected readonly eventEmitter: EventEmitter2,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    protected readonly persistence: AttractapPersistence,
+    @Inject(EventEmitter2) protected readonly eventEmitter: EventEmitter2,
     protected readonly encryptionService: EncryptionService,
     protected readonly metricsService: MetricsService,
     protected readonly coredumpSymbolicationService: CoredumpSymbolicationService,
@@ -78,7 +66,7 @@ export class AttractapService {
         ? Buffer.from(payload.coredumpBase64, 'base64')
         : null;
 
-    const report = await this.crashReportRepository.save({
+    const report = await this.persistence.recordCrash({
       attractapId: readerId,
       resetReason: payload.resetReason,
       rebootReason: payload.rebootReason || null,
@@ -107,26 +95,20 @@ export class AttractapService {
     coredump: Buffer,
   ): Promise<void> {
     try {
-      const reader = await this.readerRepository.findOne({ where: { id: readerId } });
+      const reader = await this.persistence.readerFirmware(readerId);
       // No explicit buildId: the symbolication service extracts the truncated app ELF
       // SHA256 from the coredump itself and matches it against published firmware ELFs.
       const result = await this.coredumpSymbolicationService.symbolicate(coredump, {
         variant: reader?.firmware?.variant ?? null,
       });
-      await this.crashReportRepository.update(report.id, {
-        coredumpBuildId: result.buildId,
-        symbolicationStatus: result.status,
-        symbolizedBacktrace: result.backtrace,
-      });
+      await this.persistence.recordSymbolication(report.id, result.status, result.backtrace, result.buildId);
       report.coredumpBuildId = result.buildId;
       report.symbolicationStatus = result.status;
       report.symbolizedBacktrace = result.backtrace;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to symbolicate coredump for report ${report.id}: ${message}`);
-      await this.crashReportRepository
-        .update(report.id, { symbolicationStatus: 'failed', symbolizedBacktrace: message })
-        .catch(() => undefined);
+      await this.persistence.recordSymbolication(report.id, 'failed', message).catch(() => undefined);
       report.symbolicationStatus = 'failed';
       report.symbolizedBacktrace = message;
     }
@@ -134,11 +116,8 @@ export class AttractapService {
 
   public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReportDto[]> {
     const [reader, reports] = await Promise.all([
-      this.readerRepository.findOne({ where: { id: readerId } }),
-      this.crashReportRepository.find({
-        where: { attractapId: readerId },
-        order: { createdAt: 'DESC' },
-      }),
+      this.persistence.readerFirmware(readerId),
+      this.persistence.readerCrashReports(readerId),
     ]);
 
     const currentReaderFirmwareVersion = reader?.firmware?.version ?? null;
@@ -203,10 +182,7 @@ export class AttractapService {
     readerId: number,
     reportId: number,
   ): Promise<{ filename: string; coredump: Buffer } | null> {
-    const report = await this.crashReportRepository.findOne({
-      where: { id: reportId, attractapId: readerId },
-      select: { id: true, attractapId: true, coredump: true },
-    });
+    const report = await this.persistence.crashCoredump(readerId, reportId);
 
     if (!report?.coredump) {
       return null;
@@ -226,30 +202,22 @@ export class AttractapService {
   }
 
   public async updateLastReaderConnection(id: number) {
-    return await this.readerRepository.update(id, { lastConnection: new Date() });
+    return await this.persistence.touchReader(id, new Date());
   }
 
   public async findReaderById(id: number): Promise<Attractap | undefined> {
-    return await this.readerRepository.findOne({
-      where: { id },
-      relations: [
-        'resources',
-        'resources.billingConfigurations',
-        'resources.introducers',
-        'resources.introducers.user',
-      ],
-    });
+    return await this.persistence.readerWithResources(id);
   }
 
   public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
     const token = randomBytes(12).toString('base64url').slice(0, 16);
     const apiTokenHash = await securelyHashToken(token);
 
-    const reader = await this.readerRepository.save({
+    const reader = await this.persistence.registerReader(
       apiTokenHash,
-      name: randomBytes(3).toString('base64url').slice(0, 4),
+      randomBytes(3).toString('base64url').slice(0, 4),
       firmware,
-    });
+    );
 
     return {
       reader,
@@ -291,11 +259,7 @@ export class AttractapService {
       this.logger.debug('attaching resources to reader', updateData.connectedResourceIds);
       let resources: Resource[] = [];
       if (updateData.connectedResourceIds.length > 0) {
-        resources = await this.resourceRepository.find({
-          where: {
-            id: In(updateData.connectedResourceIds),
-          },
-        });
+        resources = await this.persistence.resourcesByIds(updateData.connectedResourceIds);
 
         this.logger.debug('resources from db', resources);
       }
@@ -311,7 +275,7 @@ export class AttractapService {
       reader.resources = resources;
     }
 
-    const response = await this.readerRepository.save(reader);
+    const response = await this.persistence.saveReader(reader);
 
     if (emitEvent) {
       this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
@@ -321,8 +285,8 @@ export class AttractapService {
   }
 
   public async deleteReader(id: number): Promise<boolean> {
-    const result = await this.readerRepository.delete(id);
-    if (!result.affected) return false;
+    const removed = await this.persistence.removeReader(id);
+    if (!removed) return false;
 
     this.eventEmitter.emit(ReaderDeletedEvent.EVENT_NAME, new ReaderDeletedEvent(id));
     return true;
@@ -353,8 +317,8 @@ export class AttractapService {
     await this.updateReader(id, { firmware }, false);
   }
 
-  public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {
-    return await this.readerRepository.find(options);
+  public async getAllReaders(options?: { relations?: readonly 'resources'[] }): Promise<Attractap[]> {
+    return await this.persistence.listReaders(options?.relations?.includes('resources') ?? false);
   }
 
   public uint8ArrayToHexString(uint8Array: Uint8Array) {
@@ -377,7 +341,7 @@ export class AttractapService {
    * @returns 16 bytes Uint8Array
    */
   public async generateNTAG424Key(data: { keyNo: number; cardUID: string; userId: number }) {
-    const user = await this.userRepository.findOne({ where: { id: data.userId } });
+    const user = await this.persistence.findUser(data.userId);
 
     if (!user) {
       this.logger.error(`User with ID ${data.userId} not found`);
@@ -409,7 +373,7 @@ export class AttractapService {
     if (!user.nfcKeySeedToken) {
       const token = randomBytes(24).toString('base64url').slice(0, 32);
       user.nfcKeySeedToken = this.encryptionService.encrypt(token);
-      await this.userRepository.save(user);
+      await this.persistence.saveUser(user);
       return token;
     }
     return this.encryptionService.decryptIfEncrypted(user.nfcKeySeedToken) ?? user.nfcKeySeedToken;
@@ -440,24 +404,24 @@ export class AttractapService {
   }
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
+    const card = await this.persistence.cardById(id);
     return this.decryptCardKey(card);
   }
 
   public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
-    const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
+    const cards = await this.persistence.userCards(userId);
     cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
   public async getAllNFCCards(): Promise<NFCCard[]> {
-    const cards = await this.nfcCardRepository.find();
+    const cards = await this.persistence.allCards();
     cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
+    const card = await this.persistence.cardByUid(uid);
     return this.decryptCardKey(card);
   }
 
@@ -465,15 +429,10 @@ export class AttractapService {
     user: User,
     data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>,
   ): Promise<NFCCard> {
-    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
-
-      return await transactionalEntityManager.save(NFCCard, {
-        ...data,
-        key: this.encryptionService.encrypt(data.key),
-        user,
-        isActive: true,
-      });
+    const card = await this.persistence.registerActiveCard({
+      ...data,
+      key: this.encryptionService.encrypt(data.key),
+      user,
     });
     this.notifyNfcCardChange(card, 'registered');
     return card;
@@ -485,25 +444,8 @@ export class AttractapService {
    * @returns The activated RFID card
    */
   public async activateNFCCard(id: number): Promise<NFCCard> {
-    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: ['user'] });
-
-      if (!card) {
-        throw new Error(`Card with ID ${id} not found`);
-      }
-
-      await transactionalEntityManager
-        .createQueryBuilder()
-        .update(NFCCard)
-        .set({ isActive: false })
-        .where({ user: { id: card.user.id } })
-        .execute();
-
-      return await transactionalEntityManager.save(NFCCard, {
-        ...card,
-        isActive: true,
-      });
-    });
+    const card = await this.persistence.activateCard(id);
+    if (!card) throw new Error(`Card with ID ${id} not found`);
     this.notifyNfcCardChange(card, 'activated');
     return card;
   }
@@ -514,17 +456,17 @@ export class AttractapService {
    * @returns The deactivated RFID card
    */
   public async deactivateNFCCard(id: number): Promise<NFCCard> {
-    await this.nfcCardRepository.update(id, { isActive: false });
+    await this.persistence.deactivateCard(id);
     const card = await this.getNFCCardByID(id);
     this.notifyNfcCardChange(card, 'deactivated');
     return card;
   }
 
-  public async deleteNFCCard(id: number): Promise<DeleteResult> {
+  public async deleteNFCCard(id: number): Promise<CardDeletion> {
     const card = await this.getNFCCardByID(id);
-    const result = await this.nfcCardRepository.delete(id);
+    const removed = await this.persistence.removeCard(id);
     this.notifyNfcCardChange(card, 'deleted');
-    return result;
+    return { affected: removed ? 1 : 0 };
   }
 
   public async updateNFCCardLastSeen(uid: string): Promise<null | true> {
@@ -534,7 +476,7 @@ export class AttractapService {
       return null;
     }
 
-    await this.nfcCardRepository.update(card.id, { lastSeen: new Date() });
+    await this.persistence.touchCard(card.id, new Date());
     return true;
   }
 

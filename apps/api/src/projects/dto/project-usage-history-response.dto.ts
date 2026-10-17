@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceUsage } from '@attraccess/database-entities';
+import { ResourceUsage } from '../../transport/models/resourceUsage.dto';
 import { PaginatedResponse } from '../../types/response';
 
 export class ProjectUsageHistoryResponseDto implements PaginatedResponse<ResourceUsage> {
@@ -18,4 +18,3 @@ export class ProjectUsageHistoryResponseDto implements PaginatedResponse<Resourc
   @ApiProperty({ required: false })
   nextPage?: number;
 }
-

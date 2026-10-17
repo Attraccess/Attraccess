@@ -9,7 +9,7 @@
 //
 // Both are normalised into FirmwareStatus so the UI does not need to branch.
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
-import { createSharedLiveSampler } from '@attraccess/plugins-backend-sdk';
+import { createSharedLiveSampler } from '@attraccess/plugins-backend-sdk/v2';
 import { ShellyHttpClient, type DeviceCredentials } from '../communication/http-client';
 import type { Observable } from 'rxjs';
 

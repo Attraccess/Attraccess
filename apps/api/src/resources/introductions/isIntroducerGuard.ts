@@ -6,7 +6,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 
 @Injectable()

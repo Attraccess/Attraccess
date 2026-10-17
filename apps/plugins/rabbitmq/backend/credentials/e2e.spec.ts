@@ -1,6 +1,6 @@
 import * as mqtt from 'mqtt';
 import type { MqttClient } from 'mqtt';
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
 import { RabbitmqCredentialProvisioningProvider } from './provider';
 

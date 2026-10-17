@@ -1,4 +1,5 @@
-import { AuditLog } from '@attraccess/database-entities';
+import { AuditPersistence } from './port';
+import { AuditLog } from '@attraccess/application-models';
 
 import { ServiceUnavailableException, Logger } from '@nestjs/common';
 
@@ -16,7 +17,7 @@ import { knownAuditActions, knownSubjectTypes } from '../policies/vocabulary';
 
 import { readAuditSettings, AuditSettings } from '../audit.config';
 
-import { PluginAuditEvent, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
+import { PluginAuditEvent, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk/v2';
 
 import { projectPluginAuditEvent } from '../policies/plugins';
 
@@ -35,15 +36,11 @@ import {
   ResourceAuditEvent,
 } from '../audit-policy';
 
-import { DataSource, QueryRunner } from 'typeorm';
-
 import { SettingsStoreService } from '../../settings/settings-store.service';
 
 export const billingStatuses = new Set(['pending', 'completed', 'failed']);
 
 export const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup', 'energy-correction']);
-
-export const SQLITE_BUSY_TIMEOUT_MS = 10;
 
 export const SQLITE_CONTENTION_RECOVERY_DELAY_MS = 500;
 
@@ -75,56 +72,27 @@ export abstract class AuditStorage {
   }
 
   async list(query: AuditQueryDto) {
-    if (this.stopping || !this.storage?.isInitialized)
+    if (this.stopping || !this.persistence.available())
       throw new ServiceUnavailableException('Audit storage unavailable');
     this.activeReads++;
     try {
       const config = await readAuditSettings(this.settings);
       const limit = Math.min(100, Math.max(1, query.limit ?? 50));
-      const builder = this.storage
-        .getRepository(AuditLog)
-        .createQueryBuilder('audit')
-        .where('audit.at >= :cutoff', { cutoff: this.cutoff(config.retention_days) });
-      for (const key of [
-        'domain',
-        'action',
-        'outcome',
-        'operationId',
-        'actorId',
-        'subjectId',
-        'subjectType',
-      ] as const) {
-        if (query[key] !== undefined) builder.andWhere(`audit.${key} = :${key}`, { [key]: query[key] });
-      }
-      if (query.eventPrefix !== undefined)
-        builder.andWhere('substr(audit.action, 1, :prefixLength) = :prefix', {
-          prefixLength: query.eventPrefix.length,
-          prefix: query.eventPrefix,
-        });
-      if (query.from !== undefined) builder.andWhere('audit.at >= :from', { from: new Date(query.from) });
-      if (query.to !== undefined) builder.andWhere('audit.at <= :to', { to: new Date(query.to) });
-      if (query.beforeId !== undefined) builder.andWhere('audit.id < :beforeId', { beforeId: query.beforeId });
-      const rows = await builder
-        .orderBy('audit.id', 'DESC')
-        .take(limit + 1)
-        .getMany();
+      const rows = await this.persistence.read({
+        ...query,
+        cutoff: this.cutoff(config.retention_days),
+        limit: limit + 1,
+        from: query.from === undefined ? undefined : new Date(query.from),
+        to: query.to === undefined ? undefined : new Date(query.to),
+      });
       const hasMore = rows.length > limit;
       const retainedRows = rows.slice(0, limit);
       await this.hydrateLegacyPasswordPolicyDetails(retainedRows);
-      const items = await auditEntriesWithLabels(this.source, retainedRows);
+      const items = await auditEntriesWithLabels(this.persistence, retainedRows);
       return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
     } finally {
       this.activeReads--;
     }
-  }
-
-  protected async hasPasswordPolicyOverflow(): Promise<boolean> {
-    const storage = this.storage;
-    if (!storage) return false;
-    const rows = await storage.query(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'password_policy_audit_overflow' LIMIT 1",
-    );
-    return rows.some((row: { name?: unknown }) => row.name === 'password_policy_audit_overflow');
   }
 
   /** Hydrate only legacy rows returned on this page; current audit event details stay bounded at write time. */
@@ -135,18 +103,12 @@ export abstract class AuditStorage {
         return Number.isSafeInteger(legacyAuditId) ? legacyAuditId : null;
       })
       .filter((id): id is number => id !== null);
-    if (!legacyIds.length || !(await this.hasPasswordPolicyOverflow())) return;
-    const storage = this.storage;
-    if (!storage) return;
-    const placeholders = legacyIds.map(() => '?').join(', ');
-    const archived = await storage.query(
-      `SELECT legacyAuditId, metadata FROM password_policy_audit_overflow WHERE legacyAuditId IN (${placeholders})`,
-      legacyIds,
-    );
+    if (!legacyIds.length || !(await this.persistence.hasLegacyMetadata())) return;
+    const archived = await this.persistence.legacyMetadata(legacyIds);
     const metadata = new Map<string, Record<string, string | number | boolean | null>>();
     for (const row of archived) {
       try {
-        const legacyAuditId = Number(row.legacyAuditId ?? row.legacyauditid);
+        const legacyAuditId = Number(row.legacyAuditId);
         const value = JSON.parse(String(row.metadata));
         if (Number.isSafeInteger(legacyAuditId) && value && typeof value === 'object' && !Array.isArray(value))
           metadata.set(String(legacyAuditId), value);
@@ -191,8 +153,8 @@ export abstract class AuditStorage {
     event: Omit<AuditLog, 'id' | 'at'>,
     finalSettingsChange = false,
   ): Promise<PluginAuditReceipt> {
-    if (this.stopping || !this.storage?.isInitialized || this.pending >= 8) return { status: 'unavailable' };
-    if (this.source.createQueryRunner().isTransactionActive) return { status: 'unavailable' };
+    if (this.stopping || !this.persistence.available() || this.pending >= 8) return { status: 'unavailable' };
+    if (this.persistence.originatingTransactionActive()) return { status: 'unavailable' };
     this.pending++;
     try {
       const config = await readAuditSettings(this.settings);
@@ -207,7 +169,7 @@ export abstract class AuditStorage {
           this.contended = false;
         }
         try {
-          await this.storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
+          await this.persistence.insert({ at: new Date(), ...event });
         } catch {
           this.contended = true;
           return { status: 'unavailable' };
@@ -244,10 +206,6 @@ export abstract class AuditStorage {
 
   protected cutoff(retentionDays: number): Date {
     return new Date(Date.now() - retentionDays * 86_400_000);
-  }
-
-  protected sqliteDate(date: Date): string {
-    return date.toISOString().replace('T', ' ').replace('Z', '');
   }
 
   /** Billing events are projected from scalar transaction fields only, never provider payloads. */
@@ -294,14 +252,13 @@ export abstract class AuditStorage {
   async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<boolean> {
     try {
       const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
-      const storage = this.storage;
-      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return false;
+      if (!snapshot || this.stopping || !this.persistence.available() || this.pending >= 8) return false;
       this.pending++;
       try {
         const config = await readAuditSettings(this.settings);
         if (!config.enabled || !config.domains.includes('resource') || this.stopping) return false;
         await this.serializeStorageWrite(() =>
-          storage.getRepository(AuditLog).insert({
+          this.persistence.insert({
             at: new Date(),
             domain: 'resource',
             pluginId: 'core',
@@ -375,14 +332,13 @@ export abstract class AuditStorage {
   async recordProject(event: Omit<ProjectAuditEvent, 'operationId'>): Promise<void> {
     try {
       const snapshot = projectProjectAuditEvent({ ...event, operationId: randomUUID() });
-      const storage = this.storage;
-      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return;
+      if (!snapshot || this.stopping || !this.persistence.available() || this.pending >= 8) return;
       this.pending++;
       try {
         const config = await readAuditSettings(this.settings);
         if (!config.enabled || !config.domains.includes('project') || this.stopping) return;
         await this.serializeStorageWrite(() =>
-          storage.getRepository(AuditLog).insert({
+          this.persistence.insert({
             at: new Date(),
             domain: 'project',
             pluginId: 'core',
@@ -409,22 +365,13 @@ export abstract class AuditStorage {
 
   protected abstract readonly logger: Logger;
 
-  protected abstract readonly billingEvents: WeakMap<
-    QueryRunner,
-    { event: BillingTransactionAuditEvent; transactionDepth: number; resolve: (receipt: PluginAuditReceipt) => void }[]
-  >;
-
-  protected abstract transactionDepth(queryRunner: QueryRunner): number;
-
-  protected abstract storage?: DataSource;
+  protected abstract readonly persistence: AuditPersistence;
 
   protected abstract stopping: boolean;
 
   protected abstract pending: number;
 
   protected abstract readonly settings: SettingsStoreService;
-
-  protected abstract readonly source: DataSource;
 
   protected abstract contended: boolean;
 

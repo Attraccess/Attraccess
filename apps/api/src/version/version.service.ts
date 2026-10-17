@@ -1,11 +1,8 @@
+import { VersionPersistence } from './persistence/port';
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Repository, MoreThan } from 'typeorm';
-import { activeUsageWhere } from '../resources/usage/sessions/active-usage';
 import axios, { AxiosInstance } from 'axios';
 import * as semver from 'semver';
-import { User, Resource, Project, ResourceUsage, Session } from '@attraccess/database-entities';
 import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { AppConfigType } from '../config/app.config';
 import { ReleaseDto } from './dto/release.dto';
@@ -39,11 +36,7 @@ export class VersionService {
 
   constructor(
     private readonly configService: ConfigService,
-    @InjectRepository(User) private readonly userRepository: Repository<User>,
-    @InjectRepository(Resource) private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(Project) private readonly projectRepository: Repository<Project>,
-    @InjectRepository(ResourceUsage) private readonly resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(Session) private readonly sessionRepository: Repository<Session>,
+    private readonly persistence: VersionPersistence,
   ) {
     this.http = axios.create({
       timeout: GITHUB_REQUEST_TIMEOUT_MS,
@@ -64,23 +57,12 @@ export class VersionService {
   }
 
   async getSystemInfo(): Promise<SystemInfoDto> {
-    const [usersTotal, resourcesTotal, projectsTotal, activeResourceUsageSessions, activeAuthSessions] =
-      await Promise.all([
-        this.userRepository.count(),
-        this.resourceRepository.count(),
-        this.projectRepository.count(),
-        this.resourceUsageRepository.count({ where: activeUsageWhere() }),
-        this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
-      ]);
+    const counts = await this.persistence.systemCounts(new Date());
 
     return {
       uptimeSeconds: Math.floor(process.uptime()),
       nodeVersion: process.version,
-      usersTotal,
-      resourcesTotal,
-      projectsTotal,
-      activeResourceUsageSessions,
-      activeAuthSessions,
+      ...counts,
     };
   }
 

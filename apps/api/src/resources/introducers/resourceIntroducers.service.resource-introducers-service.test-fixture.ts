@@ -1,3 +1,5 @@
+import { ResourceIntroducerPersistence } from './persistence/port';
+import { TypeormResourceIntroducerPersistence } from './persistence/typeorm-adapter';
 import { ResourceIntroducer, User } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -48,6 +50,7 @@ export function registerResourceIntroducersServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceIntroducersService,
+        { provide: ResourceIntroducerPersistence, useValue: new TypeormResourceIntroducerPersistence({getRepository: (entity:unknown) => entity === User ? userRepository : repository} as never) },
         { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
         { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: EventEmitter2, useValue: eventEmitter },

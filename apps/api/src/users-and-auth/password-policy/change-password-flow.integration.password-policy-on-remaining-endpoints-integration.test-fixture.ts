@@ -1,3 +1,9 @@
+import { DatabaseTransactions, OperationToken } from '../../database/transaction-scope';
+import { EntityManager } from 'typeorm';
+import { PasswordPolicyPersistence } from './persistence/port';
+import { passwordPolicyTransactionOperations, TypeormPasswordPolicyPersistence } from './persistence/typeorm-adapter';
+import { SignupDomainPersistence } from '../users/persistence/port';
+import { TypeormSignupDomainPersistence } from '../users/persistence/typeorm-adapter';
 import {
   AuthenticationDetail,
   AuthenticationType,
@@ -107,7 +113,34 @@ async function buildController(opts: BuildOpts = {}) {
       UserPasswordService,
       UserRegistrationService,
       SignupDomainService,
+      { provide: SignupDomainPersistence, useClass: TypeormSignupDomainPersistence },
       PasswordPolicyService,
+      {
+        provide: PasswordPolicyPersistence,
+        useFactory: (policy, overrides, history, auth) =>
+          new TypeormPasswordPolicyPersistence(policy, overrides, history, auth),
+        inject: [
+          getRepositoryToken(PasswordPolicy),
+          getRepositoryToken(PasswordPolicyOverride),
+          getRepositoryToken(PasswordHistory),
+          getRepositoryToken(AuthenticationDetail),
+        ],
+      },
+      {
+        provide: DatabaseTransactions,
+        useFactory: (source: DataSource) =>
+          new DatabaseTransactions({
+            backend: 'sqlite',
+            run: (_conflicts, work) =>
+              source.transaction(async (manager: EntityManager) =>
+                work({
+                  resolve: <T extends object>(_token: OperationToken<T>): T =>
+                    passwordPolicyTransactionOperations(manager) as unknown as T,
+                }),
+              ),
+          }),
+        inject: [DataSource],
+      },
       {
         provide: HibpClient,
         useValue: {

@@ -13,6 +13,7 @@ const VERSIONED_PACKAGE_PATHS = [
   'apps/frontend/package.json',
   'libs/api-client/package.json',
   'libs/database-entities/package.json',
+  'libs/application-models/package.json',
   'libs/env/package.json',
   'libs/plugins-backend-sdk/package.json',
   'libs/plugins-frontend-sdk/package.json',
@@ -50,9 +51,7 @@ describe('package.json version drift guard', () => {
 
     if (distinct.size > 1) {
       const summary = versions.map((v) => `  ${v.path}: ${v.version}`).join('\n');
-      throw new Error(
-        `package.json versions are out of sync. nx release must bump them in lockstep.\n${summary}`,
-      );
+      throw new Error(`package.json versions are out of sync. nx release must bump them in lockstep.\n${summary}`);
     }
 
     expect(distinct.size).toBe(1);

@@ -1,3 +1,6 @@
+import { createSqliteManagedPersistence } from './persistence/typeorm-adapter';
+import { createSqliteDeviceOperations, TypeormWagoDeviceOperationPersistence } from '../persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../../commissioning/persistence/typeorm-adapter';
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { DataSource } from 'typeorm';
 import { BuildRuntimeArtifact } from '../artifacts/build';
@@ -142,6 +145,9 @@ describe('managed enrolment and durable credential lifecycle', () => {
       { registerRuntimeStatusHandler: jest.fn() } as unknown as WagoService,
       {} as WagoRuntimeArtifactsService,
       {} as WagoCommissioningReadiness,
+      createSqliteCommissioningPersistence(context),
+      createSqliteDeviceOperations(context),
+      createSqliteManagedPersistence(context),
     );
     const scan = jest.spyOn(restarted as unknown as { scan(): Promise<void> }, 'scan').mockResolvedValue(undefined);
     try {
@@ -390,8 +396,12 @@ describe('managed enrolment and durable credential lifecycle', () => {
   });
 
   it('shares device ownership across processes and fences expired owners without releasing a successor', async () => {
-    const first = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
-    const second = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
+    const first = new WagoDeviceOperations(
+      new TypeormWagoDeviceOperationPersistence(() => db.getRepository(WagoDeviceOperation)),
+    );
+    const second = new WagoDeviceOperations(
+      new TypeormWagoDeviceOperationPersistence(() => db.getRepository(WagoDeviceOperation)),
+    );
     expect(await first.acquire('device-a', 'commissioning', 100, 200)).toBe(true);
     expect(await second.acquire('device-a', 'update', 150, 300)).toBe(false);
     expect(await second.acquire('device-b', 'update-b', 150, 300)).toBe(true);

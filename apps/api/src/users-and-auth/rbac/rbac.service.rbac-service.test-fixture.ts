@@ -1,3 +1,6 @@
+import { DatabaseTransactions, OperationToken, TransactionScope } from '../../database/transaction-scope';
+import { RbacPersistence } from './persistence/port';
+import { TypeormRbacPersistence } from './persistence/typeorm-adapter';
 import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -80,8 +83,12 @@ export function registerRbacServiceFixture() {
     // manager.transaction calls the callback with a mock EntityManager that proxies back
     // to userRoleRepo so count/delete mocks still apply in the transactional path.
     const mockManager = {
-      createQueryBuilder: jest.fn().mockReturnValue(mockQb),
-      delete: jest.fn(),
+      createQueryBuilder: (...args: unknown[]) => roleManager.createQueryBuilder(...args),
+      delete: (...args: unknown[]) => roleManager.delete(...args),
+      save: (...args: unknown[]) => roleManager.save(...args),
+      find: (...args: unknown[]) => roleManager.find(...args),
+      findOne: (...args: unknown[]) => roleManager.findOne(...args),
+      create: (...args: unknown[]) => roleManager.create(...args),
       getRepository: jest.fn((entity) => (entity === UserRole ? userRoleRepo : roleRepo)),
     };
     const mockTransaction = jest.fn().mockImplementation((cb: (em: unknown) => Promise<unknown>) => cb(mockManager));
@@ -135,6 +142,32 @@ export function registerRbacServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RbacService,
+        {
+          provide: RbacPersistence,
+          useFactory: () =>
+            new TypeormRbacPersistence(userRoleRepo, roleRepo, permissionRepo, userRepo, rolePermissionRepo),
+        },
+        {
+          provide: DatabaseTransactions,
+          useFactory: () =>
+            new DatabaseTransactions({
+              backend: 'sqlite',
+              run: async (_conflicts, work) =>
+                userRoleRepo.manager.transaction(async (manager) =>
+                  work({
+                    resolve: <T extends object>(_token: OperationToken<T>) =>
+                      new TypeormRbacPersistence(
+                        userRoleRepo,
+                        roleRepo,
+                        permissionRepo,
+                        userRepo,
+                        rolePermissionRepo,
+                        manager,
+                      ) as unknown as T,
+                  }),
+                ),
+            }),
+        },
         { provide: getRepositoryToken(UserRole), useValue: userRoleRepo },
         { provide: getRepositoryToken(Role), useValue: roleRepo },
         { provide: getRepositoryToken(Permission), useValue: permissionRepo },
@@ -159,6 +192,21 @@ export function registerRbacServiceFixture() {
       updatedAt: new Date(),
     }) as Permission;
   return {
+    parentScope(): TransactionScope {
+      return {
+        backend: 'sqlite',
+        conflicts: { resourceIds: [], accountIds: [] },
+        afterCommit: jest.fn(),
+        resolve: <T extends object>(_token: OperationToken<T>) =>
+          new TypeormRbacPersistence(
+            userRoleRepo,
+            roleRepo,
+            permissionRepo,
+            userRepo,
+            rolePermissionRepo,
+          ) as unknown as T,
+      };
+    },
     get createMockQueryBuilder() {
       return createMockQueryBuilder;
     },

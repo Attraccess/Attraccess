@@ -1,10 +1,8 @@
-import { Resource, SupervisionMode } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { AttractapResourceReader } from '../../../persistence/port';
 
 import { AuditService } from '../../../../audit/audit.service';
 
@@ -51,8 +49,8 @@ export class AttractapCardHandler {
   @Inject(RbacService)
   protected rbacService: RbacService;
 
-  @InjectRepository(Resource)
-  protected resourceRepository: Repository<Resource>;
+  @Inject(AttractapResourceReader)
+  protected resourceReader: AttractapResourceReader;
 
   @Inject(AuditService)
   protected audit: AuditService;
@@ -103,7 +101,7 @@ export class AttractapCardHandler {
     const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.resourceReader.findResource(resourceId);
     const supervisionMode = resource?.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED;
 
     // Whether this tap must be authorised by a supervisor before a session can start (ATT-493):

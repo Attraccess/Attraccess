@@ -1,3 +1,5 @@
+import { VersionPersistence } from './persistence/port';
+import { TypeormVersionPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -26,6 +28,7 @@ describe('VersionService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VersionService,
+        { provide: VersionPersistence, useClass: TypeormVersionPersistence },
         { provide: ConfigService, useValue: configService },
         { provide: getRepositoryToken(User), useValue: makeRepo(5) },
         { provide: getRepositoryToken(Resource), useValue: makeRepo(10) },

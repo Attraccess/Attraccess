@@ -110,7 +110,7 @@ describe('ResourceUsageService', () => {
 
       const result = await doorActionsScope.service.lockDoor(10, doorActionsScope.mockUser);
 
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
       expect(doorActionsScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
         expect.any(Object),
@@ -144,7 +144,7 @@ describe('ResourceUsageService', () => {
 
       const result = await doorActionsScope.service.unlockDoor(10, doorActionsScope.mockUser);
 
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
       expect(doorActionsScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
         expect.any(Object),
@@ -181,7 +181,7 @@ describe('ResourceUsageService', () => {
 
       const result = await doorActionsScope.service.unlatchDoor(10, doorActionsScope.mockUser);
 
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
       expect(doorActionsScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
         expect.any(Object),

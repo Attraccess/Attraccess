@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@attraccess/database-entities';
-import { EntityManager, Repository } from 'typeorm';
+import { TransactionScope } from '../database/transaction-scope';
+import { EMAIL_TEMPLATE_READ, EmailTemplatePersistence } from './persistence/port';
+import { EmailTemplate, EmailTemplateType } from '@attraccess/application-models';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
 import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from './email-defaults';
@@ -15,20 +15,17 @@ export interface TemplateTranslations {
 @Injectable()
 export class EmailTemplateService {
   constructor(
-    @InjectRepository(EmailTemplate)
-    private readonly emailTemplateRepository: Repository<EmailTemplate>,
-    @InjectRepository(EmailTemplateTranslation)
-    private readonly translationRepository: Repository<EmailTemplateTranslation>,
+    private readonly persistence: EmailTemplatePersistence,
     private readonly mjmlService: MjmlService,
   ) {}
 
   async findAll(): Promise<EmailTemplate[]> {
-    return this.emailTemplateRepository.find();
+    return this.persistence.templates();
   }
 
-  async findOne(type: EmailTemplateType, manager?: EntityManager): Promise<EmailTemplate> {
-    const repo = manager ? manager.getRepository(EmailTemplate) : this.emailTemplateRepository;
-    const template = await repo.findOneBy({ type });
+  async findOne(type: EmailTemplateType, scope?: TransactionScope): Promise<EmailTemplate> {
+    const reader = scope ? scope.resolve(EMAIL_TEMPLATE_READ) : this.persistence;
+    const template = await reader.template(type);
     if (!template) {
       throw new NotFoundException(`Email template "${type}" not found`);
     }
@@ -47,7 +44,7 @@ export class EmailTemplateService {
       await this.mjmlService.validateAndConvert(`<mjml><mj-body>${updateEmailTemplateDto.body}</mj-body></mjml>`);
     }
 
-    await this.emailTemplateRepository.update({ type }, {
+    await this.persistence.update(type, {
       body: updateEmailTemplateDto.body,
       subject: updateEmailTemplateDto.subject,
     });
@@ -61,21 +58,12 @@ export class EmailTemplateService {
     const defaults = EMAIL_TEMPLATE_DEFAULTS[type];
     const body = readDefaultTemplateBody(type);
 
-    await this.emailTemplateRepository.update(
-      { type },
-      { subject: defaults.subject, body, variables: defaults.variables },
-    );
+    await this.persistence.update(type, { subject: defaults.subject, body, variables: defaults.variables });
 
-    await this.translationRepository.manager.transaction(async (manager) => {
-      await manager.delete(EmailTemplateTranslation, { templateType: type });
-      const shipped = SHIPPED_TRANSLATIONS.filter((t) => t.templateType === type);
-      if (shipped.length > 0) {
-        await manager.insert(
-          EmailTemplateTranslation,
-          shipped.map((t) => manager.create(EmailTemplateTranslation, { templateType: t.templateType, locale: t.locale, key: t.key, value: t.value })),
-        );
-      }
-    });
+    await this.persistence.replaceTranslations(
+      type,
+      SHIPPED_TRANSLATIONS.filter((row) => row.templateType === type),
+    );
 
     return this.findOne(type);
   }
@@ -85,15 +73,15 @@ export class EmailTemplateService {
     const hasRegion = baseLocale !== locale;
 
     if (!hasRegion) {
-      const rows = await this.translationRepository.findBy({ templateType: type, locale });
+      const rows = await this.persistence.translations(type, locale);
       return Object.fromEntries(rows.map((r) => [r.key, r.value]));
     }
 
     // BCP-47 merge: base translations first, then regional overrides per key.
     // Skip empty regional values so they fall through to the base translation.
     const [baseRows, regionalRows] = await Promise.all([
-      this.translationRepository.findBy({ templateType: type, locale: baseLocale }),
-      this.translationRepository.findBy({ templateType: type, locale }),
+      this.persistence.translations(type, baseLocale),
+      this.persistence.translations(type, locale),
     ]);
     const base = Object.fromEntries(baseRows.map((r) => [r.key, r.value]));
     for (const r of regionalRows) {
@@ -105,7 +93,7 @@ export class EmailTemplateService {
   async getTranslations(type: EmailTemplateType): Promise<TemplateTranslations> {
     const template = await this.findOne(type);
     const keys = extractTranslationKeys(template.subject + '\n' + template.body);
-    const rows = await this.translationRepository.findBy({ templateType: type });
+    const rows = await this.persistence.translations(type);
 
     const translations: Record<string, Record<string, string>> = {};
     for (const row of rows) {
@@ -118,19 +106,12 @@ export class EmailTemplateService {
 
   async setTranslations(type: EmailTemplateType, locale: string, data: Record<string, string>): Promise<void> {
     await this.findOne(type);
-    const entities = Object.entries(data).map(([key, value]) =>
-      this.translationRepository.create({ templateType: type, key, locale, value }),
-    );
-    await this.translationRepository.manager.transaction(async (manager) => {
-      await manager.delete(EmailTemplateTranslation, { templateType: type, locale });
-      if (entities.length > 0) {
-        await manager.insert(EmailTemplateTranslation, entities);
-      }
-    });
+    const rows = Object.entries(data).map(([key, value]) => ({ templateType: type, key, locale, value }));
+    await this.persistence.replaceTranslations(type, rows, locale);
   }
 
   async deleteTranslations(type: EmailTemplateType, locale: string): Promise<void> {
     await this.findOne(type);
-    await this.translationRepository.delete({ templateType: type, locale });
+    await this.persistence.removeTranslations(type, locale);
   }
 }

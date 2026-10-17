@@ -85,6 +85,7 @@ test('verifies actual packed entries and removes archives after success or failu
       'plugin/frontend',
       'dist/libs/plugins-backend-sdk',
       'dist/libs/database-entities',
+      'dist/libs/application-models',
       'dist/libs/shared',
       'node_modules',
     ])

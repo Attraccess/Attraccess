@@ -1,3 +1,5 @@
+import { SignupDomainPersistence } from './persistence/port';
+import { TypeormSignupDomainPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Setting } from '@attraccess/database-entities';
@@ -14,6 +16,7 @@ describe('SignupDomainService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SignupDomainService,
+        { provide: SignupDomainPersistence, useClass: TypeormSignupDomainPersistence },
         {
           provide: getRepositoryToken(Setting),
           useValue: {

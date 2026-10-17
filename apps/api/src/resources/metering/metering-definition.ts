@@ -4,7 +4,7 @@ import {
   ResourceFlowEdge,
   ResourceFlowNode,
   ResourceFlowNodeType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 export type MeterProblem =
   'start-trigger-missing' | 'ready-unreachable' | 'collect-trigger-missing' | 'report-unreachable';

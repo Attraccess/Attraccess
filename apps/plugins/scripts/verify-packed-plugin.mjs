@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import Module from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -59,8 +59,10 @@ export async function verifyPackedPlugin(
     const modules = join(extracted, 'node_modules', '@attraccess');
     mkdirSync(modules, { recursive: true });
     cpSync(join(workspace, 'dist/libs/plugins-backend-sdk'), join(modules, 'plugins-backend-sdk'), { recursive: true });
-    for (const library of ['database-entities', 'shared'])
-      symlinkSync(join(workspace, 'dist/libs', library), join(modules, library), 'dir');
+    // Keep workspace dependencies beside the copied SDK. Symlinks resolve their
+    // dependencies from dist/ rather than from the extracted package tree.
+    for (const library of ['application-models', 'database-entities', 'shared'])
+      cpSync(join(workspace, 'dist/libs', library), join(modules, library), { recursive: true });
     process.env.NODE_PATH = join(workspace, 'node_modules');
     Module._initPaths();
     if (pkg.attraccess?.backend) await import(pathToFileURL(join(extracted, pkg.attraccess.backend)).href);

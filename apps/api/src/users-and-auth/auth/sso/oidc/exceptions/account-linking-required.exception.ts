@@ -1,4 +1,4 @@
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 
 export class AccountLinkingRequiredException extends BadRequestException {

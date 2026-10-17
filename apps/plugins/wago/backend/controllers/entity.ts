@@ -1,9 +1,10 @@
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
-
-export type WagoTrustState = 'untrusted' | 'claimed';
+import type { WagoController as WagoControllerRecord } from './record';
+import type { WagoTrustState } from './record';
+export type { WagoTrustState } from './record';
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/adapter';
 
 @Entity({ name: 'plugin_wago_controllers' })
-export class WagoController {
+export class WagoController implements WagoControllerRecord {
   @PrimaryGeneratedColumn({ type: 'integer' }) id!: number;
   @Column({ type: 'varchar', name: 'hardware_id', unique: true }) hardwareId!: string;
   @Column({ type: 'varchar', name: 'trust_state' }) trustState!: WagoTrustState;

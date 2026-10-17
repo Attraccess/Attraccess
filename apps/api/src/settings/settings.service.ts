@@ -1,12 +1,8 @@
-import { User } from '@attraccess/database-entities';
+import { SettingsPersistence } from './persistence/port';
 
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
-
-import { Repository } from 'typeorm';
 
 import { auditSettingsUpdateSchema, readAuditSettings } from '../audit/audit.config';
 
@@ -88,8 +84,7 @@ export function parsePositiveFloat(raw: string | null, fallback: number): number
 @Injectable()
 export class SettingsService {
   constructor(
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    protected readonly persistence: SettingsPersistence,
     protected readonly settingsStore: SettingsStoreService,
     protected readonly smtpSettingsService: SmtpSettingsService,
     @Optional()
@@ -140,7 +135,7 @@ export class SettingsService {
   }
 
   async isFirstTimeSetupAvailable(): Promise<boolean> {
-    const count = await this.userRepository.count();
+    const count = await this.persistence.countUsers();
     return count === 0;
   }
 
@@ -148,8 +143,8 @@ export class SettingsService {
     const [app, smtp, userCount, verifiedAdminCount] = await Promise.all([
       this.getAppSettings(),
       this.smtpSettingsService.getSettings(),
-      this.userRepository.count(),
-      this.userRepository.count({ where: { isEmailVerified: true } }),
+      this.persistence.countUsers(),
+      this.persistence.countUsers(true),
     ]);
 
     const adminEmailVerified = userCount > 0 && verifiedAdminCount > 0;

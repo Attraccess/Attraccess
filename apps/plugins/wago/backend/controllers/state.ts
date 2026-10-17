@@ -1,21 +1,18 @@
+import { WagoControllerPersistence } from './persistence/port';
+import { WagoConfigurationPersistence, type DraftWrite } from '../configuration/persistence/port';
 import { ConflictException, Inject } from '@nestjs/common';
 
-import {
-  PluginContext,
-  PluginMqttSubscription,
-  Repository,
-  type PluginAuditPrincipal,
-} from '@attraccess/plugins-backend-sdk';
+import { PluginContext, PluginMqttSubscription, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk/v2';
 
-import { WagoController } from './entity';
+import { WagoController } from './record';
 
-import { WagoSettings } from './settings.entity';
+import { WagoSettings } from './settings.record';
 
-import { WagoEnrollment } from './enrollment.entity';
+import { WagoEnrollment } from './enrollment.record';
 
-import { WagoConfigurationDraft } from '../configuration/draft.entity';
+import { WagoConfigurationDraft } from '../configuration/draft.record';
 
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import { WagoConfigurationRevision } from '../configuration/revision.record';
 
 import { WagoCommandHandler } from '../commands/handler';
 
@@ -45,23 +42,17 @@ import { configurationFlowImpacts } from '../configuration/flow-references';
 import { type ConfigurationDiff } from '../configuration/model';
 
 export abstract class WagoServiceState {
-  constructor(@Inject(PLUGIN_CONTEXT) protected readonly context: PluginContext) {}
+  constructor(
+    @Inject(PLUGIN_CONTEXT) protected readonly context: Omit<PluginContext, 'operations' | 'persistence'>,
+    protected readonly registry: WagoControllerPersistence,
+    protected readonly configuration: WagoConfigurationPersistence,
+  ) {}
 
   readonly diagnostics = new WagoDiagnosticsStore();
-
-  protected controllers!: Repository<WagoController>;
 
   protected readonly networkSubscriptions = new Map<number, PluginMqttSubscription[]>();
 
   protected networkSubscriptionRevision = 0;
-
-  protected settings!: Repository<WagoSettings>;
-
-  protected enrollments!: Repository<WagoEnrollment>;
-
-  protected drafts!: Repository<WagoConfigurationDraft>;
-
-  protected revisions!: Repository<WagoConfigurationRevision>;
 
   protected readonly subscriptions: PluginMqttSubscription[] = [];
 
@@ -104,7 +95,8 @@ export abstract class WagoServiceState {
 
   protected readonly commands = new WagoCommandHandler({
     context: this.context,
-    controllers: () => this.controllers,
+    registry: this.registry,
+    configuration: this.configuration,
     claimedController: async (id) => {
       const controller = await this.claimedController(id);
       if (this.isRuntimeUpdateRequired(id))
@@ -450,19 +442,19 @@ export abstract class WagoServiceState {
   protected abstract impactIdentity(impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>): unknown;
 
   protected abstract reviewIdentity(
-    draft: WagoConfigurationDraft,
+    draft: DraftWrite,
     current: WagoConfigurationRevision | null,
     impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>,
   ): string;
 
   protected abstract rollbackIdentity(
-    draft: WagoConfigurationDraft | null,
+    draft: DraftWrite | null,
     current: WagoConfigurationRevision | null,
     source: WagoConfigurationRevision,
     impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>,
   ): string;
 
-  protected abstract draftIdentity(draft: WagoConfigurationDraft | null): string;
+  protected abstract draftIdentity(draft: DraftWrite | null): string;
 
   protected abstract metadataFromProvenance(provenance: string | null | undefined): ConfigurationEditorMetadata;
 
@@ -488,7 +480,7 @@ export abstract class WagoServiceState {
     force?: boolean,
     reviewedHash?: string,
     principal?: PluginAuditPrincipal,
-    preparedDraft?: WagoConfigurationDraft,
+    preparedDraft?: DraftWrite,
     onAllocated?: (revision: number) => void,
   ): Promise<WagoConfigurationRevision>;
 

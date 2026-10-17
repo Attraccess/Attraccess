@@ -1,13 +1,11 @@
 // Generic Web Push (VAPID) sender. VAPID keys live in the settings table and are
 // auto-generated on first use; admins can override them (which invalidates all subscriptions).
 // FEATURE: Push notification foundation
-import { PushSubscription } from '@attraccess/database-entities';
+import { PushSubscription } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { PushPersistence } from './persistence/port';
 
 import * as webpush from 'web-push';
 
@@ -59,8 +57,7 @@ export class PushService {
   private vapidKeysPromise: Promise<VapidKeys> | null = null;
 
   constructor(
-    @InjectRepository(PushSubscription)
-    private readonly subscriptionRepository: Repository<PushSubscription>,
+    private readonly persistence: PushPersistence,
     private readonly settingsStore: SettingsStoreService,
     private readonly settingsService: SettingsService,
   ) {}
@@ -81,7 +78,7 @@ export class PushService {
   }
 
   public async getSubscriptionCount(): Promise<number> {
-    return this.subscriptionRepository.count();
+    return this.persistence.countSubscriptions();
   }
 
   /**
@@ -91,8 +88,7 @@ export class PushService {
   public async replaceVapidKeys(override?: VapidKeys): Promise<{ keys: VapidKeys; deletedSubscriptions: number }> {
     const keys = override ? this.validateVapidKeys(override) : (webpush.generateVAPIDKeys() as VapidKeys);
 
-    const deletedSubscriptions = await this.subscriptionRepository.count();
-    await this.subscriptionRepository.createQueryBuilder().delete().execute();
+    const deletedSubscriptions = await this.persistence.removeAllSubscriptions();
 
     await this.persistVapidKeys(keys);
     this.vapidKeysPromise = Promise.resolve(keys);
@@ -105,30 +101,22 @@ export class PushService {
   }
 
   public async upsertSubscription(userId: number, dto: CreatePushSubscriptionDto): Promise<PushSubscription> {
-    // The endpoint uniquely identifies a device/browser subscription. Re-subscribing (possibly as a
-    // different user on the same browser) replaces the existing entry instead of failing the unique index.
-    const existing = await this.subscriptionRepository.findOne({ where: { endpoint: dto.endpoint } });
-    const subscription =
-      existing ??
-      this.subscriptionRepository.create({
-        endpoint: dto.endpoint,
-      });
-
-    subscription.userId = userId;
-    subscription.p256dh = dto.keys.p256dh;
-    subscription.auth = dto.keys.auth;
-    subscription.userAgent = dto.userAgent ?? subscription.userAgent ?? null;
-    subscription.lastSeenAt = new Date();
-
-    return this.subscriptionRepository.save(subscription);
+    return this.persistence.registerSubscription({
+      endpoint: dto.endpoint,
+      userId,
+      p256dh: dto.keys.p256dh,
+      auth: dto.keys.auth,
+      userAgent: dto.userAgent,
+      lastSeenAt: new Date(),
+    });
   }
 
   public async deleteSubscription(userId: number, endpoint: string): Promise<void> {
-    await this.subscriptionRepository.delete({ userId, endpoint });
+    await this.persistence.removeOwnedSubscription(userId, endpoint);
   }
 
   public async sendToUser(userId: number, payload: PushNotificationPayload): Promise<void> {
-    const subscriptions = await this.subscriptionRepository.find({ where: { userId } });
+    const subscriptions = await this.persistence.listUserSubscriptions(userId);
     if (subscriptions.length === 0) {
       return;
     }
@@ -204,7 +192,7 @@ export class PushService {
     return sendToSubscriptionImplementation(
       {
         logger: getContextOwner().logger,
-        subscriptionRepository: getContextOwner().subscriptionRepository,
+        persistence: getContextOwner().persistence,
       },
       subscription,
       serializedPayload,

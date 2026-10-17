@@ -1,3 +1,4 @@
+import { sqliteRepositoryFixture } from '../../database/conformance/sqlite-fixture';
 import {
   BillingTransaction,
   BillingTransactionItem,
@@ -59,21 +60,20 @@ describe('BillingService', () => {
 
     it('creates and saves default configuration when none exists', async () => {
       getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(null);
-      const created = { resourceId: 42, creditsPerUsage: 0, creditsPerMinute: 0 } as ResourceBillingConfiguration;
-      getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.create.mockReturnValue(created);
-      getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.save.mockResolvedValue(created);
-
-      const result = await getResourceBillingConfigurationScope.service.getResourceBillingConfiguration(42);
-      expect(getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.create).toHaveBeenCalledWith({
+      const created = {
         resourceId: 42,
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
-      });
+      } as ResourceBillingConfiguration;
+      getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.create.mockReturnValue(created);
+      getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.save.mockResolvedValue(created);
+
+      const result = await getResourceBillingConfigurationScope.service.getResourceBillingConfiguration(42);
       expect(getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.save).toHaveBeenCalledWith(
         created,
       );
-      expect(result).toBe(created);
+      expect(result).toEqual(created);
     });
 
     it('returns existing configuration when present', async () => {
@@ -84,7 +84,7 @@ describe('BillingService', () => {
       expect(
         getResourceBillingConfigurationScope.resourceBillingConfigurationRepository.findOneBy,
       ).toHaveBeenCalledWith({ resourceId: 7 });
-      expect(result).toBe(existing);
+      expect(result).toEqual(existing);
     });
 
     it('charges both snapped duration rates without changing legacy session-duration charging', async () => {
@@ -111,7 +111,12 @@ describe('BillingService', () => {
         ),
       } as unknown as never;
 
-      const transaction = await getResourceBillingConfigurationScope.service.chargeForResourceUsage(usage, manager);
+      const transaction = await sqliteRepositoryFixture(
+        () => ({}),
+        (work) => work(manager),
+      ).transactions.run({ resourceIds: [205], accountIds: [25] }, (scope) =>
+        getResourceBillingConfigurationScope.service.chargeForResourceUsage(usage, scope),
+      );
 
       expect(transaction).toEqual(expect.objectContaining({ amount: -23 }));
       expect((manager as { save: jest.Mock }).save).toHaveBeenCalledWith(
@@ -405,7 +410,7 @@ describe('BillingService', () => {
     const billingServiceChargeForResourceUsageScope = createBillingServiceChargeForResourceUsageFixture(scope);
 
     it('rejects recalculation when a completed transaction already exists for the usage', async () => {
-      const usage = { id: 5 } as ResourceUsage;
+      const usage = { id: 5, resourceId: 1 } as ResourceUsage;
       billingServiceChargeForResourceUsageScope.billingTransactionRepository.findOneBy.mockResolvedValue({
         id: 123,
         resourceUsageId: usage.id,
@@ -418,13 +423,16 @@ describe('BillingService', () => {
 
       expect(
         billingServiceChargeForResourceUsageScope.billingTransactionItemRepository.manager.transaction,
-      ).not.toHaveBeenCalled();
+      ).toHaveBeenCalledTimes(1);
+      expect(billingServiceChargeForResourceUsageScope.billingTransactionRepository.save).not.toHaveBeenCalled();
     });
 
     it('sends email after completing usage transaction', async () => {
       let committed = false;
       const usage: Partial<ResourceUsage> = {
         id: 5,
+        resourceId: 1,
+        userId: 10,
         usageInMinutes: 10,
         resource: { id: 1, name: 'CNC' } as Resource,
         user: { id: 10, billingFactor: 100 } as User,

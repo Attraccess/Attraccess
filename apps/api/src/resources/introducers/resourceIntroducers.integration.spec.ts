@@ -1,3 +1,4 @@
+import { sqliteResourceFixture } from '../../database/conformance/sqlite-fixture';
 import {
   entities,
   ResourceType,
@@ -28,8 +29,7 @@ describe('persisted resource introducer aggregation', () => {
     }).initialize();
     await source.runMigrations();
     service = new ResourceIntroducersService(
-      source.getRepository(ResourceIntroducer),
-      source.getRepository(User),
+      sqliteResourceFixture(source).introducers,
       new EventEmitter2(),
       { dispatch: jest.fn() } as unknown as NotificationDispatchService,
     );

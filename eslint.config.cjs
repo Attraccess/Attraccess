@@ -27,12 +27,17 @@ module.exports = [
     // Override or add rules here
     rules: {
       '@nx/workspace-multiline-import-specifiers': 'error',
+      '@nx/workspace-persistence-boundaries': 'error',
       '@nx/enforce-module-boundaries': [
         'error',
         {
           enforceBuildableLibDependency: true,
           allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?js$'],
           depConstraints: [
+            {
+              sourceTag: 'persistence:neutral',
+              notDependOnLibsWithTags: ['persistence:schema', 'persistence:compatibility'],
+            },
             // Plugins are encapsulated, separately shipped products. They may build
             // only on the public plugin SDKs — never on core apps, core libs, or
             // other plugins.

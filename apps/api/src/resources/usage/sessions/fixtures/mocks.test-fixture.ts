@@ -27,7 +27,7 @@ export function createResourceUsageMocks() {
   const lifecycleAttempts = new Map<string, ResourceUsageLifecycleAttempt>();
 
   const mockRepository = () => ({
-    find: jest.fn(),
+    find: jest.fn().mockResolvedValue([]),
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),

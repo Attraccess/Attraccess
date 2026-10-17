@@ -22,7 +22,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-backend-sdk": "^1.11.0",
     "@attraccess/plugins-frontend-sdk": "^1.9.0",
     "@attraccess/plugins-frontend-ui": "^1.11.0"
   },
@@ -38,8 +38,14 @@
       "DATABASE_ACCESS"
     ],
     "sdk": {
-      "backend": "^1.9.0",
+      "backend": "^1.11.0",
       "frontend": "^1.9.0"
+    },
+    "persistence": {
+      "contractVersion": 2,
+      "supportedBackends": [
+        "sqlite"
+      ]
     }
   }
 }

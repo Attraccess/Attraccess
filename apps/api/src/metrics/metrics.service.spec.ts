@@ -1,7 +1,17 @@
+import { MetricsPersistence } from './persistence/port';
+import { TypeormMetricsPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MetricsService } from './metrics.service';
-import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session } from '@attraccess/database-entities';
+import {
+  User,
+  Resource,
+  Project,
+  ResourceGroup,
+  MqttServer,
+  ResourceUsage,
+  Session,
+} from '@attraccess/database-entities';
 
 describe('MetricsService', () => {
   let service: MetricsService;
@@ -27,6 +37,7 @@ describe('MetricsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MetricsService,
+        { provide: MetricsPersistence, useClass: TypeormMetricsPersistence },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(Resource), useValue: mockResourceRepo },
         { provide: getRepositoryToken(Project), useValue: mockProjectRepo },
@@ -136,7 +147,9 @@ describe('MetricsService', () => {
       service.authSsoLoginFailuresTotal.inc({ provider_type: 'oidc', reason: 'invalid_assertion' });
 
       const metrics = await service.getMetrics();
-      expect(metrics).toContain('attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1');
+      expect(metrics).toContain(
+        'attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1',
+      );
     });
 
     it('attractapFirmwareUpdatesTotal counter is defined', () => {
@@ -166,7 +179,9 @@ describe('MetricsService', () => {
 
       const metrics = await service.getMetrics();
       expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="success"} 1');
-      expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1');
+      expect(metrics).toContain(
+        'attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1',
+      );
     });
 
     it('uses attraccess_ prefix (consistent with naming convention)', async () => {

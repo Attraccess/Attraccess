@@ -15,7 +15,7 @@ import {
   PLUGIN_AUDIT_DOMAIN_PATTERN,
   PluginAuditDomainDeclaration,
   validatePluginAuditDomainDeclaration,
-} from '@attraccess/plugins-backend-sdk';
+} from '@attraccess/plugins-backend-sdk/v2';
 import { CORE_AUDIT_DOMAINS } from '../../audit/policies/domains';
 
 export interface CompiledPluginAuditField {

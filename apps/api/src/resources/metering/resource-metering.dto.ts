@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceMeteringSessionStatus } from '@attraccess/database-entities';
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { IsInt, IsNotEmpty, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 

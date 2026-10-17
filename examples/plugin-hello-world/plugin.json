@@ -13,7 +13,18 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.0.0"
+    "min": "1.11.0"
   },
-  "permissions": ["READ_USERS", "LISTEN_EVENTS", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS"]
+  "permissions": [
+    "READ_USERS",
+    "LISTEN_EVENTS",
+    "ACCESS_MQTT_SERVERS",
+    "TRIGGER_FLOWS"
+  ],
+  "persistence": {
+    "contractVersion": 2,
+    "supportedBackends": [
+      "sqlite"
+    ]
+  }
 }

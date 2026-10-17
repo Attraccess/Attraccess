@@ -5,13 +5,13 @@ import {
   ProjectMember,
   ProjectMemberRole,
   User,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { NotificationCategory } from '../../notifications/notification-types';
 
-import { Repository } from 'typeorm';
+import { ProjectPersistence } from '../persistence/port';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -29,11 +29,7 @@ import { ProjectAccessService } from '../project-access.service';
 
 export abstract class ProjectInvitations {
   public async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitation[]> {
-    return await this.projectInvitationRepository.find({
-      where: { invitedUser: { id: userId }, status: ProjectInvitationStatus.PENDING },
-      relations: { invitedUser: true, inviter: true, project: { owner: true } },
-      order: { createdAt: 'DESC' },
-    });
+    return this.persistence.pendingInvitations(userId);
   }
 
   public async acceptInvitation(
@@ -85,7 +81,7 @@ export abstract class ProjectInvitations {
 
     invitation.status = status;
     invitation.respondedAt = new Date();
-    await this.projectInvitationRepository.save(invitation);
+    await this.persistence.saveInvitation(invitation);
 
     await this.audit.recordProject({
       action:
@@ -121,29 +117,17 @@ export abstract class ProjectInvitations {
     userId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
   ): Promise<ProjectMember | null> {
-    const existingMembership = await this.projectMemberRepository.findOne({
-      where: {
-        project: { id: projectId },
-        user: { id: userId },
-      },
-    });
+    const existingMembership = await this.persistence.membership(projectId, userId);
 
     if (existingMembership) {
       return null;
     }
 
-    return await this.projectMemberRepository.save({
-      project: { id: projectId },
-      user: { id: userId },
-      role,
-    });
+    return await this.persistence.addMember(projectId, userId, role);
   }
 
   protected async getInvitationWithRelations(invitationId: number): Promise<ProjectInvitation> {
-    const invitation = await this.projectInvitationRepository.findOne({
-      where: { id: invitationId },
-      relations: { invitedUser: true, inviter: true, project: { owner: true } },
-    });
+    const invitation = await this.persistence.invitationWithRelations(invitationId);
 
     if (!invitation) {
       throw new NotFoundException('Project invitation not found');
@@ -177,7 +161,7 @@ export abstract class ProjectInvitations {
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     const project = await this.projectAccessService.ensureOwner(ownerId, projectId);
-    const invitedUser = await this.userRepository.findOne({ where: { id: invitedUserId } });
+    const invitedUser = await this.persistence.findUser(invitedUserId);
 
     if (!invitedUser) {
       throw new NotFoundException('User not found');
@@ -187,34 +171,17 @@ export abstract class ProjectInvitations {
       throw new BadRequestException('Project owner already has access');
     }
 
-    const existingMember = await this.projectMemberRepository.findOne({
-      where: {
-        project: { id: projectId },
-        user: { id: invitedUserId },
-      },
-    });
+    const existingMember = await this.persistence.membership(projectId, invitedUserId);
     if (existingMember) {
       throw new BadRequestException('User is already a project member');
     }
 
-    const existingInvitation = await this.projectInvitationRepository.findOne({
-      where: {
-        project: { id: projectId },
-        invitedUser: { id: invitedUserId },
-        status: ProjectInvitationStatus.PENDING,
-      },
-    });
+    const existingInvitation = await this.persistence.pendingInvitation(projectId, invitedUserId);
     if (existingInvitation) {
       throw new BadRequestException('User already has a pending invitation');
     }
 
-    const invitation = await this.projectInvitationRepository.save({
-      project: { id: projectId },
-      inviter: { id: ownerId },
-      invitedUser: { id: invitedUserId },
-      status: ProjectInvitationStatus.PENDING,
-      requestedRole: role,
-    });
+    const invitation = await this.persistence.invite(projectId, ownerId, invitedUserId, role);
 
     await this.audit.recordProject({
       action: 'project.invitation.sent',
@@ -249,7 +216,7 @@ export abstract class ProjectInvitations {
     }
 
     invitation.updatedAt = new Date();
-    await this.projectInvitationRepository.save(invitation);
+    await this.persistence.saveInvitation(invitation);
     await this.audit.recordProject({
       action: 'project.invitation.sent',
       actorId: ownerId,
@@ -284,7 +251,7 @@ export abstract class ProjectInvitations {
 
     invitation.status = ProjectInvitationStatus.CANCELED;
     invitation.respondedAt = new Date();
-    await this.projectInvitationRepository.save(invitation);
+    await this.persistence.saveInvitation(invitation);
 
     await this.audit.recordProject({
       action: 'project.invitation.revoked',
@@ -300,7 +267,7 @@ export abstract class ProjectInvitations {
 
   protected abstract readonly fileStorageService: FileStorageService;
 
-  protected abstract readonly projectRepository: Repository<Project>;
+  protected abstract readonly persistence: ProjectPersistence;
 
   protected abstract readonly audit: AuditService;
 
@@ -311,12 +278,6 @@ export abstract class ProjectInvitations {
   protected abstract setLogo(project: Project, logo: FileUpload): Promise<void>;
 
   protected abstract readonly projectAccessService: ProjectAccessService;
-
-  protected abstract readonly userRepository: Repository<User>;
-
-  protected abstract readonly projectMemberRepository: Repository<ProjectMember>;
-
-  protected abstract readonly projectInvitationRepository: Repository<ProjectInvitation>;
 
   protected abstract invitationDetails(invitation: ProjectInvitation): Record<string, string | number>;
 

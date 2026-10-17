@@ -19,6 +19,8 @@ module.exports = {
     ],
   },
   moduleNameMapper: {
+    '^@attraccess/plugins-backend-sdk/v2$': '<rootDir>/libs/plugins-backend-sdk/src/v2.ts',
+    '^@attraccess/plugins-backend-sdk/adapter$': '<rootDir>/libs/plugins-backend-sdk/src/adapter.ts',
     '^@attraccess/(.*)$': '<rootDir>/libs/$1/src/index.ts',
     '^lodash-es$': 'lodash',
     '^@node-saml/passport-saml$': '<rootDir>/apps/api/src/test/mocks/node-saml-passport-saml.ts',

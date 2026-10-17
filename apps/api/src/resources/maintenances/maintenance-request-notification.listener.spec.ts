@@ -1,3 +1,5 @@
+import { MaintenanceRequestRecipients } from './persistence/port';
+import { TypeormMaintenanceRequestRecipients } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
@@ -29,6 +31,7 @@ describe('MaintenanceRequestNotificationListener', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceRequestNotificationListener,
+        { provide: MaintenanceRequestRecipients, useClass: TypeormMaintenanceRequestRecipients },
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },
         { provide: getRepositoryToken(ResourceIntroducer), useValue: introducerRepository },
         { provide: getRepositoryToken(ResourceMaintenanceRequest), useValue: requestRepository },

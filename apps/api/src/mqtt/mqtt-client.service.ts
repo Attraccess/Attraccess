@@ -1,16 +1,14 @@
-import { MqttServer } from '@attraccess/database-entities';
+import { MqttServer } from '@attraccess/application-models';
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
 import * as mqtt from 'mqtt';
 
 import { MqttClient } from 'mqtt';
 
-import { Repository } from 'typeorm';
+import { MqttPersistence } from './persistence/port';
 
 import { EncryptionService } from '../encryption/encryption.service';
 
@@ -30,8 +28,7 @@ export interface TopicSubscription {
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {
   constructor(
-    @InjectRepository(MqttServer)
-    protected readonly mqttServerRepository: Repository<MqttServer>,
+    protected readonly persistence: MqttPersistence,
     protected readonly eventEmitter: EventEmitter2,
     protected readonly encryptionService: EncryptionService,
     protected readonly metricsService: MetricsService,
@@ -215,7 +212,7 @@ export class MqttClientService implements OnModuleDestroy {
           return;
         }
 
-        const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+        const server = await this.persistence.readServer(serverId);
         // State may have changed while resolving the server or opening a connection.
         if (this.subscriptions.get(serverId)?.get(topic) !== subscription) {
           return;
@@ -265,7 +262,7 @@ export class MqttClientService implements OnModuleDestroy {
     try {
       const [client, server] = await Promise.all([
         this.getOrCreateClient(serverId),
-        this.mqttServerRepository.findOneBy({ id: serverId }),
+        this.persistence.readServer(serverId),
       ]);
 
       if (!server) {
@@ -324,7 +321,7 @@ export class MqttClientService implements OnModuleDestroy {
 
   protected async createClient(serverId: number, keepTryingToConnect = false): Promise<MqttClient> {
     const version = this.connectionVersions.get(serverId) ?? 0;
-    const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+    const server = await this.persistence.readServer(serverId);
 
     if (!server) {
       throw new Error(`MQTT server with ID ${serverId} not found`);
@@ -493,7 +490,7 @@ export class MqttClientService implements OnModuleDestroy {
 
     const plaintext = server.password;
     const encrypted = this.encryptionService.encrypt(plaintext);
-    await this.mqttServerRepository.update(server.id, { password: encrypted });
+    await this.persistence.setEncryptedPassword(server.id, encrypted);
     return plaintext;
   }
 }

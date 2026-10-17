@@ -1,5 +1,5 @@
 import { SsoSessionRequest } from '../sso-session-request';
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 
 import { Response, Request } from 'express';
 
@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 import { CreateSessionResponse } from '../../auth.types';
 
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 
 import { Body, Param, Post, Req } from '@nestjs/common';
 

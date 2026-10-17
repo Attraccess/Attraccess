@@ -1,3 +1,5 @@
+import { AuthenticationPersistence } from './persistence/port';
+import { TypeormAuthenticationPersistence } from './persistence/typeorm-adapter';
 import { AuthenticationDetail } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -32,6 +34,11 @@ export function registerAuthServiceFixture() {
       providers: [
         AuthService,
         {
+          provide: AuthenticationPersistence,
+          useFactory: (repo) => new TypeormAuthenticationPersistence(repo),
+          inject: [AuthenticationDetailRepository],
+        },
+        {
           provide: UsersService,
           useValue: {
             findOne: jest.fn(),
@@ -45,6 +52,7 @@ export function registerAuthServiceFixture() {
           useValue: {
             findOne: jest.fn(),
             count: jest.fn(),
+            create: jest.fn((value) => value),
             save: jest.fn(async (value) => value),
             update: jest.fn(),
           },

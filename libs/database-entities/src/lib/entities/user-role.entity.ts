@@ -10,11 +10,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { Role } from './role.entity';
-
-export enum UserRoleSource {
-  MANUAL = 'manual',
-  SSO = 'sso',
-}
+import { UserRoleSource } from '@attraccess/application-models';
 
 @Entity('user_role')
 export class UserRole {
@@ -76,3 +72,5 @@ export class UserRole {
   @ApiPropertyOptional({ type: () => Role, description: 'The role object, populated when loaded with relations' })
   role!: Role;
 }
+
+export { UserRoleSource } from '@attraccess/application-models';

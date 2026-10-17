@@ -1,6 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { ResourceRetrainingService } from './resourceRetraining.service';
 import { RetrainingStatusResponseDto } from './dtos/retrainingStatus.response.dto';
 

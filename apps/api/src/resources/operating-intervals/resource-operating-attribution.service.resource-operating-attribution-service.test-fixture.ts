@@ -1,3 +1,4 @@
+import { TypeormOperatingAttributionPersistence } from './persistence/typeorm-adapter';
 import {
   ResourceOperatingInterval,
   ResourceUsage,
@@ -52,11 +53,7 @@ export function registerResourceOperatingAttributionServiceFixture() {
     };
     usageRepository = { find: jest.fn() };
     lifecycleAttemptRepository = { find: jest.fn().mockResolvedValue([]) };
-    service = new ResourceOperatingAttributionService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      usageRepository as unknown as Repository<ResourceUsage>,
-      lifecycleAttemptRepository as Repository<ResourceUsageLifecycleAttempt>,
-    );
+    service = new ResourceOperatingAttributionService(new TypeormOperatingAttributionPersistence({getRepository:(entity:unknown)=>entity===ResourceOperatingInterval?intervalRepository:entity===ResourceUsage?usageRepository:lifecycleAttemptRepository} as never));
   });
   return {
     get at() {

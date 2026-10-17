@@ -1,21 +1,10 @@
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
-
-export type WagoCommissioningState =
-  | 'awaiting_delivery'
-  | 'delivering'
-  | 'awaiting_identity_confirmation'
-  | 'awaiting_codesys_confirmation'
-  | 'delivery_failed'
-  | 'awaiting_discovery'
-  | 'awaiting_claim'
-  | 'awaiting_verification'
-  | 'claim_interrupted'
-  | 'recovery_revocation_pending'
-  | 'completed'
-  | 'revoked';
+import type { WagoCommissioningSession as WagoCommissioningSessionRecord } from './session.record';
+import type { WagoCommissioningState } from './session.record';
+export type { WagoCommissioningState } from './session.record';
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/adapter';
 
 @Entity({ name: 'plugin_wago_commissioning_sessions' })
-export class WagoCommissioningSession {
+export class WagoCommissioningSession implements WagoCommissioningSessionRecord {
   @PrimaryGeneratedColumn({ type: 'integer' }) id!: number;
   @Column({ type: 'varchar', name: 'hardware_id' }) hardwareId!: string;
   @Column({ type: 'integer', name: 'mqtt_server_id' }) mqttServerId!: number;

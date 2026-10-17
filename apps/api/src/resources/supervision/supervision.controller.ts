@@ -1,9 +1,11 @@
+import { ResourceUsage } from '../../transport/models/resourceUsage.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { ResourceUsage } from '@attraccess/database-entities';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
@@ -42,7 +44,10 @@ export class SupervisionController {
     @Body() dto: RequestSupervisedSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.supervisionService.requestSupervisedSession(resourceId, req.user, dto);
+    return mapResponse(
+      ResourceUsage,
+      await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto),
+    );
   }
 
   @Get('supervision/requests')
@@ -68,9 +73,7 @@ export class SupervisionController {
     const subject = this.supervisionLive.getSupervisorSubject(userId);
     return this.sse.wrap(
       'supervision',
-      subject.asObservable().pipe(
-        finalize(() => this.supervisionLive.deleteSubjectIfUnobserved(userId)),
-      ),
+      subject.asObservable().pipe(finalize(() => this.supervisionLive.deleteSubjectIfUnobserved(userId))),
     );
   }
 
@@ -84,15 +87,18 @@ export class SupervisionController {
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'You are not the requested supervisor for this session.' })
   @ApiResponse({ status: 404, description: 'The request was not found or has already expired.' })
-  approveRequest(
+  async approveRequest(
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.supervisionService.approve(
-      requestId,
-      req.user,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+    return mapResponse(
+      ResourceUsage,
+      await this.supervisionService.approve(
+        requestId,
+        req.user,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 

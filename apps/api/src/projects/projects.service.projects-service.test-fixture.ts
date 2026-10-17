@@ -1,3 +1,5 @@
+import { ProjectPersistence } from './persistence/port';
+import { TypeormProjectPersistence } from './persistence/typeorm-adapter';
 import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -112,6 +114,7 @@ export function registerProjectsServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectsService,
+        { provide: ProjectPersistence, useClass: TypeormProjectPersistence },
         { provide: getRepositoryToken(Project), useValue: projectRepository },
         { provide: getRepositoryToken(ProjectMember), useValue: projectMemberRepository },
         { provide: getRepositoryToken(ProjectInvitation), useValue: projectInvitationRepository },

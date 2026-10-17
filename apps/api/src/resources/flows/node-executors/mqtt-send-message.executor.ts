@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, MqttSendMessageNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, MqttSendMessageNodeDataSchema } from '@attraccess/application-models';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';

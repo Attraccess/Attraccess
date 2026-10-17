@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { LicenseService } from './license.service';
 import { LicenseDataDto } from './dtos/license.dto';
 

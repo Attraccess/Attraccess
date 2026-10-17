@@ -1,3 +1,7 @@
+import { createSqliteManagedPersistence } from '../runtime/managed/persistence/typeorm-adapter';
+import { createSqliteNetworkPersistence } from './persistence/typeorm-adapter';
+import { createSqliteDeviceOperations } from '../runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../commissioning/persistence/typeorm-adapter';
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { DataSource } from 'typeorm';
@@ -7,7 +11,7 @@ import { WagoNetworkChange, WagoMqttCredentialRetirement } from './entity';
 import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from '../runtime/managed/access.entity';
 import { WagoController } from '../controllers/entity';
 import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
-import { WagoCredentialRotationEntity } from '../credentials/service';
+import { WagoCredentialRotationEntity } from '../credentials/persistence/schema';
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 import { WagoService } from '../controllers/service';
 import { WagoRuntimeArtifactsService } from '../runtime/artifacts/catalog';
@@ -113,6 +117,9 @@ export async function resetTestFixture(scope: NetworkChangeFixture) {
     scope.wago as unknown as WagoService,
     { current: async () => scope.artifact } as WagoRuntimeArtifactsService,
     {} as WagoCommissioningReadiness,
+    createSqliteCommissioningPersistence(scope.context),
+    createSqliteDeviceOperations(scope.context),
+    createSqliteManagedPersistence(scope.context),
   );
   jest.spyOn(scope.managed as unknown as { scan(): Promise<void> }, 'scan').mockResolvedValue(undefined);
   scope.managed.onApplicationBootstrap();
@@ -186,5 +193,11 @@ export async function resetTestFixture(scope: NetworkChangeFixture) {
       if (header.startsWith('mqtt-ack ') && scope.failure === 'ack') throw new RuntimeUpdateError('offline');
       return 'OK\n';
     });
-  scope.service = new WagoNetworkChangeService(scope.context, scope.managed, scope.wago as unknown as WagoService);
+  scope.service = new WagoNetworkChangeService(
+    scope.context,
+    scope.managed,
+    scope.wago as unknown as WagoService,
+    createSqliteDeviceOperations(scope.context),
+    createSqliteNetworkPersistence(scope.context),
+  );
 }

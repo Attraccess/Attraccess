@@ -5,8 +5,8 @@ import {
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
-} from '@attraccess/database-entities';
-import { MoreThan, Repository } from 'typeorm';
+} from '@attraccess/application-models';
+import { FlowEventPersistence } from '../persistence/port';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../../mqtt/mqtt-message.event';
@@ -19,7 +19,7 @@ export class FlowTriggerDispatcher {
   private pluginFlowLookupQueue: Promise<void> = Promise.resolve();
 
   constructor(
-    private readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    private readonly persistence: FlowEventPersistence,
     private readonly mqttClientService: MqttClientService,
     private readonly startFlow: (
       nodes: ResourceFlowNode | ResourceFlowNode[],
@@ -30,12 +30,8 @@ export class FlowTriggerDispatcher {
 
   async subscribeToMqttTopics() {
     const [mqttMessageReceivedNodes, mqttWaitForMessageNodes] = await Promise.all([
-      this.flowNodeRepository.find({
-        where: { type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
-      }),
-      this.flowNodeRepository.find({
-        where: { type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
-      }),
+      this.persistence.nodesByType(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED),
+      this.persistence.nodesByType(ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE),
     ]);
 
     const subscribePairs: Array<{ serverId: number; topic: string; qos?: 0 | 1 | 2 }> = [];
@@ -68,11 +64,7 @@ export class FlowTriggerDispatcher {
   async handleMqttMessageReceivedEvent(event: MqttMessageReceivedEvent) {
     const { topic, payload, serverId } = event;
 
-    const messageReceivedNodes = await this.flowNodeRepository.find({
-      where: {
-        type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
-      },
-    });
+    const messageReceivedNodes = await this.persistence.nodesByType(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED);
 
     const filteredMessageReceivedNodes = messageReceivedNodes.filter((node) => {
       const { serverId: nodeServerId, topic: nodeTopic } = MqttMessageReceivedNodeDataSchema.parse(node.data);
@@ -109,14 +101,7 @@ export class FlowTriggerDispatcher {
     let lastId: string | undefined;
     for (;;) {
       const nodes = await this.queuedPluginFlowLookup(() =>
-        this.flowNodeRepository.find({
-          where: {
-            type: nodeType as ResourceFlowNodeType,
-            ...(lastId ? { id: MoreThan(lastId) } : {}),
-          },
-          order: { id: 'ASC' },
-          take: pageSize,
-        }),
+        this.persistence.pageNodesByType(nodeType as ResourceFlowNodeType, lastId, pageSize),
       );
 
       if (nodes.length === 0) return;
@@ -162,7 +147,7 @@ export class FlowTriggerDispatcher {
     payload: object,
     schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } },
   ): Promise<void> {
-    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const allNodes = await this.persistence.nodesByType(type);
     const matching = allNodes.filter((node) => {
       const parsed = schema.safeParse(node.data ?? {});
       return parsed.success && parsed.data?.deviceId === deviceId;
@@ -176,7 +161,7 @@ export class FlowTriggerDispatcher {
     type: ResourceFlowNodeType,
     payload: CompanionUsbDeviceDto,
   ): Promise<void> {
-    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const allNodes = await this.persistence.nodesByType(type);
     const matching = allNodes.filter((node) => {
       const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});
       if (!parsed.success || parsed.data.deviceId !== deviceId) return false;

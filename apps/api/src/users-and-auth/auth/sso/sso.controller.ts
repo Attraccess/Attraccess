@@ -1,3 +1,4 @@
+import type { SSOProvider } from '@attraccess/application-models';
 import {
   Controller,
   Logger,
@@ -48,9 +49,9 @@ import { SSOService } from './sso.service';
 
 import { installInheritedMethods } from '../../../common/inherited-implementation';
 
-import { SSOProvider, SSOProviderType, AuthenticationType } from '@attraccess/database-entities';
+import { SSOProviderType, AuthenticationType } from '@attraccess/application-models';
 
-import { AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 
 import { randomUUID } from 'node:crypto';
 

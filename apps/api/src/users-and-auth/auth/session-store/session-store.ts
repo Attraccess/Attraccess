@@ -1,4 +1,4 @@
-import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
+import { Session, User, SsoSessionContext } from '@attraccess/application-models';
 
 import { SsoSessionSelector } from './sso-session-selector';
 
@@ -49,4 +49,9 @@ export interface SessionStore {
   getUserSessions(userId: number): Promise<Session[]>;
   getStats(): Promise<{ totalActiveSessions: number; expiredSessions: number }>;
   countActive(): Promise<number>;
+}
+
+/** Authenticated identity reads are independent of the selected session storage engine. */
+export interface SessionUserReader {
+  findById(id: number): Promise<User | null>;
 }

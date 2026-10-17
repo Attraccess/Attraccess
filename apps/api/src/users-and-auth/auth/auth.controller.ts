@@ -19,8 +19,8 @@ import { Response } from 'express';
 import { SessionAuthenticatedRequest } from './session-request';
 import { SessionService } from './session.service';
 import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
-import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
-import { CreateSessionResponse } from './auth.types';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk/v2';
+import { CreateSessionResponse, mapSessionUser } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
@@ -78,13 +78,13 @@ export class AuthController {
 
       // Return user data without token for web browsers
       return {
-        user: request.user,
+        user: mapSessionUser(request.user),
         authToken: '', // Empty token for web browsers using cookies
       };
     } else {
       // Return token in response body for programmatic clients
       return {
-        user: request.user,
+        user: mapSessionUser(request.user),
         authToken: sessionToken,
       };
     }
@@ -115,13 +115,13 @@ export class AuthController {
       // Update cookie with new token
       await this.cookieConfigService.setAuthCookie(response, newToken);
       return {
-        user: request.user,
+        user: mapSessionUser(request.user),
         authToken: '',
       };
     } else {
       // Return new token for programmatic clients
       return {
-        user: request.user,
+        user: mapSessionUser(request.user),
         authToken: newToken,
       };
     }

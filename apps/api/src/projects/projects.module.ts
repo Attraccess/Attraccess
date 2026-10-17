@@ -1,3 +1,9 @@
+import { ProjectAccessPersistence, ProjectPersistence, ProjectUsagePersistence } from './persistence/port';
+import {
+  TypeormProjectAccessPersistence,
+  TypeormProjectPersistence,
+  TypeormProjectUsagePersistence,
+} from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { ConfigModule } from '@nestjs/config';
@@ -24,11 +30,26 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ConfigModule,
     EmailModule,
     NotificationsModule,
-    TypeOrmModule.forFeature([Project, ProjectMember, ProjectInvitation, ResourceUsage, BillingTransaction, Setting, User]),
+    TypeOrmModule.forFeature([
+      Project,
+      ProjectMember,
+      ProjectInvitation,
+      ResourceUsage,
+      BillingTransaction,
+      Setting,
+      User,
+    ]),
     FileStorageModule,
   ],
   controllers: [ProjectsController, ProjectInvitationsController],
-  providers: [ProjectsService, ProjectUsageService, ProjectAccessService],
+  providers: [
+    { provide: ProjectAccessPersistence, useClass: TypeormProjectAccessPersistence },
+    ProjectsService,
+    { provide: ProjectPersistence, useClass: TypeormProjectPersistence },
+    ProjectUsageService,
+    { provide: ProjectUsagePersistence, useClass: TypeormProjectUsagePersistence },
+    ProjectAccessService,
+  ],
   exports: [ProjectsService, ProjectUsageService, ProjectAccessService],
 })
 export class ProjectsModule {}

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
-import { ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 
 export class GrantIntroducerDto {
   @ApiPropertyOptional({

@@ -22,11 +22,8 @@ describe('RbacService', () => {
     expect(await fixture.service.isLastAdministrator(10)).toBe(true);
     expect(query.innerJoin).toHaveBeenCalledWith('ur.user', 'u', 'u.deletedAt IS NULL');
     query.getCount.mockResolvedValue(1);
-    const manager = {
-      getRepository: (entity) => (entity === Role ? fixture.roleRepo : fixture.userRoleRepo),
-      createQueryBuilder: () => query,
-    };
-    expect(await fixture.service.isLastAdministrator(10, manager as never)).toBe(false);
+    const scope = fixture.parentScope();
+    expect(await fixture.service.isLastAdministrator(10, scope)).toBe(false);
   });
 
   it('assigns a role by key idempotently and supports a containing transaction', async () => {
@@ -35,15 +32,15 @@ describe('RbacService', () => {
     fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole());
     const existing = fixture.makeUserRole();
     fixture.userRoleRepo.findOne.mockResolvedValue(existing);
-    expect(await fixture.service.assignRoleByKey(10, 'member')).toBe(existing);
+    expect(await fixture.service.assignRoleByKey(10, 'member')).toEqual(existing);
     expect(fixture.userRoleRepo.save).not.toHaveBeenCalled();
     fixture.userRoleRepo.findOne.mockResolvedValue(null);
     fixture.userRoleRepo.save.mockResolvedValue(existing);
     await fixture.service.assignRoleByKey(10, 'member');
     expect(fixture.userRoleRepo.create).toHaveBeenCalledWith({ userId: 10, roleId: 1, source: UserRoleSource.MANUAL });
     fixture.eventEmitter.emit.mockClear();
-    const manager = { getRepository: (entity) => (entity === Role ? fixture.roleRepo : fixture.userRoleRepo) };
-    await fixture.service.assignRoleByKey(10, 'member', manager as never);
+    const scope = fixture.parentScope();
+    await fixture.service.assignRoleByKey(10, 'member', scope);
     expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
   });
 
@@ -146,7 +143,7 @@ describe('RbacService', () => {
       const actorPermissions = new Set(['resources.read']);
       const result = await fixture.service.assignRole(10, 1, actorPermissions);
 
-      expect(result).toBe(existing);
+      expect(result).toEqual(existing);
       expect(fixture.userRoleRepo.save).not.toHaveBeenCalled();
     });
 
@@ -163,7 +160,7 @@ describe('RbacService', () => {
       const result = await fixture.service.assignRole(10, 1, actorPermissions);
 
       expect(fixture.userRoleRepo.save).toHaveBeenCalled();
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
     });
 
     it('succeeds when role grants no permissions (empty permission set)', async () => {
@@ -175,7 +172,7 @@ describe('RbacService', () => {
 
       const result = await fixture.service.assignRole(10, 1, new Set());
 
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
     });
   });
 
@@ -497,11 +494,9 @@ describe('RbacService', () => {
     it('does not invalidate before a caller-owned transaction commits', async () => {
       fixture.roleRepo.find.mockResolvedValue([fixture.makeRole({ id: 1, key: 'basic', isDefault: true })]);
       fixture.userRoleRepo.findOne.mockResolvedValue(null);
-      const manager = {
-        getRepository: jest.fn((entity) => (entity === Role ? fixture.roleRepo : fixture.userRoleRepo)),
-      };
+      const scope = fixture.parentScope();
 
-      await fixture.service.assignDefaultRoles(10, manager as any);
+      await fixture.service.assignDefaultRoles(10, scope);
 
       expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
     });

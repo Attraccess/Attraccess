@@ -1,4 +1,4 @@
-import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
+import { Attractap, ResourceFormAction } from '@attraccess/application-models';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {

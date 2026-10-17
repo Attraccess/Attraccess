@@ -1,7 +1,9 @@
+import { ProjectInvitation } from '../transport/models/project-invitation.dto';
+import { mapResponse } from '../transport/response-mapper';
 import { Controller, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { ProjectInvitation } from '@attraccess/database-entities';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+
 import { ProjectsService } from './projects.service';
 
 @ApiTags('Project Invitations')
@@ -17,7 +19,9 @@ export class ProjectInvitationsController {
   })
   @ApiResponse({ status: 200, type: ProjectInvitation, isArray: true })
   async listMyInvitations(@Req() req: AuthenticatedRequest): Promise<ProjectInvitation[]> {
-    return await this.projectsService.listPendingInvitationsForUser(req.user.id);
+    return (await this.projectsService.listPendingInvitationsForUser(req.user.id)).map((record) =>
+      mapResponse(ProjectInvitation, record),
+    );
   }
 
   @Post(':invitationId/accept')
@@ -28,7 +32,15 @@ export class ProjectInvitationsController {
     @Req() req: AuthenticatedRequest,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.acceptInvitation(req.user.id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    return mapResponse(
+      ProjectInvitation,
+      await this.projectsService.acceptInvitation(
+        req.user.id,
+        invitationId,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
+    );
   }
 
   @Post(':invitationId/decline')
@@ -39,6 +51,14 @@ export class ProjectInvitationsController {
     @Req() req: AuthenticatedRequest,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.declineInvitation(req.user.id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
+    return mapResponse(
+      ProjectInvitation,
+      await this.projectsService.declineInvitation(
+        req.user.id,
+        invitationId,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
+    );
   }
 }

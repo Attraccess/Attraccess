@@ -2,7 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { WagoConfigurationSnapshot } from '../configuration/model';
 import { configurationDiff } from '../configuration/model';
-import { WagoController } from './entity';
+import { WagoController } from './record';
 
 export const ENROLLMENT_RETRY_MS = 60_000;
 

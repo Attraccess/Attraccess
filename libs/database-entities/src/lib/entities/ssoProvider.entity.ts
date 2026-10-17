@@ -3,11 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { SSOProviderOIDCConfiguration } from './ssoProvider.oidc';
 import { SSOProviderSAMLConfiguration } from './ssoProvider.saml';
 import { IsEnum } from 'class-validator';
-
-export enum SSOProviderType {
-  OIDC = 'OIDC',
-  SAML = 'SAML',
-}
+import { SSOProviderType } from '@attraccess/application-models';
 
 @Entity()
 export class SSOProvider {
@@ -66,3 +62,5 @@ export class SSOProvider {
   })
   samlConfiguration?: SSOProviderSAMLConfiguration;
 }
+
+export { SSOProviderType } from '@attraccess/application-models';

@@ -1,6 +1,9 @@
+import { withWagoPersistenceFixture } from './wago-service.test-fixture';
+import type { PluginBackendAdapters } from '@attraccess/plugins-backend-sdk/adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { Type } from '@nestjs/common';
-import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginBackendModule } from '@attraccess/plugins-backend-sdk/v2';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -27,9 +30,9 @@ it('resolves the packaged commissioning and managed-runtime providers to the sam
     );
     // Resolve host packages through the same Jest runtime as Nest's testing module.
     load(require, bundledModule, bundledModule.exports, bundle, dirname(bundle));
-    const plugin = (bundledModule.exports as { default: PluginBackendModule }).default;
+    const plugin = (bundledModule.exports as { default: PluginBackendModule & PluginBackendAdapters }).default;
     const context = {} as PluginContext;
-    const registration = plugin.register(context);
+    const registration = plugin.register(withWagoPersistenceFixture(context, plugin));
     const compiled = await Test.createTestingModule({ imports: [registration] }).compile();
     module = compiled;
     const provider = (name: string) => {

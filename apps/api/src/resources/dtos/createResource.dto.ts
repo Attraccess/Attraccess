@@ -1,9 +1,7 @@
-import {
-  AutoIntroductionTarget,
-  ResourceType,
-  SupervisionMode,
-  DocumentationType,
-} from '@attraccess/database-entities';
+import { AutoIntroductionTarget } from '@attraccess/application-models';
+import { ResourceType } from '@attraccess/application-models';
+import { SupervisionMode } from '@attraccess/application-models';
+import { DocumentationType } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,

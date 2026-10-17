@@ -1,4 +1,4 @@
-import { ResourceFlowNode, ErrorNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, ErrorNodeDataSchema } from '@attraccess/application-models';
 import z from 'zod';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';

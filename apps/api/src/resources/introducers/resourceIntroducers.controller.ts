@@ -1,8 +1,10 @@
+import { ResourceIntroducer } from '../../transport/models/resourceIntroducer.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { ResourceIntroducerType } from '@attraccess/application-models';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { IsResourceIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from './dtos/grantIntroducer.dto';
 
@@ -51,7 +53,9 @@ export class ResourceIntroducersController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query('type') type?: ResourceIntroducerType,
   ): Promise<ResourceIntroducer[]> {
-    return await this.resourceIntroducersService.getMany(resourceId, type);
+    return (await this.resourceIntroducersService.getMany(resourceId, type)).map((record) =>
+      mapResponse(ResourceIntroducer, record),
+    );
   }
 
   @Post('/:userId/grant')
@@ -70,7 +74,7 @@ export class ResourceIntroducersController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
-    return await this.resourceIntroducersService.grant(resourceId, userId, body?.type);
+    return mapResponse(ResourceIntroducer, await this.resourceIntroducersService.grant(resourceId, userId, body?.type));
   }
 
   @Delete('/:userId/revoke')

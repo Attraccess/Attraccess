@@ -4,7 +4,8 @@ import { Registry } from 'prom-client';
 import { DataSource, QueryRunner } from 'typeorm';
 import { createDbMetrics } from '../../definitions/db.metrics';
 import { MetricsToggleService } from '../../settings/metrics-toggle.service';
-import { DbMetricsInstrumentation, parseSql } from './db.instrumentation';
+import { DbMetricsInstrumentation } from './db.instrumentation';
+import { TypeormQueryInstrumentation, parseSql } from '../../persistence/typeorm-adapter';
 
 interface FakeRunner {
   query: (sql: string, params?: unknown[]) => Promise<unknown>;
@@ -16,7 +17,11 @@ interface FakeDriver {
 }
 
 describe('DbMetricsInstrumentation', () => {
-  function setup(opts?: { enabled?: boolean; threshold?: number; queryImpl?: (sql: string, params?: unknown[]) => Promise<unknown> }) {
+  function setup(opts?: {
+    enabled?: boolean;
+    threshold?: number;
+    queryImpl?: (sql: string, params?: unknown[]) => Promise<unknown>;
+  }) {
     const enabled = opts?.enabled ?? true;
     const threshold = opts?.threshold ?? 0.5;
     const queryImpl = opts?.queryImpl ?? (async () => []);
@@ -30,7 +35,7 @@ describe('DbMetricsInstrumentation', () => {
       createQueryRunner: () => ({ query: queryImpl }),
     };
     const dataSource = { driver } as unknown as DataSource;
-    const instrumentation = new DbMetricsInstrumentation(metrics, toggle, dataSource);
+    const instrumentation = new DbMetricsInstrumentation(metrics, toggle, new TypeormQueryInstrumentation(dataSource));
     return { registry, metrics, toggle, dataSource, driver, instrumentation };
   }
 
@@ -39,10 +44,10 @@ describe('DbMetricsInstrumentation', () => {
   }
 
   it('patches the driver only once', () => {
-    const { instrumentation, dataSource, driver } = setup();
-    instrumentation.install(dataSource);
+    const { instrumentation, driver } = setup();
+    instrumentation.install();
     const patched = driver.createQueryRunner;
-    instrumentation.install(dataSource);
+    instrumentation.install();
     expect(driver.createQueryRunner).toBe(patched);
   });
 
@@ -64,11 +69,11 @@ describe('DbMetricsInstrumentation', () => {
       createQueryRunner: () => cachedRunner,
     };
     const dataSource = { driver } as unknown as DataSource;
-    const instrumentation = new DbMetricsInstrumentation(metrics, toggle, dataSource);
-    instrumentation.install(dataSource);
+    const instrumentation = new DbMetricsInstrumentation(metrics, toggle, new TypeormQueryInstrumentation(dataSource));
+    instrumentation.install();
 
     for (let i = 0; i < 200; i += 1) {
-      (driver.createQueryRunner('master') as unknown as QueryRunner);
+      driver.createQueryRunner('master') as unknown as QueryRunner;
     }
     await (cachedRunner.query as (sql: string) => Promise<unknown>)('SELECT * FROM "user"');
 
@@ -78,8 +83,8 @@ describe('DbMetricsInstrumentation', () => {
   });
 
   it('records select duration with parsed entity from FROM clause', async () => {
-    const { instrumentation, dataSource, driver, registry } = setup();
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, registry } = setup();
+    instrumentation.install();
 
     await makeRunner(driver).query('SELECT * FROM "user" WHERE "id" = ?', [1]);
 
@@ -88,8 +93,8 @@ describe('DbMetricsInstrumentation', () => {
   });
 
   it('records insert duration with parsed entity from INTO clause', async () => {
-    const { instrumentation, dataSource, driver, registry } = setup();
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, registry } = setup();
+    instrumentation.install();
 
     await makeRunner(driver).query('INSERT INTO "session" ("id") VALUES (?)', [1]);
 
@@ -98,8 +103,8 @@ describe('DbMetricsInstrumentation', () => {
   });
 
   it('records update duration with parsed entity', async () => {
-    const { instrumentation, dataSource, driver, registry } = setup();
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, registry } = setup();
+    instrumentation.install();
 
     await makeRunner(driver).query('UPDATE "resource" SET "name" = ? WHERE "id" = ?', ['x', 1]);
 
@@ -108,8 +113,8 @@ describe('DbMetricsInstrumentation', () => {
   });
 
   it('records delete duration with parsed entity', async () => {
-    const { instrumentation, dataSource, driver, registry } = setup();
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, registry } = setup();
+    instrumentation.install();
 
     await makeRunner(driver).query('DELETE FROM "session" WHERE "id" = ?', [1]);
 
@@ -118,8 +123,8 @@ describe('DbMetricsInstrumentation', () => {
   });
 
   it('skips housekeeping verbs (BEGIN, COMMIT, PRAGMA, ...)', async () => {
-    const { instrumentation, dataSource, driver, registry } = setup();
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, registry } = setup();
+    instrumentation.install();
 
     await makeRunner(driver).query('BEGIN TRANSACTION');
     await makeRunner(driver).query('COMMIT');
@@ -130,8 +135,8 @@ describe('DbMetricsInstrumentation', () => {
   });
 
   it('emits no series when toggle is disabled', async () => {
-    const { instrumentation, dataSource, driver, registry } = setup({ enabled: false });
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, registry } = setup({ enabled: false });
+    instrumentation.install();
 
     await makeRunner(driver).query('SELECT * FROM "user"');
 
@@ -145,8 +150,8 @@ describe('DbMetricsInstrumentation', () => {
       new Promise<unknown>((resolve) => {
         resolveQuery = () => resolve([]);
       });
-    const { instrumentation, dataSource, driver, metrics } = setup({ threshold: 0, queryImpl });
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, metrics } = setup({ threshold: 0, queryImpl });
+    instrumentation.install();
     const slowSpy = jest.spyOn(metrics.slowQueriesTotal, 'inc');
 
     const promise = makeRunner(driver).query('SELECT * FROM "user"');
@@ -159,13 +164,15 @@ describe('DbMetricsInstrumentation', () => {
 
   it('records error and observes duration when query throws', async () => {
     const queryImpl = () => Promise.reject(Object.assign(new Error('boom'), { code: 'SQLITE_BUSY' }));
-    const { instrumentation, dataSource, driver, registry } = setup({ queryImpl });
-    instrumentation.install(dataSource);
+    const { instrumentation, driver, registry } = setup({ queryImpl });
+    instrumentation.install();
 
     await expect(makeRunner(driver).query('SELECT * FROM "user"')).rejects.toThrow('boom');
 
     const text = await registry.metrics();
-    expect(text).toContain('attraccess_db_query_errors_total{entity="user",method="select",error_type="SQLITE_BUSY"} 1');
+    expect(text).toContain(
+      'attraccess_db_query_errors_total{entity="user",method="select",error_type="SQLITE_BUSY"} 1',
+    );
     expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="user",method="select"} 1');
   });
 

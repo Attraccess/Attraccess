@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { Session, SsoSessionContext, User, entities } from '@attraccess/database-entities';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import Redis from 'ioredis';
 import { instanceToPlain } from 'class-transformer';
-import { SessionStore } from './session-store';
+import { SessionStore, SessionUserReader } from './session-store';
 import { SessionStrategy } from '../../strategies/session.strategy';
 import { TwoFactorService } from '../two-factor.service';
 import { RbacService } from '../../rbac/rbac.service';
@@ -77,8 +77,8 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         container = await new GenericContainer('valkey/valkey:8-alpine').withExposedPorts(6379).start();
         client = new Redis(container.getMappedPort(6379), container.getHost());
         const users = {
-          findOne: async () => ({ id: 7, username: 'fixture', email: 'fixture@example.com', isEmailVerified: true }),
-        } as unknown as Repository<User>;
+          findById: async () => ({ id: 7, username: 'fixture', email: 'fixture@example.com', isEmailVerified: true }),
+        } as unknown as SessionUserReader;
         store = new ValkeySessionStore(client, users, hash);
       }
     });

@@ -1,3 +1,10 @@
+import { TransactionScope, operationToken } from '../../../../database/transaction-scope';
+import { BILLING_OPERATIONS } from '../../../../billing/persistence/port';
+import { sqliteResourceFixture } from '../../../../database/conformance/sqlite-fixture';
+import { DatabaseTransactions } from '../../../../database/transaction-scope';
+import { SqliteTransactionDriver } from '../../../../database/sqlite/transactions';
+import { OPERATING_INTERVAL_WRITES } from '../../../operating-intervals/persistence/port';
+import { operatingIntervalTransactionOperations } from '../../../operating-intervals/persistence/typeorm-adapter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import {
@@ -5,13 +12,12 @@ import {
   BillingTransactionStatus,
   Form,
   Resource,
-  ResourceOperatingInterval,
   ResourceType,
   ResourceUsage,
   SupervisionMode,
   User,
 } from '@attraccess/database-entities';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,8 +52,10 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
   scope.users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(['resources.update']) }));
   await scope.source.getRepository(Form).save({ id: 11, name: 'Safety checklist' });
   scope.events = new EventEmitter2();
+  const operatingDriver = new SqliteTransactionDriver(scope.source);
+  operatingDriver.register(OPERATING_INTERVAL_WRITES, operatingIntervalTransactionOperations);
   scope.operating = new ResourceOperatingIntervalService(
-    scope.source.getRepository(ResourceOperatingInterval),
+    new DatabaseTransactions(operatingDriver),
     {
       recordTransition: jest.fn(),
       setResourceState: jest.fn(),
@@ -56,21 +64,12 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     scope.events,
   );
   scope.flow = { runFlow: jest.fn(), trackResourceActivity: jest.fn() };
-  scope.billing = {
-    getResourceBillingConfiguration: jest
-      .fn()
-      .mockResolvedValue({ creditsPerUsage: 5, creditsPerMinute: 2, creditsPerOperatingMinute: 3 }),
-    validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
-    handleResourceUsageStart: jest.fn(
-      async (_resourceId: number, session: ResourceUsage, user: User, manager: EntityManager) =>
-        manager.save(BillingTransaction, {
-          resourceUsageId: session.id,
-          userId: user.id,
-          amount: 0,
-          status: BillingTransactionStatus.Pending,
-        }),
-    ),
-    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, manager: EntityManager) => {
+  const fixedCharge = operationToken<{ charge(session: ResourceUsage): Promise<BillingTransaction> }>(
+    'fixture fixed ledger charge',
+    ['charge'],
+  );
+  sqliteResourceFixture(scope.source).driver.register(fixedCharge, (manager) => ({
+    charge: async (session) => {
       const transaction = await manager.findOneByOrFail(BillingTransaction, { resourceUsageId: session.id });
       await manager.update(BillingTransaction, transaction.id, {
         amount: 23,
@@ -78,6 +77,24 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
       });
       await manager.decrement(User, { id: session.userId }, 'creditBalance', 23);
       return transaction;
+    },
+  }));
+  scope.billing = {
+    getResourceBillingConfiguration: jest
+      .fn()
+      .mockResolvedValue({ creditsPerUsage: 5, creditsPerMinute: 2, creditsPerOperatingMinute: 3 }),
+    validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
+    handleResourceUsageStart: jest.fn(
+      async (_resourceId: number, session: ResourceUsage, user: User, manager: TransactionScope) =>
+        manager.resolve(BILLING_OPERATIONS).createTransaction({
+          resourceUsageId: session.id,
+          userId: user.id,
+          amount: 0,
+          status: BillingTransactionStatus.Pending,
+        }),
+    ),
+    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, manager: TransactionScope) => {
+      return manager.resolve(fixedCharge).charge(session);
     }),
     notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
   };
@@ -86,9 +103,8 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     canManageMaintenance: jest.fn().mockResolvedValue(false),
   };
   scope.usage = new ResourceUsageService(
-    scope.source.getRepository(Resource),
-    scope.source.getRepository(ResourceUsage),
-    scope.source.getRepository(User),
+    sqliteResourceFixture(scope.source).usage,
+    sqliteResourceFixture(scope.source).transactions,
     {} as never,
     {} as never,
     {} as never,
@@ -97,10 +113,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     scope.maintenance as never,
     scope.events,
     scope.billing as never,
-    new ResourceOperatingAttributionService(
-      scope.source.getRepository(ResourceOperatingInterval),
-      scope.source.getRepository(ResourceUsage),
-    ),
+    new ResourceOperatingAttributionService(sqliteResourceFixture(scope.source).attribution),
     scope.flow as never,
     {} as never,
     {

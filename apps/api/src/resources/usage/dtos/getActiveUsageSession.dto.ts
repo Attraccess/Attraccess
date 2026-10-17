@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceUsage } from '@attraccess/database-entities';
+import { ResourceUsage } from '../../../transport/models/resourceUsage.dto';
 
 export class GetActiveUsageSessionDto {
   @ApiProperty({

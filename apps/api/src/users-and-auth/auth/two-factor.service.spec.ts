@@ -1,3 +1,4 @@
+import { TypeormTwoFactorPersistence } from './persistence/typeorm-adapter';
 import type { Repository } from 'typeorm';
 import type { AuthenticationDetail, Setting, User } from '@attraccess/database-entities';
 import type { SettingsService } from '../../settings/settings.service';
@@ -25,8 +26,10 @@ describe('TwoFactorService enrollment and login', () => {
     repository.findOne.mockReset();
     otp.verify.mockResolvedValue({ valid: true });
     service = new TwoFactorService(
-      repository as unknown as Repository<AuthenticationDetail>,
-      {} as Repository<Setting>,
+      new TypeormTwoFactorPersistence(
+        repository as unknown as Repository<AuthenticationDetail>,
+        {} as Repository<Setting>,
+      ),
       settings as unknown as SettingsService,
       encryption as unknown as EncryptionService,
       metrics as unknown as MetricsService,
@@ -61,6 +64,7 @@ describe('TwoFactorService enrollment and login', () => {
       epochTolerance: 30,
     });
     expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ totpEnabledAt: expect.any(Date) }));
+    repository.findOne.mockResolvedValue(repository.save.mock.calls.at(-1)?.[0]);
     await expect(service.enable(user, '123456')).rejects.toThrow('TwoFactorAlreadyEnabled');
   });
   it('requires and validates a code for enabled factors while allowing unconfigured users through this check', async () => {

@@ -1,18 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsBoolean,
-  IsDefined,
-  IsEnum,
-  IsOptional,
-  IsString,
-  ValidateIf,
-  ValidateNested,
-} from 'class-validator';
+import { IsBoolean, IsDefined, IsEnum, IsOptional, IsString, ValidateIf, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import {
-  ResourceMaintenanceScheduleDurationBasis,
-  ResourceMaintenanceScheduleTriggerType,
-} from '@attraccess/database-entities';
+import { ResourceMaintenanceScheduleDurationBasis } from '@attraccess/application-models';
+import { ResourceMaintenanceScheduleTriggerType } from '@attraccess/application-models';
 import { UsageHoursTriggerConfigDto } from './usage-hours-trigger-config.dto';
 import { UsageCountTriggerConfigDto } from './usage-count-trigger-config.dto';
 import { TimeIntervalTriggerConfigDto } from './time-interval-trigger-config.dto';
@@ -71,7 +61,9 @@ export class CreateMaintenanceScheduleDto {
   })
   usageCountConfig?: UsageCountTriggerConfigDto;
 
-  @ValidateIf((o: CreateMaintenanceScheduleDto) => o.triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL)
+  @ValidateIf(
+    (o: CreateMaintenanceScheduleDto) => o.triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+  )
   @IsDefined()
   @ValidateNested()
   @Type(() => TimeIntervalTriggerConfigDto)

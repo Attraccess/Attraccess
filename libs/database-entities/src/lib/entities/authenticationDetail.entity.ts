@@ -7,7 +7,10 @@ import { SSOProviderType } from './ssoProvider.entity';
 
 @Entity()
 @Index(['userId', 'type'], { unique: true })
-@Index(['providerType', 'providerId', 'ssoSubject'], { unique: true, where: '"providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL' })
+@Index(['providerType', 'providerId', 'ssoSubject'], {
+  unique: true,
+  where: '"providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL',
+})
 export class AuthenticationDetail {
   @PrimaryGeneratedColumn()
   @ApiProperty({

@@ -1,12 +1,12 @@
-import { Resource, ResourceGroup, ResourceIntroducer, ResourceIntroduction } from '@attraccess/database-entities';
+import { ResourceGroup } from '@attraccess/application-models';
 
 import { Inject, Injectable } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { GroupPersistence, GROUP_OPERATIONS } from './persistence/port';
 
-import { Repository, EntityManager } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -34,64 +34,19 @@ export interface GroupVisibilityContext {
 @Injectable()
 export class ResourceGroupsService {
   constructor(
-    @InjectRepository(ResourceGroup)
-    protected readonly resourceGroupRepository: Repository<ResourceGroup>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    protected readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(ResourceIntroduction)
-    protected readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
+    @Inject(GroupPersistence) protected readonly persistence: GroupPersistence,
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
     protected readonly audit: AuditService,
   ) {}
 
-  /**
-   * SQL fragment (for use against the `group` query-builder alias) that is true when the user has a
-   * currently valid (latest history item = GRANT) introduction to the group. Uses the `:userId`
-   * named parameter.
-   */
-  protected static readonly ACTIVE_INTRODUCTION_EXISTS_SQL = `EXISTS (
-    SELECT 1 FROM "resource_introduction" "rin"
-    WHERE "rin"."resourceGroupId" = group.id AND "rin"."receiverUserId" = :userId
-    AND (
-      SELECT "h"."action" FROM "resource_introduction_history_item" "h"
-      WHERE "h"."introductionId" = "rin"."id"
-      ORDER BY "h"."createdAt" DESC, "h"."id" DESC
-      LIMIT 1
-    ) = 'grant'
-  )`;
-
-  protected visibleGroupsQuery(visibility?: GroupVisibilityContext) {
-    const query = this.resourceGroupRepository.createQueryBuilder('group');
-    if (!visibility || visibility.canUpdateResources) return query;
-
-    return query
-      .where('group.isHidden = :notHidden', { notHidden: false })
-      .orWhere(
-        `EXISTS (SELECT 1 FROM "resource_introducer" "ri" WHERE "ri"."resourceGroupId" = group.id AND "ri"."userId" = :userId)`,
-        { userId: visibility.userId },
-      )
-      .orWhere(ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL, { userId: visibility.userId });
-  }
-
   public async getMany(visibility?: GroupVisibilityContext): Promise<ResourceGroup[]> {
-    return this.visibleGroupsQuery(visibility).getMany();
+    return this.persistence.visibleGroups(visibility && !visibility.canUpdateResources ? visibility.userId : undefined);
   }
 
   public async hasVisibleResources(visibility: GroupVisibilityContext): Promise<boolean> {
-    const resources = this.resourceRepository.createQueryBuilder('resource');
-    if (visibility.canUpdateResources) return resources.getExists();
-
-    const visibleGroups = this.visibleGroupsQuery(visibility).select('group.id');
-    return resources
-      .leftJoin('resource.groups', 'resourceGroup')
-      .where('resourceGroup.id IS NULL')
-      .orWhere(`resourceGroup.id IN (${visibleGroups.getQuery()})`)
-      .setParameters(visibleGroups.getParameters())
-      .getExists();
+    return this.persistence.hasVisibleResources(visibility.canUpdateResources ? undefined : visibility.userId);
   }
 
   public async getOne(
@@ -99,13 +54,7 @@ export class ResourceGroupsService {
     relations?: string[],
     visibility?: GroupVisibilityContext,
   ): Promise<ResourceGroup> {
-    const group = await this.resourceGroupRepository.findOne({
-      where: {
-        id: searchOptions.id,
-      },
-
-      relations,
-    });
+    const group = await this.persistence.group(searchOptions.id, relations?.includes('resources') ?? false);
 
     if (!group) {
       throw new ResourceGroupNotFoundException({ id: searchOptions.id });
@@ -126,7 +75,7 @@ export class ResourceGroupsService {
     dto: CreateResourceGroupDto,
     actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<ResourceGroup> {
-    const resourceGroup = this.resourceGroupRepository.create({
+    const savedResourceGroup = await this.persistence.createGroup({
       name: dto.name,
       description: dto.description,
       retrainingMaxAgeDays: dto.retrainingMaxAgeDays ?? null,
@@ -134,7 +83,6 @@ export class ResourceGroupsService {
       retrainingBlocksAccess: dto.retrainingBlocksAccess ?? false,
       isHidden: dto.isHidden ?? false,
     });
-    const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
@@ -169,7 +117,7 @@ export class ResourceGroupsService {
       isHidden: resourceGroup.isHidden,
     };
 
-    const savedResourceGroup = await this.resourceGroupRepository.save({
+    const savedResourceGroup = await this.persistence.saveGroup({
       ...resourceGroup,
       name: updateDto.name !== undefined ? updateDto.name : resourceGroup.name,
       description: updateDto.description !== undefined ? updateDto.description : resourceGroup.description,
@@ -234,8 +182,8 @@ export class ResourceGroupsService {
     actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
-    const result = await this.resourceGroupRepository.delete(groupId);
-    if (result.affected === 0) {
+    const result = await this.persistence.deleteGroup(groupId);
+    if (result === 0) {
       throw new ResourceGroupNotFoundException({ id: groupId });
     }
     this.eventEmitter.emit(
@@ -267,26 +215,8 @@ export class ResourceGroupsService {
    * their row (and a REVOKE history item) in the database but must not grant visibility.
    */
   public async userIsPartOfGroup(groupId: number, userId: number): Promise<boolean> {
-    const introducerCount = await this.resourceIntroducerRepository.count({
-      where: { resourceGroupId: groupId, userId },
-    });
-    if (introducerCount > 0) {
-      return true;
-    }
-
-    const activeIntroductions = await this.resourceIntroductionRepository.query(
-      `SELECT 1 FROM "resource_introduction" "rin"
-       WHERE "rin"."resourceGroupId" = ? AND "rin"."receiverUserId" = ?
-       AND (
-         SELECT "h"."action" FROM "resource_introduction_history_item" "h"
-         WHERE "h"."introductionId" = "rin"."id"
-         ORDER BY "h"."createdAt" DESC, "h"."id" DESC
-         LIMIT 1
-       ) = 'grant'
-       LIMIT 1`,
-      [groupId, userId],
-    );
-    return activeIntroductions.length > 0;
+    if ((await this.persistence.introducerCount(groupId, userId)) > 0) return true;
+    return this.persistence.hasActiveIntroduction(groupId, userId);
   }
 
   public async addResource(
@@ -302,18 +232,14 @@ export class ResourceGroupsService {
       return;
     }
 
-    const resource = await this.resourceRepository.findOne({
-      where: {
-        id: resourceId,
-      },
-    });
+    const resource = await this.persistence.resource(resourceId);
 
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
     }
 
     resourceGroup.resources.push(resource);
-    const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
+    const savedResourceGroup = await this.persistence.saveGroup(resourceGroup);
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
@@ -344,7 +270,7 @@ export class ResourceGroupsService {
     }
 
     resourceGroup.resources = resourceGroup.resources.filter((resource) => resource.id !== resourceId);
-    const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
+    const savedResourceGroup = await this.persistence.saveGroup(resourceGroup);
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
@@ -362,20 +288,7 @@ export class ResourceGroupsService {
     }
   }
 
-  public async getGroupsOfResource(
-    resourceId: number,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<ResourceGroup[]> {
-    const resourceGroupRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceGroup)
-      : this.resourceGroupRepository;
-
-    return await resourceGroupRepository.find({
-      where: {
-        resources: {
-          id: resourceId,
-        },
-      },
-    });
+  public async getGroupsOfResource(resourceId: number, scope?: TransactionScope): Promise<ResourceGroup[]> {
+    return (scope ? scope.resolve(GROUP_OPERATIONS) : this.persistence).groupsOfResource(resourceId);
   }
 }

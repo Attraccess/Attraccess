@@ -2,35 +2,14 @@
 //
 // Demonstrates the three core backend capabilities a real plugin needs:
 //   1. A NestJS controller that adds a REST endpoint to the host API.
-//   2. A service that reads from the host database through an injected repository.
+//   2. A service that reads user names through permission-checked host operations.
 //   3. A handler subscribed to a typed host SystemEvent.
 //
 // It is built in isolation (own bundler, own node_modules resolution) exactly
 // like a third-party plugin would be — see ../build.mjs and ../README.md.
-import type { PluginBackendModule, PluginContext, SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_CONTEXT, SystemEvent } from '@attraccess/plugins-backend-sdk/v2';
+import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from '@nestjs/common';
-
-/**
- * The injection token the host uses to hand each plugin its PluginContext.
- * Recreated locally (NOT imported as a runtime value) so the built artifact has
- * zero runtime dependency on the SDK package: `Symbol.for()` resolves against the
- * process-global registry, so this is the exact same symbol the host registers.
- */
-const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
-
-/**
- * Typed host SystemEvent this plugin subscribes to. `SystemEvent` is imported as
- * a TYPE only (erased at build time); the enum value is supplied as a string
- * literal cast so the artifact keeps zero runtime dependency on the SDK.
- * Subscribing requires the `LISTEN_EVENTS` permission declared in plugin.json.
- */
-const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
-
-/** Minimal shape of the host `User` row we read — declared locally, no import. */
-interface UserRow {
-  id: number;
-  username: string;
-}
 
 @Injectable()
 class HelloWorldService implements OnModuleInit {
@@ -39,7 +18,7 @@ class HelloWorldService implements OnModuleInit {
   // Subscribe to a typed host event once the plugin's module is initialised.
   // Handler errors are isolated by the host and never break the core flow.
   async onModuleInit(): Promise<void> {
-    this.context.onEvent(RESOURCE_USAGE_STARTED, ({ resource, user }) => {
+    this.context.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, ({ resource, user }) => {
       this.context.logger.log(`Resource ${resource.id} usage started by user ${user.id} — hello!`);
       return this.context.flows.trigger(
         'plugin.plugin-hello-world.usage-started',
@@ -54,13 +33,10 @@ class HelloWorldService implements OnModuleInit {
     await this.context.mqtt.publish(1, 'hello-world/ping', 'Hello from the plugin!');
   }
 
-  // Read from the host DB through an injected repository. We address the entity
-  // by NAME ('User') rather than importing the class, which keeps the artifact
-  // dependency-free; the host resolves the name to its own User entity and gates
-  // the call behind the READ_USERS permission.
+  // The host returns only user IDs and names, after checking READ_USERS.
+  // No entity class, repository, connection or query expression crosses this boundary.
   async greetUsers(): Promise<string[]> {
-    const users = this.context.getRepository<UserRow>('User');
-    const rows = await users.find({ take: 5 });
+    const rows = await this.context.operations.users.list({ limit: 5 });
     return rows.map((row) => `Hello, ${row.username}!`);
   }
 }
@@ -85,6 +61,7 @@ class HelloWorldController {
 class HelloWorldPluginModule {}
 
 const plugin: PluginBackendModule = {
+  persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
   flowNodes: [
     {
       type: 'plugin.plugin-hello-world.usage-started',

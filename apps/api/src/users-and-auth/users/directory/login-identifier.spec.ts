@@ -9,7 +9,7 @@ describe('UsersService', () => {
     it('preserves existing username normalization', async () => {
       const user = { id: 7 } as User;
       fixture.userRepository.findOne.mockResolvedValue(user);
-      await expect(fixture.service.findByLoginIdentifier(' Alice ')).resolves.toBe(user);
+      await expect(fixture.service.findByLoginIdentifier(' Alice ')).resolves.toEqual(user);
       expect(fixture.userRepository.findOne).toHaveBeenCalledWith({
         where: { username: 'alice' },
         relations: undefined,

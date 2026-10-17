@@ -2,9 +2,8 @@
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Resource, ResourceHealthStatus, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceHealthRecipients } from './persistence/port';
+import { Resource, ResourceHealthStatus, User } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -20,12 +19,7 @@ export class ResourceHealthNotificationListener {
   private readonly logger = new Logger(ResourceHealthNotificationListener.name);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly persistence: ResourceHealthRecipients,
     private readonly notifications: NotificationDispatchService,
     private readonly rbacService: RbacService,
   ) {}
@@ -37,10 +31,7 @@ export class ResourceHealthNotificationListener {
     }
 
     try {
-      const resource = await this.resourceRepository.findOne({
-        where: { id: event.resourceId },
-        relations: ['groups'],
-      });
+      const resource = await this.persistence.resourceWithGroups(event.resourceId);
       if (!resource) {
         this.logger.warn(`Health event for missing resource ${event.resourceId}; skipping notifications`);
         return;
@@ -89,16 +80,9 @@ export class ResourceHealthNotificationListener {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
-    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
+    const admins = await this.persistence.usersByIds(adminIds);
 
-    const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
-    if (groupIds.length > 0) {
-      introducerWhere.push({ resourceGroupId: In(groupIds) });
-    }
-    const introducerRows = await this.resourceIntroducerRepository.find({
-      where: introducerWhere,
-      relations: ['user'],
-    });
+    const introducerRows = await this.persistence.introducersForResource(resource.id, groupIds);
 
     const byId = new Map<number, User>();
     for (const admin of admins) {

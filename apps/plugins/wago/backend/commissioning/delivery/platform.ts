@@ -18,8 +18,6 @@ import { runProcess } from './process';
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
-import { WagoController } from '../../controllers/entity';
-
 import { ManagementError } from '../../management/service';
 
 import { TemporarySshCredential } from '../model';
@@ -30,7 +28,7 @@ import { CC100_DIGITAL_PROFILE_ID, type Cc100HardwareProfile } from '../../../sh
 
 import { randomBytes } from 'node:crypto';
 
-import { WagoCommissioningSession } from '../sessions/session.entity';
+import { WagoCommissioningSession } from '../sessions/session.record';
 
 import {
   wagoCommissioningPreparationScript,
@@ -164,7 +162,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
   ) {
     return this.withControllerLock(id, () =>
       this.withDeliveryLock(id, async () => {
-        const session = await this.sessions.findOneBy({ id });
+        const session = await this.persistence.session(id);
         if (!session) throw new NotFoundException('commissioning session not found');
         if (
           ['awaiting_identity_confirmation', 'delivering'].includes(session.state) ||
@@ -172,9 +170,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
         )
           throw new ConflictException('Confirm controller identity and finish delivery before management changes.');
         if (!session.managementControllerId) {
-          const controller = await this.context
-            .getRepository(WagoController)
-            .findOneBy({ hardwareId: session.hardwareId, mqttServerId: session.mqttServerId });
+          const controller = await this.persistence.controllerByHardware(session.hardwareId, session.mqttServerId);
           if (!controller) throw new ConflictException('Wait for controller enrollment before management inspection.');
           session.managementControllerId = controller.id;
           await this.save(session, 'management_subject_bound');
@@ -245,7 +241,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
   }
 
   async managementStatus(id: number) {
-    const session = await this.sessions.findOneBy({ id });
+    const session = await this.persistence.session(id);
     if (!session) throw new NotFoundException('commissioning session not found');
     return session.managementControllerId ? this.management.status(session.managementControllerId) : null;
   }
@@ -352,7 +348,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
       () =>
         this.withControllerLock(id, () =>
           this.withDeliveryLock(id, async () => {
-            const session = await this.sessions.findOneBy({ id });
+            const session = await this.persistence.session(id);
             if (!session) throw new NotFoundException('commissioning session not found');
             if (
               ['awaiting_identity_confirmation', 'delivering'].includes(session.state) ||
@@ -417,14 +413,14 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
 
   protected async reconcileDiscovery(): Promise<void> {
     for (let skip = 0; ; skip += 100) {
-      const page = await this.sessions.find({ order: { id: 'ASC' }, take: 100, skip });
+      const page = await this.persistence.recoveryPage(skip);
       for (const session of page) {
         if (session.state !== 'awaiting_discovery' || session.enrollmentId === null) continue;
-        const controller = await this.context.getRepository(WagoController).findOneBy({
-          hardwareId: session.hardwareId,
-          mqttServerId: session.mqttServerId,
-          enrollmentId: session.enrollmentId,
-        });
+        const controller = await this.persistence.controllerByHardware(
+          session.hardwareId,
+          session.mqttServerId,
+          session.enrollmentId,
+        );
         if (controller?.trustState === 'untrusted') await this.claimDiscovered(controller);
       }
       if (page.length < 100) return;

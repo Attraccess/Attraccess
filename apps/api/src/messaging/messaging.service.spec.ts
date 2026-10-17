@@ -1,3 +1,5 @@
+import { MessagingPersistence } from './persistence/port';
+import { TypeormMessagingPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -76,6 +78,7 @@ describe('MessagingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MessagingService,
+        { provide: MessagingPersistence, useClass: TypeormMessagingPersistence },
         { provide: getRepositoryToken(Conversation), useValue: conversationRepository },
         { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
         { provide: getRepositoryToken(Message), useValue: messageRepository },

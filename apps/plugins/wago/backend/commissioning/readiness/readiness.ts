@@ -1,5 +1,5 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
-import { PLUGIN_CONTEXT, PluginContext, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_CONTEXT, PluginContext, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk/v2';
 import { admitEnvelope, emptyStream, type DiagnosticStream } from '../../diagnostics/envelope';
 import { normalizeOperationalPrefix, parseOperationalMessage } from '../../protocol';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../../shared/clock';
@@ -51,7 +51,7 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
       }
   }, 30_000).unref();
 
-  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
+  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: Pick<PluginContext, 'mqtt'>) {}
 
   observe(serverId: number, hardwareId: string, prefix: string): CommissioningRuntimeState | undefined {
     const topic = `${normalizeOperationalPrefix(prefix)}/v1/controllers/${hardwareId}/state`;

@@ -9,6 +9,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
+    '^@attraccess/plugins-backend-sdk/v2$': '<rootDir>/../../../libs/plugins-backend-sdk/src/v2.ts',
+    '^@attraccess/plugins-backend-sdk/adapter$': '<rootDir>/../../../libs/plugins-backend-sdk/src/adapter.ts',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
   coverageDirectory: '../../../coverage/apps/plugins/rabbitmq',

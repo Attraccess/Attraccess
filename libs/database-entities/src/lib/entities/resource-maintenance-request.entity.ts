@@ -1,21 +1,9 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceMaintenance } from './resource.maintenance';
-
-export enum MaintenanceRequestStatus {
-  OPEN = 'open',
-  RESOLVED = 'resolved',
-  DISMISSED = 'dismissed',
-}
+import { MaintenanceRequestStatus } from '@attraccess/application-models';
 
 @Entity()
 export class ResourceMaintenanceRequest {
@@ -99,3 +87,5 @@ export class ResourceMaintenanceRequest {
   })
   resultingMaintenance!: ResourceMaintenance | null;
 }
+
+export { MaintenanceRequestStatus } from '@attraccess/application-models';

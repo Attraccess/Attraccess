@@ -1,3 +1,5 @@
+import { FlowVariablePersistence } from '../persistence/port';
+import { TypeormFlowVariablePersistence } from '../persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -47,7 +49,11 @@ describe('ResourceFlowVariablesService', () => {
         const before = store.length;
         store = store.filter(
           (r) =>
-            !(r.scope === criteria.scope && r.key === criteria.key && (criteria.resourceId ?? null) === r.resourceId),
+            !(
+              r.scope === criteria.scope &&
+              r.key === criteria.key &&
+              matchResourceId(criteria.resourceId, r.resourceId)
+            ),
         );
         return { affected: before - store.length, raw: [] };
       }),
@@ -58,6 +64,7 @@ describe('ResourceFlowVariablesService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFlowVariablesService,
+        { provide: FlowVariablePersistence, useClass: TypeormFlowVariablePersistence },
         { provide: getRepositoryToken(ResourceFlowVariable), useValue: repo },
         { provide: EventEmitter2, useValue: emitter },
       ],

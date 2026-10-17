@@ -1,3 +1,7 @@
+import { DatabaseTransactions, OperationToken } from '../../../database/transaction-scope';
+import { SsoPersistence } from '../persistence/port';
+import { ssoTransactionOperations, TypeormSsoPersistence } from '../persistence/typeorm-adapter';
+import { EntityManager } from 'typeorm';
 import {
   SSOProvider,
   SSOProviderOIDCConfiguration,
@@ -58,6 +62,30 @@ export function registerSsoServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SSOService,
+        {
+          provide: SsoPersistence,
+          useFactory: (providers, oidc, saml) => new TypeormSsoPersistence(providers, oidc, saml),
+          inject: [
+            SSOProviderRepository,
+            SSOProviderOIDCConfigurationRepository,
+            SSOProviderSAMLConfigurationRepository,
+          ],
+        },
+        {
+          provide: DatabaseTransactions,
+          useFactory: (providers: Repository<SSOProvider>) =>
+            new DatabaseTransactions({
+              backend: 'sqlite',
+              run: (_conflicts, work) =>
+                providers.manager.transaction(async (manager: EntityManager) =>
+                  work({
+                    resolve: <T extends object>(_token: OperationToken<T>): T =>
+                      ssoTransactionOperations(manager) as unknown as T,
+                  }),
+                ),
+            }),
+          inject: [SSOProviderRepository],
+        },
         {
           provide: LicenseService,
           useValue: {

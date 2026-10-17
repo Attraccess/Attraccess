@@ -15,16 +15,7 @@ export function registerResourceRetrainingServiceEvaluateFixture() {
   });
 
   beforeEach(() => {
-    service = new ResourceRetrainingService(
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-      null as never,
-    );
+    service = new ResourceRetrainingService(null as never, null as never, null as never, null as never);
   });
   return {
     get service() {

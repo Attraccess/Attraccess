@@ -1,16 +1,18 @@
+import { AUDIT_COMMIT_BOUNDARY } from '../../audit/persistence/port';
 import { Logger, ConflictException } from '@nestjs/common';
 
-import { Repository, In, EntityManager, MoreThan } from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../database/transaction-scope';
+import { MeteringPersistence, METERING_OPERATIONS } from './persistence/port';
+import { BILLING_OPERATIONS } from '../../billing/persistence/port';
+import { requireMeteringRecord } from './metering-catalog';
 
 import {
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
   BillingTransaction,
-  BillingTransactionItem,
   BillingTransactionStatus,
   ResourceMeteringOperation,
-  ResourceUsage,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -18,31 +20,29 @@ import { LiveNotificationsService } from '../../billing/live-notifications/live-
 
 import { meterCharge, meterDiscount, formatMeterValue } from './quantity';
 
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
-
 export type MeterFinal = { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string };
 
 export type FinalCollection = { status: 'not-metered' } | { status: 'collected'; meters: Record<string, MeterFinal> };
 
 export class MeteringSettlement {
   public constructor(
-    protected readonly sessions: Repository<ResourceMeteringSession>,
+    protected readonly persistence: MeteringPersistence,
+    protected readonly transactions: DatabaseTransactions,
     protected readonly audit: AuditService,
     protected readonly liveNotifications: LiveNotificationsService,
     protected readonly logger: Logger,
   ) {}
 
+  protected bound(scope?: TransactionScope): MeteringPersistence {
+    return scope ? scope.resolve(METERING_OPERATIONS) : this.persistence;
+  }
+
   async waive(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSession> {
-    const result = await this.sessions.update(
-      {
-        id: sessionId,
-        resourceId,
-        status: In([ResourceMeteringSessionStatus.Pending, ResourceMeteringSessionStatus.Failed]),
-      },
-      { status: ResourceMeteringSessionStatus.Waived, settledAt: new Date() },
-    );
-    if (!result.affected) throw new ConflictException('METER_SESSION_NOT_PENDING');
-    const session = await this.sessions.findOneByOrFail({ id: sessionId });
+    const session = await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (scope) => {
+      const affected = await this.bound(scope).waiveSession(resourceId, sessionId, new Date());
+      if (!affected) throw new ConflictException('METER_SESSION_NOT_PENDING');
+      return requireMeteringRecord(await this.bound(scope).session(sessionId), 'session');
+    });
     void this.audit.recordResource({
       action: 'meter_charge.waived',
       actorId: initiatorId,
@@ -60,67 +60,73 @@ export class MeteringSettlement {
 
   /** The usage's bill is completed and immutable: the meter consumption goes onto a new correction transaction. */
   async settleLate(sessionId: string, operationId: string, initiatorId: number): Promise<void> {
-    const correction = await runSerializedTransaction(this.sessions.manager, async (manager) => {
-      const session = await manager.findOneOrFail(ResourceMeteringSession, { where: { id: sessionId } });
-      if (session.status !== ResourceMeteringSessionStatus.Pending) return null;
-      const operation = await manager.findOneOrFail(ResourceMeteringOperation, { where: { id: operationId } });
-      const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, relations: ['user'] });
-      if (session.creditsPerUnit === 0) {
-        await manager.update(ResourceMeteringSession, session.id, {
+    const reference = requireMeteringRecord(await this.persistence.session(sessionId), 'session');
+    const referenceUsage = requireMeteringRecord(await this.persistence.usage(reference.usageId), 'usage');
+    const correction = await this.transactions.run(
+      { resourceIds: [reference.resourceId], accountIds: referenceUsage.userId == null ? [] : [referenceUsage.userId] },
+      async (manager) => {
+        const session = requireMeteringRecord(await this.bound(manager).session(sessionId), 'session');
+        if (session.status !== ResourceMeteringSessionStatus.Pending) return null;
+        const operation = requireMeteringRecord(await this.bound(manager).operation(operationId), 'operation');
+        const usage = requireMeteringRecord(await this.bound(manager).usage(session.usageId, true), 'usage');
+        if (session.creditsPerUnit === 0) {
+          await this.bound(manager).updateSession(session.id, {
+            status: ResourceMeteringSessionStatus.Settled,
+            consumedValue: operation.totalValue,
+            chargeCredits: 0,
+            finalOperationId: operation.id,
+            failureReason: null,
+            settledAt: new Date(),
+          });
+          return null;
+        }
+        const original = requireMeteringRecord(
+          await manager.resolve(BILLING_OPERATIONS).completedUsageCharge(usage.id),
+          'billing transaction',
+        );
+        const charge = meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit);
+        const factor = usage.billingFactor ?? usage.user.billingFactor;
+        const discount = meterDiscount(charge, factor);
+        const correction = await manager.resolve(BILLING_OPERATIONS).createTransaction({
+          userId: original.userId,
+          initiatorId,
+          correctionOfId: original.id,
+          amount: -(charge - discount),
+          status: BillingTransactionStatus.Completed,
+        });
+        await this.addMeterItem(manager, correction, session, operation);
+        if (discount !== 0) {
+          await manager.resolve(BILLING_OPERATIONS).saveItem({
+            billingTransactionId: correction.id,
+            name: 'BILLING_FACTOR',
+            description: `${factor}%`,
+            externalReference: `metering:${session.id}:${operation.id}:discount`,
+            unitPrice: -discount,
+            quantity: 1,
+          });
+        }
+        await this.bound(manager).updateSession(session.id, {
           status: ResourceMeteringSessionStatus.Settled,
           consumedValue: operation.totalValue,
-          chargeCredits: 0,
+          chargeCredits: charge,
           finalOperationId: operation.id,
           failureReason: null,
           settledAt: new Date(),
         });
-        return null;
-      }
-      const original = await manager.findOneOrFail(BillingTransaction, {
-        where: { resourceUsageId: usage.id, status: BillingTransactionStatus.Completed },
-      });
-      const charge = meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit);
-      const factor = usage.billingFactor ?? usage.user.billingFactor;
-      const discount = meterDiscount(charge, factor);
-      const correction = await manager.save(BillingTransaction, {
-        userId: original.userId,
-        initiatorId,
-        correctionOfId: original.id,
-        amount: -(charge - discount),
-        status: BillingTransactionStatus.Completed,
-      });
-      await this.addMeterItem(manager, correction, session, operation);
-      if (discount !== 0) {
-        await manager.save(BillingTransactionItem, {
-          billingTransactionId: correction.id,
-          name: 'BILLING_FACTOR',
-          description: `${factor}%`,
-          externalReference: `metering:${session.id}:${operation.id}:discount`,
-          unitPrice: -discount,
-          quantity: 1,
-        });
-      }
-      await manager.update(ResourceMeteringSession, session.id, {
-        status: ResourceMeteringSessionStatus.Settled,
-        consumedValue: operation.totalValue,
-        chargeCredits: charge,
-        finalOperationId: operation.id,
-        failureReason: null,
-        settledAt: new Date(),
-      });
-      void this.audit.recordBillingTransactionAfterCommit(
-        {
-          transactionId: correction.id,
-          userId: correction.userId,
-          initiatorId,
-          amount: correction.amount,
-          status: correction.status,
-          source: 'meter-correction',
-        },
-        manager,
-      );
-      return correction;
-    });
+        void this.audit.recordBillingTransactionAfterCommit(
+          {
+            transactionId: correction.id,
+            userId: correction.userId,
+            initiatorId,
+            amount: correction.amount,
+            status: correction.status,
+            source: 'meter-correction',
+          },
+          manager.resolve(AUDIT_COMMIT_BOUNDARY),
+        );
+        return correction;
+      },
+    );
     if (correction) {
       this.liveNotifications
         .notifyTransactionUpdate(correction.id)
@@ -129,21 +135,17 @@ export class MeteringSettlement {
   }
 
   protected async addMeterItem(
-    manager: EntityManager,
+    manager: TransactionScope,
     transaction: BillingTransaction,
     session: ResourceMeteringSession,
     operation: ResourceMeteringOperation,
   ): Promise<number> {
     const externalReference = `metering:${session.id}:${operation.id}`;
     const charge = meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit);
-    if (
-      await manager.findOne(BillingTransactionItem, {
-        where: { billingTransactionId: transaction.id, externalReference },
-      })
-    ) {
+    if (await manager.resolve(BILLING_OPERATIONS).itemByExternalReference(transaction.id, externalReference)) {
       return charge;
     }
-    await manager.save(BillingTransactionItem, {
+    await manager.resolve(BILLING_OPERATIONS).saveItem({
       billingTransactionId: transaction.id,
       name: session.meterName,
       description: null,
@@ -157,17 +159,13 @@ export class MeteringSettlement {
   }
 
   protected async settleSession(
-    manager: EntityManager,
+    manager: TransactionScope,
     session: ResourceMeteringSession,
     final: MeterFinal,
   ): Promise<void> {
     const usageId = session.usageId;
     const operation =
-      final.status === 'ready'
-        ? await manager.findOne(ResourceMeteringOperation, {
-            where: { id: final.operationId, sessionId: session.id, kind: 'final', status: 'completed' },
-          })
-        : null;
+      final.status === 'ready' ? await this.bound(manager).finalOperation(final.operationId, session.id) : null;
     if (!operation) {
       await this.addUnavailableItem(
         manager,
@@ -176,11 +174,9 @@ export class MeteringSettlement {
         session.creditsPerUnit,
         `metering:${session.id}:unavailable`,
       );
-      const superseded = await manager.count(ResourceMeteringSession, {
-        where: { resourceId: session.resourceId, meterId: session.meterId, usageId: MoreThan(usageId) },
-      });
+      const superseded = await this.bound(manager).newerSessionCount(session.resourceId, session.meterId, usageId);
       const unrecoverable = superseded > 0 || !!session.compromisedReason;
-      await manager.update(ResourceMeteringSession, session.id, {
+      await this.bound(manager).updateSession(session.id, {
         status: unrecoverable ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,
         failureReason: superseded
           ? 'The meter was re-initialized for a later session before the final reading was collected'
@@ -192,9 +188,12 @@ export class MeteringSettlement {
       });
       return;
     }
-    const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: usageId } });
+    const transaction = requireMeteringRecord(
+      await manager.resolve(BILLING_OPERATIONS).usageTransaction(usageId),
+      'billing transaction',
+    );
     await this.addMeterItem(manager, transaction, session, operation);
-    await manager.update(ResourceMeteringSession, session.id, {
+    await this.bound(manager).updateSession(session.id, {
       status: ResourceMeteringSessionStatus.Settled,
       consumedValue: operation.totalValue,
       chargeCredits: meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit),
@@ -205,20 +204,18 @@ export class MeteringSettlement {
   }
 
   protected async addUnavailableItem(
-    manager: EntityManager,
+    manager: TransactionScope,
     usageId: number,
     name: string,
     creditsPerUnit: number,
     externalReference: string,
   ): Promise<void> {
-    const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: usageId } });
-    if (
-      await manager.exists(BillingTransactionItem, {
-        where: { billingTransactionId: transaction.id, externalReference },
-      })
-    )
-      return;
-    await manager.save(BillingTransactionItem, {
+    const transaction = requireMeteringRecord(
+      await manager.resolve(BILLING_OPERATIONS).usageTransaction(usageId),
+      'billing transaction',
+    );
+    if (await manager.resolve(BILLING_OPERATIONS).itemReferenceExists(transaction.id, externalReference)) return;
+    await manager.resolve(BILLING_OPERATIONS).saveItem({
       billingTransactionId: transaction.id,
       name,
       description: null,
@@ -231,10 +228,8 @@ export class MeteringSettlement {
   }
 
   /** Runs inside the transaction that ends the usage, before the bill is finalized. Idempotent. */
-  async settleInTransaction(manager: EntityManager, usageId: number, final: FinalCollection): Promise<void> {
-    const sessions = await manager.find(ResourceMeteringSession, {
-      where: { usageId, status: ResourceMeteringSessionStatus.Active },
-    });
+  async settleInTransaction(manager: TransactionScope, usageId: number, final: FinalCollection): Promise<void> {
+    const sessions = await this.bound(manager).activeSessions(usageId);
     for (const session of sessions) {
       const reading = final.status === 'collected' ? final.meters[session.id] : undefined;
       await this.settleSession(
@@ -245,8 +240,8 @@ export class MeteringSettlement {
     }
     // Best-effort meters can be skipped at start. Their captured terms still
     // belong on the receipt, with an unavailable quantity rather than a zero.
-    const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: usageId } });
-    const allSessions = await manager.find(ResourceMeteringSession, { where: { usageId } });
+    const usage = requireMeteringRecord(await this.bound(manager).usage(usageId), 'usage');
+    const allSessions = await this.bound(manager).sessions(usageId);
     for (const meter of usage.meterRates ?? []) {
       if (!allSessions.some((session) => session.meterId === meter.meterId)) {
         await this.addUnavailableItem(

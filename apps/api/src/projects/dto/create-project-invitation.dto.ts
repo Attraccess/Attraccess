@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProjectMemberRole } from '@attraccess/database-entities';
+import { ProjectMemberRole } from '@attraccess/application-models';
 import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
 
 export class CreateProjectInvitationDto {

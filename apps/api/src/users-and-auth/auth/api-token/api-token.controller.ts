@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk/v2';
 import { ApiTokenService } from './api-token.service';
 import {
   ApiTokenMetadataDto,

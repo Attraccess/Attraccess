@@ -1,6 +1,7 @@
-import { ResourceUsage } from '@attraccess/database-entities';
+import { ResourceUsage } from '../../../transport/models/resourceUsage.dto';
+import { mapResponse } from '../../../transport/response-mapper';
 
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 
 import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, Body, Put } from '@nestjs/common';
 
@@ -50,7 +51,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return await this.resourceUsageService.lockDoor(resourceId, req.user);
+    return mapResponse(ResourceUsage, await this.resourceUsageService.lockDoor(resourceId, req.user));
   }
 
   @Post('unlock')
@@ -77,7 +78,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return await this.resourceUsageService.unlockDoor(resourceId, req.user);
+    return mapResponse(ResourceUsage, await this.resourceUsageService.unlockDoor(resourceId, req.user));
   }
 
   @Post('unlatch')
@@ -104,7 +105,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return await this.resourceUsageService.unlatchDoor(resourceId, req.user);
+    return mapResponse(ResourceUsage, await this.resourceUsageService.unlatchDoor(resourceId, req.user));
   }
 
   @Get('history')
@@ -203,13 +204,16 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.startSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
-    });
+    return mapResponse(
+      ResourceUsage,
+      await this.resourceUsageService.startSession(resourceId, req.user, dto, {
+        auditOrigin: {
+          actorId: req.user.id,
+          authenticationMethod: req.user.authenticationMethod,
+          ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+        },
+      }),
+    );
   }
 
   @Put('end')
@@ -237,13 +241,16 @@ export class ResourceUsageController {
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.endSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
-    });
+    return mapResponse(
+      ResourceUsage,
+      await this.resourceUsageService.endSession(resourceId, req.user, dto, {
+        auditOrigin: {
+          actorId: req.user.id,
+          authenticationMethod: req.user.authenticationMethod,
+          ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+        },
+      }),
+    );
   }
 
   @Put('sessions/:usageId/project')
@@ -279,7 +286,10 @@ export class ResourceUsageController {
     @Body() dto: UpdateUsageSessionProjectDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto);
+    return mapResponse(
+      ResourceUsage,
+      await this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto),
+    );
   }
 
   @Get('active')
@@ -315,6 +325,6 @@ export class ResourceUsageController {
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
+    return mapResponse(ResourceUsage, await this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user));
   }
 }

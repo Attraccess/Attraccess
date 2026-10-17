@@ -1,3 +1,5 @@
+import { PushPersistence } from './persistence/port';
+import { TypeormPushPersistence } from './persistence/typeorm-adapter';
 import { PushSubscription } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -47,6 +49,7 @@ export function registerPushServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PushService,
+        { provide: PushPersistence, useClass: TypeormPushPersistence },
         { provide: getRepositoryToken(PushSubscription), useValue: subscriptionRepository },
         { provide: SettingsStoreService, useValue: settingsStore },
         { provide: SettingsService, useValue: settingsService },

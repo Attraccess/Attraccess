@@ -84,7 +84,7 @@ describe('ResourceUsageService', () => {
 
       const result = await getActiveSessionScope.service.getActiveSession(1);
 
-      expect(result).toBe(mockActiveSession);
+      expect(result).toEqual(mockActiveSession);
       expect(getActiveSessionScope.resourceUsageRepository.findOne).toHaveBeenCalledWith({
         where: {
           resourceId: 1,
@@ -119,7 +119,12 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Session completed' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Session completed',
+        attributedOperatingDurationInMinutes: 0,
+      };
 
       // Mock getActiveSession to return an active session, emitUsageEvent fetch, then final fetch
       endSessionScope.resourceUsageRepository.findOne
@@ -136,7 +141,7 @@ describe('ResourceUsageService', () => {
 
       const result = await endSessionScope.service.endSession(1, endSessionScope.mockUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       expect(endSessionScope.resourceUsageRepository.manager.transaction).toHaveBeenCalled();
       expect(endSessionScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
@@ -166,7 +171,12 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Auto-ended',
+        attributedOperatingDurationInMinutes: 0,
+      };
       const calls: string[] = [];
       let usageTransactionCommitted = false;
 
@@ -229,7 +239,12 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Auto-ended',
+        attributedOperatingDurationInMinutes: 0,
+      };
       let usageTransactionCommitted = false;
 
       endSessionScope.resourceUsageRepository.findOne
@@ -324,7 +339,12 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Auto-ended',
+        attributedOperatingDurationInMinutes: 0,
+      };
       const billingError = new Error('Billing failed');
 
       endSessionScope.resourceUsageRepository.findOne
@@ -338,7 +358,7 @@ describe('ResourceUsageService', () => {
 
       expect(endSessionScope.billingService.chargeForResourceUsage).toHaveBeenCalledWith(
         mockUpdatedSession,
-        endSessionScope.transactionalEntityManager,
+        expect.objectContaining({ backend: 'sqlite', resolve: expect.any(Function) }),
       );
       expect(endSessionScope.flowExecutorService.runFlow).toHaveBeenCalledTimes(1);
       expect(endSessionScope.eventEmitter.emitAsync).not.toHaveBeenCalled();
@@ -364,6 +384,7 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: `[By #${managerUser.id} - ${managerUser.username}] ${dto.notes}`,
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceUsageRepository.findOne
@@ -384,7 +405,7 @@ describe('ResourceUsageService', () => {
       expect(endedEmit).toBeDefined();
       const payload = endedEmit?.[1] as ResourceUsageSessionEndedEvent;
       expect(payload).toBeInstanceOf(ResourceUsageSessionEndedEvent);
-      expect(payload.usage).toBe(mockUpdatedSession);
+      expect(payload.usage).toEqual(mockUpdatedSession);
       expect(payload.endedBy).toEqual({ id: managerUser.id, username: managerUser.username });
     });
 
@@ -402,6 +423,7 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: 'Flow stop',
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceUsageRepository.findOne
@@ -426,7 +448,7 @@ describe('ResourceUsageService', () => {
       );
       expect(endedEmit).toBeDefined();
       const payload = endedEmit?.[1] as ResourceUsageSessionEndedEvent;
-      expect(payload.usage).toBe(mockUpdatedSession);
+      expect(payload.usage).toEqual(mockUpdatedSession);
       expect(payload.endedBy).toBeNull();
     });
 
@@ -481,7 +503,12 @@ describe('ResourceUsageService', () => {
         user: sessionOwner,
         resource: { id: 12, name: 'Laser cutter' } as Resource,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Session completed' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Session completed',
+        attributedOperatingDurationInMinutes: 0,
+      };
       let transactionStarted = false;
 
       (endSessionScope.resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (cb) => {
@@ -521,6 +548,7 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
@@ -536,12 +564,12 @@ describe('ResourceUsageService', () => {
 
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, managerUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       expect(endSessionScope.resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(endSessionScope.transactionalEntityManager.update).toHaveBeenCalled();
       expect(endSessionScope.billingService.chargeForResourceUsage).toHaveBeenCalledWith(
         mockUpdatedSession,
-        endSessionScope.transactionalEntityManager,
+        expect.objectContaining({ backend: 'sqlite', resolve: expect.any(Function) }),
       );
       expect(endSessionScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
@@ -572,6 +600,7 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceIntroducersService.canMaintain.mockResolvedValue(true);
@@ -587,7 +616,7 @@ describe('ResourceUsageService', () => {
 
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, introducerUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       expect(endSessionScope.resourceIntroducersService.canMaintain).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         introducerUser.id,
@@ -618,6 +647,7 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceIntroducersService.canMaintain.mockImplementation(
@@ -635,7 +665,7 @@ describe('ResourceUsageService', () => {
 
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, groupIntroducer, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       expect(endSessionScope.resourceIntroducersService.canMaintain).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         groupIntroducer.id,
@@ -666,7 +696,12 @@ describe('ResourceUsageService', () => {
         user: sessionOwner,
       } as ResourceUsage;
       const prefixedNotes = `[By #${supervisorUser.id} - ${supervisorUser.username}] ${dto.notes}`;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: prefixedNotes };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
+      };
 
       endSessionScope.resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession)
@@ -680,7 +715,7 @@ describe('ResourceUsageService', () => {
 
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, supervisorUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       // The supervisor short-circuits the authorization check; no introducer lookup needed.
       expect(endSessionScope.resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(endSessionScope.flowExecutorService.runFlow).toHaveBeenCalledWith(
@@ -704,7 +739,7 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: sessionOwner,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date() };
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), attributedOperatingDurationInMinutes: 0 };
 
       endSessionScope.resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession)
@@ -737,7 +772,7 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: sessionOwner,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date() };
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), attributedOperatingDurationInMinutes: 0 };
 
       endSessionScope.resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession)

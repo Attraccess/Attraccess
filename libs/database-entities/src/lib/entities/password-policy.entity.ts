@@ -1,7 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-
-export const PASSWORD_POLICY_SINGLETON_ID = 1;
+import { PASSWORD_POLICY_SINGLETON_ID } from '@attraccess/application-models';
 
 @Entity()
 export class PasswordPolicy {
@@ -69,3 +68,5 @@ export class PasswordPolicy {
   @ApiProperty({ description: 'Row version for optimistic concurrency control', example: 1 })
   version!: number;
 }
+
+export { PASSWORD_POLICY_SINGLETON_ID } from '@attraccess/application-models';

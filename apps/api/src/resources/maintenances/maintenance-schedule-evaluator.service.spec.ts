@@ -6,7 +6,7 @@ import {
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
 } from '@attraccess/database-entities';
-import { formatDbDate } from './maintenance-schedule-evaluator.service';
+import { formatDbDate } from './persistence/typeorm-adapter';
 
 describe('MaintenanceScheduleEvaluatorService', () => {
   const fixture = registerMaintenanceScheduleEvaluatorServiceFixture();

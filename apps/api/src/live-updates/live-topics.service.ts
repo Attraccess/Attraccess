@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { LiveSubscription, LiveTopic, liveSubscriptionKey } from '@attraccess/shared';
 import { LiveTopicProvider } from './live-topic-provider';
 import { LiveTopicSchema, liveSubscriptionSchema } from './live-updates.schemas';

@@ -9,8 +9,8 @@ import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
-import { User } from '@attraccess/database-entities';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { User } from '@attraccess/application-models';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 

@@ -3,7 +3,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { RolePermission } from './role-permission.entity';
 import { UserRole } from './user-role.entity';
 
-
 @Entity('role')
 export class Role {
   @PrimaryGeneratedColumn()

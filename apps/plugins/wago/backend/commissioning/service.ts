@@ -1,10 +1,13 @@
+import { WagoDeviceOperations } from '../runtime/device-operations';
+import { WagoCommissioningPersistence } from './persistence/port';
+import { PersistentManagementStore } from '../management/store';
 import { MANAGEMENT_INSPECTION_COMMAND, parseManagementInspection } from '../management/inspection';
 
 import { ConflictException, Inject, Injectable, OnApplicationBootstrap, Optional } from '@nestjs/common';
 
 import { rm } from 'node:fs/promises';
 
-import { PLUGIN_CONTEXT, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_CONTEXT, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 
 import { WagoService } from '../controllers/service';
 
@@ -28,7 +31,7 @@ import { requireDeliveryCredentials } from './model';
 
 import { WagoCommissioningTimeoutError } from './delivery/progress';
 
-import { WagoCommissioningSession } from './sessions/session.entity';
+import { WagoCommissioningSession } from './sessions/session.record';
 
 import {
   RuntimeReleaseChangedError,
@@ -68,13 +71,16 @@ export { shellQuote } from './model';
 @Injectable()
 export class WagoCommissioningService extends WagoCommissioningProgress implements OnApplicationBootstrap {
   constructor(
-    @Inject(PLUGIN_CONTEXT) context: PluginContext,
+    @Inject(PLUGIN_CONTEXT) context: Omit<PluginContext, 'operations' | 'persistence'>,
     @Inject(WagoService) wago: WagoService,
+    @Inject(PersistentManagementStore) managementStore: PersistentManagementStore,
+    @Inject(WagoCommissioningPersistence) persistence: WagoCommissioningPersistence,
+    @Inject(WagoDeviceOperations) deviceOperations: WagoDeviceOperations,
     @Optional() @Inject(WagoRuntimeArtifactsService) artifacts?: WagoRuntimeArtifactCatalog,
     @Optional() @Inject(WagoCommissioningReadiness) readiness?: WagoCommissioningReadiness,
     @Optional() @Inject(WagoManagedRuntimeService) managedRuntime?: WagoManagedRuntimeService,
   ) {
-    super(context, wago, artifacts, readiness, managedRuntime);
+    super(context, wago, managementStore, persistence, deviceOperations, artifacts, readiness, managedRuntime);
   }
 
   protected async deliverWhileLocked(

@@ -1,4 +1,4 @@
-import { ResourceFlowNode, ResourceUsageEndSessionNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceUsageEndSessionNodeDataSchema } from '@attraccess/application-models';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';

@@ -2,12 +2,28 @@
 
 Attraccess stellt SDKs für die Entwicklung eigener Plugins bereit. Sie können Frontend-Erweiterungen, Backend-Erweiterungen oder beides erstellen.
 
+## Persistenzschnittstellen und bestehende Plugins
+
+Neue Backend-Anwendungslogik importiert `@attraccess/plugins-backend-sdk/v2`. Datensätze und Geschäftsregeln bleiben frei von ORM-Dekoratoren. SQLite-Schemaklassen und Operationsadapter importieren `/adapter`. Das SDK samt Unterpfaden und TypeORM beim Build externalisieren, damit sie aus derselben Host-Laufzeit stammen. Bei esbuild Konstruktorabhängigkeiten ausdrücklich mit `@Inject(...)` markieren; es erzeugt keine TypeScript-Dekoratormetadaten.
+
+In npm-Metadaten unter `attraccess.persistence` und im Backend-Export dieselbe Deklaration verwenden:
+
+```ts
+persistence: { contractVersion: 2, supportedBackends: ['sqlite'] }
+```
+
+Bei `plugin.json` steht `persistence` auf oberster Ebene. Nur tatsächlich implementierte Backends angeben. Der Host lehnt nicht unterstützte Kombinationen vor Schemaregistrierung, Lesen der Migrationshistorie, Migration und Aktivierung ab. Die Deklaration allein macht SQL nicht portabel.
+
+V2 stellt Host-Operationen bereit: `context.operations.users.list({ limit: 5 })` liefert öffentliche Benutzer-IDs und Namen, `resources.findById(id)` eine Ressource, `flows.findReferences({ nodeTypes })` gespeicherte Flow-Verweise und `settings.findByKey({ parent, key })` einen Einstellungswert. Die bisherigen Berechtigungen bleiben erforderlich. Eigene benannte Persistenzoperationen werden unter `persistenceAdapters` registriert und mit `context.persistence.resolve(token)` unter `DATABASE_ACCESS` aufgelöst. Nur deklarierte Methoden überschreiten diese Grenze. Verknüpfungen, bedingte Änderungen und Datenbankfehler bleiben im Adapter. Siehe [Plugin-Datenbankmigrationen](plugins/database-migrations.md).
+
+Der bisherige SDK-Haupteinstieg bleibt für Plugins ohne Persistenzdeklaration erhalten. Deren roher SQLite-Kontext ist ausdrücklich nur für SQLite verfügbar. Es gibt keine automatische Umwandlung, Zusage weiterer Datenbanksysteme oder festgelegte Entfernung dieser Schnittstelle. V2 bietet weder `getRepository` noch `dataSource` oder beliebiges `get(token)`.
+
 ## Plugin-SDKs
 
-| SDK | Installationsbefehl | Verwendung |
-|-----|---------------------|-----------|
+| SDK                                | Installationsbefehl                            | Verwendung                       |
+| ---------------------------------- | ---------------------------------------------- | -------------------------------- |
 | `@attraccess/plugins-frontend-sdk` | `npm install @attraccess/plugins-frontend-sdk` | Frontend-Seiten und -Komponenten |
-| `@attraccess/plugins-backend-sdk` | `npm install @attraccess/plugins-backend-sdk` | Backend-API-Endpunkte |
+| `@attraccess/plugins-backend-sdk`  | `npm install @attraccess/plugins-backend-sdk`  | Backend-API-Endpunkte            |
 
 ## Frontend-Plugins
 
@@ -35,9 +51,7 @@ Deklariere Plugin-Abhängigkeiten in `package.json` unter `attraccess.dependenci
 ```json
 {
   "attraccess": {
-    "dependencies": [
-      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
-    ]
+    "dependencies": [{ "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }]
   }
 }
 ```
@@ -68,14 +82,14 @@ Ein Backend-Plugin kann:
 
 ### Backend-Plugins verpacken
 
-Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build *dieselben* Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
+Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build _dieselben_ Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
 
 Teilen Sie Ihre Abhängigkeiten in zwei Gruppen auf:
 
-| Abhängigkeit | Deklaration | Grund |
-|---------------|-------------|-------|
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als *anderer* Typ und verbindet sich stillschweigend nicht. |
-| `@attraccess/plugins-backend-sdk` und Ihr eigener Code | Normal bündeln | Kann sicher in Ihr Artefakt aufgenommen werden. |
+| Abhängigkeit                                                                                              | Deklaration                                                       | Grund                                                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als _anderer_ Typ und verbindet sich stillschweigend nicht. |
+| `@attraccess/plugins-backend-sdk` samt `/v2` und `/adapter`                                               | Als Peer deklarieren und externalisieren                          | Gemeinsame Tokens, Werte und Schemahelfer aus dem Host laden. Eigenen Anwendungscode normal bündeln.                                                                                                    |
 
 Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`index.mjs`). Verweisen Sie im `plugin.json`-Manifest darauf:
 
@@ -121,16 +135,16 @@ nennt.
 }
 ```
 
-| Berechtigung | Gewährt Zugriff auf |
-|-----------|------------------|
-| `READ_USERS` | `context.getRepository(User)` -- Benutzerkonten lesen. |
-| `ACCESS_RESOURCES` | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben. |
-| `READ_SETTINGS` | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen. |
-| `DATABASE_ACCESS` | `context.dataSource` und `context.getRepository(...)` für jede andere Entität. |
-| `EMIT_EVENTS` | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden. |
-| `LISTEN_EVENTS` | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen. |
-| `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen. |
+| Berechtigung             | Gewährt Zugriff auf                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `READ_USERS`             | `context.operations.users.list(...)` -- öffentliche Benutzer-IDs und Namen lesen.                                                          |
+| `ACCESS_RESOURCES`       | `context.operations.resources` und `.flows` -- deklarierte Host-Abfragen.                                                                  |
+| `READ_SETTINGS`          | `context.operations.settings.findByKey(...)` -- Einstellungswert lesen.                                                                    |
+| `DATABASE_ACCESS`        | `context.persistence.resolve(...)` -- eigene registrierte Operationen; in V2 keine rohe Verbindung.                                        |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                          |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                             |
+| `RESOLVE_HOST_PROVIDERS` | Nur im bisherigen SQLite-Kontext; V2 löst keine beliebigen Host-Dienste auf.                                                               |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen. |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Eine unbekannte Berechtigung führt dazu, dass das Plugin
@@ -138,7 +152,7 @@ nicht geladen wird.
 
 Einige Hinweise zur Grenze:
 
-- `DATABASE_ACCESS` ist die weitreichende Berechtigung: sie umfasst die rohe
+- Im bisherigen SQLite-Kontext ist `DATABASE_ACCESS` weitreichend: es umfasst die rohe
   `dataSource` (inkl. Verbindungskonfiguration) und ein Repository für **jede**
   Entität und schließt damit implizit `READ_USERS`, `ACCESS_RESOURCES` und
   `READ_SETTINGS` ein. Bevorzugen Sie die engeren Entitäts-Berechtigungen, wenn
@@ -240,6 +254,7 @@ die Plugin-Quellen nicht.
 - [Plugins installieren](plugins/installing-plugins.md) -- Plugins hochladen und verwalten
 - [Entwicklerhandbuch](developer/overview.md) -- Attraccess-Architektur und -Entwicklung
 - [API-Referenz](developer/api-reference.md) -- Attraccess-REST-API
+
 ## Übersetzungen und Sprachwechsel
 
 Verwende `useTranslations` aus `@attraccess/plugins-frontend-ui` mit eigenen

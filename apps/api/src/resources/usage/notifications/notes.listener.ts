@@ -2,9 +2,8 @@
 // FEATURE: inform introducers/maintainers about usage notes (ATT-174)
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { UsageNoteRecipients } from '../persistence/port';
+import { Resource, User } from '@attraccess/application-models';
 import { ResourceUsageNoteAddedEvent } from '../events/resource-usage.events';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
@@ -20,12 +19,7 @@ export class ResourceUsageNoteNotificationListener {
   private readonly logger = new Logger(ResourceUsageNoteNotificationListener.name);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly persistence: UsageNoteRecipients,
     private readonly notifications: NotificationDispatchService,
     private readonly rbacService: RbacService,
   ) {}
@@ -33,10 +27,7 @@ export class ResourceUsageNoteNotificationListener {
   @OnEvent(ResourceUsageNoteAddedEvent.EVENT_NAME)
   async handleNoteAdded(event: ResourceUsageNoteAddedEvent): Promise<void> {
     try {
-      const resource = await this.resourceRepository.findOne({
-        where: { id: event.resourceId },
-        relations: ['groups'],
-      });
+      const resource = await this.persistence.resourceWithGroups(event.resourceId);
       if (!resource) {
         this.logger.warn(`Usage note for missing resource ${event.resourceId}; skipping notifications`);
         return;
@@ -81,16 +72,9 @@ export class ResourceUsageNoteNotificationListener {
     const groupIds = (resource.groups ?? []).map((group) => group.id);
 
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
-    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
+    const admins = adminIds.length > 0 ? await this.persistence.users(adminIds) : [];
 
-    const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
-    if (groupIds.length > 0) {
-      introducerWhere.push({ resourceGroupId: In(groupIds) });
-    }
-    const introducerRows = await this.resourceIntroducerRepository.find({
-      where: introducerWhere,
-      relations: ['user'],
-    });
+    const introducerRows = await this.persistence.introducers(resource.id, groupIds);
 
     const byId = new Map<number, User>();
     for (const admin of admins) {

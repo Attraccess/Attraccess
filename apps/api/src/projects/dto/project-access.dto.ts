@@ -1,7 +1,10 @@
+import type { ResponseFields } from '../../transport/response-mapper';
 import { ApiProperty } from '@nestjs/swagger';
-import { Project, ProjectMemberRole } from '@attraccess/database-entities';
+import { Project } from '../../transport/models/project.dto';
+import { ProjectMemberRole } from '@attraccess/application-models';
 
 export class ProjectAccessInfoDto {
+  static readonly responseFields: ResponseFields = { isOwner: null, role: null, canManageProject: null };
   @ApiProperty({ description: 'Whether the authenticated user owns the project' })
   isOwner!: boolean;
 
@@ -19,6 +22,7 @@ export class ProjectAccessInfoDto {
 }
 
 export class ProjectWithAccessDto extends Project {
+  static readonly responseFields: ResponseFields = { ...Project.responseFields, access: () => ProjectAccessInfoDto };
   @ApiProperty({ type: ProjectAccessInfoDto })
   access!: ProjectAccessInfoDto;
 }

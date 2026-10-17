@@ -1,3 +1,5 @@
+import { bindWagoPersistenceFixture } from './wago-service.test-fixture';
+import { createWagoRegistryPersistence } from './controllers/persistence/typeorm-adapter';
 import { createHash } from 'node:crypto';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './controllers/service';
@@ -29,7 +31,9 @@ describe('commissioning ownership through WAGO broker continuations', () => {
       mqtt: { publish: jest.fn(), subscribe: jest.fn() },
       logger: { warn: jest.fn() },
     };
-    const service = new WagoService(context as unknown as PluginContext);
+    const service = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(
+      context as unknown as PluginContext,
+    );
     const controllers = { findOneBy: jest.fn().mockResolvedValue(controller), save: jest.fn(), delete: jest.fn() };
     const enrollments = {
       findOneBy: jest.fn().mockResolvedValue(enrollment),
@@ -39,6 +43,7 @@ describe('commissioning ownership through WAGO broker continuations', () => {
     service['enrollments'] = enrollments as never;
     service['drafts'] = { delete: jest.fn() } as never;
     service['revisions'] = { delete: jest.fn() } as never;
+    bindWagoPersistenceFixture(service, context as unknown as PluginContext);
     jest
       .spyOn(service, 'getSettings')
       .mockResolvedValue({ operationalPrefix: 'attraccess/wago', defaultMqttServerId: 1 } as never);

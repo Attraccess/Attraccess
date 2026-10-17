@@ -1,3 +1,6 @@
+import { SqliteAuditTransactionObserver } from './persistence/transaction-observer';
+import { SqliteAuditPersistence } from './persistence/sqlite-audit-storage';
+import { TypeormSettingsPersistence } from '../settings/persistence/typeorm-adapter';
 import { AuditLog, entities, Resource, ResourceType, Setting, User } from '@attraccess/database-entities';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -39,7 +42,14 @@ describe('persisted audit names', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    service = new AuditService(source, new SettingsStoreService(source.getRepository(Setting), null));
+    service = new AuditService(
+      new SqliteAuditPersistence(source),
+      new SettingsStoreService(
+        new TypeormSettingsPersistence(source.getRepository(Setting), source.getRepository(User)),
+        null,
+      ),
+      new SqliteAuditTransactionObserver(source),
+    );
     await service.onModuleInit();
     controller = new AuditController(service);
     await source.getRepository(User).insert({

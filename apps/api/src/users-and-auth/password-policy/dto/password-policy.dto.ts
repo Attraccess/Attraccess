@@ -1,7 +1,7 @@
 // Admin password policy DTOs: full read, partial update, per-role override CRUD payloads
 // FEATURE: Password policy admin contract (full surface + override CRUD)
 
-import { PasswordPolicyRole } from '@attraccess/database-entities';
+import { PasswordPolicyRole } from '@attraccess/application-models';
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 

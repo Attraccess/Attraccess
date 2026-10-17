@@ -1,9 +1,10 @@
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
-
-export type WagoConfigurationRevisionState = 'pending' | 'published' | 'applied' | 'rejected';
+import type { WagoConfigurationRevision as WagoConfigurationRevisionRecord } from './revision.record';
+import type { WagoConfigurationRevisionState } from './revision.record';
+export type { WagoConfigurationRevisionState } from './revision.record';
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/adapter';
 
 @Entity({ name: 'plugin_wago_configuration_revisions' })
-export class WagoConfigurationRevision {
+export class WagoConfigurationRevision implements WagoConfigurationRevisionRecord {
   @PrimaryGeneratedColumn({ type: 'integer' }) id!: number;
   @Column({ type: 'integer', name: 'controller_id' }) controllerId!: number;
   @Column({ type: 'integer' }) revision!: number;

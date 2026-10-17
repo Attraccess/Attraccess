@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { EmailTemplate } from '@attraccess/database-entities';
+import { EmailTemplate } from '@attraccess/application-models';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';
 import { EmailLayoutResponseDto } from './dto/email-layout-response.dto';
 import { SettingsStoreService } from '../settings/settings-store.service';

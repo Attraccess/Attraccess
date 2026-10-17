@@ -1,3 +1,4 @@
+import { TypeormApiTokenPersistence } from '../persistence/typeorm-adapter';
 import { ForbiddenException } from '@nestjs/common';
 import { ApiToken } from '@attraccess/database-entities';
 import { ApiTokenService } from './api-token.service';
@@ -22,8 +23,7 @@ describe('ApiTokenService', () => {
   const tokenHashService = { hashApiToken: jest.fn((token) => `hashed:${token}`) };
   const rbacService = { getEffectivePermissions: jest.fn() };
   const service = new ApiTokenService(
-    repository as never,
-    userRepository as never,
+    new TypeormApiTokenPersistence(repository as never, userRepository as never),
     tokenHashService as never,
     rbacService as never,
   );

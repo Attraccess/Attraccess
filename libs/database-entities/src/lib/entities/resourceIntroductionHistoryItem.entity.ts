@@ -2,11 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Jo
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { User } from './user.entity';
-
-export enum IntroductionHistoryAction {
-  REVOKE = 'revoke',
-  GRANT = 'grant',
-}
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 
 @Entity()
 export class ResourceIntroductionHistoryItem {
@@ -70,3 +66,5 @@ export class ResourceIntroductionHistoryItem {
   })
   performedByUser!: User;
 }
+
+export { IntroductionHistoryAction } from '@attraccess/application-models';

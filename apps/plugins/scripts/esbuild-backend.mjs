@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- Plugin build CLI reports progress and usage errors. */
 // Shared backend bundler for Attraccess plugin nx apps.
 //
 // Bundles a plugin's backend entry into a single CommonJS file while
@@ -26,6 +27,8 @@ const HOST_SHARED_EXTERNALS = [
   'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
+  '@attraccess/plugins-backend-sdk/v2',
+  '@attraccess/plugins-backend-sdk/adapter',
 ];
 
 const { values } = parseArgs({

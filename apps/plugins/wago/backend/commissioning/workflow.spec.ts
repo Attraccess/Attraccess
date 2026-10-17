@@ -1,3 +1,6 @@
+import { createSqliteDeviceOperations } from '../runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from './persistence/typeorm-adapter';
+import { createSqliteManagementStore } from '../management/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -43,7 +46,12 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'wago-workflow-fixture-'));
-    db = new DataSource({ type: 'sqlite', database: ':memory:', entities: plugin.entities, synchronize: true });
+    db = new DataSource({
+      type: 'sqlite',
+      database: ':memory:',
+      entities: plugin.persistenceAdapters.flatMap((entry) => entry.entities ?? []),
+      synchronize: true,
+    });
     await db.initialize();
     context = {
       getRepository: (entity) => db.getRepository(entity),
@@ -65,11 +73,15 @@ describe('commissioning workflows with a real isolated database and mocked devic
         directory,
       }),
     };
-    service = new WagoCommissioningService(
-      context,
-      wago as unknown as WagoService,
-      artifacts as unknown as WagoRuntimeArtifactsService,
-    );
+    service = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        wago as unknown as WagoService,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+        artifacts as unknown as WagoRuntimeArtifactsService,
+      ))(context);
     await service.onApplicationBootstrap();
     session = await db.getRepository(WagoCommissioningSession).save({
       hardwareId: 'fixture',

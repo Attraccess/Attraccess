@@ -1,3 +1,5 @@
+import { PasskeyPersistence } from '../persistence/port';
+import { TypeormPasskeyPersistence } from '../persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -56,6 +58,7 @@ describe('PasskeyService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasskeyService,
+        { provide: PasskeyPersistence, useClass: TypeormPasskeyPersistence },
         { provide: getRepositoryToken(Passkey), useValue: passkeyRepo },
         { provide: getRepositoryToken(PasskeyChallenge), useValue: challengeRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
@@ -130,6 +133,19 @@ describe('PasskeyService', () => {
       await service.verifyAuthentication(response as never);
 
       expect(challengeRepo.delete).toHaveBeenCalledWith({ challenge: 'auth-challenge' });
+    });
+
+    it('accepts only one concurrent claim of a challenge', async () => {
+      issueChallenge();
+      challengeRepo.delete.mockResolvedValueOnce({ affected: 1 }).mockResolvedValueOnce({ affected: 0 });
+      const results = await Promise.allSettled([
+        service.verifyAuthentication(response as never),
+        service.verifyAuthentication(response as never),
+      ]);
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'rejected')).toEqual([
+        expect.objectContaining({ reason: expect.any(BadRequestException) }),
+      ]);
     });
 
     it('rejects an unknown challenge', async () => {

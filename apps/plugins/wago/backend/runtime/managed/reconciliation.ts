@@ -1,10 +1,10 @@
 import { ConflictException } from '@nestjs/common';
 
-import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk/v2';
 
-import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.record';
 
-import { WagoController } from '../../controllers/entity';
+import { WagoController } from '../../controllers/record';
 
 import { commissioningVerification } from '../../commissioning/sessions/verification';
 
@@ -37,7 +37,7 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
   }
 
   protected async finishSession(id: number) {
-    await this.sessions.update(id, {
+    await this.commissioningPersistence.updateSession(id, {
       deliveryToken: null,
       dockerProvisionToken: null,
       dockerProvisionState: null,
@@ -69,7 +69,7 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
       (await this.wago.getSettings()).operationalPrefix,
     );
     if (!state || state.streamId !== proof.streamId || Date.now() - state.timestamp > 90_000) return 'runtime_state';
-    const verification = await commissioningVerification(this.context, session, state);
+    const verification = await commissioningVerification(this.commissioningPersistence, session, state);
     if (!verification.permanentConnection) return 'connection';
     if (!verification.enrollmentRevoked) return 'enrollment_credentials';
     if (!verification.configurationApplied) return 'configuration';
@@ -80,12 +80,7 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
   protected async scan() {
     // Stable pages and fixed-size batches; no unbounded work queue or controller fanout.
     for (let skip = 0; !this.destroyed; skip += 50) {
-      const controllers = await this.controllers.find({
-        where: { trustState: 'claimed' },
-        order: { id: 'ASC' },
-        skip,
-        take: 50,
-      });
+      const controllers = await this.persistence.claimedControllerPage(skip);
       for (let index = 0; index < controllers.length && !this.destroyed; index += 2)
         await Promise.all(
           controllers.slice(index, index + 2).map(async (controller) => {
@@ -115,7 +110,7 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
     await this.assertNetworkSettled(id);
     const heartbeat = await this.refreshRuntimePolicy(id);
     if (!heartbeat) return;
-    const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
+    const controller = await this.commissioningPersistence.controller(id, true);
     if (controller && (await this.completeEnrolment(controller)))
       await this.coordinator.reconcile(id, true, heartbeat.imageId);
   }
@@ -130,12 +125,12 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
     }
     const heartbeat = this.heartbeats.get(id);
     if (!heartbeat || this.destroyed) return;
-    const access = await this.access.findOne({ where: { controllerId: id }, order: { sessionId: 'DESC' } });
+    const access = await this.persistence.latestAccess(id);
     // Verified enrollment needs a ready runtime before management can be hardened.
     // Confirm its running image during bootstrap; the server still blocks commands
     // until management is complete and the bundled image policy can be enforced.
     const enrolling = access?.state === 'verified' || access?.state === 'recovery_required';
-    const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
+    const controller = await this.commissioningPersistence.controller(id, true);
     await this.wago.setRuntimePolicy?.(
       id,
       enrolling

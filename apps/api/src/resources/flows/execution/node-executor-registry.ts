@@ -1,5 +1,5 @@
-import { BillingTransactionItem, ResourceFlowNodeType } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { DatabaseTransactions } from '../../../database/transaction-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
@@ -37,7 +37,7 @@ interface ExecutorDependencies {
   heartbeatLastSeen: Map<string, Date>;
   resourceHealthService: ResourceHealthService;
   resourceUsageService: ResourceUsageService;
-  billingTransactionItemRepository: Repository<BillingTransactionItem>;
+  transactions: DatabaseTransactions;
   mqttClientService: MqttClientService;
   operatingIntervals: ResourceOperatingIntervalService;
   eventEmitter: EventEmitter2;
@@ -71,7 +71,7 @@ export function buildNodeExecutorRegistry(
     [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET]: new HealthSetExecutor(dependencies.resourceHealthService),
     [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: new BillingSetAdditionalItemsExecutor(
       dependencies.resourceUsageService,
-      dependencies.billingTransactionItemRepository,
+      dependencies.transactions,
     ),
     [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST]: new HttpSendRequestExecutor(),
     [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(dependencies.mqttClientService),

@@ -1,13 +1,13 @@
-import { Auth, type PluginContext, Resource, ResourceFlowNode } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
+import { WagoDiagnosticsPersistence, type WagoDiagnosticNode } from '../flow/persistence/port';
 import { Controller, Get, Inject, Injectable, NotFoundException, Param, ParseIntPipe } from '@nestjs/common';
 import type { WagoDiagnostics } from '../../diagnostics-types';
 import { type WagoResourceDiagnostics } from '../../diagnostics-types';
 import { configurationHash, validateSnapshot, type WagoConfigurationSnapshot } from '../configuration/model';
 import { freshness } from './store';
 import { safeValidationSummaries } from './validation';
-import { WagoConfigurationDraft } from '../configuration/draft.entity';
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
+import { WagoConfigurationDraft } from '../configuration/draft.record';
+import { WagoConfigurationRevision } from '../configuration/revision.record';
 import { WagoService } from '../controllers/service';
 
 export function configurationRejections(
@@ -122,29 +122,13 @@ export function runtimeStreamSummary(runtime: ReturnType<WagoService['diagnostic
 @Injectable()
 export class WagoDiagnosticsService {
   public constructor(
-    @Inject(Symbol.for('attraccess.plugin.context')) protected readonly context: PluginContext,
+    @Inject(WagoDiagnosticsPersistence) protected readonly persistence: WagoDiagnosticsPersistence,
     @Inject(WagoService) protected readonly wago: WagoService,
   ) {}
 
   async get(controllerId: number): Promise<WagoDiagnostics> {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id: controllerId });
+    const { controller, draft, latest, applied, nodes } = await this.persistence.controllerSnapshot(controllerId);
     if (!controller) throw new NotFoundException('WAGO controller not found');
-    const [draft, latest, applied, nodes] = await Promise.all([
-      this.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId }),
-      this.context
-        .getRepository(WagoConfigurationRevision)
-        .findOne({ where: { controllerId }, order: { revision: 'DESC' } }),
-      this.context
-        .getRepository(WagoConfigurationRevision)
-        .findOne({ where: { controllerId, state: 'applied' }, order: { revision: 'DESC' } }),
-      this.context.dataSource
-        .getRepository(ResourceFlowNode)
-        .createQueryBuilder('node')
-        .where('node.type LIKE :type', { type: 'plugin.wago.%' })
-        .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
-        .take(1001)
-        .getMany(),
-    ]);
     const runtime = this.wago.diagnostics.read(controllerId);
     const runtimeUpdate = this.wago.isRuntimeUpdateRequired?.(controllerId) ?? false;
     const snapshot = latest ? (JSON.parse(latest.snapshot) as WagoConfigurationSnapshot) : null;
@@ -262,14 +246,7 @@ export class WagoDiagnosticsService {
   }
 
   async getResource(resourceId: number): Promise<WagoResourceDiagnostics> {
-    const nodes = await this.context.dataSource
-      .getRepository(ResourceFlowNode)
-      .createQueryBuilder('node')
-      .where('node.resourceId = :resourceId', { resourceId })
-      .andWhere('node.type LIKE :type', { type: 'plugin.wago.%' })
-      .orderBy('node.id', 'ASC')
-      .take(1001)
-      .getMany();
+    const nodes = await this.persistence.resourceNodes(resourceId);
     const controllerIds = new Set<number>();
     let invalidControllerReferences = 0;
     for (const node of nodes.slice(0, 1000)) {
@@ -292,41 +269,14 @@ export class WagoDiagnosticsService {
           .filter((channelId): channelId is string => typeof channelId === 'string'),
       ),
     ];
-    const controllerIdsForQuery = selectedControllerIds;
-    const [controllers, appliedRevisions, conflictNodes] = await Promise.all([
-      this.context
-        .getRepository(WagoController)
-        .createQueryBuilder('controller')
-        .select(['controller.id', 'controller.name', 'controller.hardwareId'])
-        .where('controller.id IN (:...controllerIds)', { controllerIds: selectedControllerIds })
-        .getMany(),
-      this.context
-        .getRepository(WagoConfigurationRevision)
-        .createQueryBuilder('revision')
-        .select(['revision.controllerId', 'revision.revision', 'revision.snapshot'])
-        .where('revision.controllerId IN (:...controllerIds)', { controllerIds: selectedControllerIds })
-        .andWhere('revision.state = :state', { state: 'applied' })
-        .andWhere(
-          'revision.revision = (SELECT MAX(applied.revision) FROM plugin_wago_configuration_revisions applied WHERE applied.controller_id = revision.controller_id AND applied.state = :state)',
-        )
-        .orderBy('revision.controllerId', 'ASC')
-        .addOrderBy('revision.revision', 'DESC')
-        .getMany(),
-      localChannelIds.length
-        ? this.context.dataSource
-            .getRepository(ResourceFlowNode)
-            .createQueryBuilder('node')
-            .where("node.data ->> 'controllerId' IN (:...controllerIds)", { controllerIds: controllerIdsForQuery })
-            .andWhere("node.data ->> 'channelId' IN (:...channelIds)", { channelIds: localChannelIds })
-            .andWhere('node.type = :type', { type: 'plugin.wago.command' })
-            .take(1001)
-            .getMany()
-        : Promise.resolve([]),
-    ]);
+    const { controllers, appliedRevisions, conflictNodes } = await this.persistence.resourceDependencies(
+      selectedControllerIds,
+      localChannelIds,
+    );
     const controllersById = new Map(controllers.map((controller) => [controller.id, controller]));
     const appliedByControllerId = new Map(appliedRevisions.map((revision) => [revision.controllerId, revision]));
     const referencesTruncated = conflictNodes.length > 1000;
-    const conflictNodesByControllerId = new Map<number, ResourceFlowNode[]>();
+    const conflictNodesByControllerId = new Map<number, WagoDiagnosticNode[]>();
     for (const node of conflictNodes.slice(0, 1000)) {
       // This resource's own nodes are already in localNodes; including them again duplicates every reference.
       if (node.resourceId === resourceId) continue;
@@ -337,14 +287,7 @@ export class WagoDiagnosticsService {
       conflictNodesByControllerId.set(controllerId, matchingNodes);
     }
     const conflictResourceIds = [...new Set([...conflictNodesByControllerId.values()].flat().map((n) => n.resourceId))];
-    const conflictResources = conflictResourceIds.length
-      ? await this.context.dataSource
-          .getRepository(Resource)
-          .createQueryBuilder('resource')
-          .select(['resource.id', 'resource.name'])
-          .where('resource.id IN (:...ids)', { ids: conflictResourceIds })
-          .getMany()
-      : [];
+    const conflictResources = await this.persistence.resourceNames(conflictResourceIds);
     const resourceNames = new Map(conflictResources.map((resource) => [resource.id, resource.name]));
     const controllersResult = selectedControllerIds.map((controllerId) => {
       const controller = controllersById.get(controllerId);

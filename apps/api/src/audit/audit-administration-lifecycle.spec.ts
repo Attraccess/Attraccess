@@ -85,7 +85,9 @@ describe('administration lifecycle hooks', () => {
       details: { passwordChanged: 1 },
     });
     audit.recordAdministration.mockRejectedValueOnce(new Error(secret));
-    await expect(controller.updateOne(7, {} as never, req)).resolves.toBe(server);
+    const response = await controller.updateOne(7, {} as never, req);
+    expect(response).toMatchObject({ id: server.id, name: server.name });
+    expect(response).not.toHaveProperty('password');
     service.update.mockRejectedValueOnce(new Error('primary failure'));
     audit.recordAdministration.mockClear();
     await expect(controller.updateOne(7, {} as never, req)).rejects.toThrow('primary failure');

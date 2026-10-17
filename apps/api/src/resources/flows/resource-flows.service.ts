@@ -1,19 +1,17 @@
 import {
-  Resource,
   ResourceFlowEdge,
   ResourceFlowNode,
   ResourceFlowNodeType,
   getNodeDataSchema,
-  ResourceMeter,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { DatabaseTransactions } from '../../database/transaction-scope';
 
-import { In, Repository } from 'typeorm';
+import { FLOW_WRITES, ResourceFlowPersistence } from './persistence/port';
 
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
@@ -46,12 +44,8 @@ export interface ResourceFlowResponse {
 @Injectable()
 export class ResourceFlowsService {
   constructor(
-    @InjectRepository(ResourceFlowNode)
-    protected readonly flowNodeRepository: Repository<ResourceFlowNode>,
-    @InjectRepository(ResourceFlowEdge)
-    protected readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
+    protected readonly persistence: ResourceFlowPersistence,
+    protected readonly transactions: DatabaseTransactions,
     protected readonly mqttClientService: MqttClientService,
     protected readonly eventEmitter: EventEmitter2,
   ) {}
@@ -60,9 +54,7 @@ export class ResourceFlowsService {
 
   public async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
     // Verify resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
+    const resource = await this.persistence.findResource(resourceId);
 
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
@@ -70,12 +62,8 @@ export class ResourceFlowsService {
 
     // Get all nodes and edges for the resource
     const [nodes, edges] = await Promise.all([
-      this.flowNodeRepository.find({
-        where: { resource: { id: resourceId } },
-      }),
-      this.flowEdgeRepository.find({
-        where: { resource: { id: resourceId } },
-      }),
+      this.persistence.graphNodes(resourceId),
+      this.persistence.graphEdges(resourceId),
     ]);
 
     const validationContext = new Map<string, unknown>([['meterResourceId', resourceId]]);
@@ -92,9 +80,7 @@ export class ResourceFlowsService {
   }
 
   public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
-    return await this.flowNodeRepository.find({
-      where: { resourceId, type },
-    });
+    return await this.persistence.nodesByType([resourceId], type);
   }
 
   public async getNodesForResources(
@@ -103,9 +89,7 @@ export class ResourceFlowsService {
   ): Promise<Map<number, ResourceFlowNode[]>> {
     const map = new Map<number, ResourceFlowNode[]>(resourceIds.map((id) => [id, []]));
     if (resourceIds.length === 0) return map;
-    const nodes = await this.flowNodeRepository.find({
-      where: { resourceId: In(resourceIds), type },
-    });
+    const nodes = await this.persistence.nodesByType(resourceIds, type);
     for (const node of nodes) {
       const bucket = map.get(node.resourceId);
       if (bucket) bucket.push(node);
@@ -115,9 +99,7 @@ export class ResourceFlowsService {
 
   async saveResourceFlow(resourceId: number, flowData: ResourceFlowSaveDto): Promise<ResourceFlowResponseDto> {
     // Verify resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
+    const resource = await this.persistence.findResource(resourceId);
 
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
@@ -132,14 +114,11 @@ export class ResourceFlowsService {
     }
 
     // Start transaction to ensure data consistency
-    const result = await this.flowNodeRepository.manager.transaction(async (transactionalEntityManager) => {
+    const result = await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (scope) => {
+      const operations = scope.resolve(FLOW_WRITES);
       const [oldMqttMessageReceivedNodes, oldMqttWaitForMessageNodes] = await Promise.all([
-        transactionalEntityManager.find(ResourceFlowNode, {
-          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
-        }),
-        transactionalEntityManager.find(ResourceFlowNode, {
-          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
-        }),
+        operations.nodesByType(resourceId, ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED),
+        operations.nodesByType(resourceId, ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE),
       ]);
 
       const newOrChangedMqttMessageReceivedNodes = [] as typeof flowData.nodes;
@@ -171,76 +150,58 @@ export class ResourceFlowsService {
         }
       }
 
-      // Delete existing nodes and edges (cascading will handle relationships)
-      await transactionalEntityManager.delete(ResourceFlowNode, { resource: { id: resourceId } });
-      await transactionalEntityManager.delete(ResourceFlowEdge, { resource: { id: resourceId } });
+      const { nodes: savedNodes, edges: savedEdges } = await operations.replaceGraph(
+        resource,
+        flowData.nodes.map((node) => ({
+          id: node.id,
+          type: node.type as ResourceFlowNodeType,
+          position: { x: node.position.x, y: node.position.y },
+          data: node.data || {},
+        })),
+        flowData.edges.map((edge) => ({
+          id: edge.id,
+          source: edge.source,
+          sourceHandle: edge.sourceHandle,
+          target: edge.target,
+          targetHandle: edge.targetHandle,
+        })),
+      );
 
-      // Create new nodes
-      const newNodes = flowData.nodes.map((nodeData) => {
-        const node = new ResourceFlowNode();
-        node.id = nodeData.id;
-        node.type = nodeData.type as ResourceFlowNodeType;
-        node.position = {
-          x: nodeData.position.x,
-          y: nodeData.position.y,
-        };
-        node.data = nodeData.data || {};
-        node.resource = resource;
-        return node;
-      });
-
-      // Create new edges
-      const newEdges = flowData.edges.map((edgeData) => {
-        const edge = new ResourceFlowEdge();
-        edge.id = edgeData.id;
-        edge.source = edgeData.source;
-        edge.sourceHandle = edgeData.sourceHandle;
-        edge.target = edgeData.target;
-        edge.targetHandle = edgeData.targetHandle;
-        edge.resource = resource;
-        return edge;
-      });
-
-      // Save all nodes and edges
-      const [savedNodes, savedEdges] = await Promise.all([
-        transactionalEntityManager.save(ResourceFlowNode, newNodes),
-        transactionalEntityManager.save(ResourceFlowEdge, newEdges),
-      ]);
-
-      for (const nodeData of newOrChangedMqttMessageReceivedNodes) {
-        if (!nodeData.data.serverId || !nodeData.data.topic) {
-          this.logger.warn(
-            `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
-          );
-          continue;
-        }
-        this.mqttClientService
-          .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
-          .catch((error) => {
-            this.logger.error(
-              `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
-              error.stack,
+      scope.afterCommit(() => {
+        for (const nodeData of newOrChangedMqttMessageReceivedNodes) {
+          if (!nodeData.data.serverId || !nodeData.data.topic) {
+            this.logger.warn(
+              `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
             );
-          });
-      }
-
-      for (const nodeData of newOrChangedMqttWaitForMessageNodes) {
-        if (!nodeData.data.serverId || !nodeData.data.topic) {
-          this.logger.warn(
-            `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
-          );
-          continue;
+            continue;
+          }
+          this.mqttClientService
+            .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
+            .catch((error) => {
+              this.logger.error(
+                `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
+                error.stack,
+              );
+            });
         }
-        this.mqttClientService
-          .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
-          .catch((error) => {
-            this.logger.error(
-              `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
-              error.stack,
-            );
-          });
-      }
 
+        for (const nodeData of newOrChangedMqttWaitForMessageNodes) {
+          if (!nodeData.data.serverId || !nodeData.data.topic) {
+            this.logger.warn(
+              `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
+            );
+            continue;
+          }
+          this.mqttClientService
+            .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
+            .catch((error) => {
+              this.logger.error(
+                `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
+                error.stack,
+              );
+            });
+        }
+      });
       return { nodes: savedNodes, edges: savedEdges };
     });
 
@@ -265,7 +226,7 @@ export class ResourceFlowsService {
     config: Record<string, unknown>,
     purpose: 'editor' | 'preview' = 'editor',
   ): Promise<ResourceFlowNodeSchemaDto> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.persistence.findResource(resourceId);
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
     }
@@ -372,9 +333,7 @@ export class ResourceFlowsService {
     const cacheKey = `resource-flow:meter-ids:${resourceId}`;
     let meterIds = validationContext.get(cacheKey) as Promise<Set<number>> | undefined;
     if (!meterIds) {
-      meterIds = this.resourceRepository.manager
-        .find(ResourceMeter, { where: { resourceId }, select: { id: true } })
-        .then((meters) => new Set(meters.map((meter) => meter.id)));
+      meterIds = this.persistence.meterIds(resourceId).then((ids) => new Set(ids));
       // Share the pending lookup with concurrent validators; each flow request has a fresh context.
       validationContext.set(cacheKey, meterIds);
     }
@@ -382,9 +341,7 @@ export class ResourceFlowsService {
   }
 
   public async getNodeSchemas(resourceId: number): Promise<ResourceFlowNodeSchemaDto[]> {
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
+    const resource = await this.persistence.findResource(resourceId);
 
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);

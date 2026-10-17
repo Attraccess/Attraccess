@@ -260,9 +260,9 @@ describe('SumUpService', () => {
 
       await callPrivate('tx1');
 
-      expect(transaction.status).toBe(BillingTransactionStatus.Completed);
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith(transaction);
-      expect(fixture.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(transaction);
+      const saved = { ...transaction, status: BillingTransactionStatus.Completed };
+      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith(saved);
+      expect(fixture.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(saved);
       expect(fixture.mockAuditService.recordBillingTransaction).toHaveBeenCalledWith({
         transactionId: 10,
         userId: 42,
@@ -285,7 +285,10 @@ describe('SumUpService', () => {
       fixture.billingTransactionRepository.save.mockImplementation(async (t: any) => t);
 
       await callPrivate('tx2');
-      expect(transaction.status).toBe(BillingTransactionStatus.Failed);
+      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith({
+        ...transaction,
+        status: BillingTransactionStatus.Failed,
+      });
     });
   });
 

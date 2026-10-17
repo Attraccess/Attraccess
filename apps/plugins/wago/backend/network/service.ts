@@ -1,8 +1,9 @@
+import { WagoNetworkPersistence } from './persistence/port';
 import {
   type PluginAuditPrincipal,
   type PluginContext,
   type PluginMqttSubscription,
-} from '@attraccess/plugins-backend-sdk';
+} from '@attraccess/plugins-backend-sdk/v2';
 
 import {
   BadRequestException,
@@ -17,17 +18,13 @@ import { randomBytes, createHash, randomUUID } from 'node:crypto';
 
 import { WagoAudit } from '../audit/index';
 
-import { WagoController } from '../controllers/entity';
-
-import { WagoCredentialRotationEntity } from '../credentials/service';
+import { WagoController } from '../controllers/record';
 
 import { WagoDeviceOperations } from '../runtime/device-operations';
 
-import { WagoDeviceOperation, WagoManagedAccess, WagoRuntimeUpdateEntity } from '../runtime/managed/access.entity';
-
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 
-import { WagoNetworkChange, WagoMqttCredentialRetirement } from './entity';
+import { WagoNetworkChange } from './record';
 
 import { NetworkChangeError } from './model';
 
@@ -45,8 +42,6 @@ import { NetworkPayload } from './model';
 
 import { EVIDENCE_MS } from './model';
 
-import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
-
 import { assertCommissioningBroker } from '../commissioning/delivery/preflight';
 
 import { lookup } from 'node:dns/promises';
@@ -56,9 +51,12 @@ export { networkChangeInput } from './model';
 @Injectable()
 export class WagoNetworkChangeService implements OnModuleDestroy {
   public constructor(
-    @Inject(Symbol.for('attraccess.plugin.context')) protected readonly context: PluginContext,
+    @Inject(Symbol.for('attraccess.plugin.context'))
+    protected readonly context: Omit<PluginContext, 'operations' | 'persistence'>,
     @Inject(WagoManagedRuntimeService) protected readonly managed: WagoManagedRuntimeService,
     @Inject(WagoService) protected readonly wago: WagoService,
+    @Inject(WagoDeviceOperations) protected readonly operations: WagoDeviceOperations,
+    @Inject(WagoNetworkPersistence) protected readonly persistence: WagoNetworkPersistence,
   ) {}
 
   protected readonly active = new Set<AbortController>();
@@ -68,11 +66,9 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   async apply(controllerId: number, body: unknown, principal: PluginAuditPrincipal, retry = false) {
     if (this.destroyed) throw new ConflictException('Controller operation has stopped. Retry the request.');
     const input = retry ? null : networkChangeInput(body);
-    const access = await this.context
-      .getRepository(WagoManagedAccess)
-      .findOne({ where: { controllerId, state: 'managed' }, order: { sessionId: 'DESC' } });
+    const access = await this.persistence.managedAccess(controllerId, true);
     if (!access) throw new ConflictException('Automatic SSH management is required for this operation.');
-    const operations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation));
+    const operations = this.operations;
     const owner = randomBytes(16).toString('hex'),
       now = Date.now();
     if (!(await operations.acquire(access.fingerprint, owner, now, now + OPERATION_MS + 60_000)))
@@ -88,28 +84,22 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     let audited = false;
     const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'network_change');
     try {
-      const controller = await this.context
-        .getRepository(WagoController)
-        .findOneBy({ id: controllerId, trustState: 'claimed' });
+      const controller = await this.persistence.controller(controllerId, true);
       if (!controller?.mqttServerId || !controller.credentialEpoch)
         throw new ConflictException('Managed enrolled controller required.');
-      row = await this.repository
-        .createQueryBuilder('change')
-        .addSelect('change.encryptedPayload')
-        .where('change.controllerId = :controllerId', { controllerId })
-        .getOne();
+      row = await this.persistence.intent(controllerId, true);
       if (retry && (!row || row.phase === 'completed')) return this.status(controllerId);
       if (!retry && row && row.phase !== 'completed' && !(row.phase === 'connecting' && row.failure))
         throw new ConflictException('Retry the pending MQTT/address change before starting another.');
-      const rotation = await this.context.getRepository(WagoCredentialRotationEntity).findOneBy({ controllerId });
-      const update = await this.context.getRepository(WagoRuntimeUpdateEntity).findOneBy({ controllerId });
-      if ((rotation && rotation.phase !== 'completed') || (update?.metadata && JSON.parse(update.metadata).token))
+      const rotation = await this.persistence.rotationPhase(controllerId);
+      const updateMetadata = await this.persistence.updateMetadata(controllerId);
+      if ((rotation && rotation !== 'completed') || (updateMetadata && JSON.parse(updateMetadata).token))
         throw new ConflictException(
           'Finish credential rotation or runtime update recovery before changing MQTT/address settings.',
         );
       if (!retry) {
         if (!input) throw new BadRequestException('Invalid MQTT/address change');
-        row = this.repository.create({
+        row = {
           controllerId,
           sessionId: access.sessionId,
           fingerprint: access.fingerprint,
@@ -118,9 +108,9 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
           failure: null,
           encryptedPayload: null,
           updatedAt: new Date().toISOString(),
-        });
+        };
         await assertOwned();
-        await this.repository.save(row);
+        await this.persistence.saveIntent(row);
       }
       if (!row || row.sessionId !== access.sessionId || row.fingerprint !== access.fingerprint)
         throw new ConflictException('Pending change belongs to another managed identity.');
@@ -156,7 +146,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
         row.failure =
           error instanceof RuntimeUpdateError || error instanceof NetworkChangeError ? error.failure : 'interrupted';
         await assertOwned()
-          .then(() => this.repository.save(row))
+          .then(() => this.persistence.saveIntent(row))
           .catch(() => undefined);
       }
       if (audited) await lifecycle.finish('failed');
@@ -354,44 +344,28 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     payload: NetworkPayload | null,
     assertOwned: () => Promise<void>,
   ) {
-    await this.repository.manager.transaction(async (manager) => {
-      await assertOwned();
-      await manager
-        .getRepository(WagoManagedAccess)
-        .update(row.sessionId, { host: row.targetHost, encryptedCredentials });
-      await manager.getRepository(WagoCommissioningSession).update(row.sessionId, {
+    await this.persistence.commitBindings(
+      {
+        controllerId: row.controllerId,
+        sessionId: row.sessionId,
         targetHost: row.targetHost,
-        ...(payload ? { mqttServerId: payload.mqttServerId } : {}),
-      });
-      if (payload) {
-        if (payload.previousServerId !== payload.mqttServerId)
-          await manager
-            .getRepository(WagoMqttCredentialRetirement)
-            .save({ controllerId: row.controllerId, mqttServerId: payload.previousServerId });
-        // A return to a previous broker makes that identity current again.
-        await manager
-          .getRepository(WagoMqttCredentialRetirement)
-          .delete({ controllerId: row.controllerId, mqttServerId: payload.mqttServerId });
-        await manager.getRepository(WagoController).update(row.controllerId, {
-          mqttServerId: payload.mqttServerId,
-          credentialMqttServerId: payload.mqttServerId,
-          credentialEpoch: payload.credentialEpoch,
-          lastHeartbeatAt: null,
-          updatedAt: new Date().toISOString(),
-        });
-        await manager.getRepository(WagoCredentialRotationEntity).save({
-          controllerId: row.controllerId,
-          revision: 1,
-          token: payload.token,
-          phase: 'completed',
-          credentialEpoch: payload.credentialEpoch,
-          mqttServerId: payload.mqttServerId,
-          prefix: payload.prefix,
-          encryptedCredentials: null,
-        });
-      }
-      await assertOwned();
-    });
+        encryptedCredentials,
+        ...(payload
+          ? {
+              broker: {
+                mqttServerId: payload.mqttServerId,
+                retirePreviousServerId:
+                  payload.previousServerId !== payload.mqttServerId ? payload.previousServerId : null,
+                credentialEpoch: payload.credentialEpoch,
+                token: payload.token,
+                prefix: payload.prefix,
+                updatedAt: new Date().toISOString(),
+              },
+            }
+          : {}),
+      },
+      assertOwned,
+    );
   }
 
   protected payload(row: WagoNetworkChange, controller: WagoController): NetworkPayload {
@@ -441,25 +415,20 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     row.phase = phase;
     row.failure = null;
     row.updatedAt = new Date().toISOString();
-    await this.repository.save(row);
+    await this.persistence.saveIntent(row);
   }
 
   async status(controllerId: number) {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id: controllerId });
+    const controller = await this.persistence.controller(controllerId);
     if (!controller) throw new NotFoundException('WAGO controller not found');
-    const access = await this.context
-      .getRepository(WagoManagedAccess)
-      .findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
-    const row = await this.repository.findOneBy({ controllerId });
-    const lease =
-      row && (await this.context.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: row.fingerprint }));
+    const access = await this.persistence.managedAccess(controllerId);
+    const row = await this.persistence.intent(controllerId);
+    const lease = row && (await this.operations.inspect(row.fingerprint));
     return {
       available: access?.state === 'managed',
       targetHost: access?.host ?? null,
       mqttServerId: controller.mqttServerId,
-      pendingCredentialRetirements: await this.context
-        .getRepository(WagoMqttCredentialRetirement)
-        .countBy({ controllerId }),
+      pendingCredentialRetirements: await this.persistence.retirementCount(controllerId),
       operation: row
         ? {
             targetHost: row.targetHost,
@@ -473,11 +442,9 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   }
 
   async retirePreviousCredentials(controllerId: number, principal: PluginAuditPrincipal) {
-    const access = await this.context
-      .getRepository(WagoManagedAccess)
-      .findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
+    const access = await this.persistence.managedAccess(controllerId);
     if (!access) throw new ConflictException('Controller management identity is unavailable.');
-    const operations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation)),
+    const operations = this.operations,
       owner = randomBytes(16).toString('hex');
     if (!(await operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 120_000)))
       throw new ConflictException('Controller is busy');
@@ -487,11 +454,11 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
       await this.managed.assertNetworkSettled(controllerId);
       await lifecycle.attempt();
       audited = true;
-      const controller = await this.context.getRepository(WagoController).findOneByOrFail({ id: controllerId });
+      const controller = await this.persistence.controller(controllerId);
+      if (!controller) throw new Error();
       const current = controller.mqttServerId && (await this.context.getMqttServerConfig(controller.mqttServerId));
       if (!current) throw new Error();
-      const repository = this.context.getRepository(WagoMqttCredentialRetirement);
-      for (const row of await repository.findBy({ controllerId })) {
+      for (const row of await this.persistence.retirements(controllerId)) {
         const previous = await this.context.getMqttServerConfig(row.mqttServerId);
         if (!previous) throw new Error();
         // Duplicate server records and DNS aliases share the active credentials.
@@ -522,7 +489,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
           // Keep ambiguous retirements retryable rather than revoking active credentials.
           if (previous.port !== current.port || previous.useTls !== current.useTls) throw new Error();
           await operations.assertOwned(access.fingerprint, owner);
-          await repository.delete({ controllerId, mqttServerId: row.mqttServerId });
+          await this.persistence.removeRetirement(controllerId, row.mqttServerId);
           continue;
         }
         await operations.assertOwned(access.fingerprint, owner);
@@ -532,7 +499,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
           .revoke({ mqttServerId: row.mqttServerId, identity, username: identity, vhost: '/' });
         if (result) throw new Error();
         await operations.assertOwned(access.fingerprint, owner);
-        await repository.delete({ controllerId, mqttServerId: row.mqttServerId });
+        await this.persistence.removeRetirement(controllerId, row.mqttServerId);
       }
       await lifecycle.finish('succeeded');
       audited = false;
@@ -550,9 +517,5 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   onModuleDestroy(): void {
     this.destroyed = true;
     this.active.forEach((controller) => controller.abort());
-  }
-
-  protected get repository() {
-    return this.context.getRepository(WagoNetworkChange);
   }
 }

@@ -1,3 +1,5 @@
+import { SupervisedUsageHistory } from '../persistence/port';
+import { TypeormSupervisedUsageHistory } from '../persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, IsNull, Not } from 'typeorm';
@@ -47,6 +49,7 @@ describe('SupervisedUsageAutoPromotionListener', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: SupervisedUsageHistory, useFactory: () => new TypeormSupervisedUsageHistory(usageRepository as never, resourceRepository as never) },
         SupervisedUsageAutoPromotionListener,
         { provide: getRepositoryToken(ResourceUsage), useValue: usageRepository },
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },

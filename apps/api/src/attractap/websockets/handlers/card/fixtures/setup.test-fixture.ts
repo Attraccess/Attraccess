@@ -1,3 +1,4 @@
+import { TypeormAttractapResourceReader } from '../../../../persistence/typeorm-adapter';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the original handler test policy for partial protocol mocks. */
 import { AttractapCardHandler } from '../card.handler';
 import { AttractapCardHandlerTestScope } from '../card.handler.spec';
@@ -40,7 +41,7 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   (scope.handler as any).resourceUsageService = scope.resourceUsageService;
   (scope.handler as any).resourceIntroducersService = scope.resourceIntroducersService;
   (scope.handler as any).metricsService = scope.metricsService;
-  (scope.handler as any).resourceRepository = scope.resourceRepository;
+  (scope.handler as any).resourceReader = new TypeormAttractapResourceReader(scope.resourceRepository as never);
   (scope.handler as any).rbacService = scope.rbacService;
   (scope.handler as any).audit = scope.audit;
 }

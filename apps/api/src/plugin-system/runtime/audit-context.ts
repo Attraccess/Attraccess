@@ -1,4 +1,4 @@
-import type { PluginAuditContext, PluginAuditHostProvider } from '@attraccess/plugins-backend-sdk';
+import type { PluginAuditContext, PluginAuditHostProvider } from '@attraccess/plugins-backend-sdk/v2';
 
 /** Missing foundation or storage failure is explicit; never log the event/error as a fallback. */
 export function createPluginAuditContext(pluginId: string, resolve: () => PluginAuditHostProvider): PluginAuditContext {

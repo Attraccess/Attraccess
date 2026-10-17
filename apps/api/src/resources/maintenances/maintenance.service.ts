@@ -1,18 +1,12 @@
-import {
-  Resource,
-  ResourceIntroducer,
-  ResourceMaintenance,
-  User,
-  ResourceMaintenanceSchedule,
-} from '@attraccess/database-entities';
+import { ResourceMaintenance, User, ResourceMaintenanceSchedule } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { MaintenancePersistence, MAINTENANCE_OPERATIONS } from './persistence/port';
 
-import { Repository, EntityManager, In } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 
 import { MetricsService } from '../../metrics/metrics.service';
 
@@ -22,7 +16,7 @@ import { ListMaintenancesDto } from './dtos/listMaintenances.dto';
 
 import { PaginatedMaintenanceResponse } from './dtos/paginatedMaintenanceResponse.dto';
 
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 
 import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
 
@@ -31,17 +25,16 @@ import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-c
 @Injectable()
 export class ResourceMaintenanceService {
   constructor(
-    @InjectRepository(ResourceMaintenance)
-    protected readonly maintenanceRepository: Repository<ResourceMaintenance>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    protected readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @Inject(MaintenancePersistence) protected readonly persistence: MaintenancePersistence,
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
     protected readonly rbacService: RbacService,
   ) {}
+
+  protected operations(scope?: TransactionScope): MaintenancePersistence {
+    return scope ? scope.resolve(MAINTENANCE_OPERATIONS) : this.persistence;
+  }
 
   protected readonly logger = new Logger(ResourceMaintenanceService.name);
 
@@ -53,64 +46,22 @@ export class ResourceMaintenanceService {
     const skip = (page - 1) * limit;
 
     // Verify the resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
+    const resource = await this.persistence.resource(resourceId);
 
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
 
-    // Build query based on filter options
-    const queryBuilder = this.maintenanceRepository
-      .createQueryBuilder('maintenance')
-      .where('maintenance.resourceId = :resourceId', { resourceId });
-
-    const now = new Date();
-
-    // Build dynamic conditions based on filter flags
-    if (includeUpcoming && includeActive && includePast) {
-      // All maintenances - no additional filtering needed
-    } else if (!includeUpcoming && !includeActive && !includePast) {
+    if (!includeUpcoming && !includeActive && !includePast)
       throw new BadRequestException('At least one filter must be true');
-    } else {
-      // Build specific conditions
-      const conditions = [];
-
-      if (includeUpcoming) {
-        conditions.push('maintenance.startTime > :now');
-      }
-
-      if (includeActive) {
-        conditions.push(
-          '(maintenance.startTime <= :now AND (maintenance.endTime IS NULL OR maintenance.endTime > :now))',
-        );
-      }
-
-      if (includePast) {
-        conditions.push(
-          '(maintenance.startTime <= :now AND (maintenance.endTime IS NOT NULL AND maintenance.endTime < :now))',
-        );
-      }
-
-      if (conditions.length > 0) {
-        queryBuilder.andWhere(`(${conditions.join(' OR ')})`, { now });
-      }
-    }
-
-    // Order by start time (soonest first)
-    queryBuilder.orderBy('maintenance.startTime', 'ASC');
-
-    // Get total count
-    const total = await queryBuilder.getCount();
-
-    // Load audit relations for "who did maintenance when" display
-    queryBuilder
-      .leftJoinAndSelect('maintenance.createdByUser', 'createdByUser')
-      .leftJoinAndSelect('maintenance.completedByUser', 'completedByUser');
-
-    // Get paginated results
-    const data = await queryBuilder.skip(skip).take(limit).getMany();
+    const [data, total] = await this.persistence.page(resourceId, {
+      now: new Date(),
+      includeUpcoming,
+      includeActive,
+      includePast,
+      skip,
+      take: limit,
+    });
 
     return {
       data,
@@ -124,10 +75,7 @@ export class ResourceMaintenanceService {
    * Get a specific maintenance by ID (includes createdByUser and completedByUser for audit display).
    */
   async getMaintenanceById(maintenanceId: number): Promise<ResourceMaintenance> {
-    const maintenance = await this.maintenanceRepository.findOne({
-      where: { id: maintenanceId },
-      relations: ['createdByUser', 'completedByUser'],
-    });
+    const maintenance = await this.persistence.maintenance(maintenanceId, true);
 
     if (!maintenance) {
       throw new NotFoundException(`Maintenance with ID ${maintenanceId} not found`);
@@ -138,43 +86,19 @@ export class ResourceMaintenanceService {
 
   async hasActiveMaintenance(
     resourceIdOrFilter: number | { resourceId: number; scheduleId?: number },
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     const resourceId = typeof resourceIdOrFilter === 'number' ? resourceIdOrFilter : resourceIdOrFilter.resourceId;
     const scheduleId = typeof resourceIdOrFilter === 'number' ? undefined : resourceIdOrFilter.scheduleId;
 
     const now = new Date();
 
-    const maintenanceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceMaintenance)
-      : this.maintenanceRepository;
-
-    const query = maintenanceRepository
-      .createQueryBuilder('maintenance')
-      .where('maintenance.resourceId = :resourceId', { resourceId })
-      .andWhere('maintenance.startTime <= :now', { now })
-      .andWhere('maintenance.endTime IS NULL');
-
-    if (scheduleId) {
-      query.andWhere('maintenance.maintenanceScheduleId = :scheduleId', { scheduleId });
-    }
-
-    const activeMaintenance = await query.getOne();
-
-    return !!activeMaintenance;
+    return this.operations(transactionalEntityManager).hasActive(resourceId, scheduleId, now);
   }
 
   async getActiveMaintenanceResourceIds(resourceIds: number[]): Promise<Set<number>> {
     if (resourceIds.length === 0) return new Set();
-    const now = new Date();
-    const active = await this.maintenanceRepository
-      .createQueryBuilder('maintenance')
-      .select('DISTINCT maintenance.resourceId', 'resourceId')
-      .where('maintenance.resourceId IN (:...resourceIds)', { resourceIds })
-      .andWhere('maintenance.startTime <= :now', { now })
-      .andWhere('maintenance.endTime IS NULL')
-      .getRawMany<{ resourceId: number }>();
-    return new Set(active.map((r) => Number(r.resourceId)));
+    return new Set(await this.persistence.activeResourceIds(resourceIds, new Date()));
   }
 
   /**
@@ -185,7 +109,7 @@ export class ResourceMaintenanceService {
     user: User | AuthenticatedUser,
     resourceIds: number[],
     effectivePermissions?: Set<string>,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<Set<number>> {
     if (resourceIds.length === 0) return new Set();
 
@@ -196,19 +120,7 @@ export class ResourceMaintenanceService {
     if (permissions.has('resources.maintenance.manage')) return new Set(resourceIds);
 
     try {
-      const resourceIntroducerRepository = transactionalEntityManager
-        ? transactionalEntityManager.getRepository(ResourceIntroducer)
-        : this.resourceIntroducerRepository;
-      const matches = await resourceIntroducerRepository
-        .createQueryBuilder('introducer')
-        .leftJoin('introducer.resource', 'resource')
-        .leftJoin('introducer.resourceGroup', 'resourceGroup')
-        .leftJoin('resourceGroup.resources', 'groupResource')
-        .select('resource.id', 'resourceId')
-        .addSelect('groupResource.id', 'groupResourceId')
-        .where('introducer.userId = :userId', { userId: user.id })
-        .andWhere('(resource.id IN (:...resourceIds) OR groupResource.id IN (:...resourceIds))', { resourceIds })
-        .getRawMany<{ resourceId: number | null; groupResourceId: number | null }>();
+      const matches = await this.operations(transactionalEntityManager).managedResourcePairs(user.id, resourceIds);
 
       return new Set(
         matches.flatMap((match) =>
@@ -227,7 +139,7 @@ export class ResourceMaintenanceService {
   async canManageMaintenance(
     user: User | AuthenticatedUser,
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     // Check if the user has system permissions to manage all resources.
     // Fall back to a DB lookup when the entity came from a WebSocket/card path (no effectivePermissions attached).
@@ -238,35 +150,16 @@ export class ResourceMaintenanceService {
     }
 
     try {
-      const resourceIntroducerRepository = transactionalEntityManager
-        ? transactionalEntityManager.getRepository(ResourceIntroducer)
-        : this.resourceIntroducerRepository;
-
-      // First, check if the user is an introducer for this specific resource
-      const resourceIntroducer = await resourceIntroducerRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-          resource: {
-            id: resourceId,
-          },
-        },
-      });
+      const resourceIntroducer = await this.operations(transactionalEntityManager).directIntroducer(
+        user.id,
+        resourceId,
+      );
 
       if (resourceIntroducer) {
         return true;
       }
 
-      const resourceRepository = transactionalEntityManager
-        ? transactionalEntityManager.getRepository(Resource)
-        : this.resourceRepository;
-
-      // If not a direct resource introducer, check if the user is an introducer for any group the resource belongs to
-      const resource = await resourceRepository.findOne({
-        where: { id: resourceId },
-        relations: ['groups'],
-      });
+      const resource = await this.operations(transactionalEntityManager).resource(resourceId, true);
 
       if (!resource) {
         this.logger.warn(`Resource ${resourceId} not found`);
@@ -274,16 +167,10 @@ export class ResourceMaintenanceService {
       }
 
       // Check if user is introducer for any of the resource's groups
-      const groupIntroducer = await resourceIntroducerRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-          resourceGroup: {
-            id: In(resource.groups.map((group) => group.id)),
-          },
-        },
-      });
+      const groupIntroducer = await this.operations(transactionalEntityManager).groupIntroducer(
+        user.id,
+        resource.groups.map((group) => group.id),
+      );
 
       if (groupIntroducer) {
         return true;
@@ -307,9 +194,7 @@ export class ResourceMaintenanceService {
     userId?: number,
   ): Promise<ResourceMaintenance> {
     // Verify the resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
+    const resource = await this.persistence.resource(resourceId);
 
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
@@ -325,7 +210,7 @@ export class ResourceMaintenanceService {
       }
     }
 
-    const maintenance = this.maintenanceRepository.create({
+    const savedMaintenance = await this.persistence.createMaintenance({
       resource,
       startTime,
       endTime: dto.endTime ? new Date(dto.endTime) : null,
@@ -333,7 +218,6 @@ export class ResourceMaintenanceService {
       createdByUser: userId != null ? ({ id: userId } as User) : undefined,
     });
 
-    const savedMaintenance = await this.maintenanceRepository.save(maintenance);
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,
       new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
@@ -349,26 +233,18 @@ export class ResourceMaintenanceService {
     resourceId: number,
     scheduleId: number,
     reason: string,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
     notify = true,
   ): Promise<ResourceMaintenance> {
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-    const maintenanceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceMaintenance)
-      : this.maintenanceRepository;
-
-    const resource = await resourceRepository.findOne({
-      where: { id: resourceId },
-    });
+    const persistence = this.operations(transactionalEntityManager);
+    const resource = await persistence.resource(resourceId);
 
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
 
     const now = new Date();
-    const maintenance = maintenanceRepository.create({
+    const savedMaintenance = await persistence.createMaintenance({
       resource,
       startTime: now,
       endTime: null,
@@ -376,8 +252,13 @@ export class ResourceMaintenanceService {
       maintenanceSchedule: { id: scheduleId } as ResourceMaintenanceSchedule,
     });
 
-    const savedMaintenance = await maintenanceRepository.save(maintenance);
-    if (notify) this.emitScheduledMaintenanceCreated(resourceId, savedMaintenance.id);
+    if (notify) {
+      if (transactionalEntityManager)
+        transactionalEntityManager.afterCommit(() =>
+          this.emitScheduledMaintenanceCreated(resourceId, savedMaintenance.id),
+        );
+      else this.emitScheduledMaintenanceCreated(resourceId, savedMaintenance.id);
+    }
     return savedMaintenance;
   }
 
@@ -397,9 +278,7 @@ export class ResourceMaintenanceService {
     maintenanceId: number,
     options?: { userId?: number; notes?: string },
   ): Promise<ResourceMaintenance> {
-    const maintenance = await this.maintenanceRepository.findOne({
-      where: { id: maintenanceId },
-    });
+    const maintenance = await this.persistence.maintenance(maintenanceId, false);
 
     if (!maintenance) {
       throw new NotFoundException(`Maintenance with ID ${maintenanceId} not found`);
@@ -415,7 +294,7 @@ export class ResourceMaintenanceService {
     if (options?.userId != null) {
       maintenance.completedByUser = { id: options.userId } as User;
     }
-    const savedMaintenance = await this.maintenanceRepository.save(maintenance);
+    const savedMaintenance = await this.persistence.saveMaintenance(maintenance);
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,
       new ResourceMaintenanceChangedEvent(maintenance.resourceId, savedMaintenance.id),

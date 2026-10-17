@@ -1,4 +1,4 @@
-import { ResourceFlowNode, Resource } from '@attraccess/database-entities';
+import { ResourceFlowNode, Resource } from '@attraccess/application-models';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 /**

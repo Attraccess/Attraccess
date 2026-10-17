@@ -1,4 +1,4 @@
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { LogoutSession } from './session-store/session-store';
 
 /** Set by the session strategy from the same storage read that authenticates the token. */

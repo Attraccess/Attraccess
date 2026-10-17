@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { ResourceFormsService } from './forms.service';
 import { CreateFormDto, FormRequirementsQueryDto, FormResponseDto, UpdateFormDto } from './dto';
 

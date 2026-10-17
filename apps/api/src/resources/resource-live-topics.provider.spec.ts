@@ -1,3 +1,4 @@
+import { TypeormResourceEventPersistence } from './persistence/typeorm-adapter';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LiveSubscription } from '@attraccess/shared';
 import { Resource } from '@attraccess/database-entities';
@@ -15,7 +16,7 @@ function setup() {
   const logs = { subjectFor: jest.fn(() => new Subject<{ data: object }>()), releaseSubject: jest.fn() };
   const provider = new ResourceLiveTopicsProvider(
     registry,
-    resources as unknown as Repository<Resource>,
+    new TypeormResourceEventPersistence(resources as unknown as Repository<Resource>),
     events as unknown as ResourceEventsService,
     logs as unknown as FlowLogRecorderService,
   );

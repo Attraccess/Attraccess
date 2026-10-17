@@ -1,6 +1,15 @@
-import { BadRequestException, Controller, ForbiddenException, Get, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseIntPipe,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import {
   ResourceOperatingAttributionService,
   ResourceOperatingAttributionSummary,

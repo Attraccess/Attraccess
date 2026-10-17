@@ -4,7 +4,7 @@ import type {
   MqttServerConnectionConfig,
   PluginContext,
   ProvisionedMqttCredential,
-} from '@attraccess/plugins-backend-sdk';
+} from '@attraccess/plugins-backend-sdk/v2';
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { Mutex } from 'async-mutex';
 import { randomBytes } from 'crypto';

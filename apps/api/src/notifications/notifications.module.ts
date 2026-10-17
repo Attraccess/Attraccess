@@ -1,3 +1,5 @@
+import { NotificationPersistence } from './persistence/port';
+import { TypeormNotificationPersistence } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NotificationPreference } from '@attraccess/database-entities';
@@ -22,6 +24,7 @@ import { NotificationLiveTopicsProvider } from './notification-live-topics.provi
   controllers: [NotificationsController],
   providers: [
     NotificationPreferenceService,
+    { provide: NotificationPersistence, useClass: TypeormNotificationPersistence },
     NotificationLiveService,
     NotificationDispatchService,
     NotificationLiveTopicsProvider,

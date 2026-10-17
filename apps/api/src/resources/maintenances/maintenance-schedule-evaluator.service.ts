@@ -1,16 +1,10 @@
-import {
-  Resource,
-  ResourceMaintenance,
-  ResourceMaintenanceSchedule,
-  ResourceUsage,
-  ResourceMaintenanceScheduleTriggerType,
-} from '@attraccess/database-entities';
+import { ResourceMaintenanceSchedule, ResourceMaintenanceScheduleTriggerType } from '@attraccess/application-models';
 
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { MaintenanceEvaluationPersistence, MaintenanceBatchIsolationError } from './persistence/port';
 
-import { Repository, In } from 'typeorm';
+import { DatabaseTransactions } from '../../database/transaction-scope';
 
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
@@ -23,100 +17,13 @@ import {
 
 import { ResourceMaintenanceService } from './maintenance.service';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
-export /**
- * SQLite stores `datetime` columns as `YYYY-MM-DD HH:mm:ss.SSS` in UTC (TypeORM's
- * DateUtils.mixedDateToUtcDatetimeString). `new Date(...)` parses that as *local* time, and
- * `.toISOString()` produces a `T`/`Z` form that doesn't compare correctly against stored values.
- * These two helpers are the only places that bridge the formats.
- */
-const parseDbDate = (value: string | Date): Date =>
-  value instanceof Date ? value : new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}Z`);
-
-export const formatDbDate = (date: Date): string => date.toISOString().replace('T', ' ').replace('Z', '');
-
-/**
- * Per-(resource, schedule) evaluation data in one query. The `(resourceId, scheduleId, createdAt)`
- * triples are supplied as a CTE, so each schedule is evaluated against its own completed-maintenance
- * baseline without interpolating application values into SQL text.
- */
-export const buildScheduleEvaluationQuery = (
-  maintenanceTable: string,
-  usageTable: string,
-  pairCount: number,
-): string => {
-  const pairs = Array.from({ length: pairCount }, () => '(?, ?, ?)').join(', ');
-
-  return `WITH pairs(resourceId, scheduleId, createdAt) AS (VALUES ${pairs}),
-               baselines AS (
-                 SELECT p.resourceId,
-                        p.scheduleId,
-                        COALESCE(MAX(done.endTime), p.createdAt) AS baseline,
-                        EXISTS(
-                          SELECT 1
-                          FROM "${maintenanceTable}" active
-                          WHERE active.resourceId = p.resourceId
-                            AND active.startTime <= ?
-                            AND active.endTime IS NULL
-                        ) AS hasActiveMaintenance
-                 FROM pairs p
-                 LEFT JOIN "${maintenanceTable}" done
-                   ON done.resourceId = p.resourceId
-                  AND done.maintenanceScheduleId = p.scheduleId
-                  AND done.endTime IS NOT NULL
-                 GROUP BY p.resourceId, p.scheduleId, p.createdAt
-               )
-          SELECT b.resourceId AS resourceId,
-                 b.scheduleId AS scheduleId,
-                 b.baseline AS baseline,
-                 b.hasActiveMaintenance AS hasActiveMaintenance,
-                 COUNT(u.id) AS totalCount
-          FROM baselines b
-          LEFT JOIN "${usageTable}" u
-            ON u.resourceId = b.resourceId
-           AND u.lifecyclePending = 0
-           AND u.endTime IS NOT NULL
-           AND u.endTime >= b.baseline
-          GROUP BY b.resourceId, b.scheduleId, b.baseline, b.hasActiveMaintenance`;
-};
-
-export const MAX_PAIRS_PER_QUERY = 10_921;
-
 export const WRITE_TRANSACTION_BATCH_SIZE = 100;
-
-/** Fetch completed-maintenance baselines and active state without scanning resource usage. */
-export const buildScheduleStateQuery = (maintenanceTable: string, pairCount: number): string => {
-  const pairs = Array.from({ length: pairCount }, () => '(?, ?, ?)').join(', ');
-
-  return `WITH pairs(resourceId, scheduleId, createdAt) AS (VALUES ${pairs})
-          SELECT p.resourceId AS resourceId,
-                 p.scheduleId AS scheduleId,
-                 COALESCE(MAX(done.endTime), p.createdAt) AS baseline,
-                 EXISTS(
-                   SELECT 1
-                   FROM "${maintenanceTable}" active
-                   WHERE active.resourceId = p.resourceId
-                     AND active.startTime <= ?
-                     AND active.endTime IS NULL
-                 ) AS hasActiveMaintenance
-          FROM pairs p
-          LEFT JOIN "${maintenanceTable}" done
-            ON done.resourceId = p.resourceId
-           AND done.maintenanceScheduleId = p.scheduleId
-           AND done.endTime IS NOT NULL
-          GROUP BY p.resourceId, p.scheduleId, p.createdAt`;
-};
 
 @Injectable()
 export class MaintenanceScheduleEvaluatorService extends MaintenanceResourceEvaluation implements OnModuleDestroy {
   constructor(
-    @InjectRepository(ResourceMaintenanceSchedule)
-    protected readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
-    @InjectRepository(ResourceMaintenance)
-    protected readonly maintenanceRepository: Repository<ResourceMaintenance>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceUsage)
-    protected readonly usageRepository: Repository<ResourceUsage>,
+    @Inject(MaintenanceEvaluationPersistence) protected readonly persistence: MaintenanceEvaluationPersistence,
+    protected readonly transactions: DatabaseTransactions,
     protected readonly maintenanceService: ResourceMaintenanceService,
     protected readonly cronTimer: CronTimer,
     protected readonly metricsService: MetricsService,
@@ -148,50 +55,46 @@ export class MaintenanceScheduleEvaluatorService extends MaintenanceResourceEval
       const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
       const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
       try {
-        await this.scheduleRepository.manager.transaction(async (em) => {
-          for (const [index, { resourceId, schedule }] of batch.entries()) {
-            const savepoint = `maintenance_schedule_${offset + index}`;
-            await em.query(`SAVEPOINT ${savepoint}`);
-            try {
-              // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
-              if (await this.maintenanceService.hasActiveMaintenance(resourceId, em)) {
-                await em.query(`RELEASE SAVEPOINT ${savepoint}`);
-                continue;
+        await this.transactions.run(
+          { resourceIds: batch.map((candidate) => candidate.resourceId), accountIds: [] },
+          async (em) => {
+            for (const { resourceId, schedule } of batch) {
+              try {
+                let reason: string | undefined;
+                const maintenanceId = await this.evaluationOperations(em).attemptCreation(resourceId, async () => {
+                  if (await this.maintenanceService.hasActiveMaintenance(resourceId, em)) return undefined;
+                  if (
+                    schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
+                    !(await this.shouldTrigger(schedule, resourceId, em))
+                  )
+                    return undefined;
+                  reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+                  return (
+                    await this.maintenanceService.createMaintenanceFromSchedule(
+                      resourceId,
+                      schedule.id,
+                      reason,
+                      em,
+                      false,
+                    )
+                  ).id;
+                });
+                if (maintenanceId !== undefined) {
+                  createdMaintenances.push({ resourceId, maintenanceId });
+                  this.logger.log(
+                    `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+                  );
+                }
+              } catch (err) {
+                if (err instanceof MaintenanceBatchIsolationError) throw err;
+                this.logger.error(
+                  `Error creating scheduled maintenance for resource ${resourceId}: ${err}`,
+                  (err as Error)?.stack,
+                );
               }
-
-              // A maintenance may have completed since the bulk read. Re-read the service cycle
-              // and its duration within the write transaction before creating a new obligation.
-              if (
-                schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
-                !(await this.shouldTrigger(schedule, resourceId, em))
-              ) {
-                await em.query(`RELEASE SAVEPOINT ${savepoint}`);
-                continue;
-              }
-
-              const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-              const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
-                resourceId,
-                schedule.id,
-                reason,
-                em,
-                false,
-              );
-              await em.query(`RELEASE SAVEPOINT ${savepoint}`);
-              createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
-              this.logger.log(
-                `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
-              );
-            } catch (err) {
-              await em.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-              await em.query(`RELEASE SAVEPOINT ${savepoint}`);
-              this.logger.error(
-                `Error creating scheduled maintenance for resource ${resourceId}: ${err}`,
-                (err as Error)?.stack,
-              );
             }
-          }
-        });
+          },
+        );
 
         // The batch transaction commits before notifications are emitted.
         for (const { resourceId, maintenanceId } of createdMaintenances) {
@@ -215,10 +118,7 @@ export class MaintenanceScheduleEvaluatorService extends MaintenanceResourceEval
       // --- BULK READ PHASE ---
 
       // 1. All enabled schedules with trigger configs
-      const allSchedules = await this.scheduleRepository.find({
-        where: { enabled: true },
-        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
-      });
+      const allSchedules = await this.persistence.enabledSchedules();
 
       if (allSchedules.length === 0) return;
 
@@ -352,64 +252,25 @@ export class MaintenanceScheduleEvaluatorService extends MaintenanceResourceEval
     const setState = (row: {
       resourceId: number;
       scheduleId: number;
-      baseline?: string | Date;
+      baseline: Date | null;
       hasActiveMaintenance?: number | boolean;
     }): void => {
       const key = `${row.scheduleId}:${row.resourceId}`;
-      baselineMap.set(
-        key,
-        row.baseline ? parseDbDate(row.baseline) : (resourceCreatedAtMap.get(row.resourceId) ?? now),
-      );
+      baselineMap.set(key, row.baseline ? row.baseline : (resourceCreatedAtMap.get(row.resourceId) ?? now));
       if (row.hasActiveMaintenance) activeResourceIds.add(row.resourceId);
     };
 
     const statePairs = pairs.filter(
       ({ triggerType }) => triggerType !== ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
     );
-    for (let offset = 0; offset < statePairs.length; offset += MAX_PAIRS_PER_QUERY) {
-      const chunk = statePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
-      const stateRows: Array<{
-        resourceId: number;
-        scheduleId: number;
-        baseline?: string | Date;
-        hasActiveMaintenance?: number | boolean;
-      }> = await this.usageRepository.query(
-        buildScheduleStateQuery(this.maintenanceRepository.metadata.tableName, chunk.length),
-        [
-          ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
-          formatDbDate(now),
-        ],
-      );
-      for (const row of stateRows) setState(row);
-    }
+    for (const row of await this.persistence.scheduleState(statePairs, now, false)) setState(row);
 
     const usagePairs = pairs.filter(
       ({ triggerType }) => triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
     );
-    for (let offset = 0; offset < usagePairs.length; offset += MAX_PAIRS_PER_QUERY) {
-      const chunk = usagePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
-      const aggregates: Array<{
-        resourceId: number;
-        scheduleId: number;
-        baseline?: string | Date;
-        hasActiveMaintenance?: number | boolean;
-        totalCount: number | string | null;
-      }> = await this.usageRepository.query(
-        buildScheduleEvaluationQuery(
-          this.maintenanceRepository.metadata.tableName,
-          this.usageRepository.metadata.tableName,
-          chunk.length,
-        ),
-        [
-          ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
-          formatDbDate(now),
-        ],
-      );
-      for (const row of aggregates) {
-        setState(row);
-        const key = `${row.scheduleId}:${row.resourceId}`;
-        usageCountBySchedule.set(key, Number(row.totalCount ?? 0));
-      }
+    for (const row of await this.persistence.scheduleState(usagePairs, now, true)) {
+      setState(row);
+      usageCountBySchedule.set(`${row.scheduleId}:${row.resourceId}`, row.totalCount ?? 0);
     }
 
     const getBaseline = (resourceId: number, scheduleId: number): Date =>
@@ -432,10 +293,7 @@ export class MaintenanceScheduleEvaluatorService extends MaintenanceResourceEval
     const resourceIds = [...allSchedules.reduce((s, a) => s.add(a.resourceId), new Set<number>())];
 
     // 2. Resource createdAt — fallback baseline when no prior maintenance for a schedule
-    const resources = await this.resourceRepository.find({
-      where: { id: In(resourceIds) },
-      select: ['id', 'createdAt'],
-    });
+    const resources = await this.persistence.resourceCreationDates(resourceIds);
     const resourceCreatedAtMap = new Map<number, Date>(resources.map((r) => [r.id, r.createdAt]));
 
     // Warn and skip schedules for resources missing from DB (orphaned foreign keys)

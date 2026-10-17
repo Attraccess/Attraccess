@@ -1,10 +1,8 @@
-import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
+import type { Passkey, User } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { LessThan, Repository } from 'typeorm';
+import { PasskeyPersistence } from '../persistence/port';
 
 import { SettingsService } from '../../../settings/settings.service';
 import {
@@ -72,12 +70,7 @@ export function hostnameOf(url: string | null | undefined): string | null {
 @Injectable()
 export class PasskeyService {
   constructor(
-    @InjectRepository(Passkey)
-    protected readonly passkeyRepository: Repository<Passkey>,
-    @InjectRepository(PasskeyChallenge)
-    protected readonly challengeRepository: Repository<PasskeyChallenge>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    protected readonly persistence: PasskeyPersistence,
     protected readonly settingsService: SettingsService,
   ) {}
 
@@ -105,33 +98,29 @@ export class PasskeyService {
   }
 
   async listForUser(userId: number): Promise<Passkey[]> {
-    return this.passkeyRepository.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    return this.persistence.listForUser(userId);
   }
 
   async delete(userId: number, passkeyId: number): Promise<void> {
-    const result = await this.passkeyRepository.delete({ id: passkeyId, userId });
-    if (!result.affected) {
+    const removed = await this.persistence.removeOwned(userId, passkeyId);
+    if (!removed) {
       throw new NotFoundException('PasskeyNotFound');
     }
   }
 
   async rename(userId: number, passkeyId: number, name: string): Promise<Passkey> {
-    const passkey = await this.passkeyRepository.findOneBy({ id: passkeyId, userId });
+    const passkey = await this.persistence.findOwned(userId, passkeyId);
     if (!passkey) {
       throw new NotFoundException('PasskeyNotFound');
     }
     passkey.name = name;
-    return this.passkeyRepository.save(passkey);
+    return this.persistence.savePasskey(passkey);
   }
 
   protected async storeChallenge(challenge: string, userId: number | null): Promise<void> {
     // ponytail: opportunistic sweep instead of a cron; challenges live 5 minutes so the table stays tiny
-    await this.challengeRepository.delete({ expiresAt: LessThan(new Date()) });
-    await this.challengeRepository.insert({
-      challenge,
-      userId,
-      expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
-    });
+    await this.persistence.removeExpiredChallenges(new Date());
+    await this.persistence.storeChallenge(challenge, userId, new Date(Date.now() + CHALLENGE_TTL_MS));
   }
 
   /**
@@ -144,8 +133,7 @@ export class PasskeyService {
       throw new BadRequestException('PasskeyChallengeInvalid');
     }
 
-    const stored = await this.challengeRepository.findOneBy({ challenge });
-    await this.challengeRepository.delete({ challenge });
+    const stored = await this.persistence.consumeChallenge(challenge);
 
     if (!stored || stored.expiresAt.getTime() < Date.now() || stored.userId !== userId) {
       throw new BadRequestException('PasskeyChallengeInvalid');
@@ -169,7 +157,7 @@ export class PasskeyService {
     const { rpID, expectedOrigin } = await this.resolveRelyingParty(requestOrigin);
     const expectedChallenge = await this.consumeChallenge(response.response.clientDataJSON, null);
 
-    const passkey = await this.passkeyRepository.findOneBy({ credentialId: response.id });
+    const passkey = await this.persistence.findCredential(response.id);
     if (!passkey) {
       throw new UnauthorizedException('PasskeyUnknownCredential');
     }
@@ -192,13 +180,14 @@ export class PasskeyService {
       throw new UnauthorizedException('PasskeyAuthenticationFailed');
     }
 
-    await this.passkeyRepository.update(passkey.id, {
-      counter: verification.authenticationInfo.newCounter,
-      backedUp: verification.authenticationInfo.credentialBackedUp,
-      lastUsedAt: new Date(),
-    });
+    await this.persistence.recordAuthentication(
+      passkey.id,
+      verification.authenticationInfo.newCounter,
+      verification.authenticationInfo.credentialBackedUp,
+      new Date(),
+    );
 
-    const user = await this.userRepository.findOneBy({ id: passkey.userId });
+    const user = await this.persistence.findUser(passkey.userId);
     if (!user) {
       throw new UnauthorizedException('PasskeyUnknownCredential');
     }
@@ -263,16 +252,14 @@ export class PasskeyService {
 
     const { credential, credentialBackedUp } = verification.registrationInfo;
 
-    return this.passkeyRepository.save(
-      this.passkeyRepository.create({
-        userId: user.id,
-        credentialId: credential.id,
-        publicKey: Buffer.from(credential.publicKey).toString('base64url'),
-        counter: credential.counter,
-        transports: credential.transports?.join(',') ?? null,
-        name: name?.trim() || 'Passkey',
-        backedUp: credentialBackedUp,
-      }),
-    );
+    return this.persistence.registerPasskey({
+      userId: user.id,
+      credentialId: credential.id,
+      publicKey: Buffer.from(credential.publicKey).toString('base64url'),
+      counter: credential.counter,
+      transports: credential.transports?.join(',') ?? null,
+      name: name?.trim() || 'Passkey',
+      backedUp: credentialBackedUp,
+    });
   }
 }

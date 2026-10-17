@@ -1,15 +1,13 @@
+import { User } from '../../transport/models/user.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Body, Controller, ForbiddenException, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { User } from '@attraccess/database-entities';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { InviteUserDto } from './dtos/inviteUser.dto';
-import {
-  CsvInviteConfigDto,
-  CsvInviteErrorResponseDto,
-  CsvInviteUploadDto,
-} from './dtos/csvInvite.dto';
+import { CsvInviteConfigDto, CsvInviteErrorResponseDto, CsvInviteUploadDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { UserInvitationService } from './user-invitation.service';
 
@@ -32,7 +30,7 @@ export class UserInvitationsController {
   })
   @Auth('users.create')
   async inviteUser(@Req() request: AuthenticatedRequest, @Body() body: InviteUserDto): Promise<User> {
-    return this.invitationService.inviteUser(body, request.user.locale);
+    return mapResponse(User, await this.invitationService.inviteUser(body, request.user.locale));
   }
 
   @Post('/invite-csv')
@@ -69,6 +67,8 @@ export class UserInvitationsController {
       throw new ForbiddenException('users.roles.manage is required to assign roles via CSV import');
     }
 
-    return this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user.id);
+    return (await this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user.id)).map(
+      (record) => mapResponse(User, record),
+    );
   }
 }

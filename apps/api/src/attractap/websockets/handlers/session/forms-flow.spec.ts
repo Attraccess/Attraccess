@@ -1,3 +1,6 @@
+import { FormsPersistence } from '../../../../resources/forms/persistence/port';
+import { TypeormFormsPersistence } from '../../../../resources/forms/persistence/typeorm-adapter';
+import { DatabaseTransactions } from '../../../../database/transaction-scope';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -83,6 +86,13 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFormsService,
+        {
+          provide: FormsPersistence,
+          useValue: new TypeormFormsPersistence({
+            getRepository: (entity: unknown) => (entity === Form ? formRepo : resourceRepo),
+          } as never),
+        },
+        { provide: DatabaseTransactions, useValue: {} },
         AttractapFormsHandler,
         AttractapSessionHandler,
         { provide: getRepositoryToken(Form), useValue: formRepo },

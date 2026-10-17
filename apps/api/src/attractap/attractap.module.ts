@@ -1,3 +1,5 @@
+import { AttractapPersistence, AttractapResourceReader } from './persistence/port';
+import { TypeormAttractapPersistence, TypeormAttractapResourceReader } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { AttractapController } from './attractap.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -70,6 +72,8 @@ import { AuditModule } from '../audit/audit.module';
   providers: [
     CardAccessService,
     AttractapService,
+    { provide: AttractapResourceReader, useClass: TypeormAttractapResourceReader },
+    { provide: AttractapPersistence, useClass: TypeormAttractapPersistence },
     WebsocketService,
     AttractapGateway,
     WebSocketEventService,

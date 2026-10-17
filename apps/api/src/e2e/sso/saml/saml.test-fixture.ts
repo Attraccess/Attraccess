@@ -1,3 +1,20 @@
+import { DatabaseTransactions } from '../../../database/transaction-scope';
+import { SqliteTransactionDriver, closeResourceTransactionConnection } from '../../../database/sqlite/transactions';
+import { RBAC_WRITES } from '../../../users-and-auth/rbac/persistence/port';
+import {
+  TypeormRbacPersistence,
+  rbacTransactionOperations,
+} from '../../../users-and-auth/rbac/persistence/typeorm-adapter';
+import { USER_WRITES } from '../../../users-and-auth/users/persistence/port';
+import {
+  TypeormUserPersistence,
+  userTransactionOperations,
+} from '../../../users-and-auth/users/persistence/typeorm-adapter';
+import { AUTHENTICATION_WRITES } from '../../../users-and-auth/auth/persistence/port';
+import {
+  TypeormAuthenticationPersistence,
+  authenticationTransactionOperations,
+} from '../../../users-and-auth/auth/persistence/typeorm-adapter';
 /**
  * SSO SAML integration e2e tests.
  *
@@ -165,28 +182,33 @@ beforeAll(async () => {
   } as unknown as LicenseService;
 
   const tokenHashService = new TokenHashService(mockConfigService);
+  const driver = new SqliteTransactionDriver(dataSource);
+  driver.register(USER_WRITES, userTransactionOperations);
+  driver.register(RBAC_WRITES, rbacTransactionOperations);
+  driver.register(AUTHENTICATION_WRITES, authenticationTransactionOperations);
+  const transactions = new DatabaseTransactions(driver);
   rbacService = new RbacService(
-    userRoleRepo,
-    roleRepo,
-    permissionRepo,
-    userRepo,
-    rolePermissionRepo,
+    new TypeormRbacPersistence(userRoleRepo, roleRepo, permissionRepo, userRepo, rolePermissionRepo),
+    transactions,
     new EventEmitter2(),
     null,
   );
   usersService = new UsersService(
-    userRepo,
-    authDetailRepo,
-    sessionRepo,
-    resourceUsageRepo,
+    new TypeormUserPersistence(userRepo, authDetailRepo, sessionRepo, resourceUsageRepo),
+    transactions,
     mockLicenseService,
     mockEmailService,
-    dataSource,
     tokenHashService,
     mockMetricsService,
     rbacService,
   );
-  authService = new AuthService(mockEmailService, authDetailRepo, usersService, tokenHashService, mockMetricsService);
+  authService = new AuthService(
+    mockEmailService,
+    new TypeormAuthenticationPersistence(authDetailRepo),
+    usersService,
+    tokenHashService,
+    mockMetricsService,
+  );
 
   mockModuleRef = {
     get: (token: unknown): unknown => {
@@ -201,6 +223,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (dataSource?.isInitialized) {
+    await closeResourceTransactionConnection(dataSource);
     await dataSource.destroy();
   }
 });

@@ -1,7 +1,8 @@
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
+import type { WagoEnrollment as WagoEnrollmentRecord } from './enrollment.record';
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/adapter';
 
 @Entity({ name: 'plugin_wago_enrollments' })
-export class WagoEnrollment {
+export class WagoEnrollment implements WagoEnrollmentRecord {
   @PrimaryGeneratedColumn({ type: 'integer' }) id!: number;
   @Column({ type: 'integer', name: 'mqtt_server_id' }) mqttServerId!: number;
   @Column({ type: 'varchar', name: 'hardware_id' }) hardwareId!: string;

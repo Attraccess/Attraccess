@@ -1,3 +1,8 @@
+import { createSqliteNetworkPersistence } from './persistence/typeorm-adapter';
+import {
+  createSqliteDeviceOperations,
+  TypeormWagoDeviceOperationPersistence,
+} from '../runtime/persistence/typeorm-adapter';
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
 import { DataSource } from 'typeorm';
 import { WagoNetworkChangeService, networkChangeInput } from './service';
@@ -10,7 +15,7 @@ import { WagoNetworkChanges1780010660000 } from '../migrations/1780010660000-add
 import type { BuildRuntimeArtifact } from '../runtime/artifacts/build';
 import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
 import { WagoController } from '../controllers/entity';
-import { WagoCredentialRotationEntity } from '../credentials/service';
+import { WagoCredentialRotationEntity } from '../credentials/persistence/schema';
 import { WagoDeviceOperations } from '../runtime/device-operations';
 import { WagoNetworkChange } from './entity';
 import { resetTestFixture } from './setup.test-fixture';
@@ -274,7 +279,13 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
       if (args[2].startsWith('inspect ')) throw new RuntimeUpdateError('offline'); // Container was deleted before interruption.
       return transport(...args);
     });
-    const restarted = new WagoNetworkChangeService(context, managed, wago as unknown as WagoService);
+    const restarted = new WagoNetworkChangeService(
+      context,
+      managed,
+      wago as unknown as WagoService,
+      createSqliteDeviceOperations(context),
+      createSqliteNetworkPersistence(context),
+    );
     expect(await restarted.apply(1, null, principal, true)).toMatchObject({
       mqttServerId: 2,
       operation: { phase: 'completed' },
@@ -306,7 +317,13 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
       password: 'replacement-device-secret',
     });
     failure = 'apply';
-    const restarted = new WagoNetworkChangeService(context, managed, wago as unknown as WagoService);
+    const restarted = new WagoNetworkChangeService(
+      context,
+      managed,
+      wago as unknown as WagoService,
+      createSqliteDeviceOperations(context),
+      createSqliteNetworkPersistence(context),
+    );
     await expect(restarted.apply(1, null, principal, true)).rejects.toThrow('incomplete');
     const replacement = JSON.parse(payloads[1].toString());
     expect(replacement).toMatchObject({
@@ -353,7 +370,9 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
   });
 
   it('excludes commissioning, updates, rotation and recovery using the shared device lease', async () => {
-    const operations = new WagoDeviceOperations(db.getRepository(WagoDeviceOperation));
+    const operations = new WagoDeviceOperations(
+      new TypeormWagoDeviceOperationPersistence(() => db.getRepository(WagoDeviceOperation)),
+    );
     await operations.acquire(fingerprint, 'other-operation', Date.now(), Date.now() + 60000);
     await expect(service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal)).rejects.toThrow('active');
     expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();

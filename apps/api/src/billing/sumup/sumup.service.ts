@@ -1,12 +1,10 @@
-import { BillingTransaction, Setting, BillingTransactionStatus } from '@attraccess/database-entities';
+import { BillingTransaction, BillingTransactionStatus } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { SumupPersistence } from '../persistence/port';
 
 import { SumUp } from '@sumup/sdk';
-
-import { Repository, DeepPartial } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -35,12 +33,9 @@ export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 @Injectable()
 export class SumUpService {
   constructor(
-    @InjectRepository(Setting)
-    protected readonly settingRepository: Repository<Setting>,
+    protected readonly persistence: SumupPersistence,
     protected readonly encryptionService: EncryptionService,
     protected readonly settingsService: SettingsService,
-    @InjectRepository(BillingTransaction)
-    protected readonly billingTransactionRepository: Repository<BillingTransaction>,
     protected readonly liveNotificationsService: LiveNotificationsService,
     protected readonly billingService: BillingService,
     protected readonly cronTimer: CronTimer,
@@ -70,23 +65,11 @@ export class SumUpService {
 
     const encryptedApiKey = this.encryptionService.encrypt(token);
 
-    const existingApiKey = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
-    if (existingApiKey) {
-      await this.settingRepository.update(existingApiKey.id, { value: encryptedApiKey });
-    } else {
-      await this.settingRepository.insert({ parent: 'sumup', key: 'apiKey', value: encryptedApiKey });
-    }
-
-    const existingMerchantCode = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'merchantCode' });
-    if (existingMerchantCode) {
-      await this.settingRepository.update(existingMerchantCode.id, { value: merchantCode });
-    } else {
-      await this.settingRepository.insert({ parent: 'sumup', key: 'merchantCode', value: merchantCode });
-    }
+    await this.persistence.writeCredentials(encryptedApiKey, merchantCode);
   }
 
   async getIsEnabled(): Promise<boolean> {
-    const apiKey = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
+    const apiKey = await this.persistence.apiKey();
 
     if (!apiKey) {
       return false;
@@ -101,7 +84,7 @@ export class SumUpService {
   }
 
   protected async getSumUp(): Promise<SumUp> {
-    const apiKeySetting = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
+    const apiKeySetting = await this.persistence.apiKey();
     const apiKeyEncrypted = apiKeySetting?.value;
     if (!apiKeyEncrypted) {
       throw new BadRequestException('SumUp API key not found');
@@ -112,7 +95,7 @@ export class SumUpService {
   }
 
   protected async getMerchantCode(): Promise<string> {
-    const setting = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'merchantCode' });
+    const setting = await this.persistence.merchantCode();
     if (!setting?.value) {
       throw new BadRequestException('SumUp merchant code not found');
     }
@@ -165,9 +148,7 @@ export class SumUpService {
   }
 
   protected async updateTransactionStatusBySumupServer(sumupTransactionId: string): Promise<void> {
-    const transaction = await this.billingTransactionRepository.findOneBy({
-      externalReference: `sumup_topup_transaction:${sumupTransactionId}`,
-    });
+    const transaction = await this.persistence.transactionByReference(`sumup_topup_transaction:${sumupTransactionId}`);
 
     if (!transaction) {
       this.logger.error(`updateTransactionStatusBySumupServer: Sumup transaction not found, ${sumupTransactionId}`);
@@ -209,7 +190,7 @@ export class SumUpService {
     this.logger.debug(
       `updateTransactionStatusBySumupServer: Updating transaction status of ${sumupTransactionId} to ${transaction.status}`,
     );
-    const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+    const updatedTransaction = await this.persistence.saveTransaction(transaction);
     this.hasPendingTransactions = true;
     this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
     void this.auditService.recordBillingTransaction({
@@ -235,9 +216,7 @@ export class SumUpService {
 
       this.logger.debug('processPendingTransactions: starting');
 
-      const transactions = await this.billingTransactionRepository.findBy({
-        status: BillingTransactionStatus.Pending,
-      });
+      const transactions = await this.persistence.pendingTransactions();
 
       this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
 
@@ -252,7 +231,7 @@ export class SumUpService {
         if (!transactionId) {
           this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
           transaction.status = BillingTransactionStatus.Failed;
-          const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+          const updatedTransaction = await this.persistence.saveTransaction(transaction);
           this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
           void this.auditService.recordBillingTransaction({
             transactionId: updatedTransaction.id,
@@ -302,7 +281,7 @@ export class SumUpService {
         }),
       );
 
-      const transaction = await this.billingTransactionRepository.save({
+      const transaction = await this.persistence.createTopup({
         userId,
         amount: amount,
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:${checkout.data.client_transaction_id}`,
@@ -329,7 +308,11 @@ export class SumUpService {
     }
   }
 
-  async handleTransactionCallback(data: DeepPartial<SumupTransactionCallbackDto>): Promise<void> {
+  async handleTransactionCallback(
+    data: Partial<Omit<SumupTransactionCallbackDto, 'payload'>> & {
+      payload?: Partial<SumupTransactionCallbackDto['payload']>;
+    },
+  ): Promise<void> {
     if (data.event_type !== SumupTransactionEventType.SoloTransactionUpdated) {
       this.logger.warn('Received unknown sumup webhook event', { eventType: data.event_type, fullEvent: data });
       return;

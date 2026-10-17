@@ -1,4 +1,4 @@
-import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoCommandHandler } from './handler';
 import { WagoController } from '../controllers/entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
@@ -31,11 +31,19 @@ describe('WAGO command form', () => {
         findOneBy: draftLookup,
       }),
     } as unknown as PluginContext,
-    controllers: () =>
-      ({
-        find: async () => [{ id: 1, name: 'Workshop' }],
-        findOneBy: async () => ({ id: 1, trustState: 'claimed' }),
-      }) as unknown as Repository<WagoController>,
+    registry: {
+      commandControllers: async () => [{ id: 1, name: 'Workshop' }] as WagoController[],
+      controller: async () => ({ id: 1, trustState: 'claimed' }) as WagoController,
+    },
+    configuration: {
+      draft: (id) => draftLookup({ controllerId: id }),
+      commandReferences: async (controllerId, channelId, resourceId) => {
+        query.andWhere('node.resourceId <> :resourceId', { resourceId });
+        query.andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId });
+        query.andWhere("node.data ->> 'channelId' = :channelId", { channelId });
+        return query.getMany();
+      },
+    },
     claimedController: jest.fn(),
     getSettings: jest.fn(),
     appliedRevision,

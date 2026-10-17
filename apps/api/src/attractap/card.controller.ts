@@ -1,3 +1,4 @@
+import { mapResponse } from '../transport/response-mapper';
 import {
   Controller,
   Get,
@@ -13,7 +14,8 @@ import {
   ClassSerializerInterceptor,
   SerializeOptions,
 } from '@nestjs/common';
-import { Auth, AuthenticatedRequest, NFCCard } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+import { NFCCard } from '../transport/models/rfidCard.dto';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { AttractapService } from './attractap.service';
 import { AppKeyRequestDto } from './dtos/app-key-request.dto';
@@ -77,7 +79,7 @@ export class AttractapNfcCardsController {
     @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
   ): Promise<NFCCard[]> {
     const ownerId = await this.cardAccess.resolveUserId(req.user, userId);
-    return await this.attractapService.getNFCCardsByUserId(ownerId);
+    return (await this.attractapService.getNFCCardsByUserId(ownerId)).map((record) => mapResponse(NFCCard, record));
   }
 
   @Patch('/:id/active')
@@ -96,9 +98,9 @@ export class AttractapNfcCardsController {
   ): Promise<NFCCard> {
     await this.cardAccess.getCardForManagement(id, req.user);
     if (data.active) {
-      return await this.attractapService.activateNFCCard(id);
+      return mapResponse(NFCCard, await this.attractapService.activateNFCCard(id));
     } else {
-      return await this.attractapService.deactivateNFCCard(id);
+      return mapResponse(NFCCard, await this.attractapService.deactivateNFCCard(id));
     }
   }
 }

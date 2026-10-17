@@ -4,7 +4,7 @@ import {
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { heartbeatKey } from './flow.utils';

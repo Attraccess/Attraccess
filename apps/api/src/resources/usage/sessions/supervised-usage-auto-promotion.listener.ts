@@ -2,9 +2,8 @@
 // FEATURE: auto-promotion to introduction after X supervised usages (ATT-488)
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
-import { AutoIntroductionTarget, Resource, ResourceUsage } from '@attraccess/database-entities';
+import { SupervisedUsageHistory } from '../persistence/port';
+import { AutoIntroductionTarget, Resource } from '@attraccess/application-models';
 import { ResourceSupervisedUsageEndedEvent } from '../events/resource-usage.events';
 import { ResourceIntroductionsService } from '../../introductions/resouceIntroductions.service';
 import { ResourceGroupsIntroductionsService } from '../../groups/introductions/resourceGroups.introductions.service';
@@ -14,10 +13,7 @@ export class SupervisedUsageAutoPromotionListener {
   private readonly logger = new Logger(SupervisedUsageAutoPromotionListener.name);
 
   constructor(
-    @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    private readonly history: SupervisedUsageHistory,
     private readonly resourceIntroductionsService: ResourceIntroductionsService,
     private readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService,
   ) {}
@@ -25,7 +21,7 @@ export class SupervisedUsageAutoPromotionListener {
   @OnEvent(ResourceSupervisedUsageEndedEvent.EVENT_NAME)
   async handleSupervisedUsageEnded(event: ResourceSupervisedUsageEndedEvent): Promise<void> {
     try {
-      const resource = await this.resourceRepository.findOne({ where: { id: event.resourceId } });
+      const resource = await this.history.resource(event.resourceId);
       if (!resource) {
         this.logger.warn(`Supervised usage ended for missing resource ${event.resourceId}; skipping auto-promotion`);
         return;
@@ -123,18 +119,10 @@ export class SupervisedUsageAutoPromotionListener {
 
   // Counts the user's completed supervised sessions across the given resources.
   private async countSupervisedUsages(resourceIds: number[], userId: number): Promise<number> {
-    return await this.resourceUsageRepository.count({
-      where: {
-        resourceId: resourceIds.length === 1 ? resourceIds[0] : In(resourceIds),
-        userId,
-        supervisorUserId: Not(IsNull()),
-        endTime: Not(IsNull()),
-      },
-    });
+    return this.history.completedCount(resourceIds, userId);
   }
 
   private async getGroupResourceIds(groupId: number): Promise<number[]> {
-    const resources = await this.resourceRepository.find({ where: { groups: { id: groupId } } });
-    return resources.map((resource) => resource.id);
+    return this.history.groupResourceIds(groupId);
   }
 }

@@ -1,13 +1,13 @@
 // Manages resource health state tracking with mutable status and source lifecycle tracking
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
 import { NotFoundException } from '@nestjs/common';
-import { ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceHealthStatus } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
 import type { ResourceHealthService } from './resource-health.service';
 
 interface ResourceHealthServiceResourceHealthClearContext {
-  healthRepository: ResourceHealthService['healthRepository'];
+  persistence: ResourceHealthService['persistence'];
   audit: ResourceHealthService['audit'];
   logger: ResourceHealthService['logger'];
   eventEmitter: ResourceHealthService['eventEmitter'];
@@ -20,14 +20,12 @@ export async function clearEntry(
     actorId: null,
   },
 ): Promise<void> {
-  const entry = await context.healthRepository.findOne({
-    where: { id: entryId, resourceId },
-  });
+  const entry = await context.persistence.findEntryById(resourceId, entryId);
   if (!entry) {
     throw new NotFoundException(`Health entry ${entryId} not found for resource ${resourceId}`);
   }
 
-  await context.healthRepository.remove(entry);
+  await context.persistence.removeEntry(entry);
 
   if (entry.status === ResourceHealthStatus.UNHEALTHY) {
     await context.audit

@@ -1,3 +1,5 @@
+import { CompanionPersistence } from './persistence/port';
+import { TypeormCompanionPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -32,10 +34,10 @@ describe('CompanionGatewayService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompanionGatewayService,
+        { provide: CompanionPersistence, useClass: TypeormCompanionPersistence },
         { provide: getRepositoryToken(CompanionDevice), useValue: mockDeviceRepo },
         { provide: getRepositoryToken(ResourceFlowNode), useValue: mockFlowNodeRepo },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
-
       ],
     }).compile();
 

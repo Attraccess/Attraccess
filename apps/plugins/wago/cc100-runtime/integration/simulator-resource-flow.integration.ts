@@ -1,3 +1,5 @@
+import { WagoSettings } from '../../backend/controllers/settings.entity';
+import { TypeormWagoFlowPersistence } from '../../backend/flow/persistence/typeorm-adapter';
 import { writeFile } from 'node:fs/promises';
 
 import { join } from 'node:path';
@@ -86,7 +88,14 @@ describe('isolated broker / executable simulator', () => {
           },
         },
       });
-      const flow = new WagoFlowService(fixture.context);
+      const flow = new WagoFlowService(
+        fixture.context,
+        new TypeormWagoFlowPersistence(
+          () => fixture.context.getRepository(WagoController),
+          () => fixture.context.getRepository(WagoConfigurationRevision),
+          () => fixture.context.getRepository(WagoSettings),
+        ),
+      );
       try {
         await flow.onModuleInit();
         fixture.launch(statePath);

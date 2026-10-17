@@ -1,3 +1,15 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DataSource } from 'typeorm';
+import { entities, SSOProvider, SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import { DatabaseTransactions } from '../../../database/transaction-scope';
+import { SqliteTransactionDriver, closeResourceTransactionConnection } from '../../../database/sqlite/transactions';
+import { SSO_WRITES } from '../persistence/port';
+import { ssoTransactionOperations } from '../persistence/typeorm-adapter';
+import { SSOService } from './sso.service';
+import { LicenseService } from '../../../license/license.service';
+import { EncryptionService } from '../../../encryption/encryption.service';
 import { registerSsoServiceFixture } from './sso.service.sso-service.test-fixture';
 import { SSOProviderType, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
@@ -412,5 +424,62 @@ describe('SsoService', () => {
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
       expect(fixture.samlConfigRepository.update).toHaveBeenCalledWith({ ssoProviderId: 1 }, {});
     });
+  });
+});
+
+describe('SSO provider configuration with SQLite transactions', () => {
+  it('rolls back the provider if its configuration cannot be stored, then saves encrypted records', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'attraccess-sso-'));
+    const source = await new DataSource({
+      type: 'sqlite',
+      database: join(directory, 'database.sqlite'),
+      entities: Object.values(entities),
+      synchronize: true,
+    }).initialize();
+    try {
+      const driver = new SqliteTransactionDriver(source);
+      driver.register(SSO_WRITES, ssoTransactionOperations);
+      const service = new SSOService(
+        ssoTransactionOperations(source.manager),
+        new DatabaseTransactions(driver),
+        { verifyLicense: async () => undefined } as unknown as LicenseService,
+        {
+          encrypt: (value: string) => `encrypted:${value}`,
+          decryptIfEncrypted: (value: string) => value.replace(/^encrypted:/, ''),
+        } as unknown as EncryptionService,
+      );
+      const input = {
+        name: 'Transactional provider',
+        type: SSOProviderType.OIDC,
+        oidcConfiguration: {
+          issuer: 'https://issuer.example',
+          authorizationURL: 'https://issuer.example/auth',
+          tokenURL: 'https://issuer.example/token',
+          userInfoURL: 'https://issuer.example/userinfo',
+          clientId: 'client',
+          clientSecret: 'private-client-secret',
+        },
+      };
+      const table = source.getRepository(SSOProviderOIDCConfiguration).metadata.tableName;
+      await source.query(
+        `CREATE TRIGGER reject_sso_configuration BEFORE INSERT ON "${table}" BEGIN SELECT RAISE(ABORT, 'configuration rejected'); END`,
+      );
+      await expect(service.createProvider(input)).rejects.toThrow('configuration rejected');
+      expect(await source.getRepository(SSOProvider).count()).toBe(0);
+      expect(await source.getRepository(SSOProviderOIDCConfiguration).count()).toBe(0);
+      await source.query('DROP TRIGGER reject_sso_configuration');
+      const provider = await service.createProvider(input);
+      expect(provider.oidcConfiguration.clientSecret).toBe('private-client-secret');
+      const stored = await source
+        .getRepository(SSOProviderOIDCConfiguration)
+        .findOneByOrFail({ ssoProviderId: provider.id });
+      expect(stored.clientSecret).toBe('encrypted:private-client-secret');
+      expect(Object.getPrototypeOf(provider)).toBe(Object.prototype);
+      expect(Object.getPrototypeOf(provider.oidcConfiguration)).toBe(Object.prototype);
+    } finally {
+      await closeResourceTransactionConnection(source);
+      await source.destroy();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

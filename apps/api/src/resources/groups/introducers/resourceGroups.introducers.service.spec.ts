@@ -1,3 +1,5 @@
+import { GroupIntroducerPersistence } from '../persistence/port';
+import { TypeormGroupIntroducerPersistence } from '../persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -24,6 +26,7 @@ describe('ResourceGroupsIntroducersService notifications', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceGroupsIntroducersService,
+        { provide: GroupIntroducerPersistence, useClass: TypeormGroupIntroducerPersistence },
         { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: NotificationDispatchService, useValue: notifications },

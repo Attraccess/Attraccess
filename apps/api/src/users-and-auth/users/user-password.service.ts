@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { User } from '@attraccess/application-models';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
@@ -89,7 +89,11 @@ export class UserPasswordService {
     });
   }
 
-  public async setUserPassword(id: number, body: SetUserPasswordDto, requestUser: User | AuthenticatedUser): Promise<void> {
+  public async setUserPassword(
+    id: number,
+    body: SetUserPasswordDto,
+    requestUser: User | AuthenticatedUser,
+  ): Promise<void> {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${requestUser.id}`);
 
     // Prevent users from updating their own password through this endpoint

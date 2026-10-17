@@ -6,19 +6,15 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ResourceIntroducer, User } from '@attraccess/database-entities';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { GroupIntroducerPersistence } from '../persistence/port';
+import type { User } from '@attraccess/application-models';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 
 @Injectable()
 export class IsResourceGroupIntroducerGuard implements CanActivate {
   private readonly logger = new Logger(IsResourceGroupIntroducerGuard.name);
 
-  constructor(
-    @InjectRepository(ResourceIntroducer)
-    private resourceIntroducerRepository: Repository<ResourceIntroducer>
-  ) {}
+  constructor(private readonly persistence: GroupIntroducerPersistence) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -52,16 +48,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
 
     try {
       // Check if the user is an introducer for this resource group
-      const introducer = await this.resourceIntroducerRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-          resourceGroup: {
-            id: groupId,
-          },
-        },
-      });
+      const introducer = await this.persistence.grant(groupId, user.id);
 
       if (introducer) {
         return true;

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import { SSOProviderOIDCConfiguration } from '@attraccess/application-models';
 import axios from 'axios';
 import { createLocalJWKSet, jwtVerify, JWTPayload, JSONWebKeySet } from 'jose';
 import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from '../logout-endpoints';

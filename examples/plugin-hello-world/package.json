@@ -12,7 +12,7 @@
   "homepage": "https://attraccess.org",
   "scripts": {
     "build": "node build.mjs",
-    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
+    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && ATTRACCESS_PLUGIN_TEST_HOST_VERSION=1.11.0 node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
   },
   "keywords": [
     "attraccess-plugin",
@@ -21,34 +21,42 @@
   ],
   "files": [
     "dist",
-    "frontend"
+    "frontend",
+    "plugin.json"
   ],
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0",
+    "@attraccess/plugins-backend-sdk": "^1.11.0",
+    "@attraccess/plugins-frontend-sdk": "^1.11.0",
     "@nestjs/common": "^11.0.0",
-    "@nestjs/event-emitter": "^3.0.0",
-    "typeorm": "^0.3.0"
+    "@nestjs/event-emitter": "^3.0.0"
   },
   "attraccess": {
     "displayName": "Hello World",
     "description": "Example Attraccess plugin.",
-    "host": "^1.9.0",
+    "host": "^1.11.0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
     "permissions": [
       "READ_USERS",
-      "LISTEN_EVENTS"
+      "LISTEN_EVENTS",
+      "ACCESS_MQTT_SERVERS",
+      "TRIGGER_FLOWS"
     ],
     "sdk": {
-      "backend": "^1.9.0",
-      "frontend": "^1.9.0"
+      "backend": "^1.11.0",
+      "frontend": "^1.11.0"
+    },
+    "persistence": {
+      "contractVersion": 2,
+      "supportedBackends": [
+        "sqlite"
+      ]
     }
   },
   "devDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.0.0",
-    "@attraccess/plugins-frontend-sdk": "^1.0.0",
+    "@attraccess/plugins-backend-sdk": "^1.11.0",
+    "@attraccess/plugins-frontend-sdk": "^1.11.0",
     "@heroui/react": "^3.0.4",
     "@heroui/styles": "^3.0.0",
     "@tailwindcss/vite": "^4.0.0",

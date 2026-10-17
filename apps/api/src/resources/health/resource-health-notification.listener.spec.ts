@@ -1,3 +1,4 @@
+import { TypeormResourceHealthRecipients } from './persistence/typeorm-adapter';
 import { ResourceHealthStatus, type Resource, type ResourceIntroducer, type User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { ResourceHealthNotificationListener } from './resource-health-notification.listener';
@@ -20,9 +21,11 @@ describe('Resource health notifications', () => {
   };
   const rbac = { getUserIdsWithPermission: jest.fn() };
   const listener = new ResourceHealthNotificationListener(
-    resources as unknown as Repository<Resource>,
-    introducers as unknown as Repository<ResourceIntroducer>,
-    users as unknown as Repository<User>,
+    new TypeormResourceHealthRecipients(
+      resources as unknown as Repository<Resource>,
+      introducers as unknown as Repository<ResourceIntroducer>,
+      users as unknown as Repository<User>,
+    ),
     notifications as unknown as NotificationDispatchService,
     rbac as unknown as RbacService,
   );

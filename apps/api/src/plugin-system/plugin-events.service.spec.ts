@@ -7,7 +7,7 @@ import {
   SystemEvent,
   SystemEventPayload,
 } from '@attraccess/plugins-backend-sdk';
-import { PluginSandboxService } from './plugin-sandbox.service';
+import { LegacyPluginSandbox } from './persistence/legacy-context';
 import { PluginEventsService } from './plugin-events.service';
 
 function buildPayload(): { resource: Resource; user: User } {
@@ -80,7 +80,7 @@ function baseContext(events: EventEmitter2, name: string): PluginContext {
 }
 
 function guarded(events: EventEmitter2, name: string, permissions: PluginPermission[]): PluginContext {
-  return PluginSandboxService.createGuardedContext(baseContext(events, name), permissions);
+  return LegacyPluginSandbox.createGuardedContext(baseContext(events, name), permissions);
 }
 
 const BOTH = [PluginPermission.EMIT_EVENTS, PluginPermission.LISTEN_EVENTS];

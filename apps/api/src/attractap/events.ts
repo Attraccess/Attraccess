@@ -1,4 +1,4 @@
-import { Attractap } from '@attraccess/database-entities';
+import { Attractap } from '@attraccess/application-models';
 
 export class ReaderUpdatedEvent {
   public static readonly EVENT_NAME = 'reader.updated';

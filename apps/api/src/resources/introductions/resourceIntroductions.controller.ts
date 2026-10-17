@@ -1,8 +1,11 @@
+import { ResourceIntroduction } from '../../transport/models/resourceIntroduction.dto';
+import { ResourceIntroductionHistoryItem } from '../../transport/models/resourceIntroductionHistoryItem.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req, ForbiddenException } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
-import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
+
 import { IsResourceIntroducer } from './isIntroducer.decorator';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
@@ -23,7 +26,9 @@ export class ResourceIntroductionsController {
     type: [ResourceIntroduction],
   })
   async getManyByResource(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceIntroduction[]> {
-    return await this.resourceIntroductionsService.getMany(resourceId);
+    return (await this.resourceIntroductionsService.getMany(resourceId)).map((record) =>
+      mapResponse(ResourceIntroduction, record),
+    );
   }
 
   @Get('people')
@@ -46,7 +51,9 @@ export class ResourceIntroductionsController {
     ) {
       throw new ForbiddenException('User cannot view this resource’s People tab');
     }
-    return this.resourceIntroductionsService.getMany(resourceId, true);
+    return (await this.resourceIntroductionsService.getMany(resourceId, true)).map((record) =>
+      mapResponse(ResourceIntroduction, record),
+    );
   }
 
   @Post('/:userId/grant')
@@ -63,9 +70,14 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.grant(resourceId, userId, data, {
-      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
-    });
+    return mapResponse(
+      ResourceIntroductionHistoryItem,
+      await this.resourceIntroductionsService.grant(resourceId, userId, data, {
+        performedByUserId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        apiTokenId: req.user.apiTokenId,
+      }),
+    );
   }
 
   @Delete('/:userId/revoke')
@@ -85,9 +97,14 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
-      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
-    });
+    return mapResponse(
+      ResourceIntroductionHistoryItem,
+      await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
+        performedByUserId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        apiTokenId: req.user.apiTokenId,
+      }),
+    );
   }
 
   @Get('/:userId/history')
@@ -105,8 +122,10 @@ export class ResourceIntroductionsController {
   @IsResourceIntroducer()
   async getHistory(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
-    return await this.resourceIntroductionsService.getHistoryByResourceIdAndUserId(resourceId, userId);
+    return (await this.resourceIntroductionsService.getHistoryByResourceIdAndUserId(resourceId, userId)).map((record) =>
+      mapResponse(ResourceIntroductionHistoryItem, record),
+    );
   }
 }

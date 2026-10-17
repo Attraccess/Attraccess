@@ -856,7 +856,7 @@ describe('UsersService', () => {
           emailVerificationTokenExpiresAt: expect.any(Date),
         }),
       );
-      expect(fixture.service.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
+      expect(fixture.service.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, expect.objectContaining({ backend: 'sqlite', resolve: expect.any(Function) }));
       expect(fixture.emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
     });
     it('leaves an unchanged email verified without a transaction', async () => {
@@ -902,22 +902,22 @@ describe('UsersService', () => {
       };
       const repo = {
         count: jest.fn().mockResolvedValue(totalExisting),
-        create: jest.fn(() => new User()),
+        create: jest.fn((data) => Object.assign(new User(), data)),
         save: jest.fn(async (users: User[]) => users.map((user, index) => Object.assign(user, { id: index + 1 }))),
       };
       const manager = {
         getRepository: jest.fn((entity) => (entity === Role ? roleRepo : repo)),
       } as unknown as EntityManager;
-      return { manager, repo, roleRepo };
+      return { scope: fixture.parentScope(manager), repo, roleRepo };
     }
     it('bootstraps one administrator and assigns defaults to remaining normalized users', async () => {
-      const { manager } = managerForImport();
+      const { scope } = managerForImport();
       const users = await fixture.service.createMany(
         [
           { username: ' FIRST ', email: ' first@example.com ', locale: ' de ' },
           { username: 'second', email: 'second@example.com', locale: ' ' },
         ],
-        { manager, grantAllPermissionsToFirst: true },
+        { manager: scope, grantAllPermissionsToFirst: true },
       );
       expect(users).toEqual([
         expect.objectContaining({
@@ -928,43 +928,43 @@ describe('UsersService', () => {
         }),
         expect.objectContaining({ username: 'second', locale: 'en' }),
       ]);
-      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', manager);
+      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', scope);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledTimes(1);
-      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(2, manager);
+      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(2, scope);
     });
     it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
-      const { manager } = managerForImport(3);
+      const { scope } = managerForImport(3);
       fixture.mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
       await fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'viewer' }], {
-        manager,
+        manager: scope,
         grantAllPermissionsToFirst: true,
         actorId: 9,
       });
       expect(fixture.mockRbacService.getEffectivePermissions).toHaveBeenCalledWith(9);
-      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, manager);
-      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'viewer', manager);
-      expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(1, 'administrator', manager);
+      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, scope);
+      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'viewer', scope);
+      expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(1, 'administrator', scope);
     });
     it('refuses an import role above the actor privilege ceiling', async () => {
-      const { manager } = managerForImport(1, ['users.update']);
+      const { scope } = managerForImport(1, ['users.update']);
       fixture.mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
       await expect(
         fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'admin' }], {
-          manager,
+          manager: scope,
           actorId: 9,
         }),
       ).rejects.toThrow(ForbiddenException);
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
     });
     it('rejects an unknown role and an empty email', async () => {
-      const { manager, roleRepo } = managerForImport();
+      const { scope, roleRepo } = managerForImport();
       roleRepo.findOne.mockResolvedValue(null);
       await expect(
         fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'missing' }], {
-          manager,
+          manager: scope,
         }),
       ).rejects.toThrow("Role with key 'missing' not found");
-      await expect(fixture.service.createMany([{ username: 'member', email: ' ' }], { manager })).rejects.toThrow(
+      await expect(fixture.service.createMany([{ username: 'member', email: ' ' }], { manager: scope })).rejects.toThrow(
         'Email is required',
       );
     });

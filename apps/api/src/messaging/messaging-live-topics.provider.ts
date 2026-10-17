@@ -1,7 +1,9 @@
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { LiveSubscription } from '@attraccess/shared';
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { defer } from 'rxjs';
+import { defer, map } from 'rxjs';
+import { Message } from '../transport/models/message.dto';
+import { mapResponse } from '../transport/response-mapper';
 import { LiveTopicProvider } from '../live-updates/live-topic-provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { MessagingLiveService } from './messaging-live.service';
@@ -22,7 +24,9 @@ export class MessagingLiveTopicsProvider implements LiveTopicProvider, OnModuleI
   source(_subscription: LiveSubscription, user: AuthenticatedUser) {
     return this.messaging.trackPresence(
       user.id,
-      defer(() => this.messaging.getUserMessageSubject(user.id).asObservable()),
+      defer(() => this.messaging.getUserMessageSubject(user.id).asObservable()).pipe(
+        map((event) => ({ data: mapResponse(Message, event.data) })),
+      ),
     );
   }
 }

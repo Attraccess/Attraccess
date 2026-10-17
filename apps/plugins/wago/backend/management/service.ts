@@ -1,4 +1,4 @@
-import { type PluginSecretsContext } from '@attraccess/plugins-backend-sdk';
+import { type PluginSecretsContext } from '@attraccess/plugins-backend-sdk/v2';
 
 import { generateManagementKey, restoreManagementKey, assertManagementKey } from './key';
 

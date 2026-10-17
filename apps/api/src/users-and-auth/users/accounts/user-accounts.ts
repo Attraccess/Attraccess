@@ -1,16 +1,8 @@
-import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+import { SSOProviderType, User } from '@attraccess/application-models';
 
-import {
-  EntityManager,
-  FindOptionsWhere,
-  In,
-  FindOneOptions as TypeormFindOneOptions,
-  Not,
-  QueryFailedError,
-  DataSource,
-  Repository,
-  SelectQueryBuilder,
-} from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../../database/transaction-scope';
+import { NewUserAccount, UserOperations, UserPersistence, UserRelations, USER_WRITES } from '../persistence/port';
+export type { UserListOptions, UpdateUserData } from '../persistence/port';
 import { BadRequestException, ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
 
 import { randomBytes } from 'crypto';
@@ -19,29 +11,11 @@ import { LicenseError, LicenseService } from '../../../license/license.service';
 
 import { EmailService } from '../../../email/email.service';
 
-import { TokenHashService } from '../../../encryption/token-hash.service';
 
 import { MetricsService } from '../../../metrics/metrics.service';
 
 import { RbacService } from '../../rbac/rbac.service';
 import { z } from 'zod';
-import { PaginationOptions } from '../../../types/request';
-
-export type UserListOptions = PaginationOptions & {
-  search?: string;
-  ids?: number[];
-  roleId?: number;
-  roleIds?: number[];
-  excludeRoleIds?: number[];
-  roleMatch?: 'any' | 'all';
-  emailVerified?: boolean;
-  ssoProviderIds?: number[];
-  excludeSsoProviderIds?: number[];
-  ssoProviderNone?: boolean;
-  hasSsoProvider?: boolean;
-  ssoProviderMatch?: 'any' | 'all';
-  includeRoles?: boolean;
-};
 
 export class DeleteAccountTokenInvalidException extends BadRequestException {
   constructor() {
@@ -61,21 +35,6 @@ export class UserHasActiveUsageSessionsException extends BadRequestException {
   }
 }
 
-export type UpdateUserData = Partial<
-  Pick<
-    User,
-    | 'externalIdentifier'
-    | 'emailVerificationToken'
-    | 'emailVerificationTokenExpiresAt'
-    | 'isEmailVerified'
-    | 'passwordResetToken'
-    | 'passwordResetTokenExpiresAt'
-    | 'lockedUntil'
-    | 'failedLoginAttempts'
-    | 'firstFailedLoginAt'
-  >
->;
-
 export const FindOneOptionsSchema = z
   .object({
     id: z.number(),
@@ -91,86 +50,39 @@ export const FindOneOptionsSchema = z
 export type FindOneOptions = z.infer<typeof FindOneOptionsSchema>;
 
 export abstract class UserAccounts {
-  async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
+  async findOne(options: FindOneOptions, relations?: UserRelations, scope?: TransactionScope): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(options);
 
-    // Build a where condition that uses case-insensitive comparison for username
-    const whereCondition: TypeormFindOneOptions<User>['where'] = {};
-
-    if (validatedOptions.id !== undefined) {
-      whereCondition.id = validatedOptions.id;
-    }
-
-    if (validatedOptions.username !== undefined) {
-      whereCondition.username = this.cleanupUsername(validatedOptions.username);
-    }
-
-    if (validatedOptions.email !== undefined) {
-      whereCondition.email = validatedOptions.email;
-    }
-
-    if (validatedOptions.externalIdentifier !== undefined) {
-      whereCondition.externalIdentifier = validatedOptions.externalIdentifier;
-    }
-
-    const userRepo = manager ? manager.getRepository(User) : this.userRepository;
-    const user = await userRepo.findOne({
-      where: whereCondition,
+    return this.accountOperations(scope).account(
+      {
+        ...validatedOptions,
+        ...(validatedOptions.username === undefined
+          ? {}
+          : { username: this.cleanupUsername(validatedOptions.username) }),
+      },
       relations,
-    });
+    );
+  }
 
-    return user || null;
+  protected accountOperations(scope?: TransactionScope): UserOperations {
+    return scope ? scope.resolve(USER_WRITES) : this.persistence;
   }
 
   public async isSSOUser(userId: number): Promise<boolean> {
-    const ssoUser = await this.userRepository
-      .createQueryBuilder('user')
-      .where('user.id = :id', { id: userId })
-      .leftJoin('user.authenticationDetails', 'authenticationDetails')
-      .andWhere('authenticationDetails.type = :type', { type: AuthenticationType.SSO })
-      .getOne();
-
-    return !!ssoUser;
+    return this.persistence.ssoUser(userId);
   }
-
   public async findOneBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<User | null> {
-    const user = await this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.authenticationDetails', 'authenticationDetails')
-      .where('authenticationDetails.type = :type', { type: AuthenticationType.SSO })
-      .andWhere('authenticationDetails.providerType = :providerType', { providerType })
-      .andWhere('authenticationDetails.providerId = :providerId', { providerId })
-      .andWhere('authenticationDetails.ssoSubject = :subject', { subject })
-      .getOne();
-
-    return user ?? null;
+    return this.persistence.bySso(providerType, providerId, subject);
   }
-
   async countUsers(): Promise<number> {
-    return this.userRepository.count();
+    return this.persistence.count();
   }
-
   async findByEmailsOrUsernames(emails: string[], usernames: string[]): Promise<User[]> {
-    const normalizedEmails = Array.from(new Set(emails.map((email) => email.trim()).filter((email) => email !== '')));
-    const normalizedUsernames = Array.from(
-      new Set(usernames.map((username) => this.cleanupUsername(username)).filter((username) => username !== '')),
-    );
-
-    const where: FindOptionsWhere<User>[] = [];
-
-    if (normalizedEmails.length) {
-      where.push({ email: In(normalizedEmails) });
-    }
-
-    if (normalizedUsernames.length) {
-      where.push({ username: In(normalizedUsernames) });
-    }
-
-    if (!where.length) {
-      return [];
-    }
-
-    return this.userRepository.find({ where });
+    const normalizedEmails = [...new Set(emails.map((email) => email.trim()).filter(Boolean))];
+    const normalizedUsernames = [
+      ...new Set(usernames.map((username) => this.cleanupUsername(username)).filter(Boolean)),
+    ];
+    return this.persistence.byEmailsOrUsernames(normalizedEmails, normalizedUsernames);
   }
 
   async createOne(
@@ -183,7 +95,7 @@ export abstract class UserAccounts {
       locale?: string;
       isFirstTimeSetupAdmin?: boolean;
     },
-    manager?: EntityManager,
+    scope?: TransactionScope,
     options: { excludedUserIdFromLicenseUsage?: number } = {},
   ): Promise<User> {
     const data = {
@@ -199,12 +111,8 @@ export abstract class UserAccounts {
     }
 
     // verifying usage limits
-    const userRepository = manager ? manager.getRepository(User) : this.userRepository;
-    const currentAmountOfUsers = await userRepository.count(
-      options.excludedUserIdFromLicenseUsage === undefined
-        ? undefined
-        : { where: { id: Not(options.excludedUserIdFromLicenseUsage) } },
-    );
+    const operations = this.accountOperations(scope);
+    const currentAmountOfUsers = await operations.count(options.excludedUserIdFromLicenseUsage);
     try {
       await this.licenseService.verifyLicense({
         usageLimits: {
@@ -221,7 +129,7 @@ export abstract class UserAccounts {
 
     // Check for existing email
     this.logger.debug(`Checking if email already exists: ${data.email}`);
-    const existingEmail = await this.findOne({ email: data.email }, undefined, manager);
+    const existingEmail = await this.findOne({ email: data.email }, undefined, scope);
     if (existingEmail) {
       this.logger.debug(`Email already exists: ${data.email}`);
       throw new BadRequestException('Email already exists');
@@ -229,43 +137,29 @@ export abstract class UserAccounts {
 
     // Check for existing username
     this.logger.debug(`Checking if username already exists: ${data.username}`);
-    const existingUsername = await this.findOne({ username: data.username }, undefined, manager);
+    const existingUsername = await this.findOne({ username: data.username }, undefined, scope);
     if (existingUsername) {
       this.logger.debug(`Username already exists: ${data.username}`);
       throw new BadRequestException('Username already exists');
     }
 
-    const user = new User();
-    user.username = data.username;
-    user.email = data.email;
-    user.externalIdentifier = data.externalIdentifier;
-    user.isEmailVerified = data.isEmailVerified;
-    if (userData.locale) {
-      user.locale = userData.locale.trim() || 'en';
-    }
-
-    // Check if this is the first user in the system
-    this.logger.debug('Checking if this is the first user in the system');
-    const totalUsers = await userRepository.count();
-    const isFirstUser = totalUsers === 0;
-
-    this.logger.debug('Saving new user to database');
-    // Wrap save + role assignment in a single transaction so a role-assignment failure
-    // doesn't leave an administrator-less account on a fresh install.
-    const saveUser = async (em: EntityManager) => {
-      const saved = await em.save(user);
+    const user: NewUserAccount = { ...data, ...(userData.locale ? { locale: userData.locale.trim() || 'en' } : {}) };
+    // Account creation and its initial roles share one attempt and one commit.
+    const saveUser = async (parent: TransactionScope) => {
+      const writes = this.accountOperations(parent);
+      const isFirstUser = (await writes.count()) === 0;
+      const saved = await writes.createAccount(user);
       if (isFirstUser || userData.isFirstTimeSetupAdmin) {
-        this.logger.debug('First user in system - assigning administrator role');
-        await this.rbacService.assignRoleByKey(saved.id, 'administrator', em);
-      } else {
-        await this.rbacService.assignDefaultRoles(saved.id, em);
-      }
+        await this.rbacService.assignRoleByKey(saved.id, 'administrator', parent);
+      } else await this.rbacService.assignDefaultRoles(saved.id, parent);
       return saved;
     };
-    const savedUser = manager ? await saveUser(manager) : await this.dataSource.transaction(saveUser);
+    const savedUser = scope
+      ? await saveUser(scope)
+      : await this.transactions.run({ resourceIds: [], accountIds: [] }, saveUser);
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
 
-    if (!manager) {
+    if (!scope) {
       this.recordCreatedUser(savedUser);
     }
     return savedUser;
@@ -278,49 +172,36 @@ export abstract class UserAccounts {
   }
 
   public async rollbackFailedRegistration(userId: number): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      // This is only used for a just-created account whose verification email could not be sent.
-      // It bypasses normal account-deletion rules so the first administrator can be retried.
-      await manager.delete(User, userId);
-    });
+    await this.transactions.run({ resourceIds: [], accountIds: [userId] }, (scope) =>
+      this.accountOperations(scope).hardDeleteAccount(userId),
+    );
   }
 
-  public async releaseFirstTimeSetupAdminIdentifiers(manager: EntityManager): Promise<User> {
-    const repository = manager.getRepository(User);
-    const [existingAdmin] = await repository.find({ take: 1 });
-    if (!existingAdmin || existingAdmin.isEmailVerified) {
+  public async releaseFirstTimeSetupAdminIdentifiers(scope: TransactionScope): Promise<User> {
+    const operations = this.accountOperations(scope);
+    const existingAdmin = await operations.firstAccount();
+    if (!existingAdmin || existingAdmin.isEmailVerified)
       throw new ForbiddenException('First-time setup is already complete');
-    }
-
     const suffix = randomBytes(6).toString('base64url').slice(0, 8);
-    // Claim the setup account only while it is the sole active account. The conditional
-    // update is atomic across API instances, unlike an in-process mutex or count-then-update.
-    const claim = await repository
-      .createQueryBuilder()
-      .update(User)
-      .set({
-        username: `first-time-setup-${existingAdmin.id}-${suffix}`,
-        email: `first-time-setup-${existingAdmin.id}-${suffix}@deleted.local`,
-      })
-      .where('id = :id', { id: existingAdmin.id })
-      .andWhere('isEmailVerified = :isEmailVerified', { isEmailVerified: false })
-      .andWhere('NOT EXISTS (SELECT 1 FROM user AS other WHERE other.id != :id AND other.deletedAt IS NULL)')
-      .execute();
-    if (claim.affected !== 1) {
+    const name = `first-time-setup-${existingAdmin.id}-${suffix}`;
+    if (!(await operations.claimSetupAccount(existingAdmin.id, name, `${name}@deleted.local`))) {
       throw new ForbiddenException('First-time setup is already complete');
     }
-
     return existingAdmin;
   }
 
   public async rollbackFirstTimeSetupAdminReplacement(replacementUserId: number, existingAdmin: User): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      await manager.delete(User, replacementUserId);
-      await manager.getRepository(User).update(existingAdmin.id, {
-        username: existingAdmin.username,
-        email: existingAdmin.email,
-      });
-    });
+    await this.transactions.run(
+      { resourceIds: [], accountIds: [replacementUserId, existingAdmin.id] },
+      async (scope) => {
+        const operations = this.accountOperations(scope);
+        await operations.hardDeleteAccount(replacementUserId);
+        await operations.patchAccount(existingAdmin.id, {
+          username: existingAdmin.username,
+          email: existingAdmin.email,
+        });
+      },
+    );
   }
 
   public validateUsernameOrThrow(username: string): void {
@@ -381,31 +262,11 @@ export abstract class UserAccounts {
   }
 
   protected isEmailUniqueConstraintViolation(error: unknown): boolean {
-    if (!(error instanceof QueryFailedError)) {
-      return false;
-    }
-
-    const driverError = (
-      error as QueryFailedError & { driverError?: { code?: string | number; errno?: number; message?: string } }
-    ).driverError;
-    const errorCode = driverError?.code ?? driverError?.errno;
-    if (
-      errorCode === '23505' ||
-      errorCode === 'SQLITE_CONSTRAINT' ||
-      errorCode === 'SQLITE_CONSTRAINT_UNIQUE' ||
-      errorCode === 'ER_DUP_ENTRY' ||
-      errorCode === 1062
-    ) {
-      return true;
-    }
-
-    const message = driverError?.message ?? '';
-    return (
-      typeof message === 'string' && message.toLowerCase().includes('unique') && message.toLowerCase().includes('email')
-    );
+    return this.persistence.isWriteConflict(error);
   }
 
-  protected abstract userRepository: Repository<User>;
+  protected abstract persistence: UserPersistence;
+  protected abstract transactions: DatabaseTransactions;
 
   protected abstract readonly logger: Logger;
 
@@ -413,17 +274,9 @@ export abstract class UserAccounts {
 
   protected abstract readonly rbacService: RbacService;
 
-  protected abstract dataSource: DataSource;
-
   protected abstract readonly metricsService: MetricsService;
 
-  protected abstract anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void>;
+  protected abstract anonymizeAndSoftDelete(id: number, scope?: TransactionScope): Promise<void>;
 
   protected abstract emailService: EmailService;
-
-  protected abstract applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void;
-
-  protected abstract applySsoFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void;
-
-  protected abstract readonly tokenHashService: TokenHashService;
 }

@@ -1,3 +1,5 @@
+import { DatabaseTransactions, OperationToken } from '../../database/transaction-scope';
+import { TypeormFlowWriteOperations, TypeormResourceFlowPersistence } from './persistence/typeorm-adapter';
 import { createMock } from '@golevelup/ts-jest';
 import {
   Resource,
@@ -46,7 +48,7 @@ describe('resource flow meter validation', () => {
         return work(manager);
       },
     );
-    const service = new ResourceFlowsService(
+    const service = makeFlowService(
       createMock<Repository<ResourceFlowNode>>({ manager, find: jest.fn().mockResolvedValue(nodes) }),
       createMock<Repository<ResourceFlowEdge>>({ find: jest.fn().mockResolvedValue([]) }),
       createMock<Repository<Resource>>({ manager, findOne: jest.fn().mockResolvedValue(resource) }),
@@ -186,3 +188,28 @@ describe('resource flow meter validation', () => {
     expectOneMeterQuery(manager);
   });
 });
+
+function makeFlowService(
+  nodes: Repository<ResourceFlowNode>,
+  edges: Repository<ResourceFlowEdge>,
+  resources: Repository<Resource>,
+  mqtt: MqttClientService,
+  events: EventEmitter2,
+): ResourceFlowsService {
+  const transactions = new DatabaseTransactions({
+    backend: 'sqlite',
+    run: (_conflicts, work) =>
+      nodes.manager.transaction(async (manager) =>
+        work({
+          resolve: <T extends object>(_token: OperationToken<T>): T =>
+            new TypeormFlowWriteOperations(manager) as unknown as T,
+        }),
+      ),
+  });
+  return new ResourceFlowsService(
+    new TypeormResourceFlowPersistence(nodes, edges, resources),
+    transactions,
+    mqtt,
+    events,
+  );
+}

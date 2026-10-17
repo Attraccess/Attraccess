@@ -1,7 +1,6 @@
-import { InjectRepository } from '@nestjs/typeorm';
+import { GroupIntroducerPersistence } from '../persistence/port';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
@@ -12,8 +11,7 @@ export class ResourceGroupsIntroducersService {
   private readonly logger = new Logger(ResourceGroupsIntroducersService.name);
 
   constructor(
-    @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    private readonly persistence: GroupIntroducerPersistence,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly notifications: NotificationDispatchService,
@@ -46,14 +44,7 @@ export class ResourceGroupsIntroducersService {
   }
 
   public async getMany(groupId: number): Promise<ResourceIntroducer[]> {
-    return this.resourceIntroducerRepository.find({
-      where: {
-        resourceGroup: {
-          id: groupId,
-        },
-      },
-      relations: ['user'],
-    });
+    return this.persistence.grants(groupId);
   }
 
   public async grant(
@@ -86,13 +77,7 @@ export class ResourceGroupsIntroducersService {
   }
 
   private async createOne(groupId: number, userId: number, type: ResourceIntroducerType): Promise<ResourceIntroducer> {
-    const introducer = this.resourceIntroducerRepository.create({
-      resourceGroup: { id: groupId },
-      user: { id: userId },
-      type,
-    });
-
-    return await this.resourceIntroducerRepository.save(introducer, { reload: true });
+    return this.persistence.createGrant(groupId, userId, type);
   }
 
   public async revoke(
@@ -106,7 +91,7 @@ export class ResourceGroupsIntroducersService {
       return;
     }
 
-    const savedIntroducer = await this.resourceIntroducerRepository.remove(introducer);
+    const savedIntroducer = await this.persistence.removeGrant(introducer);
     this.notifyAccessChange(groupId, userId, introducer.type, false);
     this.eventEmitter.emit(
       ResourceGroupIntroducerChangedEvent.EVENT_NAME,
@@ -120,13 +105,7 @@ export class ResourceGroupsIntroducersService {
     userId: number,
     type?: ResourceIntroducerType,
   ): Promise<ResourceIntroducer | null> {
-    return await this.resourceIntroducerRepository.findOne({
-      where: {
-        resourceGroup: { id: groupId },
-        user: { id: userId },
-        ...(type ? { type } : {}),
-      },
-    });
+    return this.persistence.grant(groupId, userId, type);
   }
 
   public async isIntroducer({ groupId, userId }: { groupId: number; userId: number }): Promise<boolean> {

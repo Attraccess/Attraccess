@@ -1,3 +1,4 @@
+import { sqliteRepositoryFixture } from '../../database/conformance/sqlite-fixture';
 import { registerMaintenanceServiceFixture } from './maintenance.service.maintenance-service.test-fixture';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { Resource } from '@attraccess/database-entities';
@@ -14,7 +15,7 @@ describe('MaintenanceService', () => {
         entity === Resource ? fixture.resourceRepository : fixture.maintenanceRepository,
     };
     const emit = jest.spyOn(fixture.service, 'emitScheduledMaintenanceCreated');
-    expect(await fixture.service.createMaintenanceFromSchedule(1, 8, 'Due', manager as never, false)).toBe(
+    expect(await sqliteRepositoryFixture(manager.getRepository).transactions.run({resourceIds:[1],accountIds:[]},scope=>fixture.service.createMaintenanceFromSchedule(1,8,'Due',scope,false))).toEqual(
       fixture.mockMaintenance,
     );
     expect(fixture.maintenanceRepository.create).toHaveBeenCalledWith(
@@ -38,7 +39,7 @@ describe('MaintenanceService', () => {
     expect(query.where).toHaveBeenCalledWith('maintenance.resourceId = :resourceId', { resourceId: 1 });
     query.getOne.mockResolvedValue(null);
     const manager = { getRepository: () => fixture.maintenanceRepository };
-    expect(await fixture.service.hasActiveMaintenance({ resourceId: 1, scheduleId: 8 }, manager as never)).toBe(false);
+    expect(await sqliteRepositoryFixture(manager.getRepository).transactions.run({resourceIds:[1],accountIds:[]},scope=>fixture.service.hasActiveMaintenance({resourceId:1,scheduleId:8},scope))).toBe(false);
     expect(query.andWhere).toHaveBeenCalledWith('maintenance.maintenanceScheduleId = :scheduleId', { scheduleId: 8 });
   });
 
