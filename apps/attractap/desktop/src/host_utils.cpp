@@ -1,3 +1,5 @@
+#include "display/messages.hpp"
+#include "state/state.hpp"
 #include "utils.hpp"
 
 #include <algorithm>
@@ -131,4 +133,4 @@ time_t parseIso8601ToTimeT(const std::string &iso8601)
     return timestamp - (timezoneHour * 3600L + timezoneMinute * 60L) * timezoneSign;
 }
 
-std::string translateReaderError(const std::string &errorKey) { return errorKey; }
+std::string translateReaderError(const std::string &errorKey) { return FirmwareI18n::readerError(errorKey).render(State::getActiveLanguage()); }

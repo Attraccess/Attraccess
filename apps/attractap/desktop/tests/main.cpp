@@ -3,6 +3,7 @@
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
 #include "settings/settings.hpp"
+#include "state/state.hpp"
 #include "virtual_rfid.hpp"
 #include "utils.hpp"
 
@@ -188,6 +189,29 @@ int main()
     assert(rejectsInvalidApiEndpoint("https://localhost:"));
     assert(rejectsInvalidApiEndpoint("https://::1"));
 
+    KVStore::setHostProfile(&first);
+    Settings::setup();
+    assert(State::getActiveLanguage() == "en");
+    // A cold start reloads the last API default, never a cardholder override.
+    KVStore persistedSettings;
+    persistedSettings.begin("settings", false);
+    persistedSettings.putString("api.language", "de");
+    persistedSettings.end();
+    State::setUserLanguage(true, "en");
+    State::setApiState(false, "");
+    ProfileStore rebooted("https://example.test", 42, root);
+    KVStore::setHostProfile(&rebooted);
+    Settings::setup();
+    assert(State::getActiveLanguage() == "de");
+    assert(!State::getApiState().userAuthenticated);
+    persistedSettings.begin("settings", false);
+    persistedSettings.putString("api.language", "unsupported");
+    persistedSettings.end();
+    Settings::setup();
+    assert(State::getActiveLanguage() == "en");
+    KVStore::setHostProfile(&otherReader);
+    Settings::setup();
+    assert(State::getActiveLanguage() == "en");
     KVStore::setHostProfile(&first);
     Settings::setup();
     Settings::saveAttraccessApiConfig("localhost", 3001, false);

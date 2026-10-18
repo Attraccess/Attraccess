@@ -38,7 +38,7 @@ void ReaderWorkflow::testWallClock()
     // Reuse an idle lockscreen that was created before synchronization.
     Display::lockscreen.init();
     for (int weekday = 0; weekday < 7; ++weekday)
-        assert(!label(lv_screen_active(), WallClockText::weekday(WallClock::LocalTime{true, 2026, 10, 10, weekday})));
+        assert(!label(lv_screen_active(), FirmwareI18n::messageText(WallClockText::weekday(WallClock::LocalTime{true, 2026, 10, 10, weekday}), State::getActiveLanguage())));
     display.capture(output, "wall-clock-01-unknown");
 
     // Heartbeat replies carry the server clock at the top level.
@@ -47,12 +47,12 @@ void ReaderWorkflow::testWallClock()
     pump();
     assert(WallClock::now().valid);
     assert(showsClock(lv_screen_active(), 120, before));
-    assert(label(lv_screen_active(), WallClockText::weekday(WallClock::now())));
+    assert(label(lv_screen_active(), FirmwareI18n::messageText(WallClockText::weekday(WallClock::now()), State::getActiveLanguage())));
     display.capture(output, "wall-clock-02-list");
 
     // Authentication applies the server timezone too, e.g. a non-hour offset.
     before = expectedClock(-210);
-    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","serverTime":)" + serverTime(-210) + "}");
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"de","serverTime":)" + serverTime(-210) + "}");
     list(false);
     assert(showsClock(lv_screen_active(), -210, before));
 
@@ -88,7 +88,7 @@ void ReaderWorkflow::testWallClock()
     assert(WallClock::now().valid);
     assert(WallClockText::clock(WallClock::now()) == expectedClock(-210));
     State::setWebsocketState(true, "reader.test", 80, false);
-    server.push("READER_AUTHENTICATED", R"({"name":"Test reader"})");
+    server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"de"})");
     server.incoming.push(R"({"event":"HEARTBEAT","serverTime":)" + serverTime(60) + "}");
     before = expectedClock(60);
     list(false);
@@ -165,7 +165,7 @@ void ReaderWorkflow::testWallClock()
     assert(time(nullptr) >= presetUtc && time(nullptr) < presetUtc + 5);
     assert(WallClock::now().valid && WallClock::now().year == expectedPreset.year);
     assert(label(lv_screen_active(), WallClockText::clock(expectedPreset).c_str()));
-    assert(label(lv_screen_active(), WallClockText::date(expectedPreset, true).c_str()));
+    assert(label(lv_screen_active(), WallClockText::date(expectedPreset, true).render(State::getActiveLanguage()).c_str()));
     display.capture(output, "wall-clock-04-demo-preset-2024");
     TestClock::set(restoredUtc);
     WallClock::onServerTime(static_cast<int64_t>(restoredUtc) * 1000, 60);

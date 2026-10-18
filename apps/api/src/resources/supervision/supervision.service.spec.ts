@@ -321,6 +321,29 @@ describe('SupervisionService', () => {
       await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
     });
 
+    it.each([false, true])('cancels an HTTP request during reader arming=%s', async (duringArming) => {
+      let finishArming: (() => void) | undefined;
+      if (duringArming) {
+        armer.arm.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finishArming = () => resolve(readerCallbacks);
+            }),
+        );
+      }
+      const controller = new AbortController();
+      const pending = fixture.service.requestSupervisedSession(5, fixture.requester, readerDto, controller.signal);
+      pending.catch(() => undefined);
+      await fixture.flush();
+      expect(armer.arm).toHaveBeenCalledTimes(1);
+      controller.abort();
+      finishArming?.();
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+      expect(fixture.service.listPendingForSupervisor(fixture.supervisor.id)).toEqual([]);
+      expect(readerCallbacks.onFailed).toHaveBeenCalledTimes(1);
+      expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
+    });
+
     it('times the requester out after 30s', async () => {
       // The reader path awaits validation, eligibility and arming before the timer is armed, so the
       // request must be fully created before time is advanced — keep setImmediate real to flush it.

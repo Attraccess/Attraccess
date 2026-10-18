@@ -191,6 +191,14 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
 })
 class PluginBootstrapConfigModule {}
 
+async function closeAfterStartupFailure(app: { close(): Promise<void> }, logger: Logger): Promise<void> {
+  try {
+    await app.close();
+  } catch (cleanupError) {
+    logger.error('Application cleanup failed after startup failure', cleanupError);
+  }
+}
+
 export async function bootstrap() {
   Logger.attachBuffer();
   const bootstrapLogger = new Logger('Bootstrap');
@@ -213,9 +221,11 @@ export async function bootstrap() {
     routingLogger = initializeProcessLogging();
     configContext.useLogger(routingLogger);
     Logger.flush();
-  } finally {
-    await configContext.close();
+  } catch (error) {
+    await closeAfterStartupFailure(configContext, bootstrapLogger);
+    throw error;
   }
+  await configContext.close();
 
   if (!earlyConfig) {
     bootstrapLogger.error("Application configuration ('app') not loaded. Exiting.");
@@ -270,9 +280,11 @@ export async function bootstrap() {
     backendUrlFromDb = skipDatabaseMigrations
       ? appConfig.ATTRACCESS_URL
       : await appForConfig.get(SettingsService).getUrl();
-  } finally {
-    await appForConfig.close();
+  } catch (error) {
+    await closeAfterStartupFailure(appForConfig, bootstrapLogger);
+    throw error;
   }
+  await appForConfig.close();
   // AppModule is constructed again below. Plugin providers in that application
   // must not receive repositories from the closed configuration DataSource.
   PluginModule.resetHostReferences();
@@ -336,7 +348,7 @@ export async function bootstrap() {
       shouldGuardPluginLifecycle,
     };
   } catch (error) {
-    await app.close();
+    await closeAfterStartupFailure(app, bootstrapLogger);
     throw error;
   }
 }

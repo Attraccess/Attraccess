@@ -53,6 +53,8 @@ public:
     static void saveAttraccessAuthConfig(const std::string &apiKey, uint32_t readerId);
     static void clearAttraccessAuthConfig();
 
+    static void saveDefaultLanguage(const std::string &language);
+
     static std::string getHostname();
 
 private:
@@ -63,6 +65,7 @@ private:
     static NetworkConfig _networkConfig;
     static AttraccessApiConfig _attraccessApiConfig;
     static AttraccessAuthConfig _attraccessAuthConfig;
+    static std::string _cachedDefaultLanguage;
 
     static std::string _hostname;
 };

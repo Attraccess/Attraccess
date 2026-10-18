@@ -52,9 +52,9 @@ public:
     void setFormsCancelCallback(std::function<void()> callback);
 
     // UI helpers for async actions
-    void showActionProgress(const char *text);
+    void showActionProgress(const FirmwareI18n::Text &text);
     void hideActionProgress();
-    void showSuccessToast(const char *text, uint16_t ms = 1200);
+    void showSuccessToast(const FirmwareI18n::Text &text, uint16_t ms = 1200);
 
     void setProjects(const API::ProjectsOfUserResponse &projects);
 
@@ -73,7 +73,7 @@ private:
     std::string loginUsernameCache;
     SessionHeader sessionHeader;
     ActionOverlay actionOverlay;
-    std::string actionTitle;
+    FirmwareI18n::Text actionTitle;
 
     lv_obj_t *sessionDetailsContainer = nullptr;
     time_t sessionStartTime = 0;

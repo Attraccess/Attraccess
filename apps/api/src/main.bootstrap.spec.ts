@@ -104,6 +104,7 @@ describe('API bootstrap ordering and configuration', () => {
   const originalSkip = process.env.SKIP_DATABASE_MIGRATIONS;
   beforeEach(() => {
     jest.clearAllMocks();
+    app.close.mockReset();
     jest.mocked(existsSync).mockImplementation(jest.requireActual<typeof import('fs')>('fs').existsSync);
     delete process.env.SKIP_DATABASE_MIGRATIONS;
     appConfig.DISABLE_PLUGINS = false;
@@ -292,5 +293,21 @@ describe('API bootstrap ordering and configuration', () => {
     expect(PluginService.recordBootFailure).toHaveBeenCalledWith(error);
     expect(app.close).toHaveBeenCalledTimes(2);
     expect(app.setGlobalPrefix).not.toHaveBeenCalled();
+  });
+  it('preserves the configuration error when configuration cleanup also fails', async () => {
+    const error = new Error('configuration failed');
+    settings.getUrl.mockRejectedValueOnce(error);
+    app.close.mockRejectedValueOnce(new Error('configuration cleanup failed'));
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(app.close).toHaveBeenCalledTimes(1);
+    expect(NestFactory.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the migration error when main application cleanup also fails', async () => {
+    const error = new Error('migration failed');
+    datasource.runMigrations.mockRejectedValueOnce(error);
+    app.close.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('main cleanup failed'));
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(app.close).toHaveBeenCalledTimes(2);
   });
 });

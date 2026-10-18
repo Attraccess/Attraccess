@@ -16,6 +16,7 @@ int main(int argc, char **argv)
     workflow.testFormsAndLogout();
     workflow.testSupervisionAndCorrelation();
     workflow.testIdentityAndPendingAuthentication();
+    workflow.testLocalization();
     workflow.testSessionSummary();
     workflow.testWallClock();
     if (timeouts) workflow.testTimeouts();

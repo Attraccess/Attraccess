@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <cstdlib>
 #include "text.hpp"
+#ifdef DEMO_MODE
+#include "display/demoFormOptions.hpp"
+#endif
 
 void ResourceDetailsScreen::buildCurrentFormField()
 {
@@ -18,9 +21,10 @@ void ResourceDetailsScreen::buildCurrentFormField()
    lv_obj_clean(this->formsModalList);
    this->formFieldWidgetCount = 0;
 
+
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
 
    if (!this->formsModalPage || this->formsModalPage->fieldCount == 0)
@@ -48,7 +52,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             fieldTitle += " *";
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
-         lv_label_set_text(fieldLabel, fieldTitle.c_str());
+         FirmwareI18n::setDynamicLabel(fieldLabel, fieldTitle.c_str()) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */;
           lv_obj_set_style_text_font(fieldLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
           lv_obj_set_style_text_color(fieldLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -57,7 +61,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          if (field.description.length() > 0)
          {
             lv_obj_t *desc = lv_label_create(fieldContainer);
-            lv_label_set_text(desc, field.description.c_str());
+            FirmwareI18n::setDynamicLabel(desc, field.description.c_str()) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */;
              lv_obj_set_style_text_color(desc, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
              lv_obj_set_style_text_font(desc, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -125,7 +129,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_label_set_long_mode(valueLabel, multiline ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
 
             lv_obj_t *editIcon = lv_label_create(preview);
-            lv_label_set_text(editIcon, LV_SYMBOL_EDIT);
+            FirmwareI18n::setLabel(editIcon, FirmwareI18n::Text::literal(LV_SYMBOL_EDIT) /* i18n-data: Language-neutral LVGL icon glyph. */);
             lv_obj_set_style_text_color(editIcon, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
             lv_obj_add_event_cb(preview, &ResourceDetailsScreen::onFieldPreviewClick, LV_EVENT_CLICKED, this);
@@ -133,7 +137,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
 
          widget.errorLabel = lv_label_create(fieldContainer);
-         lv_label_set_text(widget.errorLabel, "");
+         FirmwareI18n::setLabel(widget.errorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
           lv_obj_set_style_text_color(widget.errorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
           lv_obj_set_style_text_font(widget.errorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
       }
@@ -280,7 +284,7 @@ void ResourceDetailsScreen::createSelectField(lv_obj_t *fieldContainer, FormFiel
             if (field.options.select.count == 0)
             {
                lv_obj_t *info = lv_label_create(selectContainer);
-               lv_label_set_text(info, SELECT_FIELD_NO_OPTIONS);
+               FirmwareI18n::setLabel(info, SELECT_FIELD_NO_OPTIONS);
                 lv_obj_set_style_text_color(info, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
                 lv_obj_set_style_text_font(info, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -300,9 +304,18 @@ void ResourceDetailsScreen::createSelectField(lv_obj_t *fieldContainer, FormFiel
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
-                  lv_label_set_text(optLabel, displayValue.c_str());
+#ifdef DEMO_MODE
+                  const auto caption = FirmwareI18n::demoMaterialCaption(
+                      this->formsModalPage->resourceId, this->formsModalPage->formId, field.id,
+                      field.options.select.values[optIndex]);
+                  if (caption)
+                     FirmwareI18n::setLabel(optLabel, *caption);
+                  else
+#endif
+                  FirmwareI18n::setDynamicLabel(optLabel, displayValue.c_str()) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */;
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 
                   if (widget.selectOptionEventCount >= API::MAX_SELECT_OPTIONS)
                   {
@@ -430,11 +443,11 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       FormFieldWidget &widget = this->formFieldWidgets[i];
 
-      auto setError = [&](const char *msg)
+      auto setError = [&](FirmwareI18n::Text msg)
       {
          if (widget.errorLabel)
          {
-            lv_label_set_text(widget.errorLabel, msg);
+            FirmwareI18n::setLabel(widget.errorLabel, msg);
          }
          hasErrors = true;
       };
@@ -445,7 +458,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
          // Required boolean fields must be checked (true)
          if (widget.isRequired && !isChecked)
          {
-            setError("Pflichtfeld");
+            setError(FirmwareI18n::Message::RequiredField);
             continue;
          }
          API::FormSubmissionAnswer &answer = outPage.answers[outPage.answerCount++];
@@ -461,7 +474,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
          {
             if (widget.isRequired)
             {
-               setError("Pflichtfeld");
+               setError(FirmwareI18n::Message::RequiredField);
             }
             continue;
          }
@@ -487,7 +500,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
       {
          if (widget.isRequired)
          {
-            setError("Pflichtfeld");
+            setError(FirmwareI18n::Message::RequiredField);
          }
          continue;
       }
@@ -511,7 +524,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       if (this->formsModalErrorLabel)
       {
-         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfüllen.");
+         FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Message::PleaseCompleteTheHighlightedFields);
       }
       return false;
    }
@@ -551,11 +564,11 @@ void ResourceDetailsScreen::clearFormFieldErrors()
    {
       if (this->formFieldWidgets[i].errorLabel)
       {
-         lv_label_set_text(this->formFieldWidgets[i].errorLabel, "");
+         FirmwareI18n::setLabel(this->formFieldWidgets[i].errorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
       }
    }
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, "");
+      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
 }

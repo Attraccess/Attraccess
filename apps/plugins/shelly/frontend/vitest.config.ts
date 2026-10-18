@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
   resolve: {
     alias: {
+      '@attraccess/shared': fileURLToPath(new URL('../../../../libs/shared/src/index.ts', import.meta.url)),
       // Exercise the real shared translation store without pulling in the core's
       // generated API client through the UI library's component barrel.
       '@attraccess/plugins-frontend-ui': fileURLToPath(

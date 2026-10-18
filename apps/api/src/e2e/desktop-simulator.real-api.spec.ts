@@ -53,7 +53,7 @@ describe('desktop simulator against an isolated real API', () => {
     if (typeof database !== 'string') throw new Error('Expected an owned SQLite database');
     const location = relative(realpathSync(storageRoot), realpathSync(database));
     if (location.startsWith('..') || isAbsolute(location)) throw new Error('API database escaped isolated storage');
-    await app.get(SettingsService).updateAppSettings({ licenseKey: nonProfitLicense });
+    await app.get(SettingsService).updateAppSettings({ licenseKey: nonProfitLicense, defaultLanguage: 'de' });
     await app.listen(0, '127.0.0.1');
     const address = app.getHttpServer().address();
     if (!address || typeof address === 'string') throw new Error('API did not bind TCP');
@@ -141,9 +141,12 @@ describe('desktop simulator against an isolated real API', () => {
   }
 
   async function user(name: string, introduced = true) {
-    const result = await db
-      .getRepository(User)
-      .save({ username: `${name}-${reader.id}`, email: `${name}-${reader.id}@example.invalid`, isEmailVerified: true });
+    const result = await db.getRepository(User).save({
+      username: `${name}-${reader.id}`,
+      email: `${name}-${reader.id}@example.invalid`,
+      isEmailVerified: true,
+      locale: 'de',
+    });
     if (introduced) {
       const introduction = await db
         .getRepository(ResourceIntroduction)
@@ -238,7 +241,7 @@ describe('desktop simulator against an isolated real API', () => {
   it('enrolls cards, rejects unknown and incorrect keys, and recovers from write failure and removal', async () => {
     await start('cards');
     await desktop().present(3);
-    await desktop().text('CARD_NOT_FOUND');
+    await desktop().text('Karte nicht gefunden');
     await desktop().snapshot('unknown-card');
     await desktop().click('OK');
     await desktop().screen('locked');
@@ -369,6 +372,7 @@ describe('desktop simulator against an isolated real API', () => {
     );
     const submissions = await db.getRepository(FormSubmission).findBy({ resourceUsageId: usage.id });
     expect(submissions).toHaveLength(2);
+    expect(submissions.map((submission) => submission.action).sort()).toEqual(['end', 'start']);
     for (const submission of submissions) {
       expect(submission.userId).toBe(owner.id);
       expect(submission.formId).toBe(form.id);
@@ -377,9 +381,9 @@ describe('desktop simulator against an isolated real API', () => {
     }
   }, 120_000);
 
-  it.each([false, true])(
-    'handles web supervision approval and request failure (abort=%s)',
-    async (abort) => {
+  it.each(['approval', 'http-abort', 'reader-disconnect'] as const)(
+    'handles web supervision %s',
+    async (outcomeType) => {
       await start('supervision');
       const supervisor = await user('supervisor');
       const requester = await user('requester', false);
@@ -412,14 +416,32 @@ describe('desktop simulator against an isolated real API', () => {
         expect(requests[0]).toMatchObject({ resourceId: resource.id, requesterUserId: requester.id });
         expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
         await desktop().snapshot('supervision-request');
-        if (abort) {
-          controller.abort(new Error('Injected supervision request failure'));
-          expect((await pending).error).toBeDefined();
+        if (outcomeType !== 'approval') {
+          if (outcomeType === 'http-abort') {
+            controller.abort(new Error('Injected supervision request failure'));
+            expect((await pending).error).toBeDefined();
+          } else {
+            const root = desktop().root;
+            await desktop().dispose();
+            expect(existsSync(root)).toBe(false);
+            const outcome = await pending;
+            expect(outcome.response?.status).toBe(408);
+          }
+          await waitFor(
+            () => api().get(SupervisionService).listPendingForSupervisor(supervisor.id).length === 0,
+            `backend supervision cancellation after ${outcomeType}`,
+          );
+          if (outcomeType === 'http-abort') {
+            // The reader stays connected: HTTP cancellation must clean up on its own.
+            expect((await desktop().command('inspect')).authenticated).toBe(true);
+            expect(socket().readerId).toBe(reader.id);
+          }
+          expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
           expect(settled).toBe(true);
           return;
         }
         await desktop().present(3);
-        await desktop().text('CARD_NOT_FOUND');
+        await desktop().text('Karte nicht gefunden');
         expect(settled).toBe(false);
         expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
         await desktop().remove(3);
@@ -442,19 +464,7 @@ describe('desktop simulator against an isolated real API', () => {
       } finally {
         // Always consume the bounded HTTP request, including if a screen assertion fails.
         try {
-          if (abort) {
-            const root = desktop().root;
-            await desktop().dispose();
-            expect(existsSync(root)).toBe(false);
-            // HTTP abort ends the client wait; reader disconnect cancels the backend request.
-            await waitFor(
-              () => api().get(SupervisionService).listPendingForSupervisor(supervisor.id).length === 0,
-              'backend supervision cancellation after reader disconnect',
-            );
-            expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
-          } else {
-            await desktop().remove();
-          }
+          if (outcomeType === 'approval') await desktop().remove();
         } finally {
           controller.abort();
           await pending;
