@@ -41,6 +41,8 @@ export function legacyUpgradeConformance(name: string, factory: UpgradeFixtureFa
           await fixture.close();
         }
       },
+      // Historical migrations run inside these cases, including with CI coverage instrumentation.
+      60_000,
     );
   });
 }
