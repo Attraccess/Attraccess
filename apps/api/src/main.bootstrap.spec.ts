@@ -75,6 +75,7 @@ describe('API bootstrap ordering and configuration', () => {
   const datasource = {
     isInitialized: false,
     initialize: jest.fn(),
+    destroy: jest.fn(),
     showMigrations: jest.fn(),
     runMigrations: jest.fn(),
     migrations: [],
@@ -305,9 +306,21 @@ describe('API bootstrap ordering and configuration', () => {
 
   it('preserves the migration error when main application cleanup also fails', async () => {
     const error = new Error('migration failed');
+    datasource.isInitialized = true;
     datasource.runMigrations.mockRejectedValueOnce(error);
     app.close.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('main cleanup failed'));
     await expect(bootstrap()).rejects.toBe(error);
     expect(app.close).toHaveBeenCalledTimes(2);
+    expect(datasource.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the startup error when database fallback cleanup also fails', async () => {
+    const error = new Error('migration failed');
+    datasource.isInitialized = true;
+    datasource.runMigrations.mockRejectedValueOnce(error);
+    datasource.destroy.mockRejectedValueOnce(new Error('database cleanup failed'));
+    app.close.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('main cleanup failed'));
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(datasource.destroy).toHaveBeenCalledTimes(1);
   });
 });

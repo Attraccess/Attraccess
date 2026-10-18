@@ -1,12 +1,31 @@
 import { DataSource } from 'typeorm';
+import { NestFactory } from '@nestjs/core';
 import { existsSync } from 'fs';
 import { bootstrap } from '../main.bootstrap';
 import { withDesktopCleanup } from './desktop-simulator-cleanup';
 import { disposeStorage, storageRoot } from '../test/desktop-real-api.test-fixture';
 
-it('closes the real API database and removes owned storage after migration startup failure', async () => {
+it('releases the real database and storage when migration startup and application closure both fail', async () => {
   let database: DataSource | undefined;
   let started: Awaited<ReturnType<typeof bootstrap>> | undefined;
+  const create = NestFactory.create.bind(NestFactory);
+  const applications: Awaited<ReturnType<typeof NestFactory.create>>[] = [];
+  const factory = jest.spyOn(NestFactory, 'create').mockImplementation(async (...args) => {
+    const app = await create(...args);
+    applications.push(app);
+    if (applications.length === 2) {
+      return new Proxy(app, {
+        get(target, property) {
+          if (property === 'close')
+            return async () => {
+              throw new Error('Injected application cleanup failure');
+            };
+          return Reflect.get(target, property);
+        },
+      });
+    }
+    return app;
+  });
   const migrate = jest.spyOn(DataSource.prototype, 'showMigrations').mockImplementationOnce(async function (
     this: DataSource,
   ) {
@@ -25,6 +44,10 @@ it('closes the real API database and removes owned storage after migration start
       expect(database?.isInitialized).toBe(false);
     },
     () => migrate.mockRestore(),
+    () => factory.mockRestore(),
+    async () => {
+      for (const app of applications) await app.close();
+    },
     async () => started?.app.close(),
     async () => {
       if (database?.isInitialized) await database.destroy();

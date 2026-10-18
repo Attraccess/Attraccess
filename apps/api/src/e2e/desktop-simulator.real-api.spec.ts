@@ -88,14 +88,15 @@ describe('desktop simulator against an isolated real API', () => {
     return fixture;
   }
 
-  async function start(scenario: string) {
+  async function start(scenario: string, pin = '1234') {
     fixture = new DesktopFixture(endpoint, scenario);
     await fixture.start();
     const observed = await fixture.command('inspect');
     expect(observed.authenticated).toBe(true);
     expect(observed.networkAvailable).toBe(true);
     expect(observed.devicePin).toBe('0000');
-    await fixture.command('set-pin', { text: '1234' });
+    await fixture.screen('set-pin');
+    expect((await fixture.command('edit', { text: pin })).devicePin).toBe(pin);
     reader = await db.getRepository(Attractap).findOneByOrFail({ id: observed.readerId });
     resource = await db.getRepository(Resource).save({ name: `Desktop Mill ${reader.id}`, type: ResourceType.Machine });
     const alternate = await db
@@ -207,7 +208,7 @@ describe('desktop simulator against an isolated real API', () => {
   }
 
   it('registers the exact reader, observes ACKs on both connections and preserves its profile', async () => {
-    const original = await start('registration-reconnect');
+    const original = await start('registration-reconnect', '7391');
     const user1 = await user('reader');
     await enroll(user1);
     await authenticate();
@@ -226,7 +227,6 @@ describe('desktop simulator against an isolated real API', () => {
     await pushWithAck();
     await desktop().text(resource.name);
     await desktop().snapshot('reconnected');
-    expect((await desktop().command('set-pin', { text: '7391' })).devicePin).toBe('7391');
     const readerCount = await db.getRepository(Attractap).count();
     await desktop().stop();
     await desktop().start();

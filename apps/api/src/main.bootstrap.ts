@@ -191,11 +191,27 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
 })
 class PluginBootstrapConfigModule {}
 
-async function closeAfterStartupFailure(app: { close(): Promise<void> }, logger: Logger): Promise<void> {
+async function closeAfterStartupFailure(
+  app: { close(): Promise<void>; get?(token: typeof DataSource): DataSource },
+  logger: Logger,
+): Promise<void> {
+  // Capture ownership before closing: an earlier shutdown hook may throw before
+  // TypeORM's hook runs, and the application may no longer allow provider lookup.
+  let database: DataSource | undefined;
+  try {
+    database = app.get?.(DataSource);
+  } catch {
+    // The early configuration context has no database provider.
+  }
   try {
     await app.close();
   } catch (cleanupError) {
     logger.error('Application cleanup failed after startup failure', cleanupError);
+  }
+  try {
+    if (database?.isInitialized) await database.destroy();
+  } catch (cleanupError) {
+    logger.error('Database cleanup failed after startup failure', cleanupError);
   }
 }
 

@@ -87,13 +87,13 @@ bool validCommand(JsonDocument &command)
 {
     if (!command.is<JsonObject>() || !command["action"].is<const char *>()) return false;
     const std::string action = command["action"].as<std::string>();
-    const std::vector<std::string> actions = {"wait-text", "wait-screen", "click", "edit", "present", "remove", "faults", "corrupt-key", "snapshot", "reconnect", "inspect", "set-pin", "quit"};
+    const std::vector<std::string> actions = {"wait-text", "wait-screen", "click", "edit", "present", "remove", "faults", "corrupt-key", "snapshot", "reconnect", "inspect", "quit"};
     if (std::find(actions.begin(), actions.end(), action) == actions.end()) return false;
     for (JsonPair field : command.as<JsonObject>())
     {
         const std::string key = field.key().c_str();
         if (key == "action") continue;
-        if (key == "text" && (action == "wait-text" || action == "wait-screen" || action == "click" || action == "edit" || action == "snapshot" || action == "set-pin"))
+        if (key == "text" && (action == "wait-text" || action == "wait-screen" || action == "click" || action == "edit" || action == "snapshot"))
         {
             if (!field.value().is<const char *>() || field.value().as<std::string>().size() > 512) return false;
         }
@@ -147,6 +147,7 @@ bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::file
         else if (text == "details") screen = &Display::resourceDetailsScreen;
         else if (text == "enrollment") screen = &Display::enrollmentScreen;
         else if (text == "supervision") screen = &Display::supervisionScreen;
+        else if (text == "set-pin") screen = &Display::setPinScreen;
         if (!screen) return false;
         return waitFor([&] { return screen->getScreen() && lv_screen_active() == screen->getScreen(); }, simulator);
     }
@@ -185,11 +186,6 @@ bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::file
         const size_t slot = command["slot"] | 1;
         card.keys.at(slot)[0] ^= 0xff;
         simulator.nfc().setCard(cardIndex, card);
-    }
-    else if (action == "set-pin")
-    {
-        if (text.size() != 4 || !std::all_of(text.begin(), text.end(), [](unsigned char c) { return std::isdigit(c); })) return false;
-        Settings::setDevicePin(text);
     }
     else if (action == "snapshot")
     {
