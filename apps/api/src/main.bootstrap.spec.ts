@@ -105,7 +105,15 @@ describe('API bootstrap ordering and configuration', () => {
   const originalSkip = process.env.SKIP_DATABASE_MIGRATIONS;
   beforeEach(() => {
     jest.clearAllMocks();
-    app.close.mockReset();
+    app.close.mockReset().mockImplementation(async () => {
+      datasource.isInitialized = false;
+    });
+    datasource.initialize.mockImplementation(async () => {
+      datasource.isInitialized = true;
+    });
+    datasource.destroy.mockImplementation(async () => {
+      datasource.isInitialized = false;
+    });
     jest.mocked(existsSync).mockImplementation(jest.requireActual<typeof import('fs')>('fs').existsSync);
     delete process.env.SKIP_DATABASE_MIGRATIONS;
     appConfig.DISABLE_PLUGINS = false;
@@ -304,11 +312,27 @@ describe('API bootstrap ordering and configuration', () => {
     expect(NestFactory.create).toHaveBeenCalledTimes(1);
   });
 
+  it('releases the database when configuration reads succeed but closure fails', async () => {
+    const error = new Error('configuration close failed');
+    datasource.isInitialized = true;
+    app.close.mockRejectedValueOnce(error);
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(settings.getUrl).toHaveBeenCalled();
+    expect(app.close).toHaveBeenCalledTimes(1);
+    expect(datasource.destroy).toHaveBeenCalledTimes(1);
+    expect(app.get.mock.invocationCallOrder.at(-1)).toBeLessThan(app.close.mock.invocationCallOrder[0]);
+    expect(NestFactory.create).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves the migration error when main application cleanup also fails', async () => {
     const error = new Error('migration failed');
     datasource.isInitialized = true;
     datasource.runMigrations.mockRejectedValueOnce(error);
-    app.close.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('main cleanup failed'));
+    app.close
+      .mockImplementationOnce(async () => {
+        datasource.isInitialized = false;
+      })
+      .mockRejectedValueOnce(new Error('main cleanup failed'));
     await expect(bootstrap()).rejects.toBe(error);
     expect(app.close).toHaveBeenCalledTimes(2);
     expect(datasource.destroy).toHaveBeenCalledTimes(1);
@@ -319,7 +343,11 @@ describe('API bootstrap ordering and configuration', () => {
     datasource.isInitialized = true;
     datasource.runMigrations.mockRejectedValueOnce(error);
     datasource.destroy.mockRejectedValueOnce(new Error('database cleanup failed'));
-    app.close.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('main cleanup failed'));
+    app.close
+      .mockImplementationOnce(async () => {
+        datasource.isInitialized = false;
+      })
+      .mockRejectedValueOnce(new Error('main cleanup failed'));
     await expect(bootstrap()).rejects.toBe(error);
     expect(datasource.destroy).toHaveBeenCalledTimes(1);
   });

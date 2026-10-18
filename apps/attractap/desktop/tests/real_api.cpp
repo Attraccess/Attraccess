@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdexcept>
+#include <regex>
 
 namespace
 {
@@ -80,6 +81,11 @@ std::string screenName()
     if (lv_screen_active() == Display::resourceDetailsScreen.getScreen()) return "details";
     if (lv_screen_active() == Display::enrollmentScreen.getScreen()) return "enrollment";
     if (lv_screen_active() == Display::supervisionScreen.getScreen()) return "supervision";
+    if (lv_screen_active() == Display::setPinScreen.getScreen()) return "set-pin";
+    if (lv_screen_active() == Display::connectionConfigurationScreen.getScreen()) return "settings";
+#ifdef DEMO_MODE
+    if (lv_screen_active() == Display::demoSettingsScreen.getScreen()) return "settings";
+#endif
     return "other";
 }
 
@@ -131,6 +137,43 @@ void collectLabels(lv_obj_t *root, JsonArray labels)
     }
     for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
         collectLabels(lv_obj_get_child(root, i), labels);
+}
+
+// Capture safety cannot depend on the bounded diagnostic inspect response or a
+// previous command. Traverse all visible text in the exact tree being captured.
+bool screenshotTextSafe(const std::string &text)
+{
+    static const std::regex sensitive(
+        "pin|passcode|password|passwort|credential|token|secret|authorization|payload|key|schlüssel|\\{[[:space:]]*\"|[a-zA-Z0-9_+/-]{24,}",
+        std::regex::icase);
+    if (std::regex_search(text, sensitive)) return false;
+    const std::vector<std::string> secrets = {
+        Settings::getDeviceConfig().passCode,
+        Settings::getNetworkConfig().password,
+        Settings::getAttraccessAuthConfig().apiKey,
+    };
+    for (const auto &secret : secrets)
+        if (!secret.empty() && text.find(secret) != std::string::npos) return false;
+    return true;
+}
+
+bool screenshotTreeSafe(lv_obj_t *root)
+{
+    if (!root || lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) return true;
+    if (lv_obj_check_type(root, &lv_label_class) && !screenshotTextSafe(lv_label_get_text(root))) return false;
+    if (lv_obj_check_type(root, &lv_textarea_class) &&
+        (lv_textarea_get_password_mode(root) || !screenshotTextSafe(lv_textarea_get_text(root)))) return false;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        if (!screenshotTreeSafe(lv_obj_get_child(root, i))) return false;
+    return true;
+}
+
+bool screenshotSafe()
+{
+    const auto screen = screenName();
+    return screen != "settings" && screen != "set-pin" &&
+        screenshotTreeSafe(lv_screen_active()) && screenshotTreeSafe(lv_layer_top()) &&
+        screenshotTreeSafe(lv_layer_bottom()) && screenshotTreeSafe(lv_layer_sys());
 }
 
 bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::filesystem::path &screenshots)
@@ -190,6 +233,7 @@ bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::file
     else if (action == "snapshot")
     {
         lv_refr_now(nullptr);
+        if (!screenshotSafe()) return false;
         return simulator.display().saveDisplayScreenshot(screenshots / (text + ".png"));
     }
     else if (action == "reconnect")

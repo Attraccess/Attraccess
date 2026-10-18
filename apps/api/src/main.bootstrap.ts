@@ -191,10 +191,9 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
 })
 class PluginBootstrapConfigModule {}
 
-async function closeAfterStartupFailure(
-  app: { close(): Promise<void>; get?(token: typeof DataSource): DataSource },
-  logger: Logger,
-): Promise<void> {
+type OwnedApplication = { close(): Promise<void>; get?(token: typeof DataSource): DataSource };
+
+async function closeOwnedApplication(app: OwnedApplication, logger: Logger): Promise<void> {
   // Capture ownership before closing: an earlier shutdown hook may throw before
   // TypeORM's hook runs, and the application may no longer allow provider lookup.
   let database: DataSource | undefined;
@@ -205,13 +204,20 @@ async function closeAfterStartupFailure(
   }
   try {
     await app.close();
+  } finally {
+    try {
+      if (database?.isInitialized) await database.destroy();
+    } catch (cleanupError) {
+      logger.error('Database cleanup failed during application closure', cleanupError);
+    }
+  }
+}
+
+async function closeAfterStartupFailure(app: OwnedApplication, logger: Logger): Promise<void> {
+  try {
+    await closeOwnedApplication(app, logger);
   } catch (cleanupError) {
     logger.error('Application cleanup failed after startup failure', cleanupError);
-  }
-  try {
-    if (database?.isInitialized) await database.destroy();
-  } catch (cleanupError) {
-    logger.error('Database cleanup failed after startup failure', cleanupError);
   }
 }
 
@@ -300,7 +306,7 @@ export async function bootstrap() {
     await closeAfterStartupFailure(appForConfig, bootstrapLogger);
     throw error;
   }
-  await appForConfig.close();
+  await closeOwnedApplication(appForConfig, bootstrapLogger);
   // AppModule is constructed again below. Plugin providers in that application
   // must not receive repositories from the closed configuration DataSource.
   PluginModule.resetHostReferences();

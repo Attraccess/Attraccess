@@ -73,4 +73,59 @@ int main()
     lv_obj_add_state(disabled, LV_STATE_DISABLED);
     assert(findText("Disabled control") == nullptr);
     std::cout << "PASS duplicate, hidden and disabled targets rejected\n";
+
+    command["action"] = "snapshot";
+    command["text"] = "capture";
+    const auto capture = profile / "capture.png";
+    const auto refused = [&] {
+        std::filesystem::remove(capture);
+        assert(!execute(command, simulator, profile));
+        assert(!std::filesystem::exists(capture));
+    };
+    const auto accepted = [&] {
+        assert(execute(command, simulator, profile));
+        assert(std::filesystem::file_size(capture) > 0);
+    };
+    accepted();
+    auto *content = lv_obj_create(screen);
+    for (int i = 0; i < 70; ++i) label(content, "Safe label");
+    auto *secret = lv_label_create(content);
+    lv_label_set_text(secret, "password: hidden-secret");
+    // Direct capture must inspect the full tree/text, including disabled widgets.
+    lv_obj_add_state(content, LV_STATE_DISABLED);
+    refused();
+    lv_obj_add_flag(content, LV_OBJ_FLAG_HIDDEN);
+    accepted();
+    lv_obj_delete(content);
+    secret = lv_label_create(screen);
+    std::string longText;
+    for (int i = 0; i < 40; ++i) longText += "Safe text ";
+    lv_label_set_text(secret, (longText + "password: hidden-secret").c_str());
+    refused();
+    lv_obj_delete(secret);
+    secret = lv_label_create(lv_layer_top());
+    lv_label_set_text(secret, "Authorization: bearer-secret");
+    refused();
+    lv_obj_delete(secret);
+    auto *input = lv_textarea_create(screen);
+    lv_textarea_set_password_mode(input, true);
+    lv_textarea_set_text(input, "masked-secret");
+    refused();
+    lv_obj_delete(input);
+    secret = lv_label_create(screen);
+    lv_label_set_text(secret, Settings::getDeviceConfig().passCode.c_str());
+    refused();
+    lv_obj_delete(secret);
+    Display::setPinScreen.init();
+    lv_screen_load(Display::setPinScreen.getScreen());
+    refused();
+    assert(screenName() == "set-pin");
+    Display::connectionConfigurationScreen.init();
+    lv_screen_load(Display::connectionConfigurationScreen.getScreen());
+    refused();
+    assert(screenName() == "settings");
+    lv_screen_load(screen);
+    accepted();
+    std::cout << "PASS direct captures reject sensitive screens and untruncated visible content\n";
+
 }
