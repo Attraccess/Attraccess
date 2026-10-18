@@ -1,3 +1,4 @@
+import { runtimeVersion } from '../../../cc100-runtime/manifest.json';
 import { BuildRuntimeArtifact } from '../artifacts/build';
 import {
   ManagedRuntimeUpdateHost,
@@ -97,6 +98,33 @@ describe('durable managed runtime reconciliation', () => {
       owners = value;
     },
   };
+
+  it('upgrades an installation running the main-branch 0.2.7 runtime to the hardened release', async () => {
+    desired = { ...desired, manifest: { ...desired.manifest, runtimeVersion } };
+    host.inspect.mockResolvedValue({
+      imageId: release('a').imageId,
+      runtimeVersion: '0.2.7',
+      managed: true,
+      claimed: true,
+      compatible: true,
+      online: true,
+    });
+
+    await coordinator.reconcile(1);
+
+    expect(host.activate).toHaveBeenCalledWith(
+      1,
+      expect.any(String),
+      expect.objectContaining({ imageId: desired.imageId }),
+      expect.any(AbortSignal),
+    );
+    expect(rows.get(1)).toMatchObject({
+      phase: 'current',
+      previousRuntimeVersion: '0.2.7',
+      desiredRuntimeVersion: runtimeVersion,
+      desiredImageId: desired.imageId,
+    });
+  });
 
   it('updates immediately when a fresh heartbeat contradicts a current checkpoint', async () => {
     await coordinator.reconcile(1);

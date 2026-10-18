@@ -33,7 +33,22 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },
       ]);
     }
-    if (desired && Object.prototype.hasOwnProperty.call(desired, 'runtimeImageId')) {
+    const hasRuntimePolicy = desired && Object.prototype.hasOwnProperty.call(desired, 'runtimeImageId');
+    // A combined message must be valid before policy can change readiness or outputs.
+    // Policy-only messages still use the authenticated configuration ACL.
+    if (!hasRuntimePolicy || Object.prototype.hasOwnProperty.call(desired, 'snapshot')) {
+      const errors = validateDesired(desired);
+      if (!errors.length && desired.contentHash !== hash(desired.snapshot))
+        errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
+      if (!errors.length) errors.push(...(this.options.device.validate?.(desired.snapshot) ?? []));
+      if (errors.length)
+        return this.reportRejected(
+          Number.isSafeInteger(desired?.revision) ? desired.revision : 0,
+          typeof desired?.contentHash === 'string' ? desired.contentHash : '',
+          errors,
+        );
+    }
+    if (hasRuntimePolicy) {
       if (typeof desired.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(desired.runtimeImageId))
         return this.rejectRuntimeMessage('validation');
       if (this.options.runtimeImageId && desired.runtimePolicyToken !== this.runtimePolicyToken)
@@ -47,16 +62,6 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
     if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return this.rejectRuntimeMessage('validation');
     await this.runConfigurationUpdate(async () => {
       if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return this.rejectRuntimeMessage('validation');
-      const errors = validateDesired(desired);
-      if (!errors.length && desired.contentHash !== hash(desired.snapshot))
-        errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
-      if (!errors.length) errors.push(...(this.options.device.validate?.(desired.snapshot) ?? []));
-      if (errors.length)
-        return this.reportRejected(
-          Number.isSafeInteger(desired?.revision) ? desired.revision : 0,
-          typeof desired?.contentHash === 'string' ? desired.contentHash : '',
-          errors,
-        );
       if (
         this.state.accepted?.revision === desired.revision &&
         this.state.accepted.contentHash === desired.contentHash
