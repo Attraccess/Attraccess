@@ -435,6 +435,9 @@ describe('desktop simulator against an isolated real API', () => {
         expect(usage.resourceId).toBe(resource.id);
         expect(usage.endTime).toBeNull();
         await desktop().text('Freigegeben!');
+        const confirmation = await desktop().command('inspect');
+        expect(confirmation.labels).toContain('Aufsicht bestätigt');
+        expect(confirmation.labels).not.toContain('Aufsichts-Karte auflegen');
         await desktop().snapshot('supervision-approved');
       } finally {
         // Always consume the bounded HTTP request, including if a screen assertion fails.
