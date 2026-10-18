@@ -16,6 +16,7 @@ export enum AttractapEventType {
   READER_UNAUTHORIZED = 'READER_UNAUTHORIZED',
   READER_REQUEST_AUTHENTICATION = 'READER_REQUEST_AUTHENTICATION',
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
+  READER_LANGUAGE = 'READER_LANGUAGE',
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
   READER_CRASH_REPORT = 'READER_CRASH_REPORT',
@@ -135,6 +136,7 @@ export interface ResourceUsageFormCancelPayload {
 export interface ResourceUsageFormPageErrorPayload {
   fieldId: number;
   message: string;
+  code?: string;
 }
 
 export interface ResourceUsageFormPageResultPayload {
@@ -163,6 +165,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   sendBinaryData: (data: Buffer) => void;
   state: {
     verifiedCardOperation?: { handle: string; binding: CardOperationBinding };
+    /** Only the latest reader authentication attempt may restore its identity. */
+    readerAuthenticationAttempt?: symbol;
     lastAuthenticatedUserId: number | null;
     enrollment: {
       userId: number;

@@ -58,3 +58,8 @@ export interface FirmwareUpdateResponse {
   max_attempts?: number;
   bytes_received_before_timeout?: number;
 }
+
+/** Build the heartbeat reply with the same clock sample as authentication. */
+export function readerHeartbeat(): string {
+  return JSON.stringify({ event: 'HEARTBEAT', serverTime: readerServerTime() });
+}

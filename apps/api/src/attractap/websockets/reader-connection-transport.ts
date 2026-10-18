@@ -1,9 +1,21 @@
+import { AttractapEventType } from './websocket.types';
 import { Duplex } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import { TLSSocket } from 'node:tls';
 import { WebSocket } from 'ws';
 import { AttractapReaderIdentity } from '@attraccess/database-entities';
 import { encodeReaderFrame, ReaderFrameDecoder, ReaderFrameType, READER_LIMITS } from './reader-frame';
+
+// Legacy credentials allow firmware maintenance and display defaults only.
+export const LEGACY_READER_OUTPUT = new Set([
+  AttractapEventType.READER_LANGUAGE,
+  AttractapEventType.READER_REGISTER,
+  AttractapEventType.READER_UNAUTHORIZED,
+  AttractapEventType.READER_REQUEST_AUTHENTICATION,
+  AttractapEventType.READER_AUTHENTICATED,
+  AttractapEventType.READER_FIRMWARE_INFO,
+  AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED,
+]);
 
 export interface ProtectedReaderConnection {
   identity: AttractapReaderIdentity;

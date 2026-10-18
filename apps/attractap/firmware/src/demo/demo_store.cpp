@@ -1,6 +1,7 @@
 #ifdef DEMO_MODE
 
 #include "demo_store.hpp"
+#include "../state/state.hpp"
 #include <ArduinoJson.h>
 #include <cstring>
 
@@ -125,12 +126,13 @@ const DemoStore::DemoResource &DemoStore::getResource(uint8_t i) { return _resou
 
 const char *DemoStore::roleName(UserRole role)
 {
+    const bool english = State::getActiveLanguage() == "en";
     switch (role)
     {
-    case UserRole::NO_PERMISSION: return "Kein Zugang";
-    case UserRole::INTRODUCED:    return "Eingewiesen";
+    case UserRole::NO_PERMISSION: return english ? "No access" : "Kein Zugang";
+    case UserRole::INTRODUCED:    return english ? "Introduced" : "Eingewiesen";
     case UserRole::ADMIN:         return "Admin";
-    default:                      return "Unbekannt";
+    default:                      return english ? "Unknown" : "Unbekannt";
     }
 }
 

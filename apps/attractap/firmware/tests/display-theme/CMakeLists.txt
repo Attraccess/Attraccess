@@ -48,6 +48,7 @@ add_executable(display-theme-host
     background_and_list.cpp
     wall_clock.cpp
     resource_details.cpp
+    demo_form_options.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"
     "${FIRMWARE_DIR}/src/display/theme.cpp"
@@ -59,6 +60,8 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/demoSettings/demoSettingsScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/firmwareUpdate/firmwareUpdateScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsSession.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjects.cpp"
@@ -68,6 +71,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/fields.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/editor.cpp"
     ${ATTRACTAP_LATIN1_FONTS}
+    "${FIRMWARE_DIR}/src/display/shared/powerOff/powerOffButton.cpp"
     "${FIRMWARE_DIR}/src/display/shared/pinInput/pinInputPage.cpp")
 target_include_directories(display-theme-host PRIVATE shims "${FIRMWARE_DIR}/src")
 target_compile_definitions(display-theme-host PRIVATE
@@ -75,6 +79,7 @@ target_compile_definitions(display-theme-host PRIVATE
     FIRMWARE_VERSION="test"
     PIN_ETH_SPI_CS=1
     DEMO_MODE=1
+    HAS_POWER_BUTTON=1
     LOGGER_LEVEL_NUM=0)
 target_compile_options(display-theme-host PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")
@@ -83,13 +88,16 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(display-theme-host PRIVATE m)
 endif()
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 enable_testing()
+add_test(NAME localization-audit COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/audit_localization.py")
+add_test(NAME localization-audit-tests COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_localization_audit.py")
 add_test(NAME display-theme-host COMMAND display-theme-host)
 add_test(NAME display-theme-repeatability COMMAND "${CMAKE_COMMAND}"
     "-DHARNESS=$<TARGET_FILE:display-theme-host>"
     "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/repeatability"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_repeatability.cmake")
-set_tests_properties(display-theme-host display-theme-repeatability PROPERTIES TIMEOUT 120)
+set_tests_properties(display-theme-host display-theme-repeatability PROPERTIES TIMEOUT 330)
 
 # Exercise the production introducer parser with real ArduinoJson, not JSON shims.
 include(FetchContent)

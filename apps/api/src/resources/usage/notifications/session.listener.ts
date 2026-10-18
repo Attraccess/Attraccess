@@ -27,10 +27,10 @@ export class ResourceSessionNotificationListener {
       },
       url: `/resources/${event.resource.id}`,
       severity: 'warning',
-      sendEmail: (recipient) =>
+      sendEmail: (recipient, language) =>
         this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_TAKEOVER, {
           resource: { id: event.resource.id, name: event.resource.name },
-          takeover: { actorName: newUserUsername ?? t(recipient.locale, 'fallbackUser') },
+          takeover: { actorName: newUserUsername ?? t(language, 'fallbackUser') },
         }),
     });
   }
@@ -62,13 +62,13 @@ export class ResourceSessionNotificationListener {
       url: `/resources/${resource.id}`,
       severity: 'warning',
       dedupeKey: `resource_session_ended:${event.usage.id}`,
-      sendEmail: (r) =>
+      sendEmail: (r, language) =>
         this.notifications.sendEmailTemplate(r, NotificationCategory.RESOURCE_SESSION_ENDED, {
           resource: { id: resource.id, name: resource.name },
           session: {
             id: event.usage.id,
             endedAt: event.usage.endTime,
-            endedBy: endedByUsername ?? t(r.locale, 'fallbackSystem'),
+            endedBy: endedByUsername ?? t(language, 'fallbackSystem'),
           },
         }),
     });

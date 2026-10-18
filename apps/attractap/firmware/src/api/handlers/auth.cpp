@@ -1,3 +1,4 @@
+#include "../../state/language.hpp"
 // Reader registration, authentication, and device-name handshake handlers
 // FEATURE: api-auth
 
@@ -51,6 +52,7 @@ void API::onUnauthorized(JsonObject data)
     }
 
     logger.error(("UNAUTHORIZED: " + message).c_str());
+    State::setApiState(false, "");
     Settings::clearAttraccessAuthConfig();
 
     this->sendMessage("READER_REGISTER", JsonObject());
@@ -138,9 +140,11 @@ void API::onReaderAuthenticated(JsonObject data)
     cancelResourceAction();
 
     std::string deviceName = data["payload"]["name"].as<std::string>();
+    const char *language = data["payload"]["language"].as<const char *>();
     this->onServerTime(data["payload"]["serverTime"]);
 
-    State::setApiState(true, deviceName);
+    State::setApiState(true, deviceName, Language::supported(language ? language : "en"));
+    if (language) Settings::saveDefaultLanguage(language);
 
     if (this->deviceNameCallback != nullptr)
     {

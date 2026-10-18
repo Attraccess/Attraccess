@@ -83,7 +83,10 @@ beforeEach(() => {
   state.needsTwoFactorSetup = false;
   Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1200 });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 it('renders unauthenticated content with server status and disables live subscriptions', () => {
   state.authenticated = false;
   open();
@@ -124,4 +127,29 @@ it('refreshes billing data on live updates and gates subscriptions during two-fa
   expect(screen.getByText('Messaging false')).toBeTruthy();
   expect(screen.getByText('Notifications false')).toBeTruthy();
   expect(screen.getByText('Push false')).toBeTruthy();
+});
+
+it('keeps public navigation usable when the storage getter is unavailable', () => {
+  state.authenticated = false;
+  vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+    throw new DOMException('Storage is blocked', 'SecurityError');
+  });
+  open();
+  expect(screen.getByText('Page contents')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Navigate' }));
+  expect(screen.getByText('Page contents')).toBeTruthy();
+});
+it('keeps sidebar collapse usable in memory when storage reads and writes fail', () => {
+  vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+    throw new DOMException('Storage read is blocked', 'SecurityError');
+  });
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new DOMException('Storage write is blocked', 'QuotaExceededError');
+  });
+  open();
+  expect(screen.getByText('Sidebar open expanded')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse' }));
+  expect(screen.getByText('Sidebar open collapsed')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse' }));
+  expect(screen.getByText('Sidebar open expanded')).toBeTruthy();
 });

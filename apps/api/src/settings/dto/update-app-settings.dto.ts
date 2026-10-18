@@ -1,10 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, MinLength, ValidateIf } from 'class-validator';
 
 /** Allow URLs without TLD (e.g. http://localhost:3000) for development. */
 const urlOptions = { require_tld: false };
 
 export class UpdateAppSettingsDto {
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(['en', 'de'])
+  @ApiPropertyOptional({ description: 'Default language used throughout the system', enum: ['en', 'de'] })
+  defaultLanguage?: 'en' | 'de';
+
   @IsOptional()
   @IsUrl(urlOptions)
   @ApiPropertyOptional({

@@ -43,12 +43,22 @@ void testBackgroundScreens(Renderer &renderer)
         expect(lv_obj_get_style_text_font(resourceName, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
                "Lockscreen resource name uses a Latin-1 font");
         expectBackground(renderer, guard.root, "lockscreen-available");
+        Fixtures::activeLanguage = "en";
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Tap your RFID \n        card/tag to sign in");
+        requireObject(guard.root, &lv_label_class, "Available");
+        renderer.capture("lockscreen-english-available");
         lock.setUsageInfo(true, "Müller", false);
-        auto *usage = requireObject(guard.root, &lv_label_class, "In Verwendung: Müller");
+        auto *usage = requireObject(guard.root, &lv_label_class, "In use: Müller");
         expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
                "Lockscreen active username uses a Latin-1 font");
-        expectBackground(renderer, guard.root, "lockscreen-in-use");
         lock.setUsageInfo(false, "", true);
+        requireObject(guard.root, &lv_label_class, "Under maintenance");
+        Fixtures::activeLanguage = "de";
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Bitte mit RFID \n        Karte/Tag anmelden");
+        requireObject(guard.root, &lv_label_class, "In Wartung");
+        expectBackground(renderer, guard.root, "lockscreen-in-use");
         expectBackground(renderer, guard.root, "lockscreen-maintenance");
     }
     {
@@ -85,12 +95,12 @@ void testAuthenticatedList(Renderer &renderer)
     API::ResourceList resources{};
     resources.count = 4;
     std::strcpy(resources.authenticatedUsername, "Alex Example");
-    const char *names[] = {"Lasercutter", "CNC Fräse", "Werkstatttür", "3D Drucker"};
+    const char *names[] = {"Lasercutter", "Maintenance", "Werkstatttür", "3D Drucker"};
     for (int i = 0; i < 4; ++i) {
         auto &resource = resources.items[i];
         resource.id = i + 1;
         std::strcpy(resource.name, names[i]);
-        resource.description = "Werkstatt";
+        resource.description = i == 1 ? "Maintenance" : "Werkstatt";
         resource.isHealthy = true;
         resource.accessKnown = true;
         resource.hasIntroduction = true;
@@ -139,13 +149,13 @@ void testAuthenticatedList(Renderer &renderer)
     click("Stop"); expect(acted == 2 && action == ResourceListAction::Stop, "Stop targets its exact row");
     click("Öffnen"); expect(acted == 3 && action == ResourceListAction::OpenDoor, "Door action targets its exact row");
     click("Einweisung"); expect(acted == 3, "Missing introduction blocks a direct event too");
-    list.showActionProgress("Nutzung wird gestartet", "Lasercutter");
+    list.showActionProgress(FirmwareI18n::Message::StartingUsage, FirmwareI18n::Text::literal("Lasercutter"));
     list.setSessionTimeoutPaused(true);
     renderer.capture("att-880-action-pending");
     auto *overlay = lv_obj_get_child(guard.root, -1);
     lv_area_t area; lv_obj_get_coords(overlay, &area);
     expect(area.x1 == 0 && area.y1 == 0 && area.x2 == 479 && area.y2 == 479, "Loading overlay covers the entire input surface");
-    click("Start"); click("CNC Fräse"); click("Abmelden");
+    click("Start"); click("Maintenance"); click("Abmelden");
     expect(acted == 3 && opened == 1 && logouts == 0, "Pending action blocks actions, navigation and logout");
     Fixtures::nowMs += 45000;
     list.loop();
@@ -157,7 +167,7 @@ void testAuthenticatedList(Renderer &renderer)
     resources.items[0].hasActiveUsage = true;
     std::strcpy(resources.items[0].activeUser, "Alex Example");
     list.setResourceList(resources);
-    list.showSuccessToast("Nutzung gestartet");
+    list.showSuccessToast(FirmwareI18n::Message::UsageStarted);
     renderer.capture("att-880-action-complete");
     resources.items[0].hasActiveUsage = false;
     resources.items[0].requiresSupervisor = true;

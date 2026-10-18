@@ -1,5 +1,8 @@
-import { protectedReaderConnection } from './reader-connection-transport';
+import { broadcastReaderLanguage, canReceiveReaderLanguage, sanitizeForLVGL } from './reader-display';
+import { LEGACY_READER_OUTPUT, protectedReaderConnection } from './reader-connection-transport';
 import { VerifiedCardSessionService } from '../security/verified-card-session.service';
+import { SettingsService } from '../../settings/settings.service';
+import { OnEvent } from '@nestjs/event-emitter';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 
 import {
@@ -14,7 +17,7 @@ import {
 
 import { Mutex } from 'async-mutex';
 
-import { Server } from 'ws';
+import { Server, WebSocket } from 'ws';
 
 import { LicenseService, LicenseModuleType } from '../../license/license.service';
 
@@ -51,8 +54,7 @@ import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 
 import { WebsocketService } from './websocket.service';
-import { readerServerTime } from './websocket-reader-payloads';
-
+import { readerHeartbeat, readerServerTime } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
 
 import { randomBytes } from 'crypto';
@@ -68,6 +70,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   protected readonly logger = new Logger(AttractapGateway.name);
 
   protected readonly clientResponseAwaitersMutex = new Mutex();
+
+  @Inject(SettingsService)
+  protected settingsService: SettingsService;
 
   @Inject(WebsocketService)
   protected websocketService: WebsocketService;
@@ -189,6 +194,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_LANGUAGE]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
@@ -204,6 +210,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   public async sendResourceList(readerId: number) {
     return this.resourceListService.sendResourceList(readerId);
+  }
+
+  @OnEvent('settings.default-language')
+  async updateReaderLanguage(language: 'en' | 'de') {
+    await broadcastReaderLanguage(this.websocketService, language);
   }
 
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {
@@ -237,65 +248,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     apiTokenId?: number;
   }) {
     return this.cardHandler.startResetOfNfcCard(data);
-  }
-
-  protected makeStringLVGLReady(input: string): string {
-    if (!input) return input;
-
-    // Step 1: Explicit replacements for unsupported punctuation and symbols
-    const explicitReplacements: Array<[RegExp, string]> = [
-      // Common symbols and punctuation
-      [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
-      [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
-      [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
-      [/\u2026/g, '...'], // ellipsis
-      [/\u2022/g, '-'], // bullet -> hyphen
-      [/\u2122/g, 'TM'], // trademark
-    ];
-
-    let output = input;
-    for (const [pattern, replacement] of explicitReplacements) {
-      output = output.replace(pattern, replacement);
-    }
-
-    // The reader's Latin-1 fonts cover printable ASCII plus U+00A0-U+00FF.
-    // Normalize only unsupported code points so existing Latin-1 glyphs survive.
-    return Array.from(output)
-      .map((character) => {
-        if (/^[\n\r\t\x20-\x7E\xA0-\xFF]$/.test(character)) {
-          return character;
-        }
-
-        const fallback = character.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        return /^[\x20-\x7E]*$/.test(fallback) ? fallback : '?';
-      })
-      .join('');
-  }
-
-  protected sanitizeForLVGL<T>(value: T): T {
-    const seen = new WeakSet<object>();
-
-    const sanitize = (v: unknown): unknown => {
-      if (typeof v === 'string') return this.makeStringLVGLReady(v);
-      if (v === null || v === undefined) return v;
-      if (Array.isArray(v)) return v.map((item) => sanitize(item));
-      if (typeof v === 'object') {
-        const obj = v as Record<string, unknown>;
-        if (seen.has(obj)) return obj;
-        seen.add(obj);
-        const out: Record<string, unknown> = {};
-        for (const [k, val] of Object.entries(obj)) {
-          // Select options and draft values are protocol values: changing them
-          // prevents the firmware from submitting the value the API validates.
-          // Object-based options contain display metadata such as placeholders.
-          out[k] = (k === 'options' && Array.isArray(val)) || k === 'value' || k === 'answers' ? val : sanitize(val);
-        }
-        return out;
-      }
-      return v;
-    };
-
-    return sanitize(value) as T;
   }
 
   protected async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
@@ -357,9 +309,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
     try {
-      (socket as unknown as { send: (data: string) => void }).send(
-        JSON.stringify({ event: 'HEARTBEAT', serverTime: readerServerTime() }),
-      );
+      (socket as unknown as { send: (data: string) => void }).send(readerHeartbeat());
     } catch (error) {
       this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
     }
@@ -441,26 +391,38 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     let messageCount = 0;
 
     const connection = protectedReaderConnection(client);
-    const legacyOutput = new Set([
-      AttractapEventType.READER_REGISTER,
-      AttractapEventType.READER_UNAUTHORIZED,
-      AttractapEventType.READER_REQUEST_AUTHENTICATION,
-      AttractapEventType.READER_AUTHENTICATED,
-      AttractapEventType.READER_FIRMWARE_INFO,
-      AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED,
-    ]);
     const sendMessage = async (message: AttractapMessage) => {
-      if (!connection && !legacyOutput.has(message.data.type)) return false;
+      if (!connection && !LEGACY_READER_OUTPUT.has(message.data.type)) return false;
       if (connection && !connection.ready) return false;
       messageCount++;
       message.data.messageId = messageCount;
 
       const RETRY_COUNT = 3;
+      const socket = client as unknown as AuthenticatedWebSocket;
+      const readerId = socket.readerId;
+      const authenticationAttempt = socket.state.readerAuthenticationAttempt;
 
       let lastError: Error | undefined;
 
       for (let i = 0; i < RETRY_COUNT; i++) {
-        const stringifiedMessage = JSON.stringify(connection ? message : this.sanitizeForLVGL(message));
+        // Authentication success and language retries belong to the current open reader connection.
+        if (
+          (message.data.type === AttractapEventType.READER_LANGUAGE ||
+            message.data.type === AttractapEventType.READER_AUTHENTICATED) &&
+          (!canReceiveReaderLanguage(socket) ||
+            socket.readerId !== readerId ||
+            socket.state.readerAuthenticationAttempt !== authenticationAttempt)
+        )
+          return false;
+        // An older auth/update retry must not restore a superseded default.
+        if (
+          (message.data.type === AttractapEventType.READER_AUTHENTICATED ||
+            message.data.type === AttractapEventType.READER_LANGUAGE) &&
+          this.websocketService.readerLanguage !== undefined
+        ) {
+          message.data.payload.language = this.websocketService.readerLanguage;
+        }
+        const stringifiedMessage = JSON.stringify(connection ? message : sanitizeForLVGL(message));
         // The protected facade validates size before writing any envelope bytes.
         // Oversize is deterministic; close without retrying it.
         try {
@@ -529,10 +491,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         client.close();
         return;
       }
+      const storedLanguage = await this.settingsService.getDefaultLanguage();
       (client as unknown as AuthenticatedWebSocket).readerName = reader.name;
       await sendMessage(
         new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
           name: reader.name,
+          language: this.websocketService.readerLanguage ?? storedLanguage,
           serverTime: readerServerTime(),
         }),
       );
@@ -555,6 +519,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
+    // Invalidate asynchronous authentication before waiting on cleanup locks.
+    const readerId = socket.readerId;
+    const readerName = socket.readerName;
+    if (socket.state) socket.state.readerAuthenticationAttempt = Symbol('reader-disconnected');
+    socket.readerId = null;
+    socket.readerName = null;
     const connection = protectedReaderConnection(socket);
     if (connection) this.proofs.cancelConnection(connection.generation);
     for (const awaiter of this.clientResponseAwaiters)
@@ -580,8 +550,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== socket.id);
     });
 
-    const readerId = socket.readerId;
-    const readerName = socket.readerName;
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
       // ponytail: only zero gauge when no other socket for this reader exists —

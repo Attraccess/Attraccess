@@ -1,3 +1,4 @@
+#include "../../demo/demo_localization.hpp"
 #ifdef DEMO_MODE
 
 #include "websocket.hpp"
@@ -198,7 +199,9 @@ void DemoWebsocket::respondAuthenticated()
     StaticJsonDocument<256> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "READER_AUTHENTICATED";
-    doc["data"]["payload"]["name"] = "Demo Gerät";
+    doc["data"]["payload"]["name"] = DemoLocalization::readerName(true);
+    // Keep the standalone demo's unauthenticated screens in English by default.
+    doc["data"]["payload"]["language"] = "en";
     // Demo time is the device's own clock in its configured timezone.
     const time_t now = time(nullptr);
     doc["data"]["payload"]["serverTime"]["epochMs"] = static_cast<int64_t>(now) * 1000;
@@ -209,11 +212,13 @@ void DemoWebsocket::respondAuthenticated()
     if (n > 0)
         enqueue(std::string(buf, n));
 
-    respondResourceList();
+    // These responses are queued before the API applies the authentication locale.
+    respondResourceList(0, "en");
 }
 
-void DemoWebsocket::respondResourceList(uint32_t requestId)
+void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language)
 {
+    const bool english = language ? std::string(language) == "en" : State::getActiveLanguage() == "en";
     StaticJsonDocument<3072> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_LIST";
@@ -221,7 +226,7 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
     doc["data"]["payload"]["revision"] = _resourceListMsgId;
     doc["data"]["payload"]["requestId"] = requestId;
     doc["data"]["payload"]["authenticatedUsername"] = _currentUser;
-    doc["data"]["payload"]["readerName"] = "Demo Gerät";
+    doc["data"]["payload"]["readerName"] = DemoLocalization::readerName(english);
 
     // Introducers = enrolled admin cards (they can introduce others). Shown in
     // the "not introduced" panel when a no-permission card taps a resource.
@@ -241,8 +246,10 @@ void DemoWebsocket::respondResourceList(uint32_t requestId)
         const DemoStore::DemoResource &r = DemoStore::getResource(i);
         JsonObject obj = resources.createNestedObject();
         obj["id"] = r.id;
-        obj["name"] = r.name;
-        obj["description"] = "Demo Ressource";
+        // DemoStore's immutable resources are authored examples, not supplied
+        // server names. Real reader resource names remain literal in the API.
+        obj["name"] = DemoLocalization::resourceName(r.id, english);
+        obj["description"] = english ? "Demo resource" : "Demo Ressource";
         obj["type"] = (r.type == 1) ? "door" : "machine";
         if (!_currentUser.empty()) {
             obj["hasIntroduction"] = _currentHasIntroduction;
@@ -303,12 +310,16 @@ void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resource
     _currentUser = DemoStore::displayName(card);
     _currentCanManage = (card.role == DemoStore::UserRole::ADMIN);
     _currentHasIntroduction = (card.role != DemoStore::UserRole::NO_PERMISSION);
-    respondResourceList();
+    // Demo cardholders use English; publish examples in that locale before the API applies it.
+    respondResourceList(0, "en");
 
     // Always return the factory key (all zeros) — demo cards are never physically enrolled.
     doc["data"]["payload"]["keyNo"] = 0;
     doc["data"]["payload"]["key"] = "00000000000000000000000000000000";
     doc["data"]["payload"]["username"] = DemoStore::displayName(card);
+    // Demo cards represent an English-speaking cardholder so the localized
+    // fixture form is reachable in the normal demo card-authentication flow.
+    doc["data"]["payload"]["language"] = "en";
     doc["data"]["payload"]["canManageResource"] = (card.role == DemoStore::UserRole::ADMIN);
     doc["data"]["payload"]["hasIntroduction"] = (card.role != DemoStore::UserRole::NO_PERMISSION);
     doc["data"]["payload"]["isIntroducer"] = (card.role == DemoStore::UserRole::ADMIN);
@@ -354,9 +365,9 @@ bool DemoWebsocket::cncFormComplete() const
 {
     for (uint32_t i = 0; i < CNC_FIELD_COUNT; i++)
     {
-        if (!CNC_FIELDS[i].required)
+        if (!CNC_FIELDS_DE[i].required)
             continue;
-        auto it = _cncDraft.find(CNC_FIELDS[i].id);
+        auto it = _cncDraft.find(CNC_FIELDS_DE[i].id);
         if (it == _cncDraft.end() || it->second.empty())
             return false;
     }
@@ -370,13 +381,14 @@ void DemoWebsocket::respondFormRequest(uint32_t resourceId)
     doc["data"]["type"] = "RESOURCE_USAGE_FORM_REQUEST";
     doc["data"]["payload"]["requestId"] = _actionRequestId;
     doc["data"]["payload"]["resourceId"] = resourceId;
-    doc["data"]["payload"]["resourceName"] = "CNC Fräse";
+    const bool english = State::getActiveLanguage() == "en";
+    doc["data"]["payload"]["resourceName"] = english ? "CNC mill" : "CNC Fräse";
     doc["data"]["payload"]["action"] = "start";
 
     JsonArray forms = doc["data"]["payload"]["forms"].to<JsonArray>();
     JsonObject form = forms.createNestedObject();
     form["id"] = CNC_FORM_ID;
-    form["name"] = "CNC Einrichtung";
+    form["name"] = english ? "CNC setup" : "CNC Einrichtung";
     form["fieldCount"] = CNC_FIELD_COUNT;
 
     char buf[512];
@@ -400,7 +412,8 @@ void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, u
     // The client fetches a one-field window (MAX_FORM_PAGE_FIELDS == 1).
     if (offset < CNC_FIELD_COUNT)
     {
-        const CncField &f = CNC_FIELDS[offset];
+        const bool english = State::getActiveLanguage() == "en";
+        const CncField &f = (english ? CNC_FIELDS_EN : CNC_FIELDS_DE)[offset];
         JsonObject obj = fields.createNestedObject();
         obj["id"] = f.id;
         obj["name"] = f.name;
@@ -423,7 +436,7 @@ void DemoWebsocket::respondFormFields(uint32_t resourceId, const char *action, u
         }
         else if (strcmp(f.type, "text") == 0)
         {
-            obj["options"]["placeholder"] = "z.B. 2024-042";
+            obj["options"]["placeholder"] = english ? "e.g. 2024-042" : "z.B. 2024-042";
         }
 
         auto draft = _cncDraft.find(f.id);
@@ -477,9 +490,9 @@ void DemoWebsocket::respondFormPageResult(JsonObjectConst data)
         bool required = false;
         for (uint32_t i = 0; i < CNC_FIELD_COUNT; i++)
         {
-            if (CNC_FIELDS[i].id == fieldId)
+            if (CNC_FIELDS_DE[i].id == fieldId)
             {
-                required = CNC_FIELDS[i].required;
+                required = CNC_FIELDS_DE[i].required;
                 break;
             }
         }
@@ -548,7 +561,7 @@ void DemoWebsocket::respondProjects(uint32_t page)
     {
         JsonObject obj = projects.createNestedObject();
         obj["id"] = i + 1;
-        obj["name"] = DEMO_PROJECTS[i];
+        obj["name"] = DemoLocalization::projectName(i, State::getActiveLanguage() == "en");
     }
 
     char buf[1024];

@@ -1,4 +1,5 @@
 #include "api/api.hpp"
+#include "state/state.hpp"
 #include <cassert>
 #include <fstream>
 #include <iostream>
@@ -12,6 +13,8 @@ void Logger::error(const char *) {}
 void Logger::errorf(const char *, ...) {}
 uint8_t Settings::getLedBrightness() { return 128; }
 void Settings::setLedBrightness(uint8_t) {}
+void Settings::saveDefaultLanguage(const std::string &) {}
+void State::setDefaultLanguage(std::string) {}
 #define UNUSED_HANDLER(name) void API::name(JsonObject) {}
 UNUSED_HANDLER(onRegistrationData)
 UNUSED_HANDLER(onUnauthorized)

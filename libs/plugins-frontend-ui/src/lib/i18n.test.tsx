@@ -1,8 +1,15 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { detectAndSetLanguage, useTranslations, useTranslationState } from './i18n';
+import {
+  detectAndSetLanguage,
+  detectLanguage,
+  detectPreferredLanguage,
+  useTranslations,
+  useTranslationState,
+} from './i18n';
 
 beforeEach(() => {
+  useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
   const values = new Map<string, string>();
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => values.get(key) ?? null,
@@ -14,7 +21,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  useTranslationState.setState({ language: 'en' });
+  useTranslationState.setState({ language: 'en', explicitLanguage: undefined });
 });
 it('reports missing nested translation leaves without treating plural objects or arrays as branches', () => {
   vi.stubEnv('NODE_ENV', 'development');
@@ -58,11 +65,69 @@ it('uses English for an unsupported detected locale so host and plugins can stil
 
 it('preserves names in React text and retranslates retained message descriptors', () => {
   const message = { key: 'saved', data: { name: 'R&D <Workshop>' } };
-  const { result } = renderHook(() => useTranslations({
-    en: { saved: 'Saved {{name}}' }, de: { saved: '{{name}} gespeichert' },
-  }, { escapeValues: false }));
+  const { result } = renderHook(() =>
+    useTranslations(
+      {
+        en: { saved: 'Saved {{name}}' },
+        de: { saved: '{{name}} gespeichert' },
+      },
+      { escapeValues: false },
+    ),
+  );
   expect(result.current.tMessage(message)).toBe('Saved R&D <Workshop>');
   act(() => result.current.setLanguage('de'));
   expect(result.current.tMessage(message)).toBe('R&D <Workshop> gespeichert');
   expect(result.current.tMessage('Literal server error')).toBe('Literal server error');
+});
+
+it('does not persist detected fallbacks, and honors supported browser and stored choices', () => {
+  vi.stubGlobal('navigator', { language: 'fr', languages: ['fr'] });
+  vi.stubGlobal('sessionStorage', { getItem: () => null });
+  detectAndSetLanguage();
+  expect(localStorage.getItem('language')).toBeNull();
+  expect(detectLanguage('de')).toBe('de');
+  vi.stubGlobal('navigator', { language: 'fr', languages: ['fr', 'en-GB'] });
+  expect(detectLanguage('de')).toBe('en');
+  localStorage.setItem('language', 'de');
+  expect(detectLanguage('en')).toBe('de');
+});
+
+it('retains an explicit choice in memory when both browser stores are inaccessible', () => {
+  vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US'] });
+  const blocked = {
+    getItem: () => {
+      throw new Error('Storage unavailable');
+    },
+    setItem: () => {
+      throw new Error('Storage unavailable');
+    },
+  };
+  vi.stubGlobal('localStorage', blocked);
+  vi.stubGlobal('sessionStorage', blocked);
+  useTranslationState.getState().setLanguage('de');
+  expect(detectLanguage('en')).toBe('de');
+});
+
+it.each(['getter', 'getItem'] as const)('uses the session language when the local storage %s throws', (failure) => {
+  vi.stubGlobal('navigator', { language: 'en-US', languages: ['en-US'] });
+  vi.stubGlobal('sessionStorage', { getItem: () => 'de' });
+  const unavailable = () => {
+    throw new Error('Storage unavailable');
+  };
+  if (failure === 'getter') vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(unavailable);
+  else vi.stubGlobal('localStorage', { getItem: unavailable });
+
+  expect(detectPreferredLanguage()).toBe('de');
+  expect(detectLanguage('en')).toBe('de');
+  detectAndSetLanguage();
+  expect(useTranslationState.getState().language).toBe('de');
+  expect(useTranslationState.getState().explicitLanguage).toBeUndefined();
+});
+
+it('keeps memory and local choices ahead of the session language', () => {
+  vi.stubGlobal('sessionStorage', { getItem: () => 'de' });
+  localStorage.setItem('language', 'en');
+  expect(detectPreferredLanguage()).toBe('en');
+  useTranslationState.setState({ explicitLanguage: 'de' });
+  expect(detectPreferredLanguage()).toBe('de');
 });

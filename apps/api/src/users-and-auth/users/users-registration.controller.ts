@@ -78,7 +78,7 @@ export class UsersRegistrationController {
   })
   async createOne(@Body() body: CreateUserDto, @Req() req: Request): Promise<User> {
     const acceptLanguage = req.headers['accept-language'];
-    const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || 'en';
+    const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || undefined;
     const user = await this.registrationService.createOne(body, locale);
     await this.identityAudit?.record({
       action: 'user_created',

@@ -1,22 +1,27 @@
 #pragma once
 
 #include "../../clock/wall_clock.hpp"
+#include "../messages.hpp"
 #include <cstdio>
 #include <string>
 
-// German wall-clock formatting for the idle screens.
+// Localized date captions and language-neutral clock values for idle screens.
 namespace WallClockText
 {
-    inline const char *weekday(const WallClock::LocalTime &time)
+    inline FirmwareI18n::Message weekday(const WallClock::LocalTime &time)
     {
-        static const char *names[] = {"Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"};
+        using FirmwareI18n::Message;
+        static constexpr Message names[] = {Message::Sunday, Message::Monday, Message::Tuesday,
+            Message::Wednesday, Message::Thursday, Message::Friday, Message::Saturday};
         return names[time.weekday % 7];
     }
 
-    inline const char *month(const WallClock::LocalTime &time)
+    inline FirmwareI18n::Message month(const WallClock::LocalTime &time)
     {
-        static const char *names[] = {"Januar", "Februar", "März", "April", "Mai", "Juni",
-                                      "Juli", "August", "September", "Oktober", "November", "Dezember"};
+        using FirmwareI18n::Message;
+        static constexpr Message names[] = {Message::January, Message::February, Message::March,
+            Message::April, Message::May, Message::June, Message::July, Message::August,
+            Message::September, Message::October, Message::November, Message::December};
         return names[(time.month + 11) % 12];
     }
 
@@ -28,11 +33,13 @@ namespace WallClockText
         return text;
     }
 
-    // "10. Oktober" or "10. Oktober 2026"
-    inline std::string date(const WallClock::LocalTime &time, bool withYear)
+    inline FirmwareI18n::Text date(const WallClock::LocalTime &time, bool withYear)
     {
-        std::string text = std::to_string(time.day) + ". " + month(time);
-        return withYear ? text + " " + std::to_string(time.year) : text;
+        using namespace FirmwareI18n;
+        const auto caption = Text::format(Message::ClockDate,
+            {FirmwareI18n::Text::literal(std::to_string(time.day)) /* i18n-data: Calendar day number within a localized date caption. */, month(time)});
+        return withYear ? Text::format(Message::ClockDateWithYear,
+            {caption, FirmwareI18n::Text::literal(std::to_string(time.year)) /* i18n-data: Calendar year number within a localized date caption. */}) : caption;
     }
 
     // Changes once per minute; -1 while the time is unknown.

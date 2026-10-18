@@ -1,3 +1,4 @@
+#include "../i18n.hpp"
 #pragma once
 
 #include "../fonts/attractap_fonts.hpp"
@@ -6,7 +7,7 @@
 // Owned by a screen; covers its complete input area while a request is pending.
 class ActionOverlay {
 public:
-    void show(lv_obj_t *screen, const char *title, const char *resource) {
+    void show(lv_obj_t *screen, const FirmwareI18n::Text &title, const FirmwareI18n::Text &resource) {
         if (!screen) return;
         if (!root) {
             root = lv_obj_create(screen);
@@ -43,8 +44,8 @@ public:
             lv_obj_align(description, LV_ALIGN_TOP_MID, 0, 112);
             lv_label_set_long_mode(description, LV_LABEL_LONG_DOT);
         }
-        lv_label_set_text(heading, title ? title : "Bitte warten");
-        lv_label_set_text(description, resource ? resource : "");
+        FirmwareI18n::setLabel(heading, title.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseWait) : title);
+        FirmwareI18n::setLabel(description, resource);
         lv_obj_remove_flag(root, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(root);
     }

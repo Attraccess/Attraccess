@@ -50,6 +50,9 @@ describe('registered reader identity', () => {
   });
 });
 
+// Each lifecycle case creates and migrates a real database before exercising issuance.
+jest.setTimeout(60_000);
+
 describe('persisted reader lifecycle boundaries', () => {
   let fixture: ReturnType<typeof readerSecurityFixture>;
   let source: DataSource;

@@ -1,3 +1,8 @@
+#include "display/screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#include "display/shared/powerOff/powerOffButton.hpp"
+#include "display/screens/demoSettings/demoSettingsScreen.hpp"
+#include "state/language.hpp"
+#include "display/i18n.hpp"
 #pragma once
 #include "display/theme.hpp"
 #include "display/fonts/attractap_fonts.hpp"
@@ -231,3 +236,11 @@ void testWallClock(Renderer &renderer);
 void testAuthenticatedList(Renderer &renderer);
 void testUsageStatsExpiry(Renderer &renderer);
 void testIntroducerDetails(Renderer &renderer);
+
+void testDemoFixtureLocales(Renderer &renderer);
+void testDemoResourceListLocales(Renderer &renderer);
+void testCatalogLocales(Renderer &renderer);
+void testPowerOffLocales(Renderer &renderer);
+void testFormAndProjectLocaleRefresh(Renderer &renderer);
+void testDemoMaterialCaptions(Renderer &renderer);
+void testFirmwareUpdateLocales(Renderer &renderer);

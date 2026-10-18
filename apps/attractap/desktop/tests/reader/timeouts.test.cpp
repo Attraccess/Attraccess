@@ -3,6 +3,7 @@
 
 void ReaderWorkflow::testTimeouts()
 {
+        server.push("READER_LANGUAGE", R"({"language":"en"})"); pump();
         login();
         const auto stopsBeforeTimeout = server.count("STOP_RESOURCE_USAGE_SESSION");
         const auto loginUtc = time(nullptr);
@@ -11,7 +12,9 @@ void ReaderWorkflow::testTimeouts()
         assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
         TestClock::set(loginUtc - 86400); // backward correction must not extend expiry
         pump(31050);
-        assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
+        assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
+        server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
         assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeTimeout);
         std::cout << "PASS idle login expiry preserves running usage" << std::endl;
         active = false; login(); click("Start");
@@ -20,11 +23,11 @@ void ReaderWorkflow::testTimeouts()
         assert(label(lv_screen_active(), "Pausiert"));
         // An unconfirmed action gets a fresh 30-second status-refresh window.
         pump(30500);
-        assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         assert(label(lv_screen_active(), "Status wird geladen"));
         assert(label(lv_layer_top(), "Aktion nicht bestätigt"));
         Display::hidePopup(); active = true; list();
-        assert(lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         std::cout << "PASS action pauses the real 30-second login timeout" << std::endl;
         click("Abmelden");
         nfc.setPresent(0, true); pump(); nfc.setPresent(0, false); pump();
@@ -34,7 +37,7 @@ void ReaderWorkflow::testTimeouts()
         server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})"); pump();
         pump(31050);
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-        assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+        assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         assert(label(lv_layer_top(), "Anmeldung fehlgeschlagen"));
         std::cout << "PASS lifted card authentication expires and recovers" << std::endl;
-}
+    }

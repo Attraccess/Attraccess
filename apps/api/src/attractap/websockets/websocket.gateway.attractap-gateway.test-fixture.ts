@@ -7,6 +7,8 @@ import { ProtectedReaderSocket } from './reader-connection-transport';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditService } from '../../audit/audit.service';
+import { SettingsService } from '../../settings/settings.service';
+
 import { BillingService } from '../../billing/charges/billing.service';
 import { SumUpService } from '../../billing/sumup/sumup.service';
 import { LicenseService } from '../../license/license.service';
@@ -48,6 +50,7 @@ import { VerifiedCardSessionService } from '../security/verified-card-session.se
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
+  attractapReaderConnected: { set: jest.fn() },
   attractapNfcTapsTotal: { inc: jest.fn() },
   attractapFirmwareUpdatesTotal: { inc: jest.fn() },
 };
@@ -100,7 +103,6 @@ export function registerAttractapGatewayFixture() {
   let websocketService: WebsocketService;
 
   let licenseService: { verifyLicense: jest.Mock };
-
   let attractapService: { updateLastReaderConnection: jest.Mock; findReaderById: jest.Mock };
 
   beforeEach(async () => {
@@ -140,6 +142,7 @@ export function registerAttractapGatewayFixture() {
         { provide: SupervisionService, useValue: {} },
         { provide: RbacService, useValue: {} },
         { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
+        { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
         { provide: getRepositoryToken(Resource), useValue: {} },
         ResourceListService,
         ResourceActionGuard,

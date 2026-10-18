@@ -67,6 +67,8 @@ spec.loader.exec_module(builder)
 builder.FIRMWARE_DIR = sys.argv[2]
 builder.find_idf_export = lambda: None
 builder.shutil.which = lambda command: None
+# Only the builder's arguments belong to its CLI parser.
+sys.argv = ['build_firmwares.py']
 builder.main()
 `;
     const result = spawnSync(

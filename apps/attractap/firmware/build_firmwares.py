@@ -206,7 +206,10 @@ def main():
 
     generate_certificates(python_cmd)
 
-    active_variants = args.variants or [name for name in known_variants if not (args.production and 'demo' in name)]
+    default_variants = known_variants if args.production else [
+        "attractap-touch", "attractap-touch-v2", "attractap-touch-demo", "attractap-touch-v2-demo",
+    ]
+    active_variants = args.variants or [name for name in default_variants if not (args.production and 'demo' in name)]
     if args.production and any('demo' in name for name in active_variants):
         parser.error('Demo variants cannot use the production profile')
     variants = [(name, os.path.join("variants", name + ".cmake")) for name in active_variants]
