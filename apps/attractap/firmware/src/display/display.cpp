@@ -1,5 +1,6 @@
 #include "display.hpp"
 #include "theme.hpp"
+#include "i18n.hpp"
 #include <vector>
 #include <string>
 #include <functional>
@@ -31,6 +32,22 @@
 //   display_popups.cpp  - global overlay popups
 //   display_overlay.cpp - persistent device-info overlay
 
+static std::string s_renderedLanguage;
+
+void Display::refreshVisibleTextForLanguageChange()
+{
+    const std::string language = State::getActiveLanguage();
+    if (language == s_renderedLanguage) return;
+    s_renderedLanguage = language;
+    if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
+    FirmwareI18n::refreshTree(Display::activePopup, language);
+    FirmwareI18n::refreshTree(Display::drawerPanel, language);
+    FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
+    // Project and form dialogs live on LVGL's top layer, outside the active
+    // screen tree. Refreshing the layer reaches those open dialogs as well.
+    FirmwareI18n::refreshTree(lv_layer_top(), language);
+}
+
 // Static member definitions
 Logger Display::logger("Display");
 uint32_t Display::screenWidth = 0;
@@ -38,7 +55,7 @@ uint32_t Display::screenHeight = 0;
 IDisplayDriver *Display::driver = nullptr;
 lv_display_t *Display::disp = NULL;
 lv_indev_t *Display::indev = NULL;
-std::string Display::deviceNameInitValue = "Attractap";
+FirmwareI18n::Text Display::deviceNameInitValue = FirmwareI18n::Text::literal("Attractap") /* i18n-data: Product name before reader authentication. */;
 
 lv_obj_t *Display::deviceNameLabel = NULL;
 lv_obj_t *Display::networkQualityContainer = NULL;
@@ -196,6 +213,7 @@ void Display::loop()
 #ifdef ATTRACTAP_HOST
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
     return;
 #endif
@@ -207,13 +225,15 @@ void Display::loop()
     if (Display::touchWarningPending)
     {
         Display::touchWarningPending = false;
-        Display::showErrorPopup("Touch Unavailable",
-                                "Touch panel not detected.\nCheck hardware and reboot.");
+        Display::showErrorPopup(FirmwareI18n::Message::TouchUnavailable,
+                                FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot);
     }
 
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
+
 
     lv_unlock();
 }

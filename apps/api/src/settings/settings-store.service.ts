@@ -31,7 +31,7 @@ export class SettingsStoreService {
     }
 
     const existing = await this.persistence.read(parent, key);
-    if (existing?.value) {
+    if (existing) {
       this.setCache(cacheKey, existing.value, true);
       return existing.value;
     }

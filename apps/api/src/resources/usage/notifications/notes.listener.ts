@@ -49,13 +49,13 @@ export class ResourceUsageNoteNotificationListener {
           return t(recipient.locale, 'body', { authorName, note: event.note });
         },
         url: `/resources/${resource.id}/usage`,
-        sendEmail: (recipient) =>
+        sendEmail: (recipient, language) =>
           this.notifications.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_USAGE_NOTES, {
             resource: { id: resource.id, name: resource.name },
             note: {
               content: event.note,
               phase: event.phase,
-              authorName: authorUsername ?? t(recipient.locale, 'fallbackUser'),
+              authorName: authorUsername ?? t(language, 'fallbackUser'),
             },
           }),
       });

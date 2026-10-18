@@ -1,9 +1,11 @@
 import { SettingsPersistence } from './persistence/port';
+import { SystemLanguageDto } from './dto/system-language.dto';
 
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
+import { normalizeDeviceLanguage } from '../attractap/language/device-language';
 import { auditSettingsUpdateSchema, readAuditSettings } from '../audit/audit.config';
 
 import {
@@ -30,6 +32,7 @@ import { SmtpSettingsDto, SmtpServiceType } from './dto/smtp-settings.dto';
 import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 
 import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-toggle-invalidator.token';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { SettingsStoreService } from './settings-store.service';
 
@@ -90,6 +93,9 @@ export class SettingsService {
     @Optional()
     @Inject(METRICS_TOGGLE_INVALIDATOR)
     protected readonly metricsToggleInvalidator: MetricsToggleInvalidator | null = null,
+    @Optional()
+    @Inject(EventEmitter2)
+    private readonly eventEmitter?: EventEmitter2,
   ) {}
 
   getAuditSettings() {
@@ -182,16 +188,19 @@ export class SettingsService {
   }
 
   async getAppSettings(): Promise<AppSettingsDto> {
-    const [url, publicInternetUrl, licenseKey] = await Promise.all([
+    const [url, publicInternetUrl, licenseKey, defaultLanguage] = await Promise.all([
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url),
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.publicInternetUrl),
       this.settingsStore.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey),
+      this.getDefaultLanguage(),
     ]);
 
     return {
       url,
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
+      // Missing values preserve the legacy German behavior; malformed stored values use English.
+      defaultLanguage,
     };
   }
 
@@ -209,6 +218,30 @@ export class SettingsService {
     if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
       await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
     }
+    if (update.defaultLanguage !== undefined) {
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage, update.defaultLanguage);
+      this.eventEmitter?.emit('settings.default-language', update.defaultLanguage);
+    }
+  }
+
+  async getDefaultLanguage(): Promise<'en' | 'de'> {
+    return (await this.getSystemLanguage()).defaultLanguage;
+  }
+
+  async getSystemLanguage(): Promise<SystemLanguageDto> {
+    // Retain choices saved by earlier versions of the Attractap setting.
+    const language =
+      (await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage)) ??
+      (await this.settingsStore.getPlainSetting(APP_PARENT, 'attractap_language'));
+    return {
+      defaultLanguage: language === null ? 'de' : normalizeDeviceLanguage(language),
+      configured: language !== null,
+    };
+  }
+
+  /** Supported user locales take precedence; missing or unsupported preferences follow the system. */
+  async resolveLanguage(locale: string | null | undefined): Promise<'en' | 'de'> {
+    return normalizeDeviceLanguage(locale, await this.getDefaultLanguage());
   }
 
   async getMetricsApiKey(): Promise<{ value: string | null; configured: boolean }> {

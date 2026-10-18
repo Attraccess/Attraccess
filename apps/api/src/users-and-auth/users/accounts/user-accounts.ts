@@ -1,4 +1,6 @@
 import { SSOProviderType, User } from '@attraccess/application-models';
+import { getSupportedDeviceLanguage } from '@attraccess/shared';
+import { SettingsService } from '../../../settings/settings.service';
 
 import { DatabaseTransactions, TransactionScope } from '../../../database/transaction-scope';
 import { NewUserAccount, UserOperations, UserPersistence, UserRelations, USER_WRITES } from '../persistence/port';
@@ -10,7 +12,6 @@ import { randomBytes } from 'crypto';
 import { LicenseError, LicenseService } from '../../../license/license.service';
 
 import { EmailService } from '../../../email/email.service';
-
 
 import { MetricsService } from '../../../metrics/metrics.service';
 
@@ -143,7 +144,10 @@ export abstract class UserAccounts {
       throw new BadRequestException('Username already exists');
     }
 
-    const user: NewUserAccount = { ...data, ...(userData.locale ? { locale: userData.locale.trim() || 'en' } : {}) };
+    const user: NewUserAccount = {
+      ...data,
+      locale: getSupportedDeviceLanguage(userData.locale) ? userData.locale.trim() : 'und',
+    };
     // Account creation and its initial roles share one attempt and one commit.
     const saveUser = async (parent: TransactionScope) => {
       const writes = this.accountOperations(parent);
@@ -279,4 +283,6 @@ export abstract class UserAccounts {
   protected abstract anonymizeAndSoftDelete(id: number, scope?: TransactionScope): Promise<void>;
 
   protected abstract emailService: EmailService;
+
+  protected abstract readonly settingsService: SettingsService;
 }

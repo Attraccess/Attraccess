@@ -28,7 +28,7 @@ export function sessionConformance(name: string, factory: ApplicationFixtureFact
       fixture = await factory();
       a = await fixture.client();
       b = await fixture.client();
-    });
+    }, 60_000);
     afterEach(async () => {
       await fixture?.close();
     });

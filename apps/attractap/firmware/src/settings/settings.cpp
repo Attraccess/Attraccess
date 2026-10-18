@@ -1,4 +1,6 @@
 #include "settings.hpp"
+#include "../state/language.hpp"
+#include "../state/state.hpp"
 #include <string>
 
 #ifdef ATTRACTAP_HOST
@@ -14,6 +16,7 @@ DeviceConfig Settings::_deviceConfig;
 NetworkConfig Settings::_networkConfig;
 AttraccessApiConfig Settings::_attraccessApiConfig;
 AttraccessAuthConfig Settings::_attraccessAuthConfig;
+std::string Settings::_cachedDefaultLanguage;
 std::string Settings::_hostname;
 
 void Settings::setup()
@@ -36,10 +39,12 @@ void Settings::setup()
 
     _attraccessAuthConfig.apiKey = preferences.getString("api.key", "");
     _attraccessAuthConfig.readerId = preferences.getUInt("api.readerId", 0);
+    _cachedDefaultLanguage = Language::supported(preferences.getString("api.language"), "");
 
     _hostname = preferences.getString("hostname", "");
 
     preferences.end();
+    State::setDefaultLanguage(_cachedDefaultLanguage);
 
     logger.info("Setup complete.");
 }
@@ -156,6 +161,17 @@ void Settings::clearAttraccessAuthConfig()
     _attraccessAuthConfig.readerId = 0;
 
     preferences.end();
+}
+
+void Settings::saveDefaultLanguage(const std::string &language)
+{
+    // Missing or malformed protocol fields must not erase a learned default.
+    if ((language != "en" && language != "de") || language == _cachedDefaultLanguage) return;
+    preferences.begin("settings", false);
+    const bool saved = preferences.putString("api.language", language) != 0;
+    preferences.end();
+    if (saved) _cachedDefaultLanguage = language;
+    else logger.error("Could not cache the API default language.");
 }
 
 std::string Settings::getHostname()

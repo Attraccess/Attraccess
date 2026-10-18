@@ -1,10 +1,11 @@
+#include "display/i18n.hpp"
 #include "display.hpp"
 #include "fonts/attractap_fonts.hpp"
 #include "theme.hpp"
 
-#include <cstdlib>
-#include <cstring>
+#include <new>
 #include <string>
+#include <utility>
 
 // Persistent device-info overlay drawn on the LVGL top layer: a bottom bar
 // showing the device name and firmware version, present across all screens.
@@ -39,7 +40,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_x(Display::deviceNameLabel, -75);
     lv_obj_set_y(Display::deviceNameLabel, -18);
     lv_obj_set_align(Display::deviceNameLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(Display::deviceNameLabel, Display::deviceNameInitValue.c_str());
+    FirmwareI18n::setLabel(Display::deviceNameLabel, Display::deviceNameInitValue);
 
     lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -49,7 +50,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_width(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_height(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(firmwareLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str());
+    FirmwareI18n::setDynamicLabel(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str()) /* i18n-data: Build or server firmware name/version data; preserve exact version contents. */;
     lv_obj_set_style_text_color(firmwareLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(firmwareLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(firmwareLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -71,7 +72,7 @@ void Display::initDeviceOverlay()
     lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
 
     Display::networkQualityLabel = lv_label_create(Display::networkQualityContainer);
-    lv_label_set_text(Display::networkQualityLabel, "! NET");
+    FirmwareI18n::setLabel(Display::networkQualityLabel, FirmwareI18n::Message::NetworkPoor);
     lv_obj_set_style_text_color(Display::networkQualityLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(Display::networkQualityLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
@@ -105,23 +106,33 @@ void Display::updateNetworkQualityOverlay()
     case State::NETWORK_QUALITY_GOOD:
         lv_obj_add_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_label_set_text(Display::networkQualityLabel, "OK NET");
+        FirmwareI18n::setLabel(Display::networkQualityLabel, FirmwareI18n::Message::NetworkGood);
         break;
     case State::NETWORK_QUALITY_DEGRADED:
         lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_label_set_text(Display::networkQualityLabel, "! NET");
+        FirmwareI18n::setLabel(Display::networkQualityLabel, FirmwareI18n::Message::NetworkPoor);
         break;
     case State::NETWORK_QUALITY_OFFLINE:
     default:
         lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_label_set_text(Display::networkQualityLabel, "x NET");
+        FirmwareI18n::setLabel(Display::networkQualityLabel, FirmwareI18n::Message::NetworkOffline);
         break;
     }
 }
 
 void Display::setDeviceName(std::string deviceName)
+{
+    setDeviceNameText(FirmwareI18n::Text::literal(std::move(deviceName)) /* i18n-data: Operator-supplied reader name; preserve exact contents. */);
+}
+
+void Display::setDemoDeviceName()
+{
+    setDeviceNameText(FirmwareI18n::Message::DemoDeviceName);
+}
+
+void Display::setDeviceNameText(const FirmwareI18n::Text &deviceName)
 {
     if (!Display::deviceNameLabel)
     {
@@ -130,20 +141,19 @@ void Display::setDeviceName(std::string deviceName)
     }
 
     // Schedule label update on LVGL thread to avoid cross-thread access
-    char *text = (char *)malloc(deviceName.length() + 1);
+    auto *text = new (std::nothrow) FirmwareI18n::Text(deviceName);
     if (!text)
     {
         return;
     }
-    strcpy(text, deviceName.c_str());
     Display::asyncCall(
         [](void *p)
         {
             if (Display::deviceNameLabel)
             {
-                lv_label_set_text(Display::deviceNameLabel, (const char *)p);
+                FirmwareI18n::setLabel(Display::deviceNameLabel, *static_cast<FirmwareI18n::Text *>(p));
             }
-            free(p);
+            delete static_cast<FirmwareI18n::Text *>(p);
         },
         text);
 }

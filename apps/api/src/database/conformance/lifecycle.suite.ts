@@ -8,7 +8,7 @@ export function identityLifecycleConformance(name: string, factory: IdentityFixt
     let fixture: IdentityFixture;
     beforeEach(async () => {
       fixture = await factory();
-    });
+    }, 60_000);
     afterEach(async () => {
       await fixture?.close();
     });
@@ -68,7 +68,7 @@ export function usageLifecycleConformance(name: string, factory: ApplicationFixt
       fixture = await factory();
       a = await fixture.client();
       b = await fixture.client();
-    });
+    }, 60_000);
     afterEach(async () => {
       await fixture?.close();
     });

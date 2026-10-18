@@ -230,6 +230,8 @@ void API::onResourceUsageFormPageResult(JsonObject data)
             ResourceUsageFormPageResult::Error &error = result.errors[errorIndex];
             error.fieldId = errorObj["fieldId"].is<uint32_t>() ? errorObj["fieldId"].as<uint32_t>() : 0;
             error.message = errorObj["message"].is<const char *>() ? errorObj["message"].as<const char *>() : "";
+            error.code = errorObj["code"].is<const char *>() ? errorObj["code"].as<const char *>() : "";
+            this->logger.debug((std::string("Form validation error: ") + error.message).c_str());
             errorIndex++;
         }
     }

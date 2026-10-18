@@ -1,0 +1,102 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { closeResourceTransactionConnection, SqliteTransactionDriver } from '../../database/sqlite/transactions';
+import { USER_WRITES } from './persistence/port';
+import { TypeormSettingsPersistence } from '../../settings/persistence/typeorm-adapter';
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import { TypeormUserPersistence, userTransactionOperations } from './persistence/typeorm-adapter';
+import { createMock } from '@golevelup/ts-jest';
+import { entities, AuthenticationDetail, ResourceUsage, Session, Setting, User } from '@attraccess/database-entities';
+import { Logger } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import * as migrations from '../../database/migrations';
+import { EncryptionService } from '../../encryption/encryption.service';
+import { LicenseService } from '../../license/license.service';
+import { MetricsService } from '../../metrics/metrics.service';
+import { APP_KEYS, APP_PARENT } from '../../settings/constants';
+import { SettingsStoreService } from '../../settings/settings-store.service';
+import { SettingsService } from '../../settings/settings.service';
+import { RbacService } from '../rbac/rbac.service';
+import { UsersService } from './users.service';
+
+describe('new account language persistence', () => {
+  let source: DataSource;
+  let directory: string;
+  let users: UsersService;
+  let settings: SettingsService;
+  let store: SettingsStoreService;
+
+  beforeAll(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'account-language-'));
+    source = await new DataSource({
+      type: 'sqlite',
+      database: join(directory, 'accounts.sqlite'),
+      entities: Object.values(entities),
+      migrations: Object.values(migrations),
+    }).initialize();
+    await source.runMigrations();
+    store = new SettingsStoreService(
+      new TypeormSettingsPersistence(source.getRepository(Setting), source.getRepository(User)),
+      createMock<EncryptionService>(),
+    );
+    settings = Object.assign(Object.create(SettingsService.prototype), { settingsStore: store });
+    const driver = new SqliteTransactionDriver(source);
+    driver.register(USER_WRITES, userTransactionOperations);
+    // Execute production creation, transactions, persistence and language resolution.
+    // Licensing, roles and metrics are unrelated collaborators for this regression.
+    users = Object.assign(Object.create(UsersService.prototype), {
+      logger: createMock<Logger>(),
+      persistence: new TypeormUserPersistence(
+        source.getRepository(User),
+        source.getRepository(AuthenticationDetail),
+        source.getRepository(Session),
+        source.getRepository(ResourceUsage),
+      ),
+      transactions: new DatabaseTransactions(driver),
+      licenseService: createMock<LicenseService>(),
+      rbacService: createMock<RbacService>(),
+      metricsService: createMock<MetricsService>(),
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    if (source) await closeResourceTransactionConnection(source);
+    if (source?.isInitialized) await source.destroy();
+    if (directory) await rm(directory, { recursive: true, force: true });
+  });
+
+  it.each(['single', 'bulk'] as const)(
+    '%s creation leaves unknown preferences following later defaults',
+    async (path) => {
+      for (const [index, locale] of [undefined, '', 'fr-FR', 'en-!!!', 'de-u-12'].entries()) {
+        const input = { username: `${path}${index}`, email: `${path}${index}@example.test`, locale };
+        const user =
+          path === 'single'
+            ? await users.createOne({ ...input, externalIdentifier: null })
+            : (await users.createMany([input]))[0];
+        const persisted = await source.getRepository(User).findOneByOrFail({ id: user.id });
+        expect(persisted.locale).toBe('und');
+        await store.setPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage, 'de');
+        expect(await settings.resolveLanguage(persisted.locale)).toBe('de');
+        await store.setPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage, 'en');
+        expect(await settings.resolveLanguage(persisted.locale)).toBe('en');
+        expect((await source.getRepository(User).findOneByOrFail({ id: user.id })).locale).toBe('und');
+      }
+    },
+  );
+
+  it.each(['single', 'bulk'] as const)('%s creation preserves supported regional preferences', async (path) => {
+    for (const [index, locale] of ['de-AT', 'EN-Latn-GB'].entries()) {
+      const input = { username: `${path}supported${index}`, email: `${path}supported${index}@example.test`, locale };
+      const user =
+        path === 'single'
+          ? await users.createOne({ ...input, externalIdentifier: null })
+          : (await users.createMany([input]))[0];
+      const persisted = await source.getRepository(User).findOneByOrFail({ id: user.id });
+      expect(persisted.locale).toBe(locale);
+      await store.setPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage, locale === 'de-AT' ? 'en' : 'de');
+      expect(await settings.resolveLanguage(persisted.locale)).toBe(locale === 'de-AT' ? 'de' : 'en');
+    }
+  });
+});

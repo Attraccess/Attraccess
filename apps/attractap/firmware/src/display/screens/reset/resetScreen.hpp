@@ -39,7 +39,7 @@ public:
     void setStatus(Status status);
     // Override the status line text (used for specific error messages). Cleared
     // automatically on the next setStatus() call that isn't STATUS_ERROR.
-    void setStatusMessage(const std::string &message);
+    void setStatusMessage(const FirmwareI18n::Text &message);
     void setOnCancelCallback(std::function<void()> callback);
 
 private:
@@ -51,7 +51,7 @@ private:
     lv_obj_t *statusLabel = nullptr;
     lv_obj_t *cancelButton = nullptr;
     std::string userNameCache;
-    std::string statusMessageOverride;
+    FirmwareI18n::Text statusMessageOverride;
     Status status = STATUS_WAITING;
 
     std::function<void()> onCancelCallback;

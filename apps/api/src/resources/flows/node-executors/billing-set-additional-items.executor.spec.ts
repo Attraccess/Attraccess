@@ -5,6 +5,7 @@ import {
   ResourceFlowNode,
   ResourceFlowNodeType,
   BillingTransaction,
+  BillingTransactionItem,
   BillingTransactionStatus,
 } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
@@ -235,7 +236,10 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     expect(manager.findOne).toHaveBeenNthCalledWith(2, BillingTransactionItem, {
       where: expect.objectContaining({ externalReference: 'compiled-ref' }),
     });
-    expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ externalReference: 'compiled-ref' }));
+    expect(manager.save).toHaveBeenCalledWith(
+      BillingTransactionItem,
+      expect.objectContaining({ externalReference: 'compiled-ref' }),
+    );
     expect(result.payload).toMatchObject({ externalReference: 'compiled-ref' });
   });
 
@@ -247,7 +251,10 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     const result = await runExecutor(createNode(dataNoRef), { externalReference: 'from-input' }, ctx);
 
     expect(ctx.compileTemplate).not.toHaveBeenCalled();
-    expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ externalReference: 'from-input' }));
+    expect(manager.save).toHaveBeenCalledWith(
+      BillingTransactionItem,
+      expect.objectContaining({ externalReference: 'from-input' }),
+    );
     expect(result.payload).toMatchObject({ externalReference: 'from-input' });
   });
 
@@ -257,7 +264,10 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     await runExecutor(createNode(baseData), { externalReference: 123 }, ctx);
 
     expect(ctx.compileTemplate).not.toHaveBeenCalled();
-    expect(manager.save).toHaveBeenCalledWith(expect.objectContaining({ externalReference: 'power' }));
+    expect(manager.save).toHaveBeenCalledWith(
+      BillingTransactionItem,
+      expect.objectContaining({ externalReference: 'power' }),
+    );
   });
 
   it('creates an owning transaction when no parent scope is provided', async () => {
@@ -270,7 +280,10 @@ describe('BillingSetAdditionalItemsExecutor', () => {
       1,
       expect.objectContaining({ backend: 'sqlite', conflicts: { resourceIds: [1], accountIds: [] } }),
     );
-    expect(repoManager.save).toHaveBeenCalledWith(expect.objectContaining({ billingTransactionId: 42, quantity: 2 }));
+    expect(repoManager.save).toHaveBeenCalledWith(
+      BillingTransactionItem,
+      expect.objectContaining({ billingTransactionId: 42, quantity: 2 }),
+    );
     expect(manager.findOne).not.toHaveBeenCalled();
   });
 

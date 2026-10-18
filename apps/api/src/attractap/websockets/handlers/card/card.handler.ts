@@ -1,5 +1,7 @@
 import { SupervisionMode } from '@attraccess/application-models';
+import { getSupportedDeviceLanguage } from '@attraccess/shared';
 
+import { SettingsService } from '../../../../settings/settings.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { AttractapResourceReader } from '../../../persistence/port';
@@ -27,6 +29,9 @@ import { ResourceListService } from '../resource-list/resource-list.service';
 @Injectable()
 export class AttractapCardHandler {
   protected readonly logger = new Logger(AttractapCardHandler.name);
+
+  @Inject(SettingsService)
+  protected settingsService: SettingsService;
 
   @Inject(WebsocketService)
   protected websocketService: WebsocketService;
@@ -118,6 +123,8 @@ export class AttractapCardHandler {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
+        language: await this.settingsService.resolveLanguage(nfcCard.user.locale),
+        languageFallback: !getSupportedDeviceLanguage(nfcCard.user.locale),
         canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
         hasIntroduction,
         isIntroducer,

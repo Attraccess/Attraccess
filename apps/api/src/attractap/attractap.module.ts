@@ -45,6 +45,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
 import { AuditModule } from '../audit/audit.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { AuditModule } from '../audit/audit.module';
     SupervisionModule,
     NotificationsModule,
     AuditModule,
+    SettingsModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
   ],

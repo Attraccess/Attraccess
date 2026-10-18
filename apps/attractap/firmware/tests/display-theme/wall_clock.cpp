@@ -72,6 +72,18 @@ void testWallClock(Renderer &renderer)
         expect(timeArea.y2 <= dateArea.y1 + 8 && dateArea.y2 < promptArea.y1, "Clock, date and prompt stack top to bottom");
         expect(promptArea.y2 <= 460 && promptArea.x1 >= 0 && promptArea.x2 < 480, "Card prompt clears the device footer");
         renderer.capture("wall-clock-lockscreen");
+        // Refresh the existing bindings in the same minute, without a clock tick.
+        Fixtures::activeLanguage = "en";
+        FirmwareI18n::refreshTree(guard.root, "en");
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Saturday, 10 October");
+        requireObject(guard.root, &lv_label_class, "Tap RFID card");
+        renderer.capture("wall-clock-lockscreen-en");
+        Fixtures::activeLanguage = "de";
+        FirmwareI18n::refreshTree(guard.root, "de");
+        lock.loop();
+        requireObject(guard.root, &lv_label_class, "Samstag, 10. Oktober");
+
 
         lock.setUsageInfo(true, "Müller", false);
         renderer.capture("wall-clock-lockscreen-in-use");
@@ -114,6 +126,18 @@ void testWallClock(Renderer &renderer)
         const auto firstRow = bounds(lv_obj_get_parent(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Lasercutter"))));
         expect(header.y2 < firstRow.y1, "Clock header stays above the resource rows");
         renderer.capture("wall-clock-resource-list");
+        Fixtures::activeLanguage = "en";
+        FirmwareI18n::refreshTree(guard.root, "en");
+        list.loop();
+        requireObject(guard.root, &lv_label_class, "Saturday");
+        requireObject(guard.root, &lv_label_class, "10 October 2026");
+        requireObject(guard.root, &lv_label_class, "CNC Fräse"); // supplied name stays literal
+        renderer.capture("wall-clock-resource-list-en");
+        Fixtures::activeLanguage = "de";
+        FirmwareI18n::refreshTree(guard.root, "de");
+        list.loop();
+        requireObject(guard.root, &lv_label_class, "10. Oktober 2026");
+
 
         unsigned clockClicks = 0, selections = 0, actions = 0;
         for (auto *container : {lv_obj_get_parent(time),

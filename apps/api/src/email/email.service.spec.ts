@@ -53,6 +53,8 @@ describe('EmailService', () => {
     (createTransport as jest.Mock).mockReturnValue({ sendMail, close });
 
     const settingsService = {
+      resolveLanguage: jest.fn(async (locale) => locale ?? 'en'),
+      getDefaultLanguage: jest.fn().mockResolvedValue('en'),
       getUrl: jest.fn().mockResolvedValue('https://frontend.example'),
       getSmtpConfiguration: jest.fn().mockResolvedValue({
         service: SmtpServiceType.SMTP,
@@ -146,6 +148,7 @@ describe('EmailService', () => {
         throw new Error('Unexpected template type');
       }),
       getTranslationsMap: jest.fn().mockResolvedValue({}),
+      getExactTranslationsMap: jest.fn().mockResolvedValue({}),
     };
     const emailLayoutService = {
       renderWithTemplate: jest.fn().mockImplementation((template: { body: string }) => Promise.resolve(template.body)),
@@ -416,7 +419,7 @@ describe('EmailService', () => {
         expect(sendMail.mock.calls[0][0].html).toContain('Measured: 61.001 s');
         expect(emailTemplateService.getTranslationsMap).toHaveBeenCalledWith(
           shippedUsageReceiptScope.receiptType,
-          locale,
+          locale === 'en_US' ? 'en-US' : locale === 'de_DE' ? 'de-DE' : 'en',
         );
       },
     );
@@ -840,6 +843,42 @@ describe('EmailService', () => {
       expect(html).toContain('Hello alice!');
     });
 
+    it('uses the system default for mail without a user locale and keeps explicit user locales', async () => {
+      const { service, sendMail, settingsService, emailTemplateService } = tHandlebarsHelperScope.setupT();
+      settingsService.resolveLanguage.mockImplementation(async (locale) => locale ?? 'de');
+      settingsService.getDefaultLanguage.mockResolvedValue('de');
+      emailTemplateService.getTranslationsMap.mockImplementation(async (_type, locale) =>
+        locale === 'de' ? { greeting: 'Hallo {name}!' } : {},
+      );
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser(), 'tok');
+      expect(sendMail.mock.calls[0][0].html).toContain('Hallo alice!');
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'en' }), 'tok');
+      expect(sendMail.mock.calls[1][0].html).toContain('Hello alice!');
+    });
+
+    it('falls back to the system translation for unsupported locales but keeps custom translations', async () => {
+      const { service, sendMail, settingsService, emailTemplateService } = tHandlebarsHelperScope.setupT();
+      settingsService.getDefaultLanguage.mockResolvedValue('de');
+      emailTemplateService.getTranslationsMap.mockImplementation(async (_type, locale) =>
+        locale === 'de' ? { greeting: 'Hallo {name}!' } : locale === 'it' ? { greeting: 'Ciao {name}!' } : {},
+      );
+      emailTemplateService.getExactTranslationsMap.mockImplementation(async (_type, locale) =>
+        locale === 'it-it' ? { greeting: 'Ciao regionale {name}!' } : {},
+      );
+      for (const locale of ['fr-FR', 'en-!!!', 'it', 'it-it']) {
+        await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale }), 'tok');
+      }
+      expect(sendMail.mock.calls[0][0].html).toContain('Hallo alice!');
+      expect(sendMail.mock.calls[1][0].html).toContain('Hallo alice!');
+      expect(sendMail.mock.calls[2][0].html).toContain('Ciao alice!');
+      expect(sendMail.mock.calls[3][0].html).toContain('Ciao regionale alice!');
+      settingsService.getDefaultLanguage.mockResolvedValue('en');
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'fr' }), 'tok');
+      expect(sendMail.mock.calls[4][0].html).toContain('Hello alice!');
+      await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'de-u-ca-ca-12' }), 'tok');
+      expect(sendMail.mock.calls[5][0].html).toContain('Hello alice!');
+    });
+
     it('uses DB translation over default and still interpolates {var}', async () => {
       const { service, sendMail } = tHandlebarsHelperScope.setupT({ greeting: 'Hallo {name}!' });
       await service.sendVerificationEmail(
@@ -850,6 +889,36 @@ describe('EmailService', () => {
       expect(html).toContain('Hallo alice!');
       expect(html).not.toContain('Hello alice!');
     });
+
+    it.each([undefined, '', 'Hoi {name}!'])(
+      'preserves canonical regional translations with exact-tag override %s',
+      async (exactGreeting) => {
+        const { service, sendMail, emailTemplateService } = tHandlebarsHelperScope.setupT();
+        const rows = [
+          { locale: 'de', key: 'greeting', value: 'Hallo {name}!' },
+          { locale: 'de', key: 'footer', value: 'Basis' },
+          { locale: 'de-CH', key: 'greeting', value: 'Grüezi {name}!' },
+          { locale: 'de-CH', key: 'footer', value: 'Schweiz' },
+          ...(exactGreeting === undefined ? [] : [{ locale: 'de-ch', key: 'greeting', value: exactGreeting }]),
+        ];
+        const translations = new EmailTemplateService(
+          { translations: jest.fn(async (_type, locale) => rows.filter((row) => row.locale === locale)) } as never,
+          {} as never,
+        );
+        emailTemplateService.getTranslationsMap.mockImplementation(translations.getTranslationsMap.bind(translations));
+        emailTemplateService.getExactTranslationsMap.mockImplementation(
+          translations.getExactTranslationsMap.bind(translations),
+        );
+        emailTemplateService.findOne.mockResolvedValue({
+          type: EmailTemplateType.VERIFY_EMAIL,
+          subject: "{{t 'greeting' 'Hello {name}!' name=user.username}}",
+          body: "{{t 'footer' 'Footer'}}",
+        });
+        await service.sendVerificationEmail(tHandlebarsHelperScope.makeUser({ locale: 'de-ch' }), 'tok');
+        expect(sendMail.mock.calls[0][0].subject).toBe(exactGreeting ? 'Hoi alice!' : 'Grüezi alice!');
+        expect(sendMail.mock.calls[0][0].html).toBe('Schweiz');
+      },
+    );
 
     it('leaves unresolved {var} literals intact when hash arg is missing', async () => {
       const { service, sendMail } = tHandlebarsHelperScope.setupT(
@@ -912,7 +981,7 @@ export type EmailServiceTestScope = {
     sendMail: any;
     close: any;
     settingsService: { getUrl: any; getSmtpConfiguration: any; buildSmtpTransportOptions: any };
-    emailTemplateService: { findOne: any; getTranslationsMap: any };
+    emailTemplateService: { findOne: any; getTranslationsMap: any; getExactTranslationsMap: any };
     emailLayoutService: { renderWithTemplate: any };
     userRepository: { findOne: any };
   };

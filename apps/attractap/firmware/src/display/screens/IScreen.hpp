@@ -1,5 +1,7 @@
 #pragma once
 
+#include "display/i18n.hpp"
+
 #include <cstring>
 #include <string>
 
@@ -13,18 +15,13 @@
  * (ATT-554 item 5). Compare against the current text first; screen loop()
  * implementations must use this instead of raw lv_label_set_text().
  */
-static inline void setLabelTextIfChanged(lv_obj_t *label, const char *text)
+static inline void setLabelTextIfChanged(lv_obj_t *label, const FirmwareI18n::Text &text)
 {
-    if (label == nullptr || text == nullptr)
-    {
-        return;
-    }
-    const char *current = lv_label_get_text(label);
-    if (current != nullptr && strcmp(current, text) == 0)
-    {
-        return;
-    }
-    lv_label_set_text(label, text);
+    FirmwareI18n::setLabel(label, text);
+}
+static inline void setDynamicLabelTextIfChanged(lv_obj_t *label, const char *text) /* i18n-data: Literal-label helper; caller explicitly owns and classifies the supplied data. */
+{
+    FirmwareI18n::setDynamicLabel(label, text) /* i18n-data: Literal-only label helper for supplied display data; never infer a message from its wording. */;
 }
 
 class IScreen

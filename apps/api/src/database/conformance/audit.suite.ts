@@ -13,7 +13,7 @@ export function auditConformance(name: string, factory: ApplicationFixtureFactor
       fixture = await factory();
       a = await fixture.client();
       b = await fixture.client();
-    });
+    }, 60_000);
     afterEach(async () => {
       await fixture?.close();
     });

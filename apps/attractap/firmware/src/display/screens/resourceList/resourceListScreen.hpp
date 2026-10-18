@@ -23,9 +23,9 @@ public:
     void setSessionTimeoutTime(uint32_t deadline) { sessionHeader.setDeadline(deadline); }
     void setSessionTimeoutPaused(bool paused) { sessionHeader.setPaused(paused); }
     void extendSessionTimeoutBy(uint32_t delta) { sessionHeader.extend(delta); }
-    void showActionProgress(const char *title, const char *resource = "");
+    void showActionProgress(const FirmwareI18n::Text &title, const FirmwareI18n::Text &resource = {});
     void hideActionProgress();
-    void showSuccessToast(const char *message);
+    void showSuccessToast(const FirmwareI18n::Text &message);
 private:
     lv_obj_t *screen = nullptr, *logo = nullptr, *loginContainer = nullptr, *resourceContainer = nullptr, *footer = nullptr;
     lv_obj_t *clockHeader = nullptr, *clockTime = nullptr, *clockWeekday = nullptr, *clockDate = nullptr;
@@ -33,7 +33,8 @@ private:
     SessionHeader sessionHeader;
     ActionOverlay overlay;
     API::ResourceList cachedResourceList{};
-    std::string username, actionTitle, actionResource, successMessage;
+    std::string username;
+    FirmwareI18n::Text actionTitle, actionResource, successMessage;
     uint32_t successUntil = 0;
     bool busy = false;
     bool footerShowsSuccess = false;

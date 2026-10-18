@@ -1,9 +1,25 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useResourcesServiceGetAllResourcesKey } from '@attraccess/react-query-client';
 import { ResourceOverview } from './index';
+
+const storageDescriptors = new Map(
+  (['localStorage', 'sessionStorage'] as const).map((area) => [area, Object.getOwnPropertyDescriptor(window, area)!]),
+);
+const storageMethods = [localStorage, sessionStorage].map((storage) => ({
+  storage,
+  getItem: storage.getItem,
+  setItem: storage.setItem,
+  removeItem: storage.removeItem,
+}));
+function restoreStorage() {
+  for (const [area, descriptor] of storageDescriptors) Object.defineProperty(window, area, descriptor);
+  for (const { storage, getItem, setItem, removeItem } of storageMethods) {
+    Object.assign(storage, { getItem, setItem, removeItem });
+  }
+}
 
 const state = vi.hoisted(() => ({
   groups: [{ id: 1 }] as Array<{ id: number }> | undefined,
@@ -52,6 +68,10 @@ function renderOverview(client = new QueryClient({ defaultOptions: { queries: { 
 }
 
 describe('ResourceOverview empty-state selection', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    restoreStorage();
+  });
   beforeEach(() => {
     localStorage.clear();
     state.groups = [{ id: 1 }];
@@ -78,6 +98,34 @@ describe('ResourceOverview empty-state selection', () => {
     expect(state.getExistence).toHaveBeenCalledTimes(1);
     expect(state.getResources.mock.calls.every(([params]) => params.onlyWithPermissions === true)).toBe(true);
   });
+
+  it.each(['getter', 'methods'])(
+    'uses default filters and resets them in memory when storage %s fail',
+    async (fault) => {
+      state.resources = [{ id: 10, groupId: 1, permitted: false }];
+      if (fault === 'getter') {
+        Object.defineProperty(window, 'localStorage', {
+          configurable: true,
+          get() {
+            throw new DOMException('Storage unavailable', 'SecurityError');
+          },
+        });
+      } else {
+        localStorage.getItem = () => {
+          throw new DOMException('Storage read unavailable', 'SecurityError');
+        };
+        localStorage.setItem = () => {
+          throw new DOMException('Storage write unavailable', 'QuotaExceededError');
+        };
+      }
+      renderOverview();
+      const reset = await screen.findByRole('button', { name: 'Reset filters' });
+      expect(state.getResources.mock.calls.every(([params]) => params.onlyWithPermissions === true)).toBe(true);
+      fireEvent.click(reset);
+      await waitFor(() => expect(screen.queryByRole('button')).not.toBeInTheDocument());
+      expect(state.getResources.mock.calls.some(([params]) => params.onlyWithPermissions === false)).toBe(true);
+    },
+  );
 
   it('ignores resources belonging only to a hidden group, even after filters are cleared', async () => {
     state.resources = [{ id: 20, groupId: 99, permitted: false }];

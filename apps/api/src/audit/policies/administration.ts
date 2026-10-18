@@ -90,6 +90,7 @@ export const locale: Check = (v) => typeof v === 'string' && /^[a-z]{2,3}(-[A-Z]
 export const SETTING_KEYS = [
   'app.url',
   'app.publicInternetUrl',
+  'app.defaultLanguage',
   'app.licenseKeyConfigured',
   'app.licenseKeyChanged',
   'smtp.service',
@@ -303,6 +304,7 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditEvent)
 
 function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
+  if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
   if (key === 'smtp.host') return value === safeAuditHost(value);

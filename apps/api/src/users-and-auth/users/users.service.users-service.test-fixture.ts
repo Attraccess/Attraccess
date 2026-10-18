@@ -1,6 +1,7 @@
 import { DatabaseTransactions, OperationToken, TransactionScope } from '../../database/transaction-scope';
 import { UserPersistence } from './persistence/port';
 import { TypeormUserPersistence } from './persistence/typeorm-adapter';
+import { SettingsService } from '../../settings/settings.service';
 import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -11,6 +12,13 @@ import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { RbacService } from '../rbac/rbac.service';
 import { UsersService } from './users.service';
+
+const settingsService = {
+  getDefaultLanguage: jest.fn().mockResolvedValue('en'),
+  resolveLanguage: jest.fn(
+    async (locale: string | undefined) => locale?.trim() || settingsService.getDefaultLanguage(),
+  ),
+};
 
 const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
@@ -47,6 +55,7 @@ export function registerUsersServiceFixture() {
     );
   };
   beforeEach(async () => {
+    settingsService.getDefaultLanguage.mockResolvedValue('en');
     mockRbacService.assignRoleByKey.mockClear();
     mockRbacService.assignDefaultRoles.mockClear();
     mockRbacService.isLastAdministrator.mockClear();
@@ -55,6 +64,7 @@ export function registerUsersServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
+        { provide: SettingsService, useValue: settingsService },
         {
           provide: UserPersistence,
           useFactory: (users, auth, sessions, usages) => new TypeormUserPersistence(users, auth, sessions, usages),
@@ -177,6 +187,9 @@ export function registerUsersServiceFixture() {
         afterCommit: jest.fn(),
         resolve: <T extends object>(_token: OperationToken<T>) => bind(manager as EntityManager) as unknown as T,
       };
+    },
+    get settingsService() {
+      return settingsService;
     },
     get mockMetricsService() {
       return mockMetricsService;

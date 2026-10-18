@@ -103,6 +103,7 @@ export async function createSqliteFixture(): Promise<IdentityFixture> {
       tokens as never,
       metrics as never,
       rbac,
+      { getDefaultLanguage: async () => 'en' } as never,
     );
     const authentication = new AuthService(
       email as never,

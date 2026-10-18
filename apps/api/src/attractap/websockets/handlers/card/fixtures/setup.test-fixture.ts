@@ -1,5 +1,6 @@
 import { TypeormAttractapResourceReader } from '../../../../persistence/typeorm-adapter';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the original handler test policy for partial protocol mocks. */
+import { SettingsService } from '../../../../../settings/settings.service';
 import { AttractapCardHandler } from '../card.handler';
 import { AttractapCardHandlerTestScope } from '../card.handler.spec';
 export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
@@ -34,6 +35,9 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   scope.rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
   scope.audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
+  (scope.handler as any).settingsService = Object.assign(Object.create(SettingsService.prototype), {
+    getDefaultLanguage: jest.fn().mockResolvedValue('en'),
+  });
   (scope.handler as any).resourceListService = { sendResourceListToSocket: jest.fn().mockResolvedValue(undefined) };
   (scope.handler as any).websocketService = scope.websocketService;
   (scope.handler as any).attractapService = scope.attractapService;

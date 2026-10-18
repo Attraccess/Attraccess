@@ -97,6 +97,7 @@ describe('UsersService', () => {
         email: 'test@example.com',
         externalIdentifier: null,
         isEmailVerified: false,
+        locale: 'und',
       });
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, expect.anything());
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
@@ -691,20 +692,35 @@ describe('UsersService', () => {
       expect(fixture.mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
     });
 
-    it('stores the full BCP 47 locale tag without lowercasing or truncating', async () => {
+    it('stores a supported full BCP 47 locale tag without lowercasing or truncating', async () => {
       await fixture.service.createOne({
         username: 'usr',
         email: 'u@x.com',
         externalIdentifier: null,
-        locale: 'ZH-Hant-TW',
+        locale: 'EN-Latn-GB',
       });
-      expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'ZH-Hant-TW' }));
+      expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'EN-Latn-GB' }));
     });
 
-    it('leaves locale at column default when not provided', async () => {
+    it.each(['fr-FR', 'en-!!!', 'de-u-12', '', ' '])(
+      'stores unsupported preference %s as undetermined',
+      async (locale) => {
+        const user = await fixture.service.createOne({
+          username: 'usr',
+          email: 'u@x.com',
+          externalIdentifier: null,
+          locale,
+        });
+        expect(user.locale).toBe('und');
+        expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'und' }));
+      },
+    );
+
+    it('leaves the personal locale undetermined when none was provided', async () => {
+      fixture.settingsService.getDefaultLanguage.mockResolvedValue('de');
       await fixture.service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null });
       const saved = (fixture.userRepository.save as jest.Mock).mock.calls[0][0] as Partial<User>;
-      expect(saved.locale).toBeUndefined();
+      expect(saved.locale).toBe('und');
     });
   });
 
@@ -856,7 +872,11 @@ describe('UsersService', () => {
           emailVerificationTokenExpiresAt: expect.any(Date),
         }),
       );
-      expect(fixture.service.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, expect.objectContaining({ backend: 'sqlite', resolve: expect.any(Function) }));
+      expect(fixture.service.findOne).toHaveBeenLastCalledWith(
+        { id: 1 },
+        undefined,
+        expect.objectContaining({ backend: 'sqlite', resolve: expect.any(Function) }),
+      );
       expect(fixture.emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
     });
     it('leaves an unchanged email verified without a transaction', async () => {
@@ -926,11 +946,18 @@ describe('UsersService', () => {
           locale: 'de',
           externalIdentifier: null,
         }),
-        expect.objectContaining({ username: 'second', locale: 'en' }),
+        expect.objectContaining({ username: 'second', locale: 'und' }),
       ]);
       expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', scope);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledTimes(1);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(2, scope);
+    });
+    it.each(['fr-FR', 'en-!!!', 'de-u-12'])('keeps unsupported imported preference %s undetermined', async (locale) => {
+      const { scope } = managerForImport(3);
+      const [user] = await fixture.service.createMany([{ username: 'member', email: 'member@example.com', locale }], {
+        manager: scope,
+      });
+      expect(user.locale).toBe('und');
     });
     it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
       const { scope } = managerForImport(3);
@@ -964,9 +991,9 @@ describe('UsersService', () => {
           manager: scope,
         }),
       ).rejects.toThrow("Role with key 'missing' not found");
-      await expect(fixture.service.createMany([{ username: 'member', email: ' ' }], { manager: scope })).rejects.toThrow(
-        'Email is required',
-      );
+      await expect(
+        fixture.service.createMany([{ username: 'member', email: ' ' }], { manager: scope }),
+      ).rejects.toThrow('Email is required');
     });
   });
 });

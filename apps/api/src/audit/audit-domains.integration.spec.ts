@@ -5,6 +5,7 @@ import { TypeormSettingsPersistence } from '../settings/persistence/typeorm-adap
 import { AuditLog, entities, Setting } from '@attraccess/database-entities';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import cookieParser from 'cookie-parser';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -44,6 +45,8 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
   let audit: AuditService;
   let store: SettingsStoreService;
   let app: INestApplication;
+  let settings: SettingsService;
+  const events = new EventEmitter2();
   const ownerPermissions = new Set(['system.audit.read', 'system.settings.manage', 'users.api-tokens.manage']);
   const coreDomains = [...CORE_AUDIT_DOMAINS];
   const read = (query: Record<string, string | number> = {}, token = 'audit-reader') =>
@@ -84,12 +87,16 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       null,
     );
     audit = new AuditService(new SqliteAuditPersistence(source), store, new SqliteAuditTransactionObserver(source));
+    settings = new SettingsService(null, store, { getSettings: async () => ({}) } as never, null, events);
     const module = await Test.createTestingModule({
       controllers: [AuditController, SettingsController],
       providers: [
         SessionStrategy,
         { provide: AuditService, useValue: audit },
-        { provide: SettingsService, useValue: new SettingsService(null, store, null) },
+        {
+          provide: SettingsService,
+          useValue: settings,
+        },
         { provide: SessionService, useValue: { authenticateSession: async () => null } },
         { provide: TwoFactorService, useValue: { getStatus: async () => ({ required: false }) } },
         { provide: RbacService, useValue: { getEffectivePermissions: async () => ownerPermissions } },
@@ -180,6 +187,135 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       store = value;
     },
   };
+
+  it.each([
+    [null, 'de'],
+    ['', 'en'],
+    ['fr', 'en'],
+    ['de-DE', 'de'],
+    ['de-u-12', 'en'],
+  ])('resolves persisted language %s through the real store and its cache', async (value, expected) => {
+    const repository = source.getRepository(Setting);
+    await repository.delete({ parent: 'app', key: 'default_language' });
+    if (value !== null) await repository.save(repository.create({ parent: 'app', key: 'default_language', value }));
+    const persistedStore = new SettingsStoreService(
+      new TypeormSettingsPersistence(repository, source.getRepository(User)),
+      null,
+    );
+    const settings = new SettingsService(null, persistedStore, null);
+    expect((await settings.getAppSettings()).defaultLanguage).toBe(expected);
+    expect(await settings.getDefaultLanguage()).toBe(expected);
+  });
+
+  it('exposes only the default language publicly while keeping settings writes restricted', async () => {
+    await store.setPlainSetting('app', 'default_language', 'en');
+    await request(app.getHttpServer())
+      .get('/api/settings/language')
+      .expect(200, { defaultLanguage: 'en', configured: true });
+    await request(app.getHttpServer()).get('/api/settings').expect(401);
+    await request(app.getHttpServer())
+      .patch('/api/settings')
+      .send({ app: { defaultLanguage: 'de' } })
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/api/settings/language')
+      .expect(200, { defaultLanguage: 'en', configured: true });
+  });
+
+  it('persists settings.updated with canonical language deltas for successful HTTP changes', async () => {
+    await store.setPlainSetting('app', 'default_language', 'de');
+    for (const defaultLanguage of ['en', 'de']) {
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-manager')
+        .send({ app: { defaultLanguage } })
+        .expect(200)
+        .expect(({ body }) => expect(body.app.defaultLanguage).toBe(defaultLanguage));
+    }
+    const rows = await source.getRepository(AuditLog).find({ order: { id: 'ASC' } });
+    expect(rows.map(({ action, details }) => ({ action, details }))).toEqual([
+      { action: 'settings.updated', details: { settingKey: 'app.defaultLanguage', before: 'de', after: 'en' } },
+      { action: 'settings.updated', details: { settingKey: 'app.defaultLanguage', before: 'en', after: 'de' } },
+    ]);
+    await read({ action: 'settings.updated' })
+      .expect(200)
+      .expect(({ body }) => expect(body.items).toHaveLength(2));
+  });
+
+  it('keeps a persisted language save and reader notification successful when auditing fails', async () => {
+    await store.setPlainSetting('app', 'default_language', 'de');
+    const notified = jest.fn();
+    events.on('settings.default-language', notified);
+    const failure = jest
+      .spyOn(audit, 'recordAdministration')
+      .mockRejectedValueOnce(new Error('Injected audit failure'));
+    try {
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-manager')
+        .send({ app: { defaultLanguage: 'en' } })
+        .expect(200)
+        .expect(({ body }) => expect(body.app.defaultLanguage).toBe('en'));
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(await store.getPlainSetting('app', 'default_language')).toBe('en');
+      expect(
+        await source.getRepository(Setting).findOneByOrFail({ parent: 'app', key: 'default_language' }),
+      ).toMatchObject({ value: 'en' });
+      expect(notified).toHaveBeenCalledTimes(1);
+      expect(notified).toHaveBeenCalledWith('en');
+      expect(await source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      failure.mockRestore();
+      events.off('settings.default-language', notified);
+    }
+  });
+
+  it('rejects a user without settings permission and setup writes after closure without effects', async () => {
+    await store.setPlainSetting('app', 'default_language', 'de');
+    const notified = jest.fn();
+    events.on('settings.default-language', notified);
+    const closed = jest.spyOn(settings, 'isFirstTimeSetupAvailable').mockResolvedValue(false);
+    ownerPermissions.delete('system.settings.manage');
+    try {
+      await request(app.getHttpServer()).get('/api/settings').set('Authorization', 'Bearer audit-reader').expect(403);
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-reader')
+        .send({ app: { defaultLanguage: 'en' } })
+        .expect(403);
+      await request(app.getHttpServer())
+        .post('/api/settings/first-time-setup')
+        .send({ app: { defaultLanguage: 'en' } })
+        .expect(403);
+      expect(closed).toHaveBeenCalledTimes(1);
+      expect(await store.getPlainSetting('app', 'default_language')).toBe('de');
+      expect(notified).not.toHaveBeenCalled();
+      expect(await source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      closed.mockRestore();
+      ownerPermissions.add('system.settings.manage');
+      events.off('settings.default-language', notified);
+    }
+  });
+
+  it('records no successful language audit change when HTTP persistence fails', async () => {
+    await store.setPlainSetting('app', 'default_language', 'de');
+    const failure = jest.spyOn(store, 'setPlainSetting').mockRejectedValueOnce(new Error('Injected write failure'));
+    try {
+      await request(app.getHttpServer())
+        .patch('/api/settings')
+        .set('Authorization', 'Bearer audit-manager')
+        .send({ app: { defaultLanguage: 'en' } })
+        .expect(500);
+      expect(await store.getPlainSetting('app', 'default_language')).toBe('de');
+      expect(
+        await source.getRepository(Setting).findOneByOrFail({ parent: 'app', key: 'default_language' }),
+      ).toMatchObject({ value: 'de' });
+      expect(await source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      failure.mockRestore();
+    }
+  });
 
   it.each(fixture.scenarios)(
     'exposes $domain events through every admin filter without mixing targets',

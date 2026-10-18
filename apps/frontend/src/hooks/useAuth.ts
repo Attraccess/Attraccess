@@ -80,8 +80,13 @@ export function useAuth() {
       OpenAPI.WITH_CREDENTIALS = true;
 
       // Clean up any existing localStorage/sessionStorage auth data
-      localStorage.removeItem('auth');
-      sessionStorage.removeItem('auth');
+      for (const area of ['localStorage', 'sessionStorage'] as const) {
+        try {
+          window[area].removeItem('auth');
+        } catch {
+          // Cookie authentication works even when legacy token storage is unavailable.
+        }
+      }
 
       setIsInitialized(true);
     };

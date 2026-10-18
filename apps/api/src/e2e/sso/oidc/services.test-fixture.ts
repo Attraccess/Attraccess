@@ -16,6 +16,7 @@ import {
   TypeormAuthenticationPersistence,
   authenticationTransactionOperations,
 } from '../../../users-and-auth/auth/persistence/typeorm-adapter';
+import { SettingsService } from '../../../settings/settings.service';
 import { OidcTokenVerifier } from '../../../users-and-auth/auth/sso/oidc/oidc-token-verifier.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
 import {
@@ -102,6 +103,7 @@ export function createOidcTestServices(dataSource: DataSource) {
     tokenHashService,
     mockMetricsService,
     rbacService,
+    { getDefaultLanguage: async () => 'en' } as SettingsService,
   );
   const authService = new AuthService(
     mockEmailService,

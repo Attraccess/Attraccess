@@ -11,6 +11,7 @@ import { GeneralSection } from './index';
 vi.mock('@attraccess/react-query-client', () => ({
   useSettingsServiceGetSystemSettings: vi.fn(),
   UseSettingsServiceGetSystemSettingsKeyFn: () => ['settings'],
+  UseSettingsServiceGetSystemLanguageKeyFn: () => ['system-language'],
   useSettingsServiceUpdateSystemSettings: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
@@ -24,7 +25,11 @@ vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), error: vi.fn(), apiError: vi.fn() }),
 }));
 vi.mock('../../../../components/CommunityLicenseButton', () => ({
-  CommunityLicenseButton: () => <button type="button">community license</button>,
+  CommunityLicenseButton: ({ isDisabled }: { isDisabled: boolean }) => (
+    <button type="button" disabled={isDisabled}>
+      community license
+    </button>
+  ),
 }));
 
 const saveSettings = vi.fn();
@@ -44,6 +49,71 @@ describe('GeneralSection', () => {
 
   const urlField = () => screen.getByLabelText('inputs.url.label');
   const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
+
+  it('saves a language-only edit and protects it during refetches', async () => {
+    const view = render(<GeneralSection />);
+    await userEvent.click(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'English' }));
+    expect(saveBar(view.container)).toBeInTheDocument();
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: '', defaultLanguage: 'de' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    view.rerender(<GeneralSection />);
+    expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(saveSettings).toHaveBeenCalledWith({
+      requestBody: {
+        app: {
+          url: 'https://example.org',
+          publicInternetUrl: null,
+          licenseKey: undefined,
+          defaultLanguage: 'en',
+        },
+      },
+    });
+    view.unmount();
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: '', defaultLanguage: 'en' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    const reloaded = render(<GeneralSection />);
+    expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
+    expect(saveBar(reloaded.container)).toBeNull();
+  });
+
+  it('prevents edits during a pending save and preserves the draft after failure', async () => {
+    let pending = false;
+    let fail: (() => void) | undefined;
+    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation((options) => {
+      fail = () => options?.onError?.(new Error('failed'), {} as never, undefined as never, {} as never);
+      return { mutate: saveSettings, isPending: pending } as unknown as ReturnType<
+        typeof useSettingsServiceUpdateSystemSettings
+      >;
+    });
+    const view = render(<GeneralSection />);
+    await userEvent.type(urlField(), '/submitted');
+    await userEvent.type(screen.getByLabelText('inputs.licenseKey.label'), 'submitted-license');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    pending = true;
+    view.rerender(<GeneralSection />);
+    for (const name of ['inputs.url.label', 'inputs.publicInternetUrl.label', 'inputs.licenseKey.label']) {
+      expect(screen.getByLabelText(name)).toBeDisabled();
+      await userEvent.type(screen.getByLabelText(name), 'unsaved');
+    }
+    expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'community license' })).toBeDisabled();
+    expect(urlField()).toHaveValue('https://example.org/submitted');
+    expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('submitted-license');
+    act(() => fail?.());
+    pending = false;
+    view.rerender(<GeneralSection />);
+    expect(urlField()).toBeEnabled();
+    expect(urlField()).toHaveValue('https://example.org/submitted');
+    expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('submitted-license');
+    await userEvent.type(urlField(), '/retry');
+    expect(urlField()).toHaveValue('https://example.org/submitted/retry');
+  });
 
   it('shows no save bar until something is edited', () => {
     const { container } = render(<GeneralSection />);
@@ -117,7 +187,14 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
+      requestBody: {
+        app: {
+          url: 'https://example.org/app',
+          publicInternetUrl: null,
+          licenseKey: undefined,
+          defaultLanguage: 'de',
+        },
+      },
     });
   });
 
@@ -136,7 +213,9 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined } },
+      requestBody: {
+        app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, defaultLanguage: 'de' },
+      },
     });
   });
 
@@ -230,7 +309,14 @@ describe('GeneralSection — Enter key', () => {
     await userEvent.type(field, '/app{Enter}');
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
+      requestBody: {
+        app: {
+          url: 'https://example.org/app',
+          publicInternetUrl: null,
+          licenseKey: undefined,
+          defaultLanguage: 'de',
+        },
+      },
     });
   });
 });
