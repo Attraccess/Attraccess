@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { registerAttractapFirmwareHandlerFixture } from './handler.test-fixture';
+import { fstatSync } from 'fs';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 
 jest.mock('fs', () => {
@@ -11,246 +12,109 @@ jest.mock('fs', () => {
     statSync: jest.fn(),
     openSync: jest.fn(),
     readSync: jest.fn(),
+    fstatSync: jest.fn(),
+    closeSync: jest.fn(),
   };
 });
 describe('AttractapFirmwareHandler', () => {
   const fixture = registerAttractapFirmwareHandlerFixture();
+  beforeEach(() => {
+    // The shared legacy fixture uses Object.create instead of the constructor.
+    // Initialize the handler's per-socket storage explicitly in this suite.
+    (fixture.handler as any).contexts = new WeakMap();
+    fixture.socket.close = jest.fn();
+    fixture.socket.bufferedAmount = 0;
+    const filesystem = jest.requireMock('fs');
+    filesystem.fstatSync = jest.fn();
+    filesystem.closeSync = jest.fn();
+  });
 
-  describe('handleFirmwareChunkRequest', () => {
-    it('returns early and logs error when no OTA context set', async () => {
-      fixture.socket.state.ota = null;
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(expect.stringContaining('no OTA context set'));
-    });
-
-    it('returns early when OTA path missing', async () => {
-      fixture.socket.state.ota = { size: 2048 };
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalled();
-    });
-
-    it('returns early when OTA size missing', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin' };
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalled();
-    });
-
-    it('returns early when offset is not a number', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048 };
-      const data = { payload: { offset: 'x', length: 100 } } as any;
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid chunk request'),
-      );
-    });
-
-    it('returns early when length is not a number', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048 };
-      const data = { payload: { offset: 0, length: 'y' } } as any;
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid chunk request'),
-      );
-    });
-
-    it('returns early when offset < 0', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048 };
-      const data = { payload: { offset: -1, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid chunk request'),
-      );
-    });
-
-    it('returns early when length <= 0', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048 };
-      const data = { payload: { offset: 0, length: 0 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid chunk request'),
-      );
-    });
-
-    it('returns early when offset >= total', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048 };
-      const data = { payload: { offset: 2048, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid chunk request'),
-      );
-    });
-
-    it('opens fd lazily via openSync when fd absent', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048 };
-      fixture.mockOpenSync.mockReturnValue(7 as any);
-      fixture.mockReadSync.mockReturnValue(100 as any);
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.mockOpenSync).toHaveBeenCalledWith('/tmp/fw.bin', 'r');
-      expect(fixture.socket.state.ota.fd).toBe(7);
-      expect(fixture.socket.sendBinaryData).toHaveBeenCalled();
-    });
-
-    it('returns early and logs error when openSync throws', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048 };
-      fixture.mockOpenSync.mockImplementation(() => {
-        throw new Error('open failed');
+  describe('legacy chunk exchange with a socket-owned update', () => {
+    const binary = Buffer.alloc(16384, 0xa5);
+    beforeEach(async () => {
+      fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({
+        name: 'attractap',
+        variant: 'touch',
+        version: '2.0.0',
+        filename: 'fw.bin',
+        filenameOTA: 'fw-ota.bin',
       });
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to open firmware'),
-      );
+      fixture.mockExistsSync.mockReturnValue(true);
+      fixture.mockStatSync.mockReturnValue({ size: binary.length } as any);
+      jest.mocked(fstatSync).mockReturnValue({ size: binary.length, isFile: () => true } as any);
+      fixture.mockOpenSync.mockReturnValue(0 as any);
+      fixture.mockReadSync.mockImplementation((_fd, buffer: Buffer, start, length, offset) => {
+        binary.copy(buffer, start, offset, offset + length);
+        return length;
+      });
+      await fixture.handler.handleFirmwareInfo(fixture.socket, {
+        payload: { name: 'attractap', variant: 'touch', version: '1.0.0' },
+      } as AttractapEvent['data']);
     });
+    const request = (offset: unknown, length: unknown) =>
+      fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
+        payload: { offset, length },
+      } as AttractapEvent['data']);
 
-    it('does not call openSync when fd already present', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048, fd: 9 };
-      fixture.mockReadSync.mockReturnValue(100 as any);
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
+    it('completes a legacy update in bounded chunks, including descriptor zero', async () => {
+      for (let offset = 0; offset < binary.length; offset += 4096) await request(offset, 999999);
+      expect(fixture.mockOpenSync).toHaveBeenCalledTimes(1);
+      expect(fixture.socket.state.ota.fd).toBe(0);
+      const received = Buffer.concat(fixture.socket.sendBinaryData.mock.calls.map(([bytes]) => bytes));
+      expect(received).toEqual(binary);
+      expect(fixture.socket.sendBinaryData.mock.calls.every(([bytes]) => bytes.length <= 4096)).toBe(true);
+    });
+    it.each([
+      [NaN, 1],
+      [Infinity, 1],
+      [0.5, 1],
+      [0, 0.5],
+      [-1, 1],
+      [0, 0],
+      [16384, 1],
+      ['0', 1],
+      [0, Infinity],
+    ])('rejects invalid offset %s and length %s before opening a file', async (offset, length) => {
+      await request(offset, length);
       expect(fixture.mockOpenSync).not.toHaveBeenCalled();
-      expect(fixture.mockReadSync).toHaveBeenCalledWith(9, expect.any(Buffer), 0, 100, 0);
-      expect(fixture.socket.sendBinaryData).toHaveBeenCalled();
-    });
-
-    it('returns early and logs error when readSync throws', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048, fd: 9 };
-      fixture.mockReadSync.mockImplementation(() => {
-        throw new Error('read failed');
-      });
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
       expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to read firmware chunk'),
-      );
     });
-
-    it('sends binary subarray on successful read with bytesRead>0', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048, fd: 9 };
-      fixture.mockReadSync.mockReturnValue(50 as any);
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).toHaveBeenCalledTimes(1);
-      const sentBuf = fixture.socket.sendBinaryData.mock.calls[0][0] as Buffer;
-      expect(Buffer.isBuffer(sentBuf)).toBe(true);
-      expect(sentBuf.length).toBe(50);
-    });
-
-    it('caps the read length at maxChunk (4096) and remaining bytes', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 100000, fd: 9 };
-      fixture.mockReadSync.mockReturnValue(4096 as any);
-      const data = { payload: { offset: 0, length: 999999 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      // safeLen = min(999999, 4096, 100000-0) = 4096
-      expect(fixture.mockReadSync).toHaveBeenCalledWith(9, expect.any(Buffer), 0, 4096, 0);
-    });
-
-    it('caps the read length at total-offset when near end', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048, fd: 9 };
-      fixture.mockReadSync.mockReturnValue(48 as any);
-      const data = { payload: { offset: 2000, length: 4096 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      // safeLen = min(4096, 4096, 2048-2000) = 48
-      expect(fixture.mockReadSync).toHaveBeenCalledWith(9, expect.any(Buffer), 0, 48, 2000);
-    });
-
-    it('does not send binary data when bytesRead is 0', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 2048, fd: 9 };
-      fixture.mockReadSync.mockReturnValue(0 as any);
-      const data = { payload: { offset: 0, length: 100 } } as AttractapEvent['data'];
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, data);
-
-      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
-      expect((fixture.handler as any).logger.log).not.toHaveBeenCalled();
-    });
-
-    it('logs progress once per 10% bucket (lastLoggedPct gate)', async () => {
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 1000, fd: 9 };
-
-      // First read reaches 10% bucket
-      fixture.mockReadSync.mockReturnValue(100 as any);
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
-        payload: { offset: 0, length: 100 },
-      } as AttractapEvent['data']);
-
-      expect(fixture.socket.state.ota.lastLoggedPct).toBe(10);
-      expect((fixture.handler as any).logger.log).toHaveBeenCalledTimes(1);
-      expect((fixture.handler as any).logger.log).toHaveBeenCalledWith(expect.stringContaining('10%'));
-
-      // Second read still within the 10% bucket -> no additional log
-      fixture.mockReadSync.mockReturnValue(50 as any);
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
-        payload: { offset: 100, length: 50 },
-      } as AttractapEvent['data']);
-
-      // (100+50)/1000 = 15% -> bucket 10, not greater than lastLogged 10
-      expect((fixture.handler as any).logger.log).toHaveBeenCalledTimes(1);
-
-      // Third read crosses into 20% bucket -> logs again
-      fixture.mockReadSync.mockReturnValue(100 as any);
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
-        payload: { offset: 100, length: 100 },
-      } as AttractapEvent['data']);
-
-      // (100+100)/1000 = 20% -> bucket 20 > 10
-      expect(fixture.socket.state.ota.lastLoggedPct).toBe(20);
-      expect((fixture.handler as any).logger.log).toHaveBeenCalledTimes(2);
-    });
-
-    it('uses "unknown" reader label in progress log when readerId is absent', async () => {
+    it('does not read for an unauthenticated socket or a copied update context', async () => {
       fixture.socket.readerId = null;
-      fixture.socket.state.ota = { path: '/tmp/fw.bin', size: 1000, fd: 9 };
-      fixture.mockReadSync.mockReturnValue(100 as any);
-
-      await fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
-        payload: { offset: 0, length: 100 },
+      await request(0, 100);
+      fixture.socket.readerId = 42;
+      const other = { ...fixture.socket, id: 'other', state: { ...fixture.socket.state }, sendBinaryData: jest.fn() };
+      await fixture.handler.handleFirmwareChunkRequest(
+        other as any,
+        { payload: { offset: 0, length: 100 } } as AttractapEvent['data'],
+      );
+      expect(fixture.mockReadSync).not.toHaveBeenCalled();
+      expect(other.sendBinaryData).not.toHaveBeenCalled();
+    });
+    it('caps the final read at the remaining file length', async () => {
+      await request(binary.length - 17, 4096);
+      expect(fixture.mockReadSync).toHaveBeenCalledWith(0, expect.any(Buffer), 0, 17, binary.length - 17);
+    });
+    it('closes abusive chunk bursts before allocating more response data', async () => {
+      for (let i = 0; i < 17; i++) await request(0, 100);
+      expect(fixture.mockReadSync).toHaveBeenCalledTimes(16);
+      expect(fixture.socket.close).toHaveBeenCalled();
+    });
+    it('rejects a replaced file whose size differs from the announced update', async () => {
+      jest.mocked(fstatSync).mockReturnValue({ size: 1, isFile: () => true } as any);
+      await request(0, 100);
+      expect(fixture.mockReadSync).not.toHaveBeenCalled();
+    });
+    it('rejects catalog filenames outside the asset directory', async () => {
+      fixture.socket.state.ota = null;
+      fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({
+        version: '2.0.0',
+        filename: '../secret.bin',
+      });
+      await fixture.handler.handleFirmwareInfo(fixture.socket, {
+        payload: { name: 'attractap', variant: 'touch', version: '1.0.0' },
       } as AttractapEvent['data']);
-
-      expect((fixture.handler as any).logger.log).toHaveBeenCalledWith(expect.stringContaining('reader unknown'));
+      expect(fixture.socket.state.ota).toBeNull();
     });
   });
 

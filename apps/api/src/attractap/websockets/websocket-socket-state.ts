@@ -1,3 +1,4 @@
+import type { CardOperationBinding } from '../security/verified-card-session.service';
 import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
@@ -161,6 +162,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   sendMessage: (message: AttractapMessage) => Promise<boolean>;
   sendBinaryData: (data: Buffer) => void;
   state: {
+    verifiedCardOperation?: { handle: string; binding: CardOperationBinding };
     lastAuthenticatedUserId: number | null;
     enrollment: {
       userId: number;

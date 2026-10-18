@@ -50,7 +50,11 @@
           "cmake -S apps/attractap/firmware/tests/ota -B apps/attractap/firmware/tests/ota/build",
           "cmake --build apps/attractap/firmware/tests/ota/build",
           "ctest --test-dir apps/attractap/firmware/tests/ota/build --output-on-failure",
-          "node --test apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
+          "node --test apps/attractap/firmware/tests/ota/hardware-soak.test.mjs",
+          "cmake -S apps/attractap/firmware/tests/security -B apps/attractap/firmware/tests/security/build -DREADER_TLS_HOST_TESTS=ON -DREADER_PAYLOAD_FIXTURE_DIR=apps/attractap/firmware/tests/security/build/tls-fixtures",
+          "cmake --build apps/attractap/firmware/tests/security/build --parallel 2",
+          "node -e \"const p=require('node:path');const c=require('./apps/api/jest.config.ts');c.rootDir=p.resolve('apps/api');c.preset=p.resolve('jest.preset.js');c.sandboxInjectedGlobals=['Math'];process.env.READER_PAYLOAD_FIXTURE_DIR=p.resolve('apps/attractap/firmware/tests/security/build/encoder-fixtures');process.env.READER_PAYLOAD_RECEIVED_DIR=p.resolve('apps/attractap/firmware/tests/security/build/tls-fixtures');const run=async(file)=>{const {results}=await require('jest').runCLI({config:JSON.stringify(c),runInBand:true,runTestsByPath:true,_:[file]},[process.cwd()]);if(!results.success)throw new Error('Reader security integration failed');};(async()=>{await run('apps/api/src/attractap/websockets/handlers/resource-list/resource-list.service.spec.ts');process.env.READER_SESSION_TEST_BINARY=p.resolve('apps/attractap/firmware/tests/security/build/reader_session_test');await run('apps/api/src/attractap/websockets/protected-ws.adapter.spec.ts');})().catch(error=>{console.error(error);process.exitCode=1;});\"",
+          "ctest --test-dir apps/attractap/firmware/tests/security/build --output-on-failure"
         ],
         "parallel": false,
         "cwd": "."

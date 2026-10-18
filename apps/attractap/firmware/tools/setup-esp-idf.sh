@@ -38,4 +38,22 @@ if ! command -v cmake &>/dev/null || ! command -v ninja &>/dev/null; then
 fi
 # Successful checkout alone does not mean the Python environment or toolchains are usable.
 ( . "$ESP_IDF_PATH/export.sh" >/dev/null; idf.py --version )
+
+# Keep host-only DS preparation outside IDF's managed Python environment.
+# Do not leave a success marker after an interrupted or failed repair.
+provisioning_env="$REPO_ROOT/.tools/reader-provisioning"
+provisioning_lock="$REPO_ROOT/apps/attractap/firmware/tools/requirements-provisioning.txt"
+rm -f "$provisioning_env/.ready"
+if [[ ! -x "$provisioning_env/bin/python" ]]; then
+    python3 -m venv --clear "$provisioning_env"
+fi
+"$provisioning_env/bin/python" -m pip install --require-hashes --force-reinstall -r "$provisioning_lock"
+"$provisioning_env/bin/python" -m pip check
+"$provisioning_env/bin/python" - <<'PY'
+from importlib.metadata import version
+assert version('esp-secure-cert-tool') == '2.6.1', 'Unsupported DS preparation tool'
+from esp_secure_cert.configure_ds import calculate_rsa_ds_params
+assert callable(calculate_rsa_ds_params)
+PY
+"$provisioning_env/bin/python" --version > "$provisioning_env/.ready"
 printf 'ESP-IDF ready. To activate: . %q\n' "$ESP_IDF_PATH/export.sh"

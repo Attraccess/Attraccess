@@ -297,6 +297,66 @@ struct SupervisionStartCommand
 #include <atomic>
 #include <ArduinoJson.h>
 
+#ifdef ARDUINOJSON_VERSION_MAJOR
+#include <cstdlib>
+#include <algorithm>
+#include <cstring>
+#ifdef ESP_PLATFORM
+#include "esp_heap_caps.h"
+#endif
+
+// ArduinoJson 7's StaticJsonDocument capacity is only a compatibility hint.
+// Account for every allocation (including our aligned size header) instead.
+class ReaderJsonAllocator final : public ArduinoJson::Allocator
+{
+    struct alignas(std::max_align_t) Header { size_t bytes; };
+    size_t used = 0;
+    size_t peak = 0;
+public:
+    static constexpr size_t LIMIT = 32768;
+    void beginMessage() { peak = used; }
+    size_t peakBytes() const { return peak; }
+    size_t usedBytes() const { return used; }
+    void *allocate(size_t size) override { return reallocate(nullptr, size); }
+    void deallocate(void *pointer) override
+    {
+        if (!pointer) return;
+        auto *header = static_cast<Header *>(pointer) - 1;
+        used -= header->bytes;
+        // Clear transient parsed strings before releasing internal RAM.
+        volatile unsigned char *bytes = reinterpret_cast<unsigned char *>(header);
+        const size_t count = header->bytes;
+        for (size_t i = 0; i < count; ++i) bytes[i] = 0;
+        std::free(header);
+    }
+    void *reallocate(void *pointer, size_t size) override
+    {
+        if (!size) { deallocate(pointer); return nullptr; }
+        auto *old = pointer ? static_cast<Header *>(pointer) - 1 : nullptr;
+        const size_t previous = old ? old->bytes : 0;
+        if (size > LIMIT - sizeof(Header) || size + sizeof(Header) > LIMIT - used)
+            return nullptr;
+        const size_t total = size + sizeof(Header);
+#ifdef ESP_PLATFORM
+        auto *next = static_cast<Header *>(heap_caps_malloc(total, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+        auto *next = static_cast<Header *>(std::malloc(total));
+#endif
+        if (!next) return nullptr;
+        next->bytes = total;
+        used += total;
+        peak = std::max(peak, used);
+        // The old allocation remains counted until its replacement is copied
+        // and wiped. A failed allocation leaves the old data intact.
+        if (old) {
+            std::memcpy(next + 1, pointer, std::min(size, previous - sizeof(Header)));
+            deallocate(pointer);
+        }
+        return next + 1;
+    }
+};
+#endif
+
 struct ApiState : public ApiCards
 {
 protected:
@@ -312,7 +372,7 @@ protected:
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
     uint32_t lastRequestedProjectsOfUserPage = -1;
     std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;
-    static constexpr size_t JSON_INBUF = 4608;
+    static constexpr size_t JSON_INBUF = 8192;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;
     uint32_t resourceListMessageCounter = 0;
@@ -322,7 +382,13 @@ protected:
     std::function<void(const UsageStats &)> usageStatsCallback;
     std::atomic<uint32_t> activeActionRequestId{0};
     ResourceList resourceListScratch;
-    StaticJsonDocument<6144> inboundDoc;
+#ifdef ARDUINOJSON_VERSION_MAJOR
+    ReaderJsonAllocator inboundAllocator;
+    JsonDocument inboundDoc{&inboundAllocator};
+#else
+    // Declaration-only screen harnesses do not instantiate or parse JSON.
+    StaticJsonDocument<32768> inboundDoc;
+#endif
     ProjectsOfUserResponse projectsOfUserResponseScratch;
     ResourceUsageFormRequest resourceFormsRequestScratch;
     ResourceUsageFormFieldsPage resourceFormFieldsScratch;

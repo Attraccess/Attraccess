@@ -204,7 +204,7 @@ describe('AttractapGateway', () => {
 
   describe('onClientEvent', () => {
     it('passes the resource refresh request identity to the list service', async () => {
-      const socket = fixture.createMockSocket({ readerId: 42 });
+      const socket = fixture.createSecuredSocket({ readerId: 42 });
       const refresh = jest
         .spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket')
         .mockResolvedValue(undefined);
@@ -216,7 +216,7 @@ describe('AttractapGateway', () => {
     });
 
     it('rejects server-only event types from clients', async () => {
-      const socket = fixture.createMockSocket({ id: 'ev-1', readerId: 1 });
+      const socket = fixture.createSecuredSocket({ id: 'ev-1', readerId: 1 });
 
       const serverOnlyEvents = [
         AttractapEventType.RESOURCE_LIST,
@@ -243,6 +243,13 @@ describe('AttractapGateway', () => {
       const result = await fixture.gateway.onClientEvent(event.data, socket);
 
       expect(result).toBeUndefined();
+    });
+
+    it('denies a legacy resource refresh even with a cached reader id', async () => {
+      const socket = fixture.createMockSocket({ readerId: 42 });
+      const refresh = jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket');
+      await fixture.gateway.onClientEvent({ type: AttractapEventType.REQUEST_RESOURCE_LIST, payload: {} }, socket);
+      expect(refresh).not.toHaveBeenCalled();
     });
   });
 

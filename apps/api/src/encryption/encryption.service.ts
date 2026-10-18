@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'crypto';
+import { constants, closeSync, fstatSync, openSync, readFileSync, statSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { AppConfigType } from '../config/app.config';
 
 const KEY_LENGTH_BYTES = 32; // AES-256
@@ -40,6 +42,35 @@ function decryptWithKey(key: Buffer, token: string): string {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
 }
 
+export interface LegacyCardKeyContext {
+  id: number;
+  uid: string;
+  keyNo: number;
+}
+
+function cardContext(context: LegacyCardKeyContext): Buffer {
+  if (
+    !context ||
+    !Number.isSafeInteger(context.id) ||
+    context.id <= 0 ||
+    !/^[0-9a-f]+$/i.test(context.uid) ||
+    context.uid.length > 64 ||
+    !Number.isSafeInteger(context.keyNo) ||
+    context.keyNo < 0 ||
+    context.keyNo > 255
+  )
+    throw new Error('Invalid card record context');
+  const fields = ['attraccess.card-key.v1', 'legacy-record', String(context.id), context.uid, String(context.keyNo)];
+  return Buffer.concat(
+    fields.map((field) => {
+      const bytes = Buffer.from(field, 'utf8');
+      const length = Buffer.alloc(4);
+      length.writeUInt32BE(bytes.length);
+      return Buffer.concat([length, bytes]);
+    }),
+  );
+}
+
 export interface StandaloneEncryptor {
   encrypt(plaintext: string): string;
   isEncrypted(value: string): boolean;
@@ -49,7 +80,7 @@ export interface StandaloneEncryptor {
 export class EncryptionService {
   private cachedKey: Buffer | null = null;
 
-  constructor(private readonly configService: ConfigService) { }
+  constructor(private readonly configService: ConfigService) {}
 
   /**
    * Factory for use in scripts or other contexts where Nest ConfigService is not available.
@@ -129,6 +160,102 @@ export class EncryptionService {
     return decryptWithKey(this.getEncryptionKey(), token);
   }
 
+  private cardKeyring(): { active: string; keys: Map<string, Buffer> } {
+    const path = this.configService.get<AppConfigType>('app')?.CARD_KEYRING_FILE;
+    if (!path) throw new Error('Card keyring is not configured');
+    const directory = statSync(dirname(path));
+    if (!directory.isDirectory() || directory.mode & 0o077 || directory.uid !== process.getuid())
+      throw new Error('Unsafe card keyring directory');
+    const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const stat = fstatSync(fd);
+      if (!stat.isFile() || stat.uid !== process.getuid() || stat.mode & 0o077 || stat.size > 4096)
+        throw new Error('Unsafe card keyring file');
+      const encoded = readFileSync(fd);
+      try {
+        let value;
+        try {
+          value = JSON.parse(encoded.toString('utf8'));
+        } catch {
+          throw new Error('Invalid card keyring');
+        }
+        if (!value || typeof value.active !== 'string' || !value.keys || Array.isArray(value.keys))
+          throw new Error('Invalid card keyring');
+        const keys = new Map<string, Buffer>();
+        try {
+          for (const [id, text] of Object.entries(value.keys)) {
+            if (!/^[A-Za-z0-9_-]{1,32}$/.test(id) || typeof text !== 'string') throw new Error('Invalid card keyring');
+            const key = Buffer.from(text, 'base64url');
+            if (key.length !== 32 || key.toString('base64url') !== text) {
+              key.fill(0);
+              throw new Error('Invalid card keyring');
+            }
+            keys.set(id, key);
+          }
+          if (!keys.has(value.active)) throw new Error('Missing active card key');
+          return { active: value.active, keys };
+        } catch (error) {
+          for (const key of keys.values()) key.fill(0);
+          throw error;
+        }
+      } finally {
+        encoded.fill(0);
+      }
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  encryptCardKey(context: LegacyCardKeyContext, plaintext: string): string {
+    if (!/^[0-9a-f]{32}$/i.test(plaintext)) throw new Error('Invalid card key');
+    const aad = cardContext(context);
+    const ring = this.cardKeyring();
+    const raw = Buffer.from(plaintext, 'hex');
+    try {
+      const iv = randomBytes(12);
+      const cipher = createCipheriv('aes-256-gcm', ring.keys.get(ring.active), iv);
+      // Bind the selected wrapping key as well as the immutable card record.
+      cipher.setAAD(Buffer.concat([aad, Buffer.from(ring.active)]));
+      const encrypted = Buffer.concat([cipher.update(raw), cipher.final()]);
+      return `card1.${ring.active}.${Buffer.concat([iv, encrypted, cipher.getAuthTag()]).toString('base64url')}`;
+    } finally {
+      raw.fill(0);
+      for (const key of ring.keys.values()) key.fill(0);
+    }
+  }
+
+  /** Local migration only: returns another ciphertext, never a card key. */
+  rewrapCardKey(context: LegacyCardKeyContext, stored: string): string {
+    const aad = cardContext(context);
+    if (!stored.startsWith('card1.')) {
+      const legacy = stored.startsWith('v1.') ? this.decrypt(stored) : stored;
+      return this.encryptCardKey(context, legacy);
+    }
+    const parts = stored.split('.');
+    const ring = this.cardKeyring();
+    let plaintext: Buffer | undefined;
+    try {
+      if (parts.length !== 3 || !ring.keys.has(parts[1])) throw new Error('Unknown card wrapping key');
+      const bytes = Buffer.from(parts[2], 'base64url');
+      if (bytes.length !== 44 || bytes.toString('base64url') !== parts[2]) throw new Error('Invalid card envelope');
+      const decipher = createDecipheriv('aes-256-gcm', ring.keys.get(parts[1]), bytes.subarray(0, 12));
+      decipher.setAAD(Buffer.concat([aad, Buffer.from(parts[1])]));
+      decipher.setAuthTag(bytes.subarray(28));
+      const first = decipher.update(bytes.subarray(12, 28));
+      try {
+        plaintext = Buffer.concat([first, decipher.final()]);
+      } finally {
+        first.fill(0);
+      }
+      // Validating even the current envelope detects corruption on repeated runs.
+      if (parts[1] === ring.active) return stored;
+      return this.encryptCardKey(context, plaintext.toString('hex'));
+    } finally {
+      plaintext?.fill(0);
+      for (const key of ring.keys.values()) key.fill(0);
+    }
+  }
+
   encryptForPlugin(pluginId: string, plaintext: string): string {
     if (!pluginId || !/^[A-Za-z0-9_-]+$/.test(pluginId)) throw new Error('plugin ID is required for encryption');
     if (typeof plaintext !== 'string') throw new TypeError('encrypt: plaintext must be a string');
@@ -137,7 +264,8 @@ export class EncryptionService {
 
   decryptForPlugin(pluginId: string, token: string): string {
     if (!pluginId || !/^[A-Za-z0-9_-]+$/.test(pluginId)) throw new Error('plugin ID is required for decryption');
-    if (typeof token !== 'string' || token.length === 0) throw new TypeError('decrypt: token must be a non-empty string');
+    if (typeof token !== 'string' || token.length === 0)
+      throw new TypeError('decrypt: token must be a non-empty string');
     return decryptWithKey(this.getPluginEncryptionKey(pluginId), token);
   }
 }

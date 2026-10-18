@@ -11,7 +11,9 @@ import { PluginMigrationService } from './plugin-system/plugin-migration.service
 import { PluginModule } from './plugin-system/plugin.module';
 import { PluginService } from './plugin-system/plugin.service';
 import { SettingsService } from './settings/settings.service';
-import { WsAdapter } from '@nestjs/platform-ws';
+import { ProtectedWsAdapter } from './attractap/websockets/protected-ws.adapter';
+import { ReaderIdentityService } from './attractap/security/reader-identity.service';
+import { ReaderTimeService } from './attractap/security/reader-time.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
@@ -39,7 +41,7 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
   const globalPrefix = appConfig.GLOBAL_PREFIX;
   app.setGlobalPrefix(globalPrefix);
 
-  app.useWebSocketAdapter(new WsAdapter(app));
+  app.useWebSocketAdapter(new ProtectedWsAdapter(app, app.get(ReaderIdentityService), app.get(ReaderTimeService)));
 
   // Only SAML state uses a session; OIDC uses its own signed state cookie.
   app.use(samlSession(appConfig.AUTH_SESSION_SECRET));

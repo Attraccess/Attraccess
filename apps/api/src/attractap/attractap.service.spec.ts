@@ -41,6 +41,7 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
       {} as Repository<User>,
       {
         encrypt: jest.fn((value: string) => `encrypted:${value}`),
+        encryptCardKey: jest.fn((_context, value: string) => `card1.test:${value}`),
         decryptIfEncrypted: jest.fn((value: string) => value),
       } as unknown as EncryptionService,
       {} as MetricsService,
@@ -260,5 +261,37 @@ describe('AttractapService reader maintenance and crash reports', () => {
     firmware.getFirmwareDefinition.mockClear();
     expect(await service.getCrashReportsForReader(99)).toEqual([]);
     expect(firmware.getFirmwareDefinition).not.toHaveBeenCalled();
+  });
+});
+
+describe('card metadata queries', () => {
+  it('returns encrypted records without decrypting or requiring a wrapping keyring', async () => {
+    const card = { id: 12, uid: '04010203040506', keyNo: 2, key: 'card1.current.ciphertext' };
+    const repository = { findOne: jest.fn().mockResolvedValue(card), find: jest.fn().mockResolvedValue([card]) };
+    const encryption = {
+      decryptIfEncrypted: jest.fn(() => {
+        throw new Error('must not decrypt metadata');
+      }),
+    };
+    const service = new AttractapService(
+      repository as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      encryption as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    expect(await service.getNFCCardByID(12)).toBe(card);
+    expect(await service.getNFCCardByUID(card.uid)).toBe(card);
+    expect(await service.getNFCCardsByUserId(1)).toEqual([card]);
+    expect(await service.getAllNFCCards()).toEqual([card]);
+    expect(card.key).toBe('card1.current.ciphertext');
+    expect(encryption.decryptIfEncrypted).not.toHaveBeenCalled();
   });
 });

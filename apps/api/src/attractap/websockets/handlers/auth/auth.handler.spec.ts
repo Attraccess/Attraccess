@@ -58,6 +58,7 @@ describe('AttractapAuthHandler', () => {
     };
     mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
+    (handler as any).identities = { isLegacy: jest.fn().mockResolvedValue(true) };
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
@@ -148,6 +149,17 @@ describe('AttractapAuthHandler', () => {
       expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
     });
 
+    it('rejects bearer fallback for a reader with secured credential history', async () => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, apiTokenHash: 'hashed' });
+      (handler as any).identities.isLegacy.mockResolvedValue(false);
+      mockVerifyToken.mockResolvedValue(true);
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockVerifyToken).not.toHaveBeenCalled();
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+      expect(mockSocket.sendMessage.mock.calls[0][0].data.type).toBe(AttractapEventType.READER_UNAUTHORIZED);
+    });
+
     it('sends READER_UNAUTHORIZED and does not set readerId when token is invalid', async () => {
       mockAttractapService.findReaderById.mockResolvedValue({
         id: 42,
@@ -171,7 +183,7 @@ describe('AttractapAuthHandler', () => {
       expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
     });
 
-    it('sets readerId, sends READER_AUTHENTICATED, and pushes the resource list on a valid token', async () => {
+    it('sets readerId for update-only access without pushing a resource list', async () => {
       mockAttractapService.findReaderById.mockResolvedValue({
         id: 42,
         name: 'Reader A',
@@ -199,10 +211,10 @@ describe('AttractapAuthHandler', () => {
           }),
         }),
       );
-      expect(mockResourceListService.sendResourceListToSocket).toHaveBeenCalledWith(mockSocket);
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
     });
 
-    it('sends READER_AUTHENTICATED before pushing the resource list', async () => {
+    it('sends only READER_AUTHENTICATED for a legacy token', async () => {
       mockAttractapService.findReaderById.mockResolvedValue({
         id: 42,
         name: 'Reader A',
@@ -220,7 +232,7 @@ describe('AttractapAuthHandler', () => {
 
       await handler.handleAuthentication(mockSocket as any, data);
 
-      expect(callOrder).toEqual(['sendMessage', 'sendResourceList']);
+      expect(callOrder).toEqual(['sendMessage']);
     });
 
     it('does not send the unauthorized response on the happy path', async () => {

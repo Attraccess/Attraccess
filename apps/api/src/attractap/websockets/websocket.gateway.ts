@@ -1,3 +1,5 @@
+import { protectedReaderConnection } from './reader-connection-transport';
+import { VerifiedCardSessionService } from '../security/verified-card-session.service';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 
 import {
@@ -114,6 +116,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(AttractapSupervisionHandler)
   protected supervisionHandler: AttractapSupervisionHandler;
+
+  @Inject(VerifiedCardSessionService)
+  protected proofs: VerifiedCardSessionService;
 
   protected readonly connectedAt = new WeakMap<object, bigint>();
 
@@ -367,8 +372,28 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     @MessageBody() eventData: AttractapEvent['data'],
     @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
+    if (!eventData || typeof eventData.type !== 'string') return;
+    const connection = protectedReaderConnection(socket);
+    const updateEvents = [
+      AttractapEventType.READER_REGISTER,
+      AttractapEventType.READER_AUTHENTICATE,
+      AttractapEventType.READER_FIRMWARE_INFO,
+      AttractapEventType.FIRMWARE_REQUEST_CHUNK,
+    ];
+    const type = eventData.type.replace(/^ACK_/, '') as AttractapEventType;
+    if (
+      !connection &&
+      !updateEvents.includes(type) &&
+      ![
+        AttractapEventType.READER_REQUEST_AUTHENTICATION,
+        AttractapEventType.READER_AUTHENTICATED,
+        AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED,
+      ].includes(type)
+    )
+      return;
+    if (connection && !connection.ready) return;
     if (eventData.type.startsWith('ACK_')) {
-      this.logger.debug(`Received ACK response from client ${socket.id}: ${JSON.stringify(eventData)}`);
+      this.logger.debug(`Received reader ACK ${eventData.type}`);
 
       this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
       return;
@@ -384,7 +409,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     await this.clientWasActive(socket);
 
-    this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
+    this.logger.debug(`Received reader event ${eventData.type}`);
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);
@@ -415,7 +440,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const id = randomBytes(4).toString('base64url').slice(0, 5);
     let messageCount = 0;
 
+    const connection = protectedReaderConnection(client);
+    const legacyOutput = new Set([
+      AttractapEventType.READER_REGISTER,
+      AttractapEventType.READER_UNAUTHORIZED,
+      AttractapEventType.READER_REQUEST_AUTHENTICATION,
+      AttractapEventType.READER_AUTHENTICATED,
+      AttractapEventType.READER_FIRMWARE_INFO,
+      AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED,
+    ]);
     const sendMessage = async (message: AttractapMessage) => {
+      if (!connection && !legacyOutput.has(message.data.type)) return false;
+      if (connection && !connection.ready) return false;
       messageCount++;
       message.data.messageId = messageCount;
 
@@ -424,12 +460,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       let lastError: Error | undefined;
 
       for (let i = 0; i < RETRY_COUNT; i++) {
-        this.logger.debug(
-          `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-          message.data.payload,
-        );
-        const stringifiedMessage = JSON.stringify(this.sanitizeForLVGL(message));
-        client.send(stringifiedMessage);
+        const stringifiedMessage = JSON.stringify(connection ? message : this.sanitizeForLVGL(message));
+        // The protected facade validates size before writing any envelope bytes.
+        // Oversize is deterministic; close without retrying it.
+        try {
+          client.send(stringifiedMessage);
+        } catch {
+          client.close();
+          return false;
+        }
 
         this.logger.debug(
           `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
@@ -465,7 +504,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     Object.assign(client, {
       id,
       messageCount,
-      readerId: null,
+      readerId: connection?.identity.readerId ?? null,
       readerName: null,
       sendMessage,
       sendBinaryData,
@@ -484,6 +523,22 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     await this.clientWasActive(client as unknown as AuthenticatedWebSocket);
 
+    if (connection) {
+      const reader = await this.attractapService.findReaderById(connection.identity.readerId);
+      if (!reader) {
+        client.close();
+        return;
+      }
+      (client as unknown as AuthenticatedWebSocket).readerName = reader.name;
+      await sendMessage(
+        new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
+          name: reader.name,
+          serverTime: readerServerTime(),
+        }),
+      );
+      await this.resourceListService.sendResourceListToSocket(client as unknown as AuthenticatedWebSocket);
+      return;
+    }
     this.logger.debug('Sending authentication request');
     try {
       await sendMessage(new AttractapEvent(AttractapEventType.READER_REQUEST_AUTHENTICATION, {}));
@@ -500,6 +555,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
+    const connection = protectedReaderConnection(socket);
+    if (connection) this.proofs.cancelConnection(connection.generation);
+    for (const awaiter of this.clientResponseAwaiters)
+      if (awaiter.clientId === socket.id) {
+        clearTimeout(awaiter.timeoutId);
+        awaiter.resolve();
+      }
+    if (socket.state) {
+      socket.state.lastAuthenticatedUserId = null;
+      socket.state.enrollment = socket.state.enrollNewCardData = socket.state.resetNfcCardData = null;
+      socket.state.formDrafts = {};
+    }
     const connectedAt = this.connectedAt.get(socket as unknown as object);
     this.connectedAt.delete(socket as unknown as object);
     if (connectedAt !== undefined && this.metricsToggle.isEnabledCached('ws')) {
@@ -538,7 +605,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     // Clean up OTA file descriptor if present
-    if (socket.state?.ota?.fd) {
+    if (socket.state?.ota?.fd !== undefined && socket.state?.ota?.fd !== null) {
       try {
         closeSync(socket.state.ota.fd);
       } catch {

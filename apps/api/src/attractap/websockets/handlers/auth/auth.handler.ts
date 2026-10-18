@@ -1,3 +1,5 @@
+import { ReaderIdentityService } from '../../../security/reader-identity.service';
+import { protectedReaderConnection } from '../../reader-connection-transport';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../../attractap.service';
 import { verifyToken } from '../../websocket.utils';
@@ -20,10 +22,14 @@ export class AttractapAuthHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
+  @Inject(ReaderIdentityService)
+  private identities: ReaderIdentityService;
+
   @Inject(AuditService)
   private audit: AuditService;
 
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    if (protectedReaderConnection(socket)) return;
     this.logger.debug('Received REGISTER event');
     const response = await this.attractapService.createNewReader(data.payload.firmware);
     await this.audit
@@ -36,10 +42,6 @@ export class AttractapAuthHandler {
       })
       .catch(() => undefined);
 
-    this.logger.debug(
-      `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`,
-    );
-
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.READER_REGISTER, {
         id: response.reader.id,
@@ -49,7 +51,7 @@ export class AttractapAuthHandler {
   }
 
   public async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    this.logger.debug('processing READER_AUTHENTICATE event', data);
+    if (protectedReaderConnection(socket)) return;
 
     const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
       message: 'PLEASE_REREGISTER',
@@ -57,7 +59,7 @@ export class AttractapAuthHandler {
 
     this.logger.debug('Checking if reader exists');
     const reader = await this.attractapService.findReaderById(data.payload.id);
-    if (!reader) {
+    if (!reader || !(await this.identities.isLegacy(reader.id))) {
       this.logger.error('No reader-config found for socket, sending UNAUTHORIZED response to client');
       return await socket.sendMessage(unauthorizedResponse);
     }
@@ -79,6 +81,6 @@ export class AttractapAuthHandler {
     });
     await socket.sendMessage(authenticatedResponse);
 
-    await this.resourceListService.sendResourceListToSocket(socket);
+    // Bearer tokens authorize updates only; secured credentials never fall back here.
   }
 }

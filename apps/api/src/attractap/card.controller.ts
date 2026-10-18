@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Inject,
   Post,
@@ -47,15 +48,10 @@ export class AttractapNfcCardsController {
     @Body() appKeyRequest: AppKeyRequestDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<AppKeyResponseDto> {
-    const key = await this.attractapService.generateNTAG424Key({
-      keyNo: appKeyRequest.keyNo,
-      cardUID: appKeyRequest.cardUID,
-      userId: req.user.id,
-    });
-
-    return {
-      key: this.attractapService.uint8ArrayToHexString(key),
-    };
+    // Keep the published route and DTO stable, but never export reusable keys.
+    void appKeyRequest;
+    void req;
+    throw new ForbiddenException('CARD_KEY_EXPORT_DISABLED');
   }
 
   @Get()

@@ -441,24 +441,22 @@ export class AttractapService {
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
-    return this.decryptCardKey(card);
+    return card ?? undefined;
   }
 
   public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
     const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
-    cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
   public async getAllNFCCards(): Promise<NFCCard[]> {
     const cards = await this.nfcCardRepository.find();
-    cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
-    return this.decryptCardKey(card);
+    return card ?? undefined;
   }
 
   public async createNFCCard(
@@ -468,12 +466,14 @@ export class AttractapService {
     const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
 
-      return await transactionalEntityManager.save(NFCCard, {
+      const inserted = await transactionalEntityManager.save(NFCCard, {
         ...data,
-        key: this.encryptionService.encrypt(data.key),
+        key: '',
         user,
         isActive: true,
       });
+      inserted.key = this.encryptionService.encryptCardKey(inserted, data.key);
+      return await transactionalEntityManager.save(NFCCard, inserted);
     });
     this.notifyNfcCardChange(card, 'registered');
     return card;
@@ -536,17 +536,5 @@ export class AttractapService {
 
     await this.nfcCardRepository.update(card.id, { lastSeen: new Date() });
     return true;
-  }
-
-  /**
-   * Decrypts card key in place for use in the app. Assumes stored values are
-   * already encrypted (see migration EncryptSensitiveData).
-   */
-  protected decryptCardKey(card?: NFCCard | null): NFCCard | undefined {
-    if (!card?.key) {
-      return card ?? undefined;
-    }
-    card.key = this.encryptionService.decryptIfEncrypted(card.key) ?? card.key;
-    return card;
   }
 }

@@ -17,6 +17,7 @@ public:
     virtual bool sendMessage(const char *message, size_t length) = 0;
     virtual bool sendHeartbeat(const char *message, size_t length) = 0;
     virtual void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback) = 0;
+    virtual void setDisconnectCallback(std::function<void()> callback) { (void)callback; }
     virtual void enableConnectionAttempts() = 0;
     virtual void disableConnectionAttempts() = 0;
     virtual void forceReconnect(const char *reason) = 0;

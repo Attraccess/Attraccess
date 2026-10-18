@@ -23,13 +23,20 @@ Logger SerialCommandHandler::logger("SerialCmd");
 
 void SerialCommandHandler::setup()
 {
+#ifdef ATTRACTAP_PRODUCTION
+    return;
+#else
     logger.info("Serial command handler ready");
     inputBuffer.reserve(MAX_COMMAND_LENGTH);
+#endif
 }
 #endif
 
 void SerialCommandHandler::loop()
 {
+#ifdef ATTRACTAP_PRODUCTION
+    return;
+#else
     // Non-blocking drain of the USB-Serial-JTAG RX buffer (driver installed in
     // main.cpp during startup; 0-tick timeout = don't wait for more bytes).
     uint8_t byte;
@@ -61,10 +68,15 @@ void SerialCommandHandler::loop()
 
         inputBuffer += c;
     }
+#endif
 }
 
 void SerialCommandHandler::processLine(const std::string &line)
 {
+#ifdef ATTRACTAP_PRODUCTION
+    (void)line;
+    return;
+#else
     std::string trimmed = line;
     trimString(trimmed);
 
@@ -105,12 +117,19 @@ void SerialCommandHandler::processLine(const std::string &line)
 
     logger.infof("Handling command: %s %s", topic.c_str(), payload.c_str());
     handleCommand(topic, payload);
+#endif
 }
 
 void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std::string &payload)
 {
+#ifdef ATTRACTAP_PRODUCTION
+    (void)topic;
+    (void)payload;
+    return;
+#else
     // Exact wire format "RESP <topic> <payload>\n" — the provisioning tooling parses it.
     printf("RESP %s %s\n", topic.c_str(), payload.c_str());
+#endif
 }
 
 void SerialCommandHandler::sendErrorResponse(const std::string &topic, const char *error)
@@ -242,6 +261,11 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 
 void SerialCommandHandler::handleCommand(const std::string &topic, const std::string &payload)
 {
+#ifdef ATTRACTAP_PRODUCTION
+    (void)topic;
+    (void)payload;
+    return;
+#else
     bool hasPin = pinIsSet();
 
     StaticJsonDocument<512> payloadDoc;
@@ -327,6 +351,7 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
     }
 
     handleAuthorizedCommand(topic, payloadObj);
+#endif
 }
 #endif
 

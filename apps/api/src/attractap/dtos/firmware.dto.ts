@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AttractapFirmware {
+  @ApiProperty({ required: false, enum: ['bridge', 'development', 'production'] })
+  securityProfile?: 'bridge' | 'development' | 'production';
+
+  @ApiProperty({ required: false, description: 'Signed hardware qualification receipt filename' })
+  qualificationFile?: string;
+
   @ApiProperty({
     description: 'The name of the firmware',
     example: 'attractap',

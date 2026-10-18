@@ -1,14 +1,23 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { existsSync, statSync, openSync, readSync } from 'fs';
+import { existsSync, statSync, openSync, readSync, fstatSync, closeSync, constants } from 'fs';
 import { join } from 'path';
 import { AttractapService } from '../../../attractap.service';
 import { AttractapFirmwareService } from '../../../firmware.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
+import { protectedReaderConnection } from '../../reader-connection-transport';
 
 @Injectable()
 export class AttractapFirmwareHandler {
+  private readonly contexts = new WeakMap<
+    AuthenticatedWebSocket,
+    {
+      ota: NonNullable<AuthenticatedWebSocket['state']['ota']>;
+      tokens: number;
+      at: number;
+    }
+  >();
   private readonly logger = new Logger(AttractapFirmwareHandler.name);
 
   @Inject(AttractapService)
@@ -27,20 +36,42 @@ export class AttractapFirmwareHandler {
         return;
       }
 
-      const { offset, length } = data.payload;
+      const { offset, length } = data?.payload ?? {};
       const total = socket.state.ota.size;
-      if (typeof offset !== 'number' || typeof length !== 'number' || offset < 0 || length <= 0 || offset >= total) {
+      if (
+        !Number.isSafeInteger(offset) ||
+        !Number.isSafeInteger(length) ||
+        offset < 0 ||
+        length <= 0 ||
+        offset >= total
+      ) {
         this.logger.error(`Invalid chunk request from client ${socket.id}: offset=${offset} length=${length}`);
         return;
       }
 
       const maxChunk = 4096; // hard cap chunk size
       const safeLen = Math.min(length, maxChunk, total - offset);
+      const context = this.contexts.get(socket);
+      if (!socket.readerId || !context || context.ota !== socket.state.ota) return;
+      const now = performance.now();
+      context.tokens = Math.min(16, context.tokens + ((now - context.at) * 16) / 1000);
+      context.at = now;
+      if (context.tokens < 1 || socket.bufferedAmount + safeLen > 32768) {
+        socket.close();
+        return;
+      }
+      context.tokens--;
 
       // Lazily open file descriptor
-      if (!socket.state.ota.fd) {
+      if (socket.state.ota.fd === undefined) {
         try {
-          socket.state.ota.fd = openSync(socket.state.ota.path, 'r');
+          const fd = openSync(socket.state.ota.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+          const info = fstatSync(fd);
+          if (!info.isFile() || info.size !== total) {
+            closeSync(fd);
+            return;
+          }
+          socket.state.ota.fd = fd;
         } catch (e) {
           this.logger.error(`Failed to open firmware for client ${socket.id}: ${(e as Error).message}`);
           return;
@@ -75,13 +106,17 @@ export class AttractapFirmwareHandler {
   public async handleFirmwareInfo(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     await this.attractapService.updateReaderFirmware(socket.readerId, data.payload);
 
-    const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload);
+    const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload, !!protectedReaderConnection(socket));
     if (!firmwareIsUpToDate) {
       this.logger.debug('Firmware is not up to date, notifying client to start OTA');
 
       try {
         const current = data.payload as AttractapFirmware;
-        const latest = await this.firmwareService.getFirmwareDefinition(current.name, current.variant);
+        const latest = await this.firmwareService.getFirmwareDefinition(
+          current.name,
+          current.variant,
+          !!protectedReaderConnection(socket),
+        );
         if (!latest) {
           this.logger.warn(
             `No firmware definition found for ${current.name}/${current.variant}; treating as up-to-date for now.`,
@@ -91,19 +126,22 @@ export class AttractapFirmwareHandler {
 
         const assetsDir = join(__dirname, 'assets', 'attractap-firmwares');
         const otaFilename = latest.filenameOTA || latest.filename;
+        if (!/^[A-Za-z0-9_.-]+\.bin$/.test(otaFilename)) throw new Error('Invalid firmware filename');
         const firmwarePath = join(assetsDir, otaFilename);
         if (!existsSync(firmwarePath)) {
           this.logger.error(`OTA firmware binary not found at ${firmwarePath}`);
           return;
         }
         const size = statSync(firmwarePath).size;
-        if (!size || size < 1024) {
+        if (!Number.isSafeInteger(size) || size < 1024 || size > 0x640000) {
           this.logger.error(`OTA firmware size is suspicious (${size} bytes) for ${otaFilename}`);
           return;
         }
 
         // Store OTA context for this socket
+        if (socket.state.ota?.fd !== undefined) closeSync(socket.state.ota.fd);
         socket.state.ota = { path: firmwarePath, size } as AuthenticatedWebSocket['state']['ota'];
+        this.contexts.set(socket, { ota: socket.state.ota, tokens: 16, at: performance.now() });
 
         await socket.sendMessage(
           new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
@@ -123,8 +161,12 @@ export class AttractapFirmwareHandler {
     }
   }
 
-  private async isFirmwareLatest(firmware: AttractapFirmware): Promise<boolean> {
-    const firmwareDefinition = await this.firmwareService.getFirmwareDefinition(firmware.name, firmware.variant);
+  private async isFirmwareLatest(firmware: AttractapFirmware, secured: boolean): Promise<boolean> {
+    const firmwareDefinition = await this.firmwareService.getFirmwareDefinition(
+      firmware.name,
+      firmware.variant,
+      secured,
+    );
 
     if (!firmwareDefinition) {
       return true;

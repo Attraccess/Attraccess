@@ -34,7 +34,9 @@ void Settings::setup()
     _attraccessApiConfig.port = preferences.getUShort("api.port", 0);
     _attraccessApiConfig.useSSL = preferences.getBool("api.useSSL", false);
 
+#ifndef ATTRACTAP_PRODUCTION
     _attraccessAuthConfig.apiKey = preferences.getString("api.key", "");
+#endif
     _attraccessAuthConfig.readerId = preferences.getUInt("api.readerId", 0);
 
     _hostname = preferences.getString("hostname", "");
@@ -132,6 +134,11 @@ AttraccessAuthConfig Settings::getAttraccessAuthConfig()
 
 void Settings::saveAttraccessAuthConfig(const std::string &apiKey, uint32_t readerId)
 {
+#ifdef ATTRACTAP_PRODUCTION
+    (void)apiKey;
+    (void)readerId;
+    return;
+#endif
     logger.info("Saving attraccess auth config...");
     preferences.begin("settings", false);
 

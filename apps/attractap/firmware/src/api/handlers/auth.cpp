@@ -10,6 +10,10 @@
 
 void API::onRegistrationData(JsonObject data)
 {
+#ifdef ATTRACTAP_PRODUCTION
+    (void)data;
+    return;
+#endif
     this->logger.info("Received registration response.");
 
     if (data["payload"].is<JsonObject>())
@@ -31,6 +35,11 @@ void API::onRegistrationData(JsonObject data)
 
 void API::onUnauthorized(JsonObject data)
 {
+#ifdef ATTRACTAP_PRODUCTION
+    (void)data;
+    this->transport.forceReconnect("Protected reader rejected");
+    return;
+#endif
     std::string message = "Unknown error";
     if (data["payload"].is<JsonObject>())
     {
@@ -54,6 +63,11 @@ bool API::isRegistered()
 
 void API::sendAuthenticationRequest()
 {
+#ifdef ATTRACTAP_PRODUCTION
+    // Inner TLS authenticates the registered DS identity. Never export or fall
+    // back to the legacy bearer credential, even after certificate rejection.
+    return;
+#endif
     if (!this->isRegistered())
     {
         logger.info("Not registered, sending registration request");

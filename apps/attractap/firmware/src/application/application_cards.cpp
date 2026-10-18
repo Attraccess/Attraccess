@@ -4,6 +4,12 @@
 #include "application.hpp"
 
 void Application::processCardAuthenticationData() {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+  // A fabricated callback or cached key can never unlock a foundation reader.
+  this->unlocked = false;
+  memset(this->cardAuthenticationData.keyBytes, 0, sizeof(this->cardAuthenticationData.keyBytes));
+  this->cardAuthenticationData.keyLen = 0;
+#endif
   this->logger.infof("Trying to authenticate with keyNo: %u",
                      this->cardAuthenticationData.keyNo);
   if (this->cardAuthenticationData.keyLen != 16) {

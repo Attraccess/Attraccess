@@ -18,6 +18,16 @@ void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_
 
 void API::onCardAuthenticationDetailsResponse(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    if (cardAuthenticationDetailsResponseCallback) {
+        CardAuthenticationDetailsResponse denied{};
+        denied.error = "CARD_VERIFICATION_UNAVAILABLE";
+        cardAuthenticationDetailsResponseCallback(denied);
+    }
+    return;
+#endif
+
     this->logger.info("Received card authentication details response");
     if (this->cardAuthenticationDetailsResponseCallback == nullptr)
     {
@@ -101,7 +111,12 @@ void API::sendEnrollNewCard(bool success)
 {
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
+    #if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)success;
+    payload["success"] = false;
+#else
     payload["success"] = success;
+#endif
     this->sendMessage("ENROLL_NEW_CARD", payload);
 }
 
@@ -126,7 +141,12 @@ void API::sendResetNfcCard(bool success)
 {
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
+    #if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)success;
+    payload["success"] = false;
+#else
     payload["success"] = success;
+#endif
     this->sendMessage("RESET_NFC_CARD", payload);
 }
 
@@ -139,6 +159,13 @@ void API::sendResetNfcCardCancel()
 
 void API::onResetNfcCard(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    sendResetNfcCardCancel();
+    if (errorCallback) errorCallback("CARD_VERIFICATION_UNAVAILABLE", "Card reset is unavailable");
+    return;
+#endif
+
     this->logger.info("Received reset nfc card");
     if (this->resetNfcCardCallback == nullptr)
     {
@@ -170,6 +197,13 @@ void API::onResetNfcCard(JsonObject data)
 
 void API::onEnrollNewCardRequestNFCKeyError(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    sendEnrollNewCardCancel();
+    if (enrollNewCardErrorCallback) enrollNewCardErrorCallback("CARD_VERIFICATION_UNAVAILABLE");
+    return;
+#endif
+
     JsonObject payload = data["payload"].as<JsonObject>();
     std::string error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
     if (error.length() == 0)
@@ -185,6 +219,13 @@ void API::onEnrollNewCardRequestNFCKeyError(JsonObject data)
 
 void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    sendEnrollNewCardCancel();
+    if (enrollNewCardErrorCallback) enrollNewCardErrorCallback("CARD_VERIFICATION_UNAVAILABLE");
+    return;
+#endif
+
     this->logger.info("Received enroll new card available key no");
     if (this->enrollNewCardGetAvailableKeyNoCallback == nullptr)
     {
