@@ -164,6 +164,7 @@ describe('desktop simulator against an isolated real API', () => {
 
   async function request(user: User, path: string, body: object, signal = AbortSignal.timeout(40_000)) {
     const token = await api().get(SessionService).createSession(user);
+    desktop().diagnostics.remember(token);
     // Authentication and authorization are real; no guard or workflow handler is replaced.
     return fetch(`${endpoint}${prefix}${path}`, {
       method: 'POST',
@@ -182,7 +183,9 @@ describe('desktop simulator against an isolated real API', () => {
       'card enrollment',
     );
     const stored = await db.getRepository(NFCCard).findOneOrFail({ where: { user: { id: user.id }, isActive: true } });
-    expect((await desktop().command('inspect', { card })).keyVersions[stored.keyNo]).toBeGreaterThan(0);
+    desktop().diagnostics.remember(stored.key);
+    // INfc::CARD_KEY_VERSION_ENROLLED in rfid_contract.hpp; application.cpp writes this version.
+    expect((await desktop().command('inspect', { card })).keyVersions[stored.keyNo]).toBe(0x01);
     await desktop().text('Karte registriert!');
     await desktop().snapshot(`enrolled-${card}`);
     await desktop().remove(card);
@@ -285,6 +288,11 @@ describe('desktop simulator against an isolated real API', () => {
         () => db.getRepository(NFCCard).exists({ where: { user: { id: candidate.id }, isActive: true } }),
         'recovered enrollment',
       );
+      const recovered = await db.getRepository(NFCCard).findOneOrFail({
+        where: { user: { id: candidate.id }, isActive: true },
+      });
+      desktop().diagnostics.remember(recovered.key);
+      expect((await desktop().command('inspect', { card: index })).keyVersions[recovered.keyNo]).toBe(0x01);
       await desktop().remove(index);
       await authenticate(index);
       await desktop().click('Abmelden');

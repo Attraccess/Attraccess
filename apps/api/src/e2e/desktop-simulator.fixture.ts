@@ -15,6 +15,7 @@ import {
 import { createHash } from 'crypto';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
+import { DesktopDiagnostics } from './desktop-simulator-diagnostics';
 
 export const repositoryRoot = resolve(__dirname, '../../../..');
 export const buildDirectory = join(repositoryRoot, 'dist/apps/attractap-desktop');
@@ -88,12 +89,14 @@ export class DesktopFixture {
   private output = '';
   private queue: Promise<unknown> = Promise.resolve();
   readonly screenshots: string;
+  readonly diagnostics = new DesktopDiagnostics();
 
   constructor(
     private readonly endpoint: string,
     scenario: string,
   ) {
     if (!/^[a-z0-9-]+$/.test(scenario)) throw new Error('Invalid scenario name');
+    this.diagnostics.remember(process.env.AUTH_SESSION_SECRET);
     const artifacts = join(buildDirectory, 'real-api-artifacts');
     mkdirSync(artifacts, { recursive: true });
     this.screenshots = mkdtempSync(join(artifacts, `${scenario}-`));
@@ -185,7 +188,7 @@ export class DesktopFixture {
     await waitFor(() => {
       this.assertRunning();
       return existsSync(response);
-    }, description);
+    }, this.diagnostics.sanitize(description));
     this.assertPrivateFile(response);
     // ProfileStore already writes credentials privately; verify that boundary too.
     const profile = join(this.root, 'profile');
@@ -193,26 +196,31 @@ export class DesktopFixture {
     if (!credentials.length) throw new Error('Desktop credential profile is missing');
     for (const name of credentials) this.assertPrivateFile(join(profile, name));
     const result: ProbeResult = JSON.parse(readFileSync(response, 'utf8'));
+    this.diagnostics.remember(result.devicePin);
     appendFileSync(
       join(this.screenshots, 'observations.ndjson'),
       // Persist only diagnostic fields; credentials remain in the in-memory result.
       JSON.stringify({
         launch: this.launch,
         sequence,
-        description,
+        description: this.diagnostics.sanitize(description),
         readerId: result.readerId,
         authenticationGeneration: result.authenticationGeneration,
         authenticated: result.authenticated,
         networkAvailable: result.networkAvailable,
-        screen: result.screen,
+        screen: this.diagnostics.sanitize(result.screen),
         removedOnWrite: result.removedOnWrite,
         ok: result.ok,
-        labels: result.labels,
+        labels: result.labels.map((label) => this.diagnostics.sanitize(label)),
         keyVersions: result.keyVersions,
       }) + '\n',
     );
     if (requireSuccess && !result.ok)
-      throw new Error(`Desktop command ${description} failed. Visible labels: ${JSON.stringify(result.labels)}`);
+      throw new Error(
+        this.diagnostics.sanitize(
+          `Desktop command ${description} failed. Visible labels: ${JSON.stringify(result.labels)}`,
+        ),
+      );
     return result;
   }
 
@@ -240,12 +248,19 @@ export class DesktopFixture {
   recordDelivery(readerId: number, connectionId: string, messageType: string, acknowledged: boolean) {
     appendFileSync(
       join(this.screenshots, 'deliveries.ndjson'),
-      JSON.stringify({ readerId, connectionId, messageType, acknowledged }) + '\n',
+      JSON.stringify({
+        readerId,
+        connectionId: this.diagnostics.sanitize(connectionId),
+        messageType: this.diagnostics.sanitize(messageType),
+        acknowledged,
+      }) + '\n',
     );
   }
 
   async snapshot(name: string) {
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(name)) throw new Error('Invalid screenshot name');
+    const observed = await this.command('inspect');
+    this.diagnostics.assertScreenshotSafe(observed.screen, observed.labels);
     await this.command('snapshot', { text: name });
     const file = join(this.control, 'screenshots', `${name}.png`);
     const png = readFileSync(file);
@@ -276,13 +291,7 @@ export class DesktopFixture {
       await this.exited;
       clearTimeout(timer);
     }
-    writeFileSync(
-      join(this.screenshots, `launch-${this.launch}.log`),
-      this.output
-        .split('\n')
-        .filter((line) => !/token|key|secret|authorization|payload|\{\s*"/i.test(line))
-        .join('\n'),
-    );
+    writeFileSync(join(this.screenshots, `launch-${this.launch}.log`), this.diagnostics.sanitize(this.output));
     this.simulator = undefined;
   }
 

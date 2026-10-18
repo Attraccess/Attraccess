@@ -114,7 +114,11 @@ the desktop shell captures used by component tests. PNG signatures and dimension
 are checked. Artifacts remain under
 `dist/apps/attractap-desktop/real-api-artifacts/<scenario>-<unique-id>/`, including
 revision metadata, observed screen labels, per-connection delivery results and
-filtered launch diagnostics. They are local generated
+filtered launch diagnostics. One shared filter removes sensitive field lines,
+known PINs and credentials, and unlabelled key/token patterns from retained
+text. In-memory control results stay private and unfiltered for assertions.
+Screenshot capture rejects settings screens and labels that the filter would
+redact; the suite captures workflow screens only. They are local generated
 artifacts; do not commit them. Inspect workflow frames when reviewing changes;
 PNG creation alone does not establish visual correctness. Concurrent invocations
 retain separate artifacts and disposable data. Native builds share the normal
