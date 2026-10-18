@@ -49,12 +49,19 @@ before canonical serialization.
 | Desired configuration envelope | 1,048,576 bytes | Runtime admission before decoding |
 | String / object key | 4,096 / 128 UTF-16 code units | Shared structure guard before domain validation |
 | Topic/configuration/command identifier | 1–128 code units | No whitespace, controls, slash, MQTT wildcards |
+| Channel display name | 1–120 characters | Spaces are supported, including repeated spaces within a name; names must contain at least one non-whitespace character |
 | Operational prefix | 512 code units | No empty segments or MQTT wildcards; ordinary MQTT prefix characters remain supported |
 | Claim username | 255 code units | Preserves the provider username limit, including `wago-controller-` plus a 128-character hardware ID |
 | Collection | 4,096 entries per array/object | Shared guard before costly traversal |
 | Nesting / visited values | 16 / 65,536 | Shared guard; cycles rejected, ordinary shared references accepted |
 | Runtime concurrent messages | 8 each for claims/configuration/credentials; 256 commands | Admission counts running and queued operations; excess is dropped synchronously |
 | Plugin concurrent MQTT callbacks | 64 total | Admission before calling async handlers; synchronous consumers retain their own bounded queues |
+
+Channel display names you enter in the editor, such as `Workshop light`, are
+stored separately from internal channel IDs. The identifier whitespace restriction
+applies to those internal IDs. Display names support spaces and do not need to be
+renamed or migrated. Renaming a channel keeps its internal ID and flow references
+stable; display names are not included in the controller configuration or its hash.
 
 Persistent replay history is limited to 4,096 distinct command identities. When
 full, new commands receive `replay_history_full` before persistence or actuation;

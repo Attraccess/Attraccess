@@ -100,17 +100,19 @@ describe('visual configuration editing', () => {
     ).toEqual(preview.snapshot);
   });
 
-  it('creates unique stable identities and keeps display names out of the runtime snapshot', () => {
+  it('preserves spaces in display names while keeping stable identities separate from the runtime snapshot', () => {
     let sequence = 0;
     const nextId = () => String(++sequence);
     const input = addDigitalChannel(emptyConfiguration, 'input', nextId);
     const output = addDigitalChannel(input.snapshot, 'output', nextId);
     expect(output.snapshot.physicalPoints.map((point) => point.channel)).toEqual([4, 0]);
     expect(output.snapshot.logicalChannels.map((channel) => channel.id)).toEqual(['channel-2', 'channel-4']);
-    const metadata = editorMetadata({ names: { 'channel-2': 'Door contact' }, presets: [] });
-    expect(readMetadata(JSON.stringify({ editor: metadata }))).toEqual(metadata);
+    const names = { 'channel-2': 'Door contact', 'channel-4': 'Workshop  light' };
+    const metadata = editorMetadata({ names, presets: [] });
+    expect(readMetadata(JSON.stringify({ editor: metadata }))).toEqual({ names, presets: [] });
     expect(validateSnapshot(output.snapshot)).toEqual([]);
     expect(JSON.stringify(output.snapshot)).not.toContain('Door contact');
+    expect(JSON.stringify(output.snapshot)).not.toContain('Workshop  light');
     expect(output.snapshot.logicalChannels[0].id).toBe(input.channel.id);
   });
 
