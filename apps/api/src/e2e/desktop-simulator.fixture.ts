@@ -6,6 +6,8 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
+  statSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -176,13 +178,20 @@ export class DesktopFixture {
     this.assertRunning();
     const sequence = ++this.sequence;
     const temporary = join(this.control, 'request.tmp');
-    writeFileSync(temporary, request);
+    writeFileSync(temporary, request, { mode: 0o600, flag: 'wx' });
+    this.assertPrivateFile(temporary);
     renameSync(temporary, join(this.control, `${sequence}.json`));
     const response = join(this.control, `${sequence}.result.json`);
     await waitFor(() => {
       this.assertRunning();
       return existsSync(response);
     }, description);
+    this.assertPrivateFile(response);
+    // ProfileStore already writes credentials privately; verify that boundary too.
+    const profile = join(this.root, 'profile');
+    const credentials = readdirSync(profile).filter((name) => name.endsWith('.profile'));
+    if (!credentials.length) throw new Error('Desktop credential profile is missing');
+    for (const name of credentials) this.assertPrivateFile(join(profile, name));
     const result: ProbeResult = JSON.parse(readFileSync(response, 'utf8'));
     appendFileSync(
       join(this.screenshots, 'observations.ndjson'),
@@ -205,6 +214,11 @@ export class DesktopFixture {
     if (requireSuccess && !result.ok)
       throw new Error(`Desktop command ${description} failed. Visible labels: ${JSON.stringify(result.labels)}`);
     return result;
+  }
+
+  private assertPrivateFile(file: string) {
+    if ((statSync(file).mode & 0o777) !== 0o600)
+      throw new Error('Desktop credential file must have owner-only read/write permissions');
   }
 
   text(text: string) {

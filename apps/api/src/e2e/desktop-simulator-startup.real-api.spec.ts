@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { existsSync } from 'fs';
 import { bootstrap } from '../main.bootstrap';
+import { withDesktopCleanup } from './desktop-simulator-cleanup';
 import { disposeStorage, storageRoot } from '../test/desktop-real-api.test-fixture';
 
 it('closes the real API database and removes owned storage after migration startup failure', async () => {
@@ -12,20 +13,24 @@ it('closes the real API database and removes owned storage after migration start
     database = this; // eslint-disable-line @typescript-eslint/no-this-alias -- retain the real failed connection to verify closure
     throw new Error('Injected API migration failure');
   });
-  try {
-    await expect(
-      bootstrap().then((result) => {
-        started = result;
-        return result;
-      }),
-    ).rejects.toThrow('Injected API migration failure');
-    expect(database).toBeDefined();
-    expect(database?.isInitialized).toBe(false);
-  } finally {
-    migrate.mockRestore();
-    await started?.app.close();
-    if (database?.isInitialized) await database.destroy();
-    disposeStorage();
-  }
+  await withDesktopCleanup(
+    async () => {
+      await expect(
+        bootstrap().then((result) => {
+          started = result;
+          return result;
+        }),
+      ).rejects.toThrow('Injected API migration failure');
+      expect(database).toBeDefined();
+      expect(database?.isInitialized).toBe(false);
+    },
+    () => migrate.mockRestore(),
+    async () => started?.app.close(),
+    async () => {
+      if (database?.isInitialized) await database.destroy();
+    },
+    disposeStorage,
+  );
+
   expect(existsSync(storageRoot)).toBe(false);
 }, 60_000);

@@ -29,6 +29,7 @@ import { bootstrap } from '../main.bootstrap';
 import { existsSync, readFileSync, realpathSync } from 'fs';
 import { join, relative, isAbsolute } from 'path';
 import { DesktopFixture, buildProbe, waitFor } from './desktop-simulator.fixture';
+import { withDesktopCleanup } from './desktop-simulator-cleanup';
 import { disposeStorage, storageRoot } from '../test/desktop-real-api.test-fixture';
 
 const nonProfitLicense =
@@ -68,12 +69,13 @@ describe('desktop simulator against an isolated real API', () => {
     if (db?.isInitialized) await db.getRepository(NFCCard).clear();
   });
   afterAll(async () => {
-    try {
-      await app?.close();
-    } finally {
-      if (db?.isInitialized) await db.destroy();
-      disposeStorage();
-    }
+    await withDesktopCleanup(
+      async () => app?.close(),
+      async () => {
+        if (db?.isInitialized) await db.destroy();
+      },
+      disposeStorage,
+    );
   });
 
   function api() {
@@ -418,8 +420,33 @@ describe('desktop simulator against an isolated real API', () => {
         await desktop().snapshot('supervision-request');
         if (outcomeType !== 'approval') {
           if (outcomeType === 'http-abort') {
-            controller.abort(new Error('Injected supervision request failure'));
-            expect((await pending).error).toBeDefined();
+            const connection = socket();
+            const original = connection.sendMessage;
+            const cancellations: { payload: unknown; result: Promise<boolean> }[] = [];
+            connection.sendMessage = function (message) {
+              const delivery = original.call(this, message);
+              if (message.data.type === AttractapEventType.SUPERVISION_RESOLVED) {
+                cancellations.push({ payload: message.data.payload, result: delivery });
+              }
+              return delivery;
+            };
+            try {
+              controller.abort(new Error('Injected supervision request failure'));
+              expect((await pending).error).toBeDefined();
+              await desktop().text('Something went wrong. Please try again.');
+              await desktop().screen('resources');
+              const cancelled = await desktop().command('inspect');
+              expect(cancelled.labels).not.toContain('Aufsichts-Karte auflegen');
+              await desktop().snapshot('supervision-cancelled');
+              expect(cancellations).toHaveLength(1);
+              expect(cancellations[0].payload).toMatchObject({ success: false, resourceId: resource.id });
+              const acknowledged = await cancellations[0].result;
+              desktop().recordDelivery(reader.id, connection.id, AttractapEventType.SUPERVISION_RESOLVED, acknowledged);
+              expect(acknowledged).toBe(true);
+              expect(connection.state.supervisionFlow).toBeNull();
+            } finally {
+              connection.sendMessage = original;
+            }
           } else {
             const root = desktop().root;
             await desktop().dispose();

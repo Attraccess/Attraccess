@@ -14,6 +14,10 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdexcept>
 
 namespace
 {
@@ -250,7 +254,27 @@ int main(int argc, char **argv)
         auto versions = result["keyVersions"].to<JsonArray>();
         for (auto version : simulator.nfc().card(valid ? (command["card"] | 0) : 0).keyVersions) versions.add(version);
         const auto temporary = control / "result.tmp";
-        { std::ofstream output(temporary); serializeJson(result, output); }
+        {
+            // Results include the device PIN. Secure the file before writing any content.
+            const int descriptor = open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+            if (descriptor < 0) throw std::runtime_error("Could not create private control result");
+            if (fchmod(descriptor, S_IRUSR | S_IWUSR) != 0)
+            {
+                close(descriptor);
+                throw std::runtime_error("Could not secure control result");
+            }
+            FILE *output = fdopen(descriptor, "w");
+            if (!output)
+            {
+                close(descriptor);
+                throw std::runtime_error("Could not open control result");
+            }
+            std::string content;
+            serializeJson(result, content);
+            const bool written = fwrite(content.data(), 1, content.size(), output) == content.size();
+            const int closed = fclose(output);
+            if (!written || closed != 0) throw std::runtime_error("Could not write control result");
+        }
         std::filesystem::rename(temporary, control / (std::to_string(sequence) + ".result.json"));
         ++sequence;
         if (valid && command["action"] == "quit") return ok ? 0 : 1;
