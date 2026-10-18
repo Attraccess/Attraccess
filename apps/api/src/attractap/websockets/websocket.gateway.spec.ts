@@ -1,5 +1,6 @@
+import { WebSocket } from 'ws';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
-import { AttractapEvent, AttractapEventType } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
   const fixture = registerAttractapGatewayFixture();
@@ -100,6 +101,42 @@ describe('AttractapGateway', () => {
   });
 
   describe('handleDisconnect', () => {
+    it('cleans up a connection rejected before socket initialization', async () => {
+      fixture.licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
+      const client = { close: jest.fn(), send: jest.fn() } as unknown as AuthenticatedWebSocket;
+      const connectedAt = (fixture.gateway as unknown as { connectedAt: WeakMap<object, bigint> }).connectedAt;
+
+      await fixture.gateway.handleConnection(client);
+      expect(client.close).toHaveBeenCalledTimes(1);
+      expect(client.state).toBeUndefined();
+      expect(connectedAt.has(client)).toBe(true);
+
+      await expect(fixture.gateway.handleDisconnect(client)).resolves.toBeUndefined();
+
+      expect(connectedAt.has(client)).toBe(false);
+      expect(fixture.mockWsMetrics.connectionDuration.observe).toHaveBeenCalledWith(
+        { gateway: 'attractap' },
+        expect.any(Number),
+      );
+      expect(fixture.websocketService.sockets.size).toBe(0);
+    });
+
+    it('invalidates pending authentication before waiting for cleanup', async () => {
+      const attempt = Symbol('pending-authentication');
+      const socket = fixture.createMockSocket({ readerId: 42, readerName: 'Reader' });
+      socket.state.readerAuthenticationAttempt = attempt;
+      const release = await fixture.gateway['clientResponseAwaitersMutex'].acquire();
+
+      const disconnect = fixture.gateway.handleDisconnect(socket);
+      const identity = { readerId: socket.readerId, readerName: socket.readerName };
+      const invalidated = socket.state.readerAuthenticationAttempt !== attempt;
+      release();
+      await disconnect;
+
+      expect(identity).toEqual({ readerId: null, readerName: null });
+      expect(invalidated).toBe(true);
+    });
+
     it('removes the socket from websocketService', async () => {
       const socket = fixture.createMockSocket({ id: 'disc-1' });
       fixture.websocketService.sockets.set('disc-1', socket);
@@ -268,5 +305,90 @@ describe('AttractapGateway', () => {
       expect(socket1.close).toHaveBeenCalled();
       expect(socket2.close).toHaveBeenCalled();
     });
+  });
+  it('sends language updates only to open authenticated readers', async () => {
+    const authenticated = fixture.createMockSocket({ id: 'authenticated', readerId: 42, readyState: WebSocket.OPEN });
+    const unauthenticated = fixture.createMockSocket({ id: 'unauthenticated', readyState: WebSocket.OPEN });
+    const missingIdentity = fixture.createMockSocket({
+      id: 'missing',
+      readerId: undefined,
+      readyState: WebSocket.OPEN,
+    });
+    const closed = fixture.createMockSocket({ id: 'closed', readerId: 43, readyState: WebSocket.CLOSED });
+    for (const socket of [authenticated, unauthenticated, missingIdentity, closed])
+      fixture.websocketService.sockets.set(socket.id, socket);
+    await fixture.gateway.updateReaderLanguage('en');
+    expect(fixture.websocketService.readerLanguage).toBe('en');
+    expect(authenticated.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { type: AttractapEventType.READER_LANGUAGE, payload: { language: 'en' } } }),
+    );
+    for (const socket of [unauthenticated, missingIdentity, closed]) expect(socket.sendMessage).not.toHaveBeenCalled();
+    (authenticated.sendMessage as jest.Mock).mockClear();
+    authenticated.readerId = null;
+    await fixture.gateway.updateReaderLanguage('de');
+    expect(fixture.websocketService.readerLanguage).toBe('de');
+    expect(authenticated.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([AttractapEventType.READER_AUTHENTICATED, AttractapEventType.READER_LANGUAGE])(
+    'retries %s with the latest persisted default',
+    async (type) => {
+      const client = fixture.createMockSocket();
+      const wait = jest.spyOn(
+        fixture.gateway as unknown as { waitForClientResponse: () => Promise<void> },
+        'waitForClientResponse',
+      );
+      wait.mockResolvedValue(undefined);
+      await fixture.gateway.handleConnection(client);
+      const socket = Array.from(fixture.websocketService.sockets.values())[0];
+      socket.readerId = 42;
+      Object.defineProperty(client, 'readyState', { value: WebSocket.OPEN });
+      (client.send as jest.Mock).mockClear();
+      wait.mockImplementationOnce(async () => {
+        fixture.websocketService.readerLanguage = 'en';
+        throw new Error('Lost acknowledgement');
+      });
+      await socket.sendMessage(new AttractapEvent(type, { language: 'de', name: 'Reader' }));
+      const sent = (client.send as jest.Mock).mock.calls.map(([body]) => JSON.parse(body).data.payload.language);
+      expect(sent).toEqual(['de', 'en']);
+    },
+  );
+  it.each(
+    [AttractapEventType.READER_LANGUAGE, AttractapEventType.READER_AUTHENTICATED].flatMap((type) =>
+      ['revoked', 'closed', 'invalid-id', 'reauthenticated'].map((reason) => [type, reason]),
+    ),
+  )('cancels pending %s retries for a %s socket while retaining another connection', async (type, reason) => {
+    const wait = jest
+      .spyOn(fixture.gateway as unknown as { waitForClientResponse: () => Promise<void> }, 'waitForClientResponse')
+      .mockResolvedValue(undefined);
+    const client = fixture.createMockSocket({ readyState: WebSocket.OPEN });
+    await fixture.gateway.handleConnection(client);
+    client.readerId = 42;
+    const other = fixture.createMockSocket({ id: 'other', readerId: 42, readyState: WebSocket.OPEN });
+    fixture.websocketService.sockets.set(other.id, other);
+    (client.send as jest.Mock).mockClear();
+    wait.mockImplementationOnce(async () => {
+      if (reason === 'revoked') {
+        await fixture.gateway.onClientEvent(
+          { type: AttractapEventType.READER_AUTHENTICATE, payload: { id: 42, token: 'revoked' } },
+          client,
+        );
+      } else if (reason === 'closed') {
+        Object.defineProperty(client, 'readyState', { value: WebSocket.CLOSED });
+      } else if (reason === 'invalid-id') {
+        client.readerId = Number.NaN;
+      } else {
+        client.state.readerAuthenticationAttempt = Symbol('new-authentication');
+      }
+      throw new Error('Lost acknowledgement');
+    });
+    await client.sendMessage(new AttractapEvent(type as AttractapEventType, { language: 'en', name: 'Reader' }));
+    const languageSends = (client.send as jest.Mock).mock.calls
+      .map(([body]) => JSON.parse(body))
+      .filter((message) => message.data.type === type);
+    expect(languageSends).toHaveLength(1);
+    expect(other.sendMessage).not.toHaveBeenCalled();
+    await fixture.gateway.updateReaderLanguage('de');
+    expect(other.sendMessage).toHaveBeenCalledTimes(1);
   });
 });

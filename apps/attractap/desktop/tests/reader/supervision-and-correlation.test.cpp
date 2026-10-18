@@ -14,7 +14,7 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     assert(server.last("UNLOCK_DOOR")["data"]["payload"]["resourceId"].as<int>() == 3);
     server.push("UNLOCK_DOOR", R"({"error":"Denied by test"})"); pump(); list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(label(lv_layer_top(), "Denied by test"));
+    assert(label(lv_layer_top(), "Something went wrong. Please try again."));
     display.capture(output, "10-action-error");
     Display::hidePopup();
     active = false; supervised = true; list(); click("Aufsicht");
@@ -51,12 +51,12 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     const auto refreshId = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
     server.push("RESOURCE_LIST", "{\"revision\":" + std::to_string(listVersion - 1) + ",\"requestId\":" + std::to_string(refreshId) + ",\"resources\":[]}"); pump();
     assert(label(lv_screen_active(), "Start"));
-    assert(!lv_obj_is_visible(label(lv_screen_active(), "Status wird geladen")));
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Status wird geladen")));
     active = true; list();
     State::setWebsocketState(false, "reader.test", 80, false); pump();
     State::setWebsocketState(true, "reader.test", 80, false);
     State::setApiState(true, "Test reader"); list(false); pump();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(!lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
     display.capture(output, "12-reconnected-signed-out");
 }

@@ -25,6 +25,8 @@ Die Details zeigen außerdem API-Token-ID, Integrations-ID, IP-Adresse und User-
 
 Protokolleinträge sind historische Aufzeichnungen und lassen sich in der Anwendung nicht bearbeiten. Ein Ereignis enthält die für diesen Vorgang erfassten Informationen; es ist keine vollständige Kopie des zugrunde liegenden Objekts. Fehlt bei einem geänderten Feld ein gespeicherter Vorher- oder Nachher-Wert, erscheint **Nicht erfasst**.
 
+Änderungen an der Standardsprache des Systems verwenden das bestehende Ereignis `settings.updated` im Administrationsbereich. Die Details nennen `app.defaultLanguage` sowie den vorherigen und neuen Wert (`de` oder `en`). Ist die Erfassung für diesen Bereich aktiviert, erscheinen erfolgreiche Sprachänderungen unter diesem Ereignis. Ein fehlgeschlagener Speichervorgang erzeugt keinen Eintrag für eine erfolgreiche Änderung.
+
 ## Exportieren
 
 **CSV exportieren** lädt alle aufbewahrten Ereignisse herunter, die zu den angewendeten Filtern passen – einschließlich noch nicht geöffneter Ergebnisseiten. Enthalten sind IDs, Ereignis und Ergebnis, Zeitstempel, Vorgangs-IDs sowie erfasste Details. Noch nicht angewendete Filteränderungen beeinflussen den Export nicht. Formelähnliche Texte werden für Tabellenkalkulationen als Daten maskiert.

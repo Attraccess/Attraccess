@@ -335,7 +335,7 @@ void Application::finishFormFlow() {
   this->formFlowSubmitted = true;
   Display::resourceDetailsScreen.hideFormsModal();
   this->pendingUiStartedAt = millis();
-  this->showReaderActionProgress("Sende Formular");
+  this->showReaderActionProgress(FirmwareI18n::Message::SubmittingForm);
 
   if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
     this->api.startResourceUsageSession(this->pendingActionResourceId,

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const KIOSK_PREFIX = '/kiosk/';
@@ -14,16 +14,26 @@ const STORAGE_KEY = 'kiosk-return';
 export function KioskGuard() {
   const location = useLocation();
   const navigate = useNavigate();
+  const kioskReturn = useRef<string | null>(null);
 
   useEffect(() => {
     if (location.pathname.startsWith(KIOSK_PREFIX)) {
-      sessionStorage.setItem(STORAGE_KEY, location.pathname + location.search);
+      kioskReturn.current = location.pathname + location.search;
+      try {
+        sessionStorage.setItem(STORAGE_KEY, kioskReturn.current);
+      } catch {
+        // Retain the kiosk destination in memory when storage is unavailable.
+      }
       return;
     }
 
-    const ret = sessionStorage.getItem(STORAGE_KEY);
-    if (ret) {
-      navigate(ret, { replace: true });
+    try {
+      kioskReturn.current = kioskReturn.current ?? sessionStorage.getItem(STORAGE_KEY);
+    } catch {
+      // Public routes remain usable; an entered kiosk still cannot be left.
+    }
+    if (kioskReturn.current) {
+      navigate(kioskReturn.current, { replace: true });
     }
   }, [location, navigate]);
 

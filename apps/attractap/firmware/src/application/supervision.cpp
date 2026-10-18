@@ -25,7 +25,7 @@ void SupervisionFlow::resetActiveTransaction() {
     errorIsTerminal = hintReady = false;
     cardUidLength = 0;
     activeDeadlineMs = 0;
-    errorMessage[0] = hintMessage[0] = requesterName[0] = '\0';
+    errorMessage.clear(); hintMessage.clear(); requesterName[0] = '\0';
 }
 
 void SupervisionFlow::clearPendingWebStart() {
@@ -34,18 +34,18 @@ void SupervisionFlow::clearPendingWebStart() {
     armedResourceId = requestedAtMs = requestedTimeoutMs = 0;
 }
 
-void SupervisionFlow::enter(const char *requester, const char *hint, uint32_t now, uint32_t deadlineMs) {
+void SupervisionFlow::enter(const char *requester, const FirmwareI18n::Text &hint, uint32_t now, uint32_t deadlineMs) {
     phase = Phase::WaitingForCard;
     cardDetected = keyReady = cardRejected = false;
     terminalEvent = TerminalEvent::None;
     errorIsTerminal = hintReady = false;
-    errorMessage[0] = '\0';
+    errorMessage.clear();
     phaseChangedAtMs = now;
     activeDeadlineMs = deadlineMs;
     strlcpy(requesterName, requester, sizeof(requesterName));
     nfc.resetCardPresence();
     nfc.enableCardDetection();
-    strlcpy(hintMessage, hint, sizeof(hintMessage));
+    hintMessage = hint;
     renderScreen(SupervisionScreen::STATUS_WAITING);
     screen.armCancelGuard();
     Display::transitionToScreen(&screen);
@@ -63,7 +63,7 @@ void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_
     resetActiveTransaction();
     resourceId = id;
     const uint32_t now = millis();
-    enter(requester.c_str(), "Aufsichts-Karte auflegen oder per\nApp/Web bestätigen", now,
+    enter(requester.c_str(), FirmwareI18n::Message::TapSupervisorCardOrApproveInTheAppWebInterface, now,
           now + TIMEOUT_MS);
     api.requestSupervision(resourceId);
 }
@@ -81,7 +81,7 @@ void SupervisionFlow::armWebInitiated(const API::SupervisionStartCommand &comman
 void SupervisionFlow::beginWebInitiated(uint32_t id, const char *requester, uint32_t deadlineMs) {
     webInitiated = true;
     resourceId = id;
-    enter(requester, "Aufsichts-Karte auflegen", millis(), deadlineMs);
+    enter(requester, FirmwareI18n::Message::TapSupervisorCard, millis(), deadlineMs);
 }
 
 bool SupervisionFlow::takePendingWebStart(uint32_t now, bool readerBusy) {
@@ -273,28 +273,31 @@ void SupervisionFlow::processEvent(const Event &event) {
             cardDetected = true;
         }
         break;
-    case EventType::RequestResult:
+    case EventType::RequestResult: {
         if (phase == Phase::Idle || phase == Phase::Success || webInitiated) break;
         if (!event.success) {
-            strlcpy(errorMessage, strcmp(event.error, "NO_SUPERVISORS_AVAILABLE") == 0
-                                        ? "Keine Aufsicht verfügbar"
-                                        : translateReaderError(event.error).c_str(), sizeof(errorMessage));
+            errorMessage = strcmp(event.error, "NO_SUPERVISORS_AVAILABLE") == 0
+                                        ? FirmwareI18n::Message::NoSupervisorAvailable
+                                        : FirmwareI18n::readerError(event.error);
             publishTerminalEvent(TerminalEvent::Failed);
             break;
         }
-        strlcpy(hintMessage, "Aufsichts-Karte auflegen oder per\nApp/Web bestätigen", sizeof(hintMessage));
+        hintMessage = FirmwareI18n::Message::TapSupervisorCardOrApproveInTheAppWebInterface;
+        std::string names;
         for (uint8_t i = 0; i < event.supervisorCount; ++i) {
-            strlcat(hintMessage, i == 0 ? "\n" : ", ", sizeof(hintMessage));
-            strlcat(hintMessage, event.supervisorNames[i], sizeof(hintMessage));
+            if (i > 0) names += ", ";
+            names += event.supervisorNames[i];
         }
+        if (!names.empty()) hintMessage = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {hintMessage, FirmwareI18n::Text::literal(names)});
         hintReady = true;
         break;
+    }
     case EventType::CardAuthentication:
         if (phase != Phase::RequestedAuth) break;
         if (event.error[0] != '\0' || event.keyLen != 16) {
-            strlcpy(errorMessage, strcmp(event.error, "SUPERVISOR_NOT_AUTHORIZED") == 0
-                                        ? "Karte nicht als Aufsicht\nberechtigt"
-                                        : translateReaderError(event.error).c_str(), sizeof(errorMessage));
+            errorMessage = strcmp(event.error, "SUPERVISOR_NOT_AUTHORIZED") == 0
+                                        ? FirmwareI18n::Message::CardIsNotAuthorizedAsASupervisor
+                                        : FirmwareI18n::readerError(event.error);
             cardRejected = true;
             break;
         }
@@ -308,8 +311,8 @@ void SupervisionFlow::processEvent(const Event &event) {
         if (event.success) {
             publishTerminalEvent(TerminalEvent::Resolved);
         } else {
-            strlcpy(errorMessage, event.error[0] != '\0' ? translateReaderError(event.error).c_str()
-                                                          : "Aufsicht abgelehnt", sizeof(errorMessage));
+            errorMessage = event.error[0] != '\0' ? FirmwareI18n::readerError(event.error)
+                                                          : FirmwareI18n::Message::SupervisionDenied;
             publishTerminalEvent(TerminalEvent::Failed);
         }
         break;
@@ -401,7 +404,7 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
                 beeper.successBeep();
                 if (webInitiated) { api.confirmSupervisorCardAuth(resourceId); phase = Phase::Starting; phaseChangedAtMs = now; }
                 else { resetActiveTransaction(); return Outcome::UnlockAndStartSession; }
-            } else { strlcpy(errorMessage, "Karte konnte nicht\ngelesen werden", sizeof(errorMessage)); showError(false, now); }
+            } else { errorMessage = FirmwareI18n::Message::CouldNotReadCard; showError(false, now); }
         }
         break;
     case Phase::Success:

@@ -22,12 +22,21 @@ export function useTwoFactorGate(): TwoFactorGateState {
       return;
     }
 
-    setHasSetupIntent(sessionStorage.getItem('twoFactorSetupIntent') === 'true');
+    try {
+      setHasSetupIntent(sessionStorage.getItem('twoFactorSetupIntent') === 'true');
+    } catch {
+      // Optional setup intent must not prevent the mandatory server-driven gate.
+      setHasSetupIntent(false);
+    }
   }, [isAuthenticated]);
 
   const clearSetupIntent = useCallback(() => {
     if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('twoFactorSetupIntent');
+      try {
+        sessionStorage.removeItem('twoFactorSetupIntent');
+      } catch {
+        // Clearing the in-memory intent still works without browser storage.
+      }
     }
     setHasSetupIntent(false);
   }, []);

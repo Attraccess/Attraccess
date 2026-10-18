@@ -18,7 +18,14 @@ void Application::setupApiCallbacks()
 #ifdef HAS_LVGL_DISPLAY
   this->supervision.setup();
   this->api.onDeviceName(
-      [this](std::string deviceName) { Display::setDeviceName(deviceName); });
+      [this](std::string deviceName) {
+#ifdef DEMO_MODE
+        // The demo transport owns its built-in name; supplied names stay literal.
+        Display::setDemoDeviceName();
+#else
+        Display::setDeviceName(deviceName);
+#endif
+      });
 #endif
 #ifdef HAS_LVGL_DISPLAY
   this->api.setUsageStatsCallback([this](const API::UsageStats &stats) {
@@ -55,6 +62,7 @@ void Application::setupApiCallbacks()
         if (!this->cardAuthenticationPending || this->unlocked) return;
 #endif
         if (response.error.length() > 0) {
+          State::setUserLanguage(false);
           this->logger.errorf("Authentication failed: %s",
                               response.error.c_str());
           this->beeper.errorBeep();
@@ -68,6 +76,7 @@ void Application::setupApiCallbacks()
         }
 
         if (response.keyLen != 16) {
+          State::setUserLanguage(false);
           this->logger.error("Invalid key bytes provided");
           this->beeper.errorBeep();
           this->nfc.enableCardDetection();
@@ -135,7 +144,7 @@ void Application::setupErrorCallbacks()
                 },
                 []() {});
           } else {
-            Display::showErrorPopup("Fehler", translateReaderError("INSUFFICIENT_BALANCE"));
+            Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("INSUFFICIENT_BALANCE"));
           }
           delete p;
         },
@@ -160,15 +169,16 @@ void Application::setupErrorCallbacks()
     // Ensure UI operations on LVGL thread
     struct ErrPayload {
       Application *self;
-      std::string t;
-      std::string m;
+      FirmwareI18n::Text t;
+      FirmwareI18n::Text m;
     };
     ErrPayload *p = new ErrPayload();
     if (!p)
       return;
     p->self = this;
-    p->t = title;
-    p->m = message;
+    p->t = FirmwareI18n::Message::Error;
+    this->logger.errorf("Reader error %s: %s", title, message);
+    p->m = FirmwareI18n::readerError(message);
     Display::asyncCall(
         [](void *u) {
           auto *pl = (ErrPayload *)u;
@@ -237,7 +247,7 @@ void Application::setupActionCallbacks()
           if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
             Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
           } else {
-            Display::showErrorPopup("Aktion fehlgeschlagen", result.error.empty() ? "Bitte erneut versuchen." : translateReaderError(result.error));
+            Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
           }
         }
       }

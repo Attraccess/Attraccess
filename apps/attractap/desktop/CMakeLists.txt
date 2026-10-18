@@ -150,6 +150,17 @@ target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 enable_testing()
 add_test(NAME attractap-desktop-tests COMMAND attractap-desktop-tests)
 
+add_executable(attractap-demo-protocol-tests
+    tests/demo-protocol.test.cpp
+    "${FIRMWARE_DIR}/src/api/demo/websocket.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/sessions.cpp"
+    "${FIRMWARE_DIR}/src/demo/demo_store.cpp")
+target_compile_definitions(attractap-demo-protocol-tests PRIVATE DEMO_MODE)
+target_compile_options(attractap-demo-protocol-tests PRIVATE -UNDEBUG)
+target_link_libraries(attractap-demo-protocol-tests PRIVATE attractap-desktop-runtime)
+add_test(NAME attractap-demo-protocol-tests COMMAND attractap-demo-protocol-tests)
+set_tests_properties(attractap-demo-protocol-tests PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software;SDL_AUDIO_DRIVER=dummy")
 add_executable(attractap-demo-clock-tests tests/demo-clock.test.cpp "${FIRMWARE_DIR}/src/clock/wall_clock.cpp")
 target_include_directories(attractap-demo-clock-tests PRIVATE "${FIRMWARE_DIR}/src")
 target_compile_options(attractap-demo-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
@@ -193,11 +204,13 @@ set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-
 set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
-set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 180)
+# Includes the bilingual reader journey plus four real 30-second expiry windows.
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 240)
 
 # Exercise the production beeper without playing sound on the developer's machine.
 set_property(TEST
     attractap-desktop-tests
+    attractap-demo-protocol-tests
     attractap-desktop-display-tests
     attractap-reader-workflow-tests
     attractap-ota-interrupt-enrollment

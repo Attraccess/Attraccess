@@ -1,7 +1,10 @@
+import { AttractapGateway } from '../../websocket.gateway';
+import { WebsocketService } from '../../websocket.service';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AttractapAuthHandler } from './auth.handler';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { verifyToken } from '../../websocket.utils';
+import { WebSocket } from 'ws';
 
 jest.mock('../../websocket.utils', () => ({
   verifyToken: jest.fn(),
@@ -15,6 +18,7 @@ describe('AttractapAuthHandler', () => {
     id: string;
     readerId: number | null;
     readerName: string | null;
+    readyState: number;
     state: Record<string, unknown>;
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
@@ -39,6 +43,7 @@ describe('AttractapAuthHandler', () => {
       id: 'socket-1',
       readerId: null,
       readerName: null,
+      readyState: WebSocket.OPEN,
       state: {},
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
@@ -62,6 +67,8 @@ describe('AttractapAuthHandler', () => {
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
+    (handler as any).settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
+    (handler as any).websocketService = new WebsocketService();
   });
 
   describe('handleReaderRegister', () => {
@@ -129,6 +136,107 @@ describe('AttractapAuthHandler', () => {
   describe('handleAuthentication', () => {
     const data = { payload: { id: 42, token: 'client-token' } } as AttractapEvent['data'];
 
+    it.each(['lookup', 'token', 'language'])('does not authenticate after closure during %s', async (stage) => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      mockVerifyToken.mockResolvedValue(true);
+      const pending =
+        stage === 'lookup'
+          ? mockAttractapService.findReaderById
+          : stage === 'token'
+            ? mockVerifyToken
+            : (handler as any).settingsService.getDefaultLanguage;
+      pending.mockImplementationOnce(async () => {
+        mockSocket.readyState = WebSocket.CLOSED;
+        return stage === 'lookup' ? { id: 42, name: 'Reader', apiTokenHash: 'hash' } : stage === 'token' ? true : 'de';
+      });
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+      expect(mockMetricsService.attractapReaderConnected.set).not.toHaveBeenCalled();
+    });
+
+    it('delivers a default changed while the initial language read is pending', async () => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      mockVerifyToken.mockResolvedValue(true);
+      let finishRead!: (language: 'en' | 'de') => void;
+      let readStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        readStarted = resolve;
+      });
+      (handler as any).settingsService.getDefaultLanguage.mockImplementation(() => {
+        readStarted();
+        return new Promise((resolve) => {
+          finishRead = resolve;
+        });
+      });
+      const websocketService = (handler as any).websocketService;
+      websocketService.sockets.set(mockSocket.id, mockSocket);
+      const gateway = Object.create(AttractapGateway.prototype);
+      gateway.websocketService = websocketService;
+      const authentication = handler.handleAuthentication(mockSocket as any, data);
+      await started;
+      await gateway.updateReaderLanguage('en');
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+      finishRead('de');
+      await authentication;
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.READER_AUTHENTICATED,
+            payload: {
+              name: 'Reader',
+              language: 'en',
+              serverTime: { epochMs: expect.any(Number), utcOffsetMinutes: expect.any(Number) },
+            },
+          }),
+        }),
+      );
+    });
+
+    it('revokes the previous reader identity when reauthentication fails', async () => {
+      mockSocket.readerId = 99;
+      mockSocket.readerName = 'Old reader';
+      mockAttractapService.findReaderById.mockResolvedValueOnce(null);
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockSocket.readerName).toBeNull();
+      expect(mockMetricsService.attractapReaderConnected.set).toHaveBeenCalledWith(
+        { reader_id: '99', reader_name: 'Old reader' },
+        0,
+      );
+    });
+
+    it('keeps another authenticated connection marked online when revoking the old identity', async () => {
+      mockSocket.readerId = 99;
+      (handler as any).websocketService.sockets.set('other', { id: 'other', readerId: 99 });
+      mockAttractapService.findReaderById.mockResolvedValueOnce(null);
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockMetricsService.attractapReaderConnected.set).not.toHaveBeenCalled();
+    });
+
+    it('does not restore an identity from an older authentication attempt after a newer rejection', async () => {
+      let finishLookup = (_reader: unknown): void => {
+        throw new Error('The earlier authentication lookup has not started');
+      };
+      mockAttractapService.findReaderById
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            finishLookup = resolve;
+          }),
+        )
+        .mockResolvedValueOnce(null);
+      const olderAttempt = handler.handleAuthentication(mockSocket as any, data);
+      await handler.handleAuthentication(mockSocket as any, data);
+      finishLookup({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      await olderAttempt;
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockSocket.sendMessage).toHaveBeenCalledTimes(1);
+      expect(mockVerifyToken).not.toHaveBeenCalled();
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+    });
+
     it('sends READER_UNAUTHORIZED and does not set readerId when reader is not found', async () => {
       mockAttractapService.findReaderById.mockResolvedValue(null);
 
@@ -194,6 +302,7 @@ describe('AttractapAuthHandler', () => {
             type: AttractapEventType.READER_AUTHENTICATED,
             payload: {
               name: 'Reader A',
+              language: 'de',
               serverTime: { epochMs: expect.any(Number), utcOffsetMinutes: expect.any(Number) },
             },
           }),
