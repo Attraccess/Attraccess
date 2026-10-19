@@ -1,7 +1,7 @@
 import { createBrokerTls } from './broker-tls.mjs';
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, lstat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -26,6 +26,46 @@ export function validateFixtureEnvironment(env) {
     if (env[key]) throw new Error(`Refusing inherited application or fixture setting: ${key}`);
   return context;
 }
+// Persist independent cleanup results even when one resource cannot be removed.
+export async function cleanupFixtureResources({ removeBroker, temporary, output, lifecycle }, removeDirectory = rm) {
+  const resources = { broker: 'failed', storage: 'failed' };
+  let failure;
+  try {
+    resources.broker = await removeBroker();
+  } catch (error) {
+    failure = error;
+  }
+  try {
+    await removeDirectory(temporary, { recursive: true, force: true });
+    try {
+      await lstat(temporary);
+      throw new Error('Fixture directory still exists after cleanup');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    resources.storage = 'removed';
+  } catch (error) {
+    failure ??= error;
+  }
+  const cleanup = failure ? 'failed' : resources.broker;
+  if (output)
+    await writeFile(
+      output,
+      JSON.stringify(
+        {
+          ...lifecycle,
+          finishedAt: new Date().toISOString(),
+          outcome: failure ? 'failed' : lifecycle.outcome,
+          cleanup,
+          resources,
+        },
+        null,
+        2,
+      ),
+    );
+  if (failure) throw failure;
+}
+
 export async function runBrokerFixture({
   config = 'apps/plugins/wago/scripts/jest.production-fleet.config.cjs',
   environment = {},
@@ -44,7 +84,6 @@ export async function runBrokerFixture({
   let forceStop;
   let interrupted = false;
   let outcome = 'failed';
-  let cleanup = 'pending';
   const startedAt = new Date().toISOString();
   const docker = async (...args) => {
     try {
@@ -214,40 +253,26 @@ export async function runBrokerFixture({
     if (status !== 0 || interrupted) process.exitCode = 1;
   } finally {
     try {
-      cleanup = 'failed';
-      // docker run can create the container before failing or timing out, without
-      // returning its ID. Recover by name only after verifying this run's label.
-      if (!container) container = await recoverOwnedContainer();
-      if (container) {
-        const verified = await recoverOwnedContainer();
-        if (verified !== container) throw new Error('Container ownership changed before cleanup');
-        await docker('rm', '-f', '-v', container);
-        cleanup = 'removed';
-        process.stdout.write(`Removed owned RabbitMQ container ${name}\n`);
-      } else cleanup = 'no-container';
+      await cleanupFixtureResources({
+        temporary,
+        output,
+        lifecycle: { startedAt, outcome: interrupted ? 'interrupted' : outcome },
+        removeBroker: async () => {
+          // A timed-out run may have created a container without returning its ID.
+          if (!container) container = await recoverOwnedContainer();
+          if (!container) return 'no-container';
+          const verified = await recoverOwnedContainer();
+          if (verified !== container) throw new Error('Container ownership changed before cleanup');
+          await docker('rm', '-f', '-v', container);
+          if (await recoverOwnedContainer()) throw new Error('Owned RabbitMQ container still exists after cleanup');
+          process.stdout.write(`Removed owned RabbitMQ container ${name}\n`);
+          return 'removed';
+        },
+      });
     } finally {
-      try {
-        await rm(temporary, { recursive: true, force: true });
-        process.stdout.write(`Removed fixture directory ${temporary}\n`);
-      } finally {
-        if (output)
-          await writeFile(
-            output,
-            JSON.stringify(
-              {
-                startedAt,
-                finishedAt: new Date().toISOString(),
-                outcome: interrupted ? 'interrupted' : outcome,
-                cleanup,
-              },
-              null,
-              2,
-            ),
-          );
-        if (forceStop) clearTimeout(forceStop);
-        process.off('SIGINT', interrupt);
-        process.off('SIGTERM', interrupt);
-      }
+      if (forceStop) clearTimeout(forceStop);
+      process.off('SIGINT', interrupt);
+      process.off('SIGTERM', interrupt);
     }
   }
 }

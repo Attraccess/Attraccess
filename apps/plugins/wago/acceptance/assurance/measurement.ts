@@ -89,23 +89,23 @@ export async function measure(options: Options, output: string, fixture = new As
             transportAcknowledgementTimeouts: fixture.transportAcknowledgementTimeouts,
             intentionalDiscard:
               fixture.retiredStaleDiscarded +
-              fixture.devices.reduce((sum, device) => sum + device.transport.statistics.staleDiscarded, 0),
+              fixture.devices.reduce((sum, device) => sum + (device.transport?.statistics.staleDiscarded ?? 0), 0),
             transportOversizedRejected:
               fixture.retiredTransportRejected +
-              fixture.devices.reduce((sum, device) => sum + device.transport.statistics.oversizedRejected, 0),
+              fixture.devices.reduce((sum, device) => sum + (device.transport?.statistics.oversizedRejected ?? 0), 0),
             runtimeRejected: Object.fromEntries(
               (['parsing', 'structure', 'validation'] as const).map((reason) => [
                 reason,
                 fixture.retiredRuntimeRejected[reason] +
                   fixture.devices.reduce(
-                    (sum, device) => sum + device.runtime.messageStatistics.runtimeRejected[reason],
+                    (sum, device) => sum + (device.runtime?.messageStatistics.runtimeRejected[reason] ?? 0),
                     0,
                   ),
               ]),
             ),
             wireAdmissionRejected:
               fixture.retiredWireRejected +
-              fixture.devices.reduce((sum, device) => sum + device.runtime.messageStatistics.rejected, 0) +
+              fixture.devices.reduce((sum, device) => sum + (device.runtime?.messageStatistics.rejected ?? 0), 0) +
               (fixture.backend?.messageStatistics.rejected ?? 0),
           },
           peakRss,

@@ -65,3 +65,65 @@ it('flushes counters synchronously on graceful termination between checkpoints',
   reject(new Error('stop test'));
   await expect(execution).rejects.toThrow('stop test');
 });
+
+it.each(['connect', 'runtime'])('retains each counter once when replacement fails during %s', async (failure) => {
+  const fixture = new AssuranceFixture();
+  const device = {
+    username: 'fixture',
+    password: 'fixture',
+    hardwareId: 'fixture',
+    transport: { statistics: { staleDiscarded: 2, oversizedRejected: 3, acknowledgementTimeouts: 4 } },
+    runtime: { messageStatistics: { rejected: 5, runtimeRejected: { parsing: 6, structure: 7, validation: 8 } } },
+  } as unknown as AssuranceFixture['devices'][number];
+  fixture.devices.push(device);
+  const { WagoRuntime } = await import('../../cc100-runtime/src/runtime');
+  jest.spyOn(WagoRuntime.prototype, 'start').mockImplementation(async function (
+    this: InstanceType<typeof WagoRuntime>,
+  ) {
+    await this.receiveCommand(Buffer.from('{'));
+    throw new Error('startup failed');
+  });
+  const client = { on: jest.fn() } as unknown as Awaited<ReturnType<AssuranceFixture['connect']>>;
+  const connect = jest.spyOn(fixture, 'connect');
+  if (failure === 'connect') connect.mockRejectedValue(new Error('startup failed'));
+  else connect.mockResolvedValue(client);
+  jest.spyOn(fixture, 'start').mockImplementation(() => fixture.startDevice(device));
+  jest.spyOn(fixture, 'close').mockResolvedValue();
+  await expect(measure(options, directory, fixture)).rejects.toThrow('startup failed');
+  const report = JSON.parse(await readFile(join(directory, 'measurements.json'), 'utf8'));
+  expect(report.counters).toMatchObject({
+    intentionalDiscard: 2,
+    transportOversizedRejected: 3,
+    transportAcknowledgementTimeouts: 4,
+    wireAdmissionRejected: 5,
+    runtimeRejected: { parsing: failure === 'runtime' ? 7 : 6, structure: 7, validation: 8 },
+  });
+});
+
+it.each(['connect', 'runtime'])(
+  'reports initial startup failure during %s without losing counters',
+  async (failure) => {
+    const fixture = new AssuranceFixture();
+    const device = {
+      username: 'fixture',
+      password: 'fixture',
+      hardwareId: 'fixture',
+    } as AssuranceFixture['devices'][number];
+    const { WagoRuntime } = await import('../../cc100-runtime/src/runtime');
+    jest.spyOn(WagoRuntime.prototype, 'start').mockImplementation(async function (
+      this: InstanceType<typeof WagoRuntime>,
+    ) {
+      await this.receiveCommand(Buffer.from('{'));
+      throw new Error('startup failed');
+    });
+    const connect = jest.spyOn(fixture, 'connect');
+    if (failure === 'connect') connect.mockRejectedValue(new Error('startup failed'));
+    else connect.mockResolvedValue({ on: jest.fn() } as unknown as Awaited<ReturnType<AssuranceFixture['connect']>>);
+    jest.spyOn(fixture, 'start').mockImplementation(() => fixture.startDevice(device));
+    jest.spyOn(fixture, 'close').mockResolvedValue();
+    await expect(measure(options, directory, fixture)).rejects.toThrow('startup failed');
+    expect(fixture.devices).toEqual([device]);
+    const report = JSON.parse(await readFile(join(directory, 'measurements.json'), 'utf8'));
+    expect(report.counters.runtimeRejected.parsing).toBe(failure === 'runtime' ? 1 : 0);
+  },
+);

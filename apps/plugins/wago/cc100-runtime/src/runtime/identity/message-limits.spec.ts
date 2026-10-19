@@ -120,4 +120,71 @@ describe('runtime wire admission', () => {
       clock.mockRestore();
     }
   }, 60_000);
+  it('reclaims known reservations exactly at expiry and protects legacy identities across restart', async () => {
+    const expiry = Date.parse('2026-10-19T12:00:00Z');
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(expiry - 1);
+    let state: RuntimeState = {
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: {},
+      commandIds: Array.from({ length: MESSAGE_LIMITS.retainedCommands }, (_, i) => `reserved-${i}`),
+      commandExpiries: { 'reserved-1': new Date(expiry).toISOString() },
+    };
+    const publish = jest.fn(async () => undefined);
+    const device = new MemoryDeviceAdapter();
+    const create = () =>
+      new WagoRuntime({
+        hardwareId: 'fixture',
+        prefix: 'fixture',
+        pairingCode: 'fixture',
+        device,
+        store: {
+          load: async () => state,
+          save: async (next) => {
+            state = next;
+          },
+        },
+        transport: { publish, subscribe: async () => undefined },
+      });
+    const send = (runtime: WagoRuntime, id: string) =>
+      runtime.receiveCommand(
+        Buffer.from(JSON.stringify(validCommand({ id, expiresAt: new Date(expiry + 60_000).toISOString() }))),
+      );
+    try {
+      let runtime = create();
+      await runtime.start();
+      const write = jest.spyOn(device, 'write');
+      await send(runtime, 'new-before');
+      expect(publish).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ code: 'replay_history_full' }),
+        undefined,
+      );
+      expect(write).not.toHaveBeenCalled();
+      clock.mockReturnValue(expiry);
+      await send(runtime, 'new-at-boundary');
+      expect(state.commandIds).toHaveLength(MESSAGE_LIMITS.retainedCommands);
+      expect(state.commandIds).toContain('reserved-0');
+      expect(state.commandIds).not.toContain('reserved-1');
+      expect(state.commandIds).toContain('new-at-boundary');
+      runtime = create();
+      await runtime.start();
+      write.mockClear();
+      await send(runtime, 'reserved-0');
+      expect(publish).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ id: 'reserved-0', status: 'duplicate' }),
+        undefined,
+      );
+      await send(runtime, 'overflow-after-restart');
+      expect(publish).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.objectContaining({ code: 'replay_history_full' }),
+        undefined,
+      );
+      expect(write).not.toHaveBeenCalled();
+      expect(state.commandIds).toContain('reserved-0');
+    } finally {
+      clock.mockRestore();
+    }
+  });
 });

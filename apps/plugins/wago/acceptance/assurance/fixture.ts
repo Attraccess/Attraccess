@@ -81,7 +81,7 @@ export class AssuranceFixture {
   get transportAcknowledgementTimeouts() {
     return (
       this.retiredAcknowledgementTimeouts +
-      this.devices.reduce((sum, device) => sum + device.transport.statistics.acknowledgementTimeouts, 0)
+      this.devices.reduce((sum, device) => sum + (device.transport?.statistics.acknowledgementTimeouts ?? 0), 0)
     );
   }
   readonly directory = process.env.WAGO_FLEET_TEMP ? join(process.env.WAGO_FLEET_TEMP, randomUUID()) : '';
@@ -221,7 +221,6 @@ export class AssuranceFixture {
       });
       const device = { id: controller.id, hardwareId, username, password: credential.password, store } as Device;
       await this.startDevice(device);
-      this.devices.push(device);
     }
     await this.startBackend();
     await this.fresh();
@@ -277,6 +276,28 @@ export class AssuranceFixture {
   }
 
   async startDevice(device: Device) {
+    // Keep partially started instances visible to failure and interruption reports.
+    if (!this.devices.includes(device)) this.devices.push(device);
+    const connectingAt = Date.now();
+    const client = await this.connect(device.username, device.password, 100);
+    device.connectMs = Date.now() - connectingAt;
+    const adapter = new MemoryDeviceAdapter();
+    const write = adapter.write.bind(adapter);
+    adapter.write = async (...args) => {
+      await write(...args);
+      this.counts.runtimeWrites++;
+    };
+    const transport = new MqttTransport(client, () => this.recordError('runtime callback failed'));
+    const runtime = new WagoRuntime({
+      hardwareId: device.hardwareId,
+      prefix: this.prefix,
+      pairingCode: 'fixture',
+      store: device.store,
+      device: adapter,
+      transport,
+    });
+    // Transfer ownership only after connection and construction succeed. No await
+    // can expose retired counters alongside their old live instances.
     if (device.transport) {
       this.retiredStaleDiscarded += device.transport.statistics.staleDiscarded;
       this.retiredTransportRejected += device.transport.statistics.oversizedRejected;
@@ -287,24 +308,7 @@ export class AssuranceFixture {
       for (const reason of ['parsing', 'structure', 'validation'] as const)
         this.retiredRuntimeRejected[reason] += device.runtime.messageStatistics.runtimeRejected[reason];
     }
-    const connectingAt = Date.now();
-    device.client = await this.connect(device.username, device.password, 100);
-    device.connectMs = Date.now() - connectingAt;
-    device.adapter = new MemoryDeviceAdapter();
-    const write = device.adapter.write.bind(device.adapter);
-    device.adapter.write = async (...args) => {
-      await write(...args);
-      this.counts.runtimeWrites++;
-    };
-    device.transport = new MqttTransport(device.client, () => this.recordError('runtime callback failed'));
-    device.runtime = new WagoRuntime({
-      hardwareId: device.hardwareId,
-      prefix: this.prefix,
-      pairingCode: 'fixture',
-      store: device.store,
-      device: device.adapter,
-      transport: device.transport,
-    });
+    Object.assign(device, { client, adapter, transport, runtime });
     await device.runtime.start();
   }
 

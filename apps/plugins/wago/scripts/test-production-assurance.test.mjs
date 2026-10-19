@@ -104,3 +104,46 @@ test('exceptional fixture cleanup still invalidates source drift and preserves t
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('cleanup records storage failure after broker removal and verifies directory absence', async () => {
+  const { cleanupFixtureResources } = await import('./broker-fixture.mjs');
+  const evidence = await mkdtemp(join(tmpdir(), 'wago-cleanup-evidence-'));
+  const temporary = await mkdtemp(join(tmpdir(), 'wago-cleanup-resource-'));
+  const output = join(evidence, 'lifecycle.json');
+  try {
+    for (const removeDirectory of [
+      async () => {
+        throw new Error('removal denied');
+      },
+      async () => {},
+    ]) {
+      await assert.rejects(
+        cleanupFixtureResources(
+          {
+            removeBroker: async () => 'removed',
+            temporary,
+            output,
+            lifecycle: { outcome: 'passed' },
+          },
+          removeDirectory,
+        ),
+      );
+      const report = JSON.parse(await readFile(output, 'utf8'));
+      assert.equal(report.outcome, 'failed');
+      assert.equal(report.cleanup, 'failed');
+      assert.deepEqual(report.resources, { broker: 'removed', storage: 'failed' });
+    }
+    await cleanupFixtureResources({
+      removeBroker: async () => 'removed',
+      temporary,
+      output,
+      lifecycle: { outcome: 'passed' },
+    });
+    const report = JSON.parse(await readFile(output, 'utf8'));
+    assert.equal(report.cleanup, 'removed');
+    assert.deepEqual(report.resources, { broker: 'removed', storage: 'removed' });
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+    await rm(evidence, { recursive: true, force: true });
+  }
+});

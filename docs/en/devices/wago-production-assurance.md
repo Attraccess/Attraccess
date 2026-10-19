@@ -194,7 +194,7 @@ cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
 substitutes for sustained evidence.
 
-## Current assurance report selection
+## Assurance reports before startup and cleanup reporting corrections
 
 The identifier validation and measurement-reporting corrections in commit
 `12b7f675251d31d9d1c65754cc022f507ebb2cf3` have implementation fingerprint
@@ -213,6 +213,13 @@ cleanup and revision-bound CI results are recorded in
 These reports cover software fixtures. Physical qualification, real SSH recovery
 and independent penetration and safety reviews remain outstanding. Later
 workflow QA and human delivery approval have their own revision-bound gates.
+
+The later startup-counter and cleanup-reporting corrections change the fixture
+implementation: partially started devices remain visible, counter ownership moves
+only after a replacement connects, and lifecycle reports verify broker and
+storage removal separately. The reports above remain historical evidence for
+their recorded fingerprint. They do not validate these later failure paths;
+select fresh source-matched reports before making current assurance claims.
 
 ## Structural configuration rejection validation on 2026-10-17
 
