@@ -221,6 +221,25 @@ storage removal separately. The reports above remain historical evidence for
 their recorded fingerprint. They do not validate these later failure paths;
 select fresh source-matched reports before making current assurance claims.
 
+## Selecting reports after startup and cleanup reporting corrections
+
+The startup-counter and cleanup-reporting implementation in commit
+`3b4b1e6c1d46a43c2f72fd860d52f30a5da01f8e` has fingerprint
+`0eed388c1894c14fe6d8d02f314efd720f28e4a7a98ea4d6d358a82905748ae1`.
+For this implementation, select `ci-counter-fix/short-final` and
+`review-fix-startup-sustained-8` in Factory run
+`9ec4136d-070f-4f85-ab23-d75f9da50a64`. The sustained profile requests two
+software controllers, 3,600 seconds of offered workload and stages of 2, 4, 8
+and repeated 8 commands per second.
+
+Before using either report, verify its source fingerprint and completed outcome.
+Use actual achieved throughput, counters and the repeated passing stage from
+`measurements.json`; requested rates alone do not establish a recommendation.
+Require `lifecycle.json` to confirm both broker and storage removal. The matching
+reports, final revision and CI receipt are checked together in
+`review-fix-startup-validation.json`. These remain software-fixture reports;
+physical qualification and independent reviews are still outstanding.
+
 ## Structural configuration rejection validation on 2026-10-17
 
 Commit `614eebb6d57ee4785bdfe652e5f72d3faeb049f9` restores a bounded reported
