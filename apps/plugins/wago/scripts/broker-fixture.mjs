@@ -10,6 +10,22 @@ import { promisify } from 'node:util';
 // Every run owns one container, ephemeral loopback port, and temporary directory.
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../../..');
+export function validateFixtureEnvironment(env) {
+  const context = env.WAGO_FLEET_DOCKER_CONTEXT;
+  if (!context || !/^[A-Za-z0-9_.-]+$/.test(context)) throw new Error('Select an explicit WAGO_FLEET_DOCKER_CONTEXT');
+  for (const key of [
+    'WAGO_FLEET_MQTT_URL',
+    'WAGO_FLEET_MANAGEMENT_URL',
+    'WAGO_FLEET_MQTTS_URL',
+    'WAGO_FLEET_HTTPS_URL',
+    'WAGO_FLEET_MQTT_PASSWORD',
+    'WAGO_FLEET_TEMP',
+    'DATABASE_URL',
+    'STORAGE_ROOT',
+  ])
+    if (env[key]) throw new Error(`Refusing inherited application or fixture setting: ${key}`);
+  return context;
+}
 export async function runBrokerFixture({
   config = 'apps/plugins/wago/scripts/jest.production-fleet.config.cjs',
   environment = {},
@@ -17,16 +33,7 @@ export async function runBrokerFixture({
   tls = false,
   resources = { memoryMiB: 1024, cpus: 2 },
 } = {}) {
-  const context = process.env.WAGO_FLEET_DOCKER_CONTEXT;
-  if (!context || !/^[A-Za-z0-9_.-]+$/.test(context)) throw new Error('Select an explicit WAGO_FLEET_DOCKER_CONTEXT');
-  for (const key of [
-    'WAGO_FLEET_MQTT_URL',
-    'WAGO_FLEET_MQTT_PASSWORD',
-    'WAGO_FLEET_TEMP',
-    'DATABASE_URL',
-    'STORAGE_ROOT',
-  ])
-    if (process.env[key]) throw new Error(`Refusing inherited application or fixture setting: ${key}`);
+  const context = validateFixtureEnvironment(process.env);
   const temporary = await mkdtemp(join(tmpdir(), 'wago-production-fleet-'));
   const name = `wago-production-fleet-${randomUUID()}`;
   const owner = randomUUID();

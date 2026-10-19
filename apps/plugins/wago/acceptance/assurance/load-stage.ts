@@ -99,3 +99,13 @@ export async function runLoadStage(options: {
     stage.offered === stage.acknowledged;
   return stage;
 }
+
+/** Only the workload achieved in both passing stages supports a recommendation. */
+export function measuredRecommendation(stages: Stage[], requestedRate: number): number | null {
+  const original = stages.find((stage) => stage.rate === requestedRate && !stage.repeat && stage.passed);
+  const repeat = stages.find((stage) => stage.rate === requestedRate && stage.repeat && stage.passed);
+  if (!original || !repeat) return null;
+  return Math.min(
+    ...[original, repeat].flatMap((stage) => [stage.offered / stage.seconds, stage.achievedCommandsPerSecond]),
+  );
+}

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { cpus, freemem, totalmem, platform, release } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runBrokerFixture } from './broker-fixture.mjs';
+import { runBrokerFixture, validateFixtureEnvironment } from './broker-fixture.mjs';
 
 export function assuranceOptions(env) {
   const integer = (key, fallback, minimum, maximum) => {
@@ -34,7 +34,8 @@ export function assuranceOptions(env) {
   };
 }
 
-export async function main(env = process.env) {
+export async function main(env = process.env, fixture = runBrokerFixture, fingerprint = sourceFingerprint) {
+  validateFixtureEnvironment(env);
   const options = assuranceOptions(env);
   if (options.faults.length > 16) throw new Error('At most 16 scheduled recovery exercises are supported');
   if (options.faults.some((fault) => !['runtime', 'plugin', 'broker'].includes(fault)))
@@ -50,7 +51,7 @@ export async function main(env = process.env) {
     evidenceClass: 'software-fixtures-only',
     revision: git('rev-parse', 'HEAD').trim(),
     dirty: Boolean(git('status', '--porcelain').trim()),
-    sourceSha256: sourceFingerprint(root),
+    sourceSha256: fingerprint(root),
     diffSha256: createHash('sha256').update(diff).digest('hex'),
     node: process.version,
     plugin: JSON.parse(await readFile(join(root, 'apps/plugins/wago/package.json'), 'utf8')).version,
@@ -68,19 +69,22 @@ export async function main(env = process.env) {
   };
   await writeFile(join(output, 'environment.json'), JSON.stringify(metadata, null, 2));
   process.stdout.write(`Software assurance evidence: ${output}\n`);
-  await runBrokerFixture({
-    tls: true,
-    resources: { memoryMiB: options.brokerMemoryMiB, cpus: options.brokerCpus },
-    config: 'apps/plugins/wago/scripts/jest.production-assurance.config.cjs',
-    environment: { WAGO_ASSURANCE_OPTIONS: JSON.stringify(options), WAGO_ASSURANCE_OUTPUT: output },
-    output: join(output, 'lifecycle.json'),
-  });
-  if (sourceFingerprint(root) !== metadata.sourceSha256) {
-    await writeFile(
-      join(output, 'source-drift.json'),
-      JSON.stringify({ outcome: 'invalid', reason: 'Implementation changed during the run' }),
-    );
-    throw new Error('Implementation changed during assurance; measurements cannot support an envelope');
+  try {
+    await fixture({
+      tls: true,
+      resources: { memoryMiB: options.brokerMemoryMiB, cpus: options.brokerCpus },
+      config: 'apps/plugins/wago/scripts/jest.production-assurance.config.cjs',
+      environment: { WAGO_ASSURANCE_OPTIONS: JSON.stringify(options), WAGO_ASSURANCE_OUTPUT: output },
+      output: join(output, 'lifecycle.json'),
+    });
+  } finally {
+    if (fingerprint(root) !== metadata.sourceSha256) {
+      await writeFile(
+        join(output, 'source-drift.json'),
+        JSON.stringify({ outcome: 'invalid', reason: 'Implementation changed during the run' }),
+      );
+      process.exitCode = 1;
+    }
   }
 }
 if (process.argv[1] === import.meta.filename) await main();

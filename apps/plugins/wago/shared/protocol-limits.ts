@@ -23,7 +23,9 @@ export function isIdentifier(value: unknown): value is string {
     value.length <= MESSAGE_LIMITS.identifierLength &&
     value.trim() === value &&
     !/[\s/+#]/.test(value) &&
-    ![...value].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+    ![...value].some(
+      (character) => character.charCodeAt(0) < 32 || (character.charCodeAt(0) >= 127 && character.charCodeAt(0) <= 159),
+    )
   );
 }
 

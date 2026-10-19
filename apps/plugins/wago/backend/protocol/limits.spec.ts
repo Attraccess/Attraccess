@@ -216,6 +216,36 @@ describe('wire resource budgets', () => {
       expect(isIdentifier(id)).toBe(false);
   });
 
+  it.each(['\u0080', '\u009f'])(
+    'rejects C1 controls through both validators and operational parsing: %s',
+    (control) => {
+      const id = `channel${control}`;
+      const configuration = {
+        version: 1,
+        physicalPoints: [{ id: 'p', hardwareProfile: '879-3000', channel: 0 }],
+        logicalChannels: [
+          {
+            id,
+            physicalPointId: 'p',
+            profile: 'generic-digital-output',
+            capabilities: ['output'],
+            disconnectPolicy: { mode: 'hold' },
+          },
+        ],
+      };
+      expect(isIdentifier(id)).toBe(false);
+      expect(validateSnapshot(configuration)).toContainEqual(expect.objectContaining({ code: 'invalid_id' }));
+      expect(validateRuntime(configuration)).toContainEqual(expect.objectContaining({ code: 'invalid_id' }));
+      expect(() =>
+        parseHeartbeat(
+          Buffer.from(
+            JSON.stringify({ hardwareId: id, protocolVersion: '1.0.0', runtimeVersion: '1', capabilities: [] }),
+          ),
+        ),
+      ).toThrow();
+    },
+  );
+
   it('preserves synchronous callbacks and lets their own bounded queues handle bursts', () => {
     const admission = new MessageAdmission(1);
     const consume = jest.fn();

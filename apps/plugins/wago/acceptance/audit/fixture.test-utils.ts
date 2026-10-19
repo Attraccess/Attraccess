@@ -120,15 +120,17 @@ export class AuditFixtureState {
           provide: ApiTokenService,
           useValue: {
             authenticate: async (token: string) =>
-              ['fixture-token', 'command-token'].includes(token)
+              ['fixture-token', 'command-token', 'read-token'].includes(token)
                 ? {
                     user: { id: principal.userId },
                     apiToken: {
                       id: principal.apiTokenId,
                       permissionKeys:
-                        token === 'command-token'
-                          ? ['resources.update']
-                          : ['resources.update', 'system.settings.manage'],
+                        token === 'read-token'
+                          ? []
+                          : token === 'command-token'
+                            ? ['resources.update']
+                            : ['resources.update', 'system.settings.manage'],
                     },
                   }
                 : null,

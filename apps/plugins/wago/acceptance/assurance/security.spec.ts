@@ -146,6 +146,60 @@ describe('independent broker identities and verified TLS', () => {
     evidence.push('enrollment namespace cannot subscribe to operational commands; anonymous CONNECT denied');
   });
 
+  it('denies controller reads and injection into enrollment topics, including retained claims', async () => {
+    const identity = `enrollment-${randomUUID()}`;
+    const root = `${fixture.prefix}/discovery/${randomUUID()}`;
+    const credential = await fixture.provider.provision(request(identity, root));
+    const enrollment = await fixture.connect(identity, credential.password);
+    const claim = `${root}/claim`;
+    const heartbeat = `${root}/heartbeat`;
+    const received: string[] = [];
+    const observe = (topic: string) => {
+      if (topic === heartbeat) received.push(topic);
+    };
+    fixture.backendClient.on('message', observe);
+    try {
+      await fixture.backendClient.subscribeAsync(heartbeat, { qos: 1 });
+      await enrollment.publishAsync(heartbeat, 'authorized', { qos: 1 });
+      await eventually(() => received.length === 1);
+      received.length = 0;
+      await fixture.backendClient.publishAsync(claim, 'private enrollment claim', { qos: 1, retain: true });
+      const claims: string[] = [];
+      enrollment.on('message', (topic, body) => {
+        if (topic === claim) claims.push(body.toString());
+      });
+      await enrollment.subscribeAsync(claim, { qos: 1 });
+      await eventually(() => claims.length === 1);
+      for (const topic of [claim, heartbeat]) {
+        const attacker = await fixture.connect(fixture.devices[0].username, fixture.devices[0].password);
+        const leaked: string[] = [];
+        attacker.on('message', (incoming) => leaked.push(incoming));
+        try {
+          await deny(attacker.subscribeAsync(topic, { qos: 1 }));
+          await delay(250);
+          expect(leaked).toEqual([]);
+        } finally {
+          await attacker.endAsync(true);
+        }
+        const writer = await fixture.connect(fixture.devices[0].username, fixture.devices[0].password);
+        try {
+          await deny(writer.publishAsync(topic, 'unauthorized', { qos: 1 }));
+        } finally {
+          await writer.endAsync(true);
+        }
+      }
+      await delay(250);
+      expect(received).toEqual([]);
+      expect(claims).toEqual(['private enrollment claim']);
+      evidence.push('controller enrollment publish/subscribe denied; retained claim remains private and unchanged');
+    } finally {
+      fixture.backendClient.off('message', observe);
+      await fixture.backendClient.publishAsync(claim, '', { qos: 1, retain: true });
+      await enrollment.endAsync(true);
+      await fixture.provider.revoke({ mqttServerId: 1, identity, username: identity, vhost: '/' });
+    }
+  });
+
   it('revokes an active controller connection and refuses new sessions with its old secret', async () => {
     const device = fixture.devices[1];
     device.client.options.reconnectPeriod = 0;
