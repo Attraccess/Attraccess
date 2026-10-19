@@ -183,10 +183,11 @@ def preflight_inventory(inventory, hmac_id):
     if not isinstance(module, str) or not re.fullmatch(r'[A-Za-z0-9._-]{1,80}', module) or module.lower() in {'unknown', 'none', 'null'}:
         raise ValueError('Unknown board/module')
     efuses = inventory.get('efuses', {})
-    for name in ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']:
+    # esptool 5.6.0 exposes a two-bit major and calculated four-bit minor.
+    for name, maximum in [('WAFER_VERSION_MAJOR', 3), ('WAFER_VERSION_MINOR', 15)]:
         revision = efuses.get(name, {})
         value = revision.get('value')
-        if revision.get('readable') is not True or type(value) is not int or not 0 <= value <= 3:
+        if revision.get('readable') is not True or type(value) is not int or not 0 <= value <= maximum:
             raise ValueError('Unknown silicon revision')
     # This initial provisioning path accepts only unlocked blank security state.
     # Locked devices need a separately qualified recovery, never a force override.

@@ -145,7 +145,7 @@ class OfflineDSPreparation(unittest.TestCase):
         for field in ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']:
             for value in [None, {'value': 'unknown', 'readable': False},
                           {'value': 0, 'readable': False}, {'value': True, 'readable': True},
-                          {'value': -1, 'readable': True}, {'value': '0', 'readable': True}]:
+                          {'value': -1, 'readable': True}, {'value': 16, 'readable': True}, {'value': '0', 'readable': True}]:
                 with self.subTest(field=field, value=value):
                     efuses = {name: {'value': 0, 'readable': True} for name in
                               ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']}
@@ -182,6 +182,7 @@ class OfflineDSPreparation(unittest.TestCase):
             efuses[f'KEY_PURPOSE_{index}'] = {'value': 'USER', 'writeable': True}
             efuses[f'BLOCK_KEY{index}'] = {'value': 'empty', 'raw_value': 'empty', 'readable': True, 'writeable': True}
         efuses.update({name: {'value': 0, 'readable': True} for name in ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']})
+        efuses['WAFER_VERSION_MINOR']['value'] = 15
         inventory = {'target': 'esp32s3', 'board': 'attractap-touch', 'module': 'HostFixture',
                      'flashBytes': 0x1000000, 'toolVersion': '5.6.0', 'efuses': efuses}
         inventoryfile = self.directory / 'inventory.json'
