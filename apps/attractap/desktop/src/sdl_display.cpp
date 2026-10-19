@@ -105,15 +105,16 @@ bool SdlDisplay::saveScreenshot(const std::filesystem::path &path) const
     return saved;
 }
 
-bool SdlDisplay::saveDisplayScreenshot(const std::filesystem::path &path) const
+bool SdlDisplay::saveDisplayScreenshot(SDL_IOStream *output) const
 {
+    if (!window || !renderer || !texture || !output) return false;
     SDL_Surface *raw = SDL_CreateSurfaceFrom(Width, Height, SDL_PIXELFORMAT_RGB565,
                                             const_cast<uint16_t *>(framebuffer.data()), Width * sizeof(uint16_t));
     if (!raw) return false;
     SDL_Surface *frame = SDL_ConvertSurface(raw, SDL_PIXELFORMAT_RGBA32);
     SDL_DestroySurface(raw);
     if (!frame) return false;
-    const bool saved = SDL_SavePNG(frame, path.c_str());
+    const bool saved = SDL_SavePNG_IO(frame, output, false);
     SDL_DestroySurface(frame);
     return saved;
 }

@@ -16,6 +16,7 @@ import { createHash } from 'crypto';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { DesktopDiagnostics } from './desktop-simulator-diagnostics';
+import { withDesktopCleanup } from './desktop-simulator-cleanup';
 
 export const repositoryRoot = resolve(__dirname, '../../../..');
 export const buildDirectory = join(repositoryRoot, 'dist/apps/attractap-desktop');
@@ -153,8 +154,12 @@ export class DesktopFixture {
         return existsSync(join(this.control, 'ready'));
       }, 'reader authentication');
     } catch (error) {
-      await this.stop();
-      throw error;
+      await withDesktopCleanup(
+        async () => {
+          throw error;
+        },
+        () => this.dispose(),
+      );
     }
   }
 
@@ -291,8 +296,8 @@ export class DesktopFixture {
       await this.exited;
       clearTimeout(timer);
     }
-    writeFileSync(join(this.screenshots, `launch-${this.launch}.log`), this.diagnostics.sanitize(this.output));
     this.simulator = undefined;
+    writeFileSync(join(this.screenshots, `launch-${this.launch}.log`), this.diagnostics.sanitize(this.output));
   }
 
   async dispose() {

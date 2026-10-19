@@ -25,7 +25,7 @@ public:
     bool readTouch(TouchPoint &point) override;
     bool pollEvents();
     bool saveScreenshot(const std::filesystem::path &path) const;
-    bool saveDisplayScreenshot(const std::filesystem::path &path) const;
+    bool saveDisplayScreenshot(SDL_IOStream *output) const;
     void setCardPresenceCallback(std::function<void(size_t, bool)> callback) { cardMenu.setCardPresenceCallback(std::move(callback)); }
     void setClearCardCallback(std::function<void(size_t)> callback) { cardMenu.setClearCardCallback(std::move(callback)); }
 

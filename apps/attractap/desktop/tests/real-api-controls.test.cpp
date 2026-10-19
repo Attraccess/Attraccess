@@ -30,6 +30,13 @@ int main()
         std::filesystem::path path;
         ~Cleanup() { std::filesystem::remove_all(path); }
     } cleanup{profile};
+    std::filesystem::create_directories(profile);
+    // An uninitialized display must refuse capture without creating a file.
+    {
+        SdlDisplay unavailable;
+        assert(!saveOwnedScreenshot(unavailable, profile, "unavailable"));
+        assert(!std::filesystem::exists(profile / "unavailable.png"));
+    }
     DesktopSimulator simulator("http://127.0.0.1:9", 0, profile);
     auto *screen = lv_obj_create(nullptr);
     lv_screen_load(screen);
@@ -83,10 +90,30 @@ int main()
         assert(!std::filesystem::exists(capture));
     };
     const auto accepted = [&] {
+        std::filesystem::remove(capture);
         assert(execute(command, simulator, profile));
         assert(std::filesystem::file_size(capture) > 0);
     };
     accepted();
+    const auto originalSize = std::filesystem::file_size(capture);
+    assert(!execute(command, simulator, profile));
+    assert(std::filesystem::file_size(capture) == originalSize);
+    std::filesystem::remove(capture);
+    const auto outside = profile / "outside.png";
+    std::ofstream(outside) << "untouched";
+    std::filesystem::create_symlink(outside, capture);
+    assert(!execute(command, simulator, profile));
+    assert(std::filesystem::file_size(outside) == 9);
+    std::filesystem::remove(capture);
+    const auto redirect = profile / "redirect";
+    std::filesystem::create_directory_symlink(profile, redirect);
+    assert(!execute(command, simulator, redirect));
+    assert(!std::filesystem::exists(capture));
+    std::filesystem::permissions(profile, std::filesystem::perms::others_write, std::filesystem::perm_options::add);
+    assert(!execute(command, simulator, profile));
+    assert(!std::filesystem::exists(capture));
+    std::filesystem::permissions(profile, std::filesystem::perms::others_write, std::filesystem::perm_options::remove);
+    std::cout << "PASS capture refuses existing files, symlinks, writable destinations\n";
     auto *content = lv_obj_create(screen);
     for (int i = 0; i < 70; ++i) label(content, "Safe label");
     auto *secret = lv_label_create(content);

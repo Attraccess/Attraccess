@@ -1,5 +1,5 @@
 import { ChildProcess, spawn } from 'child_process';
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { PassThrough } from 'stream';
 import { DesktopFixture, ProbeResult } from './desktop-simulator.fixture';
@@ -84,4 +84,28 @@ it('allows the display date while excluding a known bare PIN', () => {
   diagnostics.remember('8642');
   expect(() => diagnostics.assertScreenshotSafe('resources', ['18. Oktober 2026'])).not.toThrow();
   expect(() => diagnostics.assertScreenshotSafe('locked', ['8642'])).toThrow('potentially sensitive');
+});
+
+it('preserves a probe startup error and removes owned storage when diagnostic retention fails', async () => {
+  const original = new Error('probe spawn failed');
+  const child = new ChildProcess();
+  const kill = jest.spyOn(child, 'kill').mockReturnValue(true);
+  jest.mocked(spawn).mockImplementation(() => {
+    process.nextTick(() => child.emit('error', original));
+    return child;
+  });
+  const fixture = new DesktopFixture('invalid-endpoint', 'startup-cleanup-failure');
+  // Make diagnostic writes fail independently of the original spawn error.
+  rmSync(fixture.screenshots, { recursive: true, force: true });
+  try {
+    await expect(fixture.start()).rejects.toBe(original);
+    expect(existsSync(fixture.root)).toBe(false);
+    expect(kill).toHaveBeenCalledTimes(1);
+    // A second stop does not retain stale child ownership after a write failure.
+    await expect(fixture.stop()).rejects.toThrow();
+    expect(kill).toHaveBeenCalledTimes(1);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+    jest.restoreAllMocks();
+  }
 });

@@ -22,6 +22,43 @@
 
 namespace
 {
+// Open the fixture directory itself without following redirects, then create a
+// fresh destination relative to that descriptor. Never overwrite existing files.
+bool saveOwnedScreenshot(SdlDisplay &display, const std::filesystem::path &directory, const std::string &name)
+{
+    const int root = open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    if (root < 0) return false;
+    struct stat info{};
+    const bool owned = fstat(root, &info) == 0 && info.st_uid == geteuid() &&
+        (info.st_mode & (S_IWGRP | S_IWOTH)) == 0;
+    SDL_IOStream *image = owned ? SDL_IOFromDynamicMem() : nullptr;
+    bool saved = image && display.saveDisplayScreenshot(image);
+    const auto filename = name + ".png";
+    if (saved)
+    {
+        const int file = openat(root, filename.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, S_IRUSR | S_IWUSR);
+        saved = file >= 0;
+        if (file >= 0)
+        {
+            const auto size = SDL_GetIOSize(image);
+            saved = size > 0 && SDL_SeekIO(image, 0, SDL_IO_SEEK_SET) == 0;
+            char bytes[4096];
+            Sint64 remaining = size;
+            while (saved && remaining > 0)
+            {
+                const auto count = SDL_ReadIO(image, bytes, std::min<Sint64>(remaining, sizeof(bytes)));
+                saved = count > 0 && write(file, bytes, count) == static_cast<ssize_t>(count);
+                remaining -= count;
+            }
+            if (close(file) != 0) saved = false;
+            if (!saved) unlinkat(root, filename.c_str(), 0);
+        }
+    }
+    if (image) SDL_CloseIO(image);
+    close(root);
+    return saved;
+}
+
 void pump(DesktopSimulator &simulator)
 {
     simulator.display().pollEvents();
@@ -234,7 +271,7 @@ bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::file
     {
         lv_refr_now(nullptr);
         if (!screenshotSafe()) return false;
-        return simulator.display().saveDisplayScreenshot(screenshots / (text + ".png"));
+        return saveOwnedScreenshot(simulator.display(), screenshots, text);
     }
     else if (action == "reconnect")
     {
