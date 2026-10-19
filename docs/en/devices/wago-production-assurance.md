@@ -194,6 +194,26 @@ cleanup prevents using a recommendation. Keep reports outside the repository;
 reference the reviewed evidence in delivery documentation. A short run never
 substitutes for sustained evidence.
 
+## Current assurance report selection
+
+The identifier validation and measurement-reporting corrections in commit
+`12b7f675251d31d9d1c65754cc022f507ebb2cf3` have implementation fingerprint
+`8536b954c5d8f88177a9c4f34e8eb9683ff5313ec85d4016a1dd7979fcfd5421`.
+Earlier sustained reports with another fingerprint do not validate these changes.
+
+In Factory run `9ec4136d-070f-4f85-ab23-d75f9da50a64`, select the short reports
+in `ci-feedback-fix/short-final` and the refreshed sustained reports in
+`review-fix-current-sustained-8`. The latter targets two software controllers,
+3,600 seconds of offered workload and stages of 2, 4, 8 and repeated 8 commands
+per second. Use the completed reports' actual achieved throughput and outcome;
+the requested rates alone are not a recommendation. Final source matching,
+cleanup and revision-bound CI results are recorded in
+`review-fix-current-validation.json`.
+
+These reports cover software fixtures. Physical qualification, real SSH recovery
+and independent penetration and safety reviews remain outstanding. Later
+workflow QA and human delivery approval have their own revision-bound gates.
+
 ## Structural configuration rejection validation on 2026-10-17
 
 Commit `614eebb6d57ee4785bdfe652e5f72d3faeb049f9` restores a bounded reported
