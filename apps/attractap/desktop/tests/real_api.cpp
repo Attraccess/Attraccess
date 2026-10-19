@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cerrno>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -22,6 +23,15 @@
 
 namespace
 {
+void createScreenshotDirectory(const std::filesystem::path &directory)
+{
+    // Set private permissions at creation, independent of the caller's umask.
+    // Existing destinations stay unchanged and must pass the capture guard.
+    if (mkdir(directory.c_str(), S_IRWXU) != 0 && errno != EEXIST)
+        throw std::filesystem::filesystem_error("create screenshot directory", directory,
+                                              std::error_code(errno, std::generic_category()));
+}
+
 // Open the fixture directory itself without following redirects, then create a
 // fresh destination relative to that descriptor. Never overwrite existing files.
 bool saveOwnedScreenshot(SdlDisplay &display, const std::filesystem::path &directory, const std::string &name)
@@ -295,7 +305,7 @@ int main(int argc, char **argv)
     }
     const std::filesystem::path control = argv[2];
     const auto screenshots = control / "screenshots";
-    std::filesystem::create_directories(screenshots);
+    createScreenshotDirectory(screenshots);
     DesktopSimulator simulator(argv[1], 0, argv[3]);
     if (!waitFor([&] { return simulator.authenticated(); }, simulator, 15000)) return 1;
     std::ofstream(control / "ready") << "authenticated\n";

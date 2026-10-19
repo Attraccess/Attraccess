@@ -30,7 +30,7 @@ int main()
         std::filesystem::path path;
         ~Cleanup() { std::filesystem::remove_all(path); }
     } cleanup{profile};
-    std::filesystem::create_directories(profile);
+    createScreenshotDirectory(profile);
     // An uninitialized display must refuse capture without creating a file.
     {
         SdlDisplay unavailable;
@@ -95,6 +95,18 @@ int main()
         assert(std::filesystem::file_size(capture) > 0);
     };
     accepted();
+    for (const mode_t mask : {0002, 0000})
+    {
+        const auto directory = profile / ("umask-" + std::to_string(mask));
+        const auto previous = umask(mask);
+        createScreenshotDirectory(directory);
+        umask(previous);
+        struct stat info{};
+        assert(stat(directory.c_str(), &info) == 0 && (info.st_mode & 0777) == 0700);
+        assert(saveOwnedScreenshot(simulator.display(), directory, "capture"));
+        assert(std::filesystem::file_size(directory / "capture.png") > 0);
+    }
+    std::cout << "PASS fresh captures use private directories under umask 002 and 000\n";
     const auto originalSize = std::filesystem::file_size(capture);
     assert(!execute(command, simulator, profile));
     assert(std::filesystem::file_size(capture) == originalSize);
@@ -109,10 +121,14 @@ int main()
     std::filesystem::create_directory_symlink(profile, redirect);
     assert(!execute(command, simulator, redirect));
     assert(!std::filesystem::exists(capture));
-    std::filesystem::permissions(profile, std::filesystem::perms::others_write, std::filesystem::perm_options::add);
-    assert(!execute(command, simulator, profile));
-    assert(!std::filesystem::exists(capture));
-    std::filesystem::permissions(profile, std::filesystem::perms::others_write, std::filesystem::perm_options::remove);
+    for (const auto permission : {std::filesystem::perms::group_write, std::filesystem::perms::others_write})
+    {
+        std::filesystem::permissions(profile, permission, std::filesystem::perm_options::add);
+        createScreenshotDirectory(profile);
+        assert(!execute(command, simulator, profile));
+        assert(!std::filesystem::exists(capture));
+        std::filesystem::permissions(profile, permission, std::filesystem::perm_options::remove);
+    }
     std::cout << "PASS capture refuses existing files, symlinks, writable destinations\n";
     auto *content = lv_obj_create(screen);
     for (int i = 0; i < 70; ++i) label(content, "Safe label");
