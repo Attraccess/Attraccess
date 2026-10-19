@@ -1,3 +1,5 @@
+import { ReaderDeliveryAwaiters, READER_DELIVERY_CANCELLED } from './reader-delivery-awaiters';
+import { ReaderIdentityService } from '../security/reader-identity.service';
 import { broadcastReaderLanguage, canReceiveReaderLanguage, sanitizeForLVGL } from './reader-display';
 import { LEGACY_READER_OUTPUT, protectedReaderConnection } from './reader-connection-transport';
 import { VerifiedCardSessionService } from '../security/verified-card-session.service';
@@ -14,8 +16,6 @@ import {
   MessageBody,
   SubscribeMessage,
 } from '@nestjs/websockets';
-
-import { Mutex } from 'async-mutex';
 
 import { Server, WebSocket } from 'ws';
 
@@ -69,7 +69,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   protected readonly logger = new Logger(AttractapGateway.name);
 
-  protected readonly clientResponseAwaitersMutex = new Mutex();
+  private readonly responses = new ReaderDeliveryAwaiters();
+  protected readonly clientResponseAwaitersMutex = this.responses.mutex;
 
   @Inject(SettingsService)
   protected settingsService: SettingsService;
@@ -125,15 +126,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(VerifiedCardSessionService)
   protected proofs: VerifiedCardSessionService;
 
-  protected readonly connectedAt = new WeakMap<object, bigint>();
+  @Inject(ReaderIdentityService)
+  protected identities: ReaderIdentityService;
 
-  protected clientResponseAwaiters: Array<{
-    id: string;
-    clientId: string;
-    type: AttractapEventType;
-    resolve: () => void;
-    timeoutId: NodeJS.Timeout;
-  }> = [];
+  private readonly disconnected = new WeakSet<object>();
+  protected readonly connectedAt = new WeakMap<object, bigint>();
 
   protected readonly eventHandlers: Record<
     AttractapEventType,
@@ -251,57 +248,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   protected async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
-    const id = randomBytes(4).toString('base64url').slice(0, 5);
-
-    const removeAwaiter = async () => {
-      await this.clientResponseAwaitersMutex
-        .runExclusive(async () => {
-          this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.id !== id);
-        })
-        .catch((error) => {
-          this.logger.error(`Error removing awaiter: ${error}`);
-        });
-    };
-
-    // TODO: refactor wait for response to rely on ACK messages instead of response mesaages
-    return await new Promise<void>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        removeAwaiter();
-        reject(new Error(`Timeout waiting for client response of type ${type}`));
-      }, timeoutMs);
-
-      const onResolve = () => {
-        clearTimeout(timeoutId);
-        resolve();
-        removeAwaiter();
-      };
-
-      this.clientResponseAwaiters.push({ id, clientId: client.id, type, resolve: onResolve, timeoutId });
-    });
+    if (this.disconnected.has(client)) throw new Error(READER_DELIVERY_CANCELLED);
+    return this.responses.wait(client, type, timeoutMs);
   }
 
   protected async resolveClientResponseAwaiters(client: AuthenticatedWebSocket, type: AttractapEventType) {
-    await this.clientResponseAwaitersMutex.runExclusive(async () => {
-      const matchingAwaiters = this.clientResponseAwaiters.filter(
-        (awaiter) => awaiter.clientId === client.id && awaiter.type === type,
-      );
-
-      this.logger.debug(
-        `Found ${matchingAwaiters.length} awaiters for client ${client.id} for event ${type} to resolve`,
-      );
-
-      matchingAwaiters.forEach((awaiter) => {
-        awaiter.resolve();
-        clearTimeout(awaiter.timeoutId);
-      });
-
-      // Only remove the awaiters we just resolved, not all awaiters for this client.
-      // Previously we removed all client awaiters, which could prematurely clear
-      // awaiters for other in-flight messages (e.g. ACK_RESOURCE_LIST clearing
-      // READER_FIRMWARE_UPDATE_REQUIRED awaiter before its ACK arrived).
-      const resolvedIds = new Set(matchingAwaiters.map((a) => a.id));
-      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => !resolvedIds.has(awaiter.id));
-    });
+    await this.responses.acknowledge(client, type);
   }
 
   @SubscribeMessage('HEARTBEAT')
@@ -342,6 +294,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     )
       return;
     if (connection && !connection.ready) return;
+    if (!connection && socket.readerId && !(await this.identities.isLegacy(socket.readerId))) {
+      socket.close();
+      return;
+    }
     if (eventData.type.startsWith('ACK_')) {
       this.logger.debug(`Received reader ACK ${eventData.type}`);
 
@@ -405,6 +361,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       let lastError: Error | undefined;
 
       for (let i = 0; i < RETRY_COUNT; i++) {
+        if (this.disconnected.has(client) || client.readyState !== WebSocket.OPEN) return false;
         // Authentication success and language retries belong to the current open reader connection.
         if (
           (message.data.type === AttractapEventType.READER_LANGUAGE ||
@@ -440,6 +397,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           lastError = undefined;
           break;
         } catch (error) {
+          if ((error as Error).message === READER_DELIVERY_CANCELLED) return false;
           lastError = error as Error;
           this.logger.debug(`Attempt ${i + 1} failed: ${error.message}`);
         }
@@ -470,6 +428,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       readerName: null,
       sendMessage,
       sendBinaryData,
+      cancelReaderConnection: async () => {
+        await this.handleDisconnect(client as unknown as AuthenticatedWebSocket);
+        client.close();
+      },
       state: {
         lastAuthenticatedUserId: null,
         enrollment: null,
@@ -480,6 +442,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       },
     });
 
+    this.disconnected.delete(client);
     this.websocketService.sockets.set(id, client as unknown as AuthenticatedWebSocket);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
 
@@ -519,6 +482,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
+    this.disconnected.add(socket);
+    this.identities.detachLegacy(socket);
     // Invalidate asynchronous authentication before waiting on cleanup locks.
     const readerId = socket.readerId;
     const readerName = socket.readerName;
@@ -527,11 +492,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     socket.readerName = null;
     const connection = protectedReaderConnection(socket);
     if (connection) this.proofs.cancelConnection(connection.generation);
-    for (const awaiter of this.clientResponseAwaiters)
-      if (awaiter.clientId === socket.id) {
-        clearTimeout(awaiter.timeoutId);
-        awaiter.resolve();
-      }
+    this.responses.cancel(socket);
     if (socket.state) {
       socket.state.lastAuthenticatedUserId = null;
       socket.state.enrollment = socket.state.enrollNewCardData = socket.state.resetNfcCardData = null;
@@ -545,10 +506,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     this.logger.debug(`Client ${socket.id} disconnected.`);
-
-    await this.clientResponseAwaitersMutex.runExclusive(async () => {
-      this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== socket.id);
-    });
 
     if (readerId) {
       this.logger.log(`Client for reader ${readerId} disconnected.`);
@@ -580,7 +537,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         // nothing to do
       }
     }
-    this.websocketService.sockets.delete(socket.id);
+    if (socket.state) socket.state.ota = null;
+    if (this.websocketService.sockets.get(socket.id) === socket) this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }
 

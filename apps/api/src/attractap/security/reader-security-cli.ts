@@ -17,7 +17,7 @@ export class ReaderSecurityCommandServer {
     if (!info.isDirectory() || info.uid !== process.getuid() || (info.mode & 0o777) !== 0o700)
       throw new Error('Unsafe reader command directory');
     const path = join(directory, 'reader-control.sock');
-    // Never unlink an existing listener or a substituted file automatically.
+    await this.reconcileSocket(path);
     this.server = createServer((socket) => {
       let received = Buffer.alloc(0);
       let complete = false;
@@ -66,6 +66,38 @@ export class ReaderSecurityCommandServer {
         }
       });
     });
+  }
+
+  private async reconcileSocket(path: string): Promise<void> {
+    let existing: ReturnType<typeof lstatSync>;
+    try {
+      existing = lstatSync(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+    if (!existing.isSocket() || existing.uid !== process.getuid() || (existing.mode & 0o777) !== 0o600)
+      throw new Error('Unsafe existing reader command socket');
+    await new Promise<void>((resolve, reject) => {
+      const probe = createConnection(path);
+      probe.setTimeout(1000, () => probe.destroy(new Error('Reader socket probe timed out')));
+      probe.once('connect', () => probe.destroy(new Error('Reader command listener already active')));
+      probe.once('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ECONNREFUSED') resolve();
+        else reject(error);
+      });
+    });
+    // The private directory and exact inode check protect substituted paths.
+    const current = lstatSync(path);
+    if (
+      !current.isSocket() ||
+      current.dev !== existing.dev ||
+      current.ino !== existing.ino ||
+      current.uid !== existing.uid ||
+      (current.mode & 0o777) !== 0o600
+    )
+      throw new Error('Reader command socket changed during recovery');
+    unlinkSync(path);
   }
 
   async execute(request: unknown): Promise<unknown> {

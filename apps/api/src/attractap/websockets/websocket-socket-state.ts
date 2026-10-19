@@ -157,12 +157,13 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   readerId: Attractap['id'] | null;
   readerName: string | null;
   /**
-   * Resolves `true` once the reader ACKed, `false` when every retry timed out. It never rejects, so
+   * Resolves `true` once the reader ACKed, `false` on cancellation, disconnect or exhausted retries. It never rejects, so
    * callers that only fire-and-forget stay unaffected — but anything that depends on the reader
    * having actually received the message (arming supervision, ATT-816) must check the result.
    */
   sendMessage: (message: AttractapMessage) => Promise<boolean>;
   sendBinaryData: (data: Buffer) => void;
+  cancelReaderConnection?: () => Promise<void>;
   state: {
     verifiedCardOperation?: { handle: string; binding: CardOperationBinding };
     /** Only the latest reader authentication attempt may restore its identity. */

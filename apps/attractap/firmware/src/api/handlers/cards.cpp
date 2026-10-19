@@ -244,6 +244,13 @@ void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
 
 void API::onEnrollNewCard(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    sendEnrollNewCardCancel();
+    if (enrollNewCardErrorCallback) enrollNewCardErrorCallback("CARD_VERIFICATION_UNAVAILABLE");
+    return;
+#endif
+
     this->logger.info("Received enroll new card");
     if (this->enrollNewCardCallback == nullptr)
     {

@@ -94,6 +94,7 @@ void Websocket::connectWebSocketLocked()
     _lastApiConfig = apiConfig;
 #ifdef ATTRACTAP_PRODUCTION
     secured.close();
+    securitySessionStarted = false;
     if (disconnectCallback) disconnectCallback();
     connectionGeneration++;
     drainTxQueue();
@@ -256,6 +257,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
                     binaryDataCallback(packet);
                 }
             })) reconnectRequested = true;
+        securitySessionStarted = true;
         // Application connection state is published only after inner TLS.
         break;
 #endif
@@ -275,6 +277,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_CLOSED:
 #ifdef ATTRACTAP_PRODUCTION
         secured.close();
+        securitySessionStarted = false;
         if (disconnectCallback) disconnectCallback();
         connectionGeneration++;
         drainTxQueue();
@@ -291,6 +294,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     {
 #ifdef ATTRACTAP_PRODUCTION
         secured.close();
+        securitySessionStarted = false;
         if (disconnectCallback) disconnectCallback();
         connectionGeneration++;
         drainTxQueue();
@@ -392,6 +396,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_ERROR:
 #ifdef ATTRACTAP_PRODUCTION
         secured.close();
+        securitySessionStarted = false;
         if (disconnectCallback) disconnectCallback();
         connectionGeneration++;
         drainTxQueue();

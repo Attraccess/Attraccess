@@ -68,6 +68,7 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
   private commandServer?: ReaderSecurityCommandServer;
   private readonly logger = new Logger(ReaderIdentityService.name);
   private readonly sessions = new Map<string, { identity: AttractapReaderIdentity; close: () => Promise<void> }>();
+  private readonly legacySessions = new Map<object, { readerId: number; close: () => Promise<void> }>();
   private readonly changing = new Set<number>();
   private trustChanging = false;
 
@@ -103,6 +104,7 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
     await this.commandServer?.close();
     await Promise.all([...this.sessions.values()].map((session) => session.close()));
     this.sessions.clear();
+    await this.closeLegacySessions();
   }
 
   get directory(): string | undefined {
@@ -291,6 +293,7 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
           this.detach(generation);
         }),
       );
+      await this.closeLegacySessions();
       this.logger.log('Reader trust configuration replaced; affected sessions closed');
     } finally {
       this.trustChanging = false;
@@ -305,7 +308,26 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
 
   async isLegacy(readerId: number): Promise<boolean> {
     // A reader with any secured history cannot downgrade, even after revocation.
-    return !(await this.identities.existsBy({ readerId }));
+    return !(await this.identities.existsBy({ readerId })) && !this.changing.has(readerId) && !this.trustChanging;
+  }
+
+  private async closeLegacySessions(): Promise<void> {
+    await Promise.all(
+      [...this.legacySessions.entries()].map(async ([generation, session]) => {
+        await session.close();
+        this.detachLegacy(generation);
+      }),
+    );
+  }
+
+  trackLegacy(generation: object, readerId: number, close: () => Promise<void>): void {
+    if (!Number.isSafeInteger(readerId) || readerId <= 0 || this.changing.has(readerId) || this.trustChanging)
+      throw new Error('Reader lifecycle changed');
+    this.legacySessions.set(generation, { readerId, close });
+  }
+
+  detachLegacy(generation: object): void {
+    this.legacySessions.delete(generation);
   }
 
   async attach(generation: string, identity: AttractapReaderIdentity, close: () => Promise<void>): Promise<void> {
@@ -321,6 +343,14 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
 
   async cancelReader(readerId: number): Promise<void> {
     this.proofs.cancelReader(readerId);
+    await Promise.all(
+      [...this.legacySessions.entries()]
+        .filter(([, session]) => session.readerId === readerId)
+        .map(async ([generation, session]) => {
+          await session.close();
+          this.detachLegacy(generation);
+        }),
+    );
     const sessions = [...this.sessions.entries()].filter(([, value]) => value.identity.readerId === readerId);
     await Promise.all(
       sessions.map(async ([generation, value]) => {

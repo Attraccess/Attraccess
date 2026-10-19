@@ -349,8 +349,21 @@ export class AttractapService {
    * @param firmwareType The firmware type
    * @returns Promise<Attractap>
    */
-  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion) {
+  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion, legacyOnly = false) {
+    if (legacyOnly) {
+      // Check eligibility in the same database statement as the metadata write.
+      // A request admitted before enrollment must not overwrite secured state later.
+      const result = await this.readerRepository
+        .createQueryBuilder()
+        .update()
+        .set({ firmware })
+        .where('id = :id', { id })
+        .andWhere('NOT EXISTS (SELECT 1 FROM attractap_reader_identity identity WHERE identity.readerId = :id)', { id })
+        .execute();
+      return result.affected === 1;
+    }
     await this.updateReader(id, { firmware }, false);
+    return true;
   }
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {

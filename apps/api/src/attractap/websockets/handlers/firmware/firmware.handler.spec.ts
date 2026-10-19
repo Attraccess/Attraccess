@@ -22,6 +22,7 @@ describe('AttractapFirmwareHandler', () => {
     // The shared legacy fixture uses Object.create instead of the constructor.
     // Initialize the handler's per-socket storage explicitly in this suite.
     (fixture.handler as any).contexts = new WeakMap();
+    (fixture.handler as any).identities = { isLegacy: jest.fn().mockResolvedValue(true) };
     fixture.socket.close = jest.fn();
     fixture.socket.bufferedAmount = 0;
     const filesystem = jest.requireMock('fs');
@@ -55,6 +56,16 @@ describe('AttractapFirmwareHandler', () => {
       fixture.handler.handleFirmwareChunkRequest(fixture.socket, {
         payload: { offset, length },
       } as AttractapEvent['data']);
+
+    it('denies metadata changes and chunks after secured enrollment', async () => {
+      fixture.mockAttractapService.updateReaderFirmware.mockClear();
+      (fixture.handler as any).identities.isLegacy.mockResolvedValue(false);
+      await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: {} } as AttractapEvent['data']);
+      await request(0, 100);
+      expect(fixture.mockAttractapService.updateReaderFirmware).not.toHaveBeenCalled();
+      expect(fixture.mockOpenSync).not.toHaveBeenCalled();
+      expect(fixture.socket.sendBinaryData).not.toHaveBeenCalled();
+    });
 
     it('completes a legacy update in bounded chunks, including descriptor zero', async () => {
       for (let offset = 0; offset < binary.length; offset += 4096) await request(offset, 999999);
@@ -127,7 +138,7 @@ describe('AttractapFirmwareHandler', () => {
 
       await fixture.handler.handleFirmwareInfo(fixture.socket, data);
 
-      expect(fixture.mockAttractapService.updateReaderFirmware).toHaveBeenCalledWith(42, payload);
+      expect(fixture.mockAttractapService.updateReaderFirmware).toHaveBeenCalledWith(42, payload, true);
     });
 
     it('does not send OTA message when firmware is already latest', async () => {

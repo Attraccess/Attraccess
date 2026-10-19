@@ -2,6 +2,7 @@ module.exports = {
   displayName: 'api',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  globalSetup: '<rootDir>/../../scripts/jest-docker-context.ts',
   setupFiles: ['<rootDir>/src/test/jest.setup.ts'],
   transform: {
     '^.+\\.js$': '<rootDir>/src/test/jose-transformer.cjs',

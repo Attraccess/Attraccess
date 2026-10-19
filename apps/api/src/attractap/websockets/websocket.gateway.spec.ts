@@ -91,6 +91,7 @@ describe('AttractapGateway', () => {
         close: jest.fn(),
         send: jest.fn(),
         on: jest.fn(),
+        readyState: WebSocket.OPEN,
       } as unknown as WebSocket;
 
       // handleConnection blocks on waitForClientResponse (3 retries × 4s).
@@ -122,6 +123,38 @@ describe('AttractapGateway', () => {
   });
 
   describe('handleDisconnect', () => {
+    it('reports false when lifecycle teardown interrupts a message awaiting its ACK', async () => {
+      const client = fixture.createMockSocket({ readyState: WebSocket.OPEN });
+      const connected = fixture.gateway.handleConnection(client);
+      await new Promise((resolve) => setImmediate(resolve));
+      const socket = client as unknown as AuthenticatedWebSocket;
+      await fixture.gateway['resolveClientResponseAwaiters'](socket, AttractapEventType.READER_REQUEST_AUTHENTICATION);
+      await connected;
+      const delivery = socket.sendMessage(new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {}));
+      await socket.cancelReaderConnection();
+      await expect(delivery).resolves.toBe(false);
+      expect(client.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('cancels pending delivery without retrying and leaves a newer socket alone', async () => {
+      const client = fixture.createMockSocket({ readyState: WebSocket.OPEN });
+      const pending = fixture.gateway.handleConnection(client);
+      await new Promise((resolve) => setImmediate(resolve));
+      const old = client as unknown as AuthenticatedWebSocket;
+      const newer = fixture.createMockSocket({ id: old.id, readerId: 42, readyState: WebSocket.OPEN });
+      fixture.websocketService.sockets.set(old.id, newer);
+      const newerAck = fixture.gateway['waitForClientResponse'](newer, AttractapEventType.READER_AUTHENTICATED);
+      await fixture.gateway.handleDisconnect(old);
+      await pending;
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(fixture.websocketService.sockets.get(old.id)).toBe(newer);
+      await fixture.gateway['resolveClientResponseAwaiters'](newer, AttractapEventType.READER_AUTHENTICATED);
+      await expect(newerAck).resolves.toBeUndefined();
+      await expect(
+        old.sendMessage(new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {})),
+      ).resolves.toBe(false);
+    });
+
     it('cleans up a connection rejected before socket initialization', async () => {
       fixture.licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
       const client = { close: jest.fn(), send: jest.fn() } as unknown as AuthenticatedWebSocket;

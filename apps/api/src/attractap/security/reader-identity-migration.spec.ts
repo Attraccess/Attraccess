@@ -73,6 +73,42 @@ describe('registered reader identity migration', () => {
     }
   }, 30_000);
 
+  it('allows only one owner when separate database connections claim the same public key concurrently', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'reader-ownership-race-'));
+    const database = join(directory, 'race.sqlite');
+    const first = await new DataSource({ type: 'sqlite', database, migrations }).initialize();
+    let second: DataSource | undefined;
+    try {
+      await first.query('PRAGMA journal_mode=WAL');
+      await first.query('CREATE TABLE attractap(id integer PRIMARY KEY)');
+      await first.query('INSERT INTO attractap VALUES (17), (18)');
+      await first.runMigrations();
+      second = await new DataSource({ type: 'sqlite', database }).initialize();
+      await first.query('PRAGMA busy_timeout=5000');
+      await second.query('PRAGMA busy_timeout=5000');
+      const claim = (connection: DataSource, reader: number) =>
+        connection.query(
+          `INSERT INTO attractap_reader_identity
+        (readerId, certificateFingerprint, publicKeyFingerprint, certificatePem, installationId,
+         generation, validFrom, validUntil, enrollmentClass, manifestDigest)
+        VALUES (?, ?, 'shared-key', 'public', 'installation', 1, '2026-01-01', '2027-01-01', 'development', 'manifest')`,
+          [reader, 'certificate-' + reader],
+        );
+      const results = await Promise.allSettled([claim(first, 17), claim(second, 18)]);
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      const denied = results.find((result) => result.status === 'rejected') as PromiseRejectedResult;
+      expect(String(denied.reason)).toMatch(/belongs to another/);
+      expect(await first.query('SELECT publicKeyFingerprint FROM attractap_reader_identity')).toEqual([
+        { publicKeyFingerprint: 'shared-key' },
+      ]);
+      expect(await first.query('PRAGMA foreign_key_check')).toEqual([]);
+    } finally {
+      if (second?.isInitialized) await second.destroy();
+      await first.destroy();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('is discovered by fresh API startup with the complete migration registry', async () => {
     const source = await new DataSource({
       type: 'sqlite',

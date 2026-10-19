@@ -179,7 +179,15 @@ def preflight_inventory(inventory, hmac_id):
     if inventory.get('target') != 'esp32s3' or inventory.get('board') not in BOARDS or \
        inventory.get('flashBytes') != 0x1000000 or inventory.get('toolVersion') != '5.6.0' or type(hmac_id) is not int or not 0 <= hmac_id < 6:
         raise ValueError('Ineligible inventory')
-    efuses = inventory['efuses']
+    module = inventory.get('module')
+    if not isinstance(module, str) or not re.fullmatch(r'[A-Za-z0-9._-]{1,80}', module) or module.lower() in {'unknown', 'none', 'null'}:
+        raise ValueError('Unknown board/module')
+    efuses = inventory.get('efuses', {})
+    for name in ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']:
+        revision = efuses.get(name, {})
+        value = revision.get('value')
+        if revision.get('readable') is not True or type(value) is not int or not 0 <= value <= 3:
+            raise ValueError('Unknown silicon revision')
     # This initial provisioning path accepts only unlocked blank security state.
     # Locked devices need a separately qualified recovery, never a force override.
     for name in ['SECURE_BOOT_EN', 'SPI_BOOT_CRYPT_CNT', 'ENABLE_SECURITY_DOWNLOAD', 'DIS_DOWNLOAD_MODE',

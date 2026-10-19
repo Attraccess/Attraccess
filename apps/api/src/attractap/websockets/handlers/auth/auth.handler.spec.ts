@@ -20,6 +20,7 @@ describe('AttractapAuthHandler', () => {
     readerName: string | null;
     readyState: number;
     state: Record<string, unknown>;
+    close: jest.Mock;
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
@@ -41,6 +42,7 @@ describe('AttractapAuthHandler', () => {
 
     mockSocket = {
       id: 'socket-1',
+      close: jest.fn(),
       readerId: null,
       readerName: null,
       readyState: WebSocket.OPEN,
@@ -63,13 +65,37 @@ describe('AttractapAuthHandler', () => {
     };
     mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
-    (handler as any).identities = { isLegacy: jest.fn().mockResolvedValue(true) };
+    (handler as any).identities = { isLegacy: jest.fn().mockResolvedValue(true), trackLegacy: jest.fn() };
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
     (handler as any).settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
     (handler as any).websocketService = new WebsocketService();
+  });
+
+  it('invalidates authentication paused during settings lookup when the reader lifecycle changes', async () => {
+    mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Legacy', apiTokenHash: 'hash' });
+    mockVerifyToken.mockResolvedValue(true);
+    let finish: (language: string) => void;
+    (handler as any).settingsService.getDefaultLanguage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = handler.handleAuthentication(
+      mockSocket as any,
+      { payload: { id: 42, token: 'token' } } as AttractapEvent['data'],
+    );
+    while (!finish) await new Promise((resolve) => setImmediate(resolve));
+    const cancel = (handler as any).identities.trackLegacy.mock.calls[0][2];
+    await cancel();
+    finish('en');
+    await pending;
+    expect(mockSocket.close).toHaveBeenCalled();
+    expect(mockSocket.readerId).toBeNull();
+    expect(mockSocket.sendMessage).not.toHaveBeenCalled();
   });
 
   describe('handleReaderRegister', () => {

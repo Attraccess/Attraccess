@@ -1,3 +1,4 @@
+import { AttractapService } from '../attractap.service';
 import { ConfigService } from '@nestjs/config';
 import { createPublicKey, X509Certificate } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
@@ -110,6 +111,30 @@ describe('persisted reader lifecycle boundaries', () => {
   afterEach(async () => {
     await service.onModuleDestroy();
     await source.destroy();
+  });
+
+  it('atomically refuses a legacy firmware write after secure enrollment', async () => {
+    const readers = Object.create(AttractapService.prototype) as AttractapService;
+    Reflect.set(readers, 'readerRepository', source.getRepository(Attractap));
+    const legacy = { name: 'bridge', version: '1', variant: 'wifi', capabilities: {} };
+    expect(await readers.updateReaderFirmware(17, legacy, true)).toBe(true);
+    await enroll();
+    expect(await readers.updateReaderFirmware(17, { ...legacy, version: 'stale' }, true)).toBe(false);
+    expect((await source.getRepository(Attractap).findOneByOrFail({ id: 17 })).firmware.version).toBe('1');
+  });
+
+  it('enrollment cancels connected and pending legacy authentication before reporting success', async () => {
+    const connected = jest.fn(async () => undefined);
+    const pending = jest.fn(async () => undefined);
+    service.trackLegacy({}, 17, connected);
+    service.trackLegacy({}, 17, pending);
+    expect(await service.isLegacy(17)).toBe(true);
+    await enroll();
+    expect(connected).toHaveBeenCalledTimes(1);
+    expect(pending).toHaveBeenCalledTimes(1);
+    expect(await service.isLegacy(17)).toBe(false);
+    await service.cancelReader(17);
+    expect(connected).toHaveBeenCalledTimes(1);
   });
 
   it('bounds renewal overlap, rejects a third active generation and preserves rows on denial', async () => {

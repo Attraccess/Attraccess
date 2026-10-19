@@ -141,6 +141,23 @@ class OfflineDSPreparation(unittest.TestCase):
         self.write(receipt, json.dumps(forged).encode())
         with self.assertRaises(ValueError): verify_qualification(receipt, trust, {'app.bin': 'c' * 64}, now=150)
 
+    def test_unknown_inventory_revision_is_ineligible(self):
+        for field in ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']:
+            for value in [None, {'value': 'unknown', 'readable': False},
+                          {'value': 0, 'readable': False}, {'value': True, 'readable': True},
+                          {'value': -1, 'readable': True}, {'value': '0', 'readable': True}]:
+                with self.subTest(field=field, value=value):
+                    efuses = {name: {'value': 0, 'readable': True} for name in
+                              ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']}
+                    if value is None:
+                        del efuses[field]
+                    else:
+                        efuses[field] = value
+                    with self.assertRaisesRegex(ValueError, 'silicon revision'):
+                        provision.preflight_inventory({'target': 'esp32s3', 'board': 'attractap-touch',
+                            'module': 'HostFixture', 'flashBytes': 0x1000000, 'toolVersion': '5.6.0',
+                            'efuses': efuses}, 0)
+
     def test_encrypted_bundle_uses_real_nvs_tool_and_rejects_unqualified_apply(self):
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes
@@ -164,6 +181,7 @@ class OfflineDSPreparation(unittest.TestCase):
         for index in range(6):
             efuses[f'KEY_PURPOSE_{index}'] = {'value': 'USER', 'writeable': True}
             efuses[f'BLOCK_KEY{index}'] = {'value': 'empty', 'raw_value': 'empty', 'readable': True, 'writeable': True}
+        efuses.update({name: {'value': 0, 'readable': True} for name in ['WAFER_VERSION_MAJOR', 'WAFER_VERSION_MINOR']})
         inventory = {'target': 'esp32s3', 'board': 'attractap-touch', 'module': 'HostFixture',
                      'flashBytes': 0x1000000, 'toolVersion': '5.6.0', 'efuses': efuses}
         inventoryfile = self.directory / 'inventory.json'

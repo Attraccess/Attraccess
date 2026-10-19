@@ -52,6 +52,7 @@ private:
 #ifdef ATTRACTAP_PRODUCTION
     ReaderSecurity::ReaderSession secured;
     std::atomic<bool> reconnectRequested{false};
+    std::atomic<bool> securitySessionStarted{false};
     std::atomic<uint32_t> connectionGeneration{0};
     std::atomic<size_t> queuedBytes{0};
     size_t incomingMessageBytes = 0;
@@ -60,6 +61,7 @@ private:
 #endif
     std::function<void()> disconnectCallback;
     friend struct WebsocketPongProbeTest;
+    friend struct WebsocketBootstrapTest;
     std::function<void(const char *, size_t)> messageCallbackRaw;
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
 

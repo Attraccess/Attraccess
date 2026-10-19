@@ -119,7 +119,10 @@ export function registerAttractapGatewayFixture() {
       providers: [
         AttractapGateway,
         WebsocketService,
-        { provide: ReaderIdentityService, useValue: { isLegacy: jest.fn().mockResolvedValue(true) } },
+        {
+          provide: ReaderIdentityService,
+          useValue: { isLegacy: jest.fn().mockResolvedValue(true), detachLegacy: jest.fn(), trackLegacy: jest.fn() },
+        },
         VerifiedCardSessionService,
         { provide: AttractapService, useValue: attractapService },
         { provide: UsersService, useValue: {} },

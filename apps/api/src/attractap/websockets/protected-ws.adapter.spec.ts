@@ -33,6 +33,29 @@ describe('actual protected reader route over plain WS', () => {
   });
   afterAll(() => fixture.cleanup());
 
+  (process.env.READER_SESSION_TEST_BINARY ? it : it.skip)(
+    'production WebSocket owner retries a silent bootstrap peer with fresh challenges',
+    async () => {
+      writeFileSync(join(fixture.directory, 'enroll.pem'), fixture.read('reader.pem'), { mode: 0o600 });
+      writeFileSync(
+        join(fixture.directory, 'time-public.pem'),
+        fixture.publicKey.export({ type: 'spki', format: 'pem' }),
+        { mode: 0o600 },
+      );
+      const peer = spawn(process.env.READER_SESSION_TEST_BINARY, ['--wrapper'], {
+        env: { ...process.env, READER_TEST_CERT_DIRECTORY: fixture.directory },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '',
+        errors = '';
+      peer.stdout.on('data', (bytes) => (output += bytes));
+      peer.stderr.on('data', (bytes) => (errors += bytes));
+      const [status] = await once(peer, 'exit');
+      expect({ status, errors }).toEqual({ status: 0, errors: '' });
+      expect(output).toContain('WRAPPER_OK');
+    },
+  );
+
   it('bootstraps time then exchanges framed JSON through mutually authenticated TLS', async () => {
     const http = createServer();
     const dbConfiguration = {
@@ -144,10 +167,11 @@ describe('actual protected reader route over plain WS', () => {
           fixture.publicKey.export({ type: 'spki', format: 'pem' }),
           { mode: 0o600 },
         );
-        const peer = spawn(process.env.READER_SESSION_TEST_BINARY, [], {
+        const peer = spawn(process.env.READER_SESSION_TEST_BINARY, ['--owner'], {
           env: { ...process.env, READER_TEST_CERT_DIRECTORY: fixture.directory },
           stdio: ['pipe', 'pipe', 'pipe'],
         });
+        let discardedTimeRequests = 0;
         const messages = new EventEmitter();
         let output = '';
         let errors = '';
@@ -158,9 +182,16 @@ describe('actual protected reader route over plain WS', () => {
             const index = output.indexOf('\n');
             const line = output.slice(0, index);
             output = output.slice(index + 1);
-            if (line.startsWith('WIRE ')) ws.send(Buffer.from(line.slice(5), 'hex'));
-            else if (line.startsWith('JSON ')) messages.emit('json', Buffer.from(line.slice(5), 'hex'));
+            if (line.startsWith('WIRE ')) {
+              const bytes = Buffer.from(line.slice(5), 'hex');
+              if (bytes.length === 81 && discardedTimeRequests < 2) {
+                discardedTimeRequests++;
+                peer.stdin.write('OUTAGE\n');
+              } else ws.send(bytes);
+            } else if (line.startsWith('JSON ')) messages.emit('json', Buffer.from(line.slice(5), 'hex'));
             else if (line.startsWith('OTA ')) messages.emit('ota', Buffer.from(line.slice(4), 'hex'));
+            // eslint-disable-next-line no-console -- Retain measured host allocation evidence in the test receipt.
+            else if (line.startsWith('MEMORY ')) console.info(line);
             else if (line === 'READY') messages.emit('ready');
             else if (line === 'CLOSED') messages.emit('error', new Error('Firmware TLS peer closed'));
           }
@@ -198,6 +229,7 @@ describe('actual protected reader route over plain WS', () => {
               }
             }
           }
+          expect(discardedTimeRequests).toBe(2);
           const ota = once(messages, 'ota');
           const chunk = Buffer.alloc(4096, 0x5a);
           socket.send(chunk);
@@ -329,6 +361,89 @@ describe('protected route rejection before application dispatch', () => {
     await once(ws, 'open');
     return ws;
   }
+
+  it.each(['time', 'tls'] as const)(
+    'closes a silent %s phase at its deadline and releases admission for reconnect',
+    async (phase) => {
+      const timeouts: Array<{ callback: () => void; delay: number }> = [];
+      const original = global.setTimeout;
+      const timer = jest.spyOn(global, 'setTimeout').mockImplementation(((callback, delay, ...args) => {
+        if (delay === 30000 || delay === 5000) timeouts.push({ callback: () => callback(...args), delay });
+        return original(callback, delay, ...args);
+      }) as typeof setTimeout);
+      try {
+        const ws = await open();
+        if (phase === 'tls') {
+          const reply = once(ws, 'message');
+          ws.send(fixture.request());
+          await reply;
+        }
+        const closed = once(ws, 'close');
+        expect(timeouts.at(-1)?.delay).toBe(30000);
+        timeouts.at(-1).callback();
+        await closed;
+        expect(dispatch).not.toHaveBeenCalled();
+        expect(adapter['pending']).toBe(0);
+        const next = await open();
+        expect(next.readyState).toBe(WebSocket.OPEN);
+      } finally {
+        timer.mockRestore();
+      }
+    },
+  );
+
+  it('closes inactive authenticated traffic and stale cleanup cannot close a reconnected generation', async () => {
+    let watchdog: () => Promise<void>;
+    const original = global.setInterval;
+    const interval = jest.spyOn(global, 'setInterval').mockImplementation(((callback, delay, ...args) => {
+      if (delay === 1000) watchdog = () => callback(...args);
+      return original(callback, delay, ...args);
+    }) as typeof setInterval);
+    const connectReader = async () => {
+      const ws = await open();
+      const time = once(ws, 'message');
+      ws.send(fixture.request());
+      await time;
+      const stream = new ReaderCiphertextStream(ws);
+      stream.on('error', () => undefined);
+      ws.on('message', (bytes: Buffer) => stream.receive(bytes));
+      const incoming = once(gateway, 'connection');
+      const tls = connect({
+        socket: stream,
+        servername: 'localhost',
+        ca: fixture.read('ca.pem'),
+        cert: fixture.read('reader.pem'),
+        key: fixture.read('reader.key'),
+        minVersion: 'TLSv1.2',
+        maxVersion: 'TLSv1.2',
+        ciphers: 'ECDHE-RSA-AES256-GCM-SHA384',
+        sigalgs: 'rsa_pkcs1_sha256:rsa_pkcs1_sha384:rsa_pkcs1_sha512',
+        rejectUnauthorized: true,
+      });
+      tls.on('error', () => undefined);
+      await once(tls, 'secureConnect');
+      const [application] = (await incoming) as [ProtectedReaderSocket];
+      return { ws, tls, application };
+    };
+    try {
+      const old = await connectReader();
+      old.application.lastAuthenticatedInput = performance.now() - 60000;
+      const closed = once(old.ws, 'close');
+      await watchdog();
+      await closed;
+      const next = await connectReader();
+      const generation = next.application.connection.generation;
+      old.application.close();
+      expect(next.application.connection.ready).toBe(true);
+      expect(next.application.connection.generation).toBe(generation);
+      const message = once(next.application, 'message');
+      next.tls.write(encodeReaderFrame(ReaderFrameType.Json, Buffer.from('{"event":"HEARTBEAT"}')));
+      expect((await message)[0].data.toString()).toBe('{"event":"HEARTBEAT"}');
+      next.application.close();
+    } finally {
+      interval.mockRestore();
+    }
+  });
 
   it.each(['text', 'version', 'bootstrap-cap', 'ws-cap', 'fragmented-cap'])(
     'rejects %s without dispatch',
@@ -555,6 +670,8 @@ firmwareTimeTest(
       const first = await begin();
       const valid = encode(first);
       await accept(valid, 'ACCEPTED');
+      peer.stdin.write('UNSIGNED\n');
+      expect(await next()).toBe('ISOLATED');
       await accept(valid, 'DENIED');
       const second = await begin();
       expect(second.subarray(49)).not.toEqual(first.subarray(49));

@@ -1,4 +1,6 @@
-import { chmodSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { writeFileSync, chmodSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createConnection, createServer } from 'node:net';
@@ -24,6 +26,40 @@ describe('protected API-host reader commands', () => {
   afterEach(async () => {
     await server.close();
     rmSync(directory, { recursive: true, force: true });
+  });
+
+  it('recovers a socket left by a killed process and refuses an active listener or substituted file', async () => {
+    await server.close();
+    const path = join(directory, 'reader-control.sock');
+    const child = spawn(
+      process.execPath,
+      [
+        '-e',
+        `
+      const fs = require('node:fs');
+      require('node:net').createServer().listen(process.argv[1], () => {
+        fs.chmodSync(process.argv[1], 0o600); process.stdout.write('ready\\n');
+      });
+    `,
+        path,
+      ],
+      { stdio: ['ignore', 'pipe', 'inherit'] },
+    );
+    await once(child.stdout, 'data');
+    child.kill('SIGKILL');
+    await once(child, 'exit');
+    await server.listen();
+    await expect(sendReaderSecurityCommand(directory, { command: 'revoke', readerId: 7 })).resolves.toMatchObject({
+      ok: true,
+    });
+    const replacement = new ReaderSecurityCommandServer(identities as unknown as ReaderIdentityService);
+    await expect(replacement.listen()).rejects.toThrow('already active');
+    await expect(sendReaderSecurityCommand(directory, { command: 'revoke', readerId: 7 })).resolves.toMatchObject({
+      ok: true,
+    });
+    await server.close();
+    writeFileSync(path, 'substituted', { mode: 0o600 });
+    await expect(replacement.listen()).rejects.toThrow('Unsafe existing');
   });
 
   it('uses a 0600 Unix socket and waits for revocation to finish', async () => {

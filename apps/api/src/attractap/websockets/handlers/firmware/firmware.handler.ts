@@ -1,3 +1,4 @@
+import { ReaderIdentityService } from '../../../security/reader-identity.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { existsSync, statSync, openSync, readSync, fstatSync, closeSync, constants } from 'fs';
 import { join } from 'path';
@@ -20,6 +21,18 @@ export class AttractapFirmwareHandler {
   >();
   private readonly logger = new Logger(AttractapFirmwareHandler.name);
 
+  @Inject(ReaderIdentityService)
+  private identities: ReaderIdentityService;
+
+  private async eligible(socket: AuthenticatedWebSocket): Promise<boolean> {
+    const readerId = socket.readerId;
+    return (
+      !!readerId &&
+      (!!protectedReaderConnection(socket) || (await this.identities.isLegacy(readerId))) &&
+      socket.readerId === readerId
+    );
+  }
+
   @Inject(AttractapService)
   private attractapService: AttractapService;
 
@@ -31,6 +44,7 @@ export class AttractapFirmwareHandler {
 
   public async handleFirmwareChunkRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     try {
+      if (!(await this.eligible(socket))) return;
       if (!socket.state.ota || !socket.state.ota.path || !socket.state.ota.size) {
         this.logger.error(`FIRMWARE_REQUEST_CHUNK received but no OTA context set for client ${socket.id}`);
         return;
@@ -104,7 +118,14 @@ export class AttractapFirmwareHandler {
   }
 
   public async handleFirmwareInfo(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    await this.attractapService.updateReaderFirmware(socket.readerId, data.payload);
+    if (!(await this.eligible(socket))) return;
+    const readerId = socket.readerId;
+    const updated = await this.attractapService.updateReaderFirmware(
+      socket.readerId,
+      data.payload,
+      !protectedReaderConnection(socket),
+    );
+    if (updated === false) return;
 
     const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload, !!protectedReaderConnection(socket));
     if (!firmwareIsUpToDate) {
@@ -138,6 +159,7 @@ export class AttractapFirmwareHandler {
           return;
         }
 
+        if (!(await this.eligible(socket)) || socket.readerId !== readerId) return;
         // Store OTA context for this socket
         if (socket.state.ota?.fd !== undefined) closeSync(socket.state.ota.fd);
         socket.state.ota = { path: firmwarePath, size } as AuthenticatedWebSocket['state']['ota'];

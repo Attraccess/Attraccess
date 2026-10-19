@@ -1,3 +1,4 @@
+import { closeSync } from 'node:fs';
 import { ReaderIdentityService } from '../../../security/reader-identity.service';
 import { protectedReaderConnection } from '../../reader-connection-transport';
 import { SettingsService } from '../../../../settings/settings.service';
@@ -82,6 +83,27 @@ export class AttractapAuthHandler {
         0,
       );
     }
+    try {
+      this.identities.trackLegacy(socket, data.payload.id, async () => {
+        if (socket.cancelReaderConnection) return socket.cancelReaderConnection();
+        socket.state.readerAuthenticationAttempt = Symbol('reader-lifecycle-changed');
+        socket.readerId = null;
+        socket.readerName = null;
+        const ota = socket.state.ota;
+        socket.state.ota = null;
+        if (ota?.fd !== undefined) {
+          try {
+            closeSync(ota.fd);
+          } catch {
+            /* Already closed by disconnect cleanup. */
+          }
+        }
+        socket.close();
+      });
+    } catch {
+      socket.close();
+      return;
+    }
     this.logger.debug('Checking if reader exists');
     const reader = await this.attractapService.findReaderById(data.payload.id);
     if (!isCurrentAttempt()) return;
@@ -102,6 +124,7 @@ export class AttractapAuthHandler {
 
     const storedLanguage = await this.settingsService.getDefaultLanguage();
     if (!isCurrentAttempt()) return;
+    if (!(await this.identities.isLegacy(reader.id)) || !isCurrentAttempt()) return;
     // A broadcast during the read supersedes its snapshot, even before this
     // socket becomes eligible for language broadcasts.
     const language = this.websocketService.readerLanguage ?? storedLanguage;

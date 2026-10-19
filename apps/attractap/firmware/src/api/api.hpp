@@ -138,6 +138,7 @@ public:
 
 class API : public ApiState
 {
+    friend struct EnrollmentInputTest;
 public:
     explicit API(IReaderTransport &transport);
 

@@ -87,72 +87,6 @@ void Websocket::unlockWsClient()
     }
 }
 
-void Websocket::loop()
-{
-#ifdef ATTRACTAP_PRODUCTION
-    this->secured.tick();
-    if (reconnectRequested.exchange(false) || (_state == CONNECTED && secured.failed()))
-    {
-        secured.close();
-        if (disconnectCallback) disconnectCallback();
-        connectionGeneration++;
-        drainTxQueue();
-        setState(INIT);
-    }
-#endif
-    uint32_t nowMs = millis();
-    if (nowMs - this->lastHeapLogTime >= this->HEAP_LOG_INTERVAL_MS)
-    {
-        this->lastHeapLogTime = nowMs;
-        this->logHeapStats();
-    }
-
-    if (!connectionAttemptsEnabled)
-    {
-        this->connectWatchdogStartMs = 0;
-        return;
-    }
-
-    this->updateInfoFromAppState();
-    this->publishConnectionStatus();
-    this->publishNetworkQuality();
-
-    if (!network_is_connected)
-    {
-        this->connectWatchdogStartMs = 0;
-        return;
-    }
-
-    AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
-    this->checkConnectWatchdog(apiConfig);
-    bool apiConfigChanged = _lastApiConfig.hostname != apiConfig.hostname || _lastApiConfig.port != apiConfig.port || _lastApiConfig.useSSL != apiConfig.useSSL;
-    if (apiConfigChanged)
-    {
-        requestConnect();
-        return;
-    }
-
-    switch (_state)
-    {
-    case INIT:
-        requestConnect();
-        break;
-    case CONNECTING:
-        break;
-    case CONNECTED:
-#ifndef ATTRACTAP_PRODUCTION
-        sendPongProbe(nowMs);
-        if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
-        {
-            logger.error("No inbound frames within liveness timeout, forcing reconnect");
-            recordNetworkQualityEvent(this->livenessTimeoutEventTimes, this->livenessTimeoutEventNextIndex);
-            setState(INIT);
-        }
-#endif
-        break;
-    }
-}
-
 void Websocket::forceReconnect(const char *reason)
 {
     logger.errorf("Forcing websocket reconnect: %s", reason);
@@ -215,6 +149,7 @@ void Websocket::disableConnectionAttempts()
     this->connectionAttemptsEnabled = false;
 #ifdef ATTRACTAP_PRODUCTION
     secured.close();
+    securitySessionStarted = false;
     if (disconnectCallback) disconnectCallback();
     connectionGeneration++;
 #endif

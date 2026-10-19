@@ -60,10 +60,21 @@ void checkResourceFixture(const std::string &input) {
     JsonDocument expected;
     assert(!deserializeJson(expected, input));
     const auto resources = expected["data"]["payload"]["resources"].as<JsonArray>();
+    size_t handlerCopies = 0;
     unsigned int callbacks = 0;
     parser.setResourceListUpdateCallback([&](const API::ResourceList &list) {
         ++callbacks;
         assert(list.count == resources.size());
+        const auto externalString = [](const std::string &value) {
+            const auto address = reinterpret_cast<uintptr_t>(value.data());
+            const auto object = reinterpret_cast<uintptr_t>(&value);
+            return address >= object && address < object + sizeof(value) ? size_t(0) : value.capacity() + 1;
+        };
+        for (const auto &item : list.items) {
+            handlerCopies += externalString(item.description);
+            handlerCopies += item.introducers.capacity() * sizeof(std::string);
+            for (const auto &name : item.introducers) handlerCopies += externalString(name);
+        }
         assert(list.requestId == (expected["data"]["payload"]["requestId"] | 0u));
         for (size_t i = 0; i < list.count; ++i) {
             assert(list.items[i].id == resources[i]["id"].as<uint32_t>());
@@ -79,6 +90,10 @@ void checkResourceFixture(const std::string &input) {
     });
     parser.processIncomingMessage(input.data(), input.size());
     std::cout << "jsonBytes=" << input.size() << " parserPeakBytes=" << parser.peak()
+              << " parserCurrentBytes=" << parser.retained() << " pointerBits=" << sizeof(void *) * 8
+              << " arduinoJson=" << ARDUINOJSON_VERSION << " handlerObjectBytes=" << sizeof(API)
+              << " resourceScratchBytes=" << sizeof(API::ResourceList) << " handlerDynamicCopiesBytes=" << handlerCopies
+              << " receivedInputCopyBytes=" << input.capacity() + 1 << " callbackCopiesBytes=0"
               << " callbacks=" << callbacks << " closes=" << transport.closes << std::endl;
     assert(callbacks == 1);
     assert(transport.sends == 1);
