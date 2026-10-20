@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import {
@@ -76,11 +76,18 @@ export function useFrontPanelInputs(controllerId: number) {
     JSON.stringify(configuration) !==
       JSON.stringify(applied ?? { snapshot: emptyConfiguration, metadata: emptyMetadata }),
   );
+  const parsedDraft = useMemo(() => {
+    try {
+      return { configuration: draft.data ? readConfiguration(draft.data) : null, unreadable: false };
+    } catch {
+      return { configuration: null, unreadable: true };
+    }
+  }, [draft.data]);
   const draftSaved = Boolean(
     configuration &&
     draft.isSuccess &&
-    draft.data &&
-    JSON.stringify(configuration) === JSON.stringify(readConfiguration(draft.data)),
+    parsedDraft.configuration &&
+    JSON.stringify(configuration) === JSON.stringify(parsedDraft.configuration),
   );
   const conflict =
     initialized.current && draft.isSuccess && draftIdentity(loadedDraft.current) !== draftIdentity(draft.data);
@@ -114,7 +121,7 @@ export function useFrontPanelInputs(controllerId: number) {
     loadedDraft,
     editing,
     setEditing,
-    errorKey,
+    errorKey: parsedDraft.unreadable ? 'panel.readError' : errorKey,
     setErrorKey,
     backendError,
     setBackendError,
