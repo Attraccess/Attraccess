@@ -64,13 +64,11 @@ export function registerAccessMatrix(
       isEmailVerified: true,
     });
     const token = await app.get(SessionService).createSession(denied);
-    const resource = await db
-      .getRepository(Resource)
-      .save({
-        name: 'Directory machine',
-        type: ResourceType.Machine,
-        supervisionMode: SupervisionMode.SUPERVISION_ALLOWED,
-      });
+    const resource = await db.getRepository(Resource).save({
+      name: 'Directory machine',
+      type: ResourceType.Machine,
+      supervisionMode: SupervisionMode.SUPERVISION_ALLOWED,
+    });
     for (const purpose of ['help', 'supervision']) {
       const path = `/api/resources/${resource.id}/introducer-directory?purpose=${purpose}`;
       await request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`).expect(403);
@@ -106,7 +104,12 @@ export function registerAccessMatrix(
   });
 
   it('starts and ends equipment use through local HTTP while external networking is denied', async () => {
-    const { app, db, admin } = get();
+    const { app, db } = get();
+    const login = await request(app.getHttpServer())
+      .post('/api/auth/session/local')
+      .send({ username: 'enrollment-admin', password: 'local-test-password', tokenLocation: 'body' })
+      .expect(201);
+    const admin = login.body.authToken;
     const resource = await db.getRepository(Resource).save({ name: 'Offline equipment', type: ResourceType.Machine });
     const start = await request(app.getHttpServer())
       .post(`/api/resources/${resource.id}/usage/start`)
@@ -129,5 +132,8 @@ export function registerAccessMatrix(
       .set('Authorization', `Bearer ${admin}`)
       .expect(200);
     expect(ended.body.usage).toBeNull();
+    await request(app.getHttpServer()).delete('/api/auth/session').set('Authorization', `Bearer ${admin}`).expect(200);
+    expect(await app.get(SessionService).validateSession(admin)).toBeNull();
+    await request(app.getHttpServer()).get('/api/users/me').set('Authorization', `Bearer ${admin}`).expect(401);
   });
 }
