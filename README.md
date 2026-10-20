@@ -89,6 +89,22 @@ take precedence. Both resolve `STORAGE_ROOT` through the API's shared path helpe
 Seeding configured storage outside the repository requires `--allow-external-db`,
 and local database paths cannot follow symlinks outside configured storage.
 
+Run the complete API regression suite with a working Docker daemon:
+
+```bash
+pnpm nx run api:test --runInBand --skipNxCache
+```
+
+When `DOCKER_HOST` is unset, the API test setup discovers the active Docker
+context. Keep an explicit `DOCKER_HOST` only when it points to the intended daemon.
+For automated runners, allow 15 minutes for the whole command, including its
+script-test dependency and container startup. A two-minute process limit can
+interrupt a healthy run before Jest prints its final result. This is the outer
+runner deadline; keep individual test timeouts and assertions unchanged. Save the
+command's exit status and complete log against the tested revision. If the runner
+kills a test process, inspect any remaining containers before removing only
+resources belonging to that invocation.
+
 Repository checks and generators are available through Nx:
 
 ```bash
