@@ -33,7 +33,7 @@ python3 apps/attractap/firmware/build_firmwares.py --variants \
   attractap-touch-ethernet attractap-touch-demo attractap-touch-v2-demo
 ```
 
-The default non-production build selects all six variants. Production builds exclude both demo variants. Firmware source changes must increase `version.txt` above the merge-base version, as enforced by `tools/check-version.mjs` and the shared release-version check. The integration baseline is 1.6.7, so the security delivery uses 1.6.8.
+The default non-production build selects all six variants. Production builds exclude both demo variants. Firmware source changes must increase `version.txt` above the merge-base version, as enforced by `tools/check-version.mjs` and the shared release-version check. The integration baseline is 1.6.8, so the security delivery uses 1.6.9.
 
 Build four non-demo production overlays with `--production --signing-key-file /protected/firmware-signing.pem`. Keep test signing keys disposable and clearly separated from production. Unqualified output stays under `build/unqualified-production-output`; it must not enter deployable catalogs. Catalog creation, API asset copying and API selection require independently signed qualification matching the artifacts. Do not bypass the gate by renaming or copying an image.
 
