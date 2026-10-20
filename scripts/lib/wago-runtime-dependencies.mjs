@@ -36,16 +36,27 @@ export function runtimeDependencies(read) {
     direct[name] = dependency;
     visit(name, dependency.version);
   }
+  // Overrides are already reflected in the resolved graph above. Comparing their
+  // declarations would also count overrides for packages this build never uses.
+  const manifestPatches = manifest.pnpm?.patchedDependencies;
+  const installPolicy = { ...manifest.pnpm };
+  delete installPolicy.overrides;
+  delete installPolicy.patchedDependencies;
+  const patchedDependencies = Object.fromEntries(
+    Object.entries(lock.patchedDependencies ?? {}).filter(([, patch]) =>
+      Object.keys(snapshots).some((key) => key.includes(`(patch_hash=${patch.hash})`)),
+    ),
+  );
+  const patchPaths = Object.fromEntries(Object.keys(patchedDependencies).map((key) => [key, manifestPatches?.[key]]));
   return {
     direct,
     packages,
     snapshots,
-    // Installation/toolchain policy remains conservative, including patches and overrides.
+    // Retain global installation policy and only patches applied to this graph.
     packageManager: manifest.packageManager,
     engines: manifest.engines,
-    pnpm: manifest.pnpm,
+    pnpm: { ...installPolicy, patchedDependencies: patchPaths },
     settings: lock.settings,
-    overrides: lock.overrides,
-    patchedDependencies: lock.patchedDependencies,
+    patchedDependencies,
   };
 }

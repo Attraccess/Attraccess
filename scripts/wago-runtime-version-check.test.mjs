@@ -91,6 +91,12 @@ for (const [name, path, next, pass] of [
   ['allows an unrelated dependency addition', 'unrelated-dependency', '0.2.0', true],
   ['allows unrelated lockfile resolution edits', 'unrelated-resolution', '0.2.0', true],
   ['handles lockfiles larger than the subprocess default buffer', 'large-lockfile', '0.2.0', true],
+  ['allows unrelated override declarations', 'unrelated-override', '0.2.0', true],
+  ['allows removing a redundant frontend override', 'remove-override', '0.2.0', true],
+  ['requires a bump when an override changes a runtime resolution', 'runtime-override', '0.2.0', false],
+  ['allows unrelated patch declarations', 'unrelated-patch', '0.2.0', true],
+  ['requires a bump for an applied runtime patch', 'runtime-patch', '0.2.0', false],
+  ['requires a bump for global install settings', 'global-install-policy', '0.2.0', false],
   ['requires a bump for a bundled dependency', 'runtime-dependency', '0.2.0', false],
   ['requires a bump for a transitive dependency', 'transitive-dependency', '0.2.0', false],
   ['requires a bump for an optional build dependency', 'build-dependency', '0.2.0', false],
@@ -114,14 +120,39 @@ for (const [name, path, next, pass] of [
       git('config', 'commit.gpgsign', 'false');
       file(manifest, JSON.stringify({ runtimeVersion: '0.2.0' }));
       file(source, 'baseline');
-      const packageJson = { packageManager: 'pnpm@10.34.6' };
+      const packageJson = { packageManager: 'pnpm@10.34.6', pnpm: { overrides: { react: '1.0.0' } } };
       const lock = dependencyFixture();
+      lock.overrides = { react: '1.0.0' };
       file('package.json', JSON.stringify(packageJson));
       file('pnpm-lock.yaml', stringify(lock));
       git('add', '.');
       git('commit', '--quiet', '-m', 'baseline');
       const base = git('rev-parse', 'HEAD');
-      if (path === 'unrelated-dependency') {
+      if (path.endsWith('-override')) {
+        if (path === 'remove-override') {
+          delete packageJson.pnpm.overrides.react;
+          delete lock.overrides.react;
+        } else {
+          const name = path === 'runtime-override' ? 'transitive' : 'absent-package';
+          packageJson.pnpm.overrides[name] = '2.0.0';
+          lock.overrides[name] = '2.0.0';
+          if (path === 'runtime-override') {
+            lock.snapshots['mqtt@1.0.0'].dependencies.transitive = '2.0.0';
+            lock.packages['transitive@2.0.0'] = { resolution: { integrity: 'new' } };
+            lock.snapshots['transitive@2.0.0'] = {};
+          }
+        }
+      } else if (path.endsWith('-patch')) {
+        const name = path === 'runtime-patch' ? 'mqtt' : 'unrelated';
+        const key = `${name}@1.0.0`;
+        packageJson.pnpm.patchedDependencies = { [key]: `patches/${name}.patch` };
+        lock.patchedDependencies = { [key]: { hash: 'patch-content-hash', path: `patches/${name}.patch` } };
+        lock.snapshots[`${key}(patch_hash=patch-content-hash)`] = lock.snapshots[key];
+        delete lock.snapshots[key];
+        if (path === 'runtime-patch')
+          lock.importers['.'].dependencies.mqtt.version += '(patch_hash=patch-content-hash)';
+      } else if (path === 'global-install-policy') packageJson.pnpm.strictDepBuilds = true;
+      else if (path === 'unrelated-dependency') {
         packageJson.devDependencies = { yaml: '^2.9.1' };
         lock.importers['.'].devDependencies = { yaml: { specifier: '^2.9.1', version: '2.9.1' } };
         lock.packages['yaml@2.9.1'] = { resolution: { integrity: 'new' } };
