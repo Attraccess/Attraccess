@@ -8,6 +8,7 @@ matches esp_ds_data_t in ESP-IDF v6.0.2 for ESP32-S3 (not vendor TLV storage).
 """
 import argparse
 import contextlib
+import fcntl
 import csv
 import hashlib
 import importlib.metadata
@@ -239,6 +240,9 @@ def prepare_bundle(request_file, output_directory):
        not isinstance(request['serverCaFiles'], list) or len(request['serverCaFiles']) != 1 or \
        not isinstance(request['timeKeys'], list) or not 1 <= len(request['timeKeys']) <= 2:
         raise ValueError('Invalid provisioning request; initial provisioning requires one server root')
+    qualification_name = Path(request['qualificationFile']).name
+    if not re.fullmatch(r'[A-Za-z0-9_.-]{1,128}', qualification_name) or qualification_name in {'.', '..'}:
+        raise ValueError('Invalid qualification filename')
     inventory = json.loads(protected_read(request['inventoryFile']))
     preflight_inventory(inventory, request['hmacId'])
     ds = protected_read(request['dsFile'])
@@ -324,7 +328,7 @@ def prepare_bundle(request_file, output_directory):
                         'certificateFingerprint': digest(certificate.public_bytes(serialization.Encoding.DER)),
                         'publicKeyFingerprint': digest(public.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)),
                         'artifacts': {name: digest(data) for name, data in artifacts.items()},
-                        'qualificationFile': request['qualificationFile'], 'hmacId': request['hmacId'],
+                        'qualificationFile': qualification_name, 'hmacId': request['hmacId'],
                         'hmacFingerprint': metadata['hmacFingerprint'],
                         'tool': {'idf': '6.0.2', 'esptool': '5.6.0', 'ds': TOOL_VERSION},
                         'operations': ['burn-ds-root', 'write-protected-images', 'qualified-first-boot'],
@@ -339,6 +343,28 @@ def prepare_bundle(request_file, output_directory):
 
 
 def apply_bundle(manifest_file, hmac_file, trust_file, port=None, execute=False):
+    if not execute:
+        return _apply_bundle(manifest_file, hmac_file, trust_file, port, execute)
+    # Keep the lock inode stable across attempts. Never unlink a flock file.
+    directory = Path(manifest_file).parent
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        raise ValueError('Unsafe provisioning directory')
+    fd = os.open(directory / '.apply.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+            raise ValueError('Unsafe provisioning lock')
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise ValueError('Provisioning apply is already running') from error
+        return _apply_bundle(manifest_file, hmac_file, trust_file, port, execute)
+    finally:
+        os.close(fd)
+
+
+def _apply_bundle(manifest_file, hmac_file, trust_file, port=None, execute=False):
     from check_security_qualification import verify_qualification
     manifest_bytes = protected_read(manifest_file)
     manifest = json.loads(manifest_bytes)
@@ -366,7 +392,10 @@ def apply_bundle(manifest_file, hmac_file, trust_file, port=None, execute=False)
             raise ValueError('Provisioning image does not fit')
     artifacts = {**manifest['artifacts'], 'reader-manifest.json': digest(manifest_bytes)}
     # Dry runs also validate qualification, but never open a serial device.
-    verify_qualification(manifest['qualificationFile'], trust_file, artifacts, manifest['inventoryDigest'])
+    receipt = manifest['qualificationFile']
+    if not isinstance(receipt, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,128}', receipt) or receipt in {'.', '..'}:
+        raise ValueError('Qualification reference must be a bundle-local filename')
+    verify_qualification(directory / receipt, trust_file, artifacts, manifest['inventoryDigest'])
     if not execute:
         return {'dryRun': True, 'operations': manifest['operations'], 'deviceAccess': False}
     if not port:

@@ -71,6 +71,9 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
   private readonly legacySessions = new Map<object, { readerId: number; close: () => Promise<void> }>();
   private readonly changing = new Set<number>();
   private trustChanging = false;
+  // Installed configuration is immutable until the protected install command or restart.
+  private snapshot?: { directory: string; value: ReaderSecurityConfiguration; roots: Map<string, X509Certificate> };
+  private readonly certificateCache = new Map<string, { certificate: X509Certificate; roots: Set<string> }>();
 
   constructor(
     @InjectRepository(AttractapReaderIdentity) private readonly identities: Repository<AttractapReaderIdentity>,
@@ -113,6 +116,17 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
 
   configuration(file?: string): ReaderSecurityConfiguration | undefined {
     if (!this.directory) return undefined;
+    if (!file && this.snapshot?.directory === this.directory) {
+      const value = this.snapshot.value;
+      if (
+        value.readerCaOverlap &&
+        Date.now() >=
+          Math.min(value.readerCaOverlap.endsAt, Date.parse(this.snapshot.roots.get(value.readerCaFiles[0]).validTo))
+      ) {
+        return { ...value, readerCaFiles: value.readerCaFiles.slice(1), readerCaOverlap: undefined };
+      }
+      return value;
+    }
     const bytes = readProtectedReaderFile(file ?? join(this.directory, 'reader-security.json'));
     try {
       const value = JSON.parse(bytes.toString('utf8')) as ReaderSecurityConfiguration;
@@ -144,6 +158,15 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
         }
       } else if (value.readerCaOverlap) throw new Error('Unexpected reader trust overlap');
       if (value.issuer) withReaderIssuer(value.issuer, value.readerCaFiles, readProtectedReaderFile, () => undefined);
+      if (!file) {
+        const roots = new Map(
+          value.readerCaFiles.map((path) => [path, new X509Certificate(readProtectedReaderFile(path))]),
+        );
+        Object.freeze(value.readerCaFiles);
+        if (value.readerCaOverlap) Object.freeze(value.readerCaOverlap);
+        if (value.issuer) Object.freeze(value.issuer);
+        this.snapshot = { directory: this.directory, value: Object.freeze(value), roots };
+      }
       return value;
     } finally {
       bytes.fill(0);
@@ -198,7 +221,13 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
   }
 
   async validateCertificate(pem: string): Promise<AttractapReaderIdentity> {
-    const certificate = new X509Certificate(pem);
+    let cached = this.certificateCache.get(pem);
+    if (!cached) {
+      cached = { certificate: new X509Certificate(pem), roots: new Set() };
+      if (this.certificateCache.size >= 256) this.certificateCache.delete(this.certificateCache.keys().next().value);
+      this.certificateCache.set(pem, cached);
+    }
+    const certificate = cached.certificate;
     const signature = (certificate as X509Certificate & { signatureAlgorithm?: string }).signatureAlgorithm;
     if (
       certificate.ca ||
@@ -219,19 +248,12 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
     )
       throw new Error('Reader credential is not active');
     const trusted = this.configuration()?.readerCaFiles.some((path) => {
-      const bytes = readProtectedReaderFile(path);
-      try {
-        const root = new X509Certificate(bytes);
-        return (
-          root.ca &&
-          Date.parse(root.validFrom) <= Date.now() &&
-          Date.parse(root.validTo) > Date.now() &&
-          certificate.checkIssued(root) &&
-          certificate.verify(root.publicKey)
-        );
-      } finally {
-        bytes.fill(0);
-      }
+      const root = this.snapshot.roots.get(path);
+      if (!root?.ca || Date.parse(root.validFrom) > Date.now() || Date.parse(root.validTo) <= Date.now()) return false;
+      if (cached.roots.has(root.fingerprint256)) return true;
+      if (!certificate.checkIssued(root) || !certificate.verify(root.publicKey)) return false;
+      cached.roots.add(root.fingerprint256);
+      return true;
     });
     if (!trusted) throw new Error('Reader trust is not active');
     return identity;
@@ -287,6 +309,9 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
     try {
       writeFileSync(temporary, JSON.stringify(candidate), { flag: 'wx', mode: 0o600 });
       renameSync(temporary, join(this.directory, 'reader-security.json'));
+      this.snapshot = undefined;
+      this.certificateCache.clear();
+      this.configuration();
       await Promise.all(
         [...this.sessions.entries()].map(async ([generation, session]) => {
           await session.close();

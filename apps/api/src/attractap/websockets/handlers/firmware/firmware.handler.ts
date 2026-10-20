@@ -17,6 +17,7 @@ export class AttractapFirmwareHandler {
       ota: NonNullable<AuthenticatedWebSocket['state']['ota']>;
       tokens: number;
       at: number;
+      pending?: boolean;
     }
   >();
   private readonly logger = new Logger(AttractapFirmwareHandler.name);
@@ -67,10 +68,29 @@ export class AttractapFirmwareHandler {
       const safeLen = Math.min(length, maxChunk, total - offset);
       const context = this.contexts.get(socket);
       if (!socket.readerId || !context || context.ota !== socket.state.ota) return;
-      const now = performance.now();
-      context.tokens = Math.min(16, context.tokens + ((now - context.at) * 16) / 1000);
-      context.at = now;
-      if (context.tokens < 1 || socket.bufferedAmount + safeLen > 32768) {
+      if (context.pending) {
+        socket.close();
+        return;
+      }
+      const refill = () => {
+        const now = performance.now();
+        context.tokens = Math.min(16, context.tokens + ((now - context.at) * 16) / 1000);
+        context.at = now;
+      };
+      refill();
+      if (context.tokens < 1) {
+        // One paced response per socket. Extra concurrent requests are abuse;
+        // sequential old firmware can download without reconnecting.
+        context.pending = true;
+        try {
+          await new Promise((resolve) => setTimeout(resolve, Math.ceil(((1 - context.tokens) * 1000) / 16)));
+          if (!(await this.eligible(socket)) || socket.state.ota !== context.ota) return;
+          refill();
+        } finally {
+          context.pending = false;
+        }
+      }
+      if (socket.bufferedAmount + safeLen > 32768) {
         socket.close();
         return;
       }

@@ -1,3 +1,5 @@
+import { signReaderCertificate } from '../security/reader-certificate-issuer';
+import { createPrivateKey } from 'node:crypto';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { createServer } from 'node:http';
 import { AddressInfo } from 'node:net';
@@ -67,239 +69,253 @@ describe('actual protected reader route over plain WS', () => {
       synchronize: false,
     };
     let source = await new DataSource(dbConfiguration).initialize();
-    const configPath = join(fixture.directory, 'reader-security.json');
-    const configuration = JSON.parse(readFileSync(configPath, 'utf8'));
-    configuration.issuer = {
-      caCertificateFile: join(fixture.directory, 'ca.pem'),
-      caKeyFile: join(fixture.directory, 'ca.key'),
-    };
-    writeFileSync(configPath, JSON.stringify(configuration));
-    await source.getRepository(Attractap).save({ id: 17, name: 'Persisted reader', apiTokenHash: 'legacy hash' });
-    writeFileSync(
-      join(fixture.directory, 'public.pem'),
-      createPublicKey(fixture.read('reader.key')).export({ type: 'spki', format: 'pem' }),
-      { mode: 0o600 },
-    );
-    writeFileSync(join(fixture.directory, 'manifest.json'), '{}', { mode: 0o600 });
-    const createIdentities = () =>
-      new ReaderIdentityService(
-        source.getRepository(AttractapReaderIdentity),
-        new ConfigService({ app: { READER_SECURITY_DIRECTORY: fixture.directory } }),
-        new VerifiedCardSessionService(),
-        new EncryptionService(new ConfigService()),
-      );
-    let identities = createIdentities();
-    await identities.onModuleInit();
-    const issueCommand = { command: 'issue', readerId: 17, publicKeyFile: join(fixture.directory, 'public.pem') };
-    const first = (await sendReaderSecurityCommand(fixture.directory, issueCommand)) as { ok: boolean; result: string };
-    expect(first.ok).toBe(true);
-    expect(await source.getRepository(AttractapReaderIdentity).count()).toBe(0);
-    const enroll = async (pem: string) => {
-      writeFileSync(join(fixture.directory, 'enroll.pem'), pem, { mode: 0o600 });
-      return identities.enroll({
-        readerId: 17,
-        certificateFile: join(fixture.directory, 'enroll.pem'),
-        manifestFile: join(fixture.directory, 'manifest.json'),
-        enrollmentClass: 'development',
-      });
-    };
-    await enroll(first.result);
-    const second = (await sendReaderSecurityCommand(fixture.directory, issueCommand)) as {
-      ok: boolean;
-      result: string;
-    };
-    expect(second.ok).toBe(true);
-    expect(await enroll(second.result)).toMatchObject({ generation: 2 });
-    const rows = await source.getRepository(AttractapReaderIdentity).find({ order: { generation: 'ASC' } });
-    expect(rows).toHaveLength(2);
-    expect(rows[0].retiredAt.getTime()).toBeLessThanOrEqual(Date.now());
-    expect(rows[0].publicKeyFingerprint).toBe(rows[1].publicKeyFingerprint);
-    // Persist invalid newer generations with the same key. They must not
-    // shadow generation two during startup or automatic time lookup.
-    for (const [index, state] of ['expired', 'revoked', 'untrusted'].entries()) {
-      const candidate = forge.pki.certificateFromPem(second.result);
-      candidate.serialNumber = '01' + String(index + 1).repeat(36);
-      if (state === 'expired') {
-        candidate.validity.notBefore = new Date(Date.now() - 86400_000);
-        candidate.validity.notAfter = new Date(Date.now() - 10000);
-      }
-      candidate.sign(
-        forge.pki.privateKeyFromPem(fixture.read(state === 'untrusted' ? 'server.key' : 'ca.key').toString()),
-        forge.md.sha256.create(),
-      );
-      const certificatePem = forge.pki.certificateToPem(candidate);
-      const certificate = new X509Certificate(certificatePem);
-      const original = { ...rows[1] };
-      delete original.id;
-      await source.getRepository(AttractapReaderIdentity).save({
-        ...original,
-        generation: index + 3,
-        certificatePem,
-        certificateFingerprint: certificate.fingerprint256.replace(/:/g, '').toLowerCase(),
-        validFrom: new Date(certificate.validFrom),
-        validUntil: new Date(certificate.validTo),
-        revokedAt: state === 'revoked' ? new Date() : null,
-      });
-    }
-    await identities.onModuleDestroy();
-    await source.destroy();
-    source = await new DataSource(dbConfiguration).initialize();
-    identities = createIdentities();
-    await identities.onModuleInit();
-    expect((await identities.findForTime(fixture.identity.publicKeyFingerprint))?.generation).toBe(2);
-    const adapter = new ProtectedWsAdapter(
-      http as unknown as INestApplicationContext,
-      identities,
-      new ReaderTimeService(identities),
-    );
-    const gateway = adapter.create(0, { path: '/api/attractap/websocket' });
-    const incoming = once(gateway, 'connection');
-    await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
-    const ws = new WebSocket(
-      `ws://127.0.0.1:${(http.address() as AddressInfo).port}${PROTECTED_READER_PATH}`,
-      PROTECTED_READER_PROTOCOL,
-    );
+    let identities: ReaderIdentityService | undefined;
     try {
-      await once(ws, 'open');
-      if (process.env.READER_SESSION_TEST_BINARY) {
-        writeFileSync(
-          join(fixture.directory, 'time-public.pem'),
-          fixture.publicKey.export({ type: 'spki', format: 'pem' }),
-          { mode: 0o600 },
-        );
-        const peer = spawn(process.env.READER_SESSION_TEST_BINARY, ['--owner'], {
-          env: { ...process.env, READER_TEST_CERT_DIRECTORY: fixture.directory },
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-        let discardedTimeRequests = 0;
-        const messages = new EventEmitter();
-        let output = '';
-        let errors = '';
-        peer.stderr.on('data', (bytes) => (errors += bytes.toString()));
-        peer.stdout.on('data', (bytes) => {
-          output += bytes.toString();
-          while (output.includes('\n')) {
-            const index = output.indexOf('\n');
-            const line = output.slice(0, index);
-            output = output.slice(index + 1);
-            if (line.startsWith('WIRE ')) {
-              const bytes = Buffer.from(line.slice(5), 'hex');
-              if (bytes.length === 81 && discardedTimeRequests < 2) {
-                discardedTimeRequests++;
-                peer.stdin.write('OUTAGE\n');
-              } else ws.send(bytes);
-            } else if (line.startsWith('JSON ')) messages.emit('json', Buffer.from(line.slice(5), 'hex'));
-            else if (line.startsWith('OTA ')) messages.emit('ota', Buffer.from(line.slice(4), 'hex'));
-            // eslint-disable-next-line no-console -- Retain measured host allocation evidence in the test receipt.
-            else if (line.startsWith('MEMORY ')) console.info(line);
-            else if (line === 'READY') messages.emit('ready');
-            else if (line === 'CLOSED') messages.emit('error', new Error('Firmware TLS peer closed'));
-          }
-        });
-        peer.on('error', (error) => messages.emit('error', error));
-        peer.on('exit', (code) => {
-          if (code) messages.emit('error', new Error(`Firmware peer exit ${code}: ${errors}`));
-        });
-        ws.on('message', (bytes: Buffer, binary) => {
-          if (!binary) messages.emit('error', new Error('Cleartext server message'));
-          else peer.stdin.write('WIRE ' + bytes.toString('hex') + '\n');
-        });
-        try {
-          await once(messages, 'ready');
-          const [socket] = (await incoming) as [ProtectedReaderSocket];
-          const heartbeat = Buffer.from(JSON.stringify({ event: 'HEARTBEAT' }));
-          const inbound = once(socket, 'message');
-          peer.stdin.write('SEND ' + heartbeat.toString('hex') + '\n');
-          expect((await inbound)[0].data).toEqual(heartbeat);
-          const response = once(messages, 'json');
-          socket.send(JSON.stringify({ event: 'HEARTBEAT', serverTime: 123 }));
-          expect(JSON.parse((await response)[0].toString())).toEqual({ event: 'HEARTBEAT', serverTime: 123 });
-          if (process.env.READER_PAYLOAD_FIXTURE_DIR) {
-            for (const name of ['empty', 'ten-descriptions', 'personalized', 'multibyte', 'escaped', 'flow-buttons']) {
-              const body = readFileSync(join(process.env.READER_PAYLOAD_FIXTURE_DIR, name + '.json'));
-              const received = once(messages, 'json');
-              socket.send(body.toString('utf8'));
-              const [plaintext] = (await received) as [Buffer];
-              expect(plaintext).toEqual(body);
-              if (process.env.READER_PAYLOAD_RECEIVED_DIR) {
-                mkdirSync(process.env.READER_PAYLOAD_RECEIVED_DIR, { recursive: true, mode: 0o700 });
-                writeFileSync(join(process.env.READER_PAYLOAD_RECEIVED_DIR, name + '.json'), plaintext, {
-                  mode: 0o600,
-                });
-              }
-            }
-          }
-          expect(discardedTimeRequests).toBe(2);
-          const ota = once(messages, 'ota');
-          const chunk = Buffer.alloc(4096, 0x5a);
-          socket.send(chunk);
-          expect((await ota)[0]).toEqual(chunk);
-          const disconnected = once(ws, 'close');
-          await identities.revoke(17);
-          await disconnected;
-          expect(await identities.findForTime(fixture.identity.publicKeyFingerprint)).toBeNull();
-        } finally {
-          peer.stdin.end('CLOSE\n');
-          peer.kill();
-        }
-        return;
-      }
-
-      const time = once(ws, 'message');
-      ws.send(fixture.request());
-      const [reply] = await time;
-      expect(reply).toHaveLength(493);
-      const stream = new ReaderCiphertextStream(ws);
-      ws.on('message', (bytes: Buffer, binary: boolean) => {
-        if (!binary) throw new Error('cleartext');
-        stream.receive(bytes);
-      });
-      const tls = connect({
-        socket: stream,
-        servername: 'localhost',
-        ca: fixture.read('ca.pem'),
-        cert: second.result,
-        key: fixture.read('reader.key'),
-        minVersion: 'TLSv1.2',
-        maxVersion: 'TLSv1.2',
-        ciphers: 'ECDHE-RSA-AES256-GCM-SHA384',
-        sigalgs: 'rsa_pkcs1_sha256:rsa_pkcs1_sha384:rsa_pkcs1_sha512',
-        rejectUnauthorized: true,
-      });
-      await once(tls, 'secureConnect');
-      const [socket] = (await incoming) as [ProtectedReaderSocket];
-      expect(tls.authorized).toBe(true);
-      expect(tls.isSessionReused()).toBe(false);
-      expect(tls.getCipher().name).toBe('ECDHE-RSA-AES256-GCM-SHA384');
-      const received = once(socket, 'message');
-      const message = Buffer.from(JSON.stringify({ event: 'HEARTBEAT' }));
-      const frame = encodeReaderFrame(ReaderFrameType.Json, message);
-      for (let index = 0; index < frame.length; index++) tls.write(frame.subarray(index, index + 1));
-      expect((await received)[0].data).toEqual(message);
-      const plaintext = new Promise<Buffer>((resolve) => {
-        const decoder = new ReaderFrameDecoder((type, bytes) => {
-          expect(type).toBe(ReaderFrameType.Json);
-          resolve(Buffer.from(bytes));
-        });
-        tls.on('data', (bytes) => decoder.push(bytes));
-      });
-      socket.send(JSON.stringify({ event: 'HEARTBEAT', serverTime: 123 }));
-      expect(JSON.parse((await plaintext).toString())).toEqual({ event: 'HEARTBEAT', serverTime: 123 });
-      const disconnected = once(ws, 'close');
-      await identities.revoke(17);
-      await disconnected;
-      tls.destroy();
-      await expect(identities.findForTime(fixture.identity.publicKeyFingerprint)).resolves.toBeNull();
-      await expect(new ReaderTimeService(identities).reply(fixture.request(), 'after-revoke')).rejects.toThrow(
-        'denied',
+      const configPath = join(fixture.directory, 'reader-security.json');
+      const configuration = JSON.parse(readFileSync(configPath, 'utf8'));
+      configuration.issuer = {
+        caCertificateFile: join(fixture.directory, 'ca.pem'),
+        caKeyFile: join(fixture.directory, 'ca.key'),
+      };
+      writeFileSync(configPath, JSON.stringify(configuration));
+      await source.getRepository(Attractap).save({ id: 17, name: 'Persisted reader', apiTokenHash: 'legacy hash' });
+      writeFileSync(
+        join(fixture.directory, 'public.pem'),
+        createPublicKey(fixture.read('reader.key')).export({ type: 'spki', format: 'pem' }),
+        { mode: 0o600 },
       );
-    } finally {
-      ws.terminate();
-      await adapter.close(gateway);
-      await adapter.dispose();
+      writeFileSync(join(fixture.directory, 'manifest.json'), '{}', { mode: 0o600 });
+      const createIdentities = () =>
+        new ReaderIdentityService(
+          source.getRepository(AttractapReaderIdentity),
+          new ConfigService({ app: { READER_SECURITY_DIRECTORY: fixture.directory } }),
+          new VerifiedCardSessionService(),
+          new EncryptionService(new ConfigService()),
+        );
+      identities = createIdentities();
+      await identities.onModuleInit();
+      const issueCommand = { command: 'issue', readerId: 17, publicKeyFile: join(fixture.directory, 'public.pem') };
+      const first = (await sendReaderSecurityCommand(fixture.directory, issueCommand)) as {
+        ok: boolean;
+        result: string;
+      };
+      expect(first.ok).toBe(true);
+      expect(await source.getRepository(AttractapReaderIdentity).count()).toBe(0);
+      const enroll = async (pem: string) => {
+        writeFileSync(join(fixture.directory, 'enroll.pem'), pem, { mode: 0o600 });
+        return identities.enroll({
+          readerId: 17,
+          certificateFile: join(fixture.directory, 'enroll.pem'),
+          manifestFile: join(fixture.directory, 'manifest.json'),
+          enrollmentClass: 'development',
+        });
+      };
+      await enroll(first.result);
+      const second = (await sendReaderSecurityCommand(fixture.directory, issueCommand)) as {
+        ok: boolean;
+        result: string;
+      };
+      expect(second.ok).toBe(true);
+      expect(await enroll(second.result)).toMatchObject({ generation: 2 });
+      const rows = await source.getRepository(AttractapReaderIdentity).find({ order: { generation: 'ASC' } });
+      expect(rows).toHaveLength(2);
+      expect(rows[0].retiredAt.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(rows[0].publicKeyFingerprint).toBe(rows[1].publicKeyFingerprint);
+      // Persist invalid newer generations with the same key. They must not
+      // shadow generation two during startup or automatic time lookup.
+      for (const [index, state] of ['expired', 'revoked', 'untrusted'].entries()) {
+        const candidate = forge.pki.certificateFromPem(second.result);
+        candidate.serialNumber = '01' + String(index + 1).repeat(36);
+        if (state === 'expired') {
+          candidate.validity.notBefore = new Date(Date.now() - 86400_000);
+          candidate.validity.notAfter = new Date(Date.now() - 10000);
+        }
+        signReaderCertificate(
+          candidate,
+          createPrivateKey(fixture.read(state === 'untrusted' ? 'server.key' : 'ca.key')),
+        );
+        const certificatePem = forge.pki.certificateToPem(candidate);
+        const certificate = new X509Certificate(certificatePem);
+        const original = { ...rows[1] };
+        delete original.id;
+        await source.getRepository(AttractapReaderIdentity).save({
+          ...original,
+          generation: index + 3,
+          certificatePem,
+          certificateFingerprint: certificate.fingerprint256.replace(/:/g, '').toLowerCase(),
+          validFrom: new Date(certificate.validFrom),
+          validUntil: new Date(certificate.validTo),
+          revokedAt: state === 'revoked' ? new Date() : null,
+        });
+      }
       await identities.onModuleDestroy();
       await source.destroy();
-      await new Promise<void>((resolve) => http.close(() => resolve()));
+      source = await new DataSource(dbConfiguration).initialize();
+      identities = createIdentities();
+      await identities.onModuleInit();
+      expect((await identities.findForTime(fixture.identity.publicKeyFingerprint))?.generation).toBe(2);
+      const adapter = new ProtectedWsAdapter(
+        http as unknown as INestApplicationContext,
+        identities,
+        new ReaderTimeService(identities),
+      );
+      const gateway = adapter.create(0, { path: '/api/attractap/websocket' });
+      const incoming = once(gateway, 'connection');
+      await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
+      const ws = new WebSocket(
+        `ws://127.0.0.1:${(http.address() as AddressInfo).port}${PROTECTED_READER_PATH}`,
+        PROTECTED_READER_PROTOCOL,
+      );
+      try {
+        await once(ws, 'open');
+        if (process.env.READER_SESSION_TEST_BINARY) {
+          writeFileSync(
+            join(fixture.directory, 'time-public.pem'),
+            fixture.publicKey.export({ type: 'spki', format: 'pem' }),
+            { mode: 0o600 },
+          );
+          const peer = spawn(process.env.READER_SESSION_TEST_BINARY, ['--owner'], {
+            env: { ...process.env, READER_TEST_CERT_DIRECTORY: fixture.directory },
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+          let discardedTimeRequests = 0;
+          const messages = new EventEmitter();
+          let output = '';
+          let errors = '';
+          peer.stderr.on('data', (bytes) => (errors += bytes.toString()));
+          peer.stdout.on('data', (bytes) => {
+            output += bytes.toString();
+            while (output.includes('\n')) {
+              const index = output.indexOf('\n');
+              const line = output.slice(0, index);
+              output = output.slice(index + 1);
+              if (line.startsWith('WIRE ')) {
+                const bytes = Buffer.from(line.slice(5), 'hex');
+                if (bytes.length === 81 && discardedTimeRequests < 2) {
+                  discardedTimeRequests++;
+                  peer.stdin.write('OUTAGE\n');
+                } else ws.send(bytes);
+              } else if (line.startsWith('JSON ')) messages.emit('json', Buffer.from(line.slice(5), 'hex'));
+              else if (line.startsWith('OTA ')) messages.emit('ota', Buffer.from(line.slice(4), 'hex'));
+              // eslint-disable-next-line no-console -- Retain measured host allocation evidence in the test receipt.
+              else if (line.startsWith('MEMORY ')) console.info(line);
+              else if (line === 'READY') messages.emit('ready');
+              else if (line === 'CLOSED') messages.emit('error', new Error('Firmware TLS peer closed'));
+            }
+          });
+          peer.on('error', (error) => messages.emit('error', error));
+          peer.on('exit', (code) => {
+            if (code) messages.emit('error', new Error(`Firmware peer exit ${code}: ${errors}`));
+          });
+          ws.on('message', (bytes: Buffer, binary) => {
+            if (!binary) messages.emit('error', new Error('Cleartext server message'));
+            else peer.stdin.write('WIRE ' + bytes.toString('hex') + '\n');
+          });
+          try {
+            await once(messages, 'ready');
+            const [socket] = (await incoming) as [ProtectedReaderSocket];
+            const heartbeat = Buffer.from(JSON.stringify({ event: 'HEARTBEAT' }));
+            const inbound = once(socket, 'message');
+            peer.stdin.write('SEND ' + heartbeat.toString('hex') + '\n');
+            expect((await inbound)[0].data).toEqual(heartbeat);
+            const response = once(messages, 'json');
+            socket.send(JSON.stringify({ event: 'HEARTBEAT', serverTime: 123 }));
+            expect(JSON.parse((await response)[0].toString())).toEqual({ event: 'HEARTBEAT', serverTime: 123 });
+            if (process.env.READER_PAYLOAD_FIXTURE_DIR) {
+              for (const name of [
+                'empty',
+                'ten-descriptions',
+                'personalized',
+                'multibyte',
+                'escaped',
+                'flow-buttons',
+              ]) {
+                const body = readFileSync(join(process.env.READER_PAYLOAD_FIXTURE_DIR, name + '.json'));
+                const received = once(messages, 'json');
+                socket.send(body.toString('utf8'));
+                const [plaintext] = (await received) as [Buffer];
+                expect(plaintext).toEqual(body);
+                if (process.env.READER_PAYLOAD_RECEIVED_DIR) {
+                  mkdirSync(process.env.READER_PAYLOAD_RECEIVED_DIR, { recursive: true, mode: 0o700 });
+                  writeFileSync(join(process.env.READER_PAYLOAD_RECEIVED_DIR, name + '.json'), plaintext, {
+                    mode: 0o600,
+                  });
+                }
+              }
+            }
+            expect(discardedTimeRequests).toBe(2);
+            const ota = once(messages, 'ota');
+            const chunk = Buffer.alloc(4096, 0x5a);
+            socket.send(chunk);
+            expect((await ota)[0]).toEqual(chunk);
+            const disconnected = once(ws, 'close');
+            await identities.revoke(17);
+            await disconnected;
+            expect(await identities.findForTime(fixture.identity.publicKeyFingerprint)).toBeNull();
+          } finally {
+            peer.stdin.end('CLOSE\n');
+            peer.kill();
+          }
+          return;
+        }
+
+        const time = once(ws, 'message');
+        ws.send(fixture.request());
+        const [reply] = await time;
+        expect(reply).toHaveLength(493);
+        const stream = new ReaderCiphertextStream(ws);
+        ws.on('message', (bytes: Buffer, binary: boolean) => {
+          if (!binary) throw new Error('cleartext');
+          stream.receive(bytes);
+        });
+        const tls = connect({
+          socket: stream,
+          servername: 'localhost',
+          ca: fixture.read('ca.pem'),
+          cert: second.result,
+          key: fixture.read('reader.key'),
+          minVersion: 'TLSv1.2',
+          maxVersion: 'TLSv1.2',
+          ciphers: 'ECDHE-RSA-AES256-GCM-SHA384',
+          sigalgs: 'rsa_pkcs1_sha256:rsa_pkcs1_sha384:rsa_pkcs1_sha512',
+          rejectUnauthorized: true,
+        });
+        await once(tls, 'secureConnect');
+        const [socket] = (await incoming) as [ProtectedReaderSocket];
+        expect(tls.authorized).toBe(true);
+        expect(tls.isSessionReused()).toBe(false);
+        expect(tls.getCipher().name).toBe('ECDHE-RSA-AES256-GCM-SHA384');
+        const received = once(socket, 'message');
+        const message = Buffer.from(JSON.stringify({ event: 'HEARTBEAT' }));
+        const frame = encodeReaderFrame(ReaderFrameType.Json, message);
+        for (let index = 0; index < frame.length; index++) tls.write(frame.subarray(index, index + 1));
+        expect((await received)[0].data).toEqual(message);
+        const plaintext = new Promise<Buffer>((resolve) => {
+          const decoder = new ReaderFrameDecoder((type, bytes) => {
+            expect(type).toBe(ReaderFrameType.Json);
+            resolve(Buffer.from(bytes));
+          });
+          tls.on('data', (bytes) => decoder.push(bytes));
+        });
+        socket.send(JSON.stringify({ event: 'HEARTBEAT', serverTime: 123 }));
+        expect(JSON.parse((await plaintext).toString())).toEqual({ event: 'HEARTBEAT', serverTime: 123 });
+        const disconnected = once(ws, 'close');
+        await identities.revoke(17);
+        await disconnected;
+        tls.destroy();
+        await expect(identities.findForTime(fixture.identity.publicKeyFingerprint)).resolves.toBeNull();
+        await expect(new ReaderTimeService(identities).reply(fixture.request(), 'after-revoke')).rejects.toThrow(
+          'denied',
+        );
+      } finally {
+        ws.terminate();
+        await adapter.close(gateway);
+        await adapter.dispose();
+        await new Promise<void>((resolve) => http.close(() => resolve()));
+      }
+    } finally {
+      await identities?.onModuleDestroy();
+      if (source.isInitialized) await source.destroy();
     }
   }, 30_000);
 });
@@ -391,6 +407,46 @@ describe('protected route rejection before application dispatch', () => {
       }
     },
   );
+
+  it('detaches a generation inserted after its connection already closed', async () => {
+    const original = identities.attach.bind(identities);
+    let attached = false;
+    jest.spyOn(identities, 'attach').mockImplementation(async (generation, identity, close) => {
+      await close();
+      await original(generation, identity, close);
+      attached = true;
+    });
+    const ws = await open();
+    const time = once(ws, 'message');
+    ws.send(fixture.request());
+    await time;
+    const stream = new ReaderCiphertextStream(ws);
+    stream.on('error', () => undefined);
+    ws.on('message', (bytes: Buffer) => stream.receive(bytes));
+    const closed = once(ws, 'close');
+    const tls = connect({
+      socket: stream,
+      servername: 'localhost',
+      ca: fixture.read('ca.pem'),
+      cert: fixture.read('reader.pem'),
+      key: fixture.read('reader.key'),
+      minVersion: 'TLSv1.2',
+      maxVersion: 'TLSv1.2',
+      ciphers: 'ECDHE-RSA-AES256-GCM-SHA384',
+      sigalgs: 'rsa_pkcs1_sha256:rsa_pkcs1_sha384:rsa_pkcs1_sha512',
+      rejectUnauthorized: true,
+    });
+    tls.on('error', () => undefined);
+    try {
+      await closed;
+      while (!attached) await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(identities.status(17)).toEqual([]);
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      tls.destroy();
+    }
+  });
 
   it('closes inactive authenticated traffic and stale cleanup cannot close a reconnected generation', async () => {
     let watchdog: () => Promise<void>;

@@ -206,9 +206,7 @@ def main():
 
     generate_certificates(python_cmd)
 
-    default_variants = known_variants if args.production else [
-        "attractap-touch", "attractap-touch-v2", "attractap-touch-demo", "attractap-touch-v2-demo",
-    ]
+    default_variants = known_variants
     active_variants = args.variants or [name for name in default_variants if not (args.production and 'demo' in name)]
     if args.production and any('demo' in name for name in active_variants):
         parser.error('Demo variants cannot use the production profile')

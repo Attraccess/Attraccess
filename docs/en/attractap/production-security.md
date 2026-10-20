@@ -33,7 +33,7 @@ python3 apps/attractap/firmware/build_firmwares.py --variants \
   attractap-touch-ethernet attractap-touch-demo attractap-touch-v2-demo
 ```
 
-The builder's default selects only four variants. Firmware source changes must increase `version.txt` above the merge-base version, as enforced by `tools/check-version.mjs` and the shared release-version check. The integration baseline is 1.6.7, so the security delivery uses 1.6.8.
+The default non-production build selects all six variants. Production builds exclude both demo variants. Firmware source changes must increase `version.txt` above the merge-base version, as enforced by `tools/check-version.mjs` and the shared release-version check. The integration baseline is 1.6.7, so the security delivery uses 1.6.8.
 
 Build four non-demo production overlays with `--production --signing-key-file /protected/firmware-signing.pem`. Keep test signing keys disposable and clearly separated from production. Unqualified output stays under `build/unqualified-production-output`; it must not enter deployable catalogs. Catalog creation, API asset copying and API selection require independently signed qualification matching the artifacts. Do not bypass the gate by renaming or copying an image.
 
@@ -50,16 +50,18 @@ The explicit `inventory --port PORT --board VARIANT --module MODULE --output /pr
 - Positive `readerId`, installation UUID `installationId`, `inventoryFile`, and free `hmacId` (0–5).
 - Protected `dsFile`, `dsMetadataFile` and API-issued `certificateFile` paths.
 - One initial `serverCaFiles` entry, and one or two `timeKeys` entries containing `id` and `publicKeyFile`.
-- Signed `applicationFile`, `bootloaderFile`, reviewed `partitionFile`, and the future independently signed `qualificationFile` path.
+- Signed `applicationFile`, `bootloaderFile`, reviewed `partitionFile`, and the future independently signed `qualificationFile` reference. Preparation records its basename; place that receipt beside `reader-manifest.json` before apply or API enrollment. Both paths resolve the same bundle-local filename. Preserve the manifest bytes when signing qualification.
 
 The output contains encrypted identity NVS, protected NVS keys, signed images, initialization images and a nonsecret `reader-manifest.json`. Preserve these exact files for review. Preparation grants no production eligibility. The initial provisioning path rejects missing, unreadable or unknown silicon revisions, invalid board/module labels, unknown geometry, insufficient free key-purpose blocks and conflicting protection state; it does not offer a force override for locked devices.
 
 `apply --manifest-file ... --hmac-key-file ... --qualification-trust-file ...` defaults to a qualification-checked dry-run without serial access. `--execute --port PORT` is an irreversible manufacturing action requiring independently reviewed qualification and freshly matching actual inventory. It burns the DS root with the vendor tool, confirms its purpose and read/write protections, then writes the reviewed images without automatically resetting the reader. The qualified first boot runs the IDF production bootloader's protection transition. The tool reports that this physical first boot and final protection verification are still required; writing images is not proof of a locked reader.
 
-An operation journal is persisted before irreversible work. After interruption, a previous journal or mismatched inventory stops the tool for protected recovery; it never guesses which key was burned or repeats an uncertain write. Retain the journal and fresh inventory for independent review. This run does not execute apply, burn eFuses or perform that first boot.
+An exclusive bundle lock prevents concurrent apply executions from inspecting stale inventory or writing the same journal. The lock is held until apply finishes. An operation journal is persisted before irreversible work. After interruption, a previous journal or mismatched inventory stops the tool for protected recovery; it never guesses which key was burned or repeats an uncertain write. Retain the journal and fresh inventory for independent review. This run does not execute apply, burn eFuses or perform that first boot.
 
 ## Software memory evidence
 
 `pnpm nx run attractap-firmware:test` exercises the actual TLS libraries, signed-time verifier, production WebSocket owner loop and parser with software signing keys. Its `MEMORY` lines separate library allocation peaks from session objects and queue/envelope allocations. Run `ctest --test-dir apps/attractap/firmware/tests/security/build -V` to see parser current/peak storage, pointer width, ArduinoJson version, handler storage, dynamic copies and received input storage for each fixture.
 
 These are host requested-byte measurements. Fixed object sizes include their embedded fields and must not be added again to their component sizes. Library allocation peaks include certificate/key operations as well as TLS. Host allocation overhead, IDF allocator behavior, task stack peaks and physical DS memory use are not established by these measurements. Real-device RAM headroom and hardware security qualification remain outstanding.
+
+The API validates its protected configuration at startup and after the local configuration-install command. Readiness uses that installed snapshot; public certificate verification is bounded and cached, while registry revocation, retirement and validity remain checked. Replace trust through the protected install command (or restart after offline changes); editing a file alone does not invalidate a running snapshot. Issuer signing keys are loaded only for startup/install validation and issuance, never retained in the snapshot. Standalone language updates require a protected connection; legacy authentication responses still carry the current language.

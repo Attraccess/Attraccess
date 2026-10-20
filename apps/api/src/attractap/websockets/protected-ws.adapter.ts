@@ -177,6 +177,7 @@ export class ProtectedWsAdapter extends WsAdapter {
               );
               await this.identities.attach(generation, identity, async () => close());
               if (phase !== 'registry') {
+                this.identities.detach(generation);
                 application.close();
                 return;
               }

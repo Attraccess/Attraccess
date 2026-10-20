@@ -1,7 +1,7 @@
 import { AttractapService } from '../attractap.service';
 import { ConfigService } from '@nestjs/config';
 import { createPublicKey, X509Certificate } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { chmodSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSource, Repository } from 'typeorm';
 import * as migrations from '../../database/migrations';
@@ -42,6 +42,25 @@ describe('registered reader identity', () => {
     expect(certificate.checkIssued(root)).toBe(true);
     expect(certificate.verify(root.publicKey)).toBe(true);
     await expect(identities.validateCertificate(fixture.identity.certificatePem)).resolves.toBe(fixture.identity);
+  });
+  it('keeps per-frame readiness and periodic validation on installed public trust', async () => {
+    await identities.validateCertificate(fixture.identity.certificatePem);
+    const verify = jest.spyOn(X509Certificate.prototype, 'verify');
+    const paths = ['reader-security.json', 'ca.pem'].map((name) => join(fixture.directory, name));
+    paths.forEach((path) => chmodSync(path, 0o000));
+    try {
+      for (let i = 0; i < 3; i++) {
+        expect(identities.connectionActive(fixture.identity)).toBe(true);
+        await expect(identities.validateCertificate(fixture.identity.certificatePem)).resolves.toBe(fixture.identity);
+      }
+      expect(verify).not.toHaveBeenCalled();
+      fixture.identity.revokedAt = new Date();
+      await expect(identities.validateCertificate(fixture.identity.certificatePem)).rejects.toThrow('not active');
+    } finally {
+      fixture.identity.revokedAt = null;
+      paths.forEach((path) => chmodSync(path, 0o600));
+      verify.mockRestore();
+    }
   });
   it('denies certificate issuance without protected issuer configuration', async () => {
     await expect(identities.issue({ readerId: 17, publicKeyFile: '/unused/public.pem' })).rejects.toThrow('denied');
@@ -231,6 +250,15 @@ describe('persisted reader lifecycle boundaries', () => {
     await service.installConfiguration(candidate);
     expect(close).toHaveBeenCalledTimes(1);
     expect(service.status(17)).toEqual([]);
+    const verify = jest.spyOn(X509Certificate.prototype, 'verify');
+    try {
+      await service.validateCertificate(identity.certificatePem);
+      expect(verify).toHaveBeenCalledTimes(1);
+      await service.validateCertificate(identity.certificatePem);
+      expect(verify).toHaveBeenCalledTimes(1);
+    } finally {
+      verify.mockRestore();
+    }
   });
 
   it('rejects installation changes, invalid time trust and excessive root overlap without replacing configuration', async () => {

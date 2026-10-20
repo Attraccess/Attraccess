@@ -6,9 +6,8 @@ import { WebSocket } from 'ws';
 import { AttractapReaderIdentity } from '@attraccess/database-entities';
 import { encodeReaderFrame, ReaderFrameDecoder, ReaderFrameType, READER_LIMITS } from './reader-frame';
 
-// Legacy credentials allow firmware maintenance and display defaults only.
+// Legacy credentials allow registration, authentication and firmware maintenance only.
 export const LEGACY_READER_OUTPUT = new Set([
-  AttractapEventType.READER_LANGUAGE,
   AttractapEventType.READER_REGISTER,
   AttractapEventType.READER_UNAUTHORIZED,
   AttractapEventType.READER_REQUEST_AUTHENTICATION,

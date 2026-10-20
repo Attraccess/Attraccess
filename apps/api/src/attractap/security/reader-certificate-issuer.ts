@@ -1,5 +1,5 @@
 import * as forge from 'node-forge';
-import { createPrivateKey, createPublicKey, randomBytes, X509Certificate } from 'node:crypto';
+import { createPrivateKey, createPublicKey, randomBytes, X509Certificate, KeyObject, sign } from 'node:crypto';
 
 export interface ReaderIssuerConfiguration {
   caCertificateFile: string;
@@ -13,7 +13,7 @@ export function withReaderIssuer<T>(
   configuration: ReaderIssuerConfiguration,
   activeRoots: string[],
   read: ProtectedRead,
-  operation: (issuer: forge.pki.Certificate, key: forge.pki.rsa.PrivateKey, native: X509Certificate) => T,
+  operation: (issuer: forge.pki.Certificate, key: KeyObject, native: X509Certificate) => T,
 ): T {
   const buffers: Buffer[] = [];
   try {
@@ -52,12 +52,23 @@ export function withReaderIssuer<T>(
       !['sha256WithRSAEncryption', 'sha384WithRSAEncryption', 'sha512WithRSAEncryption'].includes(signature)
     )
       throw new Error();
-    return operation(issuer, forge.pki.privateKeyFromPem(keyBytes.toString('utf8')), native);
+    return operation(issuer, key, native);
   } catch {
     throw new Error('Reader issuer is unavailable');
   } finally {
     buffers.forEach((bytes) => bytes.fill(0));
   }
+}
+
+/** Keep certificate encoding in Forge and the RSA operation in native OpenSSL. */
+export function signReaderCertificate(certificate: forge.pki.Certificate, key: KeyObject): void {
+  const signer = {
+    sign: () =>
+      sign('sha256', Buffer.from(forge.asn1.toDer(certificate.tbsCertificate).getBytes(), 'binary'), key).toString(
+        'binary',
+      ),
+  } as unknown as forge.pki.rsa.PrivateKey;
+  certificate.sign(signer, forge.md.sha256.create());
 }
 
 /** Certifies only a supplied public key; creates no registry entry or operational privilege. */
@@ -108,7 +119,7 @@ export function issueReaderCertificate(options: {
         { name: 'extKeyUsage', clientAuth: true },
         { name: 'subjectAltName', altNames: [{ type: 6, value: uri }] },
       ]);
-      certificate.sign(key, forge.md.sha256.create());
+      signReaderCertificate(certificate, key);
       const result = forge.pki.certificateToPem(certificate);
       const native = new X509Certificate(result);
       if (

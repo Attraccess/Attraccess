@@ -106,10 +106,18 @@ describe('AttractapFirmwareHandler', () => {
       await request(binary.length - 17, 4096);
       expect(fixture.mockReadSync).toHaveBeenCalledWith(0, expect.any(Buffer), 0, 17, binary.length - 17);
     });
-    it('closes abusive chunk bursts before allocating more response data', async () => {
-      for (let i = 0; i < 17; i++) await request(0, 100);
-      expect(fixture.mockReadSync).toHaveBeenCalledTimes(16);
+    it('paces sequential fast legacy requests without disconnecting', async () => {
+      for (let i = 0; i < 20; i++) await request(0, 100);
+      expect(fixture.mockReadSync).toHaveBeenCalledTimes(20);
+      expect(fixture.socket.close).not.toHaveBeenCalled();
+    });
+    it('bounds pending paced responses to one per socket', async () => {
+      for (let i = 0; i < 16; i++) await request(0, 100);
+      const pending = request(0, 100);
+      await new Promise((resolve) => setImmediate(resolve));
+      await request(0, 100);
       expect(fixture.socket.close).toHaveBeenCalled();
+      await pending;
     });
     it('rejects a replaced file whose size differs from the announced update', async () => {
       jest.mocked(fstatSync).mockReturnValue({ size: 1, isFile: () => true } as any);

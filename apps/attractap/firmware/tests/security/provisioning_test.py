@@ -212,6 +212,7 @@ class OfflineDSPreparation(unittest.TestCase):
         result = provision.prepare_bundle(requestfile, output)
         self.assertFalse(result['productionEligible'])
         manifest = json.loads((output / 'reader-manifest.json').read_bytes())
+        self.assertEqual(manifest['qualificationFile'], 'missing-qualification.json')
         self.assertEqual(manifest['hmacFingerprint'], hashlib.sha256(self.root.read_bytes()).hexdigest())
         self.assertEqual(len((output / 'identity.bin').read_bytes()), 0x1f000)
         self.assertNotIn(b'Host fixture', (output / 'identity.bin').read_bytes())
@@ -231,7 +232,7 @@ class OfflineDSPreparation(unittest.TestCase):
         # replaced; these fixtures can never authorize physical provisioning.
         from cryptography.hazmat.primitives.asymmetric import padding
         import copy
-        receipt = self.directory / 'missing-qualification.json'
+        receipt = output / 'missing-qualification.json'
         timestamp = int(now.timestamp())
         payload = {'version': 1, 'model': 'existing-board-v1', 'evidenceClass': 'hardware', 'result': 'passed',
                    'reviewer': 'Synthetic unit test only', 'qualifiedAt': timestamp - 1, 'expiresAt': timestamp + 3600,
@@ -245,6 +246,16 @@ class OfflineDSPreparation(unittest.TestCase):
             self.assertTrue(dry['dryRun'])
             self.assertFalse(dry['deviceAccess'])
             inventory_read.assert_not_called()
+            tools.assert_not_called()
+        def concurrent_inventory(*args):
+            with self.assertRaisesRegex(ValueError, 'already running'):
+                provision.apply_bundle(output / 'reader-manifest.json', self.root, pubfile, '/mock-only', True)
+            return {**inventory, 'module': 'mismatch'}
+        with patch.object(provision, 'inventory_reader', side_effect=concurrent_inventory) as reads, \
+             patch.object(provision, 'run_tool') as tools:
+            with self.assertRaisesRegex(ValueError, 'Fresh inventory'):
+                provision.apply_bundle(output / 'reader-manifest.json', self.root, pubfile, '/mock-only', True)
+            reads.assert_called_once()
             tools.assert_not_called()
         # Simulate a failure after burning the root. The journal must prevent
         # an automatic repeat even when a later inventory appears blank.

@@ -1,3 +1,4 @@
+import { protectedReaderConnection } from './reader-connection-transport';
 import { WebSocket } from 'ws';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { WebsocketService } from './websocket.service';
@@ -15,7 +16,7 @@ export async function broadcastReaderLanguage(service: WebsocketService, languag
   service.readerLanguage = language;
   await Promise.all(
     Array.from(service.sockets.values())
-      .filter(canReceiveReaderLanguage)
+      .filter((socket) => canReceiveReaderLanguage(socket) && protectedReaderConnection(socket)?.ready === true)
       .map((socket) => socket.sendMessage(new AttractapEvent(AttractapEventType.READER_LANGUAGE, { language }))),
   );
 }
