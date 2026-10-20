@@ -24,13 +24,12 @@ import { useTranslations, AttraccessUser, TFunction } from '@attraccess/plugins-
 import {
   ApiError,
   Attractap,
-  ResourceIntroducerType,
   ResourceUsage,
-  useAccessControlServiceResourceIntroducersGetMany,
+  useAccessControlServiceResourceIntroducerDirectory,
   useAttractapServiceGetReaders,
   useResourcesServiceResourceUsageRequestSupervisedSession,
   RequestSupervisedSessionDto,
-  ResourceIntroducer,
+  IntroducerDirectoryEntryDto,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import en from './translations/en.json';
@@ -57,7 +56,7 @@ type Props = {
   secondsLeft: number;
   t: TFunction;
   isLoadingCandidates: boolean;
-  supervisors: ResourceIntroducer[];
+  supervisors: IntroducerDirectoryEntryDto[];
   resourceReaders: Attractap[];
   otherReaders: Attractap[];
   renderReaderButton: (reader: Attractap) => ReactNode;
@@ -125,9 +124,9 @@ export function SupervisedStartBody({
               key={supervisor.id}
               variant="outline"
               className="h-auto w-full justify-start py-2"
-              onPress={() => handleSelectSupervisor(supervisor.userId)}
+              onPress={() => handleSelectSupervisor(supervisor.id)}
             >
-              <AttraccessUser user={supervisor.user} description={t('select.role.introducer')} />
+              <AttraccessUser user={supervisor} description={t('select.role.introducer')} />
             </Button>
           ))}
         </div>
@@ -173,16 +172,13 @@ export function useSupervisedStartModalState({
   const [waitingAtReader, setWaitingAtReader] = useState<string | null>(null);
 
   // Only introducers may supervise, excluding the requester themselves.
-  const { data: candidates, isLoading: isLoadingCandidates } = useAccessControlServiceResourceIntroducersGetMany({
+  const { data: candidates, isLoading: isLoadingCandidates } = useAccessControlServiceResourceIntroducerDirectory({
     resourceId,
+    purpose: 'supervision',
   });
 
   const supervisors = useMemo(
-    () =>
-      (candidates ?? []).filter(
-        (candidate) =>
-          candidate.type === ResourceIntroducerType.INTRODUCER && candidate.userId !== user?.id && candidate.user,
-      ),
+    () => (candidates ?? []).filter((candidate) => candidate.id !== user?.id),
     [candidates, user?.id],
   );
 

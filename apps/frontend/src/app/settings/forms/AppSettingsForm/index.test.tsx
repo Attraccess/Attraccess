@@ -52,7 +52,13 @@ it('loads existing URLs and preserves the stored license when the secret field i
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
     requestBody: {
-      app: { url: 'https://app.example', publicInternetUrl: undefined, licenseKey: undefined, defaultLanguage: 'de' },
+      app: {
+        url: 'https://app.example',
+        publicInternetUrl: undefined,
+        licenseKey: undefined,
+        defaultLanguage: 'de',
+        activityVisibility: 'all-resources',
+      },
     },
   });
 });
@@ -67,6 +73,7 @@ it('submits a new license and clears it only after successful save', () => {
         publicInternetUrl: 'https://public.example',
         licenseKey: 'new-license',
         defaultLanguage: 'de',
+        activityVisibility: 'all-resources',
       },
     },
   });
@@ -94,6 +101,7 @@ it('validates the wizard URL and advances after first-time setup succeeds', () =
           publicInternetUrl: window.location.origin,
           licenseKey: undefined,
           defaultLanguage: 'en',
+          activityVisibility: 'all-resources',
         },
       },
     }),
@@ -171,6 +179,7 @@ it('keeps all edited fields through refetch and a failed save, then accepts pers
         publicInternetUrl: 'https://draft-public.example',
         licenseKey: 'draft-license',
         defaultLanguage: 'en',
+        activityVisibility: 'all-resources',
       },
     },
   });

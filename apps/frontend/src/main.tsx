@@ -1,3 +1,4 @@
+import './utils/qr-scanner-runtime';
 import 'intl-pluralrules';
 import { StrictMode } from 'react';
 import { BrowserRouter } from 'react-router-dom';

@@ -2,6 +2,24 @@
 
 Attraccess bietet verschiedene sicherheitsrelevante Einstellungen fuer Sitzungs-Cookies und Authentifizierung. Diese Einstellungen beeinflussen, wie Benutzer angemeldet bleiben und wie die Anwendung mit Cross-Site-Anfragen umgeht.
 
+
+## Sichtbarkeit der Ressourcennutzung
+
+Ressourcennutzung, Zustand, laufende Sitzungen und Live-Updates erfordern eine Anmeldung. Unter **Einstellungen → Allgemein** wählen Administratoren **Alle Ressourcen** (Standard für neue und aktualisierte Installationen) oder **Nur eingewiesene Ressourcen**. Die eingeschränkte Ansicht berücksichtigt gültige direkte und Gruppen-Einweisungen sowie geerbte Einweiser. Ressourcenverwalter behalten Zugriff. Wartungs-, Aufsichts- oder Steuerungsrechte allein gewähren keinen Einblick in die Nutzung. Abgelaufene Einweisungen und fällige Nachschulungen gelten sofort, auch für offene Live-Verbindungen.
+
+Vollständige Einweisungs- und Einweiserlisten bleiben Zugriffsverwaltern und Einweisern vorbehalten. Die Hilfe- und Aufsichtsauswahl zeigt nur zulässige Benutzer-IDs und Benutzernamen, keine E-Mail-Adressen oder vollständigen Benutzerprofile. Ressourcen können auch vor einer Einweisung durchsucht und Einweisungen angefragt werden.
+
+## Browser-Herkunft und Sitzungserneuerung
+
+Nur ausdrücklich konfigurierte Browser-Ursprünge sind erlaubt. Maßgeblich ist die gespeicherte Anwendungs-URL, ersatzweise `ATTRACCESS_URL`. Bei einer getrennten Frontend-Adresse ergänzen `ATTRACCESS_FRONTEND_URL` und die kommagetrennte Liste `ATTRACCESS_ALLOWED_ORIGINS` exakte Ursprünge. Schema und Port gehören dazu, beispielsweise `https://access.example.org`. Platzhalter, Zugangsdaten, Pfade und `null` sind unzulässig. Host- und Weiterleitungs-Header gewähren keinen Browser-Zugriff. `ATTRACCESS_PUBLIC_INTERNET_URL` dient Rückrufen und erweitert die Browser-Freigabe nicht.
+
+Ändernde Browser-Anfragen mit Cookies benötigen einen erlaubten Origin-Header, ersatzweise einen erlaubten Referer, wenn Origin fehlt. Das schützt auch vor benachbarten Subdomains. Native Clients können geprüfte Bearer-Zugangsdaten ohne Browser-Origin verwenden; ein ungültiger Authorization-Header fällt nicht auf Cookies zurück. Geräte-WebSocket-Verbindungen prüfen vorhandene Origin-Header genauso. SSO-Rückrufe behalten ihre eigene Protokollprüfung.
+
+Sitzungen werden über **POST `/api/auth/session/refresh`** mit geprüftem JSON-Inhalt erneuert. Cookie-Anfragen und gemischte Cookie-/Bearer-Anfragen verwenden `{}` und erhalten die neue Sitzung ausschließlich als Cookie. Ein geprüfter Client ausschließlich mit Bearer-Token kann mit `{ "tokenLocation": "body" }` das neue Token im Antwortinhalt anfordern. GET erneuert keine Sitzung. Antworten mit Zugangsdaten verwenden `Cache-Control: no-store`.
+
+Lokaler Betrieb benötigt weder öffentlichen Hostnamen noch externen Rückrufdienst. Konfigurieren Sie vor der Ersteinrichtung den exakten lokalen Anwendungsursprung; `pnpm serve` ergänzt den tatsächlich vergebenen Entwicklungs-Frontend-Ursprung. Lokale Passwortanmeldung, Sitzungserneuerung, Gerätefreigabe und Wiederverbindung funktionieren im lokalen Netz. Externe SSO-Anbieter und Online-Lizenzprüfung benötigen weiterhin ihre jeweiligen Dienste.
+
+
 ## Cookie-SameSite-Einstellung
 
 Die Einstellung **Cookie SameSite** steuert, wann der Browser Sitzungs-Cookies mit Anfragen sendet. Dies ist sowohl fuer die Sicherheit als auch fuer die SSO-Kompatibilitaet wichtig.
@@ -170,3 +188,5 @@ docker compose logs attraccess | grep -E 'auth\.failed'
 - [SSL einrichten](installation/ssl-setup.md) -- HTTPS konfigurieren
 - [SSO Ueberblick](user-management/sso-overview.md) -- Single Sign-On einrichten
 - [Einstellungen Ueberblick](settings/overview.md) -- Alle Systemeinstellungen
+
+Der QR-Kameradecoder ist im Frontend enthalten und wird von der lokalen Instanz ausgeliefert. Scannen lädt keinen Decoder von einem öffentlichen CDN. Der Browser benötigt für Kamerazugriff weiterhin HTTPS oder einen vertrauenswürdigen lokalen Browser-Kontext.

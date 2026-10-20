@@ -26,13 +26,10 @@ export class SettingsStoreService {
     return this.getPlainSetting(APP_PARENT, key);
   }
 
-  async getPlainSetting(
-    parent: string,
-    key: string,
-  ): Promise<string | null> {
+  async getPlainSetting(parent: string, key: string, fresh = false): Promise<string | null> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
-    if (cached) {
+    if (cached && !fresh) {
       return cached.value;
     }
 
@@ -45,10 +42,7 @@ export class SettingsStoreService {
     return null;
   }
 
-  async getSecretSetting(
-    parent: string,
-    key: string,
-  ): Promise<{ value: string | null; configured: boolean }> {
+  async getSecretSetting(parent: string, key: string): Promise<{ value: string | null; configured: boolean }> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
     if (cached) {

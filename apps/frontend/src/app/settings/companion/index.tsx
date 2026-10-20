@@ -1,3 +1,4 @@
+import { DeviceEnrollment } from '../../../components/deviceEnrollment';
 import {
   Card,
   DrawerBody,
@@ -311,6 +312,7 @@ export function CompanionSettingsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<MonitorSmartphoneIcon size={20} />} />
 
+      <DeviceEnrollment type="companion" />
       {/* Registered Devices */}
       <Card>
         <Card.Header className="flex flex-col items-start gap-1">

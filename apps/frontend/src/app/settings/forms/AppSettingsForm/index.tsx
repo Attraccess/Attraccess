@@ -39,6 +39,10 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
+  const hasEditedVisibility = useRef(false);
+  const [activityVisibility, setActivityVisibility] = useState<'all-resources' | 'introduced-resources'>(
+    'all-resources',
+  );
   const hasEditedLanguage = useRef(false);
   const hasEditedUrl = useRef(false);
   const hasEditedPublicInternetUrl = useRef(false);
@@ -63,6 +67,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
 
   useEffect(() => {
     if (variant !== 'standalone' || !settings) return;
+    if (!hasEditedVisibility.current) setActivityVisibility(settings.app.activityVisibility ?? 'all-resources');
     if (!hasEditedUrl.current) setUrl(settings.app.url ?? '');
     if (!hasEditedPublicInternetUrl.current) setPublicInternetUrl(settings.app.publicInternetUrl ?? '');
     if (!hasEditedLanguage.current) setDefaultLanguage(settings.app.defaultLanguage ?? 'de');
@@ -80,6 +85,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         if (endpoint === 'first-time-setup') {
           queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
         }
+        hasEditedVisibility.current = false;
         hasEditedLanguage.current = false;
         hasEditedUrl.current = false;
         hasEditedPublicInternetUrl.current = false;
@@ -113,6 +119,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
           publicInternetUrl: publicInternetUrl.trim() ? publicInternetUrl.trim() : undefined,
           licenseKey: licenseKey.trim() ? licenseKey.trim() : undefined,
           defaultLanguage,
+          activityVisibility,
         },
       },
     };
@@ -127,6 +134,7 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
     publicInternetUrl,
     licenseKey,
     defaultLanguage,
+    activityVisibility,
     saveSettings,
     saveSettingsFirstTimeSetup,
     endpoint,
@@ -195,6 +203,23 @@ export function AppSettingsForm({ variant, endpoint, onNext }: AppSettingsFormPr
         isDisabled={isSaving}
         fullWidth
       />
+      <Select
+        label={t('inputs.activityVisibility.label')}
+        value={activityVisibility}
+        onChange={(value) => {
+          if (value === 'all-resources' || value === 'introduced-resources') {
+            hasEditedVisibility.current = true;
+            setActivityVisibility(value);
+          }
+        }}
+        items={[
+          { key: 'all-resources', label: t('inputs.activityVisibility.all') },
+          { key: 'introduced-resources', label: t('inputs.activityVisibility.introduced') },
+        ]}
+        isDisabled={isSaving}
+        fullWidth
+      />
+      <Description>{t('inputs.activityVisibility.description')}</Description>
       {variant === 'standalone' && (
         <>
           <PasswordInput

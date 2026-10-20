@@ -44,7 +44,13 @@ export function GeneralSection() {
   // the whole draft whenever the query object changes — overwrites edits the operator has not saved
   // yet as soon as a background refetch lands (ATT-868).
   const [draft, setDraft] = useState<
-    Partial<{ url: string; publicInternetUrl: string; licenseKey: string; defaultLanguage: 'en' | 'de' }>
+    Partial<{
+      url: string;
+      publicInternetUrl: string;
+      licenseKey: string;
+      defaultLanguage: 'en' | 'de';
+      activityVisibility: 'all-resources' | 'introduced-resources';
+    }>
   >({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
@@ -59,6 +65,8 @@ export function GeneralSection() {
   const licenseKey = draft.licenseKey ?? '';
   const savedLanguage = settings?.app.defaultLanguage ?? 'de';
   const defaultLanguage = draft.defaultLanguage ?? savedLanguage;
+  const savedVisibility = settings?.app.activityVisibility ?? 'all-resources';
+  const activityVisibility = draft.activityVisibility ?? savedVisibility;
 
   const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
     onSuccess(data) {
@@ -81,7 +89,8 @@ export function GeneralSection() {
     url !== savedUrl ||
     publicInternetUrl !== savedPublicUrl ||
     licenseKey.trim() !== '' ||
-    defaultLanguage !== savedLanguage;
+    defaultLanguage !== savedLanguage ||
+    activityVisibility !== savedVisibility;
 
   const trimmedUrl = url.trim();
   const trimmedPublicUrl = publicInternetUrl.trim();
@@ -117,6 +126,7 @@ export function GeneralSection() {
           publicInternetUrl: trimmedPublicUrl || null,
           licenseKey: licenseKey.trim() || undefined,
           defaultLanguage,
+          activityVisibility,
         },
       },
     });
@@ -181,6 +191,26 @@ export function GeneralSection() {
           />
         </SettingsRow>
 
+        <SettingsRow
+          stacked
+          label={t('inputs.activityVisibility.label')}
+          hint={t('inputs.activityVisibility.description')}
+        >
+          <Select
+            aria-label={t('inputs.activityVisibility.label')}
+            value={activityVisibility}
+            onChange={(next) => {
+              if (next === 'all-resources' || next === 'introduced-resources')
+                setDraft((current) => ({ ...current, activityVisibility: next }));
+            }}
+            items={[
+              { key: 'all-resources', label: t('inputs.activityVisibility.all') },
+              { key: 'introduced-resources', label: t('inputs.activityVisibility.introduced') },
+            ]}
+            isDisabled={isSaving}
+            fullWidth
+          />
+        </SettingsRow>
         <SettingsRow
           stacked
           label={t('inputs.publicInternetUrl.label')}

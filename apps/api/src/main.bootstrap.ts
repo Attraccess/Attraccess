@@ -1,3 +1,7 @@
+import { DeviceWebSocketAdapter } from './common/security/device-websocket.adapter';
+import { DeviceEnrollmentService } from './device-enrollment/device-enrollment.service';
+import { BrowserOriginPolicy, applicationBrowserOrigin } from './common/security/browser-origin-policy';
+import { browserRequestProtection } from './common/security/browser-request.middleware';
 import { Logger, Module, ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
@@ -11,7 +15,6 @@ import { PluginMigrationService } from './plugin-system/plugin-migration.service
 import { PluginModule } from './plugin-system/plugin.module';
 import { PluginService } from './plugin-system/plugin.service';
 import { SettingsService } from './settings/settings.service';
-import { WsAdapter } from '@nestjs/platform-ws';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
@@ -39,7 +42,9 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
   const globalPrefix = appConfig.GLOBAL_PREFIX;
   app.setGlobalPrefix(globalPrefix);
 
-  app.useWebSocketAdapter(new WsAdapter(app));
+  app.useWebSocketAdapter(
+    new DeviceWebSocketAdapter(app, app.get(DeviceEnrollmentService), browserOrigins(app, appConfig)),
+  );
 
   // Only SAML state uses a session; OIDC uses its own signed state cookie.
   app.use(samlSession(appConfig.AUTH_SESSION_SECRET));
@@ -76,6 +81,14 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
   return { globalPrefix, documentFactory };
 }
 
+function browserOrigins(app: NestExpressApplication, appConfig: AppConfigType) {
+  return new BrowserOriginPolicy(async () => [
+    applicationBrowserOrigin((await app.get(SettingsService).getUrl()) || appConfig.ATTRACCESS_URL),
+    applicationBrowserOrigin(appConfig.ATTRACCESS_FRONTEND_URL),
+    ...(appConfig.ATTRACCESS_ALLOWED_ORIGINS ?? []),
+  ]);
+}
+
 export function configureBootstrapHttp(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
   // Plugin configurations can include large device profiles and a previous
   // draft for conflict detection, exceeding Express's default 100 KiB limit.
@@ -105,18 +118,19 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
 
   app.use(cookieParser());
 
+  const origins = browserOrigins(app, appConfig);
+  app.use(browserRequestProtection(origins));
   app.enableCors({
     origin: (requestOrigin, callback) => {
-      // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
-      if (!requestOrigin) {
-        return callback(null, true);
-      }
-
-      return callback(null, requestOrigin);
+      if (!requestOrigin) return callback(null, true);
+      void origins.allows(requestOrigin).then(
+        (allowed) => callback(null, allowed),
+        () => callback(null, false),
+      );
     },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
-    credentials: true, // Allow cookies to be sent
+    credentials: true,
   });
 }
 

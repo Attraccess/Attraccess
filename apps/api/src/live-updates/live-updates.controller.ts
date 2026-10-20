@@ -1,3 +1,5 @@
+import { Request } from 'express';
+import { SessionStrategy } from '../users-and-auth/strategies/session.strategy';
 import { createHash } from 'node:crypto';
 import { Body, Controller, HttpCode, Param, Put, Req, Sse, UnauthorizedException } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
@@ -12,11 +14,20 @@ export class LiveUpdatesController {
   constructor(
     private readonly live: LiveUpdatesService,
     private readonly sse: SseInstrumentation,
+    private readonly sessions: SessionStrategy,
   ) {}
 
   @Sse(':id/events')
   stream(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.sse.wrap('live_updates', this.live.open(id, this.sessionPrincipal(request)));
+    return this.sse.wrap(
+      'live_updates',
+      this.live.open(id, this.sessionPrincipal(request), async () => {
+        return {
+          ...(await this.sessions.validate(request as unknown as Request)),
+          jwtTokenId: this.sessionPrincipal(request).jwtTokenId,
+        };
+      }),
+    );
   }
 
   @Put(':id/subscriptions')

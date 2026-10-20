@@ -1,3 +1,4 @@
+import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { Module } from '@nestjs/common';
 import { AttractapController } from './attractap.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -47,6 +48,7 @@ import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
+    DeviceEnrollmentModule,
     EventEmitterModule.forRoot(),
     TypeOrmModule.forFeature([Attractap, AttractapCrashReport, NFCCard, Resource, User]),
     UsersAndAuthModule,

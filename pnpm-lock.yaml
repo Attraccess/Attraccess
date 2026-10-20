@@ -203,6 +203,9 @@ importers:
       balena-sdk:
         specifier: ^23.2.12
         version: 23.2.15(@balena/sbvr-types@11.1.4)(encoding@0.1.13)
+      barcode-detector:
+        specifier: 3.2.0
+        version: 3.2.0(@types/emscripten@1.40.1)
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -464,6 +467,9 @@ importers:
       zustand:
         specifier: ^5.0.14
         version: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.8)(use-sync-external-store@1.7.0(react@19.2.8))
+      zxing-wasm:
+        specifier: 3.1.0
+        version: 3.1.0(@types/emscripten@1.40.1)
     devDependencies:
       '@babel/core':
         specifier: ^7.29.7

@@ -6,6 +6,11 @@ const urlOptions = { require_tld: false };
 
 export class UpdateAppSettingsDto {
   @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(['all-resources', 'introduced-resources'])
+  @ApiPropertyOptional({ enum: ['all-resources', 'introduced-resources'] })
+  activityVisibility?: 'all-resources' | 'introduced-resources';
+
+  @ValidateIf((_object, value) => value !== undefined)
   @IsIn(['en', 'de'])
   @ApiPropertyOptional({ description: 'Default language used throughout the system', enum: ['en', 'de'] })
   defaultLanguage?: 'en' | 'de';

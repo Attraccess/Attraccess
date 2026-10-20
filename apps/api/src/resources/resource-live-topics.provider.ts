@@ -1,3 +1,5 @@
+import { ResourceActivityPolicy } from './activity/resource-activity-policy.service';
+import { concatMap } from 'rxjs';
 import { Resource } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
@@ -23,6 +25,7 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
     @InjectRepository(Resource) private readonly resources: Repository<Resource>,
     private readonly resourceEvents: ResourceEventsService,
     private readonly flowLogs: FlowLogRecorderService,
+    private readonly activity: ResourceActivityPolicy,
   ) {}
 
   onModuleInit(): void {
@@ -41,6 +44,8 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
     for (const subscription of subscriptions) {
       if (subscription.topic === 'flow-logs' && !user.effectivePermissions?.has('resources.update')) {
         rejected.set(liveSubscriptionKey(subscription), 'Resource update permission required');
+      } else if (subscription.topic === 'resource' && !(await this.activity.canRead(subscription.resourceId, user))) {
+        rejected.set(liveSubscriptionKey(subscription), 'Resource activity is private');
       } else if (!existingIds.has(subscription.resourceId)) {
         rejected.set(liveSubscriptionKey(subscription), 'Resource not found');
       }
@@ -48,8 +53,18 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
     return rejected;
   }
 
-  source(subscription: LiveSubscription) {
-    if (subscription.topic === 'resource') return this.resourceEvents.subscribeResource(subscription.resourceId);
+  source(subscription: LiveSubscription, user: AuthenticatedUser) {
+    if (subscription.topic === 'resource')
+      return defer(async () => {
+        await this.activity.assertRead(subscription.resourceId, user);
+        return this.resourceEvents.subscribeResource(subscription.resourceId);
+      }).pipe(
+        concatMap((source) => source),
+        concatMap(async (event) => {
+          await this.activity.assertRead(subscription.resourceId, user);
+          return event;
+        }),
+      );
     if (subscription.topic === 'flow-logs') {
       return defer(() => this.flowLogs.subjectFor(subscription.resourceId).asObservable()).pipe(
         finalize(() => this.flowLogs.releaseSubject(subscription.resourceId)),

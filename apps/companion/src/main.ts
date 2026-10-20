@@ -1,7 +1,9 @@
+/* eslint-disable no-console -- Main-process operational diagnostics; enrollment secrets are never logged. */
+import { EnrollmentCodeRotation } from './enrollment-code';
 import {
-    CompanionAuthenticatedDto,
-    CompanionRegisterResponseDto,
-    CompanionWsClient,
+  CompanionAuthenticatedDto,
+  CompanionRegisterResponseDto,
+  CompanionWsClient,
 } from '@attraccess/companion-ws-client';
 import { createHash, randomBytes } from 'crypto';
 import { app, ipcMain } from 'electron';
@@ -10,10 +12,10 @@ import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
 import {
-    disableAdminOverride as _disableAdminOverride,
-    enableAdminOverride as _enableAdminOverride,
-    handleLockPc,
-    handleUnlockPc,
+  disableAdminOverride as _disableAdminOverride,
+  enableAdminOverride as _enableAdminOverride,
+  handleLockPc,
+  handleUnlockPc,
 } from './admin-override';
 import { startForegroundAppMonitoring, stopForegroundAppMonitoring } from './foreground-app';
 import { startIdleDetection, stopIdleDetection } from './idle-detection';
@@ -27,6 +29,14 @@ import { state } from './state';
 import { setTrayState, setupTray } from './tray';
 import { startUsbDevicesMonitoring, stopUsbDevicesMonitoring } from './usb-devices';
 import { openWizardWindow } from './wizard-window';
+
+const enrollmentRotation = new EnrollmentCodeRotation();
+let pendingEnrollmentCode: string | null = null;
+function clearPendingEnrollment() {
+  enrollmentRotation.stop();
+  pendingEnrollmentCode = null;
+  state.mainWindow?.webContents.send('enrollment', { code: null });
+}
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 
@@ -198,10 +208,16 @@ export function pinAllowed(): boolean {
 // ─── WebSocket wiring ─────────────────────────────────────────────────────────
 
 export function startWsClient(serverUrl: string, firstRun: boolean): void {
+  clearPendingEnrollment();
+  stopIdleDetection();
+  stopForegroundAppMonitoring();
+  stopUsbDevicesMonitoring();
   state.wsClient?.stop();
   state.wsClient = new CompanionWsClient(serverUrl);
+  const client = state.wsClient;
 
   state.wsClient.on('connected', () => {
+    if (state.wsClient !== client) return;
     state.wsConnected = true;
     setTrayState('unlocked');
     state.mainWindow?.webContents.send('ws-status', 'connected');
@@ -211,6 +227,8 @@ export function startWsClient(serverUrl: string, firstRun: boolean): void {
   });
 
   state.wsClient.on('disconnected', () => {
+    if (state.wsClient !== client) return;
+    clearPendingEnrollment();
     state.wsConnected = false;
     stopIdleDetection();
     stopForegroundAppMonitoring();
@@ -220,10 +238,16 @@ export function startWsClient(serverUrl: string, firstRun: boolean): void {
   });
 
   state.wsClient.on('request_authentication', () => {
+    if (state.wsClient !== client) return;
     if (firstRun || !state.creds?.id) {
-      state.wsClient?.sendRegister();
+      enrollmentRotation.start((code) => {
+        if (state.wsClient !== client) return;
+        pendingEnrollmentCode = code;
+        state.mainWindow?.webContents.send('enrollment', { code });
+        client.sendRegister({ enrollmentCode: code });
+      });
     } else {
-      state.wsClient?.sendAuthenticate({
+      client.sendAuthenticate({
         id: state.creds.id,
         token: state.creds.token,
         platform: process.platform,
@@ -233,15 +257,50 @@ export function startWsClient(serverUrl: string, firstRun: boolean): void {
     }
   });
 
+  state.wsClient.on('unauthorized', async () => {
+    if (state.wsClient !== client) return;
+    firstRun = true;
+    const serverUrl = state.creds?.serverUrl ?? '';
+    state.creds = { serverUrl, id: 0, token: '' };
+    await clearCredentials();
+    if (state.wsClient !== client || !state.wsConnected) return;
+    enrollmentRotation.start((code) => {
+      pendingEnrollmentCode = code;
+      state.mainWindow?.webContents.send('enrollment', { code });
+      client.sendRegister({ enrollmentCode: code });
+    });
+  });
+
+  state.wsClient.on('enrollment_status', ({ message }) => {
+    if (state.wsClient !== client) return;
+    state.mainWindow?.webContents.send('enrollment', { code: pendingEnrollmentCode, message });
+    if (message === 'CODE_COLLISION' || message === 'ENROLLMENT_FAILED') {
+      enrollmentRotation.start((code) => {
+        pendingEnrollmentCode = code;
+        state.mainWindow?.webContents.send('enrollment', { code });
+        client.sendRegister({ enrollmentCode: code });
+      });
+    }
+  });
+
   state.wsClient.on('register_response', async (payload: CompanionRegisterResponseDto) => {
+    if (
+      state.wsClient !== client ||
+      !pendingEnrollmentCode ||
+      payload.enrollmentVersion !== 1 ||
+      payload.enrollmentCode !== pendingEnrollmentCode
+    )
+      return;
+    clearPendingEnrollment();
     const url = state.creds?.serverUrl ?? '';
     state.creds = { serverUrl: url, id: payload.id, token: payload.token };
     await saveCredentials(state.creds);
+    if (state.wsClient !== client) return;
     firstRun = false;
     state.mainWindow?.webContents.send('registered', { id: payload.id });
     // server only sends AUTHENTICATED in reply to AUTHENTICATE; register alone
     // never authenticates, so do it now instead of waiting for a relaunch
-    state.wsClient?.sendAuthenticate({
+    client.sendAuthenticate({
       id: payload.id,
       token: payload.token,
       platform: process.platform,
@@ -254,6 +313,8 @@ export function startWsClient(serverUrl: string, firstRun: boolean): void {
   });
 
   state.wsClient.on('authenticated', async (payload: CompanionAuthenticatedDto) => {
+    if (state.wsClient !== client) return;
+    clearPendingEnrollment();
     state.authenticatedPayload = payload;
     state.serverLocked = payload.locked;
     state.mainWindow?.webContents.send('authenticated', payload);
@@ -354,6 +415,10 @@ ipcMain.handle('confirm-quit', () => {
 // otherwise a device keeps the same id forever. Clears creds, stops the client
 // and tears down any session so the wizard returns to a clean first-run state.
 ipcMain.handle('disconnect', async () => {
+  clearPendingEnrollment();
+  stopIdleDetection();
+  stopForegroundAppMonitoring();
+  stopUsbDevicesMonitoring();
   state.wsClient?.stop();
   state.wsClient = null;
   state.wsConnected = false;
@@ -370,6 +435,8 @@ ipcMain.handle('disconnect', async () => {
 ipcMain.handle('check-health', async (_evt, serverUrl: string) => {
   return checkHealth(normalizeServerUrl(serverUrl));
 });
+
+ipcMain.handle('get-enrollment', () => ({ code: pendingEnrollmentCode }));
 
 ipcMain.handle('register', async (_evt, serverUrl: string) => {
   const { needed, accessibility } = osAdapter.permissionsStatus();
@@ -444,4 +511,4 @@ app.on('before-quit', (event) => {
   state.wsClient?.stop();
 });
 
-export { };
+export {};

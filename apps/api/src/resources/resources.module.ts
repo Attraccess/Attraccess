@@ -1,3 +1,5 @@
+import { ResourceIntroducerDirectoryController } from './introducers/resource-introducer-directory.controller';
+import { ResourceActivityPolicyModule } from './activity/resource-activity-policy.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
@@ -59,8 +61,9 @@ import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
     ResourceHealthModule,
     LicenseModule,
     LiveTopicsModule,
+    ResourceActivityPolicyModule,
   ],
-  controllers: [ResourcesController],
+  controllers: [ResourcesController, ResourceIntroducerDirectoryController],
   providers: [ResourcesService, ResourceImageService, ResourceLiveTopicsProvider],
   exports: [ResourcesService, ResourceImageService],
 })

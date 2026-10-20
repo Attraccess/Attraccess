@@ -129,6 +129,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     AttractapEventType,
     (socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) => unknown
   > = {
+    [AttractapEventType.READER_ENROLLMENT_STATUS]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_REGISTER]: (socket, eventData) =>
       this.authHandler.handleReaderRegister(socket, eventData),
     [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) =>
@@ -315,6 +316,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   protected async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
+    if (client.readyState !== WebSocket.OPEN) return;
     const id = randomBytes(4).toString('base64url').slice(0, 5);
 
     const removeAwaiter = async () => {
@@ -403,7 +405,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     await this.clientWasActive(socket);
 
-    this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
+    this.logger.debug(`Received event from client ${socket.id}: ${eventData.type}`);
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);
@@ -431,6 +433,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
+    if (client.readyState !== 1) return;
     const id = randomBytes(4).toString('base64url').slice(0, 5);
     let messageCount = 0;
 
@@ -446,6 +449,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       let lastError: Error | undefined;
 
       for (let i = 0; i < RETRY_COUNT; i++) {
+        if (client.readyState !== WebSocket.OPEN) return false;
         // Authentication success and language retries belong to the current open reader connection.
         if (
           (message.data.type === AttractapEventType.READER_LANGUAGE ||
@@ -457,7 +461,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           return false;
         this.logger.debug(
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-          message.data.payload,
+          message.data.type === AttractapEventType.READER_REGISTER ? undefined : message.data.payload,
         );
         // An older auth/update retry must not restore a superseded default.
         if (
@@ -555,6 +559,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.logger.debug(`Client ${socket.id} disconnected.`);
 
     await this.clientResponseAwaitersMutex.runExclusive(async () => {
+      for (const awaiter of this.clientResponseAwaiters.filter((entry) => entry.clientId === socket.id)) {
+        clearTimeout(awaiter.timeoutId);
+        awaiter.resolve();
+      }
       this.clientResponseAwaiters = this.clientResponseAwaiters.filter((awaiter) => awaiter.clientId !== socket.id);
     });
 

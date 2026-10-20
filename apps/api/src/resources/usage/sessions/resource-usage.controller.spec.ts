@@ -1,3 +1,4 @@
+import { ResourceActivityPolicy } from '../../activity/resource-activity-policy.service';
 import { Test } from '@nestjs/testing';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsageController } from './resource-usage.controller';
@@ -7,7 +8,10 @@ it('passes the authenticated user and both IDs to the usage details lookup', asy
   const getSessionDetails = jest.fn().mockResolvedValue({ id: 8 });
   const moduleRef = await Test.createTestingModule({
     controllers: [ResourceUsageController],
-    providers: [{ provide: ResourceUsageService, useValue: { getSessionDetails } }],
+    providers: [
+      { provide: ResourceActivityPolicy, useValue: { assertRead: jest.fn() } },
+      { provide: ResourceUsageService, useValue: { getSessionDetails } },
+    ],
   }).compile();
   const request = { user: { id: 1, effectivePermissions: new Set(['resources.update']) } } as AuthenticatedRequest;
   expect(await moduleRef.get(ResourceUsageController).getSession(5, 8, request)).toEqual({ id: 8 });

@@ -66,8 +66,8 @@
         "description": "When prompted, enter the URL of this Attraccess server."
       },
       "register": {
-        "title": "Automatic registration",
-        "description": "The companion app registers itself — it will appear in the \"Registered Devices\" table above."
+        "title": "Approve the device",
+        "description": "Use companion 1.9.0 or later. Choose Enroll companion above, enter or scan the code shown in the companion app, then explicitly approve. The code changes every 30 seconds. The device appears in the table only after approval."
       },
       "name": {
         "title": "Name the device",

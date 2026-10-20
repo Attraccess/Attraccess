@@ -8,3 +8,8 @@ target_compile_definitions(websocket-pong-probe PRIVATE ESP_PLATFORM=1 LOGGER_LE
 enable_testing()
 add_test(NAME websocket-pong-probe COMMAND websocket-pong-probe)
 set_tests_properties(websocket-pong-probe PROPERTIES TIMEOUT 5)
+
+add_executable(enrollment-code enrollment-code.test.cpp "${FIRMWARE_DIR}/src/api/enrollment-code.cpp")
+target_include_directories(enrollment-code PRIVATE "${FIRMWARE_DIR}/src")
+target_compile_options(enrollment-code PRIVATE -UNDEBUG)
+add_test(NAME enrollment-code COMMAND enrollment-code)

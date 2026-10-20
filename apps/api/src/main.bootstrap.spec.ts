@@ -1,3 +1,4 @@
+import { DeviceEnrollmentService } from './device-enrollment/device-enrollment.service';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
@@ -135,6 +136,7 @@ describe('API bootstrap ordering and configuration', () => {
       const module = await Test.createTestingModule({
         controllers: [ConfigurationRequestController],
         providers: [
+          { provide: DeviceEnrollmentService, useValue: {} },
           { provide: ConfigService, useValue: config },
           { provide: SettingsService, useValue: settings },
           { provide: DataSource, useValue: datasource },

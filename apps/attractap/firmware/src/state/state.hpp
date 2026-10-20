@@ -106,6 +106,8 @@ public:
         bool userAuthenticated;
     };
     static ApiState getApiState();
+    static void setEnrollmentCode(std::string code);
+    static std::string getEnrollmentCode();
 
 private:
     State() = delete;
@@ -145,6 +147,7 @@ private:
     static bool websocket_cert_locked;
     static int websocket_next_attempt_seconds;
 
+    static std::string enrollment_code;
     static bool api_authenticated;
     static std::string api_device_name;
 };

@@ -52,6 +52,7 @@ export function systemSettingChanges(
     ],
     ['app.licenseKeyConfigured', before.app.licenseKeyConfigured, after.app.licenseKeyConfigured],
     ['app.defaultLanguage', before.app.defaultLanguage, after.app.defaultLanguage],
+    ['app.activityVisibility', before.app.activityVisibility, after.app.activityVisibility],
     ['smtp.service', before.smtp.service, after.smtp.service],
     ['smtp.host', safeAuditHost(before.smtp.host ?? ''), safeAuditHost(after.smtp.host ?? '')],
     ['smtp.port', before.smtp.port, after.smtp.port],

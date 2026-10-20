@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IntroductionRequiredDisplay } from '../../app/resources/usage/components/IntroductionRequiredDisplay';
 
 const query = vi.hoisted(() => ({
-  rows: Array.from({ length: 30 }, (_, index) => ({ id: index + 1, user: { username: `Tutor ${index + 1}` } })),
+  rows: Array.from({ length: 30 }, (_, index) => ({ id: index + 1, username: `Tutor ${index + 1}` })),
   load: vi.fn(),
   listeners: new Set<() => void>(),
 }));
@@ -12,7 +12,7 @@ vi.mock('@attraccess/react-query-client', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
     ResourceIntroducerType: { INTRODUCER: 'introducer' },
-    useAccessControlServiceResourceIntroducersGetMany: (...args: unknown[]) => {
+    useAccessControlServiceResourceIntroducerDirectory: (...args: unknown[]) => {
       query.load(...args);
       const data = useSyncExternalStore(
         (listener) => {
@@ -36,7 +36,7 @@ describe('introduction required tutor contacts', () => {
   beforeEach(() => {
     query.rows = Array.from({ length: 30 }, (_, index) => ({
       id: index + 1,
-      user: { username: `Tutor ${index + 1}` },
+      username: `Tutor ${index + 1}`,
     }));
     query.load.mockClear();
   });
@@ -48,7 +48,7 @@ describe('introduction required tutor contacts', () => {
       refetchInterval: 10000,
     });
     act(() => {
-      query.rows = [{ id: 50, user: { username: 'New tutor' } }];
+      query.rows = [{ id: 50, username: 'New tutor' }];
       query.listeners.forEach((listener) => listener());
     });
     expect(screen.getByText('New tutor')).toBeInTheDocument();

@@ -312,3 +312,25 @@ describe('SettingsService', () => {
     });
   });
 });
+
+describe('activity visibility settings', () => {
+  const store = { getPlainSetting: jest.fn(), setPlainSetting: jest.fn() };
+  const service = new SettingsService(undefined, store as never, undefined);
+  it.each([
+    [null, 'all-resources'],
+    ['all-resources', 'all-resources'],
+    ['introduced-resources', 'introduced-resources'],
+    ['invalid', 'introduced-resources'],
+  ])('resolves stored %s to %s', async (stored, expected) => {
+    store.getPlainSetting.mockResolvedValue(stored);
+    expect(await service.getActivityVisibility()).toBe(expected);
+    expect(store.getPlainSetting).toHaveBeenCalledWith('app', 'activity_visibility', true);
+  });
+  it('rejects invalid updates before writing', async () => {
+    store.setPlainSetting.mockClear();
+    await expect(service.updateAppSettings({ activityVisibility: 'invalid' } as never)).rejects.toThrow(
+      'Invalid activity',
+    );
+    expect(store.setPlainSetting).not.toHaveBeenCalled();
+  });
+});

@@ -1,3 +1,4 @@
+import { ResourceActivityPolicyModule } from '../activity/resource-activity-policy.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Resource, ResourceHealthState, ResourceIntroducer, User } from '@attraccess/database-entities';
@@ -10,6 +11,7 @@ import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 
 @Module({
   imports: [
+    ResourceActivityPolicyModule,
     TypeOrmModule.forFeature([ResourceHealthState, Resource, ResourceIntroducer, User]),
     ResourceMaintenanceModule,
     NotificationsModule,

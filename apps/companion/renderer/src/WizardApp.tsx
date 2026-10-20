@@ -14,6 +14,7 @@ export function useWizardAppState() {
   const [step, setStep] = useState<Step>('loading');
   const [serverUrl, setServerUrl] = useState('');
   const [connectError, setConnectError] = useState('');
+  const [enrollmentCode, setEnrollmentCode] = useState<string | null>(null);
   const [statusText, setStatusText] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [deviceId, setDeviceId] = useState<number | null>(null);
@@ -34,6 +35,25 @@ export function useWizardAppState() {
     foregroundApp: true,
     usbDevices: true,
   });
+
+  useEffect(() => {
+    let active = true;
+    let receivedUpdate = false;
+    const unsubscribe = window.companion.onEnrollment(({ code }) => {
+      receivedUpdate = true;
+      if (active) setEnrollmentCode(code);
+    });
+    void window.companion
+      .getEnrollment()
+      .then(({ code }) => {
+        if (active && !receivedUpdate) setEnrollmentCode(code);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     window.companion.onInit(async ({ serverUrl: saved, requirePin, registered: reg, connected: conn }) => {
@@ -179,6 +199,7 @@ export function useWizardAppState() {
     setServerUrl,
     connectError,
     statusText,
+    enrollmentCode,
     connecting,
     deviceId,
     perms,
@@ -211,6 +232,7 @@ export function WizardApp() {
     setServerUrl,
     connectError,
     statusText,
+    enrollmentCode,
     connecting,
     deviceId,
     perms,
@@ -313,7 +335,7 @@ export function WizardApp() {
               onBack={() => setStep('url')}
             />
           )}
-          {step === 'register' && <RegisterStep statusText={statusText} />}
+          {step === 'register' && <RegisterStep statusText={statusText} code={enrollmentCode} />}
           {step === 'done' && <DoneStep deviceId={deviceId} />}
         </section>
       </main>

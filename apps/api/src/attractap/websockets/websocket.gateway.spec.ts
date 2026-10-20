@@ -67,12 +67,14 @@ describe('AttractapGateway', () => {
 
     it('registers the socket and sends auth request on successful connection', async () => {
       const mockClient = {
+        readyState: WebSocket.OPEN,
         close: jest.fn(),
         send: jest.fn(),
         on: jest.fn(),
       } as unknown as WebSocket;
 
-      // handleConnection blocks on waitForClientResponse (3 retries × 4s).
+      jest.spyOn(fixture.gateway as never, 'waitForClientResponse').mockResolvedValue(undefined as never);
+      // Connection setup sends an authentication request before device authority is granted.
       // Don't await — just let it start, then verify the socket was registered
       // and that send() was called with the READER_REQUEST_AUTHENTICATION event.
       const connectionPromise = fixture.gateway.handleConnection(mockClient);

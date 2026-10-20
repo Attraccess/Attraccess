@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { assertAccessListAuthority } from '../introductions/access-list-policy';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
 import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { IsResourceIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from './dtos/grantIntroducer.dto';
 
@@ -12,6 +13,7 @@ export class ResourceIntroducersController {
   constructor(private readonly resourceIntroducersService: ResourceIntroducersService) {}
 
   @Get('/:userId/is-introducer')
+  @Auth()
   @ApiOperation({
     summary: 'Check if a user is an introducer for a resource',
     operationId: 'resourceIntroducersIsIntroducer',
@@ -25,7 +27,12 @@ export class ResourceIntroducersController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number,
     @Query('includeGroups') includeGroups: boolean,
+    @Req() req: AuthenticatedRequest,
   ): Promise<IsResourceIntroducerResponseDto> {
+    if (userId !== req.user.id)
+      await assertAccessListAuthority(req.user, () =>
+        this.resourceIntroducersService.isIntroducer(resourceId, req.user.id, true),
+      );
     const isResourceIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, userId, includeGroups);
 
     return {
@@ -34,6 +41,7 @@ export class ResourceIntroducersController {
   }
 
   @Get()
+  @Auth()
   @ApiOperation({ summary: 'Get all introducers for a resource', operationId: 'resourceIntroducersGetMany' })
   @ApiResponse({
     status: 200,
@@ -49,8 +57,12 @@ export class ResourceIntroducersController {
   })
   async getMany(
     @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
     @Query('type') type?: ResourceIntroducerType,
   ): Promise<ResourceIntroducer[]> {
+    await assertAccessListAuthority(req.user, () =>
+      this.resourceIntroducersService.isIntroducer(resourceId, req.user.id, true),
+    );
     return await this.resourceIntroducersService.getMany(resourceId, type);
   }
 

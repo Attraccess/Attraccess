@@ -1,3 +1,4 @@
+import { ResourceActivityPolicy } from '../../activity/resource-activity-policy.service';
 import { ResourceUsage } from '@attraccess/database-entities';
 
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -24,7 +25,10 @@ import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.
 @ApiTags('Resources')
 @Controller('resources/:resourceId/usage')
 export class ResourceUsageController {
-  constructor(protected readonly resourceUsageService: ResourceUsageService) {}
+  constructor(
+    protected readonly resourceUsageService: ResourceUsageService,
+    private readonly activity: ResourceActivityPolicy,
+  ) {}
 
   @Post('lock')
   @Auth()
@@ -300,7 +304,9 @@ export class ResourceUsageController {
   })
   public async getActiveSession(
     @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<GetActiveUsageSessionDto> {
+    await this.activity.assertRead(resourceId, req.user);
     const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
     return { usage: activeSession || null };
   }

@@ -261,6 +261,14 @@ export const sessionStoreProvider = {
     SsoLogoutController,
     RbacController,
   ],
-  exports: [UsersService, AuthService, SessionService, BruteForceProtectionService, AuthAuditLogger, RbacModule],
+  exports: [
+    SessionStrategy,
+    UsersService,
+    AuthService,
+    SessionService,
+    BruteForceProtectionService,
+    AuthAuditLogger,
+    RbacModule,
+  ],
 })
 export class UsersAndAuthModule {}

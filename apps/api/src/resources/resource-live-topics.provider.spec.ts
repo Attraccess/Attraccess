@@ -3,6 +3,7 @@ import { LiveSubscription } from '@attraccess/shared';
 import { Resource } from '@attraccess/database-entities';
 import { In, Repository } from 'typeorm';
 import { Subject } from 'rxjs';
+import { ResourceActivityPolicy } from './activity/resource-activity-policy.service';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
@@ -18,6 +19,10 @@ function setup() {
     resources as unknown as Repository<Resource>,
     events as unknown as ResourceEventsService,
     logs as unknown as FlowLogRecorderService,
+    {
+      canRead: jest.fn(async () => true),
+      assertRead: jest.fn(async () => undefined),
+    } as unknown as ResourceActivityPolicy,
   );
   provider.onModuleInit();
   return { registry, resources, events, logs };
@@ -67,7 +72,10 @@ describe('resource live topic provider', () => {
   it('delegates initial resource state and lazily creates and releases flow-log subjects', async () => {
     const { registry, events, logs } = setup();
     const user = { id: 1 } as AuthenticatedUser;
-    await registry.source({ topic: 'resource', resourceId: 1 }, user);
+    const resourceSource = await registry.source({ topic: 'resource', resourceId: 1 }, user);
+    const resourceObserver = resourceSource.subscribe();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    resourceObserver.unsubscribe();
     expect(events.subscribeResource).toHaveBeenCalledWith(1);
     const source = await registry.source({ topic: 'flow-logs', resourceId: 1 }, user);
     expect(logs.subjectFor).not.toHaveBeenCalled();

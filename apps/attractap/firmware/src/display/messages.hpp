@@ -250,6 +250,7 @@ enum class Message {
     July, August, September, October, November, December,
     ClockDate, ClockDateWithYear, ClockDayDate, TapRfidCard,
     DemoDeviceName,
+    DeviceEnrollmentInstructions,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -516,6 +517,7 @@ inline constexpr Entry catalog[] = {
     {Message::ClockDayDate, "{0}, {1}", "{0}, {1}"},
     {Message::TapRfidCard, "RFID-Karte auflegen", "Tap RFID card"},
     {Message::DemoDeviceName, "Demo Gerät", "Demo Device"},
+    {Message::DeviceEnrollmentInstructions, "Gerät freigeben: Code in Attraccess eingeben oder scannen. Neuer Code alle 30 Sekunden.", "Approve this device: enter or scan the code in Attraccess. Code changes every 30 seconds."},
 };
 
 inline const char *messageText(Message id, const std::string &locale) {

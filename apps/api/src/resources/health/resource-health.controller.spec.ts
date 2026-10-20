@@ -1,3 +1,4 @@
+import { ResourceActivityPolicy } from '../activity/resource-activity-policy.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceHealthController } from './resource-health.controller';
 import { ResourceHealthService } from './resource-health.service';
@@ -12,6 +13,7 @@ describe('ResourceHealthController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResourceHealthController],
       providers: [
+        { provide: ResourceActivityPolicy, useValue: { assertRead: jest.fn().mockResolvedValue(undefined) } },
         {
           provide: ResourceHealthService,
           useValue: {
@@ -70,7 +72,7 @@ describe('ResourceHealthController', () => {
     };
     service.getSummary.mockResolvedValue(expected);
 
-    const result = await controller.getResourceHealth(7);
+    const result = await controller.getResourceHealth(7, { user: { id: 4 } } as never);
     expect(service.getSummary).toHaveBeenCalledWith(7);
     expect(result).toBe(expected);
   });

@@ -89,3 +89,55 @@ describe('companion websocket generator', () => {
     expect(output['client.ts']).toContain("this.emit('missing', data)");
   });
 });
+
+it('ignores credentials and close events from a stopped transport after reconnect', async () => {
+  const { EventEmitter } = await import('node:events');
+  const ts = await import('typescript');
+  const sockets: FakeSocket[] = [];
+  class FakeSocket extends EventEmitter {
+    static OPEN = 1;
+    readyState = 1;
+    constructor() {
+      super();
+      sockets.push(this);
+    }
+    close() {
+      /* deliver close explicitly to exercise late callbacks */
+    }
+    send() {
+      /* no outbound packets needed */
+    }
+  }
+  const output = await generate({
+    channels: {
+      COMPANION_REGISTER_RESPONSE: { subscribe: { message: { payload: { $ref: '#/components/schemas/Reply' } } } },
+    },
+    components: { schemas: { Reply: { type: 'object', properties: { id: { type: 'integer' } } } } },
+  });
+  const source = ts.transpileModule(output['client.ts'], {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+  }).outputText;
+  const exported: {
+    CompanionWsClient?: new (url: string) => InstanceType<typeof EventEmitter> & { connect(): void; stop(): void };
+  } = {};
+  new Function('require', 'exports', source)(
+    (name: string) => (name === 'ws' ? FakeSocket : { EventEmitter }),
+    exported,
+  );
+  const client = new exported.CompanionWsClient('http://local.test');
+  const credentials = vi.fn(),
+    disconnected = vi.fn();
+  client.on('register_response', credentials).on('disconnected', disconnected);
+  client.connect();
+  const old = sockets[0];
+  client.stop();
+  client.connect();
+  const current = sockets[1];
+  old.emit('message', Buffer.from(JSON.stringify({ event: 'COMPANION_REGISTER_RESPONSE', data: { id: 1 } })));
+  old.emit('close');
+  expect(credentials).not.toHaveBeenCalled();
+  expect(disconnected).not.toHaveBeenCalled();
+  current.emit('message', Buffer.from(JSON.stringify({ event: 'COMPANION_REGISTER_RESPONSE', data: { id: 2 } })));
+  expect(credentials).toHaveBeenCalledExactlyOnceWith({ id: 2 });
+  client.stop();
+});

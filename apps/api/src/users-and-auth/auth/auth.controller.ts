@@ -1,3 +1,4 @@
+import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { ForbiddenException } from '@nestjs/common';
 import { SsoLogoutService } from './sso/sso-logout.service';
 import { CentralLogoutResult, LogoutCapability } from './sso/logout.types';
@@ -10,7 +11,6 @@ import {
   Get,
   Optional,
   Post,
-  Query,
   Req,
   Res,
   UseGuards,
@@ -66,6 +66,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
     @Body() body: { tokenLocation: 'cookie' | 'body'; twoFactorCode?: string },
   ): Promise<CreateSessionResponse> {
+    response.setHeader('Cache-Control', 'no-store');
     // Create session token using SessionService
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],
@@ -90,7 +91,7 @@ export class AuthController {
     }
   }
 
-  @Get('/session/refresh')
+  @Post('/session/refresh')
   @SessionAuth()
   @ApiOperation({ summary: 'Refresh the current session', operationId: 'refreshSession' })
   @ApiOkResponse({
@@ -98,9 +99,9 @@ export class AuthController {
     type: CreateSessionResponse,
   })
   async refreshSession(
-    @Req() request: AuthenticatedRequest,
+    @Req() request: SessionAuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
-    @Query('tokenLocation') tokenLocation: 'cookie' | 'body',
+    @Body() body: RefreshSessionDto,
   ): Promise<CreateSessionResponse> {
     const currentToken = this.sessionToken(request);
 
@@ -111,7 +112,9 @@ export class AuthController {
 
     if (!newToken) throw new UnauthorizedException('Session was ended or expired');
 
-    if (tokenLocation === 'cookie') {
+    response.setHeader('Cache-Control', 'no-store');
+    const hasCookie = Boolean(request.cookies?.[this.cookieConfigService.getCookieName()]);
+    if (request.authSessionSource !== 'bearer' || hasCookie || body.tokenLocation !== 'body') {
       // Update cookie with new token
       await this.cookieConfigService.setAuthCookie(response, newToken);
       return {

@@ -17,9 +17,8 @@ const { requestMutate, ApiErrorMock, candidates } = vi.hoisted(() => {
     ApiErrorMock,
     candidates: {
       value: [
-        { id: 10, userId: 2, type: 'introducer', user: { id: 2, username: 'alice' } },
-        { id: 11, userId: 1, type: 'introducer', user: { id: 1, username: 'me' } },
-        { id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } },
+        { id: 2, username: 'alice' },
+        { id: 1, username: 'me' },
       ],
     },
   };
@@ -37,7 +36,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: ApiErrorMock,
   ResourceIntroducerType: { INTRODUCER: 'introducer', MAINTAINER: 'maintainer' },
-  useAccessControlServiceResourceIntroducersGetMany: () => ({
+  useAccessControlServiceResourceIntroducerDirectory: () => ({
     isLoading: false,
     data: candidates.value,
   }),
@@ -70,9 +69,8 @@ describe('SupervisedStartModal', () => {
   beforeEach(() => {
     requestMutate.mockClear();
     candidates.value = [
-      { id: 10, userId: 2, type: 'introducer', user: { id: 2, username: 'alice' } },
-      { id: 11, userId: 1, type: 'introducer', user: { id: 1, username: 'me' } },
-      { id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } },
+      { id: 2, username: 'alice' },
+      { id: 1, username: 'me' },
     ];
   });
 
@@ -97,7 +95,7 @@ describe('SupervisedStartModal', () => {
   });
 
   it('does not offer a reader when no introducer is available', () => {
-    candidates.value = [{ id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } }];
+    candidates.value = [];
 
     renderModal();
 
@@ -106,7 +104,7 @@ describe('SupervisedStartModal', () => {
   });
 
   it('does not offer a deleted introducer or a reader', () => {
-    candidates.value = [{ id: 10, userId: 2, type: 'introducer', user: null }];
+    candidates.value = [];
 
     renderModal();
 

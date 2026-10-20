@@ -1,3 +1,4 @@
+import { DeviceEnrollmentService } from '../device-enrollment/device-enrollment.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CompanionAuthHandler } from './companion-auth.handler';
 import { CompanionService } from './companion.service';
@@ -7,6 +8,8 @@ import { CompanionEventType, CompanionSocket } from './companion.types';
 function makeSocket(): CompanionSocket {
   return {
     id: 'test',
+    readyState: 1,
+    close: jest.fn(),
     deviceId: null,
     sendEvent: jest.fn(),
   } as unknown as CompanionSocket;
@@ -32,6 +35,10 @@ describe('CompanionAuthHandler', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompanionAuthHandler,
+        {
+          provide: DeviceEnrollmentService,
+          useValue: { announce: jest.fn(), authenticated: jest.fn(), isPending: () => true },
+        },
         { provide: CompanionService, useValue: mockService },
         { provide: CompanionGatewayService, useValue: mockGatewayService },
       ],
@@ -41,15 +48,15 @@ describe('CompanionAuthHandler', () => {
   });
 
   describe('new device registration (empty payload)', () => {
-    it('creates device and sends COMPANION_REGISTER_RESPONSE', async () => {
+    it('does not create a device or grant authority before enrollment approval', async () => {
       mockService.createDevice.mockResolvedValue({ device: { id: 7 }, token: 'tok123' });
 
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, {});
 
-      expect(mockService.createDevice).toHaveBeenCalled();
-      expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_REGISTER_RESPONSE, { id: 7, token: 'tok123' });
-      expect(socket.deviceId).toBe(7);
+      expect(mockService.createDevice).not.toHaveBeenCalled();
+      expect(socket.sendEvent).not.toHaveBeenCalled();
+      expect(socket.deviceId).toBeNull();
     });
   });
 
@@ -84,7 +91,9 @@ describe('CompanionAuthHandler', () => {
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, { id: 5, token: 'abc' });
 
-      const call = (socket.sendEvent as jest.Mock).mock.calls.find((c) => c[0] === CompanionEventType.COMPANION_AUTHENTICATED);
+      const call = (socket.sendEvent as jest.Mock).mock.calls.find(
+        (c) => c[0] === CompanionEventType.COMPANION_AUTHENTICATED,
+      );
       expect(call[1]).toMatchObject({ locked: true });
     });
 
@@ -94,7 +103,9 @@ describe('CompanionAuthHandler', () => {
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, { id: 99, token: 'whatever' });
 
-      expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_UNAUTHORIZED, { message: 'PLEASE_REREGISTER' });
+      expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_UNAUTHORIZED, {
+        message: 'PLEASE_REREGISTER',
+      });
       expect(socket.deviceId).toBeNull();
     });
 
@@ -105,7 +116,9 @@ describe('CompanionAuthHandler', () => {
       const socket = makeSocket();
       await handler.handleAuthenticate(socket, { id: 5, token: 'wrong' });
 
-      expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_UNAUTHORIZED, { message: 'PLEASE_REREGISTER' });
+      expect(socket.sendEvent).toHaveBeenCalledWith(CompanionEventType.COMPANION_UNAUTHORIZED, {
+        message: 'PLEASE_REREGISTER',
+      });
     });
 
     it('sends COMPANION_UPDATE_AVAILABLE when version is outdated', async () => {
@@ -137,7 +150,9 @@ describe('CompanionAuthHandler', () => {
       mockService.getManifest.mockReturnValue({
         version: '2.0.0',
         buildId: 'abc',
-        platforms: [{ platform: 'linux', arch: 'x64', filename: 'companion-linux-x64.AppImage', sha256: 'deadbeef1234' }],
+        platforms: [
+          { platform: 'linux', arch: 'x64', filename: 'companion-linux-x64.AppImage', sha256: 'deadbeef1234' },
+        ],
       });
 
       const socket = makeSocket();
@@ -163,7 +178,13 @@ describe('CompanionAuthHandler', () => {
       });
 
       const socket = makeSocket();
-      await handler.handleAuthenticate(socket, { id: 5, token: 'tok', platform: 'linux', arch: 'arm64', appVersion: '1.0.0' });
+      await handler.handleAuthenticate(socket, {
+        id: 5,
+        token: 'tok',
+        platform: 'linux',
+        arch: 'arm64',
+        appVersion: '1.0.0',
+      });
 
       const calls = (socket.sendEvent as jest.Mock).mock.calls;
       const updateCall = calls.find((c) => c[0] === CompanionEventType.COMPANION_UPDATE_AVAILABLE);

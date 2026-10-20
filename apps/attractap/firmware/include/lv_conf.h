@@ -132,3 +132,6 @@
 #endif /*LV_CONF_H*/
 
 #endif /*End of "Content enable"*/
+
+// Enrollment QR codes are rendered locally, including in the desktop simulator.
+#define LV_USE_QRCODE 1

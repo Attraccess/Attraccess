@@ -125,7 +125,7 @@ export class SettingsService {
   }
 
   async getUrl(): Promise<string | null> {
-    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url);
+    return this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url, true);
   }
 
   async getPublicInternetUrl(): Promise<string | null> {
@@ -192,6 +192,11 @@ export class SettingsService {
     return this.getSystemSettings();
   }
 
+  async getActivityVisibility(): Promise<'all-resources' | 'introduced-resources'> {
+    const value = await this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.activityVisibility, true);
+    return value == null || value === 'all-resources' ? 'all-resources' : 'introduced-resources';
+  }
+
   async getAppSettings(): Promise<AppSettingsDto> {
     const [url, publicInternetUrl, licenseKey, defaultLanguage] = await Promise.all([
       this.settingsStore.getPlainSetting(APP_PARENT, APP_KEYS.url),
@@ -204,12 +209,19 @@ export class SettingsService {
       url,
       publicInternetUrl,
       licenseKeyConfigured: licenseKey.configured,
+      activityVisibility: await this.getActivityVisibility(),
       // Missing values preserve the legacy German behavior; malformed stored values use English.
       defaultLanguage,
     };
   }
 
   async updateAppSettings(update: UpdateAppSettingsDto): Promise<void> {
+    if (update.activityVisibility !== undefined) {
+      if (!['all-resources', 'introduced-resources'].includes(update.activityVisibility)) {
+        throw new BadRequestException('Invalid activity visibility');
+      }
+      await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.activityVisibility, update.activityVisibility);
+    }
     if (Object.prototype.hasOwnProperty.call(update, 'url')) {
       await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.url, update.url ?? null);
     }

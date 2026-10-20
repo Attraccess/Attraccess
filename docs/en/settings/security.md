@@ -2,6 +2,24 @@
 
 Attraccess provides several security-related settings for session cookies and authentication. These settings affect how users stay logged in and how the application handles cross-site requests.
 
+
+## Resource activity visibility
+
+Sign-in is required for resource activity, health, current sessions and live updates. In **Settings → General**, administrators can choose **All resources** (the default for new and upgraded installations) or **Introduced resources only**. Restricted visibility includes valid direct or group introductions and inherited introducers. Resource managers retain access. Being a maintainer, supervisor or allowed to control a resource does not by itself reveal its activity. Expired introductions and retraining requirements apply immediately, including to open streams.
+
+Full introduction and introducer lists remain restricted to access managers and introducers. The help and supervision selectors expose only eligible user IDs and usernames; they do not expose email addresses or full user records. Resource browsing and asking for an introduction remain available before an introduction is granted.
+
+## Browser origins and session refresh
+
+Only explicitly configured browser origins are allowed. The saved application URL is authoritative, with `ATTRACCESS_URL` as fallback. `ATTRACCESS_FRONTEND_URL` and comma-separated `ATTRACCESS_ALLOWED_ORIGINS` add exact origins when the frontend uses a separate address. Include scheme and port, for example `https://access.example.org`; wildcards, credentials, paths and the literal `null` are rejected. Request Host and forwarding headers never grant browser access. `ATTRACCESS_PUBLIC_INTERNET_URL` is for callbacks, not a browser allowlist.
+
+Unsafe browser requests using cookies must supply an allowed Origin, or an allowed Referer when Origin is absent. This also protects same-site sibling domains. Native clients may use verified bearer credentials without a browser Origin; an invalid Authorization header cannot fall back to a cookie. Device WebSocket upgrades use the same origin policy when Origin is present. Verified SSO callbacks retain their protocol-specific validation.
+
+Session refresh uses **POST `/api/auth/session/refresh`** with a validated JSON body. Cookie and mixed cookie/bearer requests must use `{}` and receive the replacement session in the cookie only. A verified bearer-only client may request `{ "tokenLocation": "body" }` to receive the replacement token in the response. GET does not refresh sessions. Credential responses use `Cache-Control: no-store`.
+
+Local operation does not require a public hostname or external callback service. Configure the exact local application origin before first setup; `pnpm serve` supplies the allocated development frontend origin. Local password sign-in, refresh, enrollment and device reconnect work on the local network. External SSO providers and online license verification still require their respective services.
+
+
 ## Cookie SameSite Setting
 
 The **Cookie SameSite** setting controls when the browser sends session cookies along with requests. This is important for security and for SSO compatibility.
@@ -183,3 +201,5 @@ docker compose logs attraccess | grep -E 'auth\.failed'
 - [SSL Setup](installation/ssl-setup.md) -- Configure HTTPS
 - [SSO Overview](user-management/sso-overview.md) -- Single Sign-On setup
 - [Settings Overview](settings/overview.md) -- All system settings
+
+The QR camera decoder is bundled with the frontend and served by the local instance; scanning does not download a decoder from a public CDN. Browser camera access still requires HTTPS or a trusted local browser context.

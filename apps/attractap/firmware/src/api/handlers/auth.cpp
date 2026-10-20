@@ -3,6 +3,7 @@
 // FEATURE: api-auth
 
 #include "../api.hpp"
+#include "../../platform.hpp"
 #include "../../clock/wall_clock.hpp"
 #include <cmath>
 #include <functional>
@@ -16,12 +17,16 @@ void API::onRegistrationData(JsonObject data)
     if (data["payload"].is<JsonObject>())
     {
         auto payload = data["payload"].as<JsonObject>();
-        if (payload["id"].is<uint32_t>() && payload["token"].is<const char *>())
+        if (payload["id"].is<uint32_t>() && payload["token"].is<const char *>() &&
+            payload["enrollmentVersion"] == 1 && !enrollmentCode.value().empty() &&
+            enrollmentCode.value() == (payload["enrollmentCode"] | ""))
         {
             uint32_t readerId = payload["id"].as<uint32_t>();
             std::string apiKey = payload["token"].as<std::string>();
 
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
+            enrollmentCode.clear();
+            State::setEnrollmentCode("");
 
             this->logger.infof("Reader registered with ID: %d", readerId);
 
@@ -46,7 +51,7 @@ void API::onUnauthorized(JsonObject data)
     State::setApiState(false, "");
     Settings::clearAttraccessAuthConfig();
 
-    this->sendMessage("READER_REGISTER", JsonObject());
+    this->sendEnrollmentRequest(true);
 }
 
 bool API::isRegistered()
@@ -59,7 +64,7 @@ void API::sendAuthenticationRequest()
     if (!this->isRegistered())
     {
         logger.info("Not registered, sending registration request");
-        this->sendMessage("READER_REGISTER");
+        this->sendEnrollmentRequest(true);
         return;
     }
 
@@ -164,4 +169,19 @@ void API::onServerTime(JsonVariantConst serverTime)
 void API::onDeviceName(std::function<void(std::string)> callback)
 {
     this->deviceNameCallback = callback;
+}
+
+void API::sendEnrollmentRequest(bool force)
+{
+    if (!enrollmentCode.refresh(millis(), force)) return;
+    const auto code = enrollmentCode.value();
+    if (code.empty()) return;
+    State::setEnrollmentCode(code);
+#ifndef HAS_LVGL_DISPLAY
+    // Serial is local setup output. Never include this code in remote diagnostics.
+    printf("Attraccess enrollment: %s\n", code.c_str());
+#endif
+    JsonDocument document;
+    document["enrollmentCode"] = code;
+    this->sendMessage("READER_REGISTER", document.as<JsonObject>());
 }

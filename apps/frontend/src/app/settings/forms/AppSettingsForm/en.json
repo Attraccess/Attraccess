@@ -14,6 +14,12 @@
     },
     "defaultLanguage": {
       "label": "Default system language"
+    },
+    "activityVisibility": {
+      "label": "Equipment activity visibility",
+      "all": "All equipment for resource readers",
+      "introduced": "Introduced equipment only",
+      "description": "Sign-in is always required. Restricted mode also allows equipment managers and authorized introducers. Full access lists require separate permissions."
     }
   },
   "actions": {

@@ -29,6 +29,10 @@ private:
     void createConnectionDetails(lv_obj_t *statesContainer);
     std::function<void()> onOpenSettingsCallback;
     lv_obj_t *screen = nullptr;
+    lv_obj_t *enrollmentPanel = nullptr;
+    lv_obj_t *enrollmentLabel = nullptr;
+    lv_obj_t *enrollmentQr = nullptr;
+    std::string lastEnrollmentCode;
     void finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t color);
     void markStateAsSuccess(lv_obj_t *spinner, lv_obj_t *label);
     void markStateAsError(lv_obj_t *spinner, lv_obj_t *label);

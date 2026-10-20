@@ -21,6 +21,7 @@ int main(int argc, char **argv)
             Fixtures::network = {};
             Fixtures::websocket = {};
             Fixtures::api = {};
+            Fixtures::enrollmentCode.clear();
             Fixtures::resetDemoCards();
             Fixtures::wallClock = {};
             const auto errorsBefore = lvglErrors;
@@ -34,6 +35,7 @@ int main(int argc, char **argv)
                 std::cerr << "FAIL " << name << ": " << error.what() << '\n';
             }
         };
+        test("enrollment/code-and-qr", [&] { testDeviceEnrollment(renderer); });
         test("render/latin1-all-sizes", [&] { testLatin1Fonts(renderer); });
         test("theme/surfaces-and-font", [&] { testSurfaces(renderer); });
         test("theme/automatic-button-states", [&] { testButtons(renderer, false); });
