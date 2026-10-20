@@ -224,5 +224,5 @@ The authentication-related GET routes have these boundaries:
 SAML login uses a POST callback. It requires a signed assertion correlated to a
 single-use authentication request, its provider and the initiating browser's
 HttpOnly cookie. Unsolicited responses are rejected. On HTTPS the temporary
-SAML cookie uses `SameSite=None; Secure` so it can return on an identity
+SAML cookie uses a `__Host-` name with `Path=/` and `SameSite=None; Secure` so it can return on an identity
 provider's cross-site form POST. Deploy remote company sign-in over HTTPS.

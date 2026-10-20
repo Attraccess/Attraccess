@@ -12,8 +12,9 @@ export function browserBoundSamlCache(
   providerId: number,
   secure: boolean,
 ): CacheProvider {
-  const name = `saml-request-${providerId}`;
-  const path = `/api/auth/sso/SAML/${providerId}`;
+  const name = `${secure ? '__Host-' : ''}saml-request-${providerId}`;
+  // The HTTPS host prefix prevents sibling sites from injecting a Domain cookie.
+  const path = secure ? '/' : `/api/auth/sso/SAML/${providerId}`;
   const nonce = /\/callback\/?$/.test(req.path) ? req.cookies?.[name] : randomBytes(32).toString('base64url');
   const validNonce = typeof nonce === 'string' && /^[A-Za-z0-9_-]{43}$/.test(nonce);
   const key = (id: string) => `SAML-login:${providerId}:${createHash('sha256').update(`${nonce}:${id}`).digest('hex')}`;

@@ -111,6 +111,13 @@ describe('browser-bound SAML login', () => {
     expect((await browser(cookies, true).validatePostResponseAsync(response(id))).profile.nameID).toBe('person');
     await expect(browser(cookies, true).validatePostResponseAsync(response(id))).rejects.toThrow();
   });
+  it('ignores a sibling-injected cookie without the host prefix', async () => {
+    const cookies: Record<string, string> = {};
+    const id = await initiate(cookies);
+    const injected = { 'saml-request-7': cookies['__Host-saml-request-7'] };
+    await expect(browser(injected, true).validatePostResponseAsync(response(id))).rejects.toThrow();
+    expect((await browser(cookies, true).validatePostResponseAsync(response(id))).profile.nameID).toBe('person');
+  });
   it.each(['other-browser', 'other-provider', 'unsolicited', 'mismatched', 'expired'])(
     'rejects %s assertions',
     async (kind) => {
