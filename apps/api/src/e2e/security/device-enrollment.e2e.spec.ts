@@ -1,3 +1,9 @@
+import { registerRefreshMatrix } from './refresh-matrix.test-fixture';
+import { registerActivityVisibility } from './activity-visibility.test-fixture';
+import { registerStreamRevocation } from './stream-revocation.test-fixture';
+import { registerHttpsBrowser } from './https-browser.test-fixture';
+import { registerEnrollmentRaces } from './enrollment-races.test-fixture';
+import { registerAccessMatrix } from './access-matrix.test-fixture';
 import { CompanionService } from '../../companion/companion.service';
 import { Test } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
@@ -134,6 +140,8 @@ describe('device enrollment over HTTP and WebSocket', () => {
     if (app) await app.close();
     jest.restoreAllMocks();
   });
+
+  registerAccessMatrix(() => ({ app, db, admin, ordinary, base }));
 
   it('requires sign-in for activity and preserves local password login and safe POST refresh with external networking denied', async () => {
     for (const path of [
@@ -379,4 +387,9 @@ describe('device enrollment over HTTP and WebSocket', () => {
     await receive(reader, 'READER_AUTHENTICATED');
     expect(await db.getRepository(Attractap).count()).toBe(1);
   });
+  registerRefreshMatrix(() => ({ app, db }));
+  registerActivityVisibility(() => ({ app, db }));
+  registerStreamRevocation(() => ({ app, db, base }));
+  registerHttpsBrowser(() => ({ app, base }));
+  registerEnrollmentRaces(() => ({ app, db, admin, connect, receive, send }));
 });

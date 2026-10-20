@@ -35,11 +35,18 @@ describe('equipment help directory', () => {
     await controller.getMany(7, request(['resources.update']), 'help', ResourceIntroducerType.MAINTAINER);
     expect(introducers.getMany).toHaveBeenCalledWith(7, ResourceIntroducerType.MAINTAINER);
   });
+  it('denies supervision without metadata authority', async () => {
+    await expect(controller.getMany(7, request(), 'supervision')).rejects.toThrow('Resource read');
+    expect(usage.assertSupportsSupervision).not.toHaveBeenCalled();
+    expect(introducers.getMany).not.toHaveBeenCalled();
+  });
   it('checks supervision eligibility, includes only introducers and excludes the requester', async () => {
-    expect(await controller.getMany(7, request(), 'supervision')).toEqual([{ id: 2, username: 'Tutor' }]);
+    expect(await controller.getMany(7, request(['resources.read']), 'supervision')).toEqual([
+      { id: 2, username: 'Tutor' },
+    ]);
     expect(usage.assertSupportsSupervision).toHaveBeenCalledWith(7);
     expect(introducers.getMany).toHaveBeenCalledWith(7, ResourceIntroducerType.INTRODUCER);
     usage.assertSupportsSupervision.mockRejectedValue(new Error('Not eligible'));
-    await expect(controller.getMany(7, request(), 'supervision')).rejects.toThrow('Not eligible');
+    await expect(controller.getMany(7, request(['resources.read']), 'supervision')).rejects.toThrow('Not eligible');
   });
 });

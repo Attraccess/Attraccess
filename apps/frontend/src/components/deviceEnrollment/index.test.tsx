@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@attraccess/react-query-client';
 import { DeviceEnrollment, parseEnrollmentQr } from './index';
 const state = vi.hoisted(() => ({
   permitted: true,
@@ -90,3 +91,45 @@ it('keeps manual entry available when camera permission is denied', async () => 
   expect(screen.queryByText('Camera')).not.toBeInTheDocument();
   expect(screen.getByRole('textbox')).toBeEnabled();
 });
+
+for (const type of ['reader', 'companion'] as const) {
+  it.each([
+    [401, 'denied'],
+    [403, 'denied'],
+    [404, 'expired'],
+    [409, 'busy'],
+    [429, 'throttled'],
+    [0, 'failed'],
+  ])(`${type} explains approval failure %s and permits recovery`, async (status, notice) => {
+    const approve = type === 'reader' ? state.approveReader : state.approveCompanion;
+    const error = status ? Object.assign(Object.create(ApiError.prototype), { status }) : new Error('offline');
+    approve.mockRejectedValueOnce(error);
+    mount(type);
+    fireEvent.click(screen.getByRole('button', { name: `add.${type}` }));
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'ABC123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'approve' }));
+    expect(await screen.findByText(`states.${notice}`)).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'approve' }));
+    expect(await screen.findByText('states.success')).toBeInTheDocument();
+  });
+  it(`${type} prevents duplicate approvals while waiting`, async () => {
+    let complete!: (value: { id: number }) => void;
+    const approve = type === 'reader' ? state.approveReader : state.approveCompanion;
+    approve.mockReturnValueOnce(
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+    );
+    mount(type);
+    fireEvent.click(screen.getByRole('button', { name: `add.${type}` }));
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'ABC123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'approve' }));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'close' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'approve' }));
+    expect(approve).toHaveBeenCalledTimes(1);
+    complete({ id: 1 });
+    expect(await screen.findByText('states.success')).toBeInTheDocument();
+  });
+}

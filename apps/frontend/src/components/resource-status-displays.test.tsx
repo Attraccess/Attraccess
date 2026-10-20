@@ -5,7 +5,7 @@ import { ResourceIntroducersList } from './ResourceIntroducersList';
 import { RetrainingStatusBanner } from '../app/resources/usage/components/RetrainingStatusBanner';
 const state = vi.hoisted(() => ({
   loading: false,
-  introducers: undefined as undefined | { id: number; user: { username: string } }[],
+  introducers: undefined as undefined | { id: number; username: string }[],
   status: undefined as undefined | { applies: boolean; isDue: boolean; blocksAccess: boolean; reason?: string },
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
@@ -15,7 +15,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAccessControlServiceResourceIntroducersGetMany: () => ({ data: state.introducers, isLoading: state.loading }),
+  useAccessControlServiceResourceIntroducerDirectory: () => ({ data: state.introducers, isLoading: state.loading }),
   useResourcesServiceResourceRetrainingGetStatus: () => ({ data: state.status }),
 }));
 beforeEach(() => {
@@ -50,8 +50,8 @@ it('shows loading, empty and populated introducer lists', () => {
   expect(screen.getByText('No instructors')).toBeTruthy();
   view.unmount();
   state.introducers = [
-    { id: 1, user: { username: 'Ada' } },
-    { id: 2, user: { username: 'Ben' } },
+    { id: 1, username: 'Ada' },
+    { id: 2, username: 'Ben' },
   ];
   render(<ResourceIntroducersList resourceId={7} title="Contact instructors" />);
   expect(screen.getByText('Contact instructors:')).toBeTruthy();

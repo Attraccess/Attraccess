@@ -129,6 +129,7 @@ export class PasskeyController {
 
     // A passkey proves possession of the authenticator (and usually a biometric/PIN on top of it),
     // so it stands on its own and does not additionally prompt for the TOTP code.
+    response.setHeader('Cache-Control', 'no-store');
     const sessionToken = await this.sessionService.createSession(user, {
       userAgent: request.headers['user-agent'],
       ipAddress: ip,
@@ -157,17 +158,19 @@ export class PasskeyController {
     action: 'passkey_created' | 'passkey_renamed' | 'passkey_deleted',
     request: AuthenticatedRequest,
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-      subjectId: request.user.id,
-      details: {},
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    })).then(() => undefined);
+    return Promise.resolve(
+      this.identityAudit?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectId: request.user.id,
+        details: {},
+        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+      }),
+    ).then(() => undefined);
   }
 }
 

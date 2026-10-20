@@ -520,7 +520,7 @@ describe('SsoController', () => {
       ip: string;
       connection: { remoteAddress: string };
     } & Record<string, unknown>;
-    let mockResponse: { cookie: jest.Mock; redirect: jest.Mock };
+    let mockResponse: { cookie: jest.Mock; redirect: jest.Mock; setHeader: jest.Mock };
     let sessionService: SessionService;
 
     beforeEach(() => {
@@ -539,6 +539,7 @@ describe('SsoController', () => {
       mockResponse = {
         cookie: jest.fn(),
         redirect: jest.fn(),
+        setHeader: jest.fn(),
       };
     });
 
@@ -554,6 +555,7 @@ describe('SsoController', () => {
         ipAddress: mockRequest.ip,
       });
 
+      expect(mockResponse.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
       expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
 
       expect(result).toEqual({
@@ -615,6 +617,7 @@ describe('SsoController', () => {
         mockResponse as unknown as Response,
       );
 
+      expect(mockResponse.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
       expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
       expect(mockResponse.redirect).toHaveBeenCalledWith('http://localhost:3000/dashboard');
     });

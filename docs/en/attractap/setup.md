@@ -103,3 +103,14 @@ Pending enrollment exists only in the server process owning the live socket. Res
 | Counter capacity | 10,000 entries; new entries rejected when full |
 
 Devices behind a proxy share its peer-IP connection limits. Native devices need no Origin header; a browser-supplied Origin must be explicitly allowed. Enrollment and valid-device reconnect use the local server without external Internet access. The QR format is `attraccess-enroll:v1:reader:ABC-123`; never publish a current code in a screenshot or log from a real deployment.
+
+## Physical validation checklist
+
+Hardware checks below have **not been performed** for ATT-1149. The operator explicitly skipped physical validation because hardware was unavailable. Software and simulated-device tests do not establish these results.
+
+- [ ] Verify the rotating code on a real reader display and serial output.
+- [ ] Scan the real reader code and approve enrollment in the web UI.
+- [ ] Reboot the reader and verify that saved credentials reconnect without enrollment.
+- [ ] Start and end real equipment use, including with external internet access disconnected.
+
+Record the firmware revision, device model and result when performing each check.

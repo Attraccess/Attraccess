@@ -17,6 +17,7 @@ export function registerSsosamlStrategyFixture() {
     } as SSOProviderSAMLConfiguration;
 
     return {
+      path: `/api/auth/sso/SAML/${providerId}/login`,
       ssoSamlOptions: {
         providerId,
         samlConfiguration,

@@ -275,3 +275,25 @@ it.each(['settings', 'first-time-setup'] as const)(
     );
   },
 );
+
+it.each(['all-resources', 'introduced-resources'] as const)('loads and saves the %s activity policy', async (mode) => {
+  state.settings = { app: { url: 'https://app.example', activityVisibility: mode } };
+  render(<AppSettingsForm variant="standalone" endpoint="settings" />);
+  const select = screen.getByRole('button', { name: /inputs.activityVisibility.label$/ });
+  expect(select).toHaveTextContent(
+    mode === 'all-resources' ? 'inputs.activityVisibility.all' : 'inputs.activityVisibility.introduced',
+  );
+  await userEvent.click(select);
+  const next = mode === 'all-resources' ? 'introduced' : 'all';
+  await userEvent.click(screen.getByRole('option', { name: `inputs.activityVisibility.${next}` }));
+  await userEvent.click(screen.getByRole('button', { name: 'actions.save' }));
+  expect(state.save).toHaveBeenCalledWith(
+    expect.objectContaining({
+      requestBody: {
+        app: expect.objectContaining({
+          activityVisibility: mode === 'all-resources' ? 'introduced-resources' : 'all-resources',
+        }),
+      },
+    }),
+  );
+});

@@ -203,3 +203,26 @@ docker compose logs attraccess | grep -E 'auth\.failed'
 - [Settings Overview](settings/overview.md) -- All system settings
 
 The QR camera decoder is bundled with the frontend and served by the local instance; scanning does not download a decoder from a public CDN. Browser camera access still requires HTTPS or a trusted local browser context.
+
+## Browser session callbacks
+
+Session refresh and local/provider logout initiation use POST or DELETE. GET
+navigation does not refresh a session. Credential responses, including company
+sign-in and passkeys, use `Cache-Control: no-store`.
+
+The authentication-related GET routes have these boundaries:
+
+| Route                                                          | Session effect and verification                                                           |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `/auth/sso/OIDC/:id/login`, `/auth/sso/SAML/:id/login`         | Initiate a provider login; issue browser state but no authenticated session.              |
+| `/auth/sso/OIDC/:id/callback`                                  | Creates a session only after OIDC state/nonce verification.                               |
+| `/auth/sso/OIDC/:id/frontchannel-logout`                       | Requires matching provider issuer and session ID; a cookie alone cannot revoke a session. |
+| `/auth/sso/OIDC/:id/post-logout`                               | Consumes a single-use initiated logout state; does not authenticate a browser.            |
+| `/auth/sso/SAML/:id/slo`                                       | Verifies the provider signature and logout correlation/replay rules.                      |
+| `/auth/session/logout-capability`, `/auth/sso/:id/logout-urls` | Read configuration/capability only.                                                       |
+
+SAML login uses a POST callback. It requires a signed assertion correlated to a
+single-use authentication request, its provider and the initiating browser's
+HttpOnly cookie. Unsolicited responses are rejected. On HTTPS the temporary
+SAML cookie uses `SameSite=None; Secure` so it can return on an identity
+provider's cross-site form POST. Deploy remote company sign-in over HTTPS.

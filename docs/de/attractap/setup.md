@@ -103,3 +103,14 @@ Eine ausstehende Freigabe lebt nur im Serverprozess der offenen Geräteverbindun
 | Zählerkapazität | 10.000 Einträge; bei voller Kapazität werden neue Einträge abgewiesen |
 
 Geräte hinter einem Proxy teilen dessen Gegenstellen-IP-Grenzen. Native Geräte benötigen keinen Origin-Header; ein Browser-Origin muss ausdrücklich erlaubt sein. Freigabe und Wiederverbindung funktionieren mit dem lokalen Server ohne Internet. Das QR-Format lautet `attraccess-enroll:v1:reader:ABC-123`. Veröffentlichen Sie niemals einen aktuellen Code aus einer echten Installation in Bildern oder Protokollen.
+
+## Checkliste zur Hardware-Validierung
+
+Die folgenden Hardware-Prüfungen wurden für ATT-1149 **nicht durchgeführt**. Der Betreiber hat sie wegen fehlender Hardware ausdrücklich übersprungen. Softwaretests und simulierte Geräte belegen diese Ergebnisse nicht.
+
+- [ ] Rotierenden Code auf einem echten Leserdisplay und in der seriellen Ausgabe prüfen.
+- [ ] Code des echten Lesers scannen und Registrierung in der Weboberfläche bestätigen.
+- [ ] Leser neu starten und Wiederverbindung mit gespeicherten Zugangsdaten ohne erneute Registrierung prüfen.
+- [ ] Echte Gerätenutzung starten und beenden, auch bei unterbrochener Internetverbindung.
+
+Bei jeder Prüfung Firmware-Version, Gerätemodell und Ergebnis dokumentieren.

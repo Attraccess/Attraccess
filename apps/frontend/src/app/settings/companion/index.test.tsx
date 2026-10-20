@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   renameOptions: {} as { onSuccess: () => void; onError: () => void },
   deleteOptions: {} as { onSuccess: () => void; onError: () => void },
 }));
+vi.mock('../../../components/deviceEnrollment', () => ({ DeviceEnrollment: () => null }));
 vi.mock('@attraccess/react-query-client', () => ({
   UseCompanionDevicesServiceListCompanionDevicesKeyFn: () => ['devices'],
   useCompanionDevicesServiceListCompanionDevices: () => ({ data: state.devices, isLoading: state.loading }),

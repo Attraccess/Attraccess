@@ -226,14 +226,8 @@ export class SsoLogoutService {
         context.sid === sid
       );
     }
-    if (
-      context?.protocol !== 'OIDC' ||
-      context.providerId !== providerId ||
-      context.issuer !== provider.oidcConfiguration.issuer
-    )
-      return false;
-    await this.sessions.revokeLogoutSession(session.id);
-    return true;
+    // A cookie identifies a browser session, but does not authenticate a provider logout.
+    return false;
   }
 
   private async saml(providerId: number, generateUniqueId?: () => string): Promise<SamlLogoutAdapter> {

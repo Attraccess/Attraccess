@@ -56,11 +56,12 @@ export function ResourceUsageSession({
     queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
   }, [queryClient]);
 
-  useLiveUpdates({
+  const { unavailable } = useLiveUpdates({
     topic: 'resource',
     resourceId,
+    onReconnect: invalidateSessionQueries,
     onUpdate: (data: { eventType?: string; inUse?: boolean }) => {
-      if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
+      if (!data.eventType || SESSION_EVENTS.has(data.eventType)) {
         invalidateSessionQueries();
       }
     },
@@ -75,10 +76,11 @@ export function ResourceUsageSession({
     resourceId,
   });
 
-  const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourcesServiceResourceUsageGetActiveSession(
-    { resourceId },
-    undefined,
-  );
+  const {
+    data: activeSessionResponse,
+    isLoading: isLoadingSession,
+    isError: sessionUnavailable,
+  } = useResourcesServiceResourceUsageGetActiveSession({ resourceId }, undefined);
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
@@ -157,6 +159,8 @@ export function ResourceUsageSession({
       </>
     );
   };
+
+  if (unavailable || sessionUnavailable) return null;
 
   return (
     <FlatSection icon={<Clock className="w-4 h-4" />} title={t('title.' + resource.type)} {...rest}>

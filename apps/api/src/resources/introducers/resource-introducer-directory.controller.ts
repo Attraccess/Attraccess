@@ -38,15 +38,15 @@ export class ResourceIntroducerDirectoryController {
     if (!['help', 'supervision'].includes(purpose) || (type && !Object.values(ResourceIntroducerType).includes(type))) {
       throw new BadRequestException('Invalid directory request');
     }
-    if (purpose === 'supervision') {
-      // This is the same requester eligibility check used before a supervised start.
-      await this.usage.assertSupportsSupervision(resourceId);
-      type = ResourceIntroducerType.INTRODUCER;
-    } else if (
+    if (
       !req.user.effectivePermissions?.has('resources.read') &&
       !req.user.effectivePermissions?.has('resources.update')
     ) {
       throw new ForbiddenException('Resource read permission required');
+    }
+    if (purpose === 'supervision') {
+      await this.usage.assertSupportsSupervision(resourceId);
+      type = ResourceIntroducerType.INTRODUCER;
     }
     const entries = await this.introducers.getMany(resourceId, type);
     const users = new Map<number, IntroducerDirectoryEntryDto>();
