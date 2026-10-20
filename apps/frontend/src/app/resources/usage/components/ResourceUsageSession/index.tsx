@@ -5,6 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { ActiveSessionDisplay } from '../ActiveSessionDisplay';
 import { OtherUserSessionDisplay } from '../OtherUserSessionDisplay';
+import { ResourceIntroducersList } from '../../../../../components/ResourceIntroducersList';
 import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
 import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
@@ -14,6 +15,7 @@ import {
   useResourcesServiceResourceUsageGetActiveSessionKey,
   useResourcesServiceResourceUsageCanControlKey,
   Resource,
+  ResourceIntroducerType,
   useResourcesServiceResourceUsageCanControl,
   useResourceMaintenancesServiceFindMaintenances,
   SupervisionMode,
@@ -104,7 +106,11 @@ export function ResourceUsageSession({
     includeActive: true,
   });
 
+  const privateActivityUnavailable = unavailable || sessionUnavailable;
+
   const renderContent = () => {
+    if (privateActivityUnavailable)
+      return <ResourceIntroducersList resourceId={resourceId} type={ResourceIntroducerType.INTRODUCER} />;
     if (isLoading) {
       return (
         <div className="flex justify-center py-4">
@@ -160,19 +166,19 @@ export function ResourceUsageSession({
     );
   };
 
-  if (unavailable || sessionUnavailable) return null;
-
   return (
     <FlatSection icon={<Clock className="w-4 h-4" />} title={t('title.' + resource.type)} {...rest}>
       <div className="space-y-4">
         <RetrainingStatusBanner resourceId={resourceId} />
         {renderContent()}
-        {!isLoading && !(activeMaintenances?.data?.length && activeMaintenances.data.length > 0) && (
-          <div className="flex justify-end gap-2">
-            <RequestMaintenanceButton resourceId={resourceId} />
-            <InstantMaintenanceButton resourceId={resourceId} />
-          </div>
-        )}
+        {!privateActivityUnavailable &&
+          !isLoading &&
+          !(activeMaintenances?.data?.length && activeMaintenances.data.length > 0) && (
+            <div className="flex justify-end gap-2">
+              <RequestMaintenanceButton resourceId={resourceId} />
+              <InstantMaintenanceButton resourceId={resourceId} />
+            </div>
+          )}
       </div>
     </FlatSection>
   );

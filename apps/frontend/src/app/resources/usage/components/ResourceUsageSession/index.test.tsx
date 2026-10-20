@@ -24,6 +24,9 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 vi.mock('../../../../../utils/live-updates', () => ({ useLiveUpdates: () => ({ unavailable: denied.value }) }));
 
 // The child components are irrelevant here — we only assert which branch renders.
+vi.mock('../../../../../components/ResourceIntroducersList', () => ({
+  ResourceIntroducersList: () => <div data-testid="activity-help" />,
+}));
 vi.mock('../StartSessionControls', () => ({
   StartSessionControls: ({ requiresSupervision }: { requiresSupervision?: boolean }) => (
     <div data-testid="start-controls" data-requires-supervision={String(!!requiresSupervision)} />
@@ -51,6 +54,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
     SUPERVISION_ALLOWED: 'supervision_allowed',
     SUPERVISION_REQUIRED: 'supervision_required',
   },
+  ResourceIntroducerType: { INTRODUCER: 'introducer' },
   ResourceType: { MACHINE: 'machine', DOOR: 'door' },
   useResourcesServiceResourceUsageCanControl: () => ({
     data: { canControl: canControl.value },
@@ -166,6 +170,8 @@ it.each(['stream', 'http'])('hides an allowed private snapshot immediately after
   else denied.http = true;
   view.rerender(<ResourceUsageSession resourceId={7} resource={resource} />);
   expect(screen.queryByTestId('active-session')).not.toBeInTheDocument();
+  expect(screen.getByTestId('activity-help')).toBeInTheDocument();
+  expect(screen.queryByTestId('start-controls')).not.toBeInTheDocument();
   denied.value = false;
   denied.http = false;
   view.rerender(<ResourceUsageSession resourceId={7} resource={resource} />);
