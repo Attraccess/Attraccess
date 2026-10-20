@@ -3,6 +3,9 @@
 // Like the Attractap firmware gate, compare the PR/merge queue with its base.
 import { checkReleaseVersion } from './lib/release-version.mjs';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { isDeepStrictEqual } from 'node:util';
+import { runtimeDependencies } from './lib/wago-runtime-dependencies.mjs';
 
 const manifestPath = 'apps/plugins/wago/cc100-runtime/manifest.json';
 
@@ -42,10 +45,23 @@ export function isRuntimeSource(path) {
 }
 
 export function checkRuntimeVersion(base = process.env.NX_AFFECTED_BASE ?? 'origin/main') {
+  const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  const ancestor = git('merge-base', base, 'HEAD').trim();
+  let dependenciesChanged;
+  const isSource = (path) => {
+    if (!isRuntimeSource(path)) return false;
+    if (!['package.json', 'pnpm-lock.yaml'].includes(path)) return true;
+    // Read committed versions, never installed packages or a dirty working tree.
+    dependenciesChanged ??= !isDeepStrictEqual(
+      runtimeDependencies((file) => git('show', `${ancestor}:${file}`)),
+      runtimeDependencies((file) => git('show', `HEAD:${file}`)),
+    );
+    return dependenciesChanged;
+  };
   return checkReleaseVersion({
     base,
     versionFile: manifestPath,
-    isSource: isRuntimeSource,
+    isSource,
     readVersion: (manifest) => JSON.parse(manifest).runtimeVersion,
     label: 'WAGO CC100 runtime',
   });

@@ -7,10 +7,40 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { fixtureGitEnv } from './test-utils/git-env.mjs';
 import { isRuntimeSource } from './check-wago-runtime-version.mjs';
+import { stringify } from 'yaml';
 
 const script = fileURLToPath(new URL('./check-wago-runtime-version.mjs', import.meta.url));
 const manifest = 'apps/plugins/wago/cc100-runtime/manifest.json';
 const source = 'apps/plugins/wago/cc100-runtime/src/runtime.ts';
+
+// Exercise the committed-file gate, including direct and transitive resolutions.
+const dependencyRoots = ['mqtt', 'ipaddr.js', 'nx', '@nx/esbuild', 'esbuild', 'typescript'];
+function dependencyFixture() {
+  return {
+    lockfileVersion: '9.0',
+    importers: {
+      '.': {
+        dependencies: Object.fromEntries(
+          dependencyRoots.map((name) => [name, { specifier: '^1.0.0', version: '1.0.0' }]),
+        ),
+      },
+    },
+    packages: Object.fromEntries(
+      [...dependencyRoots, 'transitive', 'optional', 'unrelated'].map((name) => [
+        `${name}@1.0.0`,
+        { resolution: { integrity: 'original' } },
+      ]),
+    ),
+    snapshots: {
+      ...Object.fromEntries(dependencyRoots.map((name) => [`${name}@1.0.0`, {}])),
+      'mqtt@1.0.0': { dependencies: { transitive: '1.0.0' } },
+      'esbuild@1.0.0': { optionalDependencies: { optional: '1.0.0' } },
+      'transitive@1.0.0': {},
+      'optional@1.0.0': {},
+      'unrelated@1.0.0': {},
+    },
+  };
+}
 
 test('covers shared contracts, runtime dependencies, image construction and activation, excluding tests/docs/simulators', () => {
   for (const path of [
@@ -58,6 +88,16 @@ for (const [name, path, next, pass] of [
   ['allows docs without a bump', 'apps/plugins/wago/cc100-runtime/README.md', '0.2.0', true],
   ['allows test edits without a bump', 'apps/plugins/wago/cc100-runtime/src/runtime.spec.ts', '0.2.0', true],
   ['allows unrelated edits without a bump', 'apps/frontend/README.md', '0.2.0', true],
+  ['allows an unrelated dependency addition', 'unrelated-dependency', '0.2.0', true],
+  ['allows unrelated lockfile resolution edits', 'unrelated-resolution', '0.2.0', true],
+  ['handles lockfiles larger than the subprocess default buffer', 'large-lockfile', '0.2.0', true],
+  ['requires a bump for a bundled dependency', 'runtime-dependency', '0.2.0', false],
+  ['requires a bump for a transitive dependency', 'transitive-dependency', '0.2.0', false],
+  ['requires a bump for an optional build dependency', 'build-dependency', '0.2.0', false],
+  ['requires a bump for a direct build tool', 'build-tool', '0.2.0', false],
+  ['requires a bump for install policy', 'install-policy', '0.2.0', false],
+  ['rejects an unsupported lockfile', 'unsupported-lockfile', '0.2.1', false],
+  ['accepts a bump for relevant dependency edits', 'transitive-dependency', '0.2.1', true],
 ]) {
   test(name, () => {
     const directory = mkdtempSync(join(tmpdir(), 'cc100-version-check-'));
@@ -74,10 +114,29 @@ for (const [name, path, next, pass] of [
       git('config', 'commit.gpgsign', 'false');
       file(manifest, JSON.stringify({ runtimeVersion: '0.2.0' }));
       file(source, 'baseline');
+      const packageJson = { packageManager: 'pnpm@10.34.6' };
+      const lock = dependencyFixture();
+      file('package.json', JSON.stringify(packageJson));
+      file('pnpm-lock.yaml', stringify(lock));
       git('add', '.');
       git('commit', '--quiet', '-m', 'baseline');
       const base = git('rev-parse', 'HEAD');
-      file(path, 'changed');
+      if (path === 'unrelated-dependency') {
+        packageJson.devDependencies = { yaml: '^2.9.1' };
+        lock.importers['.'].devDependencies = { yaml: { specifier: '^2.9.1', version: '2.9.1' } };
+        lock.packages['yaml@2.9.1'] = { resolution: { integrity: 'new' } };
+        lock.snapshots['yaml@2.9.1'] = {};
+      } else if (path === 'large-lockfile') lock.packages['unrelated@1.0.0'].description = 'x'.repeat(1024 * 1024);
+      else if (path === 'unrelated-resolution') lock.packages['unrelated@1.0.0'].resolution.integrity = 'changed';
+      else if (path === 'runtime-dependency') lock.packages['mqtt@1.0.0'].resolution.integrity = 'changed';
+      else if (path === 'transitive-dependency') lock.packages['transitive@1.0.0'].resolution.integrity = 'changed';
+      else if (path === 'build-dependency') lock.packages['optional@1.0.0'].resolution.integrity = 'changed';
+      else if (path === 'build-tool') lock.importers['.'].dependencies.esbuild.specifier = '~1.0.0';
+      else if (path === 'install-policy') packageJson.packageManager = 'pnpm@11.0.0';
+      else if (path === 'unsupported-lockfile') lock.lockfileVersion = '10.0';
+      else file(path, 'changed');
+      file('package.json', JSON.stringify(packageJson));
+      file('pnpm-lock.yaml', stringify(lock));
       file(manifest, JSON.stringify({ runtimeVersion: next }));
       git('add', '.');
       git('commit', '--quiet', '--allow-empty', '-m', 'change');
