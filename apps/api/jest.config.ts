@@ -2,6 +2,7 @@ module.exports = {
   displayName: 'api',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  globalSetup: '<rootDir>/../../scripts/jest-docker-context.ts',
   // Direct Jest callers (including CRAP coverage) must keep native workflows opt-in too.
   testMatch: ['**/*.spec.ts', '!**/*.real-api.spec.ts'],
   setupFiles: ['<rootDir>/src/test/jest.setup.ts'],
