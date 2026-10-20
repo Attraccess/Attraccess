@@ -1,4 +1,5 @@
 #include "AdaptiveCertManager.hpp"
+#include "../../certs/ca_index.hpp"
 
 // Preference keys
 const char *AdaptiveCertManager::PREF_NAMESPACE = "cert_mgr";

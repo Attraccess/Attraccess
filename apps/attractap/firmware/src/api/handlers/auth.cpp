@@ -131,6 +131,7 @@ void API::onReaderAuthenticated(JsonObject data)
 
     State::setApiState(true, deviceName, Language::supported(language ? language : "en"));
     if (language) Settings::saveDefaultLanguage(language);
+    ++authenticationCount;
 
     if (this->deviceNameCallback != nullptr)
     {
