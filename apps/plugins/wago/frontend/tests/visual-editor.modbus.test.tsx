@@ -73,11 +73,14 @@ describe('mounted Modbus configuration', () => {
     await external(user, 'Connections');
     await user.click(await screen.findByRole('button', { name: 'Add connection' }));
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await user.type(screen.getByRole('textbox', { name: 'Host' }), 'meter.fixture.invalid');
+    // These cases verify the submitted configuration, not per-keystroke behavior.
+    // Paste complete values to avoid dozens of full editor renders under coverage.
+    await user.click(screen.getByRole('textbox', { name: 'Host' }));
+    await user.paste('meter.fixture.invalid');
     await external(user, 'Devices');
     await user.click(screen.getByRole('button', { name: 'Add device' }));
     await user.clear(screen.getByRole('textbox', { name: 'Device name' }));
-    await user.type(screen.getByRole('textbox', { name: 'Device name' }), 'Workshop meter');
+    await user.paste('Workshop meter');
     await user.click(screen.getByRole('button', { name: 'Add Active power from Workshop meter' }));
     await section(user, 'Channels');
     return user;
