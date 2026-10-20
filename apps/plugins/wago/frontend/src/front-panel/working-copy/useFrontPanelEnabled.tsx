@@ -7,6 +7,7 @@ export function useFrontPanelEnabled(model: ReturnType<typeof useFrontPanelApply
     applied: model.applied,
     diagnostics: model.diagnostics,
     dirty: model.dirty,
+    draftSaved: model.draftSaved,
     conflict: model.conflict,
     busy: model.busy,
     pending: model.pending,

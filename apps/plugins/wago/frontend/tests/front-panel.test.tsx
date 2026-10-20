@@ -171,6 +171,41 @@ function required<T>(value: T | null | undefined): T {
 }
 
 describe('front panel', () => {
+  it('distinguishes a saved unpublished draft from edits that failed to save', async () => {
+    const savedDraft = {
+      ...draft,
+      presetProvenance: JSON.stringify({ editor: { names: { output: 'Workshop  light' }, presets: [] } }),
+    };
+    api.getDraft.mockResolvedValue(savedDraft);
+    const view = render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    expect(await screen.findByText('Draft saved')).toBeTruthy();
+    expect(screen.getByText(/saved in Attraccess, but have not been applied/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Configure DO1 Workshop light' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'New light name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(screen.queryByText('Draft saved')).toBeNull();
+    api.save.mockRejectedValueOnce(new Error('Save denied'));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    await screen.findByText('Save denied');
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+    expect(screen.queryByText('Draft saved')).toBeNull();
+    api.review.mockImplementation(async () => ({ draft: await api.save.mock.results.at(-1)?.value, impacts: [] }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Apply configuration?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByText('Draft saved')).toBeTruthy();
+    expect(api.publish).not.toHaveBeenCalled();
+    // A fresh editor must derive the saved state from the server draft too.
+    const persisted = await api.save.mock.results.at(-1)?.value;
+    view.unmount();
+    client.clear();
+    api.getDraft.mockResolvedValue(persisted);
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    expect(await screen.findByText('Draft saved')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Configure DO1 New light name' })).toBeTruthy();
+  });
+
   it('exposes an interactive output switch and sends a manual command when clicked', async () => {
     render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
     const control = await screen.findByRole('switch', { name: 'Switch DO1 Laser power' });

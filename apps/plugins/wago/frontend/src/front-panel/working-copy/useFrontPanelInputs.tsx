@@ -76,6 +76,12 @@ export function useFrontPanelInputs(controllerId: number) {
     JSON.stringify(configuration) !==
       JSON.stringify(applied ?? { snapshot: emptyConfiguration, metadata: emptyMetadata }),
   );
+  const draftSaved = Boolean(
+    configuration &&
+    draft.isSuccess &&
+    draft.data &&
+    JSON.stringify(configuration) === JSON.stringify(readConfiguration(draft.data)),
+  );
   const conflict =
     initialized.current && draft.isSuccess && draftIdentity(loadedDraft.current) !== draftIdentity(draft.data);
   useEffect(() => {
@@ -122,6 +128,7 @@ export function useFrontPanelInputs(controllerId: number) {
     loadedBaseline,
     applied,
     dirty,
+    draftSaved,
     conflict,
     refresh,
     controllerId,

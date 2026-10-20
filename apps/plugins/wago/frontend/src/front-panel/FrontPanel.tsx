@@ -55,8 +55,11 @@ export function FrontPanel({
       {model.panel.ready && model.panel.dirty && (
         <Alert status="warning" className="wg:flex-col wg:items-stretch wg:sm:flex-row wg:sm:items-start">
           <Alert.Content>
-            <Alert.Title>{model.t('panel.unapplied')}</Alert.Title>
-            <Alert.Description>{model.t('panel.unappliedHint')}</Alert.Description>
+            <Alert.Title>{model.t(model.panel.draftSaved ? 'panel.draftSaved' : 'panel.unsaved')}</Alert.Title>
+            <Alert.Description>
+              {model.t(model.panel.draftSaved ? 'panel.draftSavedHint' : 'panel.unsavedHint')}{' '}
+              {model.t('panel.unappliedHint')}
+            </Alert.Description>
           </Alert.Content>
           <div className="wg:flex wg:flex-wrap wg:gap-2">
             <Button
