@@ -321,6 +321,86 @@ describe('SupervisionService', () => {
       await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
     });
 
+    it.each([false, true])('cancels an HTTP request during reader arming=%s', async (duringArming) => {
+      let finishArming: (() => void) | undefined;
+      if (duringArming) {
+        armer.arm.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finishArming = () => resolve(readerCallbacks);
+            }),
+        );
+      }
+      const controller = new AbortController();
+      const pending = fixture.service.requestSupervisedSession(5, fixture.requester, readerDto, controller.signal);
+      pending.catch(() => undefined);
+      await fixture.flush();
+      expect(armer.arm).toHaveBeenCalledTimes(1);
+      controller.abort();
+      finishArming?.();
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+      expect(fixture.service.listPendingForSupervisor(fixture.supervisor.id)).toEqual([]);
+      expect(readerCallbacks.onFailed).toHaveBeenCalledTimes(1);
+      expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
+    });
+
+    it('does not start a session when HTTP cancellation wins during authorization', async () => {
+      const controller = new AbortController();
+      const pending = fixture.service.requestSupervisedSession(5, fixture.requester, readerDto, controller.signal);
+      pending.catch(() => undefined);
+      await fixture.flush();
+      const requestId = fixture.service.listPendingForSupervisor(2)[0].id;
+      let finishAuthorization: () => void;
+      fixture.resourceUsageService.validateSupervisedStart.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishAuthorization = resolve;
+          }),
+      );
+      const approval = fixture.service.approve(requestId, fixture.supervisor);
+      controller.abort();
+      finishAuthorization();
+      await expect(approval).rejects.toBeInstanceOf(NotFoundException);
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+      expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
+      expect(readerCallbacks.onFailed).toHaveBeenCalledTimes(1);
+      expect(readerCallbacks.onResolved).not.toHaveBeenCalled();
+      expect(fixture.service.listPendingForSupervisor(2)).toEqual([]);
+      expect(
+        fixture.live.emitToSupervisor.mock.calls.some((call) => call[1].type === SupervisionLiveEventType.RESOLVED),
+      ).toBe(false);
+    });
+
+    it('finishes the claimed approval once when HTTP disconnects during session start', async () => {
+      const controller = new AbortController();
+      const pending = fixture.service.requestSupervisedSession(5, fixture.requester, readerDto, controller.signal);
+      pending.catch(() => undefined);
+      await fixture.flush();
+      const requestId = fixture.service.listPendingForSupervisor(2)[0].id;
+      let finishPersistence: () => void;
+      fixture.resourceUsageService.startSession.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishPersistence = () => resolve(fixture.startedSession);
+          }),
+      );
+      const approval = fixture.service.approve(requestId, fixture.supervisor);
+      await fixture.flush();
+      expect(fixture.resourceUsageService.startSession).toHaveBeenCalledTimes(1);
+      expect(fixture.service.listPendingForSupervisor(2)).toEqual([]);
+      controller.abort();
+      await expect(fixture.service.approve(requestId, fixture.supervisor)).rejects.toBeInstanceOf(NotFoundException);
+      finishPersistence();
+      await expect(approval).resolves.toBe(fixture.startedSession);
+      await expect(pending).resolves.toBe(fixture.startedSession);
+      expect(readerCallbacks.onResolved).toHaveBeenCalledTimes(1);
+      expect(readerCallbacks.onFailed).not.toHaveBeenCalled();
+      expect(fixture.resourceUsageService.startSession).toHaveBeenCalledTimes(1);
+      expect(
+        fixture.live.emitToSupervisor.mock.calls.some((call) => call[1].type === SupervisionLiveEventType.EXPIRED),
+      ).toBe(false);
+    });
+
     it('times the requester out after 30s', async () => {
       // The reader path awaits validation, eligibility and arming before the timer is armed, so the
       // request must be fully created before time is advanced — keep setImmediate real to flush it.

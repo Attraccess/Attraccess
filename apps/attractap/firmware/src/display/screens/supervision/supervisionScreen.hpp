@@ -61,6 +61,7 @@ private:
     lv_obj_t *screen = nullptr;
 
     lv_obj_t *timeoutBar = nullptr;
+    lv_obj_t *titleLabel = nullptr;
     lv_obj_t *requesterNameLabel = nullptr;
     lv_obj_t *statusLabel = nullptr;
     lv_obj_t *hintLabel = nullptr;
