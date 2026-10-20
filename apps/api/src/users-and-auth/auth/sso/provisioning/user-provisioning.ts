@@ -5,7 +5,7 @@ import { Response, Request } from 'express';
 
 import { randomUUID } from 'node:crypto';
 
-import { CreateSessionResponse } from '../../auth.types';
+import { CreateSessionResponse, mapSessionUser } from '../../auth.types';
 
 import { SSOProviderType } from '@attraccess/application-models';
 
@@ -49,7 +49,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     }
 
     const auth: CreateSessionResponse = {
-      user: request.user,
+      user: mapSessionUser(request.user),
       authToken: sessionToken,
     };
 

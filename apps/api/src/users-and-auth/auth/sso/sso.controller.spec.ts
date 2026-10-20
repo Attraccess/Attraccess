@@ -20,7 +20,6 @@ describe('SsoController', () => {
     return { ...fixture.mockSSOProvider, oidcConfiguration };
   };
 
-
   it('should be defined', () => {
     expect(fixture.controller).toBeDefined();
   });
@@ -581,7 +580,7 @@ describe('SsoController', () => {
       expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'mock-session-token');
 
       expect(result).toEqual({
-        user: mockRequest.user,
+        user: { id: 1, username: 'testuser' },
         authToken: 'mock-session-token',
       });
     });
@@ -605,7 +604,7 @@ describe('SsoController', () => {
       expect(mockResponse.cookie).not.toHaveBeenCalled();
 
       expect(result).toEqual({
-        user: mockRequest.user,
+        user: { id: 1, username: 'testuser' },
         authToken: 'mock-session-token',
       });
     });

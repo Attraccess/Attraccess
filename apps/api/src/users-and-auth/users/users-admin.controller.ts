@@ -178,7 +178,9 @@ export class UsersAdminController {
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
     return {
       ...result,
-      data: canReadUsers ? result.data : result.data.map(({ id, username }) => ({ id, username })),
+      data: canReadUsers
+        ? result.data.map((record) => mapResponse(User, record))
+        : result.data.map(({ id, username }) => ({ id, username })),
       nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }

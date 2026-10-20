@@ -1,3 +1,5 @@
+import { User } from '../transport/models/user.dto';
+import { ProjectMember } from '../transport/models/project-member.dto';
 import { ResourceUsage } from '../transport/models/resourceUsage.dto';
 import { Project } from '../transport/models/project.dto';
 import { ProjectInvitation } from '../transport/models/project-invitation.dto';
@@ -255,8 +257,8 @@ export class ProjectsController {
     const members = await this.projectsService.listMembers(id);
 
     return {
-      owner: project.owner,
-      members,
+      owner: mapResponse(User, project.owner),
+      members: members.map((record) => mapResponse(ProjectMember, record)),
     };
   }
 

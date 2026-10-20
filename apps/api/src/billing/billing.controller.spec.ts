@@ -68,7 +68,7 @@ describe('BillingController', () => {
       const data = { data: [], total: 0, page: 1, limit: 10 };
       fixture.service.getHistory.mockResolvedValue(data);
       const res = await fixture.controller.getBillingTransactions(1, { page: 1, limit: 10 }, fixture.baseReq());
-      expect(res).toBe(data);
+      expect(res).toEqual(data);
       expect(fixture.service.getHistory).toHaveBeenCalledWith(1, { page: 1, limit: 10 });
     });
 
@@ -83,7 +83,7 @@ describe('BillingController', () => {
       fixture.service.getHistory.mockResolvedValue(data);
       const req = fixture.baseReq({ effectivePermissions: new Set(['billing.manage']) });
       const res = await fixture.controller.getBillingTransactions(2, { page: 1, limit: 10 }, req);
-      expect(res).toBe(data);
+      expect(res).toEqual(data);
     });
   });
 

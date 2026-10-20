@@ -128,7 +128,8 @@ export class ResourceMaintenanceController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: ListMaintenancesDto,
   ): Promise<PaginatedMaintenanceResponse> {
-    return await this.maintenanceService.findMaintenances(resourceId, query);
+    const page = await this.maintenanceService.findMaintenances(resourceId, query);
+    return { ...page, data: page.data.map((record) => mapResponse(ResourceMaintenance, record)) };
   }
 
   @Get(':maintenanceId')

@@ -208,7 +208,8 @@ export class BillingController {
       throw new ForbiddenException('You are not allowed to get the billing transactions for this user.');
     }
 
-    return await this.billingService.getHistory(userId, query);
+    const page = await this.billingService.getHistory(userId, query);
+    return { ...page, data: page.data.map((record) => mapResponse(BillingTransaction, record)) };
   }
 
   @Get('/billing/transactions/for-usage/:usageId')

@@ -14,7 +14,7 @@ import {
   VerifyPasskeyRegistrationDto,
 } from './passkey.dto';
 import { SessionService } from '../session.service';
-import { CreateSessionResponse } from '../auth.types';
+import { CreateSessionResponse, mapSessionUser } from '../auth.types';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
@@ -138,10 +138,10 @@ export class PasskeyController {
 
     if (body.tokenLocation === 'cookie') {
       await this.cookieConfigService.setAuthCookie(response, sessionToken);
-      return { user, authToken: '' };
+      return { user: mapSessionUser(user), authToken: '' };
     }
 
-    return { user, authToken: sessionToken };
+    return { user: mapSessionUser(user), authToken: sessionToken };
   }
 
   private async assertNotThrottled(request: Request): Promise<void> {

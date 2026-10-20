@@ -155,7 +155,7 @@ export class ResourceUsageController {
     );
 
     return {
-      data,
+      data: data.map((record) => mapResponse(ResourceUsage, record)),
       total,
       page: query.page,
       limit: query.limit,
@@ -312,7 +312,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
   ): Promise<GetActiveUsageSessionDto> {
     const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
-    return { usage: activeSession || null };
+    return { usage: mapResponse(ResourceUsage, activeSession || null) };
   }
 
   @Get(':usageId')

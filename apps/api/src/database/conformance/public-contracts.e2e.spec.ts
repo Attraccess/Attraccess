@@ -1,3 +1,9 @@
+import { ProjectsController } from '../../projects/projects.controller';
+import { ResourceMaintenanceController } from '../../resources/maintenances/maintenance.controller';
+import { ResourceUsageController } from '../../resources/usage/sessions/resource-usage.controller';
+import { PasskeyController } from '../../users-and-auth/auth/passkey/passkey.controller';
+import { UsersAdminController } from '../../users-and-auth/users/users-admin.controller';
+import { SsoUserProvisioning } from '../../users-and-auth/auth/sso/provisioning/user-provisioning';
 import { SchemaObjectFactory } from '@nestjs/swagger/dist/services/schema-object-factory';
 import { ModelPropertiesAccessor } from '@nestjs/swagger/dist/services/model-properties-accessor';
 import { SwaggerTypesMapper } from '@nestjs/swagger/dist/services/swagger-types-mapper';
@@ -29,6 +35,24 @@ describe('persistence replacement: public billing HTTP boundary', () => {
     fixture = await createSqliteApplicationFixture();
     client = await fixture.client();
     const billing = {
+      getHistory: async () => ({
+        page: 1,
+        limit: 10,
+        total: 1,
+        data: [
+          {
+            id: 7,
+            amount: 123,
+            initiator: {
+              id: 2,
+              username: 'administrator',
+              nfcKeySeedToken: 'nfc-secret',
+              passwordResetToken: 'reset-secret',
+              authenticationDetails: [{ id: 3, type: 'local_password', password: 'hash', totpSecret: 'totp-secret' }],
+            },
+          },
+        ],
+      }),
       getBalance: async () => (await client.snapshot()).balances[0],
       getTransaction: async (id) => ({
         ...(await client.snapshot()).ledger.find((row) => row.id === id),
@@ -62,6 +86,26 @@ describe('persistence replacement: public billing HTTP boundary', () => {
   afterEach(async () => {
     await app?.close();
     await fixture?.close();
+  });
+  it('filters a different account initiating a transaction from the HTTP history response', async () => {
+    await request(app.getHttpServer())
+      .get('/users/1/billing/transactions')
+      .expect(200, {
+        page: 1,
+        limit: 10,
+        total: 1,
+        data: [
+          {
+            id: 7,
+            amount: 123,
+            initiator: {
+              id: 2,
+              username: 'administrator',
+              authenticationDetails: [{ id: 3, type: 'local_password' }],
+            },
+          },
+        ],
+      });
   });
   it('preserves balance and transaction JSON after manual credit and refund', async () => {
     const credit = await client.manual(123456789);
@@ -185,5 +229,106 @@ describe('persistence replacement: public response and device/flow records', () 
       creditBalance: 123,
     });
     expect(wire.resource).not.toHaveProperty('documentationMarkdown');
+  });
+});
+
+/** Real response methods and serializer, with plain persistence records and simulated services. */
+describe('controller privacy after plain-record hydration', () => {
+  const user = {
+    id: 2,
+    username: 'administrator',
+    passwordResetToken: 'reset-secret',
+    emailVerificationToken: 'verification-secret',
+    accountDeletionToken: 'deletion-secret',
+    nfcKeySeedToken: 'nfc-secret',
+    authenticationDetails: [{ id: 3, type: 'local_password', password: 'password-hash', totpSecret: 'totp-secret' }],
+  };
+  const publicUser = { id: 2, username: 'administrator', authenticationDetails: [{ id: 3, type: 'local_password' }] };
+  const page = { page: 1, limit: 10, total: 1 };
+  const req = { user: { id: 1, effectivePermissions: new Set(['users.read']) }, headers: {}, ip: '127.0.0.1' };
+  const serialize = (value: object) => JSON.parse(JSON.stringify(instanceToPlain(value)));
+
+  it('filters another user initiating a billing transaction and retains pagination', async () => {
+    const controller = Object.assign(Object.create(BillingController.prototype), {
+      billingService: { getHistory: async () => ({ ...page, data: [{ id: 7, amount: 123, initiator: user }] }) },
+    });
+    expect(serialize(await controller.getBillingTransactions(1, page, req))).toEqual({
+      ...page,
+      data: [{ id: 7, amount: 123, initiator: publicUser }],
+    });
+  });
+
+  it('filters both the project owner and loaded member users', async () => {
+    const controller = Object.assign(Object.create(ProjectsController.prototype), {
+      projectAccessService: { ensureOwner: async () => ({ owner: user }) },
+      projectsService: { listMembers: async () => [{ id: 8, user }] },
+    });
+    expect(serialize(await controller.listMembers(req, 1))).toEqual({
+      owner: publicUser,
+      members: [{ id: 8, user: publicUser }],
+    });
+  });
+
+  it('filters maintenance creators and completers and retains pagination', async () => {
+    const controller = new ResourceMaintenanceController({
+      findMaintenances: async () => ({ ...page, data: [{ id: 9, createdByUser: user, completedByUser: user }] }),
+    } as never);
+    expect(serialize(await controller.getMaintenances(1, page as never))).toEqual({
+      ...page,
+      data: [{ id: 9, createdByUser: publicUser, completedByUser: publicUser }],
+    });
+  });
+
+  it('filters active-session and history users and supervisors, retaining null and page values', async () => {
+    const usage = { id: 10, user, supervisorUser: user, endTime: null };
+    const controller = Object.assign(Object.create(ResourceUsageController.prototype), {
+      resourceUsageService: {
+        getActiveSession: jest.fn().mockResolvedValueOnce(usage).mockResolvedValueOnce(null),
+        getResourceUsageHistory: async () => ({ data: [usage], total: 1 }),
+      },
+    });
+    const projected = { id: 10, user: publicUser, supervisorUser: publicUser, endTime: null };
+    expect(serialize(await controller.getActiveSession(1))).toEqual({ usage: projected });
+    expect(serialize(await controller.getActiveSession(1))).toEqual({ usage: null });
+    expect(serialize(await controller.getHistory(1, { ...page }, req))).toEqual({ ...page, data: [projected] });
+  });
+
+  it.each(['cookie', 'body'])('filters passkey login with token in %s', async (tokenLocation) => {
+    const sessionService = { createSession: jest.fn().mockResolvedValue('session-token') };
+    const controller = Object.assign(Object.create(PasskeyController.prototype), {
+      passkeyService: { verifyAuthentication: async () => user },
+      sessionService,
+      cookieConfigService: { setAuthCookie: jest.fn() },
+      bruteForce: { assertIpAllowed: jest.fn(), recordSuccess: jest.fn() },
+      audit: { log: jest.fn() },
+    });
+    expect(serialize(await controller.createSession(req, {}, { tokenLocation, response: {} }))).toEqual({
+      user: publicUser,
+      authToken: tokenLocation === 'cookie' ? '' : 'session-token',
+    });
+    expect(sessionService.createSession).toHaveBeenCalledWith(user, expect.any(Object));
+  });
+
+  it('filters privileged user lists including nested authentication secrets', async () => {
+    const controller = Object.assign(Object.create(UsersAdminController.prototype), {
+      usersService: { findMany: async () => ({ ...page, data: [user] }) },
+      logger: { debug: jest.fn() },
+    });
+    expect(serialize(await controller.findMany(page, req))).toEqual({ ...page, data: [publicUser] });
+    expect(serialize(await controller.findMany(page, { user: { id: 1 } }))).toEqual({
+      ...page,
+      data: [{ id: 2, username: 'administrator' }],
+    });
+  });
+
+  it('filters the same plain user in SSO login responses', async () => {
+    const controller = Object.assign(Object.create(SsoUserProvisioning.prototype), {
+      sessionService: { createSession: async () => 'session-token' },
+      cookieConfigService: { setAuthCookie: jest.fn() },
+    });
+    expect(serialize(await controller.finalizeLogin({ ...req, user }, {}))).toEqual({
+      user: publicUser,
+      authToken: 'session-token',
+    });
   });
 });
