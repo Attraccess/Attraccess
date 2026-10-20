@@ -336,6 +336,7 @@ describe('protected route rejection before application dispatch', () => {
     fixture = readerSecurityFixture();
   });
   afterAll(() => fixture.cleanup());
+  // Full-schema migrations need a bounded setup budget under concurrent CI load.
   beforeEach(async () => {
     source = await new DataSource({
       type: 'sqlite',
@@ -363,7 +364,7 @@ describe('protected route rejection before application dispatch', () => {
     gateway.on('connection', dispatch);
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
     url = `ws://127.0.0.1:${(http.address() as AddressInfo).port}${PROTECTED_READER_PATH}`;
-  });
+  }, 30_000);
   afterEach(async () => {
     for (const client of clients.splice(0)) client.terminate();
     await adapter.close(gateway);

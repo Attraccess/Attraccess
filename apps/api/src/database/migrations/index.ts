@@ -185,3 +185,4 @@ export * from './1791400000000-sso-central-logout';
 export * from './1791400000000-user-date-time-preferences';
 export * from './1791500000000-user-date-time-locale';
 export * from './1792200000000-attractap-reader-identity';
+export * from './1792300000000-preserve-reader-key-ownership';

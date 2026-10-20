@@ -7,13 +7,13 @@ import {
   AttractapFirmwareVersion,
 } from '@attraccess/database-entities';
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, FindManyOptions, In, DeleteResult } from 'typeorm';
+import { Repository, FindManyOptions, In, DeleteResult, QueryFailedError } from 'typeorm';
 
 import { AuditService } from '../audit/audit.service';
 
@@ -321,7 +321,18 @@ export class AttractapService {
   }
 
   public async deleteReader(id: number): Promise<boolean> {
-    const result = await this.readerRepository.delete(id);
+    let result: DeleteResult;
+    try {
+      result = await this.readerRepository.delete(id);
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError.message === 'SQLITE_CONSTRAINT: Enrolled readers must be revoked instead of deleted'
+      ) {
+        throw new ConflictException('Enrolled readers must be revoked instead of deleted');
+      }
+      throw error;
+    }
     if (!result.affected) return false;
 
     this.eventEmitter.emit(ReaderDeletedEvent.EVENT_NAME, new ReaderDeletedEvent(id));

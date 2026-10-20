@@ -15,7 +15,7 @@ Certificates contain the supplied key, a fixed `CN=reader-ID`, and URI `https://
 Use the exported `sendReaderSecurityCommand` API-host client with a newline-delimited request such as:
 
 ```json
-{"command":"issue","readerId":17,"publicKeyFile":"/protected/public.pem","lifetimeSeconds":86400}
+{ "command": "issue", "readerId": 17, "publicKeyFile": "/protected/public.pem", "lifetimeSeconds": 86400 }
 ```
 
 Other commands are `status`, `enroll`, `renew`, `replace`, `transfer`, `revoke`, `configure` and `rewrap-card-keys`. Enrollment commands reference `certificateFile` and `manifestFile`, declare `enrollmentClass`, and optionally request `overlapSeconds`. Production enrollment additionally requires exact artifact/inventory bindings and valid independent hardware qualification. Issued PEM alone is insufficient. Development enrollment never establishes production eligibility.
@@ -23,6 +23,8 @@ Other commands are `status`, `enroll`, `renew`, `replace`, `transfer`, `revoke`,
 ## Renewal and trust
 
 Renewal adds a certificate generation for the same reader and DS key. Certificates remain globally unique. Database insert/update checks prevent another reader from claiming a key, including keys in revoked or retired rows. Reader and key ownership fields cannot be relabeled. Identity rotation can provision a new key; replacement hardware must use a distinct key. Ownership transfer must preserve the original reader identity or revoke it and provision a distinct replacement identity.
+
+Enrolled readers cannot be deleted, including after revocation or retirement. The API returns HTTP 409 and directs operators to revoke them instead. Database triggers preserve both the reader ID and credential history, so deletion cannot free a key for another reader or make a secured reader eligible for legacy authentication. Readers that have never enrolled a secured identity can still be deleted. The upgrade protects existing retained records without rewriting credentials; it cannot reconstruct ownership records deleted before the fix. Restoring such a database requires trusted historical evidence before reusing any affected identity. Reverting the ownership-preservation migration removes these deletion guards and must not be used on a secured deployment.
 
 At most two credential generations may overlap. Overlap defaults to zero and cannot exceed 24 hours or either credential's validity. Revocation, expiry and retirement take precedence. Lifecycle success waits for affected connections and pending proof/work cancellation. Startup rechecks stored credentials. Signed-time lookup considers generations newest first and skips invalid, expired, retired, revoked or untrusted rows; historical same-key rows cannot shadow a valid renewal.
 

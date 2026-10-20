@@ -132,6 +132,32 @@ describe('persisted reader lifecycle boundaries', () => {
     await source.destroy();
   });
 
+  it('retains revoked reader ownership when deletion and reassignment are attempted', async () => {
+    await enroll();
+    await service.revoke(17);
+    const readers = Object.create(AttractapService.prototype) as AttractapService;
+    const emit = jest.fn();
+    Reflect.set(readers, 'readerRepository', source.getRepository(Attractap));
+    Reflect.set(readers, 'eventEmitter', { emit });
+    await expect(readers.deleteReader(17)).rejects.toMatchObject({ status: 409 });
+    expect(emit).not.toHaveBeenCalled();
+    expect(await source.getRepository(Attractap).existsBy({ id: 17 })).toBe(true);
+    expect(await service.isLegacy(17)).toBe(false);
+    await expect(enroll(18)).rejects.toThrow(/another reader/);
+    expect(await source.getRepository(AttractapReaderIdentity).count()).toBe(1);
+  });
+
+  it('still deletes a reader that has never enrolled a secured identity', async () => {
+    const readers = Object.create(AttractapService.prototype) as AttractapService;
+    const emit = jest.fn();
+    Reflect.set(readers, 'readerRepository', source.getRepository(Attractap));
+    Reflect.set(readers, 'eventEmitter', { emit });
+    await expect(readers.deleteReader(18)).resolves.toBe(true);
+    expect(emit).toHaveBeenCalledTimes(1);
+    await expect(readers.deleteReader(18)).resolves.toBe(false);
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
   it('atomically refuses a legacy firmware write after secure enrollment', async () => {
     const readers = Object.create(AttractapService.prototype) as AttractapService;
     Reflect.set(readers, 'readerRepository', source.getRepository(Attractap));
