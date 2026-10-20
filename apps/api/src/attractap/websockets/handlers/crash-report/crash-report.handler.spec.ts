@@ -174,6 +174,30 @@ describe('AttractapCrashReportHandler', () => {
       );
     });
 
+    it.each([
+      'POWERON',
+      'EXT',
+      'SW',
+      'PANIC',
+      'INT_WDT',
+      'TASK_WDT',
+      'WDT',
+      'DEEPSLEEP',
+      'BROWNOUT',
+      'SDIO',
+      'UNKNOWN',
+      'diagnostic-secret',
+    ])('preserves storage and counts bounded reason %s', async (reason) => {
+      const payload = { resetReason: reason };
+      mockAttractapService.createCrashReport.mockResolvedValue({ id: 7, ...payload });
+      await handler.handleCrashReport(mockSocket as any, { payload } as AttractapEvent['data']);
+      expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, payload);
+      expect(mockMetricsService.attractapCrashReportsTotal.inc).toHaveBeenCalledWith({
+        reader_id: '42',
+        reset_reason: reason === 'diagnostic-secret' ? 'UNKNOWN' : reason,
+      });
+    });
+
     it('maps unknown reset reasons to UNKNOWN before auditing', async () => {
       const payload = { resetReason: 'diagnostic-secret-123' };
       mockAttractapService.createCrashReport.mockResolvedValue({ id: 'report-unknown', ...payload });

@@ -3,6 +3,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import {
+  AttractapCrashReport,
   User,
   Resource,
   Project,
@@ -15,6 +16,7 @@ import { Registry, collectDefaultMetrics, Counter, Gauge, Histogram } from 'prom
 import { PluginService } from '../plugin-system/plugin.service';
 import { createIdentityMetrics } from './definitions/identity.metrics';
 import { createResourcesMetrics } from './definitions/resources.metrics';
+import { normalizeResetReason } from './reset-reason';
 import { createDevicesMetrics } from './definitions/devices.metrics';
 import { createOperationsMetrics } from './definitions/operations.metrics';
 
@@ -48,6 +50,8 @@ export class MetricsService implements OnModuleInit {
   public readonly attractapNfcTapsTotal: Counter;
   public readonly attractapFirmwareUpdatesTotal: Counter;
   public readonly attractapCrashReportsTotal: Counter;
+  public readonly attractapResetReportsLastHour: Gauge;
+  private scrapeQueue: Promise<unknown> = Promise.resolve();
 
   public readonly billingTransactionsTotal: Counter;
   public readonly billingTransactionAmount: Histogram;
@@ -82,6 +86,8 @@ export class MetricsService implements OnModuleInit {
     private readonly resourceUsageRepository: Repository<ResourceUsage>,
     @InjectRepository(Session)
     private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(AttractapCrashReport)
+    private readonly crashReportRepository: Repository<AttractapCrashReport>,
   ) {
     this.registry = new Registry();
     collectDefaultMetrics({ register: this.registry });
@@ -110,6 +116,7 @@ export class MetricsService implements OnModuleInit {
     this.attractapNfcTapsTotal = devices.attractapNfcTapsTotal;
     this.attractapFirmwareUpdatesTotal = devices.attractapFirmwareUpdatesTotal;
     this.attractapCrashReportsTotal = devices.attractapCrashReportsTotal;
+    this.attractapResetReportsLastHour = devices.attractapResetReportsLastHour;
     const operations = createOperationsMetrics(this.registry);
     this.billingTransactionsTotal = operations.billingTransactionsTotal;
     this.billingTransactionAmount = operations.billingTransactionAmount;
@@ -167,7 +174,41 @@ export class MetricsService implements OnModuleInit {
   }
 
   async getMetrics(): Promise<string> {
-    return this.registry.metrics();
+    // Keep refresh and rendering together: a later scrape must not replace the
+    // gauge while an earlier registry rendering is still collecting metrics.
+    const scrape = this.scrapeQueue.then(async () => {
+      const now = new Date();
+      const driver = this.crashReportRepository.manager.connection.driver;
+      const column = this.crashReportRepository.metadata.findColumnWithPropertyName('createdAt');
+      const rows = await this.crashReportRepository
+        .createQueryBuilder('report')
+        .select('report.attractapId', 'readerId')
+        .addSelect('report.resetReason', 'resetReason')
+        .addSelect('COUNT(*)', 'count')
+        .where('report.createdAt > :start AND report.createdAt <= :end', {
+          start: driver.preparePersistentValue(new Date(now.getTime() - 3_600_000), column),
+          end: driver.preparePersistentValue(now, column),
+        })
+        .groupBy('report.attractapId')
+        .addGroupBy('report.resetReason')
+        .getRawMany<{ readerId: number; resetReason: string; count: string | number }>();
+      const counts = new Map<string, { reader_id: string; reset_reason: string; count: number }>();
+      for (const row of rows) {
+        const reader_id = String(row.readerId);
+        const reset_reason = normalizeResetReason(row.resetReason);
+        const key = `${reader_id}:${reset_reason}`;
+        const previous = counts.get(key);
+        counts.set(key, { reader_id, reset_reason, count: (previous?.count ?? 0) + Number(row.count) });
+      }
+      // Replace only after a successful query. On failure the scrape rejects.
+      this.attractapResetReportsLastHour.reset();
+      for (const { reader_id, reset_reason, count } of counts.values()) {
+        this.attractapResetReportsLastHour.set({ reader_id, reset_reason }, count);
+      }
+      return this.registry.metrics();
+    });
+    this.scrapeQueue = scrape.catch(() => undefined);
+    return scrape;
   }
 
   getContentType(): string {

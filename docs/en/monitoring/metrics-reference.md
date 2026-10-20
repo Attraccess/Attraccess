@@ -19,6 +19,10 @@ This page lists all metrics exposed by Attraccess at the `/api/metrics` endpoint
 
 **Histogram buckets:** 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
+Reset reasons are bounded to `POWERON`, `EXT`, `SW`, `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`, `DEEPSLEEP`, `BROWNOUT`, `SDIO` and `UNKNOWN`; other raw values merge into `UNKNOWN`. Reader IDs come from stored reports. The receipt window is `(scrape time − 1 hour, scrape time]`; future rows are excluded. Delayed uploads count when received, not when the physical reset happened. Expired and deleted reports disappear on the next successful scrape. Empty windows expose no contributor series. A database query failure fails the scrape rather than returning stale values or a healthy zero. Counts recover on the first successful scrape after restart.
+
+Crash/watchdog reports and POWERON reports each need **four reports across all readers**, continuously for **five minutes**, at one-minute evaluations. Three in each category triggers neither warning. SW and other reasons trigger neither. POWERON does not establish a firmware crash or explain the power cycle. Duplicate scrape targets for the same database are collapsed with `max by (reader_id, reset_reason)`. This assumes one installation/database. Contributor IDs, reasons and integer counts appear in descriptions, not alert identity labels.
+
 ### Example PromQL Queries
 
 ```promql
@@ -97,13 +101,14 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Number of connected Attractap RFID readers |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Total RFID tap events |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Total firmware update events |
-| `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Crash reports received from readers. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
+| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Historical count of all stored reset reports, including POWERON and SW; resets on API restart. Retained for compatibility, not the exact hourly alert input. |
+| `attraccess_attractap_reset_reports_last_hour` | Gauge | `reader_id`, `reset_reason` | Exact reports received in the preceding hour, rebuilt from the database on every scrape. |
 
 ### Example PromQL Queries
 
 ```promql
-# Reader crashes in the last hour, broken down by reset cause
-sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
+# Exact crash/watchdog reports received in the preceding hour
+sum(max by (reader_id, reset_reason) (attraccess_attractap_reset_reports_last_hour{job="attraccess",reset_reason=~"PANIC|INT_WDT|TASK_WDT|WDT"})) or vector(0)
 
 # Alert signal: all readers offline (but some were connected recently)
 sum(

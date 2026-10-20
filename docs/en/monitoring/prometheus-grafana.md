@@ -281,3 +281,13 @@ By default, Prometheus is only exposed internally (no `ports` mapping). If you n
 - [Metrics Reference](monitoring/metrics-reference.md) -- Complete list of all metrics
 - [Overview](monitoring/overview.md) -- Monitoring feature overview
 - [Environment Variables](installation/environment-variables.md) -- All configuration options
+
+## Attractap reset warnings
+
+Deploy the API exposing `attraccess_attractap_reset_reports_last_hour` and its receipt-time index **before or with** the updated Grafana rules. Installing the rules first can suppress warnings because missing category series fall back to zero. The old `attraccess_attractap_crash_reports_total` counter remains available for historical dashboards.
+
+`AttractapReaderCrashes` counts PANIC, INT_WDT, TASK_WDT and WDT. `AttractapReaderPowerOnResets` counts POWERON separately and does not diagnose a firmware crash or the reason for a power cycle. SW and other reasons are excluded. Each warning requires at least four reports across readers in the preceding hour for five continuous minutes, evaluated every minute. The window uses server receipt time, with an excluded lower boundary and included scrape timestamp. Three reports in either category never qualify. Changing contributors preserves pending time. Notifications list contributing reader IDs, bounded reset reasons and counts. The metric reference describes normalization and duplicate-target handling.
+
+Every scrape rebuilds the gauge from stored reports, including after restart. Expired/deleted rows disappear; empty windows have no contributor series. Database failure fails the scrape. The existing monitoring scrape-failure alerts cover availability; reset warnings alone do not prove the metric is healthy.
+
+Run `pnpm nx run api:verify-attractap-reset-alerts` to check the actual provisioned rules in disposable Grafana 13.2.3 and Prometheus 3.15.0 containers. It needs Docker, Node dependencies, `agent-browser` and Brave (override `BRAVE_EXECUTABLE` if needed). It takes several real minutes, routes only to a local webhook and previews the current Pushover message template without sending Pushover messages. Set `RESET_ALERT_EVIDENCE_DIR` for JSON evidence, logs and headless screenshots. Temporary services are removed when the command ends. The five-minute pending period belongs to rule evaluation; notification-policy group delays can add delivery time after firing. This command does not deploy changes. It proves rendering for the test contributors; very large contributor lists can exceed notification-provider message limits. Real Pushover delivery and provider truncation are not tested.

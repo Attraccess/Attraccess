@@ -33,7 +33,14 @@ export function createDevicesMetrics(registry: Registry) {
     labelNames: ['reader_id', 'reset_reason'],
     registers: [registry],
   });
+  const attractapResetReportsLastHour = new Gauge({
+    name: 'attraccess_attractap_reset_reports_last_hour',
+    help: 'Reports received in the preceding hour by reader and bounded reset reason',
+    labelNames: ['reader_id', 'reset_reason'],
+    registers: [registry],
+  });
   return {
+    attractapResetReportsLastHour,
     attractapDevicesConnected,
     attractapReaderConnected,
     attractapNfcTapsTotal,

@@ -1,3 +1,4 @@
+import { normalizeResetReason } from '../../../../metrics/reset-reason';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../../attractap.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -43,7 +44,7 @@ export class AttractapCrashReportHandler {
           subjectId: socket.readerId,
           details: {
             source: 'reader-websocket',
-            resetReason: this.normalizeResetReason(report.resetReason),
+            resetReason: normalizeResetReason(report.resetReason),
             hasCoredump: !!report.coredumpSize,
           },
         })
@@ -56,7 +57,7 @@ export class AttractapCrashReportHandler {
       );
       this.metricsService.attractapCrashReportsTotal.inc({
         reader_id: String(socket.readerId),
-        reset_reason: this.normalizeResetReason(report.resetReason),
+        reset_reason: normalizeResetReason(report.resetReason),
       });
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.READER_CRASH_REPORT, { received: true, id: report.id }),
@@ -68,22 +69,4 @@ export class AttractapCrashReportHandler {
       );
     }
   }
-
-  private normalizeResetReason(resetReason?: string | null): string {
-    return typeof resetReason === 'string' && RESET_REASONS.has(resetReason) ? resetReason : 'UNKNOWN';
-  }
 }
-
-const RESET_REASONS = new Set([
-  'POWERON',
-  'EXT',
-  'SW',
-  'PANIC',
-  'INT_WDT',
-  'TASK_WDT',
-  'WDT',
-  'DEEPSLEEP',
-  'BROWNOUT',
-  'SDIO',
-  'UNKNOWN',
-]);

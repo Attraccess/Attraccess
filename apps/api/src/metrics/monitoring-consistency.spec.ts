@@ -248,6 +248,7 @@ describe('Monitoring configuration consistency', () => {
       // ATT-517 device + system health additions
       'AttractapAllReadersOffline',
       'AttractapReaderCrashes',
+      'AttractapReaderPowerOnResets',
       'CronJobFailing',
       'CronJobStale',
       'FlowExecutionFailures',
@@ -265,6 +266,11 @@ describe('Monitoring configuration consistency', () => {
       for (const alert of requiredAlerts) {
         expect(grafanaRules).toContain(alert);
       }
+    });
+
+    it('every Attraccess metric referenced by an alert is registered by the metrics module', () => {
+      const unknown = extractMetricRefs(grafanaRules).filter(ref => !knownMetrics.has(stripHistogramSuffix(ref)));
+      expect([...new Set(unknown)]).toEqual([]);
     });
 
     it('only availability checks alert on missing data', () => {

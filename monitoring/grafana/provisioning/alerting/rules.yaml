@@ -420,8 +420,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Attractap readers crashing"
-          description: "More than 3 reader crash reports were received in the last hour."
+          summary: "Attractap crash/watchdog reports"
+          description: 'Crash/watchdog reports received in the preceding hour: {{ $total := 0.0 }}{{ range $values }}{{ if not .Labels.reader_id }}{{ $total = .Value }}{{ end }}{{ end }}{{ printf "%.0f" $total }} total (more than 3 for 5 minutes).{{ range $key, $value := $values }}{{ if and $value.Labels.reader_id $value.Labels.reset_reason }} Reader {{ $value.Labels.reader_id }}: {{ $value.Labels.reset_reason }}={{ printf "%.0f" $value.Value }}.{{ end }}{{ end }}'
         data:
           - refId: A
             relativeTimeRange:
@@ -430,7 +430,20 @@ groups:
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'sum(increase(attraccess_attractap_crash_reports_total{job="attraccess"}[1h])) or vector(0)'
+              expr: 'sum(max by (reader_id, reset_reason) (attraccess_attractap_reset_reports_last_hour{job="attraccess",reset_reason=~"PANIC|INT_WDT|TASK_WDT|WDT"})) or vector(0)'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: B
+              expr: 'max by (reader_id, reset_reason) (attraccess_attractap_reset_reports_last_hour{job="attraccess",reset_reason=~"PANIC|INT_WDT|TASK_WDT|WDT"}) > 0'
               instant: true
               range: false
               datasource:
@@ -443,8 +456,7 @@ groups:
             datasourceUid: __expr__
             model:
               refId: C
-              type: threshold
-              expression: A
+              type: classic_conditions
               datasource:
                 type: __expr__
                 uid: __expr__
@@ -456,7 +468,120 @@ groups:
                   operator:
                     type: and
                   query:
+                    params: [A]
+                  reducer:
+                    type: last
                     params: []
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    type: last
+                    params: []
+
+                # Classic conditions expose only matching rows to annotations.
+                # Retain the exact aggregate even below the alert threshold. This
+                # nonnegative-count guard does not change aggregate > 3 AND B > 0.
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [-1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: attractap-reader-poweron-resets
+        title: AttractapReaderPowerOnResets
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Attractap power-on resets"
+          description: 'Power-on reset reports received in the preceding hour: {{ $total := 0.0 }}{{ range $values }}{{ if not .Labels.reader_id }}{{ $total = .Value }}{{ end }}{{ end }}{{ printf "%.0f" $total }} total (more than 3 for 5 minutes). These reports do not establish a firmware crash or explain why power was cycled.{{ range $key, $value := $values }}{{ if and $value.Labels.reader_id $value.Labels.reset_reason }} Reader {{ $value.Labels.reader_id }}: {{ $value.Labels.reset_reason }}={{ printf "%.0f" $value.Value }}.{{ end }}{{ end }}'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(max by (reader_id, reset_reason) (attraccess_attractap_reset_reports_last_hour{job="attraccess",reset_reason=~"POWERON"})) or vector(0)'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: B
+              expr: 'max by (reader_id, reset_reason) (attraccess_attractap_reset_reports_last_hour{job="attraccess",reset_reason=~"POWERON"}) > 0'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: classic_conditions
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [3]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                    params: []
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    type: last
+                    params: []
+                # Classic conditions expose only matching rows to annotations.
+                # Retain the exact aggregate even below the alert threshold. This
+                # nonnegative-count guard does not change aggregate > 3 AND B > 0.
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [-1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
                   reducer:
                     type: last
                     params: []
