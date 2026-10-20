@@ -39,13 +39,14 @@ void SupervisionScreen::init()
    lv_obj_set_style_radius(this->timeoutBar, 6, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
    // Title
-   lv_obj_t *title = lv_label_create(this->screen);
+   this->titleLabel = lv_label_create(this->screen);
+   lv_obj_t *title = this->titleLabel;
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
    FirmwareI18n::setLabel(title, FirmwareI18n::Message::SupervisionRequired);
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Requester — the person who wants to use the resource. Most prominent line.
    this->requesterNameLabel = lv_label_create(this->screen);
@@ -180,6 +181,7 @@ void SupervisionScreen::destroy()
    lv_obj_del(this->screen);
    this->screen = nullptr;
    this->timeoutBar = nullptr;
+   this->titleLabel = nullptr;
    this->requesterNameLabel = nullptr;
    this->statusLabel = nullptr;
    this->hintLabel = nullptr;
@@ -241,6 +243,24 @@ void SupervisionScreen::applyStatus()
 
    FirmwareI18n::setLabel(this->statusLabel, text);
    lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   const bool approved = this->view.status == STATUS_SUCCESS;
+   if (this->titleLabel)
+   {
+      FirmwareI18n::setLabel(this->titleLabel, approved ? FirmwareI18n::Message::SupervisionConfirmed : FirmwareI18n::Message::SupervisionRequired);
+   }
+   // Approval is complete; card and web instructions only apply while pending.
+   if (this->hintLabel)
+   {
+      if (approved)
+      {
+         lv_obj_add_flag(this->hintLabel, LV_OBJ_FLAG_HIDDEN);
+      }
+      else
+      {
+         lv_obj_remove_flag(this->hintLabel, LV_OBJ_FLAG_HIDDEN);
+      }
+   }
 
    // Hide the cancel button once approved — nothing left to cancel.
    if (this->cancelButton)

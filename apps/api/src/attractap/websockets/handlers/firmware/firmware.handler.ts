@@ -1,9 +1,9 @@
 import { ReaderIdentityService } from '../../../security/reader-identity.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { existsSync, statSync, openSync, readSync, fstatSync, closeSync, constants } from 'fs';
+import { existsSync, statSync, readSync, closeSync } from 'fs';
 import { join } from 'path';
 import { AttractapService } from '../../../attractap.service';
-import { AttractapFirmwareService } from '../../../firmware.service';
+import { AttractapFirmwareService, openQualifiedOtaSnapshot } from '../../../firmware.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
@@ -96,21 +96,7 @@ export class AttractapFirmwareHandler {
       }
       context.tokens--;
 
-      // Lazily open file descriptor
-      if (socket.state.ota.fd === undefined) {
-        try {
-          const fd = openSync(socket.state.ota.path, constants.O_RDONLY | constants.O_NOFOLLOW);
-          const info = fstatSync(fd);
-          if (!info.isFile() || info.size !== total) {
-            closeSync(fd);
-            return;
-          }
-          socket.state.ota.fd = fd;
-        } catch (e) {
-          this.logger.error(`Failed to open firmware for client ${socket.id}: ${(e as Error).message}`);
-          return;
-        }
-      }
+      if (socket.state.ota.fd === undefined) return;
 
       const fd = socket.state.ota.fd as number;
       const buffer = Buffer.allocUnsafe(safeLen);
@@ -180,9 +166,14 @@ export class AttractapFirmwareHandler {
         }
 
         if (!(await this.eligible(socket)) || socket.readerId !== readerId) return;
-        // Store OTA context for this socket
+        const snapshot = openQualifiedOtaSnapshot(latest, assetsDir);
+        // Store the qualified snapshot for this socket; never reopen mutable assets.
         if (socket.state.ota?.fd !== undefined) closeSync(socket.state.ota.fd);
-        socket.state.ota = { path: firmwarePath, size } as AuthenticatedWebSocket['state']['ota'];
+        socket.state.ota = {
+          path: firmwarePath,
+          size: snapshot.size,
+          fd: snapshot.fd,
+        } as AuthenticatedWebSocket['state']['ota'];
         this.contexts.set(socket, { ota: socket.state.ota, tokens: 16, at: performance.now() });
 
         await socket.sendMessage(
@@ -191,7 +182,7 @@ export class AttractapFirmwareHandler {
               name: latest.name,
               variant: latest.variant,
               version: String(latest.version),
-              totalSize: size,
+              totalSize: snapshot.size,
             },
           }),
         );

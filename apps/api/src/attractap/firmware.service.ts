@@ -1,6 +1,7 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { tmpdir } from 'node:os';
 import { Injectable, Logger } from '@nestjs/common';
 
 import { createReadStream, existsSync, readFileSync, statSync, copyFileSync, mkdirSync, writeFileSync } from 'fs';
@@ -374,6 +375,7 @@ export function checkFirmwareQualification(
   firmware: AttractapFirmware,
   root: string,
   trustFile = process.env.ATTRACTAP_QUALIFICATION_PUBLIC_KEY_FILE,
+  snapshot?: ReadonlyMap<string, Buffer>,
 ) {
   const binaries = [firmware.filename, firmware.filenameOTA].filter(Boolean);
   const artifacts: Record<string, string> = {};
@@ -381,7 +383,8 @@ export function checkFirmwareQualification(
   for (const filename of binaries) {
     const artifact = contained(root, filename);
     if (fs.statSync(artifact).size > 16 * 1024 * 1024) throw new Error('Firmware exceeds supported flash geometry');
-    const bytes = fs.readFileSync(artifact);
+    const bytes = snapshot ? snapshot.get(filename) : fs.readFileSync(artifact);
+    if (!bytes) throw new Error('Missing firmware snapshot');
     if (bytes.length > 16 * 1024 * 1024) throw new Error('Firmware exceeds supported flash geometry');
     for (let offset = 0; offset + 4 <= bytes.length; offset += 4096)
       if (bytes.readUInt32LE(offset) === 0x000002e7) signed = true;
@@ -398,8 +401,13 @@ export function checkFirmwareQualification(
   verifyHardwareQualification(firmware.qualificationFile, root, trustFile, artifacts);
 }
 
-export function verifyHardwareQualification(qualificationFile: string, root: string, trustFile: string,
-  artifacts: Record<string, string>, inventoryDigest?: string): void {
+export function verifyHardwareQualification(
+  qualificationFile: string,
+  root: string,
+  trustFile: string,
+  artifacts: Record<string, string>,
+  inventoryDigest?: string,
+): void {
   if (!trustFile) throw new Error('Independent qualification trust is required');
   const trustDirectory = fs.lstatSync(path.dirname(trustFile));
   const trust = fs.lstatSync(trustFile);
@@ -471,4 +479,29 @@ export function verifyHardwareQualification(qualificationFile: string, root: str
     )
   )
     throw new Error('Invalid qualification signature');
+}
+
+/** Copy once, qualify those bytes and return an unlinked, read-only OTA snapshot.
+ * The descriptor stays valid across asset replacement and cannot be reopened by path.
+ */
+export function openQualifiedOtaSnapshot(firmware: AttractapFirmware, root: string): { fd: number; size: number } {
+  const snapshot = new Map<string, Buffer>();
+  for (const filename of [firmware.filename, firmware.filenameOTA].filter(Boolean)) {
+    const file = contained(root, filename);
+    if (fs.statSync(file).size > 16 * 1024 * 1024) throw new Error('Firmware exceeds supported flash geometry');
+    const bytes = fs.readFileSync(file);
+    if (bytes.length > 16 * 1024 * 1024) throw new Error('Firmware exceeds supported flash geometry');
+    snapshot.set(filename, bytes);
+  }
+  checkFirmwareQualification(firmware, root, process.env.ATTRACTAP_QUALIFICATION_PUBLIC_KEY_FILE, snapshot);
+  const bytes = snapshot.get(firmware.filenameOTA || firmware.filename);
+  if (!bytes || bytes.length < 1024 || bytes.length > 0x640000) throw new Error('OTA firmware size is suspicious');
+  const directory = fs.mkdtempSync(path.join(tmpdir(), 'attractap-ota-'));
+  const file = path.join(directory, 'firmware.bin');
+  try {
+    fs.writeFileSync(file, bytes, { mode: 0o400, flag: 'wx' });
+    return { fd: fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW), size: bytes.length };
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 }

@@ -639,10 +639,24 @@ describe('protected route rejection before application dispatch', () => {
             { name: 'basicConstraints', cA: false },
             { name: 'extKeyUsage', serverAuth: true },
           ]);
-        candidate.sign(
-          forge.pki.privateKeyFromPem(fixture.read(kind === 'forged' ? 'server.key' : 'ca.key').toString()),
-          kind === 'weak-signature' ? forge.md.sha1.create() : forge.md.sha256.create(),
-        );
+        const key = createPrivateKey(fixture.read(kind === 'forged' ? 'server.key' : 'ca.key'));
+        if (kind === 'weak-signature') {
+          // Keep the intentionally weak certificate, using native RSA to avoid
+          // pure-JS signing monopolizing the event loop under CI contention.
+          candidate.sign(
+            {
+              sign: () =>
+                sign(
+                  'sha1',
+                  Buffer.from(forge.asn1.toDer(candidate.tbsCertificate).getBytes(), 'binary'),
+                  key,
+                ).toString('binary'),
+            } as unknown as forge.pki.rsa.PrivateKey,
+            forge.md.sha1.create(),
+          );
+        } else {
+          signReaderCertificate(candidate, key);
+        }
         cert = forge.pki.certificateToPem(candidate);
       }
       if (kind === 'revoked')

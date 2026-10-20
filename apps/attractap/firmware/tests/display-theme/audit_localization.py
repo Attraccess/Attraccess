@@ -64,7 +64,7 @@ def literal_inventory():
 
 def main() -> int:
     errors = []
-    catalog = (ROOT / "messages.hpp").read_text()
+    catalog = (ROOT / "messages.catalog.hpp").read_text()
     entries = re.findall(r'\{Message::(\w+), ("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\}', catalog)
     ids = [entry[0] for entry in entries]
     enum = re.search(r"enum class Message\s*\{([^}]+)\}", catalog)[1]

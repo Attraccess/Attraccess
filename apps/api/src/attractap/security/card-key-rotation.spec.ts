@@ -8,6 +8,8 @@ import { rewrapCardKeys } from './card-key-rotation';
 import { EncryptionService } from '../../encryption/encryption.service';
 
 describe('transactional card key rewrapping', () => {
+  // Full SQLite schema synchronization exceeds Jest's default on CI with coverage.
+  jest.setTimeout(60000);
   let directory: string;
   let source: DataSource;
   let encryption: EncryptionService;
@@ -39,7 +41,7 @@ describe('transactional card key rewrapping', () => {
     }).initialize();
   });
   afterEach(async () => {
-    await source?.destroy();
+    if (source?.isInitialized) await source.destroy();
     rmSync(directory, { recursive: true, force: true });
   });
 

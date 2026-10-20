@@ -78,6 +78,7 @@ describe('API bootstrap ordering and configuration', () => {
   const datasource = {
     isInitialized: false,
     initialize: jest.fn(),
+    destroy: jest.fn(),
     showMigrations: jest.fn(),
     runMigrations: jest.fn(),
     migrations: [],
@@ -111,6 +112,15 @@ describe('API bootstrap ordering and configuration', () => {
   const originalSkip = process.env.SKIP_DATABASE_MIGRATIONS;
   beforeEach(() => {
     jest.clearAllMocks();
+    app.close.mockReset().mockImplementation(async () => {
+      datasource.isInitialized = false;
+    });
+    datasource.initialize.mockImplementation(async () => {
+      datasource.isInitialized = true;
+    });
+    datasource.destroy.mockImplementation(async () => {
+      datasource.isInitialized = false;
+    });
     jest.mocked(existsSync).mockImplementation(jest.requireActual<typeof import('fs')>('fs').existsSync);
     delete process.env.SKIP_DATABASE_MIGRATIONS;
     appConfig.DISABLE_PLUGINS = false;
@@ -162,15 +172,19 @@ describe('API bootstrap ordering and configuration', () => {
       await httpApp?.close();
     });
 
-    it.each([100 * 1024 + 1, 10 * 1024 * 1024])('parses configuration requests of %i bytes', async (bytes) => {
-      const body = { snapshot: { version: 1, profile: '' } };
-      body.snapshot.profile = 'x'.repeat(bytes - Buffer.byteLength(JSON.stringify(body)));
-      const response = await request(httpApp.getHttpServer()).post('/api/plugin-configuration/1/validate').send(body);
+    it.each([100 * 1024 + 1, 10 * 1024 * 1024])(
+      'parses configuration requests of %i bytes',
+      async (bytes) => {
+        const body = { snapshot: { version: 1, profile: '' } };
+        body.snapshot.profile = 'x'.repeat(bytes - Buffer.byteLength(JSON.stringify(body)));
+        const response = await request(httpApp.getHttpServer()).post('/api/plugin-configuration/1/validate').send(body);
 
-      expect(response.body).not.toHaveProperty('message', 'request entity too large');
-      expect(response.status).toBe(201);
-      expect(response.body).toEqual(body);
-    });
+        expect(response.body).not.toHaveProperty('message', 'request entity too large');
+        expect(response.status).toBe(201);
+        expect(response.body).toEqual(body);
+      },
+      20_000,
+    );
 
     it('saves a draft when its snapshot and optimistic concurrency data exceed 100 KiB together', async () => {
       const snapshot = { version: 1, profile: 'x'.repeat(60 * 1024) };
@@ -298,6 +312,55 @@ describe('API bootstrap ordering and configuration', () => {
     datasource.runMigrations.mockRejectedValue(error);
     await expect(bootstrap()).rejects.toThrow('migration failed');
     expect(PluginService.recordBootFailure).toHaveBeenCalledWith(error);
+    expect(app.close).toHaveBeenCalledTimes(2);
     expect(app.setGlobalPrefix).not.toHaveBeenCalled();
+  });
+  it('preserves the configuration error when configuration cleanup also fails', async () => {
+    const error = new Error('configuration failed');
+    settings.getUrl.mockRejectedValueOnce(error);
+    app.close.mockRejectedValueOnce(new Error('configuration cleanup failed'));
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(app.close).toHaveBeenCalledTimes(1);
+    expect(NestFactory.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the database when configuration reads succeed but closure fails', async () => {
+    const error = new Error('configuration close failed');
+    datasource.isInitialized = true;
+    app.close.mockRejectedValueOnce(error);
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(settings.getUrl).toHaveBeenCalled();
+    expect(app.close).toHaveBeenCalledTimes(1);
+    expect(datasource.destroy).toHaveBeenCalledTimes(1);
+    expect(app.get.mock.invocationCallOrder.at(-1)).toBeLessThan(app.close.mock.invocationCallOrder[0]);
+    expect(NestFactory.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the migration error when main application cleanup also fails', async () => {
+    const error = new Error('migration failed');
+    datasource.isInitialized = true;
+    datasource.runMigrations.mockRejectedValueOnce(error);
+    app.close
+      .mockImplementationOnce(async () => {
+        datasource.isInitialized = false;
+      })
+      .mockRejectedValueOnce(new Error('main cleanup failed'));
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(app.close).toHaveBeenCalledTimes(2);
+    expect(datasource.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the startup error when database fallback cleanup also fails', async () => {
+    const error = new Error('migration failed');
+    datasource.isInitialized = true;
+    datasource.runMigrations.mockRejectedValueOnce(error);
+    datasource.destroy.mockRejectedValueOnce(new Error('database cleanup failed'));
+    app.close
+      .mockImplementationOnce(async () => {
+        datasource.isInitialized = false;
+      })
+      .mockRejectedValueOnce(new Error('main cleanup failed'));
+    await expect(bootstrap()).rejects.toBe(error);
+    expect(datasource.destroy).toHaveBeenCalledTimes(1);
   });
 });

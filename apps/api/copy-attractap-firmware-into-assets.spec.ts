@@ -83,4 +83,33 @@ describe('firmware asset copying', () => {
     expect(fs.readdirSync(assets)).toEqual(['firmwares.json']);
     expect(JSON.parse(fs.readFileSync(path.join(assets, 'firmwares.json'), 'utf8'))).toEqual({ firmwares: [] });
   });
+  it.each(['filename', 'filenameOTA', 'elfFilename', 'qualificationFile'])(
+    'rejects the generated catalog name in %s without replacing existing assets',
+    (field) => {
+      fs.writeFileSync(path.join(source, 'reader.bin'), 'bridge');
+      catalog({ firmwares: [{ filename: 'reader.bin', [field]: 'firmwares.json' }] });
+      expect(run).toThrow('Reserved firmware filename');
+      expect(fs.readdirSync(assets)).toEqual(['stale.bin']);
+      expect(fs.readFileSync(path.join(assets, 'stale.bin'), 'utf8')).toBe('old');
+    },
+  );
+
+  it('validates staged bytes if a source changes while copying', () => {
+    const originalCopy = fs.copyFileSync;
+    fs.writeFileSync(path.join(source, 'reader.bin'), Buffer.alloc(8192));
+    catalog({ firmwares: [{ filename: 'reader.bin', securityProfile: 'bridge' }] });
+    const copy = jest.spyOn(fs, 'copyFileSync').mockImplementation((from, to, ...args) => {
+      // Replace the source with a same-size signed image immediately before staging.
+      const changed = Buffer.alloc(8192);
+      changed.writeUInt32LE(0x000002e7, 4096);
+      fs.writeFileSync(from, changed);
+      originalCopy(from, to, ...args);
+    });
+    try {
+      expect(run).toThrow('Production firmware requires');
+      expect(fs.readdirSync(assets)).toEqual(['stale.bin']);
+    } finally {
+      copy.mockRestore();
+    }
+  });
 });

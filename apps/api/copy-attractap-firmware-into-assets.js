@@ -134,7 +134,6 @@ function copyFirmwareAssets(destination = assetsDir, sources = origins) {
       if (!fs.existsSync(file)) return { origin, firmwares: [] };
       const firmwares = JSON.parse(fs.readFileSync(file, 'utf8')).firmwares;
       if (!Array.isArray(firmwares)) throw new Error('Invalid firmware catalog');
-      for (const firmware of firmwares) checkQualification(firmware, origin.path);
       return { origin, firmwares };
     });
   const stage = fs.mkdtempSync(destination + '.staging-');
@@ -148,6 +147,7 @@ function copyFirmwareAssets(destination = assetsDir, sources = origins) {
           firmware.elfFilename,
           firmware.qualificationFile,
         ].filter(Boolean)) {
+          if (filename === 'firmwares.json') throw new Error('Reserved firmware filename');
           const source = contained(origin.path, filename);
           const target = path.join(stage, filename);
           if (fs.existsSync(target) && !fs.readFileSync(target).equals(fs.readFileSync(source)))
@@ -156,6 +156,8 @@ function copyFirmwareAssets(destination = assetsDir, sources = origins) {
         }
         combined.push(firmware);
       }
+    // Validate the private staged snapshot, then publish those exact files.
+    for (const firmware of combined) checkQualification(firmware, stage);
     fs.writeFileSync(path.join(stage, 'firmwares.json'), JSON.stringify({ firmwares: combined }, null, 2));
     fs.rmSync(destination, { recursive: true, force: true });
     fs.renameSync(stage, destination);

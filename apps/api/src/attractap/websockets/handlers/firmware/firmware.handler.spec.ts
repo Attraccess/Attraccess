@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { registerAttractapFirmwareHandlerFixture } from './handler.test-fixture';
-import { fstatSync } from 'fs';
+import { openQualifiedOtaSnapshot } from '../../../firmware.service';
+
+jest.mock('../../../firmware.service', () => ({
+  ...jest.requireActual('../../../firmware.service'),
+  openQualifiedOtaSnapshot: jest.fn(),
+}));
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 
 jest.mock('fs', () => {
@@ -23,6 +28,7 @@ describe('AttractapFirmwareHandler', () => {
     // Initialize the handler's per-socket storage explicitly in this suite.
     (fixture.handler as any).contexts = new WeakMap();
     (fixture.handler as any).identities = { isLegacy: jest.fn().mockResolvedValue(true) };
+    jest.mocked(openQualifiedOtaSnapshot).mockImplementation(() => ({ fd: 0, size: fixture.mockStatSync('').size }));
     fixture.socket.close = jest.fn();
     fixture.socket.bufferedAmount = 0;
     const filesystem = jest.requireMock('fs');
@@ -42,7 +48,6 @@ describe('AttractapFirmwareHandler', () => {
       });
       fixture.mockExistsSync.mockReturnValue(true);
       fixture.mockStatSync.mockReturnValue({ size: binary.length } as any);
-      jest.mocked(fstatSync).mockReturnValue({ size: binary.length, isFile: () => true } as any);
       fixture.mockOpenSync.mockReturnValue(0 as any);
       fixture.mockReadSync.mockImplementation((_fd, buffer: Buffer, start, length, offset) => {
         binary.copy(buffer, start, offset, offset + length);
@@ -69,7 +74,7 @@ describe('AttractapFirmwareHandler', () => {
 
     it('completes a legacy update in bounded chunks, including descriptor zero', async () => {
       for (let offset = 0; offset < binary.length; offset += 4096) await request(offset, 999999);
-      expect(fixture.mockOpenSync).toHaveBeenCalledTimes(1);
+      expect(openQualifiedOtaSnapshot).toHaveBeenCalledTimes(1);
       expect(fixture.socket.state.ota.fd).toBe(0);
       const received = Buffer.concat(fixture.socket.sendBinaryData.mock.calls.map(([bytes]) => bytes));
       expect(received).toEqual(binary);
@@ -118,11 +123,6 @@ describe('AttractapFirmwareHandler', () => {
       await request(0, 100);
       expect(fixture.socket.close).toHaveBeenCalled();
       await pending;
-    });
-    it('rejects a replaced file whose size differs from the announced update', async () => {
-      jest.mocked(fstatSync).mockReturnValue({ size: 1, isFile: () => true } as any);
-      await request(0, 100);
-      expect(fixture.mockReadSync).not.toHaveBeenCalled();
     });
     it('rejects catalog filenames outside the asset directory', async () => {
       fixture.socket.state.ota = null;

@@ -12,7 +12,7 @@ class LocalizationAuditTests(unittest.TestCase):
     def check(self, source):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "messages.hpp").write_text(
+            (root / "messages.catalog.hpp").write_text(
                 'enum class Message { Greeting, Count };\n'
                 '{Message::Greeting, "Hallo", "Hello"}\n'
             )

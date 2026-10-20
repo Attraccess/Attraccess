@@ -141,6 +141,9 @@ export abstract class MaintenanceResourceEvaluation {
    * Evaluate all enabled schedules for a resource. If any triggers and there is no active maintenance, create one (first trigger wins).
    */
   async evaluateResource(resourceId: number): Promise<void> {
+    // Avoid opening a SQLite transaction alongside session writes when no
+    // enabled schedule can produce maintenance. Re-read inside for correctness.
+    if (!(await this.scheduleRepository.existsBy({ resourceId, enabled: true }))) return;
     let createdMaintenanceId: number | undefined;
     await this.scheduleRepository.manager.transaction(async (transactionalEntityManager) => {
       const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);

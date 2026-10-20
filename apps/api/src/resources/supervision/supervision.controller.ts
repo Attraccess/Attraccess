@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, Sse } from '@nestjs/common';
+import { Response } from 'express';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, Res, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
@@ -41,8 +42,18 @@ export class SupervisionController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: RequestSupervisedSessionDto,
     @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<ResourceUsage> {
-    return this.supervisionService.requestSupervisedSession(resourceId, req.user, dto);
+    const controller = new AbortController();
+    const onClose = () => {
+      if (!res.writableEnded) controller.abort();
+    };
+    res.on('close', onClose);
+    try {
+      return await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto, controller.signal);
+    } finally {
+      res.off('close', onClose);
+    }
   }
 
   @Get('supervision/requests')
@@ -68,9 +79,7 @@ export class SupervisionController {
     const subject = this.supervisionLive.getSupervisorSubject(userId);
     return this.sse.wrap(
       'supervision',
-      subject.asObservable().pipe(
-        finalize(() => this.supervisionLive.deleteSubjectIfUnobserved(userId)),
-      ),
+      subject.asObservable().pipe(finalize(() => this.supervisionLive.deleteSubjectIfUnobserved(userId))),
     );
   }
 
@@ -84,10 +93,7 @@ export class SupervisionController {
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'You are not the requested supervisor for this session.' })
   @ApiResponse({ status: 404, description: 'The request was not found or has already expired.' })
-  approveRequest(
-    @Param('requestId') requestId: string,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<ResourceUsage> {
+  approveRequest(@Param('requestId') requestId: string, @Req() req: AuthenticatedRequest): Promise<ResourceUsage> {
     return this.supervisionService.approve(
       requestId,
       req.user,
