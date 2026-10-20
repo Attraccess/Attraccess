@@ -16,7 +16,8 @@ export function runtimeDependencies(read) {
   const packages = {};
   const snapshots = {};
   const visit = (name, version) => {
-    const key = `${name}@${version}`;
+    // pnpm aliases resolve to a full package identifier, including peer suffixes.
+    const key = /^(?:@[^/]+\/)?[^@()]+@/.test(version) ? version : `${name}@${version}`;
     if (Object.hasOwn(snapshots, key)) return;
     const snapshot = lock.snapshots[key];
     const packageKey = key.split('(')[0];
@@ -58,5 +59,6 @@ export function runtimeDependencies(read) {
     pnpm: { ...installPolicy, patchedDependencies: patchPaths },
     settings: lock.settings,
     patchedDependencies,
+    patchContents: Object.fromEntries(Object.values(patchPaths).map((path) => [path, read(path)])),
   };
 }

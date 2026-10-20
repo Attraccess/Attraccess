@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { fixtureGitEnv } from './test-utils/git-env.mjs';
+import { runtimeDependencies } from './lib/wago-runtime-dependencies.mjs';
 import { isRuntimeSource } from './check-wago-runtime-version.mjs';
 import { stringify } from 'yaml';
 
@@ -95,6 +96,9 @@ for (const [name, path, next, pass] of [
   ['allows removing a redundant frontend override', 'remove-override', '0.2.0', true],
   ['requires a bump when an override changes a runtime resolution', 'runtime-override', '0.2.0', false],
   ['allows unrelated patch declarations', 'unrelated-patch', '0.2.0', true],
+  ['allows unchanged aliased dependencies', 'alias-unchanged', '0.2.0', true],
+  ['requires a bump for an aliased transitive dependency', 'alias-change', '0.2.0', false],
+  ['accepts a bump for an aliased transitive dependency', 'alias-change', '0.2.1', true],
   ['requires a bump for an applied runtime patch', 'runtime-patch', '0.2.0', false],
   ['requires a bump for global install settings', 'global-install-policy', '0.2.0', false],
   ['requires a bump for a bundled dependency', 'runtime-dependency', '0.2.0', false],
@@ -123,12 +127,18 @@ for (const [name, path, next, pass] of [
       const packageJson = { packageManager: 'pnpm@10.34.6', pnpm: { overrides: { react: '1.0.0' } } };
       const lock = dependencyFixture();
       lock.overrides = { react: '1.0.0' };
+      if (path.startsWith('alias-')) {
+        lock.snapshots['mqtt@1.0.0'].dependencies['string-width-cjs'] = 'string-width@4.2.3';
+        lock.packages['string-width@4.2.3'] = { resolution: { integrity: 'original' } };
+        lock.snapshots['string-width@4.2.3'] = {};
+      }
       file('package.json', JSON.stringify(packageJson));
       file('pnpm-lock.yaml', stringify(lock));
       git('add', '.');
       git('commit', '--quiet', '-m', 'baseline');
       const base = git('rev-parse', 'HEAD');
-      if (path.endsWith('-override')) {
+      if (path === 'alias-change') lock.packages['string-width@4.2.3'].resolution.integrity = 'changed';
+      else if (path.endsWith('-override')) {
         if (path === 'remove-override') {
           delete packageJson.pnpm.overrides.react;
           delete lock.overrides.react;
@@ -146,6 +156,7 @@ for (const [name, path, next, pass] of [
         const name = path === 'runtime-patch' ? 'mqtt' : 'unrelated';
         const key = `${name}@1.0.0`;
         packageJson.pnpm.patchedDependencies = { [key]: `patches/${name}.patch` };
+        file(`patches/${name}.patch`, 'patch content');
         lock.patchedDependencies = { [key]: { hash: 'patch-content-hash', path: `patches/${name}.patch` } };
         lock.snapshots[`${key}(patch_hash=patch-content-hash)`] = lock.snapshots[key];
         delete lock.snapshots[key];
@@ -182,3 +193,76 @@ for (const [name, path, next, pass] of [
     }
   });
 }
+
+for (const relevant of [false, true]) {
+  for (const operation of ['add', 'edit', 'remove']) {
+    test(`${operation} ${relevant ? 'runtime' : 'unrelated'} patch file ${relevant ? 'requires' : 'does not require'} a bump`, () => {
+      const directory = mkdtempSync(join(tmpdir(), 'cc100-patch-check-'));
+      const env = fixtureGitEnv();
+      const git = (...args) => execFileSync('git', args, { cwd: directory, env, encoding: 'utf8' }).trim();
+      const file = (path, content) => {
+        mkdirSync(join(directory, path, '..'), { recursive: true });
+        writeFileSync(join(directory, path), content);
+      };
+      const name = relevant ? 'mqtt' : 'unrelated';
+      const patchPath = `patches/${name}.patch`;
+      const key = `${name}@1.0.0`;
+      const lock = dependencyFixture();
+      const packageJson = { pnpm: { patchedDependencies: {} } };
+      const setPatched = (enabled) => {
+        packageJson.pnpm.patchedDependencies = enabled ? { [key]: patchPath } : {};
+        lock.patchedDependencies = enabled ? { [key]: { hash: 'patch-hash', path: patchPath } } : {};
+        const oldKey = Object.keys(lock.snapshots).find((entry) => entry.split('(')[0] === key);
+        const snapshot = lock.snapshots[oldKey];
+        delete lock.snapshots[oldKey];
+        lock.snapshots[enabled ? `${key}(patch_hash=patch-hash)` : key] = snapshot;
+        if (relevant)
+          lock.importers['.'].dependencies.mqtt.version = enabled ? '1.0.0(patch_hash=patch-hash)' : '1.0.0';
+        if (enabled) file(patchPath, 'original patch');
+        else rmSync(join(directory, patchPath), { force: true });
+        file('package.json', JSON.stringify(packageJson));
+        file('pnpm-lock.yaml', stringify(lock));
+      };
+      try {
+        git('init', '--quiet');
+        git('config', 'user.email', 'test@example.com');
+        git('config', 'user.name', 'Test');
+        git('config', 'commit.gpgsign', 'false');
+        file(manifest, JSON.stringify({ runtimeVersion: '0.2.0' }));
+        setPatched(operation !== 'add');
+        git('add', '.');
+        git('commit', '--quiet', '-m', 'baseline');
+        const base = git('rev-parse', 'HEAD');
+        if (operation === 'edit') file(patchPath, 'changed patch');
+        else setPatched(operation === 'add');
+        git('add', '.');
+        git('commit', '--quiet', '-m', 'change');
+        if (relevant)
+          assert.throws(() => execFileSync(process.execPath, [script, base], { cwd: directory, env, stdio: 'pipe' }));
+        else
+          assert.match(
+            execFileSync(process.execPath, [script, base], { cwd: directory, env, encoding: 'utf8' }),
+            /No WAGO/,
+          );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  }
+}
+
+test('resolves scoped, unscoped and optional aliases with peer suffixes', () => {
+  const lock = dependencyFixture();
+  lock.snapshots['mqtt@1.0.0'].dependencies.alias = 'string-width@4.2.3';
+  lock.snapshots['esbuild@1.0.0'].optionalDependencies.alias = '@scope/pkg@2.0.0(peer@1.0.0)';
+  lock.importers['.'].dependencies.typescript.version = '1.0.0(peer@1.0.0)';
+  lock.snapshots['typescript@1.0.0(peer@1.0.0)'] = lock.snapshots['typescript@1.0.0'];
+  delete lock.snapshots['typescript@1.0.0'];
+  lock.packages['string-width@4.2.3'] = {};
+  lock.snapshots['string-width@4.2.3'] = {};
+  lock.packages['@scope/pkg@2.0.0'] = {};
+  lock.snapshots['@scope/pkg@2.0.0(peer@1.0.0)'] = {};
+  const result = runtimeDependencies((path) => (path === 'package.json' ? '{}' : stringify(lock)));
+  assert.ok(Object.hasOwn(result.snapshots, 'string-width@4.2.3'));
+  assert.ok(Object.hasOwn(result.snapshots, '@scope/pkg@2.0.0(peer@1.0.0)'));
+});

@@ -50,7 +50,7 @@ export function checkRuntimeVersion(base = process.env.NX_AFFECTED_BASE ?? 'orig
   let dependenciesChanged;
   const isSource = (path) => {
     if (!isRuntimeSource(path)) return false;
-    if (!['package.json', 'pnpm-lock.yaml'].includes(path)) return true;
+    if (!['package.json', 'pnpm-lock.yaml'].includes(path) && !path.startsWith('patches/')) return true;
     // Read committed versions, never installed packages or a dirty working tree.
     dependenciesChanged ??= !isDeepStrictEqual(
       runtimeDependencies((file) => git('show', `${ancestor}:${file}`)),
