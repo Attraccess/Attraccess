@@ -58,6 +58,21 @@ The output contains encrypted identity NVS, protected NVS keys, signed images, i
 
 An exclusive bundle lock prevents concurrent apply executions from inspecting stale inventory or writing the same journal. The lock is held until apply finishes. An operation journal is persisted before irreversible work. After interruption, a previous journal or mismatched inventory stops the tool for protected recovery; it never guesses which key was burned or repeats an uncertain write. Retain the journal and fresh inventory for independent review. This run does not execute apply, burn eFuses or perform that first boot.
 
+## Software verification
+
+Run API and migration checks from the repository root:
+
+```bash
+pnpm nx run api:test --skip-nx-cache --runInBand
+pnpm nx run api:e2e --skip-nx-cache --runInBand
+pnpm nx run attractap-firmware:test --skip-nx-cache
+pnpm nx run attractap-desktop:test-real-api --skip-nx-cache
+```
+
+Allow the aggregate commands several minutes to finish. An outer command-runner timeout can interrupt a progressing suite before Jest reports its final result; it is not a completed test run. Retain the command, input revision, elapsed time, exit status and complete output. Diagnose an interrupted run and obtain normal completion without weakening assertions or increasing individual test deadlines.
+
+Changes to the registered database migrations also affect firmware/API and desktop/API integration. The firmware target supplies the software peer and payload fixtures for two cases skipped by ordinary API tests. An API-only pass therefore does not replace that target. Desktop card-success scenarios remain deferred to ATT-950; the current suite verifies card-operation denial and legacy maintenance. All of these checks use host substitutes and do not qualify hardware.
+
 ## Software memory evidence
 
 `pnpm nx run attractap-firmware:test` exercises the actual TLS libraries, signed-time verifier, production WebSocket owner loop and parser with software signing keys. Its `MEMORY` lines separate library allocation peaks from session objects and queue/envelope allocations. Run `ctest --test-dir apps/attractap/firmware/tests/security/build -V` to see parser current/peak storage, pointer width, ArduinoJson version, handler storage, dynamic copies and received input storage for each fixture.
