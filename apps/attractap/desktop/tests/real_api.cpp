@@ -1,0 +1,388 @@
+#include "desktop_simulator.hpp"
+#include "settings/settings.hpp"
+#include "display/display.hpp"
+#include "state/state.hpp"
+
+#include <ArduinoJson.h>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <thread>
+#include <vector>
+#include <algorithm>
+#include <cctype>
+#include <cstdio>
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdexcept>
+#include <regex>
+
+namespace
+{
+void createScreenshotDirectory(const std::filesystem::path &directory)
+{
+    // Set private permissions at creation, independent of the caller's umask.
+    // Existing destinations stay unchanged and must pass the capture guard.
+    if (mkdir(directory.c_str(), S_IRWXU) != 0 && errno != EEXIST)
+        throw std::filesystem::filesystem_error("create screenshot directory", directory,
+                                              std::error_code(errno, std::generic_category()));
+}
+
+// Open the fixture directory itself without following redirects, then create a
+// fresh destination relative to that descriptor. Never overwrite existing files.
+bool saveOwnedScreenshot(SdlDisplay &display, const std::filesystem::path &directory, const std::string &name)
+{
+    const int root = open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    if (root < 0) return false;
+    struct stat info{};
+    const bool owned = fstat(root, &info) == 0 && info.st_uid == geteuid() &&
+        (info.st_mode & (S_IWGRP | S_IWOTH)) == 0;
+    SDL_IOStream *image = owned ? SDL_IOFromDynamicMem() : nullptr;
+    bool saved = image && display.saveDisplayScreenshot(image);
+    const auto filename = name + ".png";
+    if (saved)
+    {
+        const int file = openat(root, filename.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, S_IRUSR | S_IWUSR);
+        saved = file >= 0;
+        if (file >= 0)
+        {
+            const auto size = SDL_GetIOSize(image);
+            saved = size > 0 && SDL_SeekIO(image, 0, SDL_IO_SEEK_SET) == 0;
+            char bytes[4096];
+            Sint64 remaining = size;
+            while (saved && remaining > 0)
+            {
+                const auto count = SDL_ReadIO(image, bytes, std::min<Sint64>(remaining, sizeof(bytes)));
+                saved = count > 0 && write(file, bytes, count) == static_cast<ssize_t>(count);
+                remaining -= count;
+            }
+            if (close(file) != 0) saved = false;
+            if (!saved) unlinkat(root, filename.c_str(), 0);
+        }
+    }
+    if (image) SDL_CloseIO(image);
+    close(root);
+    return saved;
+}
+
+void pump(DesktopSimulator &simulator)
+{
+    simulator.display().pollEvents();
+    simulator.tick();
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+}
+
+bool waitFor(const std::function<bool()> &condition, DesktopSimulator &simulator, int timeoutMs = 10000)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+    do
+    {
+        pump(simulator);
+        if (condition()) return true;
+    } while (std::chrono::steady_clock::now() < deadline);
+    return false;
+}
+
+// Look only at the active LVGL tree and top layer, excluding hidden ancestors.
+// These are real widgets built by the production screens, not fixture values.
+void findObjects(lv_obj_t *root, const std::function<bool(lv_obj_t *)> &matches, std::vector<lv_obj_t *> &found)
+{
+    if (!root || lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN) || lv_obj_has_state(root, LV_STATE_DISABLED)) return;
+    if (matches(root)) found.push_back(root);
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        findObjects(lv_obj_get_child(root, i), matches, found);
+}
+
+lv_obj_t *findVisible(const std::function<bool(lv_obj_t *)> &matches)
+{
+    std::vector<lv_obj_t *> found;
+    findObjects(lv_layer_top(), matches, found);
+    // The persistent status bar also lives on the top layer. Only a visible
+    // full-display overlay blocks the underlying screen.
+    bool modal = false;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(lv_layer_top()); ++i)
+    {
+        auto *child = lv_obj_get_child(lv_layer_top(), i);
+        if (!lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN) && lv_obj_get_width(child) >= 480 && lv_obj_get_height(child) >= 480)
+            modal = true;
+    }
+    if (!modal) findObjects(lv_screen_active(), matches, found);
+    return found.size() == 1 ? found.front() : nullptr;
+}
+
+lv_obj_t *findText(const std::string &text)
+{
+    return findVisible([&](lv_obj_t *object) {
+        return lv_obj_check_type(object, &lv_label_class) && text == lv_label_get_text(object);
+    });
+}
+
+std::string screenName()
+{
+    if (lv_screen_active() == Display::lockscreen.getScreen()) return "locked";
+    if (lv_screen_active() == Display::resourceListScreen.getScreen()) return "resources";
+    if (lv_screen_active() == Display::resourceDetailsScreen.getScreen()) return "details";
+    if (lv_screen_active() == Display::enrollmentScreen.getScreen()) return "enrollment";
+    if (lv_screen_active() == Display::supervisionScreen.getScreen()) return "supervision";
+    if (lv_screen_active() == Display::setPinScreen.getScreen()) return "set-pin";
+    if (lv_screen_active() == Display::connectionConfigurationScreen.getScreen()) return "settings";
+#ifdef DEMO_MODE
+    if (lv_screen_active() == Display::demoSettingsScreen.getScreen()) return "settings";
+#endif
+    return "other";
+}
+
+bool validCommand(JsonDocument &command)
+{
+    if (!command.is<JsonObject>() || !command["action"].is<const char *>()) return false;
+    const std::string action = command["action"].as<std::string>();
+    const std::vector<std::string> actions = {"wait-text", "wait-screen", "click", "edit", "present", "remove", "faults", "corrupt-key", "snapshot", "reconnect", "inspect", "quit"};
+    if (std::find(actions.begin(), actions.end(), action) == actions.end()) return false;
+    for (JsonPair field : command.as<JsonObject>())
+    {
+        const std::string key = field.key().c_str();
+        if (key == "action") continue;
+        if (key == "text" && (action == "wait-text" || action == "wait-screen" || action == "click" || action == "edit" || action == "snapshot"))
+        {
+            if (!field.value().is<const char *>() || field.value().as<std::string>().size() > 512) return false;
+        }
+        else if (key == "card" && (action == "present" || action == "remove" || action == "faults" || action == "corrupt-key" || action == "inspect"))
+        {
+            if (!field.value().is<unsigned>() || field.value().as<unsigned>() >= VirtualNfc::CardCount) return false;
+        }
+        else if (key == "slot" && action == "corrupt-key")
+        {
+            if (!field.value().is<unsigned>() || field.value().as<unsigned>() >= VirtualNfc::KeySlotCount) return false;
+        }
+        else if ((key == "write" || key == "authentication" || key == "removeOnWrite") && action == "faults")
+        {
+            if (!field.value().is<bool>()) return false;
+        }
+        else return false;
+    }
+    if (action == "wait-text" || action == "wait-screen" || action == "click" || action == "edit" || action == "snapshot")
+        if (!command["text"].is<const char *>()) return false;
+    if (action == "snapshot")
+    {
+        const std::string name = command["text"].as<std::string>();
+        if (name.empty() || name.size() > 80 || !std::all_of(name.begin(), name.end(), [](unsigned char c) { return std::isalnum(c) || c == '-' || c == '_'; })) return false;
+    }
+    return true;
+}
+
+void collectLabels(lv_obj_t *root, JsonArray labels)
+{
+    if (!root || labels.size() >= 64 || lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) return;
+    if (lv_obj_check_type(root, &lv_label_class))
+    {
+        const std::string text = lv_label_get_text(root);
+        labels.add(text.substr(0, 256));
+    }
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        collectLabels(lv_obj_get_child(root, i), labels);
+}
+
+// Capture safety cannot depend on the bounded diagnostic inspect response or a
+// previous command. Traverse all visible text in the exact tree being captured.
+bool screenshotTextSafe(const std::string &text)
+{
+    static const std::regex sensitive(
+        "pin|passcode|password|passwort|credential|token|secret|authorization|payload|key|schlüssel|\\{[[:space:]]*\"|[a-zA-Z0-9_+/-]{24,}",
+        std::regex::icase);
+    if (std::regex_search(text, sensitive)) return false;
+    const std::vector<std::string> secrets = {
+        Settings::getDeviceConfig().passCode,
+        Settings::getNetworkConfig().password,
+        Settings::getAttraccessAuthConfig().apiKey,
+    };
+    for (const auto &secret : secrets)
+        if (!secret.empty() && text.find(secret) != std::string::npos) return false;
+    return true;
+}
+
+bool screenshotTreeSafe(lv_obj_t *root)
+{
+    if (!root || lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) return true;
+    if (lv_obj_check_type(root, &lv_label_class) && !screenshotTextSafe(lv_label_get_text(root))) return false;
+    if (lv_obj_check_type(root, &lv_textarea_class) &&
+        (lv_textarea_get_password_mode(root) || !screenshotTextSafe(lv_textarea_get_text(root)))) return false;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        if (!screenshotTreeSafe(lv_obj_get_child(root, i))) return false;
+    return true;
+}
+
+bool screenshotSafe()
+{
+    const auto screen = screenName();
+    return screen != "settings" && screen != "set-pin" &&
+        screenshotTreeSafe(lv_screen_active()) && screenshotTreeSafe(lv_layer_top()) &&
+        screenshotTreeSafe(lv_layer_bottom()) && screenshotTreeSafe(lv_layer_sys());
+}
+
+bool execute(JsonDocument &command, DesktopSimulator &simulator, const std::filesystem::path &screenshots)
+{
+    const std::string action = command["action"] | "";
+    const std::string text = command["text"] | "";
+    const size_t cardIndex = command["card"] | 0;
+    if (action == "wait-text") return waitFor([&] { return findText(text) != nullptr; }, simulator);
+    if (action == "wait-screen")
+    {
+        IScreen *screen = nullptr;
+        if (text == "locked") screen = &Display::lockscreen;
+        else if (text == "resources") screen = &Display::resourceListScreen;
+        else if (text == "details") screen = &Display::resourceDetailsScreen;
+        else if (text == "enrollment") screen = &Display::enrollmentScreen;
+        else if (text == "supervision") screen = &Display::supervisionScreen;
+        else if (text == "set-pin") screen = &Display::setPinScreen;
+        if (!screen) return false;
+        return waitFor([&] { return screen->getScreen() && lv_screen_active() == screen->getScreen(); }, simulator);
+    }
+    if (action == "click")
+    {
+        if (!waitFor([&] { return findText(text) != nullptr; }, simulator)) return false;
+        auto *object = findText(text);
+        while (object && !lv_obj_has_flag(object, LV_OBJ_FLAG_CLICKABLE)) object = lv_obj_get_parent(object);
+        if (!object || lv_obj_has_state(object, LV_STATE_DISABLED)) return false;
+        // LVGL's release handler owns checkable state and VALUE_CHANGED events.
+        lv_obj_send_event(object, LV_EVENT_PRESSED, nullptr);
+        lv_obj_send_event(object, LV_EVENT_RELEASED, nullptr);
+        lv_obj_send_event(object, LV_EVENT_CLICKED, nullptr);
+    }
+    else if (action == "edit")
+    {
+        auto *input = findVisible([](lv_obj_t *obj) { return lv_obj_check_type(obj, &lv_textarea_class); });
+        auto *keyboard = findVisible([](lv_obj_t *obj) { return lv_obj_check_type(obj, &lv_keyboard_class); });
+        if (!input || !keyboard) return false;
+        lv_textarea_set_text(input, text.c_str());
+        lv_obj_send_event(keyboard, LV_EVENT_READY, nullptr);
+    }
+    else if (action == "present") simulator.nfc().setPresent(cardIndex, true);
+    else if (action == "remove") simulator.nfc().setPresent(cardIndex, false);
+    else if (action == "faults")
+    {
+        auto card = simulator.nfc().card(cardIndex);
+        card.failWrite = command["write"] | false;
+        simulator.nfc().setRemoveOnWrite(command["removeOnWrite"] | false);
+        card.failAuthentication = command["authentication"] | false;
+        simulator.nfc().setCard(cardIndex, card);
+    }
+    else if (action == "corrupt-key")
+    {
+        auto card = simulator.nfc().card(cardIndex);
+        const size_t slot = command["slot"] | 1;
+        card.keys.at(slot)[0] ^= 0xff;
+        simulator.nfc().setCard(cardIndex, card);
+    }
+    else if (action == "snapshot")
+    {
+        lv_refr_now(nullptr);
+        if (!screenshotSafe()) return false;
+        return saveOwnedScreenshot(simulator.display(), screenshots, text);
+    }
+    else if (action == "reconnect")
+    {
+        const auto generation = simulator.authenticationGeneration();
+        simulator.reconnect();
+        return waitFor([&] { return simulator.authenticated() && simulator.authenticationGeneration() > generation; }, simulator);
+    }
+    else if (action != "inspect" && action != "quit") return false;
+    pump(simulator);
+    return true;
+}
+}
+
+int main(int argc, char **argv)
+{
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+    if (argc != 4)
+    {
+        std::cerr << "usage: attractap-desktop-real-api ENDPOINT CONTROL_DIRECTORY PROFILE_DIRECTORY\n";
+        return 2;
+    }
+    const std::filesystem::path control = argv[2];
+    const auto screenshots = control / "screenshots";
+    createScreenshotDirectory(screenshots);
+    DesktopSimulator simulator(argv[1], 0, argv[3]);
+    std::string publishedCode;
+    const auto enrollmentFile = control / "enrollment-code";
+    if (!waitFor([&] {
+        const auto code = State::getEnrollmentCode();
+        if (!code.empty() && code != publishedCode)
+        {
+            // A local operator reads the displayed code. Keep this test control
+            // private and out of retained logs and screenshots.
+            const int descriptor = open(enrollmentFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, S_IRUSR | S_IWUSR);
+            if (descriptor < 0) throw std::runtime_error("Cannot publish private enrollment control");
+            const auto written = write(descriptor, code.data(), code.size());
+            close(descriptor);
+            if (written != static_cast<ssize_t>(code.size())) throw std::runtime_error("Cannot write enrollment control");
+            publishedCode = code;
+        }
+        return simulator.authenticated();
+    }, simulator, 15000)) return 1;
+    std::filesystem::remove(enrollmentFile);
+    std::ofstream(control / "ready") << "authenticated\n";
+
+    // Numbered files avoid blocking stdin while the real websocket and LVGL
+    // runtime continue pumping. The harness publishes requests atomically.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
+    for (unsigned sequence = 1; std::chrono::steady_clock::now() < deadline;)
+    {
+        pump(simulator);
+        auto request = control / (std::to_string(sequence) + ".json");
+        if (!std::filesystem::exists(request)) continue;
+        JsonDocument command;
+        std::ifstream input(request);
+        const bool sizeOk = std::filesystem::file_size(request) <= 4096;
+        const auto parseError = sizeOk ? deserializeJson(command, input) : DeserializationError::TooDeep;
+        const bool valid = sizeOk && !parseError && validCommand(command);
+        bool ok = false;
+        try { ok = valid && execute(command, simulator, screenshots); }
+        catch (const std::exception &) { ok = false; }
+        JsonDocument result;
+        result["ok"] = ok;
+        result["screen"] = screenName();
+        result["devicePin"] = Settings::getDeviceConfig().passCode;
+        result["readerId"] = Settings::getAttraccessAuthConfig().readerId;
+        result["authenticationGeneration"] = simulator.authenticationGeneration();
+        result["authenticated"] = simulator.authenticated();
+        result["networkAvailable"] = State::getNetworkQualityState().quality != State::NETWORK_QUALITY_OFFLINE;
+        result["removedOnWrite"] = simulator.nfc().removedOnWrite();
+        auto labels = result["labels"].to<JsonArray>();
+        collectLabels(lv_screen_active(), labels);
+        collectLabels(lv_layer_top(), labels);
+        auto versions = result["keyVersions"].to<JsonArray>();
+        for (auto version : simulator.nfc().card(valid ? (command["card"] | 0) : 0).keyVersions) versions.add(version);
+        const auto temporary = control / "result.tmp";
+        {
+            // Results include the device PIN. Secure the file before writing any content.
+            const int descriptor = open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+            if (descriptor < 0) throw std::runtime_error("Could not create private control result");
+            if (fchmod(descriptor, S_IRUSR | S_IWUSR) != 0)
+            {
+                close(descriptor);
+                throw std::runtime_error("Could not secure control result");
+            }
+            FILE *output = fdopen(descriptor, "w");
+            if (!output)
+            {
+                close(descriptor);
+                throw std::runtime_error("Could not open control result");
+            }
+            std::string content;
+            serializeJson(result, content);
+            const bool written = fwrite(content.data(), 1, content.size(), output) == content.size();
+            const int closed = fclose(output);
+            if (!written || closed != 0) throw std::runtime_error("Could not write control result");
+        }
+        std::filesystem::rename(temporary, control / (std::to_string(sequence) + ".result.json"));
+        ++sequence;
+        if (valid && command["action"] == "quit") return ok ? 0 : 1;
+    }
+    std::cerr << "fixture did not stop desktop simulator within five minutes\n";
+    return 1;
+}

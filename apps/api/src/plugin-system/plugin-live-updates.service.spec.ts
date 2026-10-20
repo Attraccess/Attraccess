@@ -92,6 +92,8 @@ describe('plugin live-update SDK host bridge', () => {
       subscriptions: [good, { ...good, identifier: 'device:2' }, { topic: 'billing' }],
     });
     source.next({ data: { eventType: 'changed', value: 7 } });
+    // Each event now rechecks authorization asynchronously before delivery.
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(packets).toContainEqual({
       data: { type: 'event', event: { ...good, eventType: 'changed', payload: { eventType: 'changed', value: 7 } } },
     });

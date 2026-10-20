@@ -13,6 +13,7 @@ void ReaderWorkflow::testSessionSummary()
     click("Lasercutter"); click("Sitzung beenden");
     stopReply(R"("success":true,"durationSeconds":360000,"endedOwnSession":true)", true);
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    const auto summaryRequestedAt = millis();
     stopReply(R"("success":true,"durationSeconds":360000,"endedOwnSession":true,"billingSummary":{"amount":0,"total":"0,00 EUR"})");
     assert(lv_screen_active() == Display::sessionSummaryScreen.getScreen());
     assert(label(lv_screen_active(), "100:00:00"));
@@ -22,8 +23,13 @@ void ReaderWorkflow::testSessionSummary()
     stopReply(R"("success":true,"durationSeconds":1,"endedOwnSession":true)");
     assert(label(lv_screen_active(), "100:00:00"));
     const auto stopsAtSummary = server.count("STOP_RESOURCE_USAGE_SESSION");
-    pump(3000); assert(lv_screen_active() == Display::sessionSummaryScreen.getScreen());
-    pump(600); assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+    // Capture and reply processing also consume the production 3.5-second timer.
+    // Observe expiry instead of adding a fresh three-second wait on a slow host.
+    const auto expiryDeadline = millis() + 5000;
+    while (lv_screen_active() == Display::sessionSummaryScreen.getScreen() &&
+           static_cast<int32_t>(expiryDeadline - millis()) > 0) pump();
+    assert(millis() - summaryRequestedAt >= 3500);
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsAtSummary);
     login(); click("Stop");
     stopReply(R"("success":true,"durationSeconds":0,"endedOwnSession":true)");

@@ -1,3 +1,5 @@
+import { ResourceActivityPolicy } from './activity/resource-activity-policy.service';
+import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesController } from './resources.controller';
 import { ResourcesService } from './resources.service';
@@ -34,6 +36,8 @@ describe('ResourcesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResourcesController],
       providers: [
+        { provide: ResourceActivityPolicy, useValue: { canRead: jest.fn().mockResolvedValue(true) } },
+        { provide: ResourceIntroducersService, useValue: { isIntroducer: jest.fn().mockResolvedValue(true) } },
         {
           provide: ResourcesService,
           useValue: mockResourcesService,
@@ -103,7 +107,7 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
 
-      const result = await controller.getOneById(1);
+      const result = await controller.getOneById(1, request);
 
       expect(result).toEqual({
         ...resource,
@@ -115,7 +119,7 @@ describe('ResourcesController', () => {
     it('should throw NotFoundException if resource not found', async () => {
       jest.spyOn(service, 'getResourceById').mockRejectedValue(new NotFoundException());
 
-      await expect(controller.getOneById(999)).rejects.toThrow(NotFoundException);
+      await expect(controller.getOneById(999, request)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -197,6 +201,8 @@ describe('ResourcesController', () => {
       const module = await Test.createTestingModule({
         controllers: [ResourcesController],
         providers: [
+          { provide: ResourceActivityPolicy, useValue: { canRead: jest.fn().mockResolvedValue(true) } },
+          { provide: ResourceIntroducersService, useValue: { isIntroducer: jest.fn().mockResolvedValue(true) } },
           { provide: ResourcesService, useValue: service },
           { provide: ResourceImageService, useValue: {} },
         ],
