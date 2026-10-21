@@ -1,4 +1,4 @@
-// Real-reader regression for OTA stalls under internal RAM pressure.
+// Real-reader regression for OTA stalls, including NFC/Wi-Fi coexistence.
 // Run on an isolated test network; this fixture accepts the selected reader
 // without checking its production token and never logs that token.
 import { readFileSync } from 'node:fs';
@@ -12,6 +12,7 @@ const { values } = parseArgs({
     port: { type: 'string', default: '3000' },
     cycles: { type: 'string', default: '3' },
     'disconnect-at': { type: 'string', default: '0' },
+    'offer-delay-ms': { type: 'string', default: '0' },
     'first-chunk-timeout-ms': { type: 'string', default: '10000' },
     'transfer-timeout-ms': { type: 'string', default: '180000' },
     'timeout-ms': { type: 'string', default: '900000' },
@@ -29,6 +30,7 @@ const readerId = numeric('reader-id', 1);
 const port = numeric('port', 1);
 const cycles = numeric('cycles', 1);
 const disconnectAt = numeric('disconnect-at', 0);
+const offerDelay = numeric('offer-delay-ms', 0);
 const firstChunkTimeout = numeric('first-chunk-timeout-ms', 1);
 const transferTimeout = numeric('transfer-timeout-ms', 1);
 const overallTimeout = numeric('timeout-ms', 1);
@@ -121,16 +123,24 @@ server.on('connection', (socket) => {
       const offer = () => sendEvent('READER_FIRMWARE_UPDATE_REQUIRED', {
         available: { name: payload.name, variant: payload.variant, version, totalSize: image.length },
       });
-      console.log(`Offering transfer ${completed + 1}/${cycles}`);
-      offer();
-      retryTimer = setInterval(() => { if (!updateAcked && socket.readyState === 1) offer(); }, 4000);
-      timers.add(retryTimer);
-      firstChunkTimer = after(firstChunkTimeout, () => finish(false, 'OTA stuck at 0%: no first chunk request'));
-      if (cycleNumber !== completed) {
-        cycleNumber = completed;
-        lastOffset = 0;
-        cycleTimer = after(transferTimeout, () => finish(false, `OTA failed to complete; last offset=${lastOffset}`));
-      }
+      // Let the normal card-polling state start before OTA. Otherwise a fast
+      // offer can race NFC startup and hide RF interference with Wi-Fi.
+      after(offerDelay, () => {
+        if (socket.readyState !== 1 || activeSocket !== socket) return;
+        offerStarted = Date.now();
+        console.log(`Offering transfer ${completed + 1}/${cycles}`);
+        offer();
+        retryTimer = setInterval(() => { if (!updateAcked && socket.readyState === 1) offer(); }, 4000);
+        timers.add(retryTimer);
+        if (!firstChunk) {
+          firstChunkTimer = after(firstChunkTimeout, () => finish(false, 'OTA stuck at 0%: no first chunk request'));
+        }
+        if (cycleNumber !== completed) {
+          cycleNumber = completed;
+          lastOffset = 0;
+          cycleTimer = after(transferTimeout, () => finish(false, `OTA failed to complete; last offset=${lastOffset}`));
+        }
+      });
     } else if (type === 'ACK_READER_FIRMWARE_UPDATE_REQUIRED') {
       updateAcked = true;
       clearInterval(retryTimer);

@@ -4,7 +4,6 @@
 #include "../../settings/kvstore.hpp"
 
 #include <esp_websocket_client.h>
-#include "../../certs/ca_index.hpp"
 #include "../../logger/logger.hpp"
 
 class AdaptiveCertManager

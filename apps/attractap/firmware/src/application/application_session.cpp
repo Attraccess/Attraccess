@@ -1,3 +1,4 @@
+#include "../state/state.hpp"
 // Session coordination: resource/project selection, action buttons, pause timing
 // FEATURE: application-session
 
@@ -57,8 +58,8 @@ void Application::handleResourceListUpdate(
     Display::resourceListScreen.hideActionProgress();
     Display::resourceDetailsScreen.hideActionProgress();
     if (!this->actionCompletionMessage.empty()) {
-      if (this->returnToListAfterAction) Display::resourceListScreen.showSuccessToast(this->actionCompletionMessage.c_str());
-      else Display::resourceDetailsScreen.showSuccessToast(this->actionCompletionMessage.c_str());
+      if (this->returnToListAfterAction) Display::resourceListScreen.showSuccessToast(this->actionCompletionMessage);
+      else Display::resourceDetailsScreen.showSuccessToast(this->actionCompletionMessage);
     }
     this->returnToListAfterAction = false;
     this->actionCompletionMessage.clear();
@@ -200,6 +201,7 @@ void Application::resetSessionOnDisconnect() {
   this->selectedResourceChanged = false;
 
   this->unlocked = false;
+  State::setUserLanguage(false);
   this->externalState = EXTERNAL_STATE_NONE;
   this->nfc.enableCardDetection();
 }
@@ -246,14 +248,15 @@ void Application::handleResourceListAction(const API::ResourceBrief &resource, R
   this->handleResourceDetailsButtonClick({&Display::resourceDetailsScreen, type, {}});
 }
 
-void Application::showReaderActionProgress(const char *title) {
+void Application::showReaderActionProgress(const FirmwareI18n::Text &title) {
   if (this->returnToListAfterAction && !this->resourceIsSelected) {
     const char *name = "";
     for (uint16_t i = 0; i < this->resourceList.count; ++i)
       if (this->resourceList.items[i].id == this->pendingUiResourceId) name = this->resourceList.items[i].name;
-    Display::resourceListScreen.showActionProgress(title, name);
+    Display::resourceListScreen.showActionProgress(title, FirmwareI18n::Text::literal(name));
   } else Display::resourceDetailsScreen.showActionProgress(title);
 }
+
 
 #endif
 
@@ -308,7 +311,7 @@ void Application::handleResourceDetailsButtonClick(
     }
 
     this->showReaderActionProgress(
-        isTakeover ? "Übernehme Sitzung" : "Starte Sitzung");
+        isTakeover ? FirmwareI18n::Message::TakingOverSession : FirmwareI18n::Message::StartingSession);
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -323,7 +326,7 @@ void Application::handleResourceDetailsButtonClick(
   }
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
     this->pendingUiAction = "STOP_RESOURCE_USAGE_SESSION";
-    this->showReaderActionProgress("Nutzung wird beendet");
+    this->showReaderActionProgress(FirmwareI18n::Message::EndingUsage);
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_STOP_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -335,25 +338,25 @@ void Application::handleResourceDetailsButtonClick(
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
     this->pendingUiAction = "LOCK_DOOR";
-    this->showReaderActionProgress("Sperre Tür");
+    this->showReaderActionProgress(FirmwareI18n::Message::LockingDoor);
     this->beginActionPause();
     this->api.lockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
     this->pendingUiAction = "UNLOCK_DOOR";
-    this->showReaderActionProgress("Entsperre Tür");
+    this->showReaderActionProgress(FirmwareI18n::Message::UnlockingDoor);
     this->beginActionPause();
     this->api.unlockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
     this->pendingUiAction = "UNLATCH_DOOR";
-    this->showReaderActionProgress("Öffne Tür-Riegel");
+    this->showReaderActionProgress(FirmwareI18n::Message::ReleasingDoorLatch);
     this->beginActionPause();
     this->api.unlatchDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
     this->pendingUiAction = "TRIGGER_FLOW_BUTTON";
-    this->showReaderActionProgress("Aktion Ausführen");
+    this->showReaderActionProgress(FirmwareI18n::Message::RunningAction);
     this->beginActionPause();
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;

@@ -1,3 +1,5 @@
+import { createTranslator } from '../i18n/translate';
+import { SettingsService } from '../settings/settings.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import { User } from '@attraccess/database-entities';
@@ -10,14 +12,21 @@ import { EmailService } from '../email/email.service';
 
 describe('NotificationDispatchService', () => {
   let service: NotificationDispatchService;
+  const settings = { resolveLanguage: jest.fn(async (locale: string | undefined) => locale?.trim() || 'en') };
   let preferences: { isChannelEnabled: jest.Mock };
   let push: { sendToUser: jest.Mock };
   let live: { emitToUser: jest.Mock; isUserPresent: jest.Mock };
-  let email: { sendMaintenanceRequestedEmail: jest.Mock; sendResourceTakeoverEmail: jest.Mock; sendAccessChangeEmail: jest.Mock; sendResourceSessionEndedEmail: jest.Mock };
+  let email: {
+    sendMaintenanceRequestedEmail: jest.Mock;
+    sendResourceTakeoverEmail: jest.Mock;
+    sendAccessChangeEmail: jest.Mock;
+    sendResourceSessionEndedEmail: jest.Mock;
+  };
 
-  const recipient = { id: 2, email: 'recipient@example.com' } as User;
+  const recipient = { locale: 'en', id: 2, email: 'recipient@example.com' } as User;
 
   beforeEach(async () => {
+    settings.resolveLanguage.mockImplementation(async (locale) => locale?.trim() || 'en');
     preferences = { isChannelEnabled: jest.fn().mockResolvedValue(true) };
     push = { sendToUser: jest.fn().mockResolvedValue(undefined) };
     live = { emitToUser: jest.fn(), isUserPresent: jest.fn().mockReturnValue(true) };
@@ -31,6 +40,7 @@ describe('NotificationDispatchService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationDispatchService,
+        { provide: SettingsService, useValue: settings },
         { provide: NotificationPreferenceService, useValue: preferences },
         { provide: PushService, useValue: push },
         { provide: NotificationLiveService, useValue: live },
@@ -53,7 +63,7 @@ describe('NotificationDispatchService', () => {
       sendEmail,
     });
 
-    expect(sendEmail).toHaveBeenCalledWith(recipient);
+    expect(sendEmail).toHaveBeenCalledWith(recipient, 'en');
     expect(push.sendToUser).toHaveBeenCalledWith(2, {
       title: 'Maintenance requested',
       body: 'Laser cutter needs help',
@@ -67,6 +77,42 @@ describe('NotificationDispatchService', () => {
       url: '/resources/4/maintenance',
       severity: 'info',
     });
+  });
+
+  it('uses the system default for notification text without changing recipient preferences', async () => {
+    settings.resolveLanguage.mockImplementation(async (locale) => locale?.trim() || 'de');
+    const guest = { id: 3, email: 'guest@example.com' } as User;
+    const t = createTranslator({ en: { title: 'Session ended' }, de: { title: 'Sitzung beendet' } });
+    await service.dispatch({
+      category: NotificationCategory.RESOURCE_SESSION_ENDED,
+      recipients: [guest, recipient],
+      title: (user) => t(user.locale, 'title'),
+      body: '',
+    });
+    expect(push.sendToUser).toHaveBeenCalledWith(3, expect.objectContaining({ title: 'Sitzung beendet' }));
+    expect(push.sendToUser).toHaveBeenCalledWith(2, expect.objectContaining({ title: 'Session ended' }));
+    expect(guest.locale).toBeUndefined();
+  });
+
+  it('uses the system fallback for unsupported locales while preserving the email recipient', async () => {
+    const fallback = Object.assign(Object.create(SettingsService.prototype), {
+      getDefaultLanguage: async () => 'de',
+    });
+    settings.resolveLanguage.mockImplementation((locale) => fallback.resolveLanguage(locale));
+    const unsupported = { id: 3, locale: 'fr', email: 'guest@example.com' } as User;
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    const t = createTranslator({ en: { title: 'Session ended' }, de: { title: 'Sitzung beendet' } });
+    await service.dispatch({
+      category: NotificationCategory.RESOURCE_SESSION_ENDED,
+      recipients: [unsupported, recipient],
+      title: (user) => t(user.locale, 'title'),
+      body: '',
+      sendEmail,
+    });
+    expect(push.sendToUser).toHaveBeenCalledWith(3, expect.objectContaining({ title: 'Sitzung beendet' }));
+    expect(push.sendToUser).toHaveBeenCalledWith(2, expect.objectContaining({ title: 'Session ended' }));
+    expect(sendEmail).toHaveBeenCalledWith(unsupported, 'de');
+    expect(unsupported.locale).toBe('fr');
   });
 
   it('skips disabled channels without affecting enabled channels', async () => {
@@ -98,7 +144,11 @@ describe('NotificationDispatchService', () => {
       url: '/messages?conversation=10',
     });
 
-    expect(preferences.isChannelEnabled).toHaveBeenCalledWith(2, NotificationCategory.MESSAGES, NotificationChannel.TOAST);
+    expect(preferences.isChannelEnabled).toHaveBeenCalledWith(
+      2,
+      NotificationCategory.MESSAGES,
+      NotificationChannel.TOAST,
+    );
     expect(preferences.isChannelEnabled).not.toHaveBeenCalledWith(
       2,
       NotificationCategory.MESSAGES,
@@ -208,7 +258,7 @@ describe('NotificationDispatchService', () => {
       sendEmail,
     });
 
-    expect(sendEmail).toHaveBeenCalledWith(recipient);
+    expect(sendEmail).toHaveBeenCalledWith(recipient, 'en');
   });
 
   it('does not send resource takeover email when email channel is disabled', async () => {

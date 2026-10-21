@@ -69,7 +69,7 @@ private:
     void enqueue(const std::string &msg);
     void processOutbound(const char *data, size_t len);
     void respondAuthenticated();
-    void respondResourceList(uint32_t requestId = 0);
+    void respondResourceList(uint32_t requestId = 0, const char *language = nullptr);
     void respondCardAuth(const std::string &uidHex, uint32_t resourceId);
     void respondActionSuccess(const std::string &type);
 

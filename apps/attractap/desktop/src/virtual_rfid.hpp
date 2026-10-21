@@ -48,15 +48,19 @@ public:
     void resetKeySlot(uint8_t keyNumber);
     void setKeyVersion(uint8_t keyNumber, uint8_t keyVersion);
 
+    void setRemoveOnWrite(bool enabled) { removeOnWrite = enabled; didRemoveOnWrite = false; }
+    bool removedOnWrite() const { return didRemoveOnWrite; }
+
     bool authenticate(uint8_t keyNumber, uint8_t *key) override;
     bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey,
                    uint8_t *newKey, uint8_t keyVersion = 1) override;
     bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNumber) override;
-    bool isCardPresent() override { return presentedCard < CardCount; }
+    bool isCardPresent() override { return !suspended && presentedCard < CardCount; }
     uint8_t *getFactoryKey() override { return const_cast<uint8_t *>(factoryKey().data()); }
 
-    void enableCardDetection() override { cardDetectionEnabled = true; }
+    void enableCardDetection() override { if (!suspended) cardDetectionEnabled = true; }
     void disableCardDetection() override { cardDetectionEnabled = false; }
+    bool suspend() override { suspended = true; cardDetectionEnabled = false; return true; }
     void resetCardPresence() override { cardPresenceReported = false; }
 
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback) override;
@@ -77,10 +81,13 @@ private:
     void save(size_t index);
     void reconcileCardPresence();
 
+    bool removeOnWrite = false;
+    bool didRemoveOnWrite = false;
     ProfileStore &profile;
     std::array<Card, CardCount> cards;
     size_t presentedCard = CardCount;
     bool cardDetectionEnabled = false;
+    bool suspended = false;
     bool cardPresenceReported = false;
     std::function<void(uint8_t *, uint8_t)> cardDetectedCallback;
     std::function<void(uint32_t)> cardRemovedCallback;

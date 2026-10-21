@@ -38,8 +38,8 @@ void ReaderWorkflow::testListAndAuthentication()
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 140, true}; pump();
     display.touch.pressed = false; pump();
-    assert(lv_obj_is_visible(label(lv_layer_top(), "Maintenance")));
-    drawerSettingsBeforeLogin = lv_obj_get_parent(label(lv_layer_top(), "Settings"));
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))));
+    drawerSettingsBeforeLogin = lv_obj_get_parent(label(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Settings, State::getActiveLanguage())));
     login();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Alex"));

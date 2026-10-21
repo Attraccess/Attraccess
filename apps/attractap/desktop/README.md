@@ -77,6 +77,67 @@ SDL_AUDIO_DRIVER=dummy SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software \
   dist/apps/attractap-desktop/attractap-desktop-display-tests /path/to/screenshots
 ```
 
+## Isolated real-API workflows
+
+```sh
+pnpm nx run attractap-desktop:test-real-api
+```
+
+This opt-in target builds the native probe, starts the existing Nest API on a
+free loopback port, and drives the production application, protocol and LVGL
+callbacks through numbered JSON files. It uses SDL's dummy video driver and
+software renderer; no desktop window or embedded toolchain is needed. Install
+the normal workspace dependencies (`scripts/setup-dev-dependencies.sh`) and the
+native prerequisites above. The first CMake build downloads pinned LVGL and
+ArduinoJson sources. Ordinary API unit and E2E targets exclude this suite.
+
+Each invocation creates its own SQLite database, storage, empty plugin folder,
+control directory and reader profiles. The dedicated Jest setup ignores `.env`
+and inherited application settings, uses a random session secret and disables
+plugins. Real migrations, authentication and permissions remain enabled.
+Prerequisite users, resources, introductions, projects and forms are seeded only
+in that disposable database. Successful enrollment, usage and approval are
+performed through the real application workflows.
+
+The scenarios check exact reader registration, acknowledged resource delivery
+before and after a newly authenticated connection, profile reuse without duplicate
+registration, a nondefault device PIN loaded after restart without a launch-time
+write, card enrollment and authentication after restart, unknown and
+incorrect card keys, failed writes, removal during a write and recovery. They also
+check project sessions, required start/end forms, missing input, a real server
+validation rejection followed by correction, and a web request that waits for an
+eligible supervisor's card. Probe validation and controlled failure scenarios
+check malformed commands, unsafe screenshot names, bounded waits and cleanup.
+
+Screenshots come from the actual 480 × 480 display framebuffer, separately from
+the desktop shell captures used by component tests. PNG signatures and dimensions
+are checked. Artifacts remain under
+`dist/apps/attractap-desktop/real-api-artifacts/<scenario>-<unique-id>/`, including
+revision metadata, observed screen labels, per-connection delivery results and
+filtered launch diagnostics. One shared filter removes sensitive field lines,
+known PINs and credentials, and unlabelled key/token patterns from retained
+text. In-memory control results stay private and unfiltered for assertions.
+Screenshot capture rejects settings screens and labels that the filter would
+redact; the suite captures workflow screens only. They are local generated
+artifacts; do not commit them. Inspect workflow frames when reviewing changes;
+PNG creation alone does not establish visual correctness. Concurrent invocations
+retain separate artifacts and disposable data. Native builds share the normal
+build directory, so run this target serially.
+
+The fixture waits for owned processes to exit before deleting their temporary
+profiles and controls. Nest and SQLite close before storage is removed. Tests may
+explicitly restart a reader with its own profile to check persistence. Build and
+probe waits are bounded. If startup fails, inspect the error and retained launch
+log. A moved worktree may need a fresh CMake build directory: preserve any desired
+artifacts, then rename `dist/apps/attractap-desktop` before rerunning. If a screen
+action fails, its error includes observed labels; ambiguous, hidden or disabled
+widgets are rejected. The probe has no production control listener.
+
+These host workflows do not establish physical RF/card compatibility, device
+hardware timing, embedded memory limits, FreeRTOS scheduling or OTA correctness.
+The desktop network badge follows the actual host connection; it does not
+measure the embedded transport's ping quality.
+
 For reader operation, see the user guide in
 [English](../../../docs/en/attractap/using-the-reader.md) or
 [German](../../../docs/de/attractap/using-the-reader.md).
@@ -86,7 +147,7 @@ For reader operation, see the user guide in
 `pnpm nx test attractap-desktop` also runs the reader workflows against a
 deterministic server transport. These cover sign-in, resource actions, forms,
 supervision and recovery. The timeout test uses a real clock and takes about
-134 seconds. The tests exercise the application, API parser, NFC verifier and
+three minutes. The tests exercise the application, API parser, NFC verifier and
 screen router; physical NFC, touch hardware and live-network behavior still
 need a device smoke test.
 
@@ -98,5 +159,5 @@ SDL_AUDIO_DRIVER=dummy \
 apps/attractap/firmware/tests/display-theme/build/display-theme-host --output /tmp/reader-states
 ```
 
-The user guide's screenshots are native display captures. The desktop transport
-and network badge use demonstration data.
+The user guide's screenshots are native display captures. The deterministic reader tests use a simulated transport. The connected desktop
+simulator uses the real host connection for its network badge.

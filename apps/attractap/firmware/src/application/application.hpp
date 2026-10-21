@@ -28,6 +28,7 @@ private:
     INfc &nfc;
     Logger logger;
     API &api;
+    bool firmwareUpdateActive = false;
     Beeper beeper;
 
 #ifdef HAS_LVGL_DISPLAY
@@ -83,7 +84,7 @@ private:
 
     void handleResourceListAction(const API::ResourceBrief &resource, ResourceListAction action);
     void updateSelectedResourceDetails();
-    void showReaderActionProgress(const char *title);
+    void showReaderActionProgress(const FirmwareI18n::Text &title);
     void finishReaderAction(bool success);
     void logoutReader();
     void beginSessionSummary(const API::ActionResult &result);

@@ -22,11 +22,20 @@ function getLocalStorageFilterKey(filter: PersistedFilterProps) {
 }
 
 function getValueFromLocalStorage(filter: PersistedFilterProps, defaultValue: boolean) {
-  const value = localStorage.getItem(getLocalStorageFilterKey(filter));
-  if (value === null) {
+  try {
+    const value = localStorage.getItem(getLocalStorageFilterKey(filter));
+    return value === null ? defaultValue : value === 'true';
+  } catch {
     return defaultValue;
   }
-  return value === 'true';
+}
+
+function persistFilter(filter: PersistedFilterProps, value: boolean) {
+  try {
+    localStorage.setItem(getLocalStorageFilterKey(filter), value ? 'true' : 'false');
+  } catch {
+    // Keep filters usable in memory when browser storage is unavailable.
+  }
 }
 
 export function ResourceOverview() {
@@ -35,39 +44,30 @@ export function ResourceOverview() {
 
   const [searchValue, setSearchValue] = useState('');
   const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
+    () => getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
   );
   const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
+    () => getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
   );
   const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
+    () => getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
   );
 
   const debouncedSearchValue = useDebounce(searchValue, 250);
 
   const setFilterByOnlyInUseByMe = useCallback((value: boolean) => {
     setFilterByOnlyInUseByMeState(value);
-    localStorage.setItem(
-      getLocalStorageFilterKey(PersistedFilterProps.onlyInUseByMe),
-      value === true ? 'true' : 'false',
-    );
+    persistFilter(PersistedFilterProps.onlyInUseByMe, value);
   }, []);
 
   const setFilterByOnlyWithPermissions = useCallback((value: boolean) => {
     setFilterByOnlyWithPermissionsState(value);
-    localStorage.setItem(
-      getLocalStorageFilterKey(PersistedFilterProps.onlyWithPermissions),
-      value === true ? 'true' : 'false',
-    );
+    persistFilter(PersistedFilterProps.onlyWithPermissions, value);
   }, []);
 
   const setFilterByHideEmptyResourceGroups = useCallback((value: boolean) => {
     setFilterByHideEmptyResourceGroupsState(value);
-    localStorage.setItem(
-      getLocalStorageFilterKey(PersistedFilterProps.hideEmptyResourceGroups),
-      value === true ? 'true' : 'false',
-    );
+    persistFilter(PersistedFilterProps.hideEmptyResourceGroups, value);
   }, []);
 
   const groupIds = useMemo(() => {

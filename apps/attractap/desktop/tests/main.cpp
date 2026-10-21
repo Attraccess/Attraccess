@@ -3,6 +3,7 @@
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
 #include "settings/settings.hpp"
+#include "state/state.hpp"
 #include "virtual_rfid.hpp"
 #include "utils.hpp"
 
@@ -82,6 +83,24 @@ int main()
     nfcContract.loop();
     assert(detected == 4);
 
+    // OTA suspension survives the normal reconnect path enabling detection.
+    const int detectionsBeforeOta = detected;
+    const int removalsBeforeOta = removed;
+    assert(nfcContract.suspend());
+    assert(nfcContract.suspend());
+    nfc.setPresent(1, false);
+    nfcContract.enableCardDetection();
+    nfc.setPresent(0, true);
+    nfcContract.loop();
+    assert(detected == detectionsBeforeOta);
+    assert(removed == removalsBeforeOta);
+    assert(!nfcContract.isCardPresent());
+    assert(!nfcContract.authenticate(0, nfcContract.getFactoryKey()));
+    assert(!nfcContract.getAvailableKeyNo(nullptr, nullptr, &availableKey));
+    assert(!nfcContract.changeKey(1, nfcContract.getFactoryKey(), nfcContract.getFactoryKey(),
+                                  const_cast<uint8_t *>(enrolledKey.data())));
+    assert(nfc.card(0).keys[1] == VirtualNfc::factoryKey());
+
     VirtualNfc persisted(first);
     for (size_t index = 0; index < VirtualNfc::CardCount; ++index)
     {
@@ -90,6 +109,12 @@ int main()
     }
     assert(persisted.card(1).keys[availableKey] == enrolledKey);
     assert(persisted.card(0).keys[availableKey] == VirtualNfc::factoryKey());
+    persisted.setPresent(1, true);
+    persisted.setRemoveOnWrite(true);
+    assert(!persisted.changeKey(availableKey, persisted.getFactoryKey(), const_cast<uint8_t *>(enrolledKey.data()), persisted.getFactoryKey()));
+    assert(persisted.removedOnWrite());
+    assert(!persisted.isCardPresent());
+    assert(persisted.card(1).keys[availableKey] == enrolledKey);
     persisted.setPresent(1, true);
     persisted.resetKeySlot(availableKey);
     assert(persisted.authenticate(availableKey, persisted.getFactoryKey()));
@@ -164,6 +189,29 @@ int main()
     assert(rejectsInvalidApiEndpoint("https://localhost:"));
     assert(rejectsInvalidApiEndpoint("https://::1"));
 
+    KVStore::setHostProfile(&first);
+    Settings::setup();
+    assert(State::getActiveLanguage() == "en");
+    // A cold start reloads the last API default, never a cardholder override.
+    KVStore persistedSettings;
+    persistedSettings.begin("settings", false);
+    persistedSettings.putString("api.language", "de");
+    persistedSettings.end();
+    State::setUserLanguage(true, "en");
+    State::setApiState(false, "");
+    ProfileStore rebooted("https://example.test", 42, root);
+    KVStore::setHostProfile(&rebooted);
+    Settings::setup();
+    assert(State::getActiveLanguage() == "de");
+    assert(!State::getApiState().userAuthenticated);
+    persistedSettings.begin("settings", false);
+    persistedSettings.putString("api.language", "unsupported");
+    persistedSettings.end();
+    Settings::setup();
+    assert(State::getActiveLanguage() == "en");
+    KVStore::setHostProfile(&otherReader);
+    Settings::setup();
+    assert(State::getActiveLanguage() == "en");
     KVStore::setHostProfile(&first);
     Settings::setup();
     Settings::saveAttraccessApiConfig("localhost", 3001, false);

@@ -237,6 +237,7 @@ struct ResourceUsageFormPageResult
         {
             uint32_t fieldId = 0;
             std::string message;
+            std::string code;
         } errors[MAX_FORM_PAGE_ERRORS];
     };
 };
@@ -250,6 +251,7 @@ struct CardAuthenticationDetailsResponse
         uint8_t keyLen;
         std::string error;
         std::string username;
+        std::string language;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
@@ -340,7 +342,7 @@ protected:
     std::function<void(const ActionResult &)> actionResultCallback;
     std::function<void(bool)> insufficientBalanceCallback;
     std::function<void(int)> firmwareUpdateProgressCallback;
-    std::function<void(std::string availableVersion)> firmwareUpdateMetaCallback;
+    std::function<bool(std::string availableVersion)> firmwareUpdateMetaCallback;
 };
 
 #include "../settings/settings.hpp"
@@ -429,6 +431,7 @@ public:
     void requestBillingTopup(uint32_t amountCents);
 
     void onDeviceName(std::function<void(std::string)> callback);
+    uint32_t authenticationGeneration() const { return authenticationCount; }
     void setLedBrightnessChangedCallback(std::function<void(uint8_t)> callback);
 
     void disableConnectionAttempts();
@@ -437,7 +440,8 @@ public:
     // Clear the locked TLS certificate decision (device settings button).
     void resetCertificateTrust();
 
-    // Error callback for server responses carrying an error field
+    // Error callback for server responses carrying an error field.
+    // For server errors, message is the raw code; the application localizes it.
     void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
     // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)
     void setActionResultCallback(std::function<void(const ActionResult &)> callback);
@@ -469,6 +473,8 @@ private:
     void onSupervisionRequestResult(JsonObject data);
     void onSupervisorCardAuthenticationData(JsonObject data);
     void onSupervisionResolved(JsonObject data);
+
+    uint32_t authenticationCount = 0;
 
     void sendAck(const char *type);
     void sendMessage(const char *type);
@@ -522,7 +528,8 @@ private:
     // Firmware update progress callback with status enum
 public:
     void setFirmwareUpdateProgressCallback(std::function<void(int)> callback);
-    void setFirmwareUpdateMetaCallback(std::function<void(std::string availableVersion)> callback);
+    // Return false to abort preparation before erasing flash (e.g. RF shutdown failed).
+    void setFirmwareUpdateMetaCallback(std::function<bool(std::string availableVersion)> callback);
 
 private:
 

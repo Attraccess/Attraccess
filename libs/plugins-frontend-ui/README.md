@@ -32,7 +32,14 @@ The host and plugin federation configurations must share
 this as a host-owned singleton with no remote fallback. Bundling a private
 copy would create a separate language store. Plugins should not call
 `detectAndSetLanguage` or persist an independent language preference: the core
-owns detection and selection.
+owns detection and selection. Supported personal choices and browser languages
+take precedence over the configured system default. The system default is the
+fallback when neither has an English or German translation. Detection does not
+persist a fallback as a personal choice.
+
+Explicit selections are retained in memory when browser storage is unavailable.
+Detection and system fallback resolution update the displayed language without
+marking it as an explicit preference.
 
 ## Running unit tests
 

@@ -15,6 +15,22 @@ let client: QueryClient;
 let requestLog: { path: string; method: string }[];
 let finish: (response: Response) => void;
 let fail: (error: Error) => void;
+const storageDescriptors = new Map(
+  (['localStorage', 'sessionStorage'] as const).map((area) => [area, Object.getOwnPropertyDescriptor(window, area)!]),
+);
+const storageMethods = [localStorage, sessionStorage].map((storage) => ({
+  storage,
+  getItem: storage.getItem,
+  setItem: storage.setItem,
+  removeItem: storage.removeItem,
+}));
+function restoreStorage() {
+  for (const [area, descriptor] of storageDescriptors) Object.defineProperty(window, area, descriptor);
+  for (const { storage, getItem, setItem, removeItem } of storageMethods) {
+    Object.assign(storage, { getItem, setItem, removeItem });
+  }
+}
+
 const originalBase = OpenAPI.BASE;
 const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 
@@ -54,6 +70,7 @@ afterEach(() => {
   OpenAPI.BASE = originalBase;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  restoreStorage();
 });
 function mount() {
   return renderHook(() => [useAuth(), useAuth()], {
@@ -64,6 +81,38 @@ function mount() {
     ),
   });
 }
+
+it.each(['localStorage', 'sessionStorage'] as const)(
+  'initializes cookie authentication when the %s getter is unavailable and still cleans the other storage',
+  async (area) => {
+    const other = area === 'localStorage' ? sessionStorage : localStorage;
+    other.setItem('auth', 'legacy-token');
+    Object.defineProperty(window, area, {
+      configurable: true,
+      get() {
+        throw new DOMException('Storage unavailable', 'SecurityError');
+      },
+    });
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current.every((auth) => auth.isInitialized)).toBe(true));
+    await waitFor(() => expect(requestLog.some(({ path }) => path === '/api/users/me')).toBe(true));
+    expect(other.getItem('auth')).toBeNull();
+    expect(OpenAPI.TOKEN).toBe('');
+    expect(OpenAPI.WITH_CREDENTIALS).toBe(true);
+  },
+);
+
+it.each(['localStorage', 'sessionStorage'] as const)(
+  'initializes cookie authentication when %s cleanup fails',
+  async (area) => {
+    window[area].removeItem = () => {
+      throw new DOMException('Storage unavailable', 'SecurityError');
+    };
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current.every((auth) => auth.isInitialized)).toBe(true));
+    await waitFor(() => expect(requestLog.some(({ path }) => path === '/api/users/me')).toBe(true));
+  },
+);
 
 it('keeps local logout separate, disables duplicate submissions across hook users and clears protected cache after success', async () => {
   const hook = mount();

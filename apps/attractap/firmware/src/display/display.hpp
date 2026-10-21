@@ -66,6 +66,7 @@ public:
 
     static void setTouchCallback(std::function<void(int16_t, int16_t)> callback);
     static void setDeviceName(std::string deviceName);
+    static void setDemoDeviceName();
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
     // Returns false if the display driver reported that touch hardware was not found at init.
@@ -73,7 +74,7 @@ public:
     static uint32_t touchPressSequence;
 
     // Global error popup helpers
-    static void showErrorPopup(const std::string &title, const std::string &message);
+    static void showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
     static void showBillingSummary(const std::string &total);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
@@ -95,7 +96,7 @@ public:
 private:
     static void setupFramebuffer();
     static bool touchWarningPending;
-    static void showMessagePopup(const std::string &title, const std::string &message, bool error);
+    static void showMessagePopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool error);
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.
@@ -126,6 +127,7 @@ private:
     static uint8_t reboot_count;
 
     static void advanceScreenRouter();
+    static void refreshVisibleTextForLanguageChange();
 
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);
@@ -134,7 +136,8 @@ private:
     static void initDeviceOverlay();
     static void updateNetworkQualityOverlay();
     static lv_obj_t *deviceNameLabel;
-    static std::string deviceNameInitValue;
+    static FirmwareI18n::Text deviceNameInitValue;
+    static void setDeviceNameText(const FirmwareI18n::Text &deviceName);
     static lv_obj_t *networkQualityContainer;
     static lv_obj_t *networkQualityLabel;
     static State::NetworkQuality networkQualityOverlayValue;

@@ -21,6 +21,7 @@ Allgemeine Einstellungen fuer die Attraccess-Instanz:
 | **Anwendungs-URL** | Die URL, unter der Benutzer auf Attraccess zugreifen (entspricht `ATTRACCESS_URL`). |
 | **Oeffentliche Internet-URL** | Oeffentliche URL fuer externe Callbacks, z.B. Zahlungsanbieter. Nur erforderlich, wenn sie sich von der Anwendungs-URL unterscheidet. |
 | **Lizenzschluessel** | Ihr Attraccess-Lizenzschluessel. |
+| **Standardsprache des Systems** | Deutsch oder Englisch als Ersatzsprache für übersetzte Inhalte. Eine unterstützte Benutzer- oder Browsersprache hat Vorrang. Attractap verwendet während einer Sitzung die unterstützte Sprache des Karteninhabers, sonst die Standardsprache. Auswahl bei der Ersteinrichtung; Administratoren können sie hier ändern. |
 
 > [!TIP]
 > Die meisten Einstellungen koennen auch ueber [Umgebungsvariablen](installation/environment-variables.md) konfiguriert werden. In der Oberflaeche geaenderte Einstellungen ueberschreiben die Standardwerte der Umgebungsvariablen.

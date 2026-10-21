@@ -101,6 +101,7 @@ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/device_shell.S" PROPERT
 add_library(attractap-desktop-runtime
     src/api_endpoint.cpp
     src/card_menu.cpp
+    src/desktop_simulator.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
     src/host_websocket_worker.cpp
@@ -150,6 +151,17 @@ target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 enable_testing()
 add_test(NAME attractap-desktop-tests COMMAND attractap-desktop-tests)
 
+add_executable(attractap-demo-protocol-tests
+    tests/demo-protocol.test.cpp
+    "${FIRMWARE_DIR}/src/api/demo/websocket.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/sessions.cpp"
+    "${FIRMWARE_DIR}/src/demo/demo_store.cpp")
+target_compile_definitions(attractap-demo-protocol-tests PRIVATE DEMO_MODE)
+target_compile_options(attractap-demo-protocol-tests PRIVATE -UNDEBUG)
+target_link_libraries(attractap-demo-protocol-tests PRIVATE attractap-desktop-runtime)
+add_test(NAME attractap-demo-protocol-tests COMMAND attractap-demo-protocol-tests)
+set_tests_properties(attractap-demo-protocol-tests PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software;SDL_AUDIO_DRIVER=dummy")
 add_executable(attractap-demo-clock-tests tests/demo-clock.test.cpp "${FIRMWARE_DIR}/src/clock/wall_clock.cpp")
 target_include_directories(attractap-demo-clock-tests PRIVATE "${FIRMWARE_DIR}/src")
 target_compile_options(attractap-demo-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
@@ -182,20 +194,40 @@ add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-
 set_tests_properties(attractap-desktop-display-tests PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
 
+# The API E2E suite launches this probe against a disposable Nest application.
+add_executable(attractap-desktop-real-api tests/real_api.cpp)
+target_link_libraries(attractap-desktop-real-api PRIVATE attractap-desktop-runtime)
+target_compile_options(attractap-desktop-real-api PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+
+# Exercise the actual JSON-command implementation, including checkable widgets.
+add_executable(attractap-real-api-controls-tests tests/real-api-controls.test.cpp)
+target_link_libraries(attractap-real-api-controls-tests PRIVATE attractap-desktop-runtime)
+target_compile_options(attractap-real-api-controls-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+add_test(NAME attractap-real-api-controls-tests COMMAND attractap-real-api-controls-tests)
+set_tests_properties(attractap-real-api-controls-tests PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software;SDL_AUDIO_DRIVER=dummy")
+
 file(GLOB ATTRACTAP_READER_TEST_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/reader/*.cpp")
 add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES} tests/controlled-clock.cpp)
 target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
+add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
+add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
+set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
 set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
-set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 180)
+# Includes the bilingual reader journey plus four real 30-second expiry windows.
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 240)
 
 # Exercise the production beeper without playing sound on the developer's machine.
 set_property(TEST
     attractap-desktop-tests
+    attractap-demo-protocol-tests
     attractap-desktop-display-tests
     attractap-reader-workflow-tests
+    attractap-ota-interrupt-enrollment
+    attractap-ota-interrupt-reset
     attractap-reader-timeout-tests
     APPEND PROPERTY ENVIRONMENT "SDL_AUDIO_DRIVER=dummy")

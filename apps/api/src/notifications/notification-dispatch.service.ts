@@ -5,6 +5,7 @@ import { EmailService } from '../email/email.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationLiveService } from './notification-live.service';
 import { NotificationCategory, NotificationChannel } from './notification-types';
+import { SettingsService } from '../settings/settings.service';
 
 export interface NotificationDispatchRequest {
   category: NotificationCategory;
@@ -17,7 +18,8 @@ export interface NotificationDispatchRequest {
   actorId?: number;
   severity?: 'info' | 'warning';
   dedupeKey?: string;
-  sendEmail?: (recipient: User) => Promise<void>;
+  /** Keep the original recipient locale for custom catalogs; use language for code-defined translations. */
+  sendEmail?: (recipient: User, language: 'en' | 'de') => Promise<void>;
 }
 
 @Injectable()
@@ -29,6 +31,7 @@ export class NotificationDispatchService {
     private readonly pushService: PushService,
     private readonly liveService: NotificationLiveService,
     private readonly emailService: EmailService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   public async dispatch(request: NotificationDispatchRequest): Promise<void> {
@@ -40,6 +43,10 @@ export class NotificationDispatchService {
   }
 
   private async dispatchToRecipient(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+    const language = await this.settingsService.resolveLanguage(recipient.locale);
+    const textRecipient: User = Object.assign(Object.create(Object.getPrototypeOf(recipient)), recipient, {
+      locale: language,
+    });
     const channels = request.channels ?? [
       NotificationChannel.EMAIL,
       NotificationChannel.PUSH,
@@ -57,19 +64,19 @@ export class NotificationDispatchService {
         : Promise.resolve(false),
     ]);
 
-    const title = typeof request.title === 'function' ? request.title(recipient) : request.title;
-    const body = typeof request.body === 'function' ? request.body(recipient) : request.body;
+    const title = typeof request.title === 'function' ? request.title(textRecipient) : request.title;
+    const body = typeof request.body === 'function' ? request.body(textRecipient) : request.body;
 
     await Promise.all([
-      emailEnabled && request.sendEmail ? this.tryEmail(request, recipient) : Promise.resolve(),
+      emailEnabled && request.sendEmail ? this.tryEmail(request, recipient, language) : Promise.resolve(),
       pushEnabled ? this.tryPush(request, recipient, title, body) : Promise.resolve(),
       toastEnabled ? this.tryToast(request, recipient, title, body) : Promise.resolve(),
     ]);
   }
 
-  private async tryEmail(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+  private async tryEmail(request: NotificationDispatchRequest, recipient: User, language: 'en' | 'de'): Promise<void> {
     try {
-      await request.sendEmail?.(recipient);
+      await request.sendEmail?.(recipient, language);
     } catch (error) {
       this.logger.error(
         `Failed to send ${request.category} email to user ${recipient.id}: ${(error as Error).message}`,

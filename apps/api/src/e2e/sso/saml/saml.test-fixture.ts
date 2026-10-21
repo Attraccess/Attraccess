@@ -1,3 +1,4 @@
+import { SettingsService } from '../../../settings/settings.service';
 /**
  * SSO SAML integration e2e tests.
  *
@@ -185,6 +186,7 @@ beforeAll(async () => {
     tokenHashService,
     mockMetricsService,
     rbacService,
+    { getDefaultLanguage: async () => 'en' } as SettingsService,
   );
   authService = new AuthService(mockEmailService, authDetailRepo, usersService, tokenHashService, mockMetricsService);
 
