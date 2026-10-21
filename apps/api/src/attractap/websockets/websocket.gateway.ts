@@ -1,4 +1,9 @@
-import { ReaderDeliveryAwaiters, READER_DELIVERY_CANCELLED } from './reader-delivery-awaiters';
+import {
+  ReaderDeliveryAwaiters,
+  ReaderWorkLimit,
+  READER_DELIVERY_CANCELLED,
+  READER_DELIVERY_CAPACITY,
+} from './reader-delivery-awaiters';
 import { ReaderIdentityService } from '../security/reader-identity.service';
 import { broadcastReaderLanguage, canReceiveReaderLanguage, sanitizeForLVGL } from './reader-display';
 import { LEGACY_READER_OUTPUT, protectedReaderConnection } from './reader-connection-transport';
@@ -70,6 +75,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   protected readonly logger = new Logger(AttractapGateway.name);
 
   private readonly responses = new ReaderDeliveryAwaiters();
+  private readonly deliveries = new ReaderWorkLimit();
+  private readonly requests = new ReaderWorkLimit();
   protected readonly clientResponseAwaitersMutex = this.responses.mutex;
 
   @Inject(SettingsService)
@@ -258,15 +265,30 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @SubscribeMessage('HEARTBEAT')
   public async onHeartbeat(@ConnectedSocket() socket: AuthenticatedWebSocket) {
-    this.logger.debug(`Heartbeat from client ${socket.id}.`);
+    await this.withReaderRequest(socket, async () => {
+      this.logger.debug(`Heartbeat from client ${socket.id}.`);
+      try {
+        (socket as unknown as { send: (data: string) => void }).send(readerHeartbeat());
+      } catch (error) {
+        this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
+      }
+      await this.clientWasActive(socket);
+    });
+  }
 
-    try {
-      (socket as unknown as { send: (data: string) => void }).send(readerHeartbeat());
-    } catch (error) {
-      this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
+  private async withReaderRequest(socket: AuthenticatedWebSocket, work: () => Promise<void>) {
+    if (this.disconnected.has(socket)) return;
+    const release = this.requests.acquire(socket);
+    if (!release) {
+      await this.handleDisconnect(socket);
+      socket.close();
+      return;
     }
-
-    await this.clientWasActive(socket);
+    try {
+      await work();
+    } finally {
+      release();
+    }
   }
 
   @SubscribeMessage('EVENT')
@@ -275,6 +297,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
     if (!eventData || typeof eventData.type !== 'string') return;
+    await this.withReaderRequest(socket, () => this.handleClientEvent(eventData, socket));
+  }
+
+  private async handleClientEvent(eventData: AttractapEvent['data'], socket: AuthenticatedWebSocket) {
     const connection = protectedReaderConnection(socket);
     const updateEvents = [
       AttractapEventType.READER_REGISTER,
@@ -318,6 +344,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.logger.debug(`Received reader event ${eventData.type}`);
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
+    if (this.disconnected.has(socket)) return;
     await this.eventHandlers[eventData.type](socket, eventData);
   }
 
@@ -350,67 +377,77 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const sendMessage = async (message: AttractapMessage) => {
       if (!connection && !LEGACY_READER_OUTPUT.has(message.data.type)) return false;
       if (connection && !connection.ready) return false;
-      messageCount++;
-      message.data.messageId = messageCount;
+      const release = this.deliveries.acquire(client);
+      if (!release) return false;
+      try {
+        messageCount++;
+        message.data.messageId = messageCount;
 
-      const RETRY_COUNT = 3;
-      const socket = client as unknown as AuthenticatedWebSocket;
-      const readerId = socket.readerId;
-      const authenticationAttempt = socket.state.readerAuthenticationAttempt;
+        const RETRY_COUNT = 3;
+        const socket = client as unknown as AuthenticatedWebSocket;
+        const readerId = socket.readerId;
+        const authenticationAttempt = socket.state.readerAuthenticationAttempt;
 
-      let lastError: Error | undefined;
+        let lastError: Error | undefined;
 
-      for (let i = 0; i < RETRY_COUNT; i++) {
-        if (this.disconnected.has(client) || client.readyState !== WebSocket.OPEN) return false;
-        // Authentication success and language retries belong to the current open reader connection.
-        if (
-          (message.data.type === AttractapEventType.READER_LANGUAGE ||
-            message.data.type === AttractapEventType.READER_AUTHENTICATED) &&
-          (!canReceiveReaderLanguage(socket) ||
-            socket.readerId !== readerId ||
-            socket.state.readerAuthenticationAttempt !== authenticationAttempt)
-        )
+        for (let i = 0; i < RETRY_COUNT; i++) {
+          if (this.disconnected.has(client) || client.readyState !== WebSocket.OPEN) return false;
+          // Authentication success and language retries belong to the current open reader connection.
+          if (
+            (message.data.type === AttractapEventType.READER_LANGUAGE ||
+              message.data.type === AttractapEventType.READER_AUTHENTICATED) &&
+            (!canReceiveReaderLanguage(socket) ||
+              socket.readerId !== readerId ||
+              socket.state.readerAuthenticationAttempt !== authenticationAttempt)
+          )
+            return false;
+          // An older auth/update retry must not restore a superseded default.
+          if (
+            (message.data.type === AttractapEventType.READER_AUTHENTICATED ||
+              message.data.type === AttractapEventType.READER_LANGUAGE) &&
+            this.websocketService.readerLanguage !== undefined
+          ) {
+            message.data.payload.language = this.websocketService.readerLanguage;
+          }
+          const stringifiedMessage = JSON.stringify(connection ? message : sanitizeForLVGL(message));
+          // The protected facade validates size before writing any envelope bytes.
+          // Oversize is deterministic; close without retrying it.
+          // Install the bounded waiter before send, including synchronous ACKs.
+          const response = this.waitForClientResponse(socket, message.data.type);
+          try {
+            client.send(stringifiedMessage);
+          } catch {
+            this.responses.cancel(socket);
+            await response.catch(() => undefined);
+            client.close();
+            return false;
+          }
+
+          this.logger.debug(
+            `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
+          );
+          try {
+            await response;
+            lastError = undefined;
+            break;
+          } catch (error) {
+            if ([READER_DELIVERY_CANCELLED, READER_DELIVERY_CAPACITY].includes((error as Error).message)) return false;
+            lastError = error as Error;
+            this.logger.debug(`Attempt ${i + 1} failed: ${error.message}`);
+          }
+        }
+
+        if (lastError) {
+          this.logger.error(
+            `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
+          );
           return false;
-        // An older auth/update retry must not restore a superseded default.
-        if (
-          (message.data.type === AttractapEventType.READER_AUTHENTICATED ||
-            message.data.type === AttractapEventType.READER_LANGUAGE) &&
-          this.websocketService.readerLanguage !== undefined
-        ) {
-          message.data.payload.language = this.websocketService.readerLanguage;
-        }
-        const stringifiedMessage = JSON.stringify(connection ? message : sanitizeForLVGL(message));
-        // The protected facade validates size before writing any envelope bytes.
-        // Oversize is deterministic; close without retrying it.
-        try {
-          client.send(stringifiedMessage);
-        } catch {
-          client.close();
-          return false;
         }
 
-        this.logger.debug(
-          `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-        );
-        try {
-          await this.waitForClientResponse(client as unknown as AuthenticatedWebSocket, message.data.type);
-          lastError = undefined;
-          break;
-        } catch (error) {
-          if ((error as Error).message === READER_DELIVERY_CANCELLED) return false;
-          lastError = error as Error;
-          this.logger.debug(`Attempt ${i + 1} failed: ${error.message}`);
-        }
+        return true;
+      } finally {
+        release();
       }
-
-      if (lastError) {
-        this.logger.error(
-          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
-        );
-        return false;
-      }
-
-      return true;
     };
 
     const sendBinaryData = (data: Buffer) => {

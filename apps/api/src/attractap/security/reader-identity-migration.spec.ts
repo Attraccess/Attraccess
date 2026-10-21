@@ -1,3 +1,7 @@
+import { ConfigService } from '@nestjs/config';
+import { EncryptionService } from '../../encryption/encryption.service';
+import { ReaderIdentityService } from './reader-identity.service';
+import { VerifiedCardSessionService } from './verified-card-session.service';
 import { DataSource } from 'typeorm';
 import * as registry from '../../database/migrations';
 import { Attractap, AttractapReaderIdentity, entities, NFCCard } from '@attraccess/database-entities';
@@ -12,69 +16,99 @@ const migrationNames = [migrationName, ownershipMigrationName];
 const migrations = Object.values(registry).filter((migration) => migrationNames.includes(migration.name));
 
 describe('registered reader identity migration', () => {
-  it('upgrades the full existing schema and restarts without changing readers or card slots', async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'reader-identity-migration-'));
-    const config = {
-      type: 'sqlite' as const,
-      database: join(directory, 'upgrade.sqlite'),
-      entities: Object.values(entities),
-      migrationsRun: true,
-      synchronize: false,
-    };
-    let source: DataSource | undefined;
-    try {
-      source = await new DataSource({
-        ...config,
-        migrations: Object.values(registry).filter((migration) => !migrationNames.includes(migration.name)),
-      }).initialize();
-      const reader = await source.getRepository(Attractap).save({ name: 'Existing reader', apiTokenHash: 'hash' });
-      const card = await source.getRepository(NFCCard).save({
-        uid: '04010203040506',
-        key: 'legacy ciphertext',
-        keyNo: 2,
-        isActive: true,
-      });
-      await source.destroy();
-      source = await new DataSource({ ...config, migrations: Object.values(registry) }).initialize();
-      expect(await source.getRepository(Attractap).findOneByOrFail({ id: reader.id })).toEqual(reader);
-      expect(await source.getRepository(NFCCard).findOneByOrFail({ id: card.id })).toEqual(card);
-      expect(await source.getRepository(AttractapReaderIdentity).count()).toBe(0);
-      const identity = await source.getRepository(AttractapReaderIdentity).save({
-        readerId: reader.id,
-        certificateFingerprint: 'certificate',
-        publicKeyFingerprint: 'public-key',
-        certificatePem: 'public cert',
-        installationId: 'installation',
-        generation: 1,
-        validFrom: new Date('2026-01-01'),
-        validUntil: new Date('2027-01-01'),
-        enrollmentClass: 'production',
-        manifestDigest: 'manifest',
-        revokedAt: null,
-        retiredAt: null,
-      });
-      await source.destroy();
-      source = await new DataSource({ ...config, migrations: Object.values(registry) }).initialize();
-      expect(await source.showMigrations()).toBe(false);
-      expect(await source.runMigrations()).toEqual([]);
-      expect(await source.getRepository(AttractapReaderIdentity).findOneByOrFail({ id: identity.id })).toEqual(
-        identity,
-      );
-      expect(await source.getRepository(Attractap).findOneByOrFail({ id: reader.id })).toEqual(reader);
-      expect(await source.getRepository(NFCCard).findOneByOrFail({ id: card.id })).toEqual(card);
-      await source.undoLastMigration();
-      await source.undoLastMigration();
-      expect(await source.showMigrations()).toBe(true);
-      expect(await source.getRepository(Attractap).findOneByOrFail({ id: reader.id })).toEqual(reader);
-      expect(await source.getRepository(NFCCard).findOneByOrFail({ id: card.id })).toEqual(card);
-      expect((await source.runMigrations()).map((migration) => migration.name)).toEqual(migrationNames);
-      expect(await source.getRepository(AttractapReaderIdentity).count()).toBe(0);
-      expect(await source.query('PRAGMA foreign_key_check')).toEqual([]);
-    } finally {
-      if (source?.isInitialized) await source.destroy();
-      rmSync(directory, { recursive: true, force: true });
-    }
-  }, 30_000);
+  it.each(['active', 'revoked', 'retired'])(
+    'retains %s history across refused rollback, restart and reapplication',
+    async (status) => {
+      const directory = mkdtempSync(join(tmpdir(), 'reader-identity-migration-'));
+      const config = {
+        type: 'sqlite' as const,
+        database: join(directory, 'upgrade.sqlite'),
+        entities: Object.values(entities),
+        migrationsRun: true,
+        synchronize: false,
+      };
+      let source: DataSource | undefined;
+      try {
+        source = await new DataSource({
+          ...config,
+          migrations: Object.values(registry).filter((migration) => !migrationNames.includes(migration.name)),
+        }).initialize();
+        const reader = await source.getRepository(Attractap).save({ name: 'Existing reader', apiTokenHash: 'hash' });
+        const card = await source.getRepository(NFCCard).save({
+          uid: '04010203040506',
+          key: 'legacy ciphertext',
+          keyNo: 2,
+          isActive: true,
+        });
+        await source.destroy();
+        source = await new DataSource({ ...config, migrations: Object.values(registry) }).initialize();
+        expect(await source.getRepository(Attractap).findOneByOrFail({ id: reader.id })).toEqual(reader);
+        expect(await source.getRepository(NFCCard).findOneByOrFail({ id: card.id })).toEqual(card);
+        expect(await source.getRepository(AttractapReaderIdentity).count()).toBe(0);
+        const identity = await source.getRepository(AttractapReaderIdentity).save({
+          readerId: reader.id,
+          certificateFingerprint: 'certificate',
+          publicKeyFingerprint: 'public-key',
+          certificatePem: 'public cert',
+          installationId: 'installation',
+          generation: 1,
+          validFrom: new Date('2026-01-01'),
+          validUntil: new Date('2027-01-01'),
+          enrollmentClass: 'production',
+          manifestDigest: 'manifest',
+          revokedAt: status === 'revoked' ? new Date('2026-02-01') : null,
+          retiredAt: status === 'retired' ? new Date('2026-02-01') : null,
+        });
+        await source.destroy();
+        source = await new DataSource({ ...config, migrations: Object.values(registry) }).initialize();
+        expect(await source.showMigrations()).toBe(false);
+        expect(await source.runMigrations()).toEqual([]);
+        expect(await source.getRepository(AttractapReaderIdentity).findOneByOrFail({ id: identity.id })).toEqual(
+          identity,
+        );
+        expect(await source.getRepository(Attractap).findOneByOrFail({ id: reader.id })).toEqual(reader);
+        expect(await source.getRepository(NFCCard).findOneByOrFail({ id: card.id })).toEqual(card);
+        await expect(source.undoLastMigration()).rejects.toThrow(/Cannot roll back/);
+        // The earlier migration also refuses erasure if called directly.
+        await expect(
+          new registry.AttractapReaderIdentity1792200000000().down(source.createQueryRunner()),
+        ).rejects.toThrow(/Cannot roll back/);
+        await source.destroy();
+        source = await new DataSource({ ...config, migrations: Object.values(registry) }).initialize();
+        expect(await source.showMigrations()).toBe(false);
+        expect(await source.getRepository(Attractap).findOneByOrFail({ id: reader.id })).toEqual(reader);
+        expect(await source.getRepository(NFCCard).findOneByOrFail({ id: card.id })).toEqual(card);
+        expect(await source.runMigrations()).toEqual([]);
+        expect(await source.getRepository(AttractapReaderIdentity).findOneByOrFail({ id: identity.id })).toEqual(
+          identity,
+        );
+        await expect(source.getRepository(Attractap).delete(reader.id)).rejects.toThrow(/must be revoked/);
+        await expect(source.getRepository(AttractapReaderIdentity).delete(identity.id)).rejects.toThrow(
+          /cannot be deleted/,
+        );
+        const service = new ReaderIdentityService(
+          source.getRepository(AttractapReaderIdentity),
+          new ConfigService(),
+          new VerifiedCardSessionService(),
+          new EncryptionService(new ConfigService()),
+        );
+        await expect(service.isLegacy(reader.id)).resolves.toBe(false);
+        await expect(service.isLegacy(reader.id + 1)).resolves.toBe(true);
+        // Ownership remains reserved even for revoked and retired credentials.
+        const other = await source.getRepository(Attractap).save({ name: 'Other reader', apiTokenHash: 'other hash' });
+        await expect(
+          source
+            .getRepository(AttractapReaderIdentity)
+            .save({ ...identity, id: undefined, readerId: other.id, certificateFingerprint: 'other certificate' }),
+        ).rejects.toThrow(/belongs to another/);
+        expect(await source.query('PRAGMA foreign_key_check')).toEqual([]);
+      } finally {
+        if (source?.isInitialized) await source.destroy();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
 
   it('protects existing ownership on upgrade and restart without changing credentials', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'reader-ownership-upgrade-'));
@@ -154,6 +188,20 @@ describe('registered reader identity migration', () => {
     }
   });
 
+  it('can roll back and reapply before any reader has enrolled', async () => {
+    const source = await new DataSource({ type: 'sqlite', database: ':memory:', migrations }).initialize();
+    try {
+      await source.query('CREATE TABLE attractap(id integer PRIMARY KEY)');
+      await source.runMigrations();
+      await source.undoLastMigration();
+      await source.undoLastMigration();
+      expect((await source.runMigrations()).map((migration) => migration.name)).toEqual(migrationNames);
+      expect(await source.query('SELECT * FROM attractap_reader_identity')).toEqual([]);
+    } finally {
+      await source.destroy();
+    }
+  });
+
   it('is discovered by fresh API startup with the complete migration registry', async () => {
     const source = await new DataSource({
       type: 'sqlite',
@@ -224,10 +272,9 @@ describe('registered reader identity migration', () => {
       await expect(source.query('DELETE FROM attractap_reader_identity')).rejects.toThrow(/cannot be deleted/);
       expect(await source.query('SELECT * FROM attractap_reader_identity')).toHaveLength(2);
       await expect(insert('after-deletion-cert', 'key', 1, 18)).rejects.toThrow(/belongs to another/);
-      await source.undoLastMigration();
-      await source.undoLastMigration();
-      expect(await source.showMigrations()).toBe(true);
-      expect((await source.runMigrations()).map((migration) => migration.name)).toEqual(migrationNames);
+      await expect(source.undoLastMigration()).rejects.toThrow(/Cannot roll back/);
+      expect(await source.showMigrations()).toBe(false);
+      expect(await source.query('SELECT * FROM attractap_reader_identity')).toHaveLength(2);
       expect(await source.runMigrations()).toEqual([]);
       expect(await source.query('PRAGMA foreign_key_check')).toEqual([]);
       expect(await source.query('SELECT * FROM nfc_card')).toEqual(cards);

@@ -8,7 +8,12 @@ import {
 } from '@attraccess/database-entities';
 import { ensureEntity } from '../seed-storage.test-fixture';
 import { readerSecurityFixture } from '../../../../attractap/security/reader-security.test-fixture';
-export async function migrationReaderSeeds(dataSource: DataSource, seedTag: string, resource: Resource) {
+export async function migrationReaderSeeds(
+  dataSource: DataSource,
+  seedTag: string,
+  resource: Resource,
+  enrollReader = true,
+) {
   const attractapRepo = dataSource.getRepository(Attractap);
 
   const billingConfigRepo = dataSource.getRepository(ResourceBillingConfiguration);
@@ -32,28 +37,29 @@ export async function migrationReaderSeeds(dataSource: DataSource, seedTag: stri
 
   // Public development credentials only. This seed exercises schema round trips,
   // not production enrollment or hardware qualification.
-  await ensureEntity(dataSource.getRepository(AttractapReaderIdentity), () => {
-    const fixture = readerSecurityFixture();
-    try {
-      const identity = fixture.identity;
-      return {
-        readerId: attractap.id,
-        certificatePem: identity.certificatePem,
-        certificateFingerprint: identity.certificateFingerprint,
-        publicKeyFingerprint: identity.publicKeyFingerprint,
-        installationId: identity.installationId,
-        generation: 1,
-        validFrom: identity.validFrom,
-        validUntil: identity.validUntil,
-        enrollmentClass: 'development',
-        manifestDigest: identity.manifestDigest,
-        revokedAt: null,
-        retiredAt: null,
-      };
-    } finally {
-      fixture.cleanup();
-    }
-  });
+  if (enrollReader)
+    await ensureEntity(dataSource.getRepository(AttractapReaderIdentity), () => {
+      const fixture = readerSecurityFixture();
+      try {
+        const identity = fixture.identity;
+        return {
+          readerId: attractap.id,
+          certificatePem: identity.certificatePem,
+          certificateFingerprint: identity.certificateFingerprint,
+          publicKeyFingerprint: identity.publicKeyFingerprint,
+          installationId: identity.installationId,
+          generation: 1,
+          validFrom: identity.validFrom,
+          validUntil: identity.validUntil,
+          enrollmentClass: 'development',
+          manifestDigest: identity.manifestDigest,
+          revokedAt: null,
+          retiredAt: null,
+        };
+      } finally {
+        fixture.cleanup();
+      }
+    });
 
   await ensureEntity(attractapCrashReportRepo, () => ({
     attractapId: attractap.id,

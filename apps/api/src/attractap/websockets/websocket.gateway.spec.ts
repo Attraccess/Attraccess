@@ -1,3 +1,4 @@
+import { READER_WORK_LIMIT } from './reader-delivery-awaiters';
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
 import { makeStringLVGLReady, sanitizeForLVGL } from './reader-display';
 import { WebSocket } from 'ws';
@@ -120,6 +121,70 @@ describe('AttractapGateway', () => {
       // Wait for the promise to settle (connection will be closed due to no ACK)
       await connectionPromise;
     }, 30000);
+  });
+
+  describe('reader work capacity', () => {
+    it('bounds sends before transmission, accepts immediate ACKs and recovers capacity after ACK or send failure', async () => {
+      const client = fixture.createMockSocket({ readyState: WebSocket.OPEN });
+      const connected = fixture.gateway.handleConnection(client);
+      await new Promise((resolve) => setImmediate(resolve));
+      await fixture.gateway['resolveClientResponseAwaiters'](client, AttractapEventType.READER_REQUEST_AUTHENTICATION);
+      await connected;
+      const type = AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED;
+      const deliver = () => client.sendMessage(new AttractapEvent(type, {}));
+      (client.send as jest.Mock).mockClear();
+      const pending = Array.from({ length: READER_WORK_LIMIT }, deliver);
+      for (let i = 0; i < 32; i++) await expect(deliver()).resolves.toBe(false);
+      expect(client.send).toHaveBeenCalledTimes(READER_WORK_LIMIT);
+      await fixture.gateway['resolveClientResponseAwaiters'](client, type);
+      await expect(Promise.all(pending)).resolves.toEqual(Array(READER_WORK_LIMIT).fill(true));
+      (client.send as jest.Mock).mockImplementation(() => {
+        void fixture.gateway['resolveClientResponseAwaiters'](client, type);
+      });
+      await expect(deliver()).resolves.toBe(true);
+      (client.send as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('send failed');
+      });
+      await expect(deliver()).resolves.toBe(false);
+      await expect(deliver()).resolves.toBe(true);
+      await fixture.gateway.handleDisconnect(client);
+    });
+
+    it.each(['event', 'heartbeat'])('bounds %s work before async lookup and isolates other sockets', async (kind) => {
+      let finish: () => void;
+      const blocked = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      fixture.attractapService.updateLastReaderConnection.mockReturnValue(blocked);
+      const client = fixture.createMockSocket({ readerId: 42, readyState: WebSocket.OPEN });
+      const other = fixture.createMockSocket({ id: 'other', readerId: 43, readyState: WebSocket.OPEN });
+      const handler = jest.fn().mockResolvedValue(undefined);
+      fixture.gateway['eventHandlers'][AttractapEventType.READER_FIRMWARE_INFO] = handler;
+      const request = (socket: AuthenticatedWebSocket) =>
+        kind === 'heartbeat'
+          ? fixture.gateway.onHeartbeat(socket)
+          : fixture.gateway.onClientEvent({ type: AttractapEventType.READER_FIRMWARE_INFO, payload: {} }, socket);
+      const pending = Array.from({ length: READER_WORK_LIMIT }, () => request(client));
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(fixture.attractapService.updateLastReaderConnection).toHaveBeenCalledTimes(READER_WORK_LIMIT);
+      try {
+        await request(client);
+        expect(client.close).toHaveBeenCalledTimes(1);
+        await request(client);
+        expect(fixture.attractapService.updateLastReaderConnection).toHaveBeenCalledTimes(READER_WORK_LIMIT);
+        const otherWork = request(other);
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(fixture.attractapService.updateLastReaderConnection).toHaveBeenCalledTimes(READER_WORK_LIMIT + 1);
+        finish();
+        await Promise.all([...pending, otherWork]);
+        if (kind === 'event') expect(handler).toHaveBeenCalledTimes(1);
+        await request(other);
+        expect(other.close).not.toHaveBeenCalled();
+      } finally {
+        finish();
+        await Promise.all(pending);
+      }
+    });
   });
 
   describe('handleDisconnect', () => {

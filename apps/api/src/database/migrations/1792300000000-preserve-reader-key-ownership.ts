@@ -13,6 +13,9 @@ export class PreserveReaderKeyOwnership1792300000000 implements MigrationInterfa
   }
 
   async down(runner: QueryRunner): Promise<void> {
+    // Check before removing any guards or schema, including revoked/retired history.
+    const history = await runner.query('SELECT 1 FROM "attractap_reader_identity" LIMIT 1');
+    if (history.length) throw new Error('Cannot roll back reader security with credential history');
     await runner.query('DROP TRIGGER "TR_reader_identity_preserve_history"');
     await runner.query('DROP TRIGGER "TR_reader_identity_preserve_reader"');
   }

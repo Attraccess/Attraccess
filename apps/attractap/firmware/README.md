@@ -86,7 +86,7 @@ Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v
 
 NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
-Build the four active Touch variants by default (use `--variants` to select other existing variants, including Ethernet). Production builds default to all four non-demo variants; demo variants cannot use the production profile:
+Build all six existing variants by default (use `--variants` to select a subset). Production builds default to all four non-demo variants; demo variants cannot use the production profile:
 
 ```bash
 python3 build_firmwares.py
@@ -225,4 +225,4 @@ Production overlays are distinct from bridge/development and demo builds. See
 Unqualified production builds remain outside deployable catalogs. Hardware
 qualification and rollout are outstanding. Bridge OTA does not repartition or lock
 a reader. Card operations, reader top-ups and reader project requests deny until
-ATT-950 supplies actual verification. Firmware version 1.6.7 includes this foundation.
+ATT-950 supplies actual verification. Firmware version 1.6.9 includes this foundation.

@@ -1,4 +1,4 @@
-import { entities } from '@attraccess/database-entities';
+import { AttractapReaderIdentity, entities } from '@attraccess/database-entities';
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -22,12 +22,12 @@ const getTestStorageRoot = async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'attraccess-migrations-e2e-'));
   return dir;
 };
-const seedDatabase = async (dataSource: DataSource) => {
+const seedDatabase = async (dataSource: DataSource, enrollReader = true) => {
   const seedTag = Date.now().toString(36);
   const { primaryUser, secondaryUser } = await ensureUsers(dataSource, seedTag);
   const { resourceGroup, resource, project } = await migrationResourceSeeds(dataSource, seedTag, primaryUser);
   await migrationSsoSeeds(dataSource, seedTag, primaryUser);
-  await migrationReaderSeeds(dataSource, seedTag, resource);
+  await migrationReaderSeeds(dataSource, seedTag, resource, enrollReader);
   await migrationMaintenanceSeeds(dataSource, seedTag, primaryUser, resource);
   const { usage } = await migrationFlowUsageSeeds(dataSource, seedTag, primaryUser, secondaryUser, resource, project);
   await migrationMembershipFormSeeds(
@@ -43,10 +43,11 @@ const seedDatabase = async (dataSource: DataSource) => {
   await migrationIdentityNotificationSeeds(dataSource, seedTag, primaryUser);
 };
 
-const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {
+const assertAllEntitiesHaveRows = async (dataSource: DataSource, enrollReader = true) => {
   const emptyEntities: string[] = [];
 
   for (const entity of Object.values(entities)) {
+    if (!enrollReader && entity === AttractapReaderIdentity) continue;
     const repository = dataSource.getRepository(entity);
     const count = await repository.count();
     if (count === 0) {
@@ -75,7 +76,7 @@ const getLastMigrationName = async (dataSource: DataSource) => {
   const rows = await dataSource.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1');
   return rows[0]?.name as string | undefined;
 };
-export function registerMigrationsDownUpWithDataE2eFixture() {
+export function registerMigrationsDownUpWithDataE2eFixture(enrollReader = true) {
   let dataSource: DataSource;
 
   let createdTempRoot: string | undefined;
@@ -99,8 +100,8 @@ export function registerMigrationsDownUpWithDataE2eFixture() {
 
     await dataSource.query('PRAGMA foreign_keys = ON');
     await dataSource.runMigrations();
-    await seedDatabase(dataSource);
-    await assertAllEntitiesHaveRows(dataSource);
+    await seedDatabase(dataSource, enrollReader);
+    await assertAllEntitiesHaveRows(dataSource, enrollReader);
     await assertForeignKeysClean(dataSource, 'initial seed');
   });
 
