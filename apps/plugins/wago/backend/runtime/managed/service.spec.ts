@@ -378,6 +378,8 @@ describe('managed enrolment and durable credential lifecycle', () => {
     await expect(service.assertRemovable(1)).rejects.toThrow('retire managed');
   });
 
+  // This integration path includes a real 3s SSH-settle wait, RSA key generation and SQLite writes.
+  // Keep every safety assertion while allowing coverage instrumentation and loaded CI workers.
   it('retains retirement intent and recovery secrets until remote key removal is independently verified', async () => {
     await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
     await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1, state: 'managed' });
@@ -393,7 +395,7 @@ describe('managed enrolment and durable credential lifecycle', () => {
     expect((await service.sessionStatus(1)).management).toBe('retired');
     await expect(service.assertRemovable(1)).resolves.toBeUndefined();
     expect(await service.recoverPassword(1, principal)).toEqual({ password: expect.any(String) });
-  });
+  }, 15_000);
 
   it('shares device ownership across processes and fences expired owners without releasing a successor', async () => {
     const first = new WagoDeviceOperations(
