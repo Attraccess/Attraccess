@@ -52,15 +52,14 @@ export function registerHttpsBrowser(get: () => { app: NestExpressApplication; b
             status: undefined as number | undefined,
           };
           requests.push(receipt);
-          const proxy = proxyRequest(
-            new URL(req.url, base),
-            { method: req.method, headers: req.headers },
-            (upstream) => {
-              receipt.status = upstream.statusCode;
-              res.writeHead(upstream.statusCode, upstream.headers);
-              upstream.pipe(res);
-            },
-          );
+          const target = new URL(base);
+          target.pathname = req.url.split('?')[0];
+          target.search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+          const proxy = proxyRequest(target, { method: req.method, headers: req.headers }, (upstream) => {
+            receipt.status = upstream.statusCode;
+            res.writeHead(upstream.statusCode, upstream.headers);
+            upstream.pipe(res);
+          });
           proxy.on('error', () => {
             res.statusCode = 502;
             res.end();
@@ -108,7 +107,7 @@ export function registerHttpsBrowser(get: () => { app: NestExpressApplication; b
         await browser('open', hostile);
         const attack = await browser(
           'eval',
-          `(async () => { const target = ${JSON.stringify(allowed)}; const results = []; for (const headers of [{'Content-Type':'application/json'}, {'Content-Type':'application/x-www-form-urlencoded'}]) { try { const r = await fetch(target+'/api/auth/session/refresh', {method:'POST',credentials:'include',headers,body:headers['Content-Type']==='application/json'?'{}':'tokenLocation=body'}); results.push({status:r.status,body:await r.text()}); } catch { results.push('blocked'); } } const f=document.createElement('form'); f.method='POST'; f.action=target+'/api/auth/session/refresh'; f.target='attack'; document.body.append(Object.assign(document.createElement('iframe'),{name:'attack'}),f); f.submit(); return results; })()`,
+          `(async () => { const target = location.origin.replace('help.attraccess.test', 'app.attraccess.test'); const results = []; for (const headers of [{'Content-Type':'application/json'}, {'Content-Type':'application/x-www-form-urlencoded'}]) { try { const r = await fetch(target+'/api/auth/session/refresh', {method:'POST',credentials:'include',headers,body:headers['Content-Type']==='application/json'?'{}':'tokenLocation=body'}); results.push({status:r.status,body:await r.text()}); } catch { results.push('blocked'); } } const f=document.createElement('form'); f.method='POST'; f.action=target+'/api/auth/session/refresh'; f.target='attack'; document.body.append(Object.assign(document.createElement('iframe'),{name:'attack'}),f); f.submit(); return results; })()`,
         );
         expect(attack).not.toContain(token);
         await browser('wait', '500');
@@ -133,29 +132,25 @@ export function registerHttpsBrowser(get: () => { app: NestExpressApplication; b
           .getRepository(SSOProvider)
           .save({ name: 'Browser logout fixture', type: SSOProviderType.OIDC });
         const issuer = 'https://idp.example.test';
-        await db
-          .getRepository(SSOProviderOIDCConfiguration)
-          .save({
-            ssoProviderId: provider.id,
-            issuer,
-            authorizationURL: issuer + '/auth',
-            tokenURL: issuer + '/token',
-            userInfoURL: issuer + '/user',
-            clientId: 'fixture',
-            clientSecret: 'fixture',
-          });
+        await db.getRepository(SSOProviderOIDCConfiguration).save({
+          ssoProviderId: provider.id,
+          issuer,
+          authorizationURL: issuer + '/auth',
+          tokenURL: issuer + '/token',
+          userInfoURL: issuer + '/user',
+          clientId: 'fixture',
+          clientSecret: 'fixture',
+        });
         const user = await db.getRepository(User).findOneByOrFail({ username: 'enrollment-admin' });
-        const companyToken = await app
-          .get(SessionService)
-          .createSession(user, {
-            ssoContext: {
-              protocol: 'OIDC',
-              providerId: provider.id,
-              issuer,
-              subject: 'person',
-              sid: 'browser-session',
-            },
-          });
+        const companyToken = await app.get(SessionService).createSession(user, {
+          ssoContext: {
+            protocol: 'OIDC',
+            providerId: provider.id,
+            issuer,
+            subject: 'person',
+            sid: 'browser-session',
+          },
+        });
         await browser(
           'cookies',
           'set',

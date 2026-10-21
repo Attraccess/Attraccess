@@ -28,8 +28,18 @@ vi.mock('../../../../../components/ResourceIntroducersList', () => ({
   ResourceIntroducersList: () => <div data-testid="activity-help" />,
 }));
 vi.mock('../StartSessionControls', () => ({
-  StartSessionControls: ({ requiresSupervision }: { requiresSupervision?: boolean }) => (
-    <div data-testid="start-controls" data-requires-supervision={String(!!requiresSupervision)} />
+  StartSessionControls: ({
+    requiresSupervision,
+    activityUnavailable,
+  }: {
+    requiresSupervision?: boolean;
+    activityUnavailable?: boolean;
+  }) => (
+    <div
+      data-testid="start-controls"
+      data-requires-supervision={String(!!requiresSupervision)}
+      data-activity-unavailable={String(!!activityUnavailable)}
+    />
   ),
 }));
 vi.mock('../IntroductionRequiredDisplay', () => ({
@@ -177,3 +187,20 @@ it.each(['stream', 'http'])('hides an allowed private snapshot immediately after
   view.rerender(<ResourceUsageSession resourceId={7} resource={resource} />);
   expect(screen.getByTestId('active-session')).toBeInTheDocument();
 });
+
+it.each([SupervisionMode.SUPERVISION_ALLOWED, SupervisionMode.SUPERVISION_REQUIRED])(
+  'keeps supervised initiation available with denied private activity in %s',
+  (supervisionMode) => {
+    canControl.value = false;
+    hasPermission.value = false;
+    denied.http = true;
+    activeSession.value = { id: 99, userId: 2, startTime: new Date().toISOString() };
+    renderSession(supervisionMode);
+    expect(screen.getByTestId('activity-help')).toBeInTheDocument();
+    expect(screen.getByTestId('start-controls')).toHaveAttribute('data-requires-supervision', 'true');
+    expect(screen.getByTestId('start-controls')).toHaveAttribute('data-activity-unavailable', 'true');
+    expect(screen.queryByTestId('other-user-session')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('active-session')).not.toBeInTheDocument();
+    denied.http = false;
+  },
+);

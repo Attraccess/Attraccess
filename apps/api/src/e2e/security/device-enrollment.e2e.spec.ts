@@ -1,6 +1,9 @@
+import { GenericContainer, StartedTestContainer } from 'testcontainers';
+import { registerEnrollmentApprovalLimits } from './enrollment-approval-limits.test-fixture';
+import { registerEnrollmentBoundaries } from './enrollment-boundaries.test-fixture';
 import { registerRefreshMatrix } from './refresh-matrix.test-fixture';
 import { registerActivityVisibility } from './activity-visibility.test-fixture';
-import { registerStreamRevocation } from './stream-revocation.test-fixture';
+import { drainActivitySnapshot, registerStreamRevocation } from './stream-revocation.test-fixture';
 import { registerHttpsBrowser } from './https-browser.test-fixture';
 import { registerEnrollmentRaces } from './enrollment-races.test-fixture';
 import { registerAccessMatrix } from './access-matrix.test-fixture';
@@ -40,6 +43,8 @@ import { configureBootstrapApi, configureBootstrapHttp } from '../../main.bootst
 // No hardware or external service is needed for device approval and reconnect.
 describe('device enrollment over HTTP and WebSocket', () => {
   let app: NestExpressApplication;
+  let valkey: StartedTestContainer;
+  const originalValkeyUrl = process.env.VALKEY_URL;
   let db: DataSource;
   let base: string;
   let admin: string;
@@ -88,6 +93,8 @@ describe('device enrollment over HTTP and WebSocket', () => {
       .send({ code });
 
   beforeAll(async () => {
+    valkey = await new GenericContainer('valkey/valkey:8-alpine').withExposedPorts(6379).start();
+    process.env.VALKEY_URL = `redis://${valkey.getHost()}:${valkey.getMappedPort(6379)}`;
     process.env.DISABLE_PLUGINS = 'true';
     process.env.AUTH_SESSION_SECRET = 'enrollment-integration-test-secret';
     process.env.ATTRACCESS_URL = 'http://allowed.example';
@@ -139,6 +146,9 @@ describe('device enrollment over HTTP and WebSocket', () => {
     for (const socket of sockets) socket.terminate();
     if (app) await app.close();
     jest.restoreAllMocks();
+    await valkey?.stop();
+    if (originalValkeyUrl === undefined) delete process.env.VALKEY_URL;
+    else process.env.VALKEY_URL = originalValkeyUrl;
   });
 
   registerAccessMatrix(() => ({ app, db, admin, ordinary, base }));
@@ -255,7 +265,7 @@ describe('device enrollment over HTTP and WebSocket', () => {
       });
       expect(response.status).toBe(200);
       const reader = response.body.getReader();
-      await reader.read();
+      await drainActivitySnapshot(reader);
       if (change === 'visibility')
         await app.get(SettingsService).updateAppSettings({ activityVisibility: 'introduced-resources' });
       else await app.get(SessionService).revokeSession(token);
@@ -391,5 +401,7 @@ describe('device enrollment over HTTP and WebSocket', () => {
   registerActivityVisibility(() => ({ app, db }));
   registerStreamRevocation(() => ({ app, db, base }));
   registerHttpsBrowser(() => ({ app, base }));
+  registerEnrollmentBoundaries(() => ({ app, db, admin, connect, receive, send }));
+  registerEnrollmentApprovalLimits(() => ({ app, db, admin, connect, receive, send }));
   registerEnrollmentRaces(() => ({ app, db, admin, connect, receive, send }));
 });

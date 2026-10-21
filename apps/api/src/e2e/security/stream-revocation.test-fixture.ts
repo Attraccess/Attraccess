@@ -15,6 +15,16 @@ import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { SettingsService } from '../../settings/settings.service';
 import { ResourceEventsService } from '../../resources/sse/resource-events.service';
 
+/** HTTP headers/initial SSE newline can arrive before the async allowed snapshot. */
+export async function drainActivitySnapshot(reader: ReadableStreamDefaultReader<Uint8Array>) {
+  let snapshot = '';
+  while (!snapshot.includes('"inUse"') || !snapshot.endsWith('\n\n')) {
+    const chunk = await reader.read();
+    if (chunk.done) throw new Error('Stream ended before its allowed activity snapshot');
+    snapshot += new TextDecoder().decode(chunk.value);
+  }
+}
+
 export function registerStreamRevocation(get: () => { app: NestExpressApplication; db: DataSource; base: string }) {
   for (const transport of ['legacy', 'multiplexed']) {
     it.each(['permission', 'introduction', 'session', 'visibility'])(
@@ -48,7 +58,6 @@ export function registerStreamRevocation(get: () => { app: NestExpressApplicatio
         });
         expect(response.status).toBe(200);
         const reader = response.body.getReader();
-        await reader.read();
         if (transport === 'multiplexed') {
           const update = await fetch(`${base}/api/live-updates/${id}/subscriptions`, {
             method: 'PUT',
@@ -60,9 +69,8 @@ export function registerStreamRevocation(get: () => { app: NestExpressApplicatio
             body: JSON.stringify({ revision: 0, subscriptions: [{ topic: 'resource', resourceId: resource.id }] }),
           });
           expect(update.status).toBe(204);
-          // Drain the allowed snapshot before revoking authority.
-          await reader.read();
         }
+        await drainActivitySnapshot(reader);
         if (change === 'permission') await db.getRepository(UserRole).delete({ userId: user.id });
         if (change === 'introduction' || change === 'visibility')
           await db.getRepository(ResourceIntroduction).delete(intro.id);

@@ -126,7 +126,7 @@ export function SupervisedStartBody({
               className="h-auto w-full justify-start py-2"
               onPress={() => handleSelectSupervisor(supervisor.id)}
             >
-              <AttraccessUser user={supervisor} description={t('select.role.introducer')} />
+              <AttraccessUser user={supervisor} interactive={false} description={t('select.role.introducer')} />
             </Button>
           ))}
         </div>

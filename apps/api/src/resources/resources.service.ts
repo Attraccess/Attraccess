@@ -201,7 +201,7 @@ export class ResourcesService {
     onlyWithPermissionForUserId?: number;
     onlyInUse?: boolean;
     returnUsingUser?: boolean;
-    activityAllowed?: (resourceId: number) => Promise<boolean>;
+    activityAllowed?: (resourceIds: number[]) => Promise<number[]>;
   }): Promise<PaginatedResponse<Resource>> {
     if (!options) {
       options = {};
@@ -337,8 +337,7 @@ export class ResourcesService {
     // Filter protected activity before pagination and totals, using the authoritative policy.
     if (options.activityAllowed) {
       const candidates = await queryBuilder.clone().select('resource.id').getMany();
-      const allowed: number[] = [];
-      for (const candidate of candidates) if (await options.activityAllowed(candidate.id)) allowed.push(candidate.id);
+      const allowed = await options.activityAllowed(candidates.map((candidate) => candidate.id));
       if (allowed.length === 0) return { data: [], total: 0, page, limit };
       queryBuilder.andWhere('resource.id IN (:...activityIds)', { activityIds: allowed });
     }

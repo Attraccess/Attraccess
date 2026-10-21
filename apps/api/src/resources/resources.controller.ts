@@ -97,7 +97,7 @@ export class ResourcesController {
       groupId: query.groupId,
       onlyInUseByUserId: query.onlyInUseByMe ? req.user.id : undefined,
       onlyWithPermissionForUserId,
-      ...(query.onlyInUseByMe ? { activityAllowed: (id: number) => this.activity.canRead(id, req.user) } : {}),
+      ...(query.onlyInUseByMe ? { activityAllowed: (ids: number[]) => this.activity.filterReadable(ids, req.user) } : {}),
     });
 
     resources.data = resources.data.map((resource) => {
@@ -117,7 +117,7 @@ export class ResourcesController {
   async getAllInUse(@Req() req: AuthenticatedRequest): Promise<Resource[]> {
     const resources = await this.resourcesService.listResources({
       onlyInUse: true,
-      activityAllowed: (id) => this.activity.canRead(id, req.user),
+      activityAllowed: (ids) => this.activity.filterReadable(ids, req.user),
       returnUsingUser: true,
     });
     return resources.data.map((resource) => this.transformResource(resource));

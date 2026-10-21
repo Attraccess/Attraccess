@@ -22,12 +22,36 @@ export class ResourceActivityPolicy {
   ) {}
 
   async canRead(resourceId: number, user: User & Partial<AuthenticatedUser>): Promise<boolean> {
-    if (!user?.id) return false;
+    return (await this.reader(user))(resourceId);
+  }
+
+  /** One request-wide permissions/settings snapshot; never reuse it across stream deliveries. */
+  async filterReadable(resourceIds: number[], user: User & Partial<AuthenticatedUser>): Promise<number[]> {
+    const canRead = await this.reader(user);
+    const allowed: number[] = [];
+    // Bound concurrent resource-specific checks rather than serializing the whole listing.
+    for (let offset = 0; offset < resourceIds.length; offset += 8) {
+      const batch = resourceIds.slice(offset, offset + 8);
+      const decisions = await Promise.all(batch.map(canRead));
+      allowed.push(...batch.filter((_, index) => decisions[index]));
+    }
+    return allowed;
+  }
+
+  private async reader(user: User & Partial<AuthenticatedUser>): Promise<(resourceId: number) => Promise<boolean>> {
+    if (!user?.id) return async () => false;
     const current = await this.rbac.getEffectivePermissions(user.id, true);
     const has = (key: string) => current.has(key) && (!user.apiTokenId || user.effectivePermissions?.has(key));
-    if (has('resources.update')) return true;
-    if ((await this.settings.getActivityVisibility()) === 'all-resources') return Boolean(has('resources.read'));
-    if (has('resources.access.manage') || (await this.introducers.isIntroducer(resourceId, user.id, true))) return true;
+    if (has('resources.update')) return async () => true;
+    const visibility = await this.settings.getActivityVisibility();
+    if (visibility === 'all-resources') return async () => Boolean(has('resources.read'));
+    // Owner-specific grants must never supply authority omitted from an API token.
+    if (user.apiTokenId && !has('resources.read') && !has('resources.access.manage')) return async () => false;
+    return (resourceId) => this.canReadRestricted(resourceId, user, Boolean(has('resources.access.manage')));
+  }
+
+  private async canReadRestricted(resourceId: number, user: User, managesAccess: boolean): Promise<boolean> {
+    if (managesAccess || (await this.introducers.isIntroducer(resourceId, user.id, true))) return true;
     if (
       (await this.introductions.hasValidIntroduction(resourceId, user.id)) &&
       !(await this.retraining.isResourceIntroductionBlocked(resourceId, user.id))

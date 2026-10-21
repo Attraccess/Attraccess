@@ -78,4 +78,33 @@ describe('ResourceActivityPolicy', () => {
     permissions.add('resources.update');
     expect(await policy.canRead(1, { id: 7, apiTokenId: 5, effectivePermissions: new Set() } as never)).toBe(false);
   });
+  it.each(['introducer', 'direct', 'group'])('requires token scope before the owner %s grant', async (grant) => {
+    settings.getActivityVisibility.mockResolvedValue('introduced-resources');
+    permissions.add('resources.read');
+    introducers.isIntroducer.mockResolvedValue(grant === 'introducer');
+    introductions.hasValidIntroduction.mockResolvedValue(grant === 'direct');
+    groupIntroductions.hasValidIntroduction.mockResolvedValue(grant === 'group');
+    const token = { id: 7, apiTokenId: 5, effectivePermissions: new Set<string>() } as unknown as Parameters<
+      ResourceActivityPolicy['canRead']
+    >[1];
+    expect(await policy.canRead(1, token)).toBe(false);
+    expect(introducers.isIntroducer).not.toHaveBeenCalled();
+    expect(await policy.canRead(1, { ...token, effectivePermissions: new Set(['resources.read']) })).toBe(true);
+  });
+
+  it.each(['all-resources', 'introduced-resources'])(
+    'loads request-wide context once in %s mode',
+    async (visibility) => {
+      settings.getActivityVisibility.mockResolvedValue(visibility);
+      permissions.add('resources.read');
+      introductions.hasValidIntroduction.mockImplementation(async (id) => id % 2 === 0);
+      const ids = Array.from({ length: 20 }, (_, i) => i + 1);
+      expect(await policy.filterReadable(ids, user)).toEqual(
+        visibility === 'all-resources' ? ids : ids.filter((id) => id % 2 === 0),
+      );
+      expect(rbac.getEffectivePermissions).toHaveBeenCalledTimes(1);
+      expect(settings.getActivityVisibility).toHaveBeenCalledTimes(1);
+      if (visibility === 'all-resources') expect(introductions.hasValidIntroduction).not.toHaveBeenCalled();
+    },
+  );
 });

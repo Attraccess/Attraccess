@@ -30,7 +30,12 @@ vi.mock('../../../../../hooks/useAuth', () => ({
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
-  AttraccessUser: ({ user }: { user: { username: string } }) => <div>{user.username}</div>,
+  AttraccessUser: ({ user, interactive = true }: { user: { username: string }; interactive?: boolean }) =>
+    interactive ? (
+      <button onClick={(event) => event.stopPropagation()}>{user.username}</button>
+    ) : (
+      <span>{user.username}</span>
+    ),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

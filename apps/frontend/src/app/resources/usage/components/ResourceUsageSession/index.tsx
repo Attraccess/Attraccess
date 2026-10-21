@@ -110,7 +110,19 @@ export function ResourceUsageSession({
 
   const renderContent = () => {
     if (privateActivityUnavailable)
-      return <ResourceIntroducersList resourceId={resourceId} type={ResourceIntroducerType.INTRODUCER} />;
+      return (
+        <>
+          <ResourceIntroducersList resourceId={resourceId} type={ResourceIntroducerType.INTRODUCER} />
+          {supervisionEnabled && !isLoadingIntroStatus && !isLoadingIntroducers && (
+            <StartSessionControls
+              resourceId={resourceId}
+              activityUnavailable
+              insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+              requiresSupervision={!canStartSession}
+            />
+          )}
+        </>
+      );
     if (isLoading) {
       return (
         <div className="flex justify-center py-4">
