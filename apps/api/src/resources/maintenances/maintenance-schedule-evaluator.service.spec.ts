@@ -5,8 +5,7 @@ import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
-} from '@attraccess/database-entities';
-import { formatDbDate } from './persistence/typeorm-adapter';
+} from '@attraccess/application-models';
 
 describe('MaintenanceScheduleEvaluatorService', () => {
   const fixture = registerMaintenanceScheduleEvaluatorServiceFixture();
@@ -23,10 +22,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
     it('should return last maintenance endTime when exists', async () => {
       const lastEnd = new Date('2025-02-01T12:00:00.000Z');
-      const mockQb = fixture.createQueryBuilderMock();
-      mockQb.getOne.mockResolvedValue({ endTime: lastEnd });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(mockQb as any);
+      fixture.persistence.lastCompleted.mockResolvedValue(lastEnd);
 
       const result = await fixture.service.getBaselineDate(fixture.resourceId, fixture.scheduleId);
       expect(result).toEqual(lastEnd);
@@ -64,10 +60,10 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   });
 
   describe('evaluateResource', () => {
-    it('does not open a SQLite transaction for resources without enabled schedules', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'existsBy').mockResolvedValue(false);
+    it('does not open a transaction for resources without enabled schedules', async () => {
+      jest.spyOn(fixture.persistence, 'hasEnabledSchedules').mockResolvedValue(false);
       await expect(fixture.service.evaluateResource(fixture.resourceId)).resolves.toBeUndefined();
-      expect(fixture.scheduleRepository.manager.transaction).not.toHaveBeenCalled();
+      expect(fixture.transactionDriver.run).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -75,7 +71,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       { kind: 'another schedule', activeScheduleId: fixture.scheduleId + 1 },
     ])('does not create a second maintenance while $kind maintenance is active', async ({ activeScheduleId }) => {
       jest
-        .spyOn(fixture.scheduleRepository, 'find')
+        .spyOn(fixture.persistence, 'enabledSchedules')
         .mockResolvedValue([
           { id: fixture.scheduleId, resourceId: fixture.resourceId, enabled: true } as ResourceMaintenanceSchedule,
         ]);
@@ -92,7 +88,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
     it('should not create maintenance when resource has active maintenance', async () => {
       jest.spyOn(fixture.maintenanceService, 'hasActiveMaintenance').mockResolvedValue(true);
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: fixture.resourceId,
@@ -108,7 +104,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     });
 
     it('should create maintenance when USAGE_HOURS threshold met and no active maintenance', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: fixture.resourceId,
@@ -142,7 +138,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     });
 
     it('should not create when USAGE_HOURS threshold not met', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: fixture.resourceId,
@@ -167,12 +163,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
     it('should create when TIME_INTERVAL threshold due', async () => {
       const oldBaseline = new Date('2024-12-01T00:00:00.000Z');
-      const mantQb = fixture.createQueryBuilderMock();
-      mantQb.getOne.mockResolvedValue({ endTime: oldBaseline });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(mantQb as any);
+      fixture.persistence.lastCompleted.mockResolvedValue(oldBaseline);
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: fixture.resourceId,
@@ -200,7 +193,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     });
 
     it('should skip disabled schedules', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: fixture.resourceId,
@@ -221,7 +214,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
 
       // Two resources with TIME_INTERVAL schedules due (baseline is createdAt, > 30 days ago)
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -243,13 +236,10 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       // No last-done maintenances, no active maintenances
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       // Resources with old createdAt (> 30 days) so TIME_INTERVAL triggers
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([
           { id: 1, createdAt: oldCreatedAt } as Resource,
           { id: 2, createdAt: oldCreatedAt } as Resource,
@@ -257,7 +247,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await fixture.service.evaluateAll();
 
-      expect(fixture.scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(fixture.transactionDriver.run).toHaveBeenCalledTimes(1);
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         1,
@@ -293,12 +283,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           }) as ResourceMaintenanceSchedule,
       );
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue(dueSchedules);
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue(dueSchedules);
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue(dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
       (fixture.maintenanceService.hasActiveMaintenance as jest.Mock).mockImplementation((id: number) =>
         Promise.resolve(id === 101),
@@ -306,7 +293,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await fixture.service.evaluateAll();
 
-      expect(fixture.scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(fixture.transactionDriver.run).toHaveBeenCalledTimes(2);
       expect(fixture.maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(101, expect.anything());
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(100);
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalledWith(
@@ -320,7 +307,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
     it('should continue creating other due maintenances when a stale active check succeeds', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -336,11 +323,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           timeIntervalConfig: { duration: 30, unit: 'DAYS' },
         } as ResourceMaintenanceSchedule,
       ]);
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([
           { id: 1, createdAt: oldCreatedAt } as Resource,
           { id: 2, createdAt: oldCreatedAt } as Resource,
@@ -352,7 +336,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await fixture.service.evaluateAll();
 
-      expect(fixture.scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(fixture.transactionDriver.run).toHaveBeenCalledTimes(1);
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         2,
@@ -367,7 +351,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       // Schedule due in 30 days, resource created 1 day ago
       const recentCreatedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -379,25 +363,20 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: recentCreatedAt } as Resource]);
 
-      const querySpy = jest.spyOn(fixture.usageRepository, 'query');
+      const querySpy = jest.spyOn(fixture.persistence, 'scheduleState');
 
       await fixture.service.evaluateAll();
 
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
-      expect(querySpy).toHaveBeenCalledTimes(1);
-      expect(querySpy.mock.calls[0][0]).not.toContain('resource_usage');
+      expect(querySpy).toHaveBeenCalledTimes(2);
     });
 
     it('should skip orphaned schedules without issuing an invalid empty-pairs query', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -406,8 +385,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           timeIntervalConfig: { duration: 1, unit: 'DAYS' },
         } as ResourceMaintenanceSchedule,
       ]);
-      jest.spyOn(fixture.resourceRepository, 'find').mockResolvedValue([]);
-      const querySpy = jest.spyOn(fixture.usageRepository, 'query');
+      jest.spyOn(fixture.persistence, 'resourceCreationDates').mockResolvedValue([]);
+      const querySpy = jest.spyOn(fixture.persistence, 'scheduleState');
 
       await fixture.service.evaluateAll();
 
@@ -415,36 +394,10 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
     });
 
-    it('should chunk usage evaluation queries below SQLite bind limits', async () => {
-      const count = 10_922;
-      const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
-      const schedules = Array.from(
-        { length: count },
-        (_, index) =>
-          ({
-            id: index + 1,
-            resourceId: index + 1,
-            enabled: true,
-            triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
-            usageCountConfig: { thresholdSessions: 1 },
-          }) as ResourceMaintenanceSchedule,
-      );
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue(schedules);
-      jest
-        .spyOn(fixture.resourceRepository, 'find')
-        .mockResolvedValue(schedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
-      const querySpy = jest.spyOn(fixture.usageRepository, 'query').mockResolvedValue([]);
-
-      await fixture.service.evaluateAll();
-
-      expect(querySpy).toHaveBeenCalledTimes(2);
-      expect(querySpy.mock.calls.map(([, params]) => (params as unknown[]).length)).toEqual([32_764, 4]);
-    });
-
     it('should skip resources that already have active maintenance', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -457,24 +410,20 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       // The combined evaluation query reports this resource as active.
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany
-        .mockResolvedValueOnce([]) // first call: last done query
-        .mockResolvedValueOnce([{ resourceId: 1, scheduleId: fixture.scheduleId }]); // second call: active query
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
-      jest.spyOn(fixture.usageRepository, 'query').mockResolvedValue([
-        {
-          resourceId: 1,
-          scheduleId: fixture.scheduleId,
-          hasActiveMaintenance: 1,
-          totalMinutes: 0,
-          totalCount: 0,
-        },
-      ]);
+      jest.spyOn(fixture.persistence, 'scheduleState').mockResolvedValue(
+        [
+          {
+            resourceId: 1,
+            scheduleId: fixture.scheduleId,
+            hasActiveMaintenance: true,
+            totalCount: 0,
+          },
+        ].map((row) => ({ baseline: null, hasActiveMaintenance: false, ...row })),
+      );
 
       await fixture.service.evaluateAll();
 
@@ -484,7 +433,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     it('should evaluate USAGE_HOURS using bulk-fetched usage data', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -497,12 +446,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       // No last-done maintenances, no active maintenances — maintenance qb
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       fixture.operatingAttribution.getDurationsForWindows.mockResolvedValue(
@@ -510,8 +456,14 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       );
       // The state query supplies each service-cycle baseline.
       jest
-        .spyOn(fixture.usageRepository, 'query')
-        .mockResolvedValue([{ resourceId: 1, scheduleId: fixture.scheduleId, totalMinutes: '120', totalCount: '3' }]);
+        .spyOn(fixture.persistence, 'scheduleState')
+        .mockResolvedValue(
+          [{ resourceId: 1, scheduleId: fixture.scheduleId, totalCount: 3 }].map((row) => ({
+            baseline: null,
+            hasActiveMaintenance: false,
+            ...row,
+          })),
+        );
 
       await fixture.service.evaluateAll();
 
@@ -525,7 +477,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     });
 
     it('rechecks a duration cycle completed between the bulk read and maintenance creation', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -558,7 +510,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     it('should not create maintenance when USAGE_HOURS threshold not met in bulk data', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -570,12 +522,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       fixture.operatingAttribution.getDurationsForWindows.mockResolvedValue(
@@ -583,8 +531,14 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       );
       // 100 minutes < 600 minutes threshold
       jest
-        .spyOn(fixture.usageRepository, 'query')
-        .mockResolvedValue([{ resourceId: 1, scheduleId: fixture.scheduleId, totalMinutes: '100', totalCount: '2' }]);
+        .spyOn(fixture.persistence, 'scheduleState')
+        .mockResolvedValue(
+          [{ resourceId: 1, scheduleId: fixture.scheduleId, totalCount: 2 }].map((row) => ({
+            baseline: null,
+            hasActiveMaintenance: false,
+            ...row,
+          })),
+        );
 
       await fixture.service.evaluateAll();
 
@@ -594,7 +548,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     it('should evaluate USAGE_COUNT using bulk-fetched usage data', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -606,18 +560,20 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       // SQL aggregation returns totalCount=7 (>= 5 threshold)
       jest
-        .spyOn(fixture.usageRepository, 'query')
-        .mockResolvedValue([{ resourceId: 1, scheduleId: fixture.scheduleId, totalMinutes: '0', totalCount: '7' }]);
+        .spyOn(fixture.persistence, 'scheduleState')
+        .mockResolvedValue(
+          [{ resourceId: 1, scheduleId: fixture.scheduleId, totalCount: 7 }].map((row) => ({
+            baseline: null,
+            hasActiveMaintenance: false,
+            ...row,
+          })),
+        );
 
       await fixture.service.evaluateAll();
 
@@ -635,7 +591,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     it('should not create maintenance when USAGE_COUNT threshold not met in bulk data', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -647,18 +603,20 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       // 3 sessions < 10 threshold
       jest
-        .spyOn(fixture.usageRepository, 'query')
-        .mockResolvedValue([{ resourceId: 1, scheduleId: fixture.scheduleId, totalMinutes: '0', totalCount: '3' }]);
+        .spyOn(fixture.persistence, 'scheduleState')
+        .mockResolvedValue(
+          [{ resourceId: 1, scheduleId: fixture.scheduleId, totalCount: 3 }].map((row) => ({
+            baseline: null,
+            hasActiveMaintenance: false,
+            ...row,
+          })),
+        );
 
       await fixture.service.evaluateAll();
 
@@ -670,7 +628,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       const resourceCreatedAt = new Date('2024-01-01T00:00:00.000Z');
       const recentlyServiced = new Date('2026-06-01T00:00:00.000Z');
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         // Never serviced -> baseline is resource createdAt, plenty of usage accumulated
         {
           id: fixture.scheduleId,
@@ -693,16 +651,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany
-        .mockResolvedValueOnce([
-          { resourceId: 1, scheduleId: otherScheduleId, lastEndTime: recentlyServiced.toISOString() },
-        ])
-        .mockResolvedValueOnce([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: resourceCreatedAt } as Resource]);
 
       fixture.operatingAttribution.getDurationsForWindows.mockResolvedValue(
@@ -712,29 +662,27 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         ]),
       );
       // Same resource, different service-cycle baselines.
-      const querySpy = jest.spyOn(fixture.usageRepository, 'query').mockResolvedValue([
-        {
-          resourceId: 1,
-          scheduleId: fixture.scheduleId,
-          baseline: resourceCreatedAt.toISOString(),
-          totalMinutes: '900',
-          totalCount: '9',
-        },
-        {
-          resourceId: 1,
-          scheduleId: otherScheduleId,
-          baseline: recentlyServiced.toISOString(),
-          totalMinutes: '30',
-          totalCount: '1',
-        },
-      ]);
+      const querySpy = jest.spyOn(fixture.persistence, 'scheduleState').mockResolvedValue(
+        [
+          {
+            resourceId: 1,
+            scheduleId: fixture.scheduleId,
+            baseline: resourceCreatedAt,
+            totalCount: 9,
+          },
+          {
+            resourceId: 1,
+            scheduleId: otherScheduleId,
+            baseline: recentlyServiced,
+            totalCount: 1,
+          },
+        ].map((row) => ({ baseline: null, hasActiveMaintenance: false, ...row })),
+      );
 
       await fixture.service.evaluateAll();
 
       // Resolve all service-cycle baselines together, then derive exact durations per window.
-      expect(querySpy).toHaveBeenCalledTimes(1);
-      expect(querySpy.mock.calls[0][0]).toContain('resource_maintenance');
-      expect(querySpy.mock.calls[0][0]).not.toContain('resource_usage');
+      expect(querySpy).toHaveBeenCalledTimes(2);
       expect(fixture.operatingAttribution.getDurationsForWindows).toHaveBeenNthCalledWith(
         1,
         [
@@ -744,17 +692,24 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         expect.any(Date),
       );
 
-      // Both schedules must be sent to SQL with their resource-created fallback baseline.
-      const params = querySpy.mock.calls[0][1] as unknown[];
-      expect(params).toEqual([
-        1,
-        fixture.scheduleId,
-        formatDbDate(resourceCreatedAt),
-        1,
-        otherScheduleId,
-        formatDbDate(resourceCreatedAt),
-        expect.any(String),
-      ]);
+      expect(querySpy).toHaveBeenCalledWith(
+        [
+          {
+            resourceId: 1,
+            scheduleId: fixture.scheduleId,
+            createdAt: resourceCreatedAt,
+            triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+          },
+          {
+            resourceId: 1,
+            scheduleId: otherScheduleId,
+            createdAt: resourceCreatedAt,
+            triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+          },
+        ],
+        expect.any(Date),
+        false,
+      );
 
       // Only the never-serviced schedule crossed its threshold
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
@@ -768,7 +723,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     });
 
     it('should continue creating scheduled maintenances when one creation fails', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -789,12 +744,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([
           { id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
           { id: 2, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
@@ -806,13 +757,13 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await expect(fixture.service.evaluateAll()).resolves.toBeUndefined();
 
-      expect(fixture.scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(fixture.transactionDriver.run).toHaveBeenCalledTimes(1);
       expect(fixture.maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
       expect(fixture.maintenanceService.emitScheduledMaintenanceCreated).toHaveBeenCalledWith(2, 1);
     });
 
     it('should not emit side effects when the write transaction fails to commit', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -824,21 +775,14 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      maintenanceQb.getRawMany.mockResolvedValue([]);
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource]);
 
-      jest
-        .spyOn(fixture.scheduleRepository.manager, 'transaction')
-        .mockImplementation(async (isolationOrCallback, callback) => {
-          const run = typeof isolationOrCallback === 'function' ? isolationOrCallback : callback;
-          await run({ query: jest.fn().mockResolvedValue([]) } as never);
-          throw new Error('transaction commit failed');
-        });
+      fixture.transactionDriver.run.mockImplementation(async (_conflicts, work) => {
+        await work({ resolve: () => fixture.persistence as never });
+        throw new Error('transaction commit failed');
+      });
 
       await expect(fixture.service.evaluateAll()).resolves.toBeUndefined();
 
@@ -847,7 +791,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     });
 
     it('should do nothing when no enabled schedules exist', async () => {
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([]);
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([]);
 
       await fixture.service.evaluateAll();
 
@@ -859,7 +803,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       // Last maintenance done 2 days ago — not yet 30 days, so should NOT trigger
       const lastDoneEndTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
 
-      jest.spyOn(fixture.scheduleRepository, 'find').mockResolvedValue([
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockResolvedValue([
         {
           id: fixture.scheduleId,
           resourceId: 1,
@@ -871,21 +815,19 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const maintenanceQb = fixture.createQueryBuilderMock();
-      jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
       jest
-        .spyOn(fixture.resourceRepository, 'find')
+        .spyOn(fixture.persistence, 'resourceCreationDates')
         .mockResolvedValue([{ id: 1, createdAt: resourceCreatedAt } as Resource]);
-      jest.spyOn(fixture.usageRepository, 'query').mockResolvedValue([
-        {
-          resourceId: 1,
-          scheduleId: fixture.scheduleId,
-          baseline: lastDoneEndTime.toISOString(),
-          totalMinutes: 0,
-          totalCount: 0,
-        },
-      ]);
+      jest.spyOn(fixture.persistence, 'scheduleState').mockResolvedValue(
+        [
+          {
+            resourceId: 1,
+            scheduleId: fixture.scheduleId,
+            baseline: lastDoneEndTime,
+            totalCount: 0,
+          },
+        ].map((row) => ({ baseline: null, hasActiveMaintenance: false, ...row })),
+      );
 
       await fixture.service.evaluateAll();
 
@@ -900,7 +842,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       const pendingFind = new Promise<ResourceMaintenanceSchedule[]>((res) => {
         resolveFind = res;
       });
-      jest.spyOn(fixture.scheduleRepository, 'find').mockReturnValue(pendingFind);
+      jest.spyOn(fixture.persistence, 'enabledSchedules').mockReturnValue(pendingFind);
 
       const firstCall = fixture.service.evaluateAll();
       // Second call fires while firstCall is still awaiting scheduleRepository.find
@@ -910,7 +852,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       await Promise.all([firstCall, secondCall]);
 
       // find called once: second call skipped due to lock held by first
-      expect(fixture.scheduleRepository.find).toHaveBeenCalledTimes(1);
+      expect(fixture.persistence.enabledSchedules).toHaveBeenCalledTimes(1);
     });
   });
 });

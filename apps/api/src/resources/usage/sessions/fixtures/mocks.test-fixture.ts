@@ -1,4 +1,4 @@
-import { ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
+import { ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/application-models';
 import { BillingService } from '../../../../billing/charges/billing.service';
 import { ProjectsService } from '../../../../projects/projects.service';
 import { ResourceFormsService } from '../../../forms/forms.service';

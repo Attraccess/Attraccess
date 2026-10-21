@@ -1,7 +1,5 @@
-import { sqliteRepositoryFixture } from '../../database/conformance/sqlite-fixture';
 import { registerResourceOperatingAttributionServiceFixture } from './resource-operating-attribution.service.resource-operating-attribution-service.test-fixture';
-import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
-import { MoreThan } from 'typeorm';
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/application-models';
 
 describe('ResourceOperatingAttributionService', () => {
   const fixture = registerResourceOperatingAttributionServiceFixture();
@@ -33,12 +31,14 @@ describe('ResourceOperatingAttributionService', () => {
 
   describe('getDurationsForWindows', () => {
     it('clips independent service cycles and unions overlapping intervals without requiring attribution', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([
-        fixture.operating(1, '09:00:00', null),
-        fixture.operating(2, '10:00:00', '11:00:00'),
-        { ...fixture.operating(3, '11:30:00', null), resourceId: 2 },
-      ]);
-      fixture.usageRepository.find.mockResolvedValue([fixture.usage(1, '10:15:00', '10:45:00')]);
+      fixture.persistence.durationRows.mockResolvedValue({
+        intervals: [
+          fixture.operating(1, '09:00:00', null),
+          fixture.operating(2, '10:00:00', '11:00:00'),
+          { ...fixture.operating(3, '11:30:00', null), resourceId: 2 },
+        ],
+        usages: [fixture.usage(1, '10:15:00', '10:45:00')],
+      });
 
       const totals = await fixture.service.getDurationsForWindows(
         [
@@ -56,20 +56,15 @@ describe('ResourceOperatingAttributionService', () => {
           ['old:2', { sessionDurationMs: 0, operatingDurationMs: 30 * 60_000 }],
         ]),
       );
-      expect(fixture.intervalRepository.find).toHaveBeenCalledTimes(1);
-      expect(fixture.usageRepository.find).toHaveBeenCalledTimes(1);
+      expect(fixture.persistence.durationRows).toHaveBeenCalledTimes(1);
     });
 
     it('does not query the database when there are no duration windows', async () => {
       await expect(fixture.service.getDurationsForWindows([], fixture.asOf)).resolves.toEqual(new Map());
-      expect(fixture.intervalRepository.find).not.toHaveBeenCalled();
-      expect(fixture.usageRepository.find).not.toHaveBeenCalled();
+      expect(fixture.persistence.durationRows).not.toHaveBeenCalled();
     });
 
     it('uses each resource service-cycle boundary when loading a batch', async () => {
-      fixture.intervalRepository.find.mockResolvedValue([]);
-      fixture.usageRepository.find.mockResolvedValue([]);
-
       await fixture.service.getDurationsForWindows(
         [
           { key: 'old:1', resourceId: 1, start: fixture.at('01:00:00') },
@@ -78,22 +73,17 @@ describe('ResourceOperatingAttributionService', () => {
         fixture.asOf,
       );
 
-      const intervalWhere = fixture.intervalRepository.find.mock.calls[0][0].where as Array<{
-        resourceId: number;
-        endTime: unknown;
-      }>;
-      expect(intervalWhere).toHaveLength(4);
-      expect(intervalWhere.filter(({ resourceId }) => resourceId === 1)).toEqual(
-        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(fixture.at('01:00:00')) })]),
-      );
-      expect(intervalWhere.filter(({ resourceId }) => resourceId === 2)).toEqual(
-        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(fixture.at('11:00:00')) })]),
+      expect(fixture.persistence.durationRows).toHaveBeenCalledWith(
+        [
+          { resourceId: 1, start: fixture.at('01:00:00') },
+          { resourceId: 2, start: fixture.at('11:00:00') },
+        ],
+        fixture.asOf,
       );
     });
 
     it('propagates unavailable authoritative data instead of returning a zero duration', async () => {
-      fixture.intervalRepository.find.mockRejectedValue(new Error('interval read failed'));
-      fixture.usageRepository.find.mockResolvedValue([]);
+      fixture.persistence.durationRows.mockRejectedValue(new Error('interval read failed'));
       await expect(
         fixture.service.getDurationsForWindows(
           [{ key: '1', resourceId: 1, start: fixture.at('10:00:00') }],
@@ -268,11 +258,11 @@ describe('ResourceOperatingAttributionService', () => {
   });
 
   it('derives an explicit diagnostics range through the same sweep as the default window (ATT-1024)', async () => {
-    fixture.intervalRepository.find.mockResolvedValue([
+    fixture.persistence.intervals.mockResolvedValue([
       fixture.operating(1, '10:00:00', '11:00:00'),
     ] as ResourceOperatingInterval[]);
-    fixture.usageRepository.find.mockResolvedValue([fixture.usage(2, '10:15:00', '10:45:00')] as ResourceUsage[]);
-    fixture.intervalRepository.existsBy.mockResolvedValue(true);
+    fixture.persistence.usages.mockResolvedValue([fixture.usage(2, '10:15:00', '10:45:00')] as ResourceUsage[]);
+    fixture.persistence.hasData.mockResolvedValue(true);
     const windowStart = fixture.at('09:00:00');
 
     const result = await fixture.service.getForResource(1, fixture.asOf, windowStart);
@@ -286,63 +276,43 @@ describe('ResourceOperatingAttributionService', () => {
   });
 
   it('calculates a completed usage session from its exact operating overlap', async () => {
-    const manager = {
-      getRepository: jest.fn(() => ({
-        find: jest.fn().mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]),
-      })),
-    };
-    const minutes = await sqliteRepositoryFixture(manager.getRepository).transactions.run({resourceIds:[1],accountIds:[]},scope=>fixture.service.getForUsage(fixture.usage(2,'10:15:00','10:45:00'),scope));
+    fixture.persistence.intervals.mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]);
+    const minutes = await fixture.transactionDriver.transactions.run({ resourceIds: [1], accountIds: [] }, (scope) =>
+      fixture.service.getForUsage(fixture.usage(2, '10:15:00', '10:45:00'), scope),
+    );
 
     expect(minutes).toBe(30);
   });
 
   it('loads only intervals that overlap the recent attribution window', async () => {
-    fixture.intervalRepository.find.mockResolvedValue([] as ResourceOperatingInterval[]);
-    fixture.usageRepository.find.mockResolvedValue([] as ResourceUsage[]);
+    fixture.persistence.intervals.mockResolvedValue([] as ResourceOperatingInterval[]);
+    fixture.persistence.usages.mockResolvedValue([] as ResourceUsage[]);
 
     const result = await fixture.service.getForResource(1, fixture.asOf);
 
     expect(result.windowStart).toEqual(new Date('2026-07-28T12:00:00.000Z'));
 
-    expect(fixture.intervalRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.arrayContaining([
-          expect.objectContaining({ resourceId: 1 }),
-          expect.objectContaining({ resourceId: 1 }),
-        ]),
-      }),
-    );
-    expect(fixture.usageRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.arrayContaining([
-          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
-          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
-        ]),
-      }),
-    );
+    expect(fixture.persistence.intervals).toHaveBeenCalledWith([1], fixture.asOf, result.windowStart);
+    expect(fixture.persistence.usages).toHaveBeenCalledWith([1], fixture.asOf, result.windowStart);
   });
 
   it('loads and derives reports for multiple resources in one query per source', async () => {
-    fixture.intervalRepository.find.mockResolvedValue([
+    fixture.persistence.intervals.mockResolvedValue([
       fixture.operating(1, '10:00:00', '11:00:00'),
       { ...fixture.operating(2, '10:00:00', '10:30:00'), resourceId: 2 },
     ] as ResourceOperatingInterval[]);
-    fixture.usageRepository.find.mockResolvedValue([
+    fixture.persistence.usages.mockResolvedValue([
       fixture.usage(1, '10:00:00', '10:30:00'),
       { ...fixture.usage(2, '10:00:00', '10:15:00'), resourceId: 2 },
     ] as ResourceUsage[]);
-    fixture.availabilityQuery.getRawMany.mockResolvedValue([{ resourceId: 1 }, { resourceId: 2 }]);
+    fixture.persistence.resourcesWithData.mockResolvedValue([1, 2]);
 
     const result = await fixture.service.getForResources([1, 2], fixture.at('09:00:00'), fixture.asOf);
 
     expect(result.get(1)).toMatchObject({ sessionDurationMs: 30 * 60_000, operatingDurationMs: 60 * 60_000 });
     expect(result.get(2)).toMatchObject({ sessionDurationMs: 15 * 60_000, operatingDurationMs: 30 * 60_000 });
-    expect(fixture.intervalRepository.find).toHaveBeenCalledTimes(1);
-    expect(fixture.usageRepository.find).toHaveBeenCalledTimes(1);
-    expect(fixture.intervalRepository.createQueryBuilder).toHaveBeenCalledWith('interval');
-    expect(fixture.availabilityQuery.select).toHaveBeenCalledWith('DISTINCT interval.resourceId', 'resourceId');
-    expect(fixture.availabilityQuery.where).toHaveBeenCalledWith('interval.resourceId IN (:...resourceIds)', {
-      resourceIds: [1, 2],
-    });
+    expect(fixture.persistence.intervals).toHaveBeenCalledTimes(1);
+    expect(fixture.persistence.usages).toHaveBeenCalledTimes(1);
+    expect(fixture.persistence.resourcesWithData).toHaveBeenCalledWith([1, 2]);
   });
 });

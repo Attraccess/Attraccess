@@ -1,13 +1,11 @@
-import { sqliteRepositoryFixture } from '../../../database/conformance/sqlite-fixture';
+import {
+  billingOperationsFake,
+  billingTransactionsFake,
+} from '../../../billing/charges/fixtures/operations.test-fixture';
+import { BillingPersistence } from '../../../billing/persistence/port';
 import { TransactionScope } from '../../../database/transaction-scope';
 import { Logger } from '@nestjs/common';
-import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  BillingTransaction,
-  BillingTransactionItem,
-  BillingTransactionStatus,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';
@@ -16,17 +14,11 @@ import { NodeExecutionContext } from './node-executor.interface';
 describe('BillingSetAdditionalItemsExecutor', () => {
   let executor: BillingSetAdditionalItemsExecutor;
   let resourceUsageService: { getActiveSession: jest.Mock; stageLifecycleBillingItem: jest.Mock };
-  let manager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock };
-  let repoManager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock; transaction: jest.Mock };
+  let operations: jest.Mocked<BillingPersistence>;
   let ctx: NodeExecutionContext;
-  let persistenceFixture: ReturnType<typeof sqliteRepositoryFixture>;
-  let boundManager: typeof manager | typeof repoManager;
+  let persistenceFixture: ReturnType<typeof billingTransactionsFake>;
   const runExecutor = (node: ResourceFlowNode, input: object, context: NodeExecutionContext) => {
-    if (!context.transactionManager) {
-      boundManager = repoManager;
-      return executor.execute(node, input, context);
-    }
-    boundManager = manager;
+    if (!context.transactionManager) return executor.execute(node, input, context);
     return persistenceFixture.transactions.run({ resourceIds: [node.resourceId], accountIds: [] }, (scope) => {
       context.transactionManager = scope;
       return executor.execute(node, input, context);
@@ -60,20 +52,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
       stageLifecycleBillingItem: jest.fn().mockResolvedValue(undefined),
     };
 
-    manager = {
-      findOne: jest.fn(),
-      update: jest.fn().mockResolvedValue(undefined),
-      save: jest.fn().mockResolvedValue(undefined),
-    };
-
-    // Distinct manager on the repository to verify the fallback path.
-    repoManager = {
-      findOne: jest.fn(),
-      update: jest.fn().mockResolvedValue(undefined),
-      save: jest.fn().mockResolvedValue(undefined),
-      transaction: jest.fn(async (work) => work(repoManager)),
-    };
-
+    operations = billingOperationsFake();
     ctx = {
       transactionManager: {} as TransactionScope,
       compileTemplate: jest.fn((tpl: string) => tpl),
@@ -81,10 +60,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
       setTemplateVariables: jest.fn(),
     } as unknown as NodeExecutionContext;
 
-    persistenceFixture = sqliteRepositoryFixture(
-      () => ({}),
-      (work) => (boundManager === repoManager ? repoManager.transaction(work) : work(manager as never)),
-    );
+    persistenceFixture = billingTransactionsFake(operations);
     executor = new BillingSetAdditionalItemsExecutor(
       resourceUsageService as unknown as ResourceUsageService,
       persistenceFixture.transactions,
@@ -96,29 +72,23 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await expect(runExecutor(createNode(baseData), {}, ctx)).rejects.toBeInstanceOf(NoUsageSessionError);
     expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, ctx.transactionManager);
-    expect(manager.findOne).not.toHaveBeenCalled();
+    expect(operations.pendingUsageTransaction).not.toHaveBeenCalled();
   });
 
   it('saves a new item using static node data when no existing item matches', async () => {
-    manager.findOne
-      .mockResolvedValueOnce({ id: 99 }) // BillingTransaction lookup
-      .mockResolvedValueOnce(null); // existing item lookup -> none
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never); // existing item lookup -> none
 
     const result = await runExecutor(createNode(baseData), {}, ctx);
 
-    expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
+    expect(operations.pendingUsageTransaction).toHaveBeenCalledWith(1, 'ru-1');
+    expect(operations.matchingPendingItem).toHaveBeenCalledWith(99, {
+      name: 'kWh',
+      description: 'Energy',
+      externalReference: 'power',
+      unitPrice: 5,
     });
-    expect(manager.findOne).toHaveBeenNthCalledWith(2, BillingTransactionItem, {
-      where: {
-        billingTransactionId: 99,
-        name: 'kWh',
-        description: 'Energy',
-        externalReference: 'power',
-        unitPrice: 5,
-      },
-    });
-    expect(manager.save).toHaveBeenCalledWith(BillingTransactionItem, {
+    expect(operations.saveItem).toHaveBeenCalledWith({
       billingTransactionId: 99,
       name: 'kWh',
       description: 'Energy',
@@ -126,7 +96,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
       unitPrice: 5,
       quantity: 2,
     });
-    expect(manager.update).not.toHaveBeenCalled();
+    expect(operations.updateItemQuantity).not.toHaveBeenCalled();
     expect(result).toEqual({
       payload: {
         name: 'kWh',
@@ -151,8 +121,8 @@ describe('BillingSetAdditionalItemsExecutor', () => {
       externalReference: 'meter-1',
     });
     expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
-    expect(manager.findOne).not.toHaveBeenCalled();
-    expect(manager.save).not.toHaveBeenCalled();
+    expect(operations.pendingUsageTransaction).not.toHaveBeenCalled();
+    expect(operations.saveItem).not.toHaveBeenCalled();
     expect(result).toEqual({ payload: { ...baseData, quantity: 4, externalReference: 'meter-1' } });
   });
 
@@ -165,67 +135,62 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     await expect(runExecutor(createNode(baseData), { id: 12 }, ctx)).rejects.toThrow(
       'Lifecycle attempt is no longer pending',
     );
-    expect(manager.save).not.toHaveBeenCalled();
-    expect(manager.update).not.toHaveBeenCalled();
+    expect(operations.saveItem).not.toHaveBeenCalled();
+    expect(operations.updateItemQuantity).not.toHaveBeenCalled();
   });
 
   it('uses the usage ID in stopped-session flow input', async () => {
-    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never);
 
     await runExecutor(createNode(baseData), { id: 12 }, ctx);
 
     expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
-    expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
-    });
+    expect(operations.pendingUsageTransaction).toHaveBeenCalledWith(1, 12);
   });
 
   it('falls back to the active session for an invalid stopped-session ID', async () => {
-    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never);
 
     await runExecutor(createNode(baseData), { id: -1 }, ctx);
 
     expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, ctx.transactionManager);
-    expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
-    });
+    expect(operations.pendingUsageTransaction).toHaveBeenCalledWith(1, 'ru-1');
   });
 
   it('throws NoUsageSessionError when the usage has no billing transaction for the resource', async () => {
-    manager.findOne.mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce(null);
 
     await expect(runExecutor(createNode(baseData), { id: 12 }, ctx)).rejects.toBeInstanceOf(NoUsageSessionError);
-    expect(manager.findOne).toHaveBeenCalledWith(BillingTransaction, {
-      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
-    });
-    expect(manager.save).not.toHaveBeenCalled();
+    expect(operations.pendingUsageTransaction).toHaveBeenCalledWith(1, 12);
+    expect(operations.saveItem).not.toHaveBeenCalled();
   });
 
   it('updates the existing item by summing the quantity', async () => {
-    manager.findOne
-      .mockResolvedValueOnce({ id: 99 }) // transaction
-      .mockResolvedValueOnce({ id: 7, quantity: 3 }); // existing item
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce({ id: 7, quantity: 3 } as never); // existing item
 
     const result = await runExecutor(createNode(baseData), {}, ctx);
 
-    expect(manager.update).toHaveBeenCalledWith(BillingTransactionItem, 7, {
-      quantity: 5, // existing 3 + data 2
-    });
-    expect(manager.save).not.toHaveBeenCalled();
+    expect(operations.updateItemQuantity).toHaveBeenCalledWith(7, 5);
+    expect(operations.saveItem).not.toHaveBeenCalled();
     expect(result.payload).toMatchObject({ quantity: 2 });
   });
 
   it('overrides quantity from input via schema coercion', async () => {
-    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never);
 
     const result = await runExecutor(createNode(baseData), { quantity: '10' }, ctx);
 
-    expect(manager.save).toHaveBeenCalledWith(BillingTransactionItem, expect.objectContaining({ quantity: 10 }));
+    expect(operations.saveItem).toHaveBeenCalledWith(expect.objectContaining({ quantity: 10 }));
     expect(result.payload).toMatchObject({ quantity: 10 });
   });
 
   it('overrides externalReference from input and recompiles the template when data has one', async () => {
-    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never);
     (ctx.compileTemplate as jest.Mock).mockReturnValue('compiled-ref');
 
     const input = { externalReference: 'override-value' };
@@ -233,62 +198,56 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     // data.externalReference is present -> recompiles data's template with input
     expect(ctx.compileTemplate).toHaveBeenCalledWith('power', input);
-    expect(manager.findOne).toHaveBeenNthCalledWith(2, BillingTransactionItem, {
-      where: expect.objectContaining({ externalReference: 'compiled-ref' }),
-    });
-    expect(manager.save).toHaveBeenCalledWith(
-      BillingTransactionItem,
+    expect(operations.matchingPendingItem).toHaveBeenCalledWith(
+      99,
       expect.objectContaining({ externalReference: 'compiled-ref' }),
     );
+    expect(operations.saveItem).toHaveBeenCalledWith(expect.objectContaining({ externalReference: 'compiled-ref' }));
     expect(result.payload).toMatchObject({ externalReference: 'compiled-ref' });
   });
 
   it('uses input externalReference verbatim when node data has no externalReference', async () => {
-    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never);
 
     const { name, description, unitPrice, quantity } = baseData;
     const dataNoRef = { name, description, unitPrice, quantity };
     const result = await runExecutor(createNode(dataNoRef), { externalReference: 'from-input' }, ctx);
 
     expect(ctx.compileTemplate).not.toHaveBeenCalled();
-    expect(manager.save).toHaveBeenCalledWith(
-      BillingTransactionItem,
-      expect.objectContaining({ externalReference: 'from-input' }),
-    );
+    expect(operations.saveItem).toHaveBeenCalledWith(expect.objectContaining({ externalReference: 'from-input' }));
     expect(result.payload).toMatchObject({ externalReference: 'from-input' });
   });
 
   it('ignores non-string input externalReference', async () => {
-    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 99 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never);
 
     await runExecutor(createNode(baseData), { externalReference: 123 }, ctx);
 
     expect(ctx.compileTemplate).not.toHaveBeenCalled();
-    expect(manager.save).toHaveBeenCalledWith(
-      BillingTransactionItem,
-      expect.objectContaining({ externalReference: 'power' }),
-    );
+    expect(operations.saveItem).toHaveBeenCalledWith(expect.objectContaining({ externalReference: 'power' }));
   });
 
   it('creates an owning transaction when no parent scope is provided', async () => {
     ctx.transactionManager = undefined;
-    repoManager.findOne.mockResolvedValueOnce({ id: 42 }).mockResolvedValueOnce(null);
+    operations.pendingUsageTransaction.mockResolvedValueOnce({ id: 42 } as never);
+    operations.matchingPendingItem.mockResolvedValueOnce(null as never);
 
     await runExecutor(createNode(baseData), {}, ctx);
 
     expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ backend: 'sqlite', conflicts: { resourceIds: [1], accountIds: [] } }),
+      expect.objectContaining({ backend: 'fake', conflicts: { resourceIds: [1], accountIds: [] } }),
     );
-    expect(repoManager.save).toHaveBeenCalledWith(
-      BillingTransactionItem,
+    expect(operations.saveItem).toHaveBeenCalledWith(
       expect.objectContaining({ billingTransactionId: 42, quantity: 2 }),
     );
-    expect(manager.findOne).not.toHaveBeenCalled();
+    expect(persistenceFixture.run).toHaveBeenCalledTimes(1);
   });
 
   it('throws when node data fails schema validation', async () => {
     await expect(runExecutor(createNode({ name: '', unitPrice: 5, quantity: 2 }), {}, ctx)).rejects.toThrow();
-    expect(manager.findOne).not.toHaveBeenCalled();
+    expect(operations.pendingUsageTransaction).not.toHaveBeenCalled();
   });
 });

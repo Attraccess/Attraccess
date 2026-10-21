@@ -1,10 +1,8 @@
-import { sqliteRepositoryFixture } from '../../../../database/conformance/sqlite-fixture';
+import { usageOperationsFake } from './operations.test-fixture';
 import { DatabaseTransactions } from '../../../../database/transaction-scope';
 import { UsagePersistence } from '../../persistence/port';
-import { Resource, ResourceUsage, User, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditService } from '../../../../audit/audit.service';
 import { BillingService } from '../../../../billing/charges/billing.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -23,7 +21,6 @@ import { ResourcesService } from '../../../resources.service';
 import { ResourceRetrainingService } from '../../../retraining/resourceRetraining.service';
 import { createResourceUsageMocks } from './mocks.test-fixture';
 import { ResourceUsageService } from '../resource-usage.service';
-const PERSISTENCE_FIXTURE = Symbol('usage persistence fixture');
 
 export function createResourceUsageTestingModule(mocks: ReturnType<typeof createResourceUsageMocks>) {
   const {
@@ -31,7 +28,6 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
     mockPluginEventsService,
     mockMetricsService,
     mockAuditService,
-    mockRepository,
     mockEventEmitter,
     mockResourcesService,
     mockResourceIntroductionService,
@@ -46,51 +42,12 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
     mockProjectsService,
     mockResourceFormsService,
   } = mocks;
+  const operations = usageOperationsFake(mocks.lifecycleAttempts);
   return Test.createTestingModule({
     providers: [
       ResourceUsageService,
-      {
-        provide: PERSISTENCE_FIXTURE,
-        useFactory: (
-          resources: object,
-          usages: { manager: { transaction: (work: (manager: never) => Promise<unknown>) => Promise<unknown> } },
-          users: object,
-        ) =>
-          sqliteRepositoryFixture(
-            (entity) =>
-              entity === Resource
-                ? resources
-                : entity === ResourceUsage
-                  ? usages
-                  : entity === ResourceUsageLifecycleAttempt
-                    ? { find: async () => [...mocks.lifecycleAttempts.values()] }
-                    : users,
-            (work) => usages.manager.transaction(work),
-          ),
-        inject: [getRepositoryToken(Resource), getRepositoryToken(ResourceUsage), getRepositoryToken(User)],
-      },
-      {
-        provide: UsagePersistence,
-        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.usage,
-        inject: [PERSISTENCE_FIXTURE],
-      },
-      {
-        provide: DatabaseTransactions,
-        useFactory: (fixture: ReturnType<typeof sqliteRepositoryFixture>) => fixture.transactions,
-        inject: [PERSISTENCE_FIXTURE],
-      },
-      {
-        provide: getRepositoryToken(Resource),
-        useFactory: mockRepository,
-      },
-      {
-        provide: getRepositoryToken(ResourceUsage),
-        useFactory: mockRepository,
-      },
-      {
-        provide: getRepositoryToken(User),
-        useFactory: mockRepository,
-      },
+      { provide: UsagePersistence, useValue: operations.persistence },
+      { provide: DatabaseTransactions, useValue: operations.transactionDriver.transactions },
       {
         provide: ResourcesService,
         useValue: mockResourcesService,

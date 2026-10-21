@@ -1,25 +1,9 @@
-import { sqliteRepositoryFixture } from '../../../database/conformance/sqlite-fixture';
-import { TypeormFlowEventPersistence } from '../persistence/typeorm-adapter';
-import {
-  BillingTransactionItem,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
-
-import { Logger } from '@nestjs/common';
+import { resetTestFixture } from './fixtures/setup.test-fixture';
+import { ResourceFlowNode, ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { Repository } from 'typeorm';
-
-import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
-
-import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
-
-import { FlowTimer } from '../../../metrics/instrumentation/flow/flow.helper';
+import { FlowExecutionPersistence, FlowEventPersistence } from '../persistence/port';
 
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 
@@ -52,9 +36,8 @@ export type ResourceFlowsExecutorServiceRunFlowTestScope = {
   edgesBySourceAndHandle: Record<string, Edge[]>;
   flowLogs: FlowLogRecorderService;
   operatingIntervals: { transition: jest.Mock };
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<Edge>>;
-  resourceRepository: Partial<Repository<Resource>>;
+  persistence: jest.Mocked<FlowExecutionPersistence>;
+  events: jest.Mocked<FlowEventPersistence>;
   eventEmitter: EventEmitter2;
   resourceHealthService: ResourceHealthService;
   variablesService: ResourceFlowVariablesService;
@@ -69,9 +52,8 @@ export type ResourceFlowsExecutorServiceMqttTestScope = {
   mqttClientService: MqttClientService;
   flowLogs: FlowLogRecorderService;
   createNode: typeof createNode;
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-  resourceRepository: Partial<Repository<Resource>>;
+  persistence: jest.Mocked<FlowExecutionPersistence>;
+  events: jest.Mocked<FlowEventPersistence>;
   resourceUsageService: ResourceUsageService;
   resourceHealthService: ResourceHealthService;
   variablesService: ResourceFlowVariablesService;
@@ -80,13 +62,9 @@ export type ResourceFlowsExecutorServiceMqttTestScope = {
 describe('ResourceFlowsExecutorService MQTT', () => {
   let service: ResourceFlowsExecutorService;
 
-  let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-
-  let flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-
+  let persistence: jest.Mocked<FlowExecutionPersistence>;
+  let events: jest.Mocked<FlowEventPersistence>;
   let flowLogs: FlowLogRecorderService;
-
-  let resourceRepository: Partial<Repository<Resource>>;
 
   let mqttClientService: MqttClientService;
 
@@ -150,23 +128,17 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     get createNode() {
       return createNode;
     },
-    get flowNodeRepository() {
-      return flowNodeRepository;
+    get persistence() {
+      return persistence;
     },
-    set flowNodeRepository(value: typeof flowNodeRepository) {
-      flowNodeRepository = value;
+    set persistence(value: typeof persistence) {
+      persistence = value;
     },
-    get flowEdgeRepository() {
-      return flowEdgeRepository;
+    get events() {
+      return events;
     },
-    set flowEdgeRepository(value: typeof flowEdgeRepository) {
-      flowEdgeRepository = value;
-    },
-    get resourceRepository() {
-      return resourceRepository;
-    },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
+    set events(value: typeof events) {
+      events = value;
     },
     get resourceUsageService() {
       return resourceUsageService;
@@ -189,117 +161,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   };
 
   beforeEach(() => {
-    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
-    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
-    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-
-    nodesById = {};
-    initialNodes = [];
-    edgesBySourceAndHandle = {};
-
-    flowNodeRepository = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      find: jest.fn(async ({ where }: any) => {
-        if (where?.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED) {
-          return initialNodes.filter((n) => n.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED);
-        }
-        const { resourceId, type } = where || {};
-        return initialNodes.filter((n) => (resourceId ? n.resourceId === resourceId : true) && n.type === type);
-      }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      findOne: jest.fn(async ({ where }: any) => {
-        return nodesById[where.id] ?? null;
-      }),
-    };
-
-    flowEdgeRepository = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      find: jest.fn(async ({ where }: any) => {
-        const key = `${where.source}|${where.sourceHandle ?? ''}`;
-        return edgesBySourceAndHandle[key] ?? [];
-      }),
-    } as unknown as Repository<ResourceFlowEdge>;
-
-    flowLogs = new FlowLogRecorderService();
-
-    resourceRepository = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      findOne: jest.fn(async ({ where }: any) => ({
-        id: where?.id ?? 1,
-        name: `Resource ${where?.id ?? 1}`,
-        type: ResourceType.Machine,
-        metadata: { zone: 'A' },
-      })),
-    } as unknown as Repository<Resource>;
-
-    mqttClientService = {
-      publish: jest.fn(async () => undefined),
-      subscribe: jest.fn(async () => undefined),
-    } as unknown as MqttClientService;
-    resourceUsageService = {
-      logger: new Logger(ResourceUsageService.name),
-      getActiveSession: jest.fn().mockResolvedValue({ id: 'ru-1' }),
-    } as unknown as ResourceUsageService;
-    eventEmitter = new EventEmitter2();
-
-    resourceHealthService = {
-      reportHealth: jest.fn(async () => undefined),
-      isResourceUnhealthy: jest.fn(async () => false),
-      listForResource: jest.fn(async () => []),
-      getSummary: jest.fn(async () => ({ resourceId: 1, isHealthy: true, entries: [], unhealthyEntries: [] })),
-    } as unknown as ResourceHealthService;
-
-    variablesService = {
-      get: jest.fn(async () => undefined),
-      getMany: jest.fn(async () => ({})),
-      getAll: jest.fn(async () => ({ resource: {}, global: {} })),
-      set: jest.fn(async () => undefined),
-      delete: jest.fn(async () => undefined),
-      listForResource: jest.fn(async () => []),
-    } as unknown as ResourceFlowVariablesService;
-
-    const billingItemRepoMock = {
-      manager: {
-        findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
-        findOneBy: jest.fn(),
-        save: jest.fn(async (_e: unknown, data: unknown) => data),
-        update: jest.fn(),
-        transaction: jest.fn(async (work) => work(billingItemRepoMock.manager)),
-      },
-    } as unknown as Repository<BillingTransactionItem>;
-
-    const persistenceFixture = sqliteRepositoryFixture(
-      (entity) =>
-        (entity === ResourceFlowNode
-          ? flowNodeRepository
-          : entity === ResourceFlowEdge
-            ? flowEdgeRepository
-            : resourceRepository) as object,
-      (work) => Reflect.get(billingItemRepoMock.manager, 'transaction')(work),
-    );
-    service = new ResourceFlowsExecutorService(
-      persistenceFixture.flows,
-      persistenceFixture.transactions,
-      flowLogs,
-      mqttClientService,
-      resourceUsageService,
-      eventEmitter,
-      resourceHealthService,
-      variablesService,
-      { time: (_n, fn) => fn() } as unknown as CronTimer,
-      {
-        timeFlow: <T>(_t: string, fn: () => Promise<T>) => fn(),
-        timeNode: <T>(_n: string, fn: () => Promise<T>) => fn(),
-      } as unknown as FlowTimer,
-      {
-        sendLockCommand: jest.fn(() => true),
-        sendUnlockCommand: jest.fn(() => true),
-      } as unknown as CompanionGatewayService,
-      { transition: jest.fn() } as never,
-      { report: jest.fn() } as never,
-      new TypeormFlowEventPersistence(flowNodeRepository as never),
-    );
+    resetTestFixture(scope as ResourceFlowsExecutorServiceRunFlowTestScope);
   });
 
   it('matches INPUT_MQTT_MESSAGE_RECEIVED nodes using wildcards', async () => {

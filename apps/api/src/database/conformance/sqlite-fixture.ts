@@ -1,4 +1,4 @@
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { AUDIT_COMMIT_BOUNDARY } from '../../audit/persistence/port';
 import { SqliteAuditTransactionObserver } from '../../audit/persistence/transaction-observer';
 import { BILLING_OPERATIONS } from '../../billing/persistence/port';
@@ -215,33 +215,6 @@ function buildResourceFixture(source: DataSource) {
   };
 }
 
-/** Unit fixtures retain their existing repository doubles behind the real operation adapters. Never used by application composition. */
-export function sqliteRepositoryFixture(
-  repository: (entity: unknown) => object,
-  run?: (work: (manager: EntityManager) => Promise<unknown>) => Promise<unknown>,
-) {
-  const invoke = (entity: unknown, method: string, args: unknown[]) =>
-    Reflect.apply(Reflect.get(repository(entity), method), repository(entity), args);
-  const manager = {
-    getRepository: repository,
-    findOne: (entity: unknown, options: unknown) => invoke(entity, 'findOne', [options]),
-    findOneBy: (entity: unknown, where: unknown) => invoke(entity, 'findOneBy', [where]),
-    find: (entity: unknown, options: unknown) => invoke(entity, 'find', [options]),
-    save: (entity: unknown, data: unknown) => invoke(entity, 'save', [data]),
-    update: (entity: unknown, where: unknown, data: unknown) => invoke(entity, 'update', [where, data]),
-    delete: (entity: unknown, where: unknown) => invoke(entity, 'delete', [where]),
-    count: (entity: unknown, options: unknown) => invoke(entity, 'count', [options]),
-    exists: (entity: unknown, options: unknown) => invoke(entity, 'exists', [options]),
-    existsBy: (entity: unknown, where: unknown) => invoke(entity, 'existsBy', [where]),
-    transaction: async (work: (manager: EntityManager) => Promise<unknown>) =>
-      run
-        ? run((bound) => work(Object.assign(Object.create(manager), bound)))
-        : work(manager as unknown as EntityManager),
-  };
-  const source = { options: { type: 'sqlite' }, manager, subscribers: [] } as unknown as DataSource;
-  return { ...sqliteResourceFixture(source), manager: manager as unknown as EntityManager, source };
-}
-
 import { ApplicationFixture, ApplicationClient, PhaseGate } from './backend-fixture';
 import { ConfigService } from '@nestjs/config';
 import { ExternalEffectFailureError } from '../../resources/flows/errors/external-effect-failure.error';
@@ -364,7 +337,7 @@ export async function createSqliteApplicationFixture(): Promise<ApplicationFixtu
         for (const method of ['recordBillingTransaction', 'recordBillingTransactionAfterCommit'] as const) {
           const original = audit[method].bind(audit);
           audit[method] = ((...args: Parameters<typeof original>) => {
-            const promise = Reflect.apply(original, audit, args);
+            const promise = Promise.resolve(Reflect.apply(original, audit, args));
             writes.push(promise);
             return promise;
           }) as (typeof audit)[typeof method];

@@ -1,14 +1,8 @@
-import {
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { Repository } from 'typeorm';
+import { FlowExecutionPersistence, FlowEventPersistence } from '../persistence/port';
 
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 
@@ -49,9 +43,8 @@ export type ResourceFlowsExecutorServiceRunFlowTestScope = {
   edgesBySourceAndHandle: Record<string, Edge[]>;
   flowLogs: FlowLogRecorderService;
   operatingIntervals: { transition: jest.Mock };
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<Edge>>;
-  resourceRepository: Partial<Repository<Resource>>;
+  persistence: jest.Mocked<FlowExecutionPersistence>;
+  events: jest.Mocked<FlowEventPersistence>;
   eventEmitter: EventEmitter2;
   resourceHealthService: ResourceHealthService;
   variablesService: ResourceFlowVariablesService;
@@ -66,9 +59,8 @@ export type ResourceFlowsExecutorServiceMqttTestScope = {
   mqttClientService: MqttClientService;
   flowLogs: FlowLogRecorderService;
   createNode: typeof createNode;
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-  resourceRepository: Partial<Repository<Resource>>;
+  persistence: jest.Mocked<FlowExecutionPersistence>;
+  events: jest.Mocked<FlowEventPersistence>;
   resourceUsageService: ResourceUsageService;
   resourceHealthService: ResourceHealthService;
   variablesService: ResourceFlowVariablesService;
@@ -82,13 +74,9 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let service: ResourceFlowsExecutorService;
 
   // Repositories and dependencies
-  let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-
-  let flowEdgeRepository: Partial<Repository<Edge>>;
-
+  let persistence: jest.Mocked<FlowExecutionPersistence>;
+  let events: jest.Mocked<FlowEventPersistence>;
   let flowLogs: FlowLogRecorderService;
-
-  let resourceRepository: Partial<Repository<Resource>>;
 
   let mqttClientService: MqttClientService;
 
@@ -165,23 +153,17 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     set operatingIntervals(value: typeof operatingIntervals) {
       operatingIntervals = value;
     },
-    get flowNodeRepository() {
-      return flowNodeRepository;
+    get persistence() {
+      return persistence;
     },
-    set flowNodeRepository(value: typeof flowNodeRepository) {
-      flowNodeRepository = value;
+    set persistence(value: typeof persistence) {
+      persistence = value;
     },
-    get flowEdgeRepository() {
-      return flowEdgeRepository;
+    get events() {
+      return events;
     },
-    set flowEdgeRepository(value: typeof flowEdgeRepository) {
-      flowEdgeRepository = value;
-    },
-    get resourceRepository() {
-      return resourceRepository;
-    },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
+    set events(value: typeof events) {
+      events = value;
     },
     get eventEmitter() {
       return eventEmitter;
@@ -439,7 +421,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       any: 'data',
     });
     expect(result).toEqual([]);
-    expect(scope.flowNodeRepository.find as jest.Mock).toHaveBeenCalled();
+    expect(scope.persistence.triggers).toHaveBeenCalled();
   });
 
   it('starts every matching plugin trigger while isolating matcher failures', async () => {
@@ -484,12 +466,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       { source: 'plugin' },
     );
 
-    expect(scope.flowEdgeRepository.find as jest.Mock).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ source: 'matching' }) }),
-    );
-    expect(scope.flowEdgeRepository.find as jest.Mock).not.toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ source: 'throws' }) }),
-    );
+    expect(scope.persistence.outgoingEdges).toHaveBeenCalledWith('matching', expect.anything());
+    expect(scope.persistence.outgoingEdges).not.toHaveBeenCalledWith('throws', expect.anything());
   });
 
   it('pages plugin trigger nodes and limits concurrent flow runs', async () => {
@@ -522,19 +500,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     await scope.service.triggerPluginFlows('pagination-test', 'plugin.pagination-test.trigger', () => true, {});
 
-    expect(scope.flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(1, {
-      where: { type: 'plugin.pagination-test.trigger' },
-      order: { id: 'ASC' },
-      take: 100,
-    });
-    expect(scope.flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(2, {
-      where: {
-        type: 'plugin.pagination-test.trigger',
-        id: expect.objectContaining({ _value: 'node-099' }),
-      },
-      order: { id: 'ASC' },
-      take: 100,
-    });
+    expect(scope.events.pageNodesByType).toHaveBeenNthCalledWith(1, 'plugin.pagination-test.trigger', undefined, 100);
+    expect(scope.events.pageNodesByType).toHaveBeenNthCalledWith(2, 'plugin.pagination-test.trigger', 'node-099', 100);
     expect(maxInFlight).toBeLessThanOrEqual(10);
     expect(scope.service.startFlow).toHaveBeenCalledTimes(101);
   });
@@ -555,7 +522,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const firstLookup = new Promise<ResourceFlowNode[]>((resolve) => {
       resolveFirstLookup = resolve;
     });
-    (scope.flowNodeRepository.find as jest.Mock).mockImplementationOnce(() => firstLookup).mockResolvedValue([node]);
+    (scope.events.pageNodesByType as jest.Mock).mockImplementationOnce(() => firstLookup).mockResolvedValue([node]);
     let releaseFirstFlow!: () => void;
     const firstFlow = new Promise<NodeProcessingResult[]>((resolve) => {
       releaseFirstFlow = () => resolve([]);
@@ -586,7 +553,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     );
 
     await Promise.resolve();
-    expect(scope.flowNodeRepository.find).toHaveBeenCalledTimes(1);
+    expect(scope.events.pageNodesByType).toHaveBeenCalledTimes(1);
     resolveFirstLookup([node]);
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -729,7 +696,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
     scope.edgesBySourceAndHandle[`${mqttNode.id}|`] = [];
 
-    (scope.resourceRepository.findOne as jest.Mock).mockResolvedValueOnce({
+    (scope.persistence.resource as jest.Mock).mockResolvedValueOnce({
       id: 1,
       name: 'Resource 1',
       type: ResourceType.Machine,
@@ -777,7 +744,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     ];
     scope.edgesBySourceAndHandle[`${billingNode.id}|`] = [];
 
-    (scope.resourceRepository.findOne as jest.Mock).mockResolvedValueOnce({
+    (scope.persistence.resource as jest.Mock).mockResolvedValueOnce({
       id: 1,
       name: 'Resource 1',
       type: ResourceType.Machine,

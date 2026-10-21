@@ -1,4 +1,4 @@
-import { Resource, ResourceType, User } from '@attraccess/database-entities';
+import { Resource, ResourceType, User } from '@attraccess/application-models';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
 
@@ -27,12 +27,7 @@ export function createStartSessionFixture(parentScope: ResourceUsageServiceTestS
       set flowExecutorService(value: typeof parentScope.flowExecutorService) {
         parentScope.flowExecutorService = value;
       },
-      get resourceRepository() {
-        return parentScope.resourceRepository;
-      },
-      set resourceRepository(value: typeof parentScope.resourceRepository) {
-        parentScope.resourceRepository = value;
-      },
+
       get mockResource() {
         return mockResource;
       },
@@ -72,21 +67,7 @@ export function createStartSessionFixture(parentScope: ResourceUsageServiceTestS
       set resourceGroupsService(value: typeof parentScope.resourceGroupsService) {
         parentScope.resourceGroupsService = value;
       },
-      get resourceUsageRepository() {
-        return parentScope.resourceUsageRepository;
-      },
-      set resourceUsageRepository(value: typeof parentScope.resourceUsageRepository) {
-        parentScope.resourceUsageRepository = value;
-      },
-      get createMockQueryBuilder() {
-        return parentScope.createMockQueryBuilder;
-      },
-      get transactionalEntityManager() {
-        return parentScope.transactionalEntityManager;
-      },
-      set transactionalEntityManager(value: typeof parentScope.transactionalEntityManager) {
-        parentScope.transactionalEntityManager = value;
-      },
+
       get service() {
         return parentScope.service;
       },
