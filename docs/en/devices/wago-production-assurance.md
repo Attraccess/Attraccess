@@ -123,6 +123,15 @@ credentials and loopback-only ports. It rejects inherited fixture endpoints,
 checks the container name, ID and owner labels, including partial startup. SIGINT
 and SIGTERM terminate the test child and retain failed/interrupted lifecycle evidence.
 
+Use an otherwise idle test host for sustained measurements. Runtime state-file
+persistence is inside the command acknowledgement deadline, so slow storage can
+cause timeouts even at low command rates. In a Linux test container, keep the
+temporary SQLite database and runtime state on the Linux filesystem rather than
+a shared host bind mount. Record the test container's CPU and memory limits
+alongside the broker limits. A passing run qualifies only its recorded environment;
+it does not resolve a failed run on another host or filesystem. Preserve failed
+reports and investigate delays without relaxing deadlines to obtain a pass.
+
 ```sh
 WAGO_FLEET_DOCKER_CONTEXT=orbstack \
   node apps/plugins/wago/scripts/test-production-assurance.mjs
