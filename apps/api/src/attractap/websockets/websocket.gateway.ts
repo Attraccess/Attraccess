@@ -77,6 +77,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   private readonly responses = new ReaderDeliveryAwaiters();
   private readonly deliveries = new ReaderWorkLimit();
   private readonly requests = new ReaderWorkLimit();
+  // ACKs must make progress while all application requests await delivery.
+  private readonly acknowledgements = new ReaderWorkLimit();
   protected readonly clientResponseAwaitersMutex = this.responses.mutex;
 
   @Inject(SettingsService)
@@ -265,7 +267,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @SubscribeMessage('HEARTBEAT')
   public async onHeartbeat(@ConnectedSocket() socket: AuthenticatedWebSocket) {
-    await this.withReaderRequest(socket, async () => {
+    await this.withReaderWork(socket, this.requests, async () => {
       this.logger.debug(`Heartbeat from client ${socket.id}.`);
       try {
         (socket as unknown as { send: (data: string) => void }).send(readerHeartbeat());
@@ -276,9 +278,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
   }
 
-  private async withReaderRequest(socket: AuthenticatedWebSocket, work: () => Promise<void>) {
+  private async withReaderWork(socket: AuthenticatedWebSocket, capacity: ReaderWorkLimit, work: () => Promise<void>) {
     if (this.disconnected.has(socket)) return;
-    const release = this.requests.acquire(socket);
+    const release = capacity.acquire(socket);
     if (!release) {
       await this.handleDisconnect(socket);
       socket.close();
@@ -297,7 +299,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
     if (!eventData || typeof eventData.type !== 'string') return;
-    await this.withReaderRequest(socket, () => this.handleClientEvent(eventData, socket));
+    const capacity = eventData.type.startsWith('ACK_') ? this.acknowledgements : this.requests;
+    await this.withReaderWork(socket, capacity, () => this.handleClientEvent(eventData, socket));
   }
 
   private async handleClientEvent(eventData: AttractapEvent['data'], socket: AuthenticatedWebSocket) {
@@ -325,9 +328,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
     if (eventData.type.startsWith('ACK_')) {
+      if (this.disconnected.has(socket)) return;
       this.logger.debug(`Received reader ACK ${eventData.type}`);
 
-      this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
+      await this.resolveClientResponseAwaiters(socket, type);
       return;
     }
 

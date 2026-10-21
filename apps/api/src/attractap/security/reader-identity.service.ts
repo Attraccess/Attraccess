@@ -387,6 +387,8 @@ export class ReaderIdentityService implements OnModuleInit, OnModuleDestroy {
 
   async revoke(readerId: number): Promise<void> {
     if (!Number.isSafeInteger(readerId) || readerId <= 0) throw new Error('Invalid reader id');
+    // Reserve before the first await; a rejected command must not release another owner's marker.
+    if (this.changing.has(readerId)) throw new Error('Reader lifecycle changed');
     this.changing.add(readerId);
     try {
       await this.identities.update({ readerId }, { revokedAt: new Date() });

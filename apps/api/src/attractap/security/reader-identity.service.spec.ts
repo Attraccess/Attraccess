@@ -239,6 +239,105 @@ describe('persisted reader lifecycle boundaries', () => {
     expect(await service.isLegacy(17)).toBe(false);
   });
 
+  it.each(['initial', 'renewal', 'replacement'])(
+    'rejects revocation during %s enrollment without releasing its owner',
+    async (kind) => {
+      if (kind !== 'initial') await enroll();
+      const readerId = kind === 'replacement' ? 18 : 17;
+      const publicKeyFile =
+        kind === 'replacement'
+          ? join(fixture.directory, 'replacement-public.pem')
+          : join(fixture.directory, 'public.pem');
+      if (kind === 'replacement')
+        writeFileSync(
+          publicKeyFile,
+          createPublicKey(fixture.read('server.key')).export({ type: 'spki', format: 'pem' }),
+          { mode: 0o600 },
+        );
+      const certificateFile = join(fixture.directory, 'concurrent.pem');
+      writeFileSync(certificateFile, await service.issue({ readerId, publicKeyFile }), { mode: 0o600 });
+      let entered: () => void;
+      let finish: () => void;
+      const saved = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const blocked = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const transaction = source.manager.transaction.bind(source.manager);
+      const pause = jest
+        .spyOn(source.manager, 'transaction')
+        .mockImplementation(async (work: (manager: typeof source.manager) => Promise<unknown>) =>
+          transaction(async (manager) => {
+            const result = await work(manager);
+            entered();
+            await blocked;
+            return result;
+          }),
+        );
+      const enrollment = service.enroll({
+        readerId,
+        replaceReaderId: kind === 'replacement' ? 17 : undefined,
+        certificateFile,
+        manifestFile: join(fixture.directory, 'manifest.json'),
+        enrollmentClass: 'development',
+      });
+      try {
+        await saved;
+        for (const id of kind === 'replacement' ? [17, 18] : [17]) {
+          await expect(service.revoke(id)).rejects.toThrow('Reader lifecycle changed');
+          expect(() => service.trackLegacy({}, id, async () => undefined)).toThrow('Reader lifecycle changed');
+        }
+      } finally {
+        finish();
+        await enrollment;
+        pause.mockRestore();
+      }
+      await service.revoke(readerId);
+      const rows = await source.getRepository(AttractapReaderIdentity).find();
+      expect(rows.every((row) => row.revokedAt instanceof Date)).toBe(true);
+      expect(await service.findForTime(fixture.identity.publicKeyFingerprint)).toBeNull();
+    },
+  );
+
+  it('rejects enrollment and a second revocation until the first revocation completes', async () => {
+    await enroll();
+    let finish: () => void;
+    let entered: () => void;
+    const saved = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const blocked = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const repository = source.getRepository(AttractapReaderIdentity);
+    const update = repository.update.bind(repository);
+    const pause = jest.spyOn(repository, 'update').mockImplementationOnce(async (...args) => {
+      const result = await update(...args);
+      entered();
+      await blocked;
+      return result;
+    });
+    const revocation = service.revoke(17);
+    try {
+      await saved;
+      await expect(service.revoke(17)).rejects.toThrow('Reader lifecycle changed');
+      await expect(enroll()).rejects.toThrow('Invalid reader enrollment');
+      expect(() => service.trackLegacy({}, 17, async () => undefined)).toThrow('Reader lifecycle changed');
+    } finally {
+      finish();
+      await revocation;
+      pause.mockRestore();
+    }
+    expect((await repository.find()).every((row) => row.revokedAt instanceof Date)).toBe(true);
+    await expect(
+      service.validateCertificate((await repository.findOneByOrFail({ readerId: 17 })).certificatePem),
+    ).rejects.toThrow('not active');
+    // Denial does not retain a marker after its actual owner finishes.
+    await enroll();
+    expect((await repository.findOneByOrFail({ readerId: 17, generation: 2 })).revokedAt).toBeNull();
+  });
+
   it('replaces hardware with a distinct key and closes the old reader before returning', async () => {
     await enroll();
     const repository = source.getRepository(AttractapReaderIdentity);

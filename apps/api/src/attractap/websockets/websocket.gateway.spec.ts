@@ -1,3 +1,4 @@
+import { protectedReaderConnection } from './reader-connection-transport';
 import { READER_WORK_LIMIT } from './reader-delivery-awaiters';
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
 import { makeStringLVGLReady, sanitizeForLVGL } from './reader-display';
@@ -148,6 +149,119 @@ describe('AttractapGateway', () => {
       await expect(deliver()).resolves.toBe(false);
       await expect(deliver()).resolves.toBe(true);
       await fixture.gateway.handleDisconnect(client);
+    });
+
+    it.each(['protected', 'legacy'])('accepts ACKs at full application capacity on a %s socket', async (kind) => {
+      fixture.attractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', resources: [] });
+      jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket').mockResolvedValue(undefined);
+      const client =
+        kind === 'protected'
+          ? fixture.createSecuredSocket({ readerId: 42 })
+          : fixture.createMockSocket({ readerId: 42, readyState: WebSocket.OPEN });
+      const connected = fixture.gateway.handleConnection(client);
+      await new Promise((resolve) => setImmediate(resolve));
+      const initial =
+        kind === 'protected'
+          ? AttractapEventType.READER_AUTHENTICATED
+          : AttractapEventType.READER_REQUEST_AUTHENTICATION;
+      await fixture.gateway.onClientEvent({ type: `ACK_${initial}` as AttractapEventType, payload: {} }, client);
+      await connected;
+      client.readerId = 42;
+      const type = AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED;
+      const results: boolean[] = [];
+      const handler = jest.fn(async () => {
+        results.push(await client.sendMessage(new AttractapEvent(type, {})));
+      });
+      fixture.gateway['eventHandlers'][AttractapEventType.READER_FIRMWARE_INFO] = handler;
+      const pending = Array.from({ length: READER_WORK_LIMIT }, () =>
+        fixture.gateway.onClientEvent({ type: AttractapEventType.READER_FIRMWARE_INFO, payload: {} }, client),
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(handler).toHaveBeenCalledTimes(READER_WORK_LIMIT);
+      try {
+        await fixture.gateway.onClientEvent({ type: `ACK_${type}` as AttractapEventType, payload: {} }, client);
+        await Promise.all(pending);
+        expect(client.close).not.toHaveBeenCalled();
+        expect(results).toEqual(Array(READER_WORK_LIMIT).fill(true));
+      } finally {
+        await fixture.gateway.handleDisconnect(client);
+        await Promise.all(pending);
+      }
+    });
+
+    it.each(['unready', 'disconnected', 'secured-history', 'forbidden-legacy', 'unknown'])(
+      'ignores %s ACKs',
+      async (reason) => {
+        const client =
+          reason === 'unready'
+            ? fixture.createSecuredSocket({ readerId: 42 })
+            : fixture.createMockSocket({ readerId: 42, readyState: WebSocket.OPEN });
+        if (reason === 'unready') {
+          const connection = protectedReaderConnection(client);
+          connection.identity.revokedAt = new Date();
+        }
+        if (reason === 'disconnected') await fixture.gateway.handleDisconnect(client);
+        if (reason === 'secured-history')
+          jest.spyOn(fixture.gateway['identities'], 'isLegacy').mockResolvedValue(false);
+        const resolve = jest.spyOn(fixture.gateway['responses'], 'acknowledge');
+        const type =
+          reason === 'forbidden-legacy'
+            ? AttractapEventType.RESOURCE_LIST
+            : AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED;
+        // A different event must not release a pending delivery either.
+        if (reason === 'unknown') {
+          let completed = false;
+          const pending = fixture.gateway['waitForClientResponse'](client, type).then(() => {
+            completed = true;
+          });
+          await fixture.gateway.onClientEvent({ type: 'ACK_UNKNOWN' as AttractapEventType, payload: {} }, client);
+          expect(completed).toBe(false);
+          await fixture.gateway.onClientEvent({ type: `ACK_${type}` as AttractapEventType, payload: {} }, client);
+          await pending;
+        } else {
+          await fixture.gateway.onClientEvent({ type: `ACK_${type}` as AttractapEventType, payload: {} }, client);
+          expect(resolve).not.toHaveBeenCalled();
+        }
+      },
+    );
+
+    it('isolates ACKs by socket even when socket IDs match', async () => {
+      const type = AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED;
+      const client = fixture.createMockSocket({ readerId: 42 });
+      const other = fixture.createMockSocket({ id: client.id, readerId: 42 });
+      let completed = false;
+      const pending = fixture.gateway['waitForClientResponse'](client, type).then(() => {
+        completed = true;
+      });
+      await fixture.gateway.onClientEvent({ type: `ACK_${type}` as AttractapEventType, payload: {} }, other);
+      expect(completed).toBe(false);
+      await fixture.gateway.onClientEvent({ type: `ACK_${type}` as AttractapEventType, payload: {} }, client);
+      await pending;
+      expect(completed).toBe(true);
+    });
+
+    it('bounds ACK validation independently before asynchronous legacy checks', async () => {
+      let finish: () => void;
+      const blocked = new Promise<boolean>((resolve) => {
+        finish = () => resolve(true);
+      });
+      const validate = jest.spyOn(fixture.gateway['identities'], 'isLegacy').mockReturnValue(blocked);
+      const client = fixture.createMockSocket({ readerId: 42 });
+      const ack = () =>
+        fixture.gateway.onClientEvent(
+          { type: 'ACK_READER_FIRMWARE_UPDATE_REQUIRED' as AttractapEventType, payload: {} },
+          client,
+        );
+      const pending = Array.from({ length: READER_WORK_LIMIT }, ack);
+      try {
+        expect(validate).toHaveBeenCalledTimes(READER_WORK_LIMIT);
+        await ack();
+        expect(client.close).toHaveBeenCalledTimes(1);
+        expect(validate).toHaveBeenCalledTimes(READER_WORK_LIMIT);
+      } finally {
+        finish();
+        await Promise.all(pending);
+      }
     });
 
     it.each(['event', 'heartbeat'])('bounds %s work before async lookup and isolates other sockets', async (kind) => {
