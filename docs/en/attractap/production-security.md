@@ -63,13 +63,25 @@ An exclusive bundle lock prevents concurrent apply executions from inspecting st
 Run API and migration checks from the repository root:
 
 ```bash
-pnpm nx run api:test --skip-nx-cache --runInBand
+pnpm nx run api:test --skip-nx-cache
 pnpm nx run api:e2e --skip-nx-cache --runInBand
 pnpm nx run attractap-firmware:test --skip-nx-cache
 pnpm nx run attractap-desktop:test-real-api --skip-nx-cache
 ```
 
+Use the API's configured pool of at most three Jest workers for the full suite. Forcing the entire aggregate through `--runInBand` keeps all test files in one long-lived process and can increase memory pressure; reserve it for focused diagnosis. Worker scheduling does not change the selected tests or their assertions.
+
 Allow the aggregate commands several minutes to finish. An outer command-runner timeout can interrupt a progressing suite before Jest reports its final result; it is not a completed test run. Retain the command, input revision, elapsed time, exit status and complete output. Diagnose an interrupted run and obtain normal completion without weakening assertions or increasing individual test deadlines.
+
+For a failing aggregate, preserve structured results as well as the streamed log so a truncated command response does not hide earlier failures:
+
+```bash
+pnpm nx run api:test --skip-nx-cache --outputStyle=stream \
+  --json --outputFile=/tmp/attraccess-api-results.json \
+  > /tmp/attraccess-api-tests.log 2>&1
+```
+
+A test's `Exceeded timeout` failure differs from an outer runner timeout. Inspect every failed suite in the results file. For a worker teardown warning, repeat with `--detectOpenHandles` and a separate results file; this tracing adds overhead. Then obtain normal aggregate completion without tracing. Keep failed executions and original timestamps alongside subsequent results; a passing rerun alone does not identify the earlier failure's cause. Run aggregate checks sequentially to avoid competing test and build processes within the same verification job.
 
 Changes to the registered database migrations also affect firmware/API and desktop/API integration. The firmware target supplies the software peer and payload fixtures for two cases skipped by ordinary API tests. An API-only pass therefore does not replace that target. Desktop card-success scenarios remain deferred to ATT-950; the current suite verifies card-operation denial and legacy maintenance. All of these checks use host substitutes and do not qualify hardware.
 
