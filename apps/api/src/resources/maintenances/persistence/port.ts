@@ -103,6 +103,7 @@ export interface ScheduleEvaluationRow {
 /** A failed storage isolation boundary aborts the whole batch, never just one candidate. */
 export class MaintenanceBatchIsolationError extends Error {}
 export abstract class MaintenanceEvaluationPersistence {
+  abstract hasEnabledSchedules(resourceId: number): Promise<boolean>;
   abstract enabledSchedules(resourceId?: number): Promise<ResourceMaintenanceSchedule[]>;
   abstract resourceCreationDate(id: number): Promise<Date | null>;
   abstract resourceCreationDates(ids: readonly number[]): Promise<{ id: number; createdAt: Date }[]>;
@@ -118,5 +119,14 @@ export abstract class MaintenanceEvaluationPersistence {
 }
 export const MAINTENANCE_EVALUATION_OPERATIONS = operationToken<MaintenanceEvaluationPersistence>(
   'maintenance evaluation',
-  ['enabledSchedules', 'resourceCreationDate', 'resourceCreationDates', 'lastCompleted', 'usageCount', 'scheduleState', 'attemptCreation'],
+  [
+    'hasEnabledSchedules',
+    'enabledSchedules',
+    'resourceCreationDate',
+    'resourceCreationDates',
+    'lastCompleted',
+    'usageCount',
+    'scheduleState',
+    'attemptCreation',
+  ],
 );

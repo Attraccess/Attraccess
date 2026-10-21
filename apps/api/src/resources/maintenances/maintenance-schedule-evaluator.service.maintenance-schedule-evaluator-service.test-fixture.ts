@@ -61,6 +61,7 @@ export function registerMaintenanceScheduleEvaluatorServiceFixture() {
     const qb = createQueryBuilderMock();
     operatingAttribution = { getDurationsForWindows: jest.fn().mockResolvedValue(new Map()) };
     const scheduleRepoMock = {
+      existsBy: jest.fn().mockResolvedValue(true),
       find: jest.fn(),
       findOne: jest.fn(),
       manager: {

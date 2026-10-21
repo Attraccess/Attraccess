@@ -366,6 +366,9 @@ export class TypeormMaintenanceEvaluationPersistence extends MaintenanceEvaluati
   constructor(private readonly manager: EntityManager) {
     super();
   }
+  async hasEnabledSchedules(resourceId: number): Promise<boolean> {
+    return this.manager.getRepository(ResourceMaintenanceSchedule).existsBy({ resourceId, enabled: true });
+  }
   async enabledSchedules(resourceId?: number): Promise<ResourceMaintenanceSchedule[]> {
     return toApplicationRecord(
       await this.manager.getRepository(ResourceMaintenanceSchedule).find({
@@ -443,10 +446,9 @@ export class TypeormMaintenanceEvaluationPersistence extends MaintenanceEvaluati
     } catch {
       throw new MaintenanceBatchIsolationError('Cannot isolate maintenance candidate');
     }
+    let id: number | undefined;
     try {
-      const id = await create();
-      await this.manager.query(`RELEASE SAVEPOINT ${name}`);
-      return id;
+      id = await create();
     } catch (error) {
       try {
         await this.manager.query(`ROLLBACK TO SAVEPOINT ${name}`);
@@ -456,5 +458,11 @@ export class TypeormMaintenanceEvaluationPersistence extends MaintenanceEvaluati
       }
       throw error;
     }
+    try {
+      await this.manager.query(`RELEASE SAVEPOINT ${name}`);
+    } catch {
+      throw new MaintenanceBatchIsolationError('Cannot complete maintenance candidate');
+    }
+    return id;
   }
 }

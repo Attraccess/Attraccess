@@ -9,7 +9,7 @@ import {
 
 import { BadRequestException } from '@nestjs/common';
 
-import { billingOperationsFake, billingTransactionsFake } from './fixtures/operations.test-fixture';
+import { billingOperationsFake } from './fixtures/operations.test-fixture';
 
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 
@@ -73,7 +73,8 @@ describe('BillingService', () => {
         .mockResolvedValue({ creditsPerMinute: 99, creditsPerUsage: 0 } as ResourceBillingConfiguration);
       const operations = billingOperationsFake();
 
-      const transaction = await billingTransactionsFake(operations).transactions.run(
+      scope.transactionDriver.setOperations(operations);
+      const transaction = await scope.transactionDriver.transactions.run(
         { resourceIds: [205], accountIds: [25] },
         (transaction) => scope.service.chargeForResourceUsage(usage, transaction),
       );
@@ -266,7 +267,7 @@ describe('BillingService', () => {
     });
 
     it('getConfiguration throws on unsupported currency value from DB', async () => {
-      scope.persistence.currency.mockResolvedValue({ value: 'USD' } as Setting);
+      scope.persistence.currency.mockResolvedValue({ value: 'USD' });
       await expect(scope.service.getConfiguration()).rejects.toBeInstanceOf(Error);
     });
   });

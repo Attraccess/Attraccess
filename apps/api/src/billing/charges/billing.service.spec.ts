@@ -1,3 +1,4 @@
+import { AUDIT_COMMIT_BOUNDARY, AuditCommitBoundary } from '../../audit/persistence/port';
 import { TransactionScope } from '../../database/transaction-scope';
 
 import {
@@ -24,23 +25,48 @@ import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
 
 export type BillingServiceTestScope = ReturnType<typeof createBillingServiceFixture>;
 
-function withBillingScope<T>(
-  usage: ResourceUsage,
-  operations: BillingPersistence,
-  work: (scope: TransactionScope) => Promise<T>,
-): Promise<T> {
-  return billingTransactionsFake(operations).transactions.run(
-    { resourceIds: [usage.resourceId ?? usage.resource.id], accountIds: usage.userId == null ? [] : [usage.userId] },
-    work,
-  );
-}
-
 describe('BillingService', () => {
   const scope = createBillingServiceFixture();
+
+  function withBillingScope<T>(
+    usage: ResourceUsage,
+    operations: BillingPersistence,
+    work: (scope: TransactionScope) => Promise<T>,
+  ): Promise<T> {
+    scope.transactionDriver.setOperations(operations);
+    return scope.transactionDriver.transactions.run(
+      { resourceIds: [usage.resourceId ?? usage.resource.id], accountIds: usage.userId == null ? [] : [usage.userId] },
+      work,
+    );
+  }
 
   beforeEach(async () => {
     await resetTestFixture(scope);
   });
+
+  it.each(['resource', 'account', 'foreign', 'closed'])(
+    'rejects a %s parent before billing reads or writes',
+    async (kind) => {
+      const usage = { id: 3, resourceId: 7, resource: { id: 7 }, userId: 9 } as ResourceUsage;
+      const owner =
+        kind === 'foreign'
+          ? billingTransactionsFake(scope.persistence).transactions
+          : scope.transactionDriver.transactions;
+      const conflicts = { resourceIds: [kind === 'resource' ? 8 : 7], accountIds: [kind === 'account' ? 10 : 9] };
+      if (kind === 'closed') {
+        const parent = await owner.run(conflicts, async (parent) => parent);
+        await expect(scope.service.chargeForResourceUsage(usage, parent)).rejects.toThrow('Invalid parent');
+      } else {
+        await owner.run(conflicts, async (parent) => {
+          await expect(scope.service.chargeForResourceUsage(usage, parent)).rejects.toThrow(
+            kind === 'foreign' ? 'Invalid parent' : 'cannot expand',
+          );
+        });
+      }
+      for (const operation of Object.values(scope.persistence)) expect(operation).not.toHaveBeenCalled();
+      expect(scope.auditService.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+    },
+  );
 
   describe('getTransaction', () => {
     it('restricts transaction lookup to its owner', async () => {
@@ -611,9 +637,12 @@ describe('BillingService', () => {
       operations.usageTransactionWithItems.mockResolvedValue(existingTransaction);
 
       // base = ceil(2) * 5 = 10; plus existing items 14 => 24; factor 100% -> 24
-      const transaction = await withBillingScope(usage as ResourceUsage, operations, (transaction) =>
-        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
-      );
+      let owningAuditBoundary: AuditCommitBoundary;
+      const transaction = await withBillingScope(usage as ResourceUsage, operations, (transaction) => {
+        owningAuditBoundary = transaction.resolve(AUDIT_COMMIT_BOUNDARY);
+        expect(owningAuditBoundary.defer).toEqual(expect.any(Function));
+        return scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction);
+      });
 
       expect(operations.completeTransaction).toHaveBeenCalledWith(77, -24);
       expect(transaction).toEqual(expect.objectContaining({ id: 77, amount: -24 }));
@@ -626,7 +655,7 @@ describe('BillingService', () => {
         previousStatus: BillingTransactionStatus.Pending,
         source: 'resource-usage',
       });
-      expect(Boolean(auditBoundary)).toBe(true);
+      expect(auditBoundary).toBe(owningAuditBoundary);
 
       // No BILLING_FACTOR item because billingFactor is 100%
       const saves = (operations.saveItem as jest.Mock).mock.calls.map(([data]) => data);

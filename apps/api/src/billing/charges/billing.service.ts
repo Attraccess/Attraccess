@@ -234,15 +234,12 @@ export class BillingService extends BillingLedger {
       return transaction;
     };
 
-    if (transactionManager) {
-      return await doCalculation(transactionManager);
-    }
-
     const transaction = await this.transactions.run(
-      { resourceIds: [usage.resourceId], accountIds: usage.userId == null ? [] : [usage.userId] },
+      { resourceIds: [usage.resourceId ?? usage.resource.id], accountIds: usage.userId == null ? [] : [usage.userId] },
       doCalculation,
+      transactionManager,
     );
-    if (transaction) await this.notifyResourceUsageCharge(transaction.id);
+    if (transaction && !transactionManager) await this.notifyResourceUsageCharge(transaction.id);
     return transaction;
   }
 

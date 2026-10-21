@@ -1,6 +1,7 @@
 import { ResourceUsage } from '../../transport/models/resourceUsage.dto';
 import { mapResponse } from '../../transport/response-mapper';
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, Sse } from '@nestjs/common';
+import { Response } from 'express';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, Res, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
@@ -43,11 +44,21 @@ export class SupervisionController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: RequestSupervisedSessionDto,
     @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<ResourceUsage> {
-    return mapResponse(
-      ResourceUsage,
-      await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto),
-    );
+    const controller = new AbortController();
+    const onClose = () => {
+      if (!res.writableEnded) controller.abort();
+    };
+    res.on('close', onClose);
+    try {
+      return mapResponse(
+        ResourceUsage,
+        await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto, controller.signal),
+      );
+    } finally {
+      res.off('close', onClose);
+    }
   }
 
   @Get('supervision/requests')

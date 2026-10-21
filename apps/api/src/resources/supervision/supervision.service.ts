@@ -30,63 +30,12 @@ import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 
-export interface PendingSupervisionRequest {
-  id: string;
-  resourceId: number;
-  requester: User;
-  /**
-   * The single supervisor whose approval is required (web flow, ATT-487), or `null` for a
-   * reader-originated request (ATT-493) that any currently authorized introducer may approve — by
-   * tapping their card at the reader or approving the web popup.
-   */
-  supervisorUserId: number | null;
-  /** Supervisors the request was broadcast to (reader flow); used to fan out resolution/expiry events. */
-  eligibleSupervisorIds: number[];
-  dto: StartUsageSessionDto;
-  createdAt: Date;
-  expiresAt: Date;
-  timeout: ReturnType<typeof setTimeout>;
-  resolve: (session: ResourceUsage) => void;
-  reject: (error: Error) => void;
-  settled: boolean;
-  /** Present for reader-originated requests (ATT-493); drives reader-websocket notifications. */
-  readerCallbacks?: ReaderSupervisionCallbacks;
-  /**
-   * The reader this request armed from the web (ATT-816). Set synchronously at registration, before
-   * arming, so the one-armed-reader-per-requester scan sees concurrent requests.
-   */
-  readerId?: number;
-}
-
-/**
- * Callbacks for a reader-originated supervision request. Unlike the web flow there is no blocking
- * HTTP caller — resolution side effects (notifying the reader websocket) run through these instead.
- */
-export interface ReaderSupervisionCallbacks {
-  onResolved: (session: ResourceUsage, supervisor: { id: number; username: string }) => void;
-  onFailed: (error: Error) => void;
-}
-
-/**
- * Port for arming a reader to wait for a supervisor card on behalf of a web requester (ATT-816).
- *
- * Implemented in the Attractap module and registered via {@link SupervisionService.setReaderArmer}.
- * A registration hook rather than an injected dependency, because the Attractap module already
- * depends on this service — injecting the gateway here would close the cycle.
- */
-export interface ReaderSupervisionArmer {
-  /**
-   * Puts the reader into its supervisor-card wait state. Throws if the reader is unknown, offline
-   * or busy with another flow, so the requester fails fast instead of watching a doomed countdown.
-   * Returns the callbacks that report the request's outcome back to that reader.
-   */
-  arm(params: {
-    readerId: number;
-    resourceId: number;
-    requester: User;
-    requestId: string;
-  }): Promise<ReaderSupervisionCallbacks>;
-}
+import { PendingSupervisionRequest, ReaderSupervisionCallbacks, ReaderSupervisionArmer } from './supervision.types';
+export type {
+  PendingSupervisionRequest,
+  ReaderSupervisionCallbacks,
+  ReaderSupervisionArmer,
+} from './supervision.types';
 
 @Injectable()
 export class SupervisionService {
@@ -132,6 +81,7 @@ export class SupervisionService {
   }
 
   protected clear(request: PendingSupervisionRequest): void {
+    request.removeAbortListener?.();
     clearTimeout(request.timeout);
     this.pending.delete(request.id);
   }
@@ -360,7 +310,9 @@ export class SupervisionService {
     eligibleSupervisorIds: number[];
     readerCallbacks?: ReaderSupervisionCallbacks;
     readerId?: number;
+    signal?: AbortSignal;
   }): { id: string; expiresAt: Date; promise: Promise<ResourceUsage> } {
+    params.signal?.throwIfAborted();
     const id = params.id ?? randomUUID();
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + SupervisionService.APPROVAL_TTL_MS);
@@ -390,6 +342,23 @@ export class SupervisionService {
       });
     });
 
+    if (params.signal) {
+      const signal = params.signal;
+      const onAbort = () => {
+        const request = this.pending.get(id);
+        if (!request) return;
+        this.clear(request);
+        const error = new RequestTimeoutException('The requester disconnected');
+        this.fail(request, error);
+        request.readerCallbacks?.onFailed(error);
+        this.emitToEligible(request, SupervisionLiveEventType.EXPIRED);
+      };
+      this.pending.get(id).removeAbortListener = () => signal.removeEventListener('abort', onAbort);
+      signal.addEventListener('abort', onAbort, { once: true });
+      // Arming the reader may still be awaiting its ACK when cancellation arrives.
+      // Consume early rejection here while retaining the original promise for the caller.
+      promise.catch(() => undefined);
+    }
     return { id, expiresAt, promise };
   }
 
@@ -455,6 +424,7 @@ export class SupervisionService {
     resourceId: number,
     requester: User,
     dto: RequestSupervisedSessionDto,
+    signal?: AbortSignal,
   ): Promise<ResourceUsage> {
     const { supervisorUserId, readerId } = dto;
 
@@ -463,8 +433,8 @@ export class SupervisionService {
     }
 
     return readerId == null
-      ? this.requestFromSupervisor(resourceId, requester, dto, supervisorUserId)
-      : this.requestAtReader(resourceId, requester, dto, readerId);
+      ? this.requestFromSupervisor(resourceId, requester, dto, supervisorUserId, signal)
+      : this.requestAtReader(resourceId, requester, dto, readerId, signal);
   }
 
   /** Web flow (ATT-487): one named supervisor, notified over SSE, approves from their own device. */
@@ -473,6 +443,7 @@ export class SupervisionService {
     requester: User,
     dto: RequestSupervisedSessionDto,
     supervisorUserId: number,
+    signal?: AbortSignal,
   ): Promise<ResourceUsage> {
     // Validate eagerly so the requester gets immediate, meaningful feedback instead of waiting 30s
     // for a request that could never have been approved (wrong supervisor, self-supervision, ...).
@@ -484,6 +455,7 @@ export class SupervisionService {
       dto,
       supervisorUserId,
       eligibleSupervisorIds: [supervisorUserId],
+      signal,
     });
 
     this.logger.debug(
@@ -503,6 +475,7 @@ export class SupervisionService {
     requester: User,
     dto: RequestSupervisedSessionDto,
     readerId: number,
+    signal?: AbortSignal,
   ): Promise<ResourceUsage> {
     if (!this.readerArmer) {
       throw new ServiceUnavailableException('Reader-based supervision is unavailable');
@@ -537,6 +510,7 @@ export class SupervisionService {
       supervisorUserId: null,
       eligibleSupervisorIds,
       readerId,
+      signal,
     });
     const request = this.pending.get(id);
 

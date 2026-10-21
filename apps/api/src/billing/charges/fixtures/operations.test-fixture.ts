@@ -1,5 +1,5 @@
 import { BILLING_OPERATIONS, BillingPersistence } from '../../persistence/port';
-import { AUDIT_COMMIT_BOUNDARY } from '../../../audit/persistence/port';
+import { AuditCommitBoundary, AUDIT_COMMIT_BOUNDARY } from '../../../audit/persistence/port';
 import { DatabaseTransactions, TransactionDriver } from '../../../database/transaction-scope';
 
 function operation<K extends keyof BillingPersistence>() {
@@ -38,17 +38,25 @@ export function billingOperationsFake(): jest.Mocked<BillingPersistence> {
 }
 
 export function billingTransactionsFake(operations: BillingPersistence) {
+  const auditBoundary: jest.Mocked<AuditCommitBoundary> = { defer: jest.fn() };
   const driver: TransactionDriver = {
     backend: 'fake',
     run: async (_conflicts, work) =>
       work({
         resolve: (token) => {
           if (token.id === BILLING_OPERATIONS.id) return operations as never;
-          if (token.id === AUDIT_COMMIT_BOUNDARY.id) return { afterCommit: () => undefined } as never;
+          if (token.id === AUDIT_COMMIT_BOUNDARY.id) return auditBoundary as never;
           throw new Error(`Unexpected transaction operations: ${token.description}`);
         },
       }),
   };
   const run = jest.spyOn(driver, 'run');
-  return { run, transactions: new DatabaseTransactions(driver) };
+  return {
+    run,
+    auditBoundary,
+    setOperations: (next: BillingPersistence) => {
+      operations = next;
+    },
+    transactions: new DatabaseTransactions(driver),
+  };
 }

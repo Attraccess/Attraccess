@@ -18,6 +18,8 @@ describe('Scheduled maintenance commit notification', () => {
   let service: MaintenanceScheduleEvaluatorService;
   let rollback: boolean;
   let reads: Promise<{ count: number }[]>[];
+  let scheduleReads: jest.Mock;
+  let enabled: boolean;
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'maintenance-commit-'));
@@ -27,6 +29,13 @@ describe('Scheduled maintenance commit notification', () => {
     await writer.query('CREATE TABLE maintenance (id INTEGER PRIMARY KEY, resourceId INTEGER)');
     reads = [];
     rollback = false;
+    enabled = true;
+    scheduleReads = jest.fn(async (resourceId) => {
+      expect(resourceId).toBe(9);
+      // Executed by the repository owned by the live transaction, not the precheck repository.
+      expect(writer.isInitialized).toBe(true);
+      return enabled ? [{ id: 1, triggerType: 'TIME_INTERVAL', timeIntervalConfig: { duration: 1 } }] : [];
+    });
     const publish = () => {
       reads.push(observer.query('SELECT COUNT(*) AS count FROM maintenance'));
     };
@@ -38,13 +47,12 @@ describe('Scheduled maintenance commit notification', () => {
       backend: 'sqlite',
       run: (_conflicts, work) =>
         writer.transaction(async (em) => {
+          expect(em.queryRunner?.isTransactionActive).toBe(true);
           const result = await work({
             resolve: ((token) => {
               if (token.id === MAINTENANCE_EVALUATION_OPERATIONS.id)
                 return {
-                  enabledSchedules: async () => [
-                    { id: 1, triggerType: 'TIME_INTERVAL', timeIntervalConfig: { duration: 1 } },
-                  ],
+                  enabledSchedules: scheduleReads,
                 };
               if (token.id === insert.id)
                 return {
@@ -80,7 +88,7 @@ describe('Scheduled maintenance commit notification', () => {
       emitScheduledMaintenanceCreated: publish,
     };
     service = new MaintenanceScheduleEvaluatorService(
-      {} as never,
+      { hasEnabledSchedules: async () => true } as never,
       transactions,
       maintenance as never,
       {} as never,
@@ -101,8 +109,18 @@ describe('Scheduled maintenance commit notification', () => {
 
   it('publishes only when another database connection can read the committed maintenance', async () => {
     await service.evaluateResource(9);
+    expect(scheduleReads).toHaveBeenCalledTimes(1);
     expect(await Promise.all(reads)).toEqual([[{ count: 1 }]]);
     expect(await observer.query('SELECT resourceId FROM maintenance')).toEqual([{ resourceId: 9 }]);
+  });
+
+  it('re-reads schedules inside the transaction even if the positive precheck becomes stale', async () => {
+    // existsBy still returns true; the transactional repository sees the schedule disabled.
+    enabled = false;
+    await service.evaluateResource(9);
+    expect(scheduleReads).toHaveBeenCalledTimes(1);
+    expect(reads).toHaveLength(0);
+    expect(await observer.query('SELECT COUNT(*) AS count FROM maintenance')).toEqual([{ count: 0 }]);
   });
 
   it('does not announce maintenance when the transaction rolls back', async () => {

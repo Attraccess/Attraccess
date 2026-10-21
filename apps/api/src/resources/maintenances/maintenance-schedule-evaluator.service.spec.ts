@@ -64,6 +64,12 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   });
 
   describe('evaluateResource', () => {
+    it('does not open a SQLite transaction for resources without enabled schedules', async () => {
+      jest.spyOn(fixture.scheduleRepository, 'existsBy').mockResolvedValue(false);
+      await expect(fixture.service.evaluateResource(fixture.resourceId)).resolves.toBeUndefined();
+      expect(fixture.scheduleRepository.manager.transaction).not.toHaveBeenCalled();
+    });
+
     it.each([
       { kind: 'manual', activeScheduleId: null },
       { kind: 'another schedule', activeScheduleId: fixture.scheduleId + 1 },
@@ -826,10 +832,13 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         .spyOn(fixture.resourceRepository, 'find')
         .mockResolvedValue([{ id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource]);
 
-      jest.spyOn(fixture.scheduleRepository.manager, 'transaction').mockImplementation(async (callback) => {
-        await callback({ query: jest.fn().mockResolvedValue([]) } as never);
-        throw new Error('transaction commit failed');
-      });
+      jest
+        .spyOn(fixture.scheduleRepository.manager, 'transaction')
+        .mockImplementation(async (isolationOrCallback, callback) => {
+          const run = typeof isolationOrCallback === 'function' ? isolationOrCallback : callback;
+          await run({ query: jest.fn().mockResolvedValue([]) } as never);
+          throw new Error('transaction commit failed');
+        });
 
       await expect(fixture.service.evaluateAll()).resolves.toBeUndefined();
 
