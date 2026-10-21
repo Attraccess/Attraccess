@@ -22,7 +22,7 @@ class ConfigurationBrowser(unittest.TestCase):
         self.runtime = sync_playwright().start()
         self.addCleanup(self.runtime.stop)
         try:
-            self.browser = self.runtime.chromium.launch(args=["--disable-background-networking", "--host-resolver-rules=MAP * ~NOTFOUND"])
+            self.browser = self.runtime.chromium.launch(headless=True, args=["--disable-background-networking", "--host-resolver-rules=MAP * ~NOTFOUND"])
         except Exception as error:
             (self.artifacts / "launch-error.txt").write_text(str(error))
             raise

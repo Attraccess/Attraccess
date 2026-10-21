@@ -2,12 +2,12 @@ import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
 import type { ProjectUsageService } from './project-usage.service';
 export type {
-  UsageSummaryRaw,
-  SpendRaw,
-  TimeSeriesUsageRaw,
-  TimeSeriesSpendRaw,
-  ResourceUsageAggregateRaw,
-  ResourceSpendAggregateRaw,
+  UsageSummary,
+  Spend,
+  TimeSeriesUsage,
+  TimeSeriesSpend,
+  ResourceUsageAggregate,
+  ResourceSpendAggregate,
 } from './persistence/port';
 
 interface ProjectUsageServiceProjectUsageStatisticsContext {
@@ -25,45 +25,39 @@ export async function getProjectUsageStats(
 
   const configuration = await context.getBillingConfiguration();
 
-  const {
-    summaryRaw,
-    perResourceUsageRaw,
-    timeSeriesUsageRaw,
-    totalSpendRaw,
-    perResourceSpendRaw,
-    timeSeriesSpendRaw,
-  } = await context.persistence.statistics(projectId, query);
+  const { summary, perResourceUsage, timeSeriesUsage, totalSpend, perResourceSpend, timeSeriesSpend } =
+    await context.persistence.statistics(projectId, query);
 
   const spendByResource = new Map<number, number>();
-  perResourceSpendRaw.forEach((row) => {
-    spendByResource.set(Number(row.resourceId), Number(row.spend));
+  perResourceSpend.forEach((row) => {
+    spendByResource.set(row.resourceId, row.spend);
   });
 
   const timeSeriesSpendMap = new Map<string, number>();
-  timeSeriesSpendRaw.forEach((row) => {
-    timeSeriesSpendMap.set(row.usageDate, Number(row.spend));
+  timeSeriesSpend.forEach((row) => {
+    timeSeriesSpendMap.set(row.usageDate, row.spend);
   });
 
-  const topResources = perResourceUsageRaw.map((row) => ({
-    resourceId: Number(row.resourceId),
+  const topResources = perResourceUsage.map((row) => ({
+    resourceId: row.resourceId,
     resourceName: row.resourceName ?? 'Unknown resource',
-    sessions: Number(row.sessions),
-    minutes: Number(row.minutes),
-    spend: spendByResource.get(Number(row.resourceId)) ?? 0,
+    sessions: row.sessions,
+    minutes: row.minutes,
+    spend: spendByResource.get(row.resourceId) ?? 0,
   }));
 
-  const timeSeries = timeSeriesUsageRaw.map((row) => ({
+  const timeSeries = timeSeriesUsage.map((row) => ({
     date: row.usageDate,
-    sessions: Number(row.sessions),
-    minutes: Number(row.minutes),
+    sessions: row.sessions,
+    minutes: row.minutes,
     spend: timeSeriesSpendMap.get(row.usageDate) ?? 0,
   }));
 
   return {
     summary: {
-      totalSessions: Number(summaryRaw?.totalSessions ?? 0),
-      totalMinutes: Number(summaryRaw?.totalMinutes ?? 0),
-      totalSpend: Number(totalSpendRaw?.totalSpend ?? 0),
+      totalSessions: summary.totalSessions,
+      totalMinutes: summary.totalMinutes,
+      totalSpend: totalSpend.totalSpend,
       currency: configuration.currency,
       minorUnit: configuration.minorUnit,
     },

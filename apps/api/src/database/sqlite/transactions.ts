@@ -2,6 +2,8 @@ import type { ConflictScope, OperationToken, TransactionDriver, TransactionOpera
 import { DataSource, EntityManager } from 'typeorm';
 
 const sqliteTransactions = new WeakMap<DataSource, Promise<unknown>>();
+const closingConnections = new WeakMap<DataSource, Promise<void>>();
+
 const resourceConnections = new WeakMap<DataSource, Promise<DataSource>>();
 
 async function getResourceConnection(source: DataSource): Promise<DataSource> {
@@ -30,17 +32,23 @@ async function getResourceConnection(source: DataSource): Promise<DataSource> {
   return connection;
 }
 
-export async function closeResourceTransactionConnection(source: DataSource): Promise<void> {
-  const pending = resourceConnections.get(source);
-  if (!pending) return;
-  await sqliteTransactions.get(source)?.catch(() => undefined);
-  try {
-    const connection = await pending;
-    if (connection.isInitialized) await connection.destroy();
-  } finally {
-    resourceConnections.delete(source);
-    sqliteTransactions.delete(source);
-  }
+export function closeResourceTransactionConnection(source: DataSource): Promise<void> {
+  const existing = closingConnections.get(source);
+  if (existing) return existing;
+  // Register closing synchronously, before yielding to the accepted transaction queue.
+  const closing = Promise.resolve().then(async () => {
+    await sqliteTransactions.get(source)?.catch(() => undefined);
+    const pending = resourceConnections.get(source);
+    try {
+      const connection = await pending;
+      if (connection?.isInitialized) await connection.destroy();
+    } finally {
+      resourceConnections.delete(source);
+      sqliteTransactions.delete(source);
+    }
+  });
+  closingConnections.set(source, closing);
+  return closing;
 }
 
 /**
@@ -56,6 +64,7 @@ export async function runSerializedTransaction<T>(
   if (connection?.options?.type !== 'sqlite') {
     return manager.transaction(work);
   }
+  if (closingConnections.has(connection)) throw new Error('Resource transaction connection is closing');
   const previous = sqliteTransactions.get(connection) ?? Promise.resolve();
   const next = previous
     .catch(() => undefined)

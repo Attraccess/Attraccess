@@ -101,3 +101,7 @@ Automatische Upgrade-Tests verwenden konstruierte historische SQLite-Datenbanken
 
 - [Aktualisierung](installation/updating.md)
 - [Docker Compose Installation](installation/docker-compose.md)
+
+### Importreihenfolge und Wertdarstellung
+
+Ein künftiger Import zwischen Engines benötigt einen konsistenten Snapshot bei gestoppten Schreibern. Lade referenzierte Datensätze vor abhängigen; verschiebe zyklische Constraints oder stelle Beziehungen in einem zweiten transaktionalen Lauf wieder her. Erhalte explizite IDs und setze Schlüsselgeneratoren von Kern und Plugins über die importierten Höchstwerte. Unterscheide SQL-NULL, JSON null und fehlende Felder; Booleans verwenden true/false, JSON wird einmal gemäß Schema dekodiert, exakte Zähler/Beträge verwenden Dezimalzeichenketten, Zeiten UTC und Binärdaten markiertes Base64. Prüfe Beziehungen, Anzahlen, exakte Werte, Salden und Migrationsidentitäten vor der Schreibfreigabe. Der vollständige [Transfervertrag](developer/adding-a-database-backend.md) beschreibt auch generierte Spalten, Sequenzkollisionen und Wiederherstellung nach dem Wechsel. Die Implementierung gehört zu ATT-584; hier wird kein Transferbefehl bereitgestellt.

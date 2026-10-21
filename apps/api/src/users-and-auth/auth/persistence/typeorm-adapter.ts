@@ -69,6 +69,16 @@ export class TypeormPasskeyPersistence extends PasskeyPersistence {
   }
 }
 
+function projectApiToken(token: ApiToken): ApiToken;
+function projectApiToken(token: ApiToken | null): ApiToken | null;
+function projectApiToken(token: ApiToken | null): ApiToken | null {
+  if (!token) return null;
+  return {
+    ...toApplicationRecord(token),
+    permissionKeys: token.apiTokenPermissions.map(({ permissionKey }) => permissionKey),
+  };
+}
+
 @Injectable()
 export class TypeormApiTokenPersistence extends ApiTokenPersistence {
   constructor(
@@ -78,18 +88,17 @@ export class TypeormApiTokenPersistence extends ApiTokenPersistence {
     super();
   }
   async activePage(userId: number, page: number, limit: number): Promise<[ApiToken[], number]> {
-    return toApplicationRecord(
-      await this.tokens.findAndCount({
-        where: { userId, revokedAt: IsNull() },
-        order: { createdAt: 'DESC', id: 'DESC' },
-        relations: { apiTokenPermissions: true },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    );
+    const [tokens, count] = await this.tokens.findAndCount({
+      where: { userId, revokedAt: IsNull() },
+      order: { createdAt: 'DESC', id: 'DESC' },
+      relations: { apiTokenPermissions: true },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return [tokens.map(projectApiToken), count];
   }
   async findOwned(userId: number, tokenId: number): Promise<ApiToken | null> {
-    return toApplicationRecord(
+    return projectApiToken(
       await this.tokens.findOne({
         where: { id: tokenId, userId, revokedAt: IsNull() },
         relations: { apiTokenPermissions: true },
@@ -97,7 +106,7 @@ export class TypeormApiTokenPersistence extends ApiTokenPersistence {
     );
   }
   async findByHash(tokenHash: string): Promise<ApiToken | null> {
-    return toApplicationRecord(
+    return projectApiToken(
       await this.tokens.findOne({ where: { tokenHash }, relations: { apiTokenPermissions: true } }),
     );
   }
@@ -109,7 +118,7 @@ export class TypeormApiTokenPersistence extends ApiTokenPersistence {
       const repo = manager.getRepository(ApiToken);
       const saved = await repo.save(repo.create(token));
       saved.apiTokenPermissions = await this.createPermissions(manager, saved.id, permissionKeys);
-      return toApplicationRecord(saved);
+      return projectApiToken(saved);
     });
   }
   async updateToken(token: ApiToken, permissionKeys?: readonly string[]): Promise<ApiToken> {
@@ -118,7 +127,7 @@ export class TypeormApiTokenPersistence extends ApiTokenPersistence {
         await manager.getRepository(ApiTokenPermission).delete({ apiTokenId: token.id });
         token.apiTokenPermissions = await this.createPermissions(manager, token.id, permissionKeys);
       }
-      return toApplicationRecord(await manager.getRepository(ApiToken).save(token));
+      return projectApiToken(await manager.getRepository(ApiToken).save(token));
     });
   }
   async saveToken(token: ApiToken): Promise<void> {

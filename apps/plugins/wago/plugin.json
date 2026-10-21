@@ -2,10 +2,26 @@
   "name": "wago",
   "version": "0.1.0",
   "main": {
-    "backend": { "directory": "dist", "entryPoint": "index.js" },
-    "migrations": { "directory": "dist", "entryPoint": "migrations.js" },
-    "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
+    "backend": {
+      "directory": "dist",
+      "entryPoint": "index.js"
+    },
+    "migrations": {
+      "directory": "dist",
+      "entryPoint": "migrations.js"
+    },
+    "frontend": {
+      "directory": "frontend",
+      "entryPoint": "remoteEntry.js",
+      "styles": "style.css"
+    }
   },
-  "attraccessVersion": { "min": "1.11.0" },
-  "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS", "MANAGE_SECRETS"]
+  "attraccessVersion": {
+    "min": "1.11.0"
+  },
+  "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS", "MANAGE_SECRETS"],
+  "persistence": {
+    "contractVersion": 2,
+    "supportedBackends": ["sqlite"]
+  }
 }

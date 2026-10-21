@@ -1,3 +1,9 @@
+// Keep plugin execution in Jest's realm, just as the production loader shares the host realm.
+jest.mock('vm', () => ({ ...jest.requireActual('vm'), runInThisContext: (source: string) => eval(source) }));
+jest.mock('module', () => ({ ...jest.requireActual('module'), createRequire: () => require }));
+import { assertPluginBackendSupport } from './persistence/port';
+import { resetPluginFlowRegistry } from './flows/node-registry';
+import { resetPluginAuditRegistry } from './audit/audit-registry';
 import { registerPluginModuleFixture } from './plugin.module.plugin-module.test-fixture';
 import 'reflect-metadata';
 import { EMPTY } from 'rxjs';
@@ -11,7 +17,11 @@ import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 import { dataSourceConfig } from './../database/datasource';
-import { mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'path';
+import { Test } from '@nestjs/testing';
+import { parseNpmPluginPackage } from './npm/contract-validation';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -32,6 +42,48 @@ describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
 
   describe('forRoot', () => {
+    it.each(['direct', 'npm'])(
+      'loads WAGO from the shipped %s manifest through host context selection',
+      async (kind) => {
+        resetPluginFlowRegistry();
+        resetPluginAuditRegistry();
+        const wago = resolve(__dirname, '../../../plugins/wago');
+        const manifest =
+          kind === 'direct'
+            ? JSON.parse(readFileSync(join(wago, 'plugin.json'), 'utf8'))
+            : parseNpmPluginPackage(JSON.parse(readFileSync(join(wago, 'package.json'), 'utf8')), '1.11.0').manifest;
+        expect(manifest.persistence).toEqual({ contractVersion: 2, supportedBackends: ['sqlite'] });
+        expect(() => assertPluginBackendSupport(manifest, 'postgres')).toThrow('does not support');
+        mkdirSync(join(fixture.root, 'wago/dist'), { recursive: true });
+        writeFileSync(join(fixture.root, 'wago/plugin.json'), JSON.stringify(manifest));
+        execFileSync(process.execPath, [
+          resolve(wago, '../scripts/esbuild-backend.mjs'),
+          '--entry',
+          join(wago, 'backend/plugin.ts'),
+          '--outfile',
+          join(fixture.root, 'wago/dist/index.js'),
+        ]);
+        PluginModule.resetHostReferences();
+        const host = PluginModule.forRoot();
+        const registration = host.imports.find(
+          (entry) => typeof entry === 'object' && 'module' in entry && entry.module.name === 'WagoPluginModule',
+        );
+        expect(registration).toBeDefined();
+        new PluginModule({} as DataSource, new EventEmitter2(), { get: () => ({ clearPlugin: jest.fn() }) } as never);
+        const compiled = await Test.createTestingModule({ imports: [registration as never] }).compile();
+        try {
+          const providers = (registration as { providers: unknown[] }).providers;
+          const service = providers.find((entry) => typeof entry === 'function' && entry.name === 'WagoService');
+          expect(compiled.get(service as never)).toBeDefined();
+        } finally {
+          await compiled.close();
+          PluginModule.resetHostReferences();
+          resetPluginFlowRegistry();
+          resetPluginAuditRegistry();
+        }
+      },
+    );
+
     it('loads the neutral SDK through the production loader and supplies only guarded host operations', async () => {
       mkdirSync(join(fixture.root, 'neutral/dist'), { recursive: true });
       writeFileSync(

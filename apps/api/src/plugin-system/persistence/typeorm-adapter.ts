@@ -2,6 +2,8 @@ import type { PluginHostOperations } from '@attraccess/plugins-backend-sdk/v2';
 import { Resource, ResourceFlowNode, Setting, User } from '@attraccess/database-entities';
 import { DataSource, DataSourceOptions, In, MigrationExecutor } from 'typeorm';
 import type { PluginMigrationClass } from '@attraccess/plugins-backend-sdk/adapter';
+import { preflightPluginBackend } from './sqlite-preflight';
+import type { PluginBackendModule } from '@attraccess/plugins-backend-sdk/v2';
 import type { PluginBackendAdapters } from '@attraccess/plugins-backend-sdk/adapter';
 import { dirname, join } from 'path';
 import { mkdirSync } from 'fs';
@@ -65,18 +67,21 @@ export class SqlitePluginMigrations implements PluginMigrationPersistence {
   }
 
   hasMigrations(manifest: LoadedPluginManifest): boolean {
-    this.assertSupported(manifest);
+    const registration = this.preflight(manifest);
     if (manifest.main?.migrations?.directory && manifest.main?.migrations?.entryPoint) return true;
-    return this.classes(manifest).length > 0;
+    return (registration?.migrations?.length ?? 0) > 0;
   }
 
   migrationNames(manifest: LoadedPluginManifest, root = this.root()): readonly string[] {
     return this.classes(manifest, root).map(({ name }) => name);
   }
 
-  async appliedNames(manifest: LoadedPluginManifest): Promise<readonly string[]> {
-    return this.connection(manifest, [], async (source) =>
-      (await new MigrationExecutor(source).getExecutedMigrations()).map(({ name }) => name),
+  async appliedNames(manifest: LoadedPluginManifest, root = this.root()): Promise<readonly string[]> {
+    return this.connection(
+      manifest,
+      [],
+      async (source) => (await new MigrationExecutor(source).getExecutedMigrations()).map(({ name }) => name),
+      root,
     );
   }
 
@@ -104,6 +109,7 @@ export class SqlitePluginMigrations implements PluginMigrationPersistence {
 
   private classes(manifest: LoadedPluginManifest, root = this.root()): PluginMigrationClass[] {
     this.assertSupported(manifest);
+    const registration = this.preflight(manifest, root);
     const migrations = manifest.main?.migrations;
     if (migrations?.directory && migrations.entryPoint) {
       const entry = join(root, migrations.directory, migrations.entryPoint);
@@ -115,33 +121,26 @@ export class SqlitePluginMigrations implements PluginMigrationPersistence {
       // Released entry points remain authoritative when both forms are declared.
       return classes;
     }
-    if (!manifest.persistence || !manifest.main.backend?.directory || !manifest.main.backend.entryPoint) return [];
-    const entry = join(root, manifest.main.backend.directory, manifest.main.backend.entryPoint);
-    const plugin = loadPluginEntryExports(entry).default as Partial<PluginBackendAdapters> & {
-      persistence?: import('@attraccess/plugins-backend-sdk/v2').PluginPersistenceDeclaration;
-    };
-    assertPluginBackendSupport({ name: manifest.name, persistence: plugin?.persistence }, this.backend);
-    if (
-      !plugin?.persistence ||
-      JSON.stringify([...plugin.persistence.supportedBackends].sort()) !==
-        JSON.stringify([...manifest.persistence.supportedBackends].sort())
-    ) {
-      throw new Error(`Plugin "${manifest.name}" exports a persistence contract inconsistent with its manifest.`);
-    }
-    const registrations = (plugin.persistenceAdapters ?? []).filter(({ backend }) => backend === this.backend);
-    if (registrations.length > 1) throw new Error(`Plugin "${manifest.name}" has duplicate SQLite registrations.`);
-    const classes = [...(registrations[0]?.migrations ?? [])];
-    if (classes.some((value) => typeof value !== 'function'))
-      throw new Error('Plugin migration registrations must contain classes.');
-    return classes;
+    return [...(registration?.migrations ?? [])];
+  }
+
+  private preflight(manifest: LoadedPluginManifest, root = this.root()) {
+    this.assertSupported(manifest);
+    if (!manifest.persistence) return undefined;
+    const backend = manifest.main?.backend;
+    if (!backend?.directory || !backend.entryPoint) throw new Error('Neutral plugin backend entry is required.');
+    const plugin = loadPluginEntryExports(join(root, backend.directory, backend.entryPoint))
+      .default as PluginBackendModule & Partial<PluginBackendAdapters>;
+    return preflightPluginBackend(manifest, plugin, this.backend);
   }
 
   private async connection<T>(
     manifest: LoadedPluginManifest,
     migrations: PluginMigrationClass[],
     work: (source: DataSource) => Promise<T>,
+    root = this.root(),
   ): Promise<T> {
-    this.assertSupported(manifest);
+    this.preflight(manifest, root);
     const base = (this.configuration ?? selectDatabaseBackend().connectionOptions()) as DataSourceOptions;
     const database = (base as { database?: unknown }).database;
     if (typeof database === 'string') mkdirSync(dirname(database), { recursive: true });

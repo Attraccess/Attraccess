@@ -1,14 +1,4 @@
-import {
-  ProjectUsagePersistence,
-  ProjectReportWindow,
-  ProjectUsageAggregates,
-  UsageSummaryRaw,
-  ResourceUsageAggregateRaw,
-  TimeSeriesUsageRaw,
-  SpendRaw,
-  ResourceSpendAggregateRaw,
-  TimeSeriesSpendRaw,
-} from './port';
+import { ProjectUsagePersistence, ProjectReportWindow, ProjectUsageAggregates } from './port';
 import {
   BillingTransaction,
   BillingTransactionStatus,
@@ -236,13 +226,13 @@ export class TypeormProjectUsagePersistence extends ProjectUsagePersistence {
 
     this.applyDateFilters(completedUsageQb, 'usage', window.startDate, window.endDate);
 
-    const summaryRaw = (await completedUsageQb
+    const summary = await completedUsageQb
       .clone()
       .select('COUNT(*)', 'totalSessions')
       .addSelect('COALESCE(SUM(usage.usageInMinutes), 0)', 'totalMinutes')
-      .getRawOne()) as UsageSummaryRaw;
+      .getRawOne();
 
-    const perResourceUsageRaw = (await completedUsageQb
+    const perResourceUsage = await completedUsageQb
       .clone()
       .select('usage.resourceId', 'resourceId')
       .addSelect('resource.name', 'resourceName')
@@ -253,16 +243,16 @@ export class TypeormProjectUsagePersistence extends ProjectUsagePersistence {
       .orderBy('sessions', 'DESC')
       .addOrderBy('minutes', 'DESC')
       .limit(5)
-      .getRawMany()) as ResourceUsageAggregateRaw[];
+      .getRawMany();
 
-    const timeSeriesUsageRaw = (await completedUsageQb
+    const timeSeriesUsage = await completedUsageQb
       .clone()
       .select('DATE(usage.startTime)', 'usageDate')
       .addSelect('COUNT(*)', 'sessions')
       .addSelect('COALESCE(SUM(usage.usageInMinutes), 0)', 'minutes')
       .groupBy('usageDate')
       .orderBy('usageDate', 'ASC')
-      .getRawMany()) as TimeSeriesUsageRaw[];
+      .getRawMany();
 
     const billingBaseQb = this.transactions
       .createQueryBuilder('tx')
@@ -272,35 +262,48 @@ export class TypeormProjectUsagePersistence extends ProjectUsagePersistence {
 
     this.applyDateFilters(billingBaseQb, 'usage', window.startDate, window.endDate);
 
-    const totalSpendRaw = (await billingBaseQb
+    const totalSpend = await billingBaseQb
       .clone()
       .select('COALESCE(SUM(CASE WHEN tx.amount < 0 THEN -tx.amount ELSE 0 END), 0)', 'totalSpend')
-      .getRawOne()) as SpendRaw;
+      .getRawOne();
 
-    const perResourceSpendRaw = (await billingBaseQb
+    const perResourceSpend = await billingBaseQb
       .clone()
       .select('usage.resourceId', 'resourceId')
       .addSelect('COALESCE(SUM(CASE WHEN tx.amount < 0 THEN -tx.amount ELSE 0 END), 0)', 'spend')
       .groupBy('usage.resourceId')
-      .getRawMany()) as ResourceSpendAggregateRaw[];
+      .getRawMany();
 
-    const timeSeriesSpendRaw = (await billingBaseQb
+    const timeSeriesSpend = await billingBaseQb
       .clone()
       .select('DATE(usage.startTime)', 'usageDate')
       .addSelect('COALESCE(SUM(CASE WHEN tx.amount < 0 THEN -tx.amount ELSE 0 END), 0)', 'spend')
       .groupBy('usageDate')
       .orderBy('usageDate', 'ASC')
-      .getRawMany()) as TimeSeriesSpendRaw[];
+      .getRawMany();
 
     return {
-      summaryRaw,
-      perResourceUsageRaw,
-      timeSeriesUsageRaw,
-      totalSpendRaw,
-      perResourceSpendRaw,
-      timeSeriesSpendRaw,
+      summary: { totalSessions: Number(summary?.totalSessions ?? 0), totalMinutes: Number(summary?.totalMinutes ?? 0) },
+      totalSpend: { totalSpend: Number(totalSpend?.totalSpend ?? 0) },
+      perResourceUsage: perResourceUsage.map((row) => ({
+        resourceId: Number(row.resourceId),
+        resourceName: row.resourceName ?? null,
+        sessions: Number(row.sessions),
+        minutes: Number(row.minutes),
+      })),
+      timeSeriesUsage: timeSeriesUsage.map((row) => ({
+        usageDate: row.usageDate,
+        sessions: Number(row.sessions),
+        minutes: Number(row.minutes),
+      })),
+      perResourceSpend: perResourceSpend.map((row) => ({
+        resourceId: Number(row.resourceId),
+        spend: Number(row.spend),
+      })),
+      timeSeriesSpend: timeSeriesSpend.map((row) => ({ usageDate: row.usageDate, spend: Number(row.spend) })),
     };
   }
+
   async billingCurrency(): Promise<string | null> {
     return (await this.settings.findOneBy({ parent: 'billing', key: 'currency' }))?.value ?? null;
   }

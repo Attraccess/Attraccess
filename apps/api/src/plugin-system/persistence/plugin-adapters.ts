@@ -11,6 +11,9 @@ export class SqlitePluginAdapters {
     private readonly source: () => DataSource,
   ) {
     for (const adapter of registration?.operations ?? []) {
+      if (!adapter?.token || typeof adapter.token.id !== 'symbol' || typeof adapter.create !== 'function')
+        throw new Error('Plugin operation adapters require a token and factory.');
+      if (!Array.isArray(adapter.token.methods)) throw new Error('Plugin operation methods must be declared.');
       if (this.adapters.has(adapter.token.id)) throw new Error('Duplicate plugin operation adapter.');
       if (!adapter.token.methods.length) throw new Error('Plugin operation methods must be declared.');
       this.adapters.set(adapter.token.id, adapter);

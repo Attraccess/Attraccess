@@ -73,10 +73,10 @@ export class ProjectUsageService {
 }
 
 export {
-  ResourceSpendAggregateRaw,
-  ResourceUsageAggregateRaw,
-  SpendRaw,
-  TimeSeriesSpendRaw,
-  TimeSeriesUsageRaw,
-  UsageSummaryRaw,
+  ResourceSpendAggregate,
+  ResourceUsageAggregate,
+  Spend,
+  TimeSeriesSpend,
+  TimeSeriesUsage,
+  UsageSummary,
 } from './project-usage-statistics';

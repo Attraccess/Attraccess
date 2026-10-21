@@ -1,27 +1,22 @@
-import { sqliteRepositoryFixture } from '../../database/conformance/sqlite-fixture';
 import { TransactionScope } from '../../database/transaction-scope';
-import { EntityManager } from 'typeorm';
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
   BillingTransaction,
-  BillingTransactionItem,
   BillingTransactionStatus,
   ResourceBillingConfiguration,
   ResourceUsage,
   ResourceUsageAction,
   User,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { BadRequestException } from '@nestjs/common';
 
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
-import { inheritTestScope } from '../../test-utils/inherit-test-scope';
+import { billingOperationsFake, billingTransactionsFake } from './fixtures/operations.test-fixture';
+import { BillingPersistence } from '../persistence/port';
 
 import { resetTestFixture } from './fixtures/setup.test-fixture';
-
-import { createBillingServiceChargeForResourceUsageFixture } from './fixtures/resource-usage.test-fixture';
 
 import { createBillingServiceFixture } from './fixtures/service.test-fixture';
 
@@ -29,19 +24,12 @@ import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
 
 export type BillingServiceTestScope = ReturnType<typeof createBillingServiceFixture>;
 
-export type BillingServiceChargeForResourceUsageTestScope = ReturnType<
-  typeof createBillingServiceChargeForResourceUsageFixture
->;
-
 function withBillingScope<T>(
   usage: ResourceUsage,
-  manager: EntityManager,
+  operations: BillingPersistence,
   work: (scope: TransactionScope) => Promise<T>,
 ): Promise<T> {
-  return sqliteRepositoryFixture(
-    () => ({}),
-    (callback) => callback(manager),
-  ).transactions.run(
+  return billingTransactionsFake(operations).transactions.run(
     { resourceIds: [usage.resourceId ?? usage.resource.id], accountIds: usage.userId == null ? [] : [usage.userId] },
     work,
   );
@@ -56,22 +44,17 @@ describe('BillingService', () => {
 
   describe('getTransaction', () => {
     it('restricts transaction lookup to its owner', async () => {
-      scope.billingTransactionRepository.findOne.mockResolvedValue(null);
+      scope.persistence.transaction.mockResolvedValue(null);
 
       expect(await scope.service.getTransaction(123, 2)).toBeNull();
-      expect(scope.billingTransactionRepository.findOne).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 123, userId: 2 } }),
-      );
+      expect(scope.persistence.transaction).toHaveBeenCalledWith(123, 2);
     });
   });
 
-  it.each([null, { id: 7 }])('finds only the owner’s transaction ID for a usage (%s)', async (transaction) => {
-    scope.billingTransactionRepository.findOne.mockResolvedValue(transaction);
-    expect(await scope.service.getTransactionIdForUsage(8, 2)).toBe(transaction?.id ?? null);
-    expect(scope.billingTransactionRepository.findOne).toHaveBeenCalledWith({
-      where: { resourceUsageId: 8, userId: 2 },
-      select: ['id'],
-    });
+  it.each([null, 7])('finds only the owner’s transaction ID for a usage (%s)', async (id) => {
+    scope.persistence.transactionIdForUsage.mockResolvedValue(id);
+    expect(await scope.service.getTransactionIdForUsage(8, 2)).toBe(id);
+    expect(scope.persistence.transactionIdForUsage).toHaveBeenCalledWith(8, 2);
   });
 
   it.each([100, -100])('creates an opposite-sign refund for transaction amount %s', async (amount) => {
@@ -83,10 +66,10 @@ describe('BillingService', () => {
       status: BillingTransactionStatus.Completed,
     } as BillingTransaction;
     jest.spyOn(scope.service, 'getTransaction').mockResolvedValueOnce(original).mockResolvedValueOnce(refund);
-    scope.billingTransactionRepository.save.mockResolvedValue(refund);
-    scope.billingTransactionRepository.findOne.mockResolvedValue(original);
+    scope.persistence.createTransaction.mockResolvedValue(refund);
+    scope.persistence.transaction.mockResolvedValue(original);
     expect(await scope.service.refundTransaction(9, 4, { amount: 25 })).toEqual(refund);
-    expect(scope.billingTransactionRepository.save).toHaveBeenCalledWith({
+    expect(scope.persistence.createTransaction).toHaveBeenCalledWith({
       userId: 7,
       initiatorId: 9,
       amount: refund.amount,
@@ -103,10 +86,10 @@ describe('BillingService', () => {
     const get = jest.spyOn(scope.service, 'getTransaction').mockResolvedValue(null);
     await expect(scope.service.refundTransaction(9, 4, { amount: 25 })).rejects.toThrow();
     get.mockResolvedValue({ id: 4, userId: 7, amount: -100 } as BillingTransaction);
-    scope.billingTransactionRepository.findOne.mockResolvedValue({ id: 4, userId: 7, amount: -100 });
+    scope.persistence.transaction.mockResolvedValue({ id: 4, userId: 7, amount: -100 });
     await expect(scope.service.refundTransaction(9, 4, { amount: 0 })).rejects.toThrow('Amount must be greater than 0');
     await expect(scope.service.refundTransaction(9, 4, { amount: 101 })).rejects.toThrow();
-    expect(scope.billingTransactionRepository.save).not.toHaveBeenCalled();
+    expect(scope.persistence.createTransaction).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {
@@ -114,138 +97,56 @@ describe('BillingService', () => {
   });
 
   describe('getBalance', () => {
-    const getBalanceScope = inheritTestScope(
-      {
-        get userRepository() {
-          return scope.userRepository;
-        },
-        set userRepository(value: typeof scope.userRepository) {
-          scope.userRepository = value;
-        },
-        get service() {
-          return scope.service;
-        },
-        set service(value: typeof scope.service) {
-          scope.service = value;
-        },
-      },
-      scope,
-    );
-
     it('returns creditBalance for existing user', async () => {
       const user = { id: 1, creditBalance: 42 } as User;
-      getBalanceScope.userRepository.findOneBy.mockResolvedValue(user);
+      scope.persistence.balance.mockResolvedValue(user);
 
-      await expect(getBalanceScope.service.getBalance(1)).resolves.toBe(42);
-      expect(getBalanceScope.userRepository.findOneBy).toHaveBeenCalledWith({ id: 1 });
+      await expect(scope.service.getBalance(1)).resolves.toBe(42);
+      expect(scope.persistence.balance).toHaveBeenCalledWith(1);
     });
 
     it('throws when user does not exist', async () => {
-      getBalanceScope.userRepository.findOneBy.mockResolvedValue(null);
+      scope.persistence.balance.mockResolvedValue(null);
 
-      await expect(getBalanceScope.service.getBalance(999)).rejects.toBeInstanceOf(UserNotFoundException);
+      await expect(scope.service.getBalance(999)).rejects.toBeInstanceOf(UserNotFoundException);
     });
   });
 
   describe('getHistory', () => {
-    const getHistoryScope = inheritTestScope(
-      {
-        get billingTransactionRepository() {
-          return scope.billingTransactionRepository;
-        },
-        set billingTransactionRepository(value: typeof scope.billingTransactionRepository) {
-          scope.billingTransactionRepository = value;
-        },
-        get service() {
-          return scope.service;
-        },
-        set service(value: typeof scope.service) {
-          scope.service = value;
-        },
-      },
-      scope,
-    );
-
-    it('returns paginated transactions and calls repository with correct options', async () => {
+    it('returns paginated transactions through the history operation', async () => {
       const transactions = [{ id: 10 } as BillingTransaction, { id: 9 } as BillingTransaction];
-      getHistoryScope.billingTransactionRepository.findAndCount.mockResolvedValue([transactions, 2]);
+      scope.persistence.history.mockResolvedValue([transactions, 2]);
 
-      const result = await getHistoryScope.service.getHistory(7, { page: 2, limit: 10 });
+      const result = await scope.service.getHistory(7, { page: 2, limit: 10 });
 
       expect(result).toEqual({ data: transactions, total: 2, page: 2, limit: 10 });
-      expect(getHistoryScope.billingTransactionRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { userId: 7 },
-          skip: 10,
-          take: 10,
-          relations: expect.arrayContaining(['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf']),
-          order: { createdAt: 'DESC', id: 'DESC' },
-        }),
-      );
+      expect(scope.persistence.history).toHaveBeenCalledWith(7, 10, 10);
     });
   });
 
   describe('createManualTransaction', () => {
-    const createManualTransactionScope = inheritTestScope(
-      {
-        get userRepository() {
-          return scope.userRepository;
-        },
-        set userRepository(value: typeof scope.userRepository) {
-          scope.userRepository = value;
-        },
-        get service() {
-          return scope.service;
-        },
-        set service(value: typeof scope.service) {
-          scope.service = value;
-        },
-        get billingTransactionRepository() {
-          return scope.billingTransactionRepository;
-        },
-        set billingTransactionRepository(value: typeof scope.billingTransactionRepository) {
-          scope.billingTransactionRepository = value;
-        },
-        get liveNotificationsService() {
-          return scope.liveNotificationsService;
-        },
-        set liveNotificationsService(value: typeof scope.liveNotificationsService) {
-          scope.liveNotificationsService = value;
-        },
-        get auditService() {
-          return scope.auditService;
-        },
-        set auditService(value: typeof scope.auditService) {
-          scope.auditService = value;
-        },
-      },
-      scope,
-    );
-
     it('throws if user does not exist', async () => {
-      createManualTransactionScope.userRepository.findOneBy.mockResolvedValue(null);
+      scope.persistence.balance.mockResolvedValue(null);
 
-      await expect(createManualTransactionScope.service.createManualTransaction(1, 2, 100)).rejects.toBeInstanceOf(
-        UserNotFoundException,
-      );
+      await expect(scope.service.createManualTransaction(1, 2, 100)).rejects.toBeInstanceOf(UserNotFoundException);
     });
 
     it('succeeds and saves the transaction when user exists', async () => {
-      createManualTransactionScope.userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 5 } as User);
-      createManualTransactionScope.billingTransactionRepository.save.mockResolvedValue({
+      scope.persistence.balance.mockResolvedValue({ id: 1, creditBalance: 5 } as User);
+      scope.persistence.createTransaction.mockResolvedValue({
         id: 123,
       } as BillingTransaction);
 
-      const result = await createManualTransactionScope.service.createManualTransaction(1, 2, 100);
+      const result = await scope.service.createManualTransaction(1, 2, 100);
 
-      expect(createManualTransactionScope.billingTransactionRepository.save).toHaveBeenCalledWith(
+      expect(scope.persistence.createTransaction).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 1, initiatorId: 2, amount: 100 }),
       );
       expect(result).toEqual({ id: 123 });
-      expect(createManualTransactionScope.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith({
+      expect(scope.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith({
         id: 123,
       });
-      expect(createManualTransactionScope.auditService.recordBillingTransaction).toHaveBeenCalledWith({
+      expect(scope.auditService.recordBillingTransaction).toHaveBeenCalledWith({
         transactionId: 123,
         userId: 1,
         initiatorId: 2,
@@ -256,42 +157,40 @@ describe('BillingService', () => {
     });
 
     it('throws InsufficientBalanceError when resulting balance would be negative', async () => {
-      createManualTransactionScope.userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 10 } as User);
+      scope.persistence.balance.mockResolvedValue({ id: 1, creditBalance: 10 } as User);
 
-      await expect(
-        createManualTransactionScope.service.createManualTransaction(1, 2, -20, true),
-      ).rejects.toBeInstanceOf(InsufficientBalanceError);
+      await expect(scope.service.createManualTransaction(1, 2, -20, true)).rejects.toBeInstanceOf(
+        InsufficientBalanceError,
+      );
     });
 
     it('allows negative charge when balance stays non-negative', async () => {
-      createManualTransactionScope.userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 50 } as User);
-      createManualTransactionScope.billingTransactionRepository.save.mockResolvedValue({
+      scope.persistence.balance.mockResolvedValue({ id: 1, creditBalance: 50 } as User);
+      scope.persistence.createTransaction.mockResolvedValue({
         id: 456,
       } as BillingTransaction);
 
-      const result = await createManualTransactionScope.service.createManualTransaction(1, 2, -20, true);
+      const result = await scope.service.createManualTransaction(1, 2, -20, true);
 
-      expect(createManualTransactionScope.billingTransactionRepository.save).toHaveBeenCalledWith(
+      expect(scope.persistence.createTransaction).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 1, initiatorId: 2, amount: -20 }),
       );
       expect(result).toEqual({ id: 456 });
     });
 
     it('throws when amount is fractional', async () => {
-      createManualTransactionScope.userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 50 } as User);
-      await expect(createManualTransactionScope.service.createManualTransaction(1, 2, 10.5)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      scope.persistence.balance.mockResolvedValue({ id: 1, creditBalance: 50 } as User);
+      await expect(scope.service.createManualTransaction(1, 2, 10.5)).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('allows negative resulting balance when failOnInsufficientBalance is false', async () => {
-      createManualTransactionScope.userRepository.findOneBy.mockResolvedValue({ id: 1, creditBalance: 10 } as User);
-      createManualTransactionScope.billingTransactionRepository.save.mockResolvedValue({
+      scope.persistence.balance.mockResolvedValue({ id: 1, creditBalance: 10 } as User);
+      scope.persistence.createTransaction.mockResolvedValue({
         id: 789,
       } as BillingTransaction);
 
-      const result = await createManualTransactionScope.service.createManualTransaction(1, 2, -20, false);
-      expect(createManualTransactionScope.billingTransactionRepository.save).toHaveBeenCalledWith(
+      const result = await scope.service.createManualTransaction(1, 2, -20, false);
+      expect(scope.persistence.createTransaction).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 1, initiatorId: 2, amount: -20 }),
       );
       expect(result).toEqual({ id: 789 });
@@ -299,64 +198,6 @@ describe('BillingService', () => {
   });
 
   describe('handleResourceSessionStartedEvent', () => {
-    const createMockManager = () => {
-      return {
-        findOneBy: jest.fn().mockResolvedValue(null),
-        findOne: jest.fn(async () => null),
-        getRepository: jest.fn(() => ({
-          findOneBy: jest.fn().mockResolvedValue(null),
-          create: jest.fn((data: unknown) => data),
-          save: jest.fn(async (data: unknown) => data),
-        })),
-        save: jest.fn(async (_entity: unknown, data: any) => ({ id: 999, ...data })),
-        update: jest.fn(async () => undefined),
-      } as unknown as {
-        findOneBy: jest.Mock;
-        findOne: jest.Mock<any, any>;
-        getRepository: jest.Mock;
-        save: jest.Mock;
-        update: jest.Mock;
-      };
-    };
-    const handleResourceSessionStartedEventScope = inheritTestScope(
-      {
-        get service() {
-          return scope.service;
-        },
-        set service(value: typeof scope.service) {
-          scope.service = value;
-        },
-        get createMockManager() {
-          return createMockManager;
-        },
-        get billingTransactionRepository() {
-          return scope.billingTransactionRepository;
-        },
-        set billingTransactionRepository(value: typeof scope.billingTransactionRepository) {
-          scope.billingTransactionRepository = value;
-        },
-        get liveNotificationsService() {
-          return scope.liveNotificationsService;
-        },
-        set liveNotificationsService(value: typeof scope.liveNotificationsService) {
-          scope.liveNotificationsService = value;
-        },
-        get emailService() {
-          return scope.emailService;
-        },
-        set emailService(value: typeof scope.emailService) {
-          scope.emailService = value;
-        },
-        get auditService() {
-          return scope.auditService;
-        },
-        set auditService(value: typeof scope.auditService) {
-          scope.auditService = value;
-        },
-      },
-      scope,
-    );
-
     it.each([
       { creditsPerUsage: 6, billingFactor: 50, expectedCharge: 15 },
       { creditsPerUsage: 0, billingFactor: 100, expectedCharge: 24 },
@@ -376,25 +217,23 @@ describe('BillingService', () => {
         userId: 25,
         user: { id: 25, billingFactor: 200 },
       } as ResourceUsage;
-      jest.spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration').mockResolvedValue({
+      jest.spyOn(scope.service, 'getResourceBillingConfiguration').mockResolvedValue({
         creditsPerUsage: 99,
         creditsPerMinute: 99,
         creditsPerOperatingMinute: 99,
       } as ResourceBillingConfiguration);
-      const manager = handleResourceSessionStartedEventScope.createMockManager();
+      const operations = billingOperationsFake();
 
-      const transaction = await withBillingScope(usage, manager as never, (scope) =>
-        handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage, scope),
+      const transaction = await withBillingScope(usage, operations, (transaction) =>
+        scope.service.chargeForResourceUsage(usage, transaction),
       );
 
       expect(transaction.amount).toBe(-contract.expectedCharge);
-      expect(manager.save).toHaveBeenCalledWith(
-        BillingTransactionItem,
+      expect(operations.saveItem).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'PER_SESSION', unitPrice: contract.creditsPerUsage, quantity: 1 }),
       );
       if (contract.billingFactor !== 100) {
-        expect(manager.save).toHaveBeenCalledWith(
-          BillingTransactionItem,
+        expect(operations.saveItem).toHaveBeenCalledWith(
           expect.objectContaining({ name: 'BILLING_FACTOR', description: `${contract.billingFactor}%` }),
         );
       }
@@ -420,15 +259,14 @@ describe('BillingService', () => {
           user: { id: 25, billingFactor: 100 },
         } as ResourceUsage;
         jest
-          .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+          .spyOn(scope.service, 'getResourceBillingConfiguration')
           .mockResolvedValue({} as ResourceBillingConfiguration);
-        const manager = handleResourceSessionStartedEventScope.createMockManager();
-        const transaction = await withBillingScope(usage, manager as never, (scope) =>
-          handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage, scope),
+        const operations = billingOperationsFake();
+        const transaction = await withBillingScope(usage, operations, (transaction) =>
+          scope.service.chargeForResourceUsage(usage, transaction),
         );
         expect(transaction.amount).toBe(-amount);
-        expect(manager.save).toHaveBeenCalledWith(
-          BillingTransactionItem,
+        expect(operations.saveItem).toHaveBeenCalledWith(
           expect.objectContaining({ name: 'BILLING_FACTOR', unitPrice: -(charge - amount) }),
         );
       },
@@ -457,18 +295,21 @@ describe('BillingService', () => {
           userId: 25,
         } as ResourceUsage;
         jest
-          .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+          .spyOn(scope.service, 'getResourceBillingConfiguration')
           .mockResolvedValue({ creditsPerUsage: 0, creditsPerMinute: 0 } as ResourceBillingConfiguration);
-        const manager = handleResourceSessionStartedEventScope.createMockManager();
-        manager.findOne.mockResolvedValue({ id: 999, items: [], status: BillingTransactionStatus.Pending });
+        const operations = billingOperationsFake();
+        operations.usageTransactionWithItems.mockResolvedValue({
+          id: 999,
+          items: [],
+          status: BillingTransactionStatus.Pending,
+        });
 
-        const transaction = await withBillingScope(usage, manager as never, (scope) =>
-          handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage, scope),
+        const transaction = await withBillingScope(usage, operations, (transaction) =>
+          scope.service.chargeForResourceUsage(usage, transaction),
         );
 
         expect(transaction.amount).toBe(-roundedMinutes * 10);
-        expect(manager.save).toHaveBeenCalledWith(
-          BillingTransactionItem,
+        expect(operations.saveItem).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'PER_MINUTE',
             durationMs,
@@ -476,8 +317,7 @@ describe('BillingService', () => {
             unitPrice: 3,
           }),
         );
-        expect(manager.save).toHaveBeenCalledWith(
-          BillingTransactionItem,
+        expect(operations.saveItem).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
             durationMs,
@@ -500,20 +340,15 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      await withBillingScope(
-        usage as ResourceUsage,
-        handleResourceSessionStartedEventScope.createMockManager() as any,
-        (scope) => handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      await withBillingScope(usage as ResourceUsage, billingOperationsFake(), (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
-      expect(handleResourceSessionStartedEventScope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(
-        99,
-        expect.any(Object),
-      );
-      expect(handleResourceSessionStartedEventScope.billingTransactionRepository.save).not.toHaveBeenCalled();
+      expect(scope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(99, expect.any(Object));
+      expect(scope.persistence.createTransaction).not.toHaveBeenCalled();
     });
 
     it('processes not-ended session without creating a transaction when credits are zero', async () => {
@@ -527,20 +362,15 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      await withBillingScope(
-        usage as ResourceUsage,
-        handleResourceSessionStartedEventScope.createMockManager() as any,
-        (scope) => handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      await withBillingScope(usage as ResourceUsage, billingOperationsFake(), (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
-      expect(handleResourceSessionStartedEventScope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(
-        100,
-        expect.any(Object),
-      );
-      expect(handleResourceSessionStartedEventScope.billingTransactionRepository.save).not.toHaveBeenCalled();
+      expect(scope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(100, expect.any(Object));
+      expect(scope.persistence.createTransaction).not.toHaveBeenCalled();
     });
 
     it('does nothing when computed credits are zero', async () => {
@@ -555,20 +385,15 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 0, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      await withBillingScope(
-        usage as ResourceUsage,
-        handleResourceSessionStartedEventScope.createMockManager() as any,
-        (scope) => handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      await withBillingScope(usage as ResourceUsage, billingOperationsFake(), (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
-      expect(handleResourceSessionStartedEventScope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(
-        101,
-        expect.any(Object),
-      );
-      expect(handleResourceSessionStartedEventScope.billingTransactionRepository.save).not.toHaveBeenCalled();
+      expect(scope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(101, expect.any(Object));
+      expect(scope.persistence.createTransaction).not.toHaveBeenCalled();
     });
 
     it('creates a negative billing transaction when credits > 0', async () => {
@@ -588,31 +413,22 @@ describe('BillingService', () => {
 
       // ceil(2.4) = 3 -> 3 * 10 + 5 = 35 credits
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 10, creditsPerUsage: 5 } as ResourceBillingConfiguration);
 
-      handleResourceSessionStartedEventScope.billingTransactionRepository.save.mockResolvedValue({
+      scope.persistence.createTransaction.mockResolvedValue({
         id: 999,
       } as BillingTransaction);
 
-      const transaction = await withBillingScope(
-        usage as ResourceUsage,
-        handleResourceSessionStartedEventScope.createMockManager() as any,
-        (scope) => handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      const transaction = await withBillingScope(usage as ResourceUsage, billingOperationsFake(), (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
-      expect(handleResourceSessionStartedEventScope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(
-        102,
-        expect.any(Object),
-      );
+      expect(scope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(102, expect.any(Object));
       // A caller-owned transaction returns the charge without publishing it before commit.
       expect(transaction).toEqual(expect.objectContaining({ id: 999, amount: -35, userId: 10, resourceUsageId: 13 }));
-      expect(
-        handleResourceSessionStartedEventScope.liveNotificationsService.notifyTransactionUpdate,
-      ).not.toHaveBeenCalled();
-      expect(
-        handleResourceSessionStartedEventScope.emailService.sendResourceUsageBillingSummaryEmail,
-      ).not.toHaveBeenCalled();
+      expect(scope.liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
+      expect(scope.emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
     });
 
     it('applies billingFactor < 100% (discount) and creates BILLING_FACTOR item', async () => {
@@ -631,53 +447,30 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 20, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      // Custom manager to capture saves/updates
-      const manager = {
-        findOneBy: jest.fn().mockResolvedValue(null),
-        findOne: jest.fn().mockResolvedValue(null),
-        update: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn().mockImplementation(async (entity: unknown, data: any) => {
-          if (data && 'status' in data && 'amount' in data) {
-            return { id: 1001, ...data };
-          }
-          return data;
-        }),
-        getRepository: jest.fn(() => ({ findOneBy: jest.fn(), create: jest.fn(), save: jest.fn() })),
-      } as unknown as {
-        findOneBy: jest.Mock;
-        findOne: jest.Mock<any, any>;
-        update: jest.Mock;
-        save: jest.Mock;
-        getRepository: jest.Mock;
-      };
+      // Operation fake captures ledger writes
+      const operations = billingOperationsFake();
 
       // ceil(2) = 2 -> 2 * 20 + 0 = 40 credits; billingFactor 50% -> 20
-      const transaction = await withBillingScope(usage as ResourceUsage, manager as unknown as never, (scope) =>
-        handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      const transaction = await withBillingScope(usage as ResourceUsage, operations, (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
-      expect(handleResourceSessionStartedEventScope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(
-        200,
-        expect.any(Object),
-      );
+      expect(scope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(200, expect.any(Object));
       expect(transaction).toEqual(expect.objectContaining({ amount: -20 }));
 
       // Ensure BILLING_FACTOR item saved with the discount as a negative unit price
-      expect(manager.save).toHaveBeenCalledWith(
-        BillingTransactionItem,
+      expect(operations.saveItem).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'BILLING_FACTOR', unitPrice: -20, quantity: 1 }),
       );
 
       // Ensure base items were saved
-      expect(manager.save).toHaveBeenCalledWith(
-        BillingTransactionItem,
+      expect(operations.saveItem).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'PER_SESSION', unitPrice: 0, quantity: 1 }),
       );
-      expect(manager.save).toHaveBeenCalledWith(
-        BillingTransactionItem,
+      expect(operations.saveItem).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'PER_MINUTE', unitPrice: 20, quantity: 2 }),
       );
     });
@@ -698,33 +491,18 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 10, creditsPerUsage: 5 } as ResourceBillingConfiguration);
 
-      const manager = {
-        findOneBy: jest.fn().mockResolvedValue(null),
-        findOne: jest.fn().mockResolvedValue(null),
-        update: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn().mockImplementation(async (entity: unknown, data: any) => {
-          if (data && 'status' in data && 'amount' in data) {
-            return { id: 1002, ...data };
-          }
-          return data;
-        }),
-      } as unknown as {
-        findOneBy: jest.Mock;
-        findOne: jest.Mock<any, any>;
-        update: jest.Mock;
-        save: jest.Mock;
-      };
+      const operations = billingOperationsFake();
 
       // ceil(3) = 3 -> 3 * 10 + 5 = 35 credits; 100% factor -> 35
-      const transaction = await withBillingScope(usage as ResourceUsage, manager as unknown as never, (scope) =>
-        handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      const transaction = await withBillingScope(usage as ResourceUsage, operations, (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
       expect(transaction.amount).toBe(-35);
 
-      const saves = (manager.save as jest.Mock).mock.calls.map(([, data]: any[]) => data);
+      const saves = (operations.saveItem as jest.Mock).mock.calls.map(([data]) => data);
       const hasBillingFactor = saves.some((c) => c && c.name === 'BILLING_FACTOR');
       expect(hasBillingFactor).toBe(false);
     });
@@ -745,35 +523,19 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 20, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      const manager = {
-        findOneBy: jest.fn().mockResolvedValue(null),
-        findOne: jest.fn().mockResolvedValue(null),
-        update: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn().mockImplementation(async (entity: unknown, data: any) => {
-          if (data && 'status' in data && 'amount' in data) {
-            return { id: 1003, ...data };
-          }
-          return data;
-        }),
-      } as unknown as {
-        findOneBy: jest.Mock;
-        findOne: jest.Mock<any, any>;
-        update: jest.Mock;
-        save: jest.Mock;
-      };
+      const operations = billingOperationsFake();
 
       // base = 20, factor 150% -> total 30, surcharge item +10
-      const transaction = await withBillingScope(usage as ResourceUsage, manager as unknown as never, (scope) =>
-        handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      const transaction = await withBillingScope(usage as ResourceUsage, operations, (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
       expect(transaction).toEqual(expect.objectContaining({ amount: -30 }));
 
-      expect(manager.save).toHaveBeenCalledWith(
-        BillingTransactionItem,
+      expect(operations.saveItem).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'BILLING_FACTOR', unitPrice: 10, quantity: 1 }),
       );
     });
@@ -794,37 +556,21 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 10, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
-      const manager = {
-        findOneBy: jest.fn().mockResolvedValue(null),
-        findOne: jest.fn().mockResolvedValue(null),
-        update: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn().mockImplementation(async (entity: unknown, data: any) => {
-          if (data && 'status' in data && 'amount' in data) {
-            return { id: 1004, ...data };
-          }
-          return data;
-        }),
-      } as unknown as {
-        findOneBy: jest.Mock;
-        findOne: jest.Mock<any, any>;
-        update: jest.Mock;
-        save: jest.Mock;
-      };
+      const operations = billingOperationsFake();
 
       // base = 30, factor 0% -> total 0
-      const transaction = await withBillingScope(usage as ResourceUsage, manager as unknown as never, (scope) =>
-        handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      const transaction = await withBillingScope(usage as ResourceUsage, operations, (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
       // Handle -0 vs 0 by checking numerically
       expect(transaction).toBeDefined();
       expect(transaction.amount).toBeCloseTo(0);
 
-      expect(manager.save).toHaveBeenCalledWith(
-        BillingTransactionItem,
+      expect(operations.saveItem).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'BILLING_FACTOR', unitPrice: -30, quantity: 1 }),
       );
     });
@@ -845,7 +591,7 @@ describe('BillingService', () => {
       } as unknown as ResourceUsage;
 
       jest
-        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .spyOn(scope.service, 'getResourceBillingConfiguration')
         .mockResolvedValue({ creditsPerMinute: 5, creditsPerUsage: 0 } as ResourceBillingConfiguration);
 
       // Existing pending transaction with additional items worth 14 (7 * 2)
@@ -861,29 +607,17 @@ describe('BillingService', () => {
         ],
       } as unknown as BillingTransaction;
 
-      const manager = {
-        // No existing completed transaction
-        findOneBy: jest.fn().mockResolvedValue(null),
-        // Existing pending transaction returned with items
-        findOne: jest.fn().mockResolvedValue(existingTransaction),
-        update: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn().mockImplementation(async (_entity: unknown, data: unknown) => data),
-      } as unknown as {
-        findOneBy: jest.Mock;
-        findOne: jest.Mock<any, any>;
-        update: jest.Mock;
-        save: jest.Mock;
-      };
+      const operations = billingOperationsFake();
+      operations.usageTransactionWithItems.mockResolvedValue(existingTransaction);
 
       // base = ceil(2) * 5 = 10; plus existing items 14 => 24; factor 100% -> 24
-      const transaction = await withBillingScope(usage as ResourceUsage, manager as unknown as never, (scope) =>
-        handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage as ResourceUsage, scope),
+      const transaction = await withBillingScope(usage as ResourceUsage, operations, (transaction) =>
+        scope.service.chargeForResourceUsage(usage as ResourceUsage, transaction),
       );
 
-      expect(manager.update).toHaveBeenCalledWith(BillingTransaction, 77, expect.objectContaining({ amount: -24 }));
+      expect(operations.completeTransaction).toHaveBeenCalledWith(77, -24);
       expect(transaction).toEqual(expect.objectContaining({ id: 77, amount: -24 }));
-      const [auditEvent, auditBoundary] =
-        handleResourceSessionStartedEventScope.auditService.recordBillingTransactionAfterCommit.mock.calls[0];
+      const [auditEvent, auditBoundary] = scope.auditService.recordBillingTransactionAfterCommit.mock.calls[0];
       expect(auditEvent).toEqual({
         transactionId: 77,
         userId: 24,
@@ -895,7 +629,7 @@ describe('BillingService', () => {
       expect(Boolean(auditBoundary)).toBe(true);
 
       // No BILLING_FACTOR item because billingFactor is 100%
-      const saves = (manager.save as jest.Mock).mock.calls.map(([, data]: any[]) => data);
+      const saves = (operations.saveItem as jest.Mock).mock.calls.map(([data]) => data);
       const hasBillingFactor = saves.some((c) => c && c.name === 'BILLING_FACTOR');
       expect(hasBillingFactor).toBe(false);
     });

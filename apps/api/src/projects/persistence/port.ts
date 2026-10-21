@@ -43,36 +43,36 @@ export abstract class ProjectPersistence {
   abstract deleteWithUsageDetachment(id: number): Promise<void>;
 }
 
-export type UsageSummaryRaw = {
-  totalSessions: string | null;
-  totalMinutes: string | null;
+export type UsageSummary = {
+  totalSessions: number;
+  totalMinutes: number;
 };
 
-export type SpendRaw = {
-  totalSpend: string | null;
+export type Spend = {
+  totalSpend: number;
 };
 
-export type TimeSeriesUsageRaw = {
+export type TimeSeriesUsage = {
   usageDate: string;
-  sessions: string;
-  minutes: string;
+  sessions: number;
+  minutes: number;
 };
 
-export type TimeSeriesSpendRaw = {
+export type TimeSeriesSpend = {
   usageDate: string;
-  spend: string;
+  spend: number;
 };
 
-export type ResourceUsageAggregateRaw = {
-  resourceId: string;
+export type ResourceUsageAggregate = {
+  resourceId: number;
   resourceName: string | null;
-  sessions: string;
-  minutes: string;
+  sessions: number;
+  minutes: number;
 };
 
-export type ResourceSpendAggregateRaw = {
-  resourceId: string;
-  spend: string;
+export type ResourceSpendAggregate = {
+  resourceId: number;
+  spend: number;
 };
 
 export interface ProjectReportWindow {
@@ -80,12 +80,12 @@ export interface ProjectReportWindow {
   endDate?: Date;
 }
 export interface ProjectUsageAggregates {
-  summaryRaw: UsageSummaryRaw;
-  perResourceUsageRaw: ResourceUsageAggregateRaw[];
-  timeSeriesUsageRaw: TimeSeriesUsageRaw[];
-  totalSpendRaw: SpendRaw;
-  perResourceSpendRaw: ResourceSpendAggregateRaw[];
-  timeSeriesSpendRaw: TimeSeriesSpendRaw[];
+  summary: UsageSummary;
+  perResourceUsage: ResourceUsageAggregate[];
+  timeSeriesUsage: TimeSeriesUsage[];
+  totalSpend: Spend;
+  perResourceSpend: ResourceSpendAggregate[];
+  timeSeriesSpend: TimeSeriesSpend[];
 }
 export abstract class ProjectUsagePersistence {
   abstract historyPage(

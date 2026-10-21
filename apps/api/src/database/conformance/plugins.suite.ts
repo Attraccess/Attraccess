@@ -74,7 +74,7 @@ export const createSqlitePluginFixture: PluginFixtureFactory = async (contract) 
       const exports =
         contract === 'legacy'
           ? names.map((name) => `exports.${name}=${name};`).join('\n')
-          : `module.exports.default={persistence:{contractVersion:2,supportedBackends:['sqlite']},persistenceAdapters:[{backend:'sqlite',migrations:[${names.join(',')}]}]};`;
+          : `module.exports.default={register(){return {};},persistence:{contractVersion:2,supportedBackends:['sqlite']},persistenceAdapters:[{backend:'sqlite',migrations:[${names.join(',')}]}]};`;
       await writeFile(join(directory, entryPoint), classes.join('\n') + '\n' + exports);
       manifest.main =
         contract === 'legacy'

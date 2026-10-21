@@ -43,3 +43,8 @@ export function getPluginFlowNodeOwner(type: string): string | undefined {
 export function getRegisteredPluginFlowNodes(): PluginFlowNodeDefinition[] {
   return Array.from(_nodesMap.values(), ({ definition }) => definition);
 }
+
+/** Test helper: drops plugin registrations between isolated host fixtures. */
+export function resetPluginFlowRegistry(): void {
+  _nodesMap.clear();
+}

@@ -101,3 +101,7 @@ The automated upgrade tests use constructed historical SQLite databases. They do
 
 - [Updating](installation/updating.md)
 - [Docker Compose Installation](installation/docker-compose.md)
+
+### Transfer ordering and representations
+
+A future cross-engine import must use one consistent stopped-writer snapshot, load referenced records before dependants (defer cyclic constraints or restore relationships in a second transactional pass), preserve explicit IDs, and reset core/plugin generated-key sequences above imported maxima. Preserve SQL null, JSON null and missing fields distinctly; booleans use true/false, JSON is decoded once according to the schema, exact counters/amounts use decimal strings, dates use UTC and bytes use tagged base64. Verify relationships, counts, exact values, balances and migration identities before writes. The full [cross-engine transfer contract](developer/adding-a-database-backend.md#cross-engine-transfer-contract-implementation-in-att-584) also defines generated columns, sequence collision checks and recovery after cutover. ATT-584 owns implementation; no transfer command is supplied here.

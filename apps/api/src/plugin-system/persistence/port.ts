@@ -26,7 +26,7 @@ export interface PluginMigrationPersistence {
   readonly backend: string;
   hasMigrations(manifest: import('../plugin.manifest').LoadedPluginManifest): boolean;
   migrationNames(manifest: import('../plugin.manifest').LoadedPluginManifest, root?: string): readonly string[];
-  appliedNames(manifest: import('../plugin.manifest').LoadedPluginManifest): Promise<readonly string[]>;
+  appliedNames(manifest: import('../plugin.manifest').LoadedPluginManifest, root?: string): Promise<readonly string[]>;
   up(manifest: import('../plugin.manifest').LoadedPluginManifest): Promise<readonly string[]>;
   down(manifest: import('../plugin.manifest').LoadedPluginManifest): Promise<number>;
   tableName(manifest: { readonly name: string }): string;

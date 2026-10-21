@@ -71,9 +71,10 @@ export class PluginMigrationService {
     sourceDirectory: string,
   ): Promise<void> {
     const storage = getImplementationClass().storage;
-    const executed = await storage.appliedNames(manifest);
-    if (!executed.length) return;
+    // Validate the candidate package before touching the durable installed history.
     const names = new Set(storage.migrationNames(manifest, sourceDirectory));
+    const executed = await storage.appliedNames(manifest, sourceDirectory);
+    if (!executed.length) return;
     const missing = executed.filter((name) => !names.has(name));
     if (missing.length)
       throw new Error(

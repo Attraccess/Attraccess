@@ -1,3 +1,10 @@
+import { UsersService } from '../../users-and-auth/users/users.service';
+import { UserPasswordService } from '../../users-and-auth/users/user-password.service';
+import { PasskeyService } from '../../users-and-auth/auth/passkey/passkey.service';
+import { SessionService } from '../../users-and-auth/auth/session.service';
+import { CookieConfigService } from '../../common/services/cookie-config.service';
+import { BruteForceProtectionService } from '../../users-and-auth/rate-limiting/brute-force.service';
+import { AuthAuditLogger } from '../../users-and-auth/rate-limiting/auth-audit.logger';
 import { ProjectsController } from '../../projects/projects.controller';
 import { ResourceMaintenanceController } from '../../resources/maintenances/maintenance.controller';
 import { ResourceUsageController } from '../../resources/usage/sessions/resource-usage.controller';
@@ -247,6 +254,48 @@ describe('controller privacy after plain-record hydration', () => {
   const page = { page: 1, limit: 10, total: 1 };
   const req = { user: { id: 1, effectivePermissions: new Set(['users.read']) }, headers: {}, ip: '127.0.0.1' };
   const serialize = (value: object) => JSON.parse(JSON.stringify(instanceToPlain(value)));
+
+  it('filters plain account records at the real user-list and passkey HTTP endpoints', async () => {
+    const module = await Test.createTestingModule({
+      controllers: [UsersAdminController, PasskeyController],
+      providers: [
+        { provide: UsersService, useValue: { findMany: async () => ({ ...page, data: [user] }) } },
+        { provide: UserPasswordService, useValue: {} },
+        { provide: PasskeyService, useValue: { verifyAuthentication: async () => user } },
+        { provide: SessionService, useValue: { createSession: async () => 'session-token' } },
+        { provide: CookieConfigService, useValue: { setAuthCookie: jest.fn() } },
+        { provide: BruteForceProtectionService, useValue: { assertIpAllowed: jest.fn(), recordSuccess: jest.fn() } },
+        { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+      ],
+    })
+      .overrideGuard(DualAuthGuard)
+      .useValue({
+        canActivate: (context) => {
+          context.switchToHttp().getRequest().user = req.user;
+          return true;
+        },
+      })
+      .compile();
+    const app = module.createNestApplication();
+    app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+    await app.init();
+    try {
+      const listed = await request(app.getHttpServer()).get('/users').expect(200);
+      expect(listed.body).toEqual({ ...page, data: [publicUser] });
+      for (const tokenLocation of ['body', 'cookie']) {
+        const response = await request(app.getHttpServer())
+          .post('/auth/session/passkey')
+          .send({ response: {}, tokenLocation })
+          .expect(201);
+        expect(response.body).toEqual({
+          user: publicUser,
+          authToken: tokenLocation === 'cookie' ? '' : 'session-token',
+        });
+      }
+    } finally {
+      await app.close();
+    }
+  });
 
   it('filters another user initiating a billing transaction and retains pagination', async () => {
     const controller = Object.assign(Object.create(BillingController.prototype), {

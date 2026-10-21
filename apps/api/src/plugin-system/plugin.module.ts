@@ -79,6 +79,7 @@ import type { PluginBackendModule as NeutralPluginBackendModule } from '@attracc
 import type { PluginBackendAdapters } from '@attraccess/plugins-backend-sdk/adapter';
 import { createNeutralGuardedContext } from './runtime/guarded-context';
 import { SqlitePluginHostOperations } from './persistence/typeorm-adapter';
+import { preflightPluginBackend } from './persistence/sqlite-preflight';
 import { SqlitePluginAdapters } from './persistence/plugin-adapters';
 
 function getImplementationClass(): typeof PluginModule {
@@ -221,21 +222,7 @@ export class PluginModule {
 
     if (manifest.persistence) {
       const neutral = importedModule.default as NeutralPluginBackendModule & Partial<PluginBackendAdapters>;
-      assertPluginBackendSupport(
-        { name: manifest.name, persistence: neutral?.persistence },
-        resolveBackendConfig().type,
-      );
-      if (
-        !neutral?.persistence ||
-        typeof neutral.register !== 'function' ||
-        JSON.stringify([...neutral.persistence.supportedBackends].sort()) !==
-          JSON.stringify([...manifest.persistence.supportedBackends].sort())
-      ) {
-        throw new Error(`Plugin "${manifest.name}" exports a persistence contract inconsistent with its manifest.`);
-      }
-      const registrations = (neutral.persistenceAdapters ?? []).filter(({ backend }) => backend === 'sqlite');
-      if (registrations.length > 1) throw new Error(`Plugin "${manifest.name}" has duplicate SQLite registrations.`);
-      const registration = registrations[0];
+      const registration = preflightPluginBackend(manifest, neutral, resolveBackendConfig().type);
       context = getImplementationClass().createPluginContext(manifest);
       const source = () => getImplementationClass().requireRef(getImplementationClass().dataSourceRef, 'DataSource');
       const neutralContext = createNeutralGuardedContext(

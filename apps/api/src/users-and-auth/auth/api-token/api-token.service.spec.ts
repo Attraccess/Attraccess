@@ -97,23 +97,39 @@ describe('ApiTokenService', () => {
   });
 
   it('rejects revoked and expired tokens before loading their owner', async () => {
-    repository.findOne.mockResolvedValueOnce({ revokedAt: new Date(), expiresAt: null });
+    repository.findOne.mockResolvedValueOnce({ apiTokenPermissions: [], revokedAt: new Date(), expiresAt: null });
     await expect(service.authenticate('secret')).resolves.toBeNull();
 
-    repository.findOne.mockResolvedValueOnce({ revokedAt: null, expiresAt: new Date(Date.now() - 1) });
+    repository.findOne.mockResolvedValueOnce({
+      apiTokenPermissions: [],
+      revokedAt: null,
+      expiresAt: new Date(Date.now() - 1),
+    });
     await expect(service.authenticate('secret')).resolves.toBeNull();
     expect(userRepository.findOneBy).not.toHaveBeenCalled();
   });
 
   it('rejects a token when its soft-deleted owner cannot be loaded', async () => {
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
+    repository.findOne.mockResolvedValue({
+      apiTokenPermissions: [],
+      id: 1,
+      userId: 3,
+      revokedAt: null,
+      expiresAt: null,
+    });
     userRepository.findOneBy.mockResolvedValue(null);
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
   });
 
   it('rejects a token when its owner is disabled', async () => {
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
+    repository.findOne.mockResolvedValue({
+      apiTokenPermissions: [],
+      id: 1,
+      userId: 3,
+      revokedAt: null,
+      expiresAt: null,
+    });
     userRepository.findOneBy.mockResolvedValue({ id: 3, isDisabled: true });
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
@@ -128,7 +144,14 @@ describe('ApiTokenService', () => {
       execute: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     repository.createQueryBuilder.mockReturnValue(queryBuilder);
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
+    repository.findOne.mockResolvedValue({
+      apiTokenPermissions: [],
+      id: 1,
+      userId: 3,
+      revokedAt: null,
+      expiresAt: null,
+      lastUsedAt: null,
+    });
     userRepository.findOneBy.mockResolvedValue({ id: 3 });
 
     await service.authenticate('secret');
@@ -151,7 +174,14 @@ describe('ApiTokenService', () => {
       execute: jest.fn().mockResolvedValue({ affected: 0 }),
     };
     repository.createQueryBuilder.mockReturnValue(queryBuilder);
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
+    repository.findOne.mockResolvedValue({
+      apiTokenPermissions: [],
+      id: 1,
+      userId: 3,
+      revokedAt: null,
+      expiresAt: null,
+      lastUsedAt: null,
+    });
     userRepository.findOneBy.mockResolvedValue({ id: 3 });
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
