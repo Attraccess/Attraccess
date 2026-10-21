@@ -20,7 +20,7 @@ export class EventStream {
   private expirationTimer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
   constructor(
-    private readonly count = 1000,
+    private readonly count = 10000,
     private readonly ageMs = 300000,
     private readonly now = Date.now,
   ) {}

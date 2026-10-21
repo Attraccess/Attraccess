@@ -9,22 +9,75 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
   let unsubscribe: (() => void) | undefined;
   let subscribed = false;
   let closing = false;
-  const send = (value: unknown): boolean => {
-    if (closing || ws.readyState !== WebSocket.OPEN) return false;
-    const data = JSON.stringify(ServerMessage.parse(value));
-    if (ws.bufferedAmount + Buffer.byteLength(data) > config.clientQueueBytes) {
-      fail(stream.reconcile('slow_client'), 4009);
-      return false;
+  let replay: unknown[] = [];
+  let replayIndex = 0;
+  let ready: unknown | undefined;
+  const pending: string[] = [];
+  let pendingBytes = 0;
+  let writingBytes = 0;
+  let writeDeadline: ReturnType<typeof setTimeout> | undefined;
+  const cleanup = () => {
+    clearTimeout(writeDeadline);
+    replay = [];
+    ready = undefined;
+    pending.length = 0;
+    pendingBytes = 0;
+    unsubscribe?.();
+  };
+  // Replay is pulled one message at a time. A healthy reconnect must not need
+  // enough socket queue space for the entire retained history at once.
+  const pump = () => {
+    if (closing || writingBytes || ws.readyState !== WebSocket.OPEN) return;
+    let data: string;
+    if (replayIndex < replay.length) {
+      data = JSON.stringify(ServerMessage.parse(replay[replayIndex]));
+      replay[replayIndex++] = undefined;
+    } else if (ready !== undefined) {
+      replay = [];
+      data = JSON.stringify(ServerMessage.parse(ready));
+      ready = undefined;
+    } else {
+      const next = pending.shift();
+      if (next === undefined) return;
+      data = next;
+      pendingBytes -= Buffer.byteLength(data);
     }
+    const bytes = Buffer.byteLength(data);
+    if (ws.bufferedAmount + pendingBytes + bytes > config.clientQueueBytes) {
+      fail(stream.reconcile('slow_client'));
+      return;
+    }
+    writingBytes = bytes;
+    writeDeadline = setTimeout(() => fail(stream.reconcile('slow_client')), config.requestTimeoutMs);
+    writeDeadline.unref();
     ws.send(data, (error) => {
-      if (error) ws.terminate();
+      clearTimeout(writeDeadline);
+      writingBytes = 0;
+      if (error) {
+        closing = true;
+        cleanup();
+        ws.terminate();
+        return;
+      }
+      pump();
     });
-    return true;
+  };
+  const sendLive = (value: unknown) => {
+    if (closing || ws.readyState !== WebSocket.OPEN) return;
+    const data = JSON.stringify(ServerMessage.parse(value));
+    const bytes = Buffer.byteLength(data);
+    if (Math.max(ws.bufferedAmount, writingBytes) + pendingBytes + bytes > config.clientQueueBytes) {
+      fail(stream.reconcile('slow_client'));
+      return;
+    }
+    pending.push(data);
+    pendingBytes += bytes;
+    pump();
   };
   const fail = (error: ProtocolError, code = 4009) => {
     if (closing) return;
     closing = true;
-    unsubscribe?.();
+    cleanup();
     if (ws.readyState === WebSocket.OPEN) {
       const data = JSON.stringify(error.envelope(requestId));
       if (ws.bufferedAmount + Buffer.byteLength(data) <= config.clientQueueBytes) {
@@ -83,21 +136,20 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
           'Only one resume request is permitted per connection. Reconnect to resume again.',
         );
       const result = stream.resume(parsed.data.cursor, (event) => {
-        send(event);
+        sendLive(event);
       });
       unsubscribe = result.unsubscribe;
       subscribed = true;
       clearTimeout(initialDeadline);
-      for (const event of result.replay) if (!send(event)) break;
-      send(
-        StreamReady.parse({
-          schemaVersion: 1,
-          type: 'stream.ready',
-          requestId,
-          watermark: result.watermark,
-          delivery: 'at_least_once',
-        }),
-      );
+      replay = result.replay;
+      ready = StreamReady.parse({
+        schemaVersion: 1,
+        type: 'stream.ready',
+        requestId,
+        watermark: result.watermark,
+        delivery: 'at_least_once',
+      });
+      pump();
     } catch (error) {
       fail(
         error instanceof ProtocolError
@@ -109,11 +161,13 @@ export function attachClient(ws: WebSocket, requestId: string, stream: EventStre
   ws.on('error', () => {
     // Parser failures (including maxPayload) have already started closing the
     // socket. They use WebSocket close codes, not application error envelopes.
-    unsubscribe?.();
+    closing = true;
+    cleanup();
   });
   ws.once('close', () => {
     clearTimeout(initialDeadline);
-    unsubscribe?.();
+    closing = true;
+    cleanup();
   });
 }
 export function createWebSocketServer(config: SidecarConfig): WebSocketServer {

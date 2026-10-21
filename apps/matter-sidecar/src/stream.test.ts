@@ -1,8 +1,42 @@
+import { AttributeReport } from '@attraccess/matter-contract';
 import { describe, it, expect, vi } from 'vitest';
+import { fixtures } from '@attraccess/matter-contract/testing';
+import { Config } from './config.js';
 import { EventStream } from './stream.js';
 
+const report = AttributeReport.parse(fixtures.AttributeReport);
 const event = { type: 'lifecycle', payload: { state: 'ready' } } as const;
 describe('bounded event resume', () => {
+  it('retains five reporting rounds from 1,000 machines and still expires them after five minutes', () => {
+    let now = 0;
+    const config = Config.parse({});
+    const stream = new EventStream(config.replayEvents, config.replayAgeMs, () => now);
+    const cursor = stream.watermark;
+    try {
+      for (let minute = 0; minute < 5; minute++) {
+        now = minute * 60000;
+        for (let machine = 0; machine < 1000; machine++) {
+          stream.publish({
+            type: 'subscription.attribute',
+            payload: {
+              ...report,
+              address: { ...report.address, nodeId: machine.toString(16).padStart(16, '0') },
+              reportedAt: new Date(now).toISOString(),
+            },
+          });
+        }
+      }
+      now = 299999;
+      const resumed = stream.resume(cursor, () => undefined);
+      expect(resumed.replay).toHaveLength(5000);
+      expect(resumed.replay.map((entry) => entry.sequence)).toEqual(Array.from({ length: 5000 }, (_, i) => i + 1));
+      resumed.unsubscribe();
+      now = 300000;
+      expect(() => stream.resume(cursor, () => undefined)).toThrow('reconcile');
+    } finally {
+      stream.dispose();
+    }
+  });
   it('removes expired events while idle and cancels cleanup on disposal', () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

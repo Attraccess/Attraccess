@@ -1,5 +1,6 @@
+import { AttributeReport } from '@attraccess/matter-contract';
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { once } from 'node:events';
+import { once, EventEmitter } from 'node:events';
 import { createServer, request } from 'node:http';
 import { createConnection } from 'node:net';
 import { WebSocket } from 'ws';
@@ -11,6 +12,7 @@ import { attachClient } from '../src/websocket.js';
 import { EventStream } from '../src/stream.js';
 import { Config } from '../src/config.js';
 
+const report = AttributeReport.parse(fixtures.AttributeReport);
 const headers = fixtures.CompatibilityHeaders as Record<string, string>;
 const apps: ReturnType<typeof createApplication>[] = [];
 afterEach(async () => {
@@ -329,6 +331,95 @@ describe('real local HTTP and WebSocket transport with a simulated platform', ()
       }
     }
   });
+  it('replays 5,000 machine reports over a real socket without overflowing the default queue', async () => {
+    const { app, url } = await start();
+    const cursor = app.stream.watermark;
+    const reports = Array.from({ length: 5000 }, (_, i) =>
+      app.stream.publish({
+        type: 'subscription.attribute',
+        payload: {
+          ...report,
+          address: { ...report.address, nodeId: (i % 1000).toString(16).padStart(16, '0') },
+        },
+      }),
+    );
+    expect(Buffer.byteLength(JSON.stringify(reports))).toBeGreaterThan(Config.parse({}).clientQueueBytes);
+    const { ws, messages } = await connect(url);
+    try {
+      ws.send(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor }));
+      await waitFor(() => messages.length === 5001);
+      expect(messages.slice(0, 5000)).toEqual(reports);
+      expect(messages[5000]).toMatchObject({ type: 'stream.ready', watermark: app.stream.watermark });
+      const live = Array.from({ length: 1000 }, (_, machine) =>
+        app.stream.publish({
+          type: 'subscription.attribute',
+          payload: {
+            ...report,
+            address: { ...report.address, nodeId: machine.toString(16).padStart(16, '0') },
+          },
+        }),
+      );
+      await waitFor(() => messages.length === 6001);
+      expect(messages.slice(5001)).toEqual(live);
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+    } finally {
+      ws.terminate();
+    }
+  });
+  it.each(['drain', 'overflow', 'timeout', 'disconnect'] as const)(
+    'bounds live reports arriving during paced replay: %s',
+    (outcome) => {
+      vi.useFakeTimers();
+      const stream = new EventStream();
+      const socket = Object.assign(new EventEmitter(), {
+        readyState: WebSocket.OPEN,
+        bufferedAmount: 0,
+        send: vi.fn((_data: string, _callback?: (error?: Error) => void) => undefined),
+        close: vi.fn(),
+        terminate: vi.fn(),
+      });
+      const config = Config.parse({ clientQueueBytes: 2048, requestTimeoutMs: 100 });
+      const cursor = stream.watermark;
+      const first = stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });
+      const second = stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });
+      try {
+        attachClient(socket as unknown as WebSocket, fixtureId, stream, config);
+        socket.emit(
+          'message',
+          Buffer.from(JSON.stringify({ schemaVersion: 1, type: 'resume', requestId: fixtureId, cursor })),
+          false,
+        );
+        const live = stream.publish({ type: 'lifecycle', payload: { state: 'draining' } });
+        expect(socket.send).toHaveBeenCalledOnce();
+        if (outcome === 'drain') {
+          for (let i = 0; i < 4; i++) socket.send.mock.calls[i][1]?.();
+          expect(socket.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([
+            first,
+            second,
+            expect.objectContaining({ type: 'stream.ready', watermark: { ...cursor, sequence: second.sequence } }),
+            live,
+          ]);
+          expect(socket.close).not.toHaveBeenCalled();
+        } else if (outcome === 'overflow') {
+          for (let i = 0; i < 10; i++) stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });
+          expect(socket.close).toHaveBeenCalledWith(4009, expect.stringContaining('Reconciliation'));
+        } else if (outcome === 'timeout') {
+          vi.advanceTimersByTime(100);
+          expect(socket.close).toHaveBeenCalledWith(4009, expect.stringContaining('Reconciliation'));
+        } else {
+          socket.emit('close');
+          socket.send.mock.calls[0][1]?.();
+          stream.publish({ type: 'lifecycle', payload: { state: 'ready' } });
+          expect(socket.send).toHaveBeenCalledOnce();
+        }
+      } finally {
+        socket.emit('close');
+        stream.dispose();
+        expect(vi.getTimerCount()).toBe(0);
+        vi.useRealTimers();
+      }
+    },
+  );
   it('replays stable events, switches to live delivery, and repeats reconnect cursors safely', async () => {
     const { app, url } = await start();
     const cursor = app.stream.watermark;
