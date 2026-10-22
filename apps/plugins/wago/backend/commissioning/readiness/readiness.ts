@@ -2,6 +2,7 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PLUGIN_CONTEXT, PluginContext, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 import { admitEnvelope, emptyStream, type DiagnosticStream } from '../../diagnostics/envelope';
 import { normalizeOperationalPrefix, parseOperationalMessage } from '../../protocol';
+import { MESSAGE_LIMITS } from '../../../shared/protocol-limits';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../../shared/clock';
 
 export interface CommissioningRuntimeState {
@@ -69,7 +70,7 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
       void this.context.mqtt
         .subscribe(serverId, topic, (message) => {
           if (message.serverId !== serverId || message.topic !== topic) return;
-          if (message.payload.length > 65_536) {
+          if (message.payload.length > MESSAGE_LIMITS.operationalBytes) {
             current.state = undefined;
             return;
           }

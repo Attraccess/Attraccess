@@ -5,6 +5,14 @@ import { type DeviceAdapter, type RuntimeState, type StateStore, type Transport,
 export abstract class RuntimeContext {
   protected state: RuntimeState = { outputs: {}, commandIds: [], commandExpiries: {} };
 
+  // Fixed keys and saturating counts retain no untrusted payloads or identifiers.
+  protected readonly runtimeRejections = { parsing: 0, structure: 0, validation: 0 };
+
+  protected rejectRuntimeMessage(reason: keyof typeof this.runtimeRejections): undefined {
+    this.runtimeRejections[reason] = Math.min(Number.MAX_SAFE_INTEGER, this.runtimeRejections[reason] + 1);
+    return undefined;
+  }
+
   protected connected = true;
 
   protected loaded = false;

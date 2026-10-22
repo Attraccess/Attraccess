@@ -1,3 +1,4 @@
+import { runtimeVersion } from '../../../cc100-runtime/manifest.json';
 import { BuildRuntimeArtifact } from '../artifacts/build';
 import {
   ManagedRuntimeUpdateHost,
@@ -97,6 +98,57 @@ describe('durable managed runtime reconciliation', () => {
       owners = value;
     },
   };
+
+  it.each(['0.2.6', '0.2.7'])(
+    'upgrades an installation running %s to the hardened release',
+    async (installedVersion) => {
+      desired = { ...desired, manifest: { ...desired.manifest, runtimeVersion } };
+      host.inspect.mockResolvedValue({
+        imageId: release('a').imageId,
+        runtimeVersion: installedVersion,
+        managed: true,
+        claimed: true,
+        compatible: true,
+        online: true,
+      });
+
+      await coordinator.reconcile(1);
+
+      expect(host.activate).toHaveBeenCalledWith(
+        1,
+        expect.any(String),
+        expect.objectContaining({ imageId: desired.imageId }),
+        expect.any(AbortSignal),
+      );
+      expect(rows.get(1)).toMatchObject({
+        phase: 'current',
+        previousRuntimeVersion: installedVersion,
+        desiredRuntimeVersion: runtimeVersion,
+        desiredImageId: desired.imageId,
+      });
+    },
+  );
+
+  it('retains the installed image when it already runs the hardened release', async () => {
+    desired = { ...desired, manifest: { ...desired.manifest, runtimeVersion } };
+    host.inspect.mockResolvedValue({
+      imageId: release('a').imageId,
+      runtimeVersion,
+      managed: true,
+      claimed: true,
+      compatible: true,
+      online: true,
+    });
+    host.verify.mockImplementation(async () => ({
+      imageId: release('a').imageId,
+      permanent: true,
+      ready: true,
+      observedAt: ++now,
+    }));
+    await coordinator.reconcile(1);
+    expect(host.activate).not.toHaveBeenCalled();
+    expect(rows.get(1)).toMatchObject({ phase: 'current', currentImageId: release('a').imageId });
+  });
 
   it('updates immediately when a fresh heartbeat contradicts a current checkpoint', async () => {
     await coordinator.reconcile(1);

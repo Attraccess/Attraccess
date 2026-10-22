@@ -4,6 +4,7 @@ import { AuditService } from '../../../../api/src/audit/audit.service';
 import { SettingsStoreService } from '../../../../api/src/settings/settings-store.service';
 import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
+import { WagoConfigurationDraft } from '../../backend/configuration/draft.entity';
 import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
 import { WagoController } from '../../backend/controllers/entity';
 import { WagoCredentialRotationEntity } from '../../backend/credentials/service';
@@ -369,6 +370,30 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect((await state.rotationRecord(controller.id)).encryptedCredentials).not.toContain(privateValue);
     await state.lifecycle('credential_rotation', controller.id, 'failed');
   }, 45_000);
+
+  it('keeps validation authenticated, authorized and read-only for invalid HTTP input', async () => {
+    const controller = await state.deliverAndClaim();
+    await state.saveAndPublish(controller.id);
+    const path = `controllers/${controller.id}/configuration/validate`;
+    const repositories = [WagoController, WagoConfigurationDraft, WagoConfigurationRevision];
+    const before = await Promise.all(repositories.map((entity) => state.db.getRepository(entity).find()));
+    state.mqtt.publish.mockClear();
+    await httpRequest(state.app.getHttpServer()).post(`/wago/${path}`).send({ snapshot }).expect(401);
+    await state.post(path, { snapshot }, 'read-token').expect(403);
+    for (const [input, code] of [
+      [{ ...snapshot, extra: 'x'.repeat(4097) }, 'message_limit'],
+      [{ ...snapshot, logicalChannels: [{ ...snapshot.logicalChannels[0], id: 'x'.repeat(129) }] }, 'invalid_id'],
+    ] as const) {
+      const response = await state.post(path, { snapshot: input }).expect(201);
+      expect(response.body).toMatchObject({
+        valid: false,
+        errors: expect.arrayContaining([expect.objectContaining({ code })]),
+      });
+    }
+    await state.post(path, { snapshot }).expect(201, { valid: true, errors: [] });
+    expect(await Promise.all(repositories.map((entity) => state.db.getRepository(entity).find()))).toEqual(before);
+    expect(state.mqtt.publish).not.toHaveBeenCalled();
+  });
 
   it('rejects unauthenticated lifecycle requests before creating audit evidence', async () => {
     await httpRequest(state.app.getHttpServer())

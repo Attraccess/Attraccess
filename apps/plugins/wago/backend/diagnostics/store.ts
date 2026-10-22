@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS, structureLimitError, isIdentifier } from '../../shared/protocol-limits';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 import type { DiagnosticStream } from './envelope';
 import {
@@ -73,12 +74,7 @@ export const MAX_CONTROLLERS = 256;
 export const RETENTION_MS = 15 * 60_000;
 
 export function identifier(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.trim().length > 0 &&
-    value.length <= 256 &&
-    !Array.from(value).some((character) => character.charCodeAt(0) < 32)
-  );
+  return isIdentifier(value);
 }
 
 export function isObject(value: unknown): value is Record<string, unknown> {
@@ -344,10 +340,11 @@ export class WagoDiagnosticsStore {
 
   ingest(id: number, kind: string, payload: Buffer): boolean {
     this.prune();
-    if (payload.length > 65_536) return false;
+    if (payload.length > MESSAGE_LIMITS.operationalBytes) return false;
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(payload.toString('utf8'));
+      if (structureLimitError(data)) return false;
     } catch {
       return false;
     }

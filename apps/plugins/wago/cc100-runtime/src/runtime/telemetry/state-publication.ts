@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { MESSAGE_LIMITS } from '../../../../shared/protocol-limits';
 import { RuntimeModbusOutputPolling } from './modbus-output-polling';
 
 export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling {
@@ -81,11 +83,24 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
           Boolean(accepted) &&
           !errors.some((error) => error.code !== 'modbus_read_failed') &&
           this.connected,
-        errors,
+        // Preserve readiness flags computed from all failures, but keep the wire
+        // diagnostics within the reserved envelope even for failing large fleets.
+        errors:
+          Buffer.byteLength(JSON.stringify(errors)) <= MESSAGE_LIMITS.readinessDiagnosticBytes
+            ? errors
+            : [
+                {
+                  path: 'hardware',
+                  code: 'diagnostics_truncated',
+                  message: 'Readiness diagnostics exceed state budget; inspect channel faults.',
+                },
+              ],
       },
     };
     this.options.onReadiness?.({ connected: this.connected, ...payload.readiness });
-    const signature = JSON.stringify(payload);
+    // Include complete local diagnostics even when the wire payload is shortened.
+    // Retain only a fixed-size digest, not a second unbounded error collection.
+    const signature = createHash('sha256').update(JSON.stringify(payload)).update(JSON.stringify(errors)).digest('hex');
     if (!force && signature === this.lastPublishedState) return;
     for (const error of errors) {
       if (error.code === 'digital_read_failed' || error.code === 'modbus_read_failed')

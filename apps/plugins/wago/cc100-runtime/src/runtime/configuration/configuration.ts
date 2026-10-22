@@ -1,10 +1,19 @@
+import { MESSAGE_LIMITS, MessageAdmission, structureLimitError } from '../../../../shared/protocol-limits';
 import { hash, validateDesired } from './validation';
 import { OutputRoutingBusyError } from '../../outputs/controller';
 import { RuntimeDiscovery } from '../identity/discovery';
 import { type Snapshot } from '../types';
 
 export abstract class RuntimeConfiguration extends RuntimeDiscovery {
-  async receiveDesired(payload: Buffer): Promise<void> {
+  protected readonly receiveDesiredAdmission = new MessageAdmission(MESSAGE_LIMITS.pendingControl);
+
+  receiveDesired(payload: Buffer): Promise<void> {
+    return this.receiveDesiredAdmission.run(payload.length, MESSAGE_LIMITS.configurationBytes, () =>
+      this.processDesired(payload),
+    );
+  }
+
+  private async processDesired(payload: Buffer): Promise<void> {
     let desired: {
       protocolVersion: number;
       revision: number;
@@ -15,28 +24,44 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
     };
     try {
       desired = JSON.parse(payload.toString('utf8'));
+      if (structureLimitError(desired))
+        return this.reportRejected(0, '', [
+          { path: '$', code: 'structure_limit', message: 'desired configuration exceeds supported structure limits' },
+        ]);
     } catch {
       return this.reportRejected(0, '', [
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },
       ]);
     }
-    if (desired && Object.prototype.hasOwnProperty.call(desired, 'runtimeImageId')) {
-      if (typeof desired.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(desired.runtimeImageId)) return;
-      if (this.options.runtimeImageId && desired.runtimePolicyToken !== this.runtimePolicyToken) return;
+    const hasRuntimePolicy = desired && Object.prototype.hasOwnProperty.call(desired, 'runtimeImageId');
+    // A combined message must be valid before policy can change readiness or outputs.
+    // Policy-only messages still use the authenticated configuration ACL.
+    if (!hasRuntimePolicy || Object.prototype.hasOwnProperty.call(desired, 'snapshot')) {
+      const errors = validateDesired(desired);
+      if (!errors.length && desired.contentHash !== hash(desired.snapshot))
+        errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
+      if (!errors.length) errors.push(...(this.options.device.validate?.(desired.snapshot) ?? []));
+      if (errors.length)
+        return this.reportRejected(
+          Number.isSafeInteger(desired?.revision) ? desired.revision : 0,
+          typeof desired?.contentHash === 'string' ? desired.contentHash : '',
+          errors,
+        );
+    }
+    if (hasRuntimePolicy) {
+      if (typeof desired.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(desired.runtimeImageId))
+        return this.rejectRuntimeMessage('validation');
+      if (this.options.runtimeImageId && desired.runtimePolicyToken !== this.runtimePolicyToken)
+        return this.rejectRuntimeMessage('validation');
       this.runtimeUpdateRequired = desired.runtimeImageId !== this.options.runtimeImageId;
       if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
       this.requestStatePublication();
       // Policy-only messages use the existing authenticated configuration ACL.
       if (!Object.prototype.hasOwnProperty.call(desired, 'snapshot')) return;
     }
-    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return this.rejectRuntimeMessage('validation');
     await this.runConfigurationUpdate(async () => {
-      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
-      const errors = validateDesired(desired);
-      if (!errors.length && desired.contentHash !== hash(desired.snapshot))
-        errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
-      if (!errors.length) errors.push(...(this.options.device.validate?.(desired.snapshot) ?? []));
-      if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
+      if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return this.rejectRuntimeMessage('validation');
       if (
         this.state.accepted?.revision === desired.revision &&
         this.state.accepted.contentHash === desired.contentHash

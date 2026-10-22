@@ -1,5 +1,10 @@
 # WAGO credential rotation
 
+See [production assurance preparation](/devices/wago-production-assurance.md) for current
+software evidence and support boundaries, and [recovery procedures](/devices/wago-recovery.md)
+for coordinated backups, compromise, outages, replacement and upgrade recovery.
+Physical qualification and independent security/safety reviews remain separate.
+
 The authenticated administration operation changes the controller's broker password,
 persists an encrypted recovery copy, hands it to the running controller, and waits
 up to 30 seconds for the controller to reconnect with the persisted credentials.

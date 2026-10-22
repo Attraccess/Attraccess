@@ -1,3 +1,4 @@
+import { MESSAGE_LIMITS } from '../../shared/protocol-limits';
 import {
   Inject,
   Injectable,
@@ -262,6 +263,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected configurationReportRevision(payload: Buffer): number | null {
+    if (payload.length > MESSAGE_LIMITS.operationalBytes) return null;
     try {
       const report = JSON.parse(payload.toString('utf8')) as { revision?: unknown };
       return Number.isSafeInteger(report.revision) && (report.revision as number) >= 1
@@ -297,6 +299,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected enqueueConfigurationReport(controllerId: number, payload: Buffer): void {
+    if (payload.length > MESSAGE_LIMITS.operationalBytes) return;
     const queue = this.configurationReportQueues.get(controllerId) ?? { pending: new Map(), processing: false };
     this.configurationReportQueues.set(controllerId, queue);
     if (queue.processing) {
@@ -313,6 +316,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected onCommandAcknowledgement(controllerId: number, payload: Buffer): void {
+    if (payload.length > MESSAGE_LIMITS.controlBytes) return;
     this.commands.acknowledge(controllerId, payload);
   }
 

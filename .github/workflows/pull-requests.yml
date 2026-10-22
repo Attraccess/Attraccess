@@ -75,6 +75,7 @@ jobs:
         plugins,
         attractap-firmware-version,
         wago-runtime-version,
+        wago-production-assurance,
         balena-compose-check,
         fail2ban-smoke,
         grafana-provisioning-smoke,
@@ -218,6 +219,39 @@ jobs:
         run: pnpm nx run generators:test
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
+
+  wago-production-assurance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NX_LOAD_DOT_ENV_FILES: 'false'
+      NX_DAEMON: 'false'
+      WAGO_ASSURANCE_PROFILE: ci
+      WAGO_FLEET_DOCKER_CONTEXT: wago-assurance-ci
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Select isolated runner Docker context
+        run: docker context create wago-assurance-ci --docker host=unix:///var/run/docker.sock
+      - name: Run uncached WAGO software assurance
+        env:
+          WAGO_ASSURANCE_OUTPUT: ${{ runner.temp }}/wago-assurance
+        run: pnpm nx run plugin-wago:production-assurance --skip-nx-cache
+      - name: Retain assurance evidence including failed runs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wago-production-assurance
+          path: ${{ runner.temp }}/wago-assurance/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove runner Docker context
+        if: always()
+        run: docker context rm -f wago-assurance-ci
 
   fail2ban-smoke:
     runs-on: ubuntu-latest

@@ -24,7 +24,7 @@ if (args[0] === 'run') {
   if (state.scenario === 'known-container-removal-fails') console.log('owned-container-id');
   else fail('Fixture startup failed after container creation');
 } else if (args[0] === 'inspect') {
-  if (state.scenario === 'absent-container') fail('Error: No such object: ' + state.name);
+  if ((state.scenario === 'absent-container' || state.removed)) fail('Error: No such object: ' + state.name);
   else {
     const labels = { ...state.labels };
     if (state.scenario === 'foreign-owner') labels['attraccess.fixture.owner'] = 'someone-else';
@@ -63,10 +63,12 @@ for (const scenario of [
         exec(process.execPath, [runner], {
           timeout: 10_000,
           env: {
-            ...(process.env.CRAP_NODE_MANIFEST ? {
-              CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,
-              NODE_OPTIONS: process.env.NODE_OPTIONS,
-            } : {}),
+            ...(process.env.CRAP_NODE_MANIFEST
+              ? {
+                  CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,
+                  NODE_OPTIONS: process.env.NODE_OPTIONS,
+                }
+              : {}),
             PATH: directory,
             TMPDIR: temporary,
             FIXTURE_STATE: stateFile,

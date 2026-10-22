@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { MqttClient } from 'mqtt';
+import { MESSAGE_LIMITS } from '../../../shared/protocol-limits';
 import { MqttTransport } from './mqtt';
 
 function createClient() {
@@ -81,7 +82,7 @@ describe('MQTT transport acknowledgment recovery', () => {
     await jest.advanceTimersByTimeAsync(10_000);
     expect(client.stream.destroy).toHaveBeenCalledTimes(1);
     await subscription;
-    expect(client.listenerCount('message')).toBe(0);
+    expect(client.listenerCount('message')).toBe(1);
 
     client.connected = true;
     client.emit('connect');
@@ -93,6 +94,29 @@ describe('MQTT transport acknowledgment recovery', () => {
     await jest.advanceTimersByTimeAsync(0);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(errors).toHaveBeenCalledWith(expect.objectContaining({ message: 'listener failed' }));
+  });
+
+  it('counts oversized matching packets once before duplicate listeners and preserves counts on reconnect', async () => {
+    const client = createClient();
+    const listener = jest.fn();
+    const transport = new MqttTransport(client as unknown as MqttClient, jest.fn());
+    for (let i = 1; i <= 2; i++) {
+      const subscription = transport.subscribe('commands', listener);
+      client.outgoing[i].cb(undefined as unknown as Error);
+      await subscription;
+    }
+    const oversized = Buffer.alloc(MESSAGE_LIMITS.configurationBytes + 1);
+    client.emit('message', 'unsubscribed', oversized);
+    expect(transport.statistics.oversizedRejected).toBe(0);
+    client.emit('message', 'commands', oversized);
+    expect(transport.statistics.oversizedRejected).toBe(1);
+    expect(listener).not.toHaveBeenCalled();
+    client.emit('connect');
+    client.emit('message', 'commands', oversized);
+    expect(transport.statistics.oversizedRejected).toBe(2);
+    client.emit('message', 'commands', Buffer.alloc(MESSAGE_LIMITS.configurationBytes));
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(transport.statistics.oversizedRejected).toBe(2);
   });
 
   it('clears successful acknowledgment deadlines and propagates broker errors without reconnecting', async () => {

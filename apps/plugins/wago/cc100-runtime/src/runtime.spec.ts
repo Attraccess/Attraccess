@@ -42,6 +42,81 @@ describe('WagoRuntime startup and connection policy', () => {
     );
   });
 
+  it.each([
+    ['invalid snapshot', { snapshot: { ...snapshot, physicalPoints: [] } }, 'missing_reference'],
+    ['hash mismatch', { contentHash: 'wrong' }, 'hash_mismatch'],
+    ['unsupported protocol', { protocolVersion: 2 }, 'unsupported_version'],
+    ['invalid revision', { revision: 0 }, 'invalid_revision'],
+  ])('rejects combined policy with %s without changing state or outputs', async (_name, changes, code) => {
+    const imageId = `sha256:${'a'.repeat(64)}`;
+    const store = new JsonStateStore(`/tmp/wago-combined-policy-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      runtimeImageId: imageId,
+      store,
+      transport,
+      device,
+    });
+    await runtime.start();
+    const heartbeat = transport.published.filter((item) => item.topic.endsWith('/heartbeat')).at(-1)?.payload as {
+      runtimePolicyToken: string;
+    };
+    let runtimePolicyToken = heartbeat.runtimePolicyToken;
+    await transport.send(desired, { runtimeImageId: imageId, runtimePolicyToken });
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, validCommand());
+    await runtime.publishHeartbeat();
+    runtimePolicyToken = (
+      transport.published.filter((item) => item.topic.endsWith('/heartbeat')).at(-1)?.payload as {
+        runtimePolicyToken: string;
+      }
+    ).runtimePolicyToken;
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(true);
+    const before = await store.load();
+    const readiness = (
+      transport.published.filter((item) => item.topic.endsWith('/state')).at(-1)?.payload as {
+        readiness: unknown;
+      }
+    ).readiness;
+    const write = jest.spyOn(device, 'write');
+    const save = jest.spyOn(store, 'save');
+
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 2,
+      contentHash: hash(snapshot),
+      snapshot,
+      runtimeImageId: `sha256:${'b'.repeat(64)}`,
+      runtimePolicyToken,
+      ...changes,
+    });
+
+    expect(write).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(await store.load()).toEqual(before);
+    expect(await device.read(snapshot.physicalPoints[0])).toBe(true);
+    expect(
+      transport.published.filter((item) => item.topic.endsWith('/configuration/reported')).at(-1)?.payload,
+    ).toEqual(expect.objectContaining({ errors: expect.arrayContaining([expect.objectContaining({ code })]) }));
+    await runtime.publishHeartbeat();
+    expect(
+      (
+        transport.published.filter((item) => item.topic.endsWith('/state')).at(-1)?.payload as {
+          readiness: unknown;
+        }
+      ).readiness,
+    ).toEqual(readiness);
+    expect(write).not.toHaveBeenCalled();
+    await transport.send(commands, validCommand({ id: 'after-invalid-combined' }));
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ id: 'after-invalid-combined', status: 'accepted' }),
+      }),
+    );
+  });
+
   it('requires fresh server confirmation at startup and after reconnect, rejecting retained confirmations', async () => {
     const imageId = `sha256:${'a'.repeat(64)}`;
     const store = new JsonStateStore(`/tmp/wago-policy-${Date.now()}-${Math.random()}.json`);
