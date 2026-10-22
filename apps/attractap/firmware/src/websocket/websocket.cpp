@@ -337,9 +337,11 @@ void Websocket::resetReconnectBackoff()
 
 void Websocket::logHeapStats()
 {
-    this->logger.infof("Heap internal: free=%u largest=%u",
+    this->logger.infof("Heap internal: free=%u largest=%u | PSRAM: free=%u largest=%u",
                        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+                       (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
 }
 
 // Deliberate-reboot reason handed to the crash reporter across the SW reset (see
