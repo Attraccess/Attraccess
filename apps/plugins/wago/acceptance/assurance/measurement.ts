@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFile } from 'node:fs/promises';
+import { rename, writeFile } from 'node:fs/promises';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
@@ -36,102 +36,107 @@ export async function measure(options: Options, output: string, fixture = new As
   let outcome = 'running';
   let sampleTimer: ReturnType<typeof setInterval> | undefined;
   let highest = 0;
-  function writeReport() {
-    writeFileSync(
-      join(output, 'measurements.json'),
-      JSON.stringify(
-        {
-          contract: 'wago-software-measurements-v1',
-          outcome,
-          elapsedSeconds: (Date.now() - started) / 1000,
-          boundaries: {
-            offered: 'generated command at stage ingress',
-            expectedOffers: 'configured rate multiplied by scheduled stage duration',
-            generationFailures: 'scheduled offers not generated; at most 1% tolerated',
-            achievedCommandsPerSecond: 'acknowledged commands divided by actual stage time including drain',
-            acknowledged: 'production plugin matched controller acknowledgement after runtime processing',
-            received: 'operational packet seen at backend MQTT connection',
-            gaps: 'sequence gaps between observed packets in the same controller, stream and category; excludes the first packet',
-            runtimeWrites:
-              'successful memory-adapter writes, including startup and policies; not physical observations',
-            processed: 'production diagnostics accepted packet',
-            transportOversizedRejected:
-              'matching oversized runtime MQTT packets dropped before listener delivery; once per wire event, retained across transport replacement',
-            transportAcknowledgementTimeouts:
-              'runtime MQTT PUBACK/SUBACK deadline expirations; one deadline can reject several pending operations; retained across transport replacement, separate from stage command acknowledgement timeouts',
-            wireAdmissionRejected:
-              'runtime and backend admission rejections, retained across replacement; separate from parser and diagnostics observations',
-            runtimeRejected:
-              'runtime parsing, structure and validation/policy rejections before actuation; per handler invocation, payload-free, retained across runtime replacement; separate from transport/admission and backend observations',
-            protocolRejected: 'ingress packets rejected by the operational parser',
-            diagnosticsRejected: 'diagnostics callback rejections; may include duplicate subscriptions',
-            rejected: 'sum of protocol and diagnostics rejections; processing observations, not unique wire packets',
-            missing: 'stage offered minus acknowledgements, failures and overload discards',
-            intentionalDiscard:
-              'outgoing QoS publications explicitly removed by the production transport on disconnect or acknowledgement timeout',
-          },
-          stages: stages.map((stage) => ({
-            ...stage,
-            latencyMs: undefined,
-            latencySamples: stage.latencyMs.length,
-            p99Ms: stage.latencyMs.length
-              ? [...stage.latencyMs].sort((a, b) => a - b)[Math.floor((stage.latencyMs.length - 1) * 0.99)]
-              : null,
-            missing: stage.offered - stage.acknowledged - stage.failed - stage.overloadDiscard,
-          })),
-          recoveryBoundary:
-            'fault invocation to fresh heartbeat, connected state, matching configuration, available software adapter and acknowledged command',
-          reconnectBoundary:
-            'runtime CONNECT duration; broker start_app invocation to all MQTT clients connected; null for plugin restart using existing connection',
-          faults,
-          counters: {
-            ...fixture.counts,
-            transportAcknowledgementTimeouts: fixture.transportAcknowledgementTimeouts,
-            intentionalDiscard:
-              fixture.retiredStaleDiscarded +
-              fixture.devices.reduce((sum, device) => sum + (device.transport?.statistics.staleDiscarded ?? 0), 0),
-            transportOversizedRejected:
-              fixture.retiredTransportRejected +
-              fixture.devices.reduce((sum, device) => sum + (device.transport?.statistics.oversizedRejected ?? 0), 0),
-            runtimeRejected: Object.fromEntries(
-              (['parsing', 'structure', 'validation'] as const).map((reason) => [
-                reason,
-                fixture.retiredRuntimeRejected[reason] +
-                  fixture.devices.reduce(
-                    (sum, device) => sum + (device.runtime?.messageStatistics.runtimeRejected[reason] ?? 0),
-                    0,
-                  ),
-              ]),
-            ),
-            wireAdmissionRejected:
-              fixture.retiredWireRejected +
-              fixture.devices.reduce((sum, device) => sum + (device.runtime?.messageStatistics.rejected ?? 0), 0) +
-              (fixture.backend?.messageStatistics.rejected ?? 0),
-          },
-          peakRss,
-          peakEventLoopP99Ms,
-          latencySamplePolicy: 'last 4096 acknowledged commands per stage',
-          samples,
-          recommendation:
-            outcome === 'passed'
-              ? {
-                  controllers: options.controllers,
-                  requestedCommandsPerSecond: highest,
-                  commandsPerSecond: measuredRecommendation(stages, highest),
-                  evidenceClass: 'software-fixtures-only',
-                  physicalCapacity: 'unverified',
-                }
-              : null,
+  function reportContents() {
+    return JSON.stringify(
+      {
+        contract: 'wago-software-measurements-v1',
+        outcome,
+        elapsedSeconds: (Date.now() - started) / 1000,
+        boundaries: {
+          offered: 'generated command at stage ingress',
+          expectedOffers: 'configured rate multiplied by scheduled stage duration',
+          generationFailures: 'scheduled offers not generated; at most 1% tolerated',
+          achievedCommandsPerSecond: 'acknowledged commands divided by actual stage time including drain',
+          acknowledged: 'production plugin matched controller acknowledgement after runtime processing',
+          received: 'operational packet seen at backend MQTT connection',
+          gaps: 'sequence gaps between observed packets in the same controller, stream and category; excludes the first packet',
+          runtimeWrites: 'successful memory-adapter writes, including startup and policies; not physical observations',
+          processed: 'production diagnostics accepted packet',
+          transportOversizedRejected:
+            'matching oversized runtime MQTT packets dropped before listener delivery; once per wire event, retained across transport replacement',
+          transportAcknowledgementTimeouts:
+            'runtime MQTT PUBACK/SUBACK deadline expirations; one deadline can reject several pending operations; retained across transport replacement, separate from stage command acknowledgement timeouts',
+          wireAdmissionRejected:
+            'runtime and backend admission rejections, retained across replacement; separate from parser and diagnostics observations',
+          runtimeRejected:
+            'runtime parsing, structure and validation/policy rejections before actuation; per handler invocation, payload-free, retained across runtime replacement; separate from transport/admission and backend observations',
+          protocolRejected: 'ingress packets rejected by the operational parser',
+          diagnosticsRejected: 'diagnostics callback rejections; may include duplicate subscriptions',
+          rejected: 'sum of protocol and diagnostics rejections; processing observations, not unique wire packets',
+          missing: 'stage offered minus acknowledgements, failures and overload discards',
+          intentionalDiscard:
+            'outgoing QoS publications explicitly removed by the production transport on disconnect or acknowledgement timeout',
         },
-        null,
-        2,
-      ),
+        stages: stages.map((stage) => ({
+          ...stage,
+          latencyMs: undefined,
+          latencySamples: stage.latencyMs.length,
+          p99Ms: stage.latencyMs.length
+            ? [...stage.latencyMs].sort((a, b) => a - b)[Math.floor((stage.latencyMs.length - 1) * 0.99)]
+            : null,
+          missing: stage.offered - stage.acknowledged - stage.failed - stage.overloadDiscard,
+        })),
+        recoveryBoundary:
+          'fault invocation to fresh heartbeat, connected state, matching configuration, available software adapter and acknowledged command',
+        reconnectBoundary:
+          'runtime CONNECT duration; broker start_app invocation to all MQTT clients connected; null for plugin restart using existing connection',
+        faults,
+        counters: {
+          ...fixture.counts,
+          transportAcknowledgementTimeouts: fixture.transportAcknowledgementTimeouts,
+          intentionalDiscard:
+            fixture.retiredStaleDiscarded +
+            fixture.devices.reduce((sum, device) => sum + (device.transport?.statistics.staleDiscarded ?? 0), 0),
+          transportOversizedRejected:
+            fixture.retiredTransportRejected +
+            fixture.devices.reduce((sum, device) => sum + (device.transport?.statistics.oversizedRejected ?? 0), 0),
+          runtimeRejected: Object.fromEntries(
+            (['parsing', 'structure', 'validation'] as const).map((reason) => [
+              reason,
+              fixture.retiredRuntimeRejected[reason] +
+                fixture.devices.reduce(
+                  (sum, device) => sum + (device.runtime?.messageStatistics.runtimeRejected[reason] ?? 0),
+                  0,
+                ),
+            ]),
+          ),
+          wireAdmissionRejected:
+            fixture.retiredWireRejected +
+            fixture.devices.reduce((sum, device) => sum + (device.runtime?.messageStatistics.rejected ?? 0), 0) +
+            (fixture.backend?.messageStatistics.rejected ?? 0),
+        },
+        peakRss,
+        peakEventLoopP99Ms,
+        latencySamplePolicy: 'last 4096 acknowledged commands per stage',
+        samples,
+        recommendation:
+          outcome === 'passed'
+            ? {
+                controllers: options.controllers,
+                requestedCommandsPerSecond: highest,
+                commandsPerSecond: measuredRecommendation(stages, highest),
+                evidenceClass: 'software-fixtures-only',
+                physicalCapacity: 'unverified',
+              }
+            : null,
+      },
+      null,
+      2,
     );
+  }
+  async function writeReport() {
+    // Checkpoints share the event loop with command delivery and acknowledgement.
+    // Never block it on evidence storage, especially a shared host filesystem.
+    const temporary = join(output, 'measurements.json.next');
+    await writeFile(temporary, reportContents());
+    await rename(temporary, join(output, 'measurements.json'));
   }
   const interrupt = () => {
     outcome = 'interrupted';
     try {
-      writeReport();
+      // Exit immediately after the synchronous final snapshot. An in-progress
+      // checkpoint cannot replace it because its rename needs the event loop.
+      writeFileSync(join(output, 'measurements.json'), reportContents());
     } finally {
       process.exit(143);
     }
@@ -217,7 +222,7 @@ export async function measure(options: Options, output: string, fixture = new As
         started: (value) => {
           stages.push(value);
         },
-        progress: async () => writeReport(),
+        progress: writeReport,
       });
       await writeReport();
       return stage.passed;
@@ -244,7 +249,7 @@ export async function measure(options: Options, output: string, fixture = new As
     // Persist a failed partial result even when setup, a fault or a budget check aborts.
     if (outcome !== 'passed') {
       outcome = 'failed';
-      writeReport();
+      await writeReport();
       await writeFile(
         join(output, 'failure.json'),
         JSON.stringify({ outcome, elapsedSeconds: (Date.now() - started) / 1000, stages, faults, peakRss }, null, 2),

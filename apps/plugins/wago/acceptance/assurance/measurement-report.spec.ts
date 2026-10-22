@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -127,3 +128,17 @@ it.each(['connect', 'runtime'])(
     expect(report.counters.runtimeRejected.parsing).toBe(failure === 'runtime' ? 1 : 0);
   },
 );
+
+it('does not block command processing with synchronous checkpoint storage', async () => {
+  const fixture = new AssuranceFixture();
+  jest.spyOn(fixture, 'start').mockRejectedValue(new Error('startup failed'));
+  jest.spyOn(fixture, 'close').mockResolvedValue();
+  const synchronousWrite = jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {
+    throw new Error('checkpoint storage must not block the MQTT event loop');
+  });
+  await expect(measure(options, directory, fixture)).rejects.toThrow('startup failed');
+  expect(synchronousWrite).not.toHaveBeenCalled();
+  const report = JSON.parse(await readFile(join(directory, 'measurements.json'), 'utf8'));
+  expect(report).toMatchObject({ outcome: 'failed', recommendation: null });
+  expect(fixture.close).toHaveBeenCalledTimes(1);
+});
