@@ -229,7 +229,7 @@ services:
       - grafana-data:/var/lib/grafana
 
   grafana-contactpoints-cleanup:
-    image: node:24.19.0-alpine
+    image: node:24.22.1-alpine
     restart: 'no'
     entrypoint: ['node', '/src/cleanup-legacy-pushover.mjs']
     environment:

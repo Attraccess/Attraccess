@@ -1,4 +1,4 @@
-ARG NODE_VERSION=24.19.0
+ARG NODE_VERSION=24.22.1
 FROM node:${NODE_VERSION}-alpine
 
 # Create unprivileged user for runtime
