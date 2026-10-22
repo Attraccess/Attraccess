@@ -5,6 +5,17 @@
   "projectType": "application",
   "tags": ["type:app", "scope:core"],
   "implicitDependencies": ["plugins-backend-sdk", "plugins-frontend-sdk"],
+  "namedInputs": {
+    "matterPackageSources": [
+      "{workspaceRoot}/apps/plugins/matter/**/*",
+      "{workspaceRoot}/libs/matter-contract/**/*",
+      "{workspaceRoot}/apps/matter-sidecar/package.json",
+      "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+      "{workspaceRoot}/package.json",
+      "{workspaceRoot}/pnpm-lock.yaml",
+      "{workspaceRoot}/tsconfig.base.json"
+    ]
+  },
   "targets": {
     "copy-attractap-firmware-into-assets": {
       "executor": "nx:run-commands",
@@ -141,10 +152,12 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
+      "dependsOn": ["plugin-matter:build", "test-scripts"],
       "cache": true,
       "inputs": [
         "default",
         "^production",
+        "matterPackageSources",
         "{workspaceRoot}/jest.preset.js",
         {
           "externalDependencies": ["jest"]
@@ -155,8 +168,26 @@
         "jestConfig": "apps/api/jest.config.ts",
         "testMatch": ["**/*.spec.ts", "!**/*.e2e.spec.ts", "!**/*.real-api.spec.ts"],
         "passWithNoTests": true
-      },
-      "dependsOn": ["test-scripts"]
+      }
+    },
+    "matter-package-isolation": {
+      "executor": "@nx/jest:jest",
+      "dependsOn": ["plugin-matter:build"],
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "matterPackageSources",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
+      "options": {
+        "jestConfig": "apps/api/jest.config.ts",
+        "testPathPatterns": ["matter-package-isolation.spec.ts"],
+        "runInBand": true
+      }
     },
     "e2e": {
       "executor": "@nx/jest:jest",

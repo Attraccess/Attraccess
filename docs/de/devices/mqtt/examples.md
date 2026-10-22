@@ -3,7 +3,7 @@
 Diese Seite zeigt praktische Beispiele, wie Sie MQTT mit Attraccess verwenden können, um Maschinen zu steuern, Sensordaten zu empfangen und Geräte in Produktions- und Laborumgebungen zu automatisieren.
 
 > [!NOTE]
-> Alle Beispiele setzen voraus, dass Sie bereits [einen MQTT-Broker verbunden](mqtt/server-setup.md) haben und mit den Grundlagen von [Flows](flows/overview.md) vertraut sind.
+> Alle Beispiele setzen voraus, dass Sie bereits [einen MQTT-Broker verbunden](devices/mqtt/server-setup.md) haben und mit den Grundlagen von [Flows](flows/overview.md) vertraut sind.
 
 ## Beispiel 1: Maschinensteuerung ueber MQTT-Relais
 
@@ -12,7 +12,7 @@ Diese Seite zeigt praktische Beispiele, wie Sie MQTT mit Attraccess verwenden k�
 ### Was Sie benoetigen
 
 - Ein intelligentes Relais oder eine schaltbare Steckdose, die mit Ihrem MQTT-Broker verbunden ist
-- Das Relais lauscht auf ein Topic wie `werkstatt/laser/strom`
+- Das Relais lauscht auf ein Topic wie `workshop/laser/power`
 
 ### Flow-Einrichtung
 
@@ -24,11 +24,11 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT-Nachricht senden (MQTT Publish)**
 3. Konfigurieren Sie den MQTT-Knoten:
 
-| Einstellung | Wert |
-|-------------|------|
-| **Server** | Ihr MQTT-Broker |
-| **Topic** | `werkstatt/laser/strom` |
-| **Payload** | `ON` |
+| Einstellung | Wert                   |
+| ----------- | ---------------------- |
+| **Server**  | Ihr MQTT-Broker        |
+| **Topic**   | `workshop/laser/power` |
+| **Payload** | `ON`                   |
 
 **Ausschalten:**
 
@@ -36,11 +36,11 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 2. Verbinden Sie ihn mit einem **Ausgabe**-Knoten: **MQTT-Nachricht senden (MQTT Publish)**
 3. Konfigurieren Sie den MQTT-Knoten:
 
-| Einstellung | Wert |
-|-------------|------|
-| **Server** | Ihr MQTT-Broker |
-| **Topic** | `werkstatt/laser/strom` |
-| **Payload** | `OFF` |
+| Einstellung | Wert                   |
+| ----------- | ---------------------- |
+| **Server**  | Ihr MQTT-Broker        |
+| **Topic**   | `workshop/laser/power` |
+| **Payload** | `OFF`                  |
 
 <!-- TODO: Screenshot des Stromsteuerungs-Flows im Editor -->
 
@@ -56,28 +56,28 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 ### Was Sie benoetigen
 
 - Einen Temperatursensor, der mit Ihrem MQTT-Broker verbunden ist
-- Der Sensor veroeffentlicht Daten auf einem Topic wie `werkstatt/3ddrucker/temperatur`
+- Der Sensor veroeffentlicht Daten auf einem Topic wie `workshop/3dprinter/temperature`
 
 ### Flow-Einrichtung
 
 1. Fuegen Sie einen **Eingabe**-Knoten hinzu: **MQTT-Nachricht empfangen (MQTT Subscribe)**
 2. Konfigurieren Sie den MQTT-Knoten:
 
-| Einstellung | Wert |
-|-------------|------|
-| **Server** | Ihr MQTT-Broker |
-| **Topic** | `werkstatt/3ddrucker/temperatur` |
+| Einstellung | Wert                             |
+| ----------- | -------------------------------- |
+| **Server**  | Ihr MQTT-Broker                  |
+| **Topic**   | `workshop/3dprinter/temperature` |
 
 3. Verbinden Sie ihn mit einem **Verarbeitungs**-Knoten (z.B. **Wenn**-Bedingung), um zu pruefen, ob die Temperatur einen Schwellenwert ueberschreitet
 4. Verbinden Sie die Bedingung mit einem **Ausgabe**-Knoten (z.B. **HTTP-Anfrage**, um eine Benachrichtigung zu senden)
 
 ### Beispiel: Temperaturwarnung
 
-| Knoten | Konfiguration |
-|--------|--------------|
-| **MQTT-Nachricht empfangen (MQTT Subscribe)** | Topic: `werkstatt/3ddrucker/temperatur` |
-| **Wenn-Bedingung** | `payload.value > 250` |
-| **HTTP-Anfrage** | Warnung an Ihren Benachrichtigungsdienst senden |
+| Knoten                                        | Konfiguration                                   |
+| --------------------------------------------- | ----------------------------------------------- |
+| **MQTT-Nachricht empfangen (MQTT Subscribe)** | Topic: `workshop/3dprinter/temperature`         |
+| **Wenn-Bedingung**                            | `payload.value > 250`                           |
+| **HTTP-Anfrage**                              | Warnung an Ihren Benachrichtigungsdienst senden |
 
 <!-- TODO: Screenshot des Sensorueberwachungs-Flows -->
 
@@ -100,11 +100,11 @@ Erstellen Sie einen Flow auf der Lasercutter-Ressource mit zwei Pfaden:
 1. Fuegen Sie einen **Eingabe**-Knoten hinzu: **Nutzung gestartet**
 2. Verbinden Sie ihn mit mehreren **Ausgabe**-Knoten (MQTT Publish), einen fuer jedes Geraet:
 
-| Geraet | Topic | Payload |
-|--------|-------|---------|
-| Lasercutter | `werkstatt/laser/strom` | `ON` |
-| Absaugung | `werkstatt/absaugung/strom` | `ON` |
-| Raumlicht | `werkstatt/licht/zone3` | `ON` |
+| Geraet      | Topic                       | Payload |
+| ----------- | --------------------------- | ------- |
+| Lasercutter | `workshop/laser/power`      | `ON`    |
+| Absaugung   | `workshop/extraction/power` | `ON`    |
+| Raumlicht   | `workshop/lights/zone3`     | `ON`    |
 
 3. Wiederholen Sie dies mit einem **Nutzung beendet**-Eingabeknoten, der mit denselben Topics mit `OFF`-Payloads verbunden ist
 
@@ -126,8 +126,8 @@ Siehe [Knotentypen](flows/node-types.md) fuer eine vollstaendige Liste der verfu
 
 ## Siehe auch
 
-- [Ueberblick](mqtt/overview.md) -- Was ist MQTT?
-- [Server einrichten](mqtt/server-setup.md) -- Attraccess mit einem MQTT-Broker verbinden
+- [Ueberblick](devices/mqtt/overview.md) -- Was ist MQTT?
+- [Server einrichten](devices/mqtt/server-setup.md) -- Attraccess mit einem MQTT-Broker verbinden
 - [Flows & Automatisierung](flows/overview.md) -- Automatisierungs-Workflows erstellen
 - [Flow-Editor](flows/flow-editor.md) -- Den visuellen Editor verwenden
 - [Knotentypen](flows/node-types.md) -- Alle verfuegbaren Knotentypen

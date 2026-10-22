@@ -29,16 +29,16 @@ Attraccess/
 
 Das Backend ist eine NestJS-Anwendung, die die REST-API bereitstellt. Es ist in Feature-Module organisiert:
 
-| Modul | Beschreibung |
-|-------|-------------|
-| **resources** | Ressourcenverwaltung (Maschinen, Türen) |
-| **users-and-auth** | Benutzerkonten, Authentifizierung, SSO |
-| **settings** | Systemkonfiguration |
-| **attractap** | RFID-Leser-Kommunikation |
-| **billing** | Nutzungsbasierte Abrechnung |
-| **mqtt** | MQTT-Broker-Integration |
-| **projects** | Projektverwaltung |
-| **plugins** | Plugin-Verwaltung und -Laden |
+| Modul              | Beschreibung                            |
+| ------------------ | --------------------------------------- |
+| **resources**      | Ressourcenverwaltung (Maschinen, Türen) |
+| **users-and-auth** | Benutzerkonten, Authentifizierung, SSO  |
+| **settings**       | Systemkonfiguration                     |
+| **attractap**      | RFID-Leser-Kommunikation                |
+| **billing**        | Nutzungsbasierte Abrechnung             |
+| **mqtt**           | MQTT-Broker-Integration                 |
+| **projects**       | Projektverwaltung                       |
+| **plugins**        | Plugin-Verwaltung und -Laden            |
 
 ### Frontend (`apps/frontend`)
 
@@ -61,28 +61,28 @@ Firmware für die ESP32-basierte Attractap RFID-Kartenleser-Hardware. Dies ist e
 
 Diese Bibliotheken werden automatisch aus der OpenAPI-Spezifikation des Backends generiert und sollten nicht manuell bearbeitet werden:
 
-| Bibliothek | Beschreibung |
-|-----------|-------------|
-| **api-client** | TypeScript-HTTP-Client, generiert aus der Swagger/OpenAPI-Spezifikation (`Api.ts`) |
+| Bibliothek             | Beschreibung                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------- |
+| **api-client**         | TypeScript-HTTP-Client, generiert aus der Swagger/OpenAPI-Spezifikation (`Api.ts`)           |
 | **react-query-client** | TanStack-Query-Hooks, generiert aus der API-Spezifikation (`schemas.gen.ts`, `types.gen.ts`) |
 
 Nach Änderungen an der API müssen diese Bibliotheken neu generiert werden, um sie synchron zu halten.
 
 ### Gemeinsame Bibliotheken
 
-| Bibliothek | Beschreibung |
-|-----------|-------------|
-| **database-entities** | TypeORM-Entity-Definitionen, die zwischen Backend-Modulen geteilt werden |
-| **shared** | Typen, Interfaces und Hilfsfunktionen, die anwendungsübergreifend genutzt werden |
-| **env** | Umgebungsvariablen-Verwaltung und Konfiguration |
+| Bibliothek            | Beschreibung                                                                     |
+| --------------------- | -------------------------------------------------------------------------------- |
+| **database-entities** | TypeORM-Entity-Definitionen, die zwischen Backend-Modulen geteilt werden         |
+| **shared**            | Typen, Interfaces und Hilfsfunktionen, die anwendungsübergreifend genutzt werden |
+| **env**               | Umgebungsvariablen-Verwaltung und Konfiguration                                  |
 
 ### Plugin-SDKs
 
-| Bibliothek | Beschreibung |
-|-----------|-------------|
-| **plugins-backend-sdk** | SDK zur Entwicklung von Backend-Plugin-Erweiterungen |
+| Bibliothek               | Beschreibung                                          |
+| ------------------------ | ----------------------------------------------------- |
+| **plugins-backend-sdk**  | SDK zur Entwicklung von Backend-Plugin-Erweiterungen  |
 | **plugins-frontend-sdk** | SDK zur Entwicklung von Frontend-Plugin-Erweiterungen |
-| **plugins-frontend-ui** | Wiederverwendbare UI-Komponenten für Plugin-Frontends |
+| **plugins-frontend-ui**  | Wiederverwendbare UI-Komponenten für Plugin-Frontends |
 
 ## Datenbank
 
@@ -101,6 +101,28 @@ Die Authentifizierung erfolgt über **Session-Cookies**. Das System unterstützt
 - SSO über OpenID Connect (OIDC)
 - SSO über SAML
 - Zwei-Faktor-Authentifizierung (TOTP)
+
+## NestJS-API-Konventionen
+
+### Die Controller-Registrierungsreihenfolge ist entscheidend
+
+NestJS (über Express) ordnet Routen nach Registrierungsreihenfolge zu — **zuerst registriert gewinnt**. Ein `:param`-Segment (z. B. `GET /users/:id`) trifft _jedes_ einzelne URL-Segment, einschließlich Strings wie `with-permission`. Dies kann unerwartete Fehler verursachen:
+
+```
+// FEHLERHAFT — :id verschluckt jeden folgenden statischen Pfad
+controllers: [UsersAdminController,    // hat GET :id
+               UserPermissionsController] // hat GET with-permission ← unerreichbar!
+```
+
+`GET /users/with-permission` wurde mit dem alten booleschen Berechtigungssystem in ATT-566 entfernt. Rollenzuweisungsabfragen verwenden jetzt `GET /users?roleId=...`; stellen Sie die entfernte Route bei rollenbezogenen Benutzerlistenänderungen nicht wieder her.
+
+**Regeln beim Ergänzen oder Aufteilen eines Controllers:**
+
+1. **Innerhalb einer Controller-Datei** alle statischen Segmentrouten _vor_ jeder `:param`-Route gleicher HTTP-Methode und URL-Tiefe deklarieren.
+2. **Im Modul-Array `controllers: []`** Controller mit ausschließlich statischen Routen _vor_ Controllern mit `:param`-Routen unter gleichem `@Controller(prefix)` listen.
+3. Teilen mehrere Controller dasselbe Präfix `@Controller('path')` (z. B. alle `@Controller('users')`), überschattet eine `:param`-Route in früherem Controller statische Routen späterer Controller.
+
+Eine automatisierte Prüfung in `apps/api/src/route-shadow.spec.ts` setzt diese Regeln in CI durch — jede neue Überschattung lässt die Tests fehlschlagen.
 
 ## Siehe auch
 

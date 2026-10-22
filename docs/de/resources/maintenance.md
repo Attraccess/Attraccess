@@ -17,10 +17,10 @@ Manuelle Wartungseinträge dokumentieren einzelne Wartungsarbeiten an einer Ress
 3. Klicken Sie auf **Neue Wartung**
 4. Füllen Sie die Details aus:
 
-| Feld | Erforderlich | Beschreibung |
-|------|-------------|-------------|
-| **Grund** | Ja | Welche Wartung durchgeführt wird |
-| **Startzeit** | Ja | Wann die Wartung beginnt |
+| Feld          | Erforderlich | Beschreibung                     |
+| ------------- | ------------ | -------------------------------- |
+| **Grund**     | Ja           | Welche Wartung durchgeführt wird |
+| **Startzeit** | Ja           | Wann die Wartung beginnt         |
 
 5. Klicken Sie auf **Speichern**
 
@@ -37,12 +37,12 @@ Manuelle Wartungseinträge dokumentieren einzelne Wartungsarbeiten an einer Ress
 
 Jeder Wartungseintrag enthält:
 
-| Feld | Beschreibung |
-|------|-------------|
-| **Startzeit** | Wann die Wartung begonnen hat |
-| **Endzeit** | Wann die Wartung abgeschlossen wurde |
-| **Grund** | Beschreibung der durchgeführten Wartungsarbeiten |
-| **Erstellt von** | Benutzer, der den Eintrag erstellt hat |
+| Feld                  | Beschreibung                                        |
+| --------------------- | --------------------------------------------------- |
+| **Startzeit**         | Wann die Wartung begonnen hat                       |
+| **Endzeit**           | Wann die Wartung abgeschlossen wurde                |
+| **Grund**             | Beschreibung der durchgeführten Wartungsarbeiten    |
+| **Erstellt von**      | Benutzer, der den Eintrag erstellt hat              |
 | **Abgeschlossen von** | Benutzer, der den Eintrag als erledigt markiert hat |
 
 ## Automatisierte Wartungspläne
@@ -60,20 +60,20 @@ Wartungspläne erstellen automatisch Wartungserinnerungen basierend auf Nutzung 
 
 ### Auslösertypen
 
-| Auslösertyp | Beschreibung | Beispiel |
-|-------------|-------------|---------|
-| **USAGE_HOURS** | Löst nach einer bestimmten Anzahl von Nutzungsstunden aus | Wartung alle 100 Betriebsstunden |
-| **USAGE_COUNT** | Löst nach einer bestimmten Anzahl von Nutzungssitzungen aus | Wartung alle 500 Sitzungen |
-| **TIME_INTERVAL** | Löst nach einer bestimmten Zeitspanne aus (Tage, Stunden oder Minuten) | Wartung alle 30 Tage |
+| Auslösertyp       | Beschreibung                                                           | Beispiel                         |
+| ----------------- | ---------------------------------------------------------------------- | -------------------------------- |
+| **USAGE_HOURS**   | Löst nach einer bestimmten Anzahl von Nutzungsstunden aus              | Wartung alle 100 Nutzungsstunden |
+| **USAGE_COUNT**   | Löst nach einer bestimmten Anzahl von Nutzungssitzungen aus            | Wartung alle 500 Sitzungen       |
+| **TIME_INTERVAL** | Löst nach einer bestimmten Zeitspanne aus (Tage, Stunden oder Minuten) | Wartung alle 30 Tage             |
 
 ### Plan-Einstellungen
 
-| Einstellung | Beschreibung |
-|-------------|-------------|
-| **Auslösertyp** | Einer von USAGE_HOURS, USAGE_COUNT oder TIME_INTERVAL |
+| Einstellung      | Beschreibung                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| **Auslösertyp**  | Einer von USAGE_HOURS, USAGE_COUNT oder TIME_INTERVAL                                 |
 | **Auslöserwert** | Der Schwellenwert, der die Wartung auslöst (z.B. 100 Stunden, 500 Sitzungen, 30 Tage) |
-| **Dauerbasis** | Bei zeitbasierten Nutzungsplänen: Sitzungsdauer oder Maschinenbetriebsdauer |
-| **Aktiviert** | Ob der Plan derzeit aktiv ist |
+| **Dauerbasis**   | Bei zeitbasierten Nutzungsplänen: Sitzungsdauer oder Maschinenbetriebsdauer           |
+| **Aktiviert**    | Ob der Plan derzeit aktiv ist                                                         |
 
 Die Sitzungsdauer zählt Nutzungssitzungen. Die Betriebsdauer zählt den aufgezeichneten Maschinenbetrieb, einschließlich Zeiten ohne aktive Nutzungssitzung. Bestehende Pläne behalten die Sitzungsdauer; aus alten Nutzungssitzungen werden keine Betriebszeiten erzeugt.
 
@@ -90,7 +90,7 @@ Beide Grundlagen berücksichtigen die laufende Dauer offener Intervalle. Für de
 4. Der Zähler wird zurückgesetzt und der Plan beginnt, den nächsten Schwellenwert zu verfolgen
 
 > [!TIP]
-> Sie können mehrere Pläne für dieselbe Ressource kombinieren. Richten Sie beispielsweise einen Plan für alle 100 Betriebsstunden und einen weiteren für alle 6 Monate ein -- je nachdem, was zuerst eintritt.
+> Sie können mehrere Pläne für dieselbe Ressource kombinieren. Richten Sie beispielsweise einen Plan für alle 100 Nutzungsstunden und einen weiteren für alle 6 Monate ein -- je nachdem, was zuerst eintritt.
 
 ## Siehe auch
 

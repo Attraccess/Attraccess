@@ -1,0 +1,34 @@
+{
+  "name": "@attraccess/plugin-matter",
+  "version": "0.1.0",
+  "description": "Matter plugin foundation for the independent Attraccess Matter sidecar.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "apps/plugins/matter"
+  },
+  "homepage": "https://attraccess.org",
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "matter"
+  ],
+  "files": [
+    "dist",
+    "plugin.json"
+  ],
+  "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "1.10.0"
+  },
+  "attraccess": {
+    "displayName": "Matter",
+    "description": "Matter sidecar foundation; device operations are not available yet.",
+    "host": "1.10.0",
+    "backend": "dist/index.js",
+    "permissions": [],
+    "sdk": {
+      "backend": "1.10.0"
+    }
+  }
+}

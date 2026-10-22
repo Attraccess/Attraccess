@@ -1,0 +1,23 @@
+{
+  "name": "@attraccess/matter-contract",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "attraccessMatter": {
+    "supportedRelease": {
+      "attraccess": "1.10.0",
+      "plugin": "0.1.0",
+      "sidecar": "0.1.0"
+    },
+    "matterJsRelease": "0.17.9"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

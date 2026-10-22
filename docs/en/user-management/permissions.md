@@ -14,36 +14,36 @@ A user's effective permissions are the union of all permissions granted by their
 
 These system-managed roles come pre-installed and cannot be deleted:
 
-| Role | Key | Permissions granted |
-|------|-----|---------------------|
-| **User** | `user` | `resources.read` — granted to every user by default |
-| **Resource Manager** | `resource-manager` | Create, update, delete resources; manage resource access and maintenance |
-| **User Manager** | `user-manager` | Read, create, update, delete users; manage role assignments |
-| **System Administrator** | `system-admin` | Manage system settings, SSO providers, and plugins |
-| **Billing Manager** | `billing-manager` | Read and manage billing configuration and transactions |
-| **Owner** | `owner` | All permissions |
+| Role                     | Key                | Permissions granted                                                      |
+| ------------------------ | ------------------ | ------------------------------------------------------------------------ |
+| **User**                 | `user`             | `resources.read` — granted to every user by default                      |
+| **Resource Manager**     | `resource-manager` | Create, update, delete resources; manage resource access and maintenance |
+| **User Manager**         | `user-manager`     | Read, create, update, delete users; manage role assignments              |
+| **System Administrator** | `system-admin`     | Manage system settings, SSO providers, and plugins                       |
+| **Billing Manager**      | `billing-manager`  | Read and manage billing configuration and transactions                   |
+| **Owner**                | `owner`            | All permissions                                                          |
 
 ## Permission Keys
 
-| Category | Key | Description |
-|----------|-----|-------------|
-| resources | `resources.read` | View resource information |
-| resources | `resources.create` | Create new resources |
-| resources | `resources.update` | Update existing resources |
-| resources | `resources.delete` | Delete resources |
-| resources | `resources.access.manage` | Manage who can access resources (introductions) |
-| resources | `resources.maintenance.manage` | Manage resource maintenance schedules and requests |
-| users | `users.read` | View user information |
-| users | `users.create` | Create users |
-| users | `users.update` | Update user accounts |
-| users | `users.delete` | Delete users |
-| users | `users.roles.manage` | Assign and revoke roles for users |
-| users | `users.rfid-cards.manage` | View, enroll, activate, deactivate, and delete RFID cards for any user |
-| system | `system.settings.manage` | Change system configuration |
-| system | `system.sso.manage` | Manage SSO provider configuration |
-| system | `system.plugins.manage` | Install and configure plugins |
-| billing | `billing.read` | View billing information |
-| billing | `billing.manage` | Manage billing configuration and transactions |
+| Category  | Key                            | Description                                                            |
+| --------- | ------------------------------ | ---------------------------------------------------------------------- |
+| resources | `resources.read`               | View resource information                                              |
+| resources | `resources.create`             | Create new resources                                                   |
+| resources | `resources.update`             | Update existing resources                                              |
+| resources | `resources.delete`             | Delete resources                                                       |
+| resources | `resources.access.manage`      | Manage who can access resources (introductions)                        |
+| resources | `resources.maintenance.manage` | Manage resource maintenance schedules and requests                     |
+| users     | `users.read`                   | View user information                                                  |
+| users     | `users.create`                 | Create users                                                           |
+| users     | `users.update`                 | Update user accounts                                                   |
+| users     | `users.delete`                 | Delete users                                                           |
+| users     | `users.roles.manage`           | Assign and revoke roles for users                                      |
+| users     | `users.rfid-cards.manage`      | View, enroll, activate, deactivate, and delete RFID cards for any user |
+| system    | `system.settings.manage`       | Change system configuration                                            |
+| system    | `system.sso.manage`            | Manage SSO provider configuration                                      |
+| system    | `system.plugins.manage`        | Install and configure plugins                                          |
+| billing   | `billing.read`                 | View billing information                                               |
+| billing   | `billing.manage`               | Manage billing configuration and transactions                          |
 
 ## Assigning Roles
 
@@ -68,6 +68,12 @@ Without any elevated role, every authenticated user can:
 - View resources they have been introduced to (`resources.read`)
 - Start and stop their own usage sessions
 - Participate in projects they have been invited to
+
+## Managing other users' RFID cards
+
+The `users.rfid-cards.manage` permission allows viewing, enrolling, activating, deactivating and deleting RFID cards for any user. It can be granted through a custom role.
+
+Open a user and select **Manage RFID cards**. Access to the user details also requires `users.read`.
 
 ## See Also
 

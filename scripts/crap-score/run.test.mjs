@@ -483,3 +483,20 @@ test('WAGO includes the complete serial frontend suite once and host-composed ac
     'apps/plugins/wago/scripts/jest.commissioning.config.cjs',
   ]);
 });
+
+test('Matter reports use the contract, artifact, sidecar and plugin test suites', async () => {
+  const { suites } = await import('./run.mjs');
+  for (const [root, configs] of Object.entries({
+    'apps/matter-sidecar': ['apps/matter-sidecar/vitest.config.mts'],
+    'libs/matter-contract': [
+      'libs/matter-contract/vitest.config.mts',
+      'libs/matter-contract/vitest.artifacts.config.mts',
+    ],
+    'apps/plugins/matter': ['apps/plugins/matter/vitest.config.mts'],
+  })) {
+    assert.deepEqual(
+      suites(root).map((suite) => suite.args[1]),
+      configs,
+    );
+  }
+});

@@ -6,11 +6,11 @@ Attraccess bietet verschiedene sicherheitsrelevante Einstellungen fuer Sitzungs-
 
 Die Einstellung **Cookie SameSite** steuert, wann der Browser Sitzungs-Cookies mit Anfragen sendet. Dies ist sowohl fuer die Sicherheit als auch fuer die SSO-Kompatibilitaet wichtig.
 
-| Wert | Beschreibung |
-|------|-------------|
+| Wert               | Beschreibung                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
 | **lax** (Standard) | Cookies werden bei Same-Site-Anfragen und Top-Level-Navigationen gesendet. Dies ist der empfohlene Standard. |
-| **strict** | Cookies werden nur bei Same-Site-Anfragen gesendet. Sicherer, aber **bricht SSO-Anmeldung**. |
-| **none** | Cookies werden bei allen Anfragen gesendet, einschliesslich Cross-Site. **Erfordert HTTPS.** |
+| **strict**         | Cookies werden nur bei Same-Site-Anfragen gesendet. Sicherer, aber **bricht SSO-Anmeldung**.                 |
+| **none**           | Cookies werden bei allen Anfragen gesendet, einschliesslich Cross-Site. **Erfordert HTTPS.**                 |
 
 > [!WARNING]
 > Das Setzen von Cookie SameSite auf **strict** bricht die SSO-Anmeldung (OIDC und SAML). Wenn ein Benutzer vom Identity Provider zurueckgeleitet wird, sendet der Browser das Sitzungs-Cookie nicht mit, da die Weiterleitung eine Cross-Site-Navigation ist. Die Anmeldung schlaegt fehl.
@@ -20,21 +20,21 @@ Die Einstellung **Cookie SameSite** steuert, wann der Browser Sitzungs-Cookies m
 
 ### Empfohlene Konfiguration
 
-| Szenario | Empfohlener SameSite-Wert |
-|----------|--------------------------|
-| Kein SSO, HTTP oder HTTPS | `lax` (Standard) |
-| SSO (OIDC/SAML), HTTPS | `lax` (Standard) |
-| Maximale Cookie-Sicherheit, kein SSO | `strict` |
-| Cross-Site-Einbettung erforderlich, HTTPS | `none` |
+| Szenario                                  | Empfohlener SameSite-Wert |
+| ----------------------------------------- | ------------------------- |
+| Kein SSO, HTTP oder HTTPS                 | `lax` (Standard)          |
+| SSO (OIDC/SAML), HTTPS                    | `lax` (Standard)          |
+| Maximale Cookie-Sicherheit, kein SSO      | `strict`                  |
+| Cross-Site-Einbettung erforderlich, HTTPS | `none`                    |
 
 ## Sitzungskonfiguration
 
 Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 
-| Variable | Standard | Beschreibung |
-|----------|----------|-------------|
-| `AUTH_SESSION_SECRET` | -- | **Erforderlich.** Geheimer Schluessel zur Verschluesselung von Sitzungsdaten. Muss ein sicherer, zufaelliger Wert sein. |
-| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximale Sitzungsdauer in Millisekunden (Standard: 7 Tage). |
+| Variable                 | Standard    | Beschreibung                                                                                                            |
+| ------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_SESSION_SECRET`    | --          | **Erforderlich.** Geheimer Schluessel zur Verschluesselung von Sitzungsdaten. Muss ein sicherer, zufaelliger Wert sein. |
+| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximale Sitzungsdauer in Millisekunden (Standard: 7 Tage).                                                             |
 
 > [!WARNING]
 > Der `AUTH_SESSION_SECRET` muss eine lange, zufaellige Zeichenkette sein. Ein schwacher oder vorhersagbarer Wert gefaehrdet die Sitzungssicherheit. Erzeugen Sie ihn mit einem Werkzeug wie `openssl rand -hex 32`.
@@ -53,13 +53,13 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 
 Fehlgeschlagene Anmeldungen, Registrierungen und Passwort-Zuruecksetzungen werden pro IP gedrosselt. Wiederholte Login-Fehlversuche sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
 
-| Einstellung | Standard | Beschreibung |
-|-------------|----------|-------------|
-| `maxAttempts` | `5` | Erlaubte Fehlversuche pro Zeitfenster, bevor Drosselung oder Sperre greift. |
-| `windowSeconds` | `900` | Zeitfenster fuer das Zaehlen der Fehlversuche. |
-| `lockoutDurationSeconds` | `900` | Grundsperrdauer. |
-| `exponentialBackoff` | `false` | Wenn `true`, waechst die Sperrdauer bei jeder Wiederholung um den Faktor `backoffMultiplier`. |
-| `backoffMultiplier` | `2` | Multiplikator fuer die Sperrdauer bei wiederholten Sperren. |
+| Einstellung              | Standard | Beschreibung                                                                                  |
+| ------------------------ | -------- | --------------------------------------------------------------------------------------------- |
+| `maxAttempts`            | `5`      | Erlaubte Fehlversuche pro Zeitfenster, bevor Drosselung oder Sperre greift.                   |
+| `windowSeconds`          | `900`    | Zeitfenster fuer das Zaehlen der Fehlversuche.                                                |
+| `lockoutDurationSeconds` | `900`    | Grundsperrdauer.                                                                              |
+| `exponentialBackoff`     | `false`  | Wenn `true`, waechst die Sperrdauer bei jeder Wiederholung um den Faktor `backoffMultiplier`. |
+| `backoffMultiplier`      | `2`      | Multiplikator fuer die Sperrdauer bei wiederholten Sperren.                                   |
 
 Antworten bei Ausloesung:
 
@@ -74,12 +74,12 @@ Die Drosselung pro IP funktioniert nur, wenn Attraccess die **echte Client-IP** 
 
 Setzen Sie die Umgebungsvariable `TRUST_PROXY` auf die Anzahl vertrauenswuerdiger Proxy-Hops zwischen Client und Attraccess. Die Client-IP wird dann aus dem vom Proxy gesetzten `X-Forwarded-For`-Header gelesen:
 
-| Deployment | `TRUST_PROXY` |
-|------------|---------------|
-| Kein Reverse Proxy (direkt) | nicht gesetzt (Standard) |
-| Einzelner Reverse Proxy (nginx/Traefik/Caddy) | `1` |
-| CDN vor einem Reverse Proxy | `2` |
-| Nur bestimmte vertrauenswuerdige Proxies | kommagetrennte IPs/CIDRs, z.B. `10.0.0.0/8, 172.16.0.0/12`, oder `uniquelocal` |
+| Deployment                                    | `TRUST_PROXY`                                                                  |
+| --------------------------------------------- | ------------------------------------------------------------------------------ |
+| Kein Reverse Proxy (direkt)                   | nicht gesetzt (Standard)                                                       |
+| Einzelner Reverse Proxy (nginx/Traefik/Caddy) | `1`                                                                            |
+| CDN vor einem Reverse Proxy                   | `2`                                                                            |
+| Nur bestimmte vertrauenswuerdige Proxies      | kommagetrennte IPs/CIDRs, z.B. `10.0.0.0/8, 172.16.0.0/12`, oder `uniquelocal` |
 
 > [!WARNING]
 > Vertrauen Sie nur so vielen Hops, wie tatsaechlich existieren. Vertraut `TRUST_PROXY` mehr Hops als Ihre reale Proxy-Kette, koennen Clients `X-Forwarded-For` faelschen, ihre scheinbare IP rotieren und das Rate-Limiting umgehen. Nicht gesetzt vertraut Attraccess keinen Weiterleitungs-Headern (sicherer Standard). Aenderungen werden nach einem Neustart wirksam.
@@ -90,18 +90,19 @@ Jeder Anmeldeversuch erzeugt eine einzeilige, leerzeichengetrennte Log-Zeile im 
 
 ```
 auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 username=alice ts=2026-05-15T12:34:56.000Z reason=bad_password
+auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=2026-05-15T12:35:01.000Z
 ```
 
-| Feld | Beschreibung |
-|------|-------------|
-| `prefix` | `auth.success` bei Erfolg, sonst `auth.failed`. |
-| `type` | `login`, `register`, `password_reset_request`, `password_reset_complete`. |
-| `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
-| `ip` | Client-IP, sonst `unknown`. |
-| `user_id` | Numerische User-ID, sonst `-`. |
-| `username` | Benutzername, sonst `-`. Whitespace und Quotes werden durch `_` ersetzt. |
-| `ts` | ISO-8601-UTC-Zeitstempel. |
-| `reason` | Optionaler Kurz-Grund. |
+| Feld       | Beschreibung                                                                                                                                                                             |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prefix`   | `auth.success` bei Erfolg, sonst `auth.failed`.                                                                                                                                          |
+| `type`     | `login`, `register`, `password_reset_request`, `password_reset_complete`.                                                                                                                |
+| `outcome`  | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
+| `ip`       | Client-IP, sonst `unknown`.                                                                                                                                                              |
+| `user_id`  | Numerische User-ID, sonst `-`.                                                                                                                                                           |
+| `username` | Benutzername, sonst `-`. Whitespace und Quotes werden durch `_` ersetzt.                                                                                                                 |
+| `ts`       | ISO-8601-UTC-Zeitstempel.                                                                                                                                                                |
+| `reason`   | Optionaler Kurz-Grund.                                                                                                                                                                   |
 
 Passwoerter, Tokens oder andere Secrets werden nie geloggt.
 
@@ -112,6 +113,18 @@ Minimaler `failregex` fuer `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 ```
 failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
+```
+
+Kombinieren Sie dies mit einem Jail (z. B. `/etc/fail2ban/jail.d/attraccess.local`), das API-Protokolle überwacht:
+
+```ini
+[attraccess-auth]
+enabled  = true
+filter   = attraccess-auth
+logpath  = /var/log/attraccess/api.log
+maxretry = 5
+findtime = 900
+bantime  = 900
 ```
 
 Der mitgelieferte Docker-Compose-Stack verdrahtet beide Dateien hinter dem Profil `fail2ban` automatisch — siehe [Docker-Compose-Installation](installation/docker-compose.md#brute-force-ip-sperre-mit-fail2ban).

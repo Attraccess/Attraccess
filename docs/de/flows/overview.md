@@ -48,5 +48,5 @@ Hier sind einige häufige Beispiele:
 - [Flow-Editor](flows/flow-editor.md) -- Den visuellen Editor verwenden
 - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) -- Knotendaten und gespeicherte Werte verwenden
 - [Knotentypen](flows/node-types.md) -- Alle verfügbaren Knotentypen
-- [MQTT & IoT](mqtt/overview.md) -- Hardware verbinden
+- [MQTT & IoT](devices/mqtt/overview.md) -- Hardware verbinden
 - [Abrechnung](billing/overview.md) -- Kostenerfassung automatisieren
