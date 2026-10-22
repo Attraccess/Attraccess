@@ -1,3 +1,4 @@
+import { DeviceEnrollmentService } from '../../device-enrollment/device-enrollment.service';
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -59,6 +60,7 @@ const mockMetricsToggle = { isEnabledCached: jest.fn().mockReturnValue(true) };
 function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {
   return {
     id: 'test-id',
+    readyState: 1,
     readerId: null,
     messageCount: 0,
     sendMessage: jest.fn().mockResolvedValue(undefined),
@@ -95,6 +97,7 @@ export function registerAttractapGatewayFixture() {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: DeviceEnrollmentService, useValue: { announce: jest.fn(), authenticated: jest.fn() } },
         AttractapGateway,
         WebsocketService,
         { provide: AttractapService, useValue: attractapService },

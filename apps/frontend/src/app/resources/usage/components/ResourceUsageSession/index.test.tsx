@@ -5,7 +5,8 @@ import { ResourceUsageSession } from './index';
 import { createMockResource } from '../../../../../test-utils/fixtures';
 import { SupervisionMode } from '@attraccess/react-query-client';
 
-const { canControl, hasPermission, activeSession, loading } = vi.hoisted(() => ({
+const { canControl, hasPermission, activeSession, loading, denied } = vi.hoisted(() => ({
+  denied: { value: false, http: false },
   canControl: { value: true },
   hasPermission: { value: false },
   activeSession: { value: null as { id: number; userId: number; startTime: string } | null },
@@ -20,12 +21,25 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
 }));
 
-vi.mock('../../../../../utils/live-updates', () => ({ useLiveUpdates: () => undefined }));
+vi.mock('../../../../../utils/live-updates', () => ({ useLiveUpdates: () => ({ unavailable: denied.value }) }));
 
 // The child components are irrelevant here — we only assert which branch renders.
+vi.mock('../../../../../components/ResourceIntroducersList', () => ({
+  ResourceIntroducersList: () => <div data-testid="activity-help" />,
+}));
 vi.mock('../StartSessionControls', () => ({
-  StartSessionControls: ({ requiresSupervision }: { requiresSupervision?: boolean }) => (
-    <div data-testid="start-controls" data-requires-supervision={String(!!requiresSupervision)} />
+  StartSessionControls: ({
+    requiresSupervision,
+    activityUnavailable,
+  }: {
+    requiresSupervision?: boolean;
+    activityUnavailable?: boolean;
+  }) => (
+    <div
+      data-testid="start-controls"
+      data-requires-supervision={String(!!requiresSupervision)}
+      data-activity-unavailable={String(!!activityUnavailable)}
+    />
   ),
 }));
 vi.mock('../IntroductionRequiredDisplay', () => ({
@@ -50,6 +64,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
     SUPERVISION_ALLOWED: 'supervision_allowed',
     SUPERVISION_REQUIRED: 'supervision_required',
   },
+  ResourceIntroducerType: { INTRODUCER: 'introducer' },
   ResourceType: { MACHINE: 'machine', DOOR: 'door' },
   useResourcesServiceResourceUsageCanControl: () => ({
     data: { canControl: canControl.value },
@@ -60,6 +75,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
   useResourcesServiceResourceUsageGetActiveSession: () => ({
     data: { usage: activeSession.value },
     isLoading: loading.activeSession,
+    isError: denied.http,
   }),
   useResourcesServiceResourceUsageGetActiveSessionKey: 'activeSession',
   useResourceMaintenancesServiceFindMaintenances: () => ({ data: { data: [] } }),
@@ -79,6 +95,8 @@ function renderSession(supervisionMode: SupervisionMode) {
 // StartSessionControls (see its own test) so that every call site inherits it — ATT-815.
 describe('ResourceUsageSession routing', () => {
   beforeEach(() => {
+    denied.value = false;
+    denied.http = false;
     canControl.value = true;
     hasPermission.value = false;
     loading.activeSession = false;
@@ -151,3 +169,38 @@ describe('ResourceUsageSession routing', () => {
     expect(screen.getByTestId('active-session')).toHaveAttribute('data-usage-id', '8');
   });
 });
+
+it.each(['stream', 'http'])('hides an allowed private snapshot immediately after %s denial and recovers', (source) => {
+  Object.assign(loading, { activeSession: false, canControl: false, introducers: false });
+  activeSession.value = { id: 99, userId: 1, startTime: new Date().toISOString() };
+  const resource = createMockResource({ id: 7 });
+  const view = render(<ResourceUsageSession resourceId={7} resource={resource} />);
+  expect(screen.getByTestId('active-session')).toBeInTheDocument();
+  if (source === 'stream') denied.value = true;
+  else denied.http = true;
+  view.rerender(<ResourceUsageSession resourceId={7} resource={resource} />);
+  expect(screen.queryByTestId('active-session')).not.toBeInTheDocument();
+  expect(screen.getByTestId('activity-help')).toBeInTheDocument();
+  expect(screen.queryByTestId('start-controls')).not.toBeInTheDocument();
+  denied.value = false;
+  denied.http = false;
+  view.rerender(<ResourceUsageSession resourceId={7} resource={resource} />);
+  expect(screen.getByTestId('active-session')).toBeInTheDocument();
+});
+
+it.each([SupervisionMode.SUPERVISION_ALLOWED, SupervisionMode.SUPERVISION_REQUIRED])(
+  'keeps supervised initiation available with denied private activity in %s',
+  (supervisionMode) => {
+    canControl.value = false;
+    hasPermission.value = false;
+    denied.http = true;
+    activeSession.value = { id: 99, userId: 2, startTime: new Date().toISOString() };
+    renderSession(supervisionMode);
+    expect(screen.getByTestId('activity-help')).toBeInTheDocument();
+    expect(screen.getByTestId('start-controls')).toHaveAttribute('data-requires-supervision', 'true');
+    expect(screen.getByTestId('start-controls')).toHaveAttribute('data-activity-unavailable', 'true');
+    expect(screen.queryByTestId('other-user-session')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('active-session')).not.toBeInTheDocument();
+    denied.http = false;
+  },
+);

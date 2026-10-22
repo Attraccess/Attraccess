@@ -109,3 +109,13 @@ In containers, give the API write access to the file path and mount its director
 - [Docker Compose Installation](installation/docker-compose.md)
 - [SSL Setup](installation/ssl-setup.md)
 - [Security](settings/security.md)
+
+
+## Browser origin configuration
+
+| Variable | Purpose |
+|----------|---------|
+| `ATTRACCESS_FRONTEND_URL` | Exact separate frontend URL, such as `https://ui.example.org`. Its origin is allowed. |
+| `ATTRACCESS_ALLOWED_ORIGINS` | Additional comma-separated exact origins, such as `https://ui.example.org,http://localhost:4201`. No wildcard or paths. |
+
+The saved application URL (or `ATTRACCESS_URL` before setup) supplies the primary allowed origin. Configure it before remote setup. Host/forwarding headers and `ATTRACCESS_PUBLIC_INTERNET_URL` cannot expand this list. A proxy must preserve Origin and Referer. Browser access and device browser WebSockets use the same policy. `pnpm serve` adds its actual allocated frontend origin automatically. See [Security settings](settings/security.md).

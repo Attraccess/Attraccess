@@ -1,3 +1,4 @@
+import { DeviceEnrollmentService } from '../device-enrollment/device-enrollment.service';
 import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AuthenticatedRequest, DualAuthGuard, NFCCard, User } from '@attraccess/plugins-backend-sdk';
@@ -33,6 +34,7 @@ describe('RFID card management authorization', () => {
     const module = await Test.createTestingModule({
       controllers: [AttractapController, AttractapNfcCardsController],
       providers: [
+        { provide: DeviceEnrollmentService, useValue: {} },
         CardAccessService,
         { provide: AttractapService, useValue: service },
         { provide: AttractapGateway, useValue: gateway },

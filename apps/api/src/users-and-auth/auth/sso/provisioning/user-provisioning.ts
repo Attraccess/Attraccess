@@ -24,6 +24,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     redirectTo?: string,
     providerId?: number,
   ): Promise<CreateSessionResponse | void> {
+    response.setHeader('Cache-Control', 'no-store');
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],
       ipAddress: request.ip || request.connection.remoteAddress,

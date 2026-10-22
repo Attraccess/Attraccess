@@ -128,6 +128,7 @@ describe('SessionStrategy', () => {
 
       expect(result).toEqual(mockUser);
       expect(sessionService.authenticateSession).toHaveBeenCalledWith('valid-session-token');
+      expect(mockRequest).toHaveProperty('authSessionSource', mockRequest.headers.authorization ? 'bearer' : 'cookie');
     });
 
     it('should validate user with valid session token from cookie', async () => {
@@ -212,7 +213,7 @@ describe('SessionStrategy', () => {
       } as Request;
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(
-        new UnauthorizedException('No session token provided'),
+        new UnauthorizedException('Invalid Authorization header'),
       );
 
       expect(sessionService.authenticateSession).not.toHaveBeenCalled();
@@ -227,7 +228,7 @@ describe('SessionStrategy', () => {
       } as Request;
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(
-        new UnauthorizedException('No session token provided'),
+        new UnauthorizedException('Invalid Authorization header'),
       );
 
       expect(sessionService.authenticateSession).not.toHaveBeenCalled();
@@ -270,5 +271,15 @@ describe('SessionStrategy', () => {
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(new ForbiddenException('TwoFactorSetupRequired'));
     });
+    it.each(['Basic invalid', 'Bearer ', 'Bearer invalid'])(
+      'does not fall back to cookies for %s',
+      async (authorization) => {
+        const request = { headers: { authorization }, cookies: { 'auth-session': 'valid-cookie' } } as Request;
+        sessionService.authenticateSession.mockResolvedValue(null);
+        await expect(strategy.validate(request)).rejects.toThrow(UnauthorizedException);
+        expect(sessionService.authenticateSession).not.toHaveBeenCalledWith('valid-cookie');
+        expect(request).not.toHaveProperty('authSessionSource');
+      },
+    );
   });
 });

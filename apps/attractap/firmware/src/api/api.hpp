@@ -1,4 +1,5 @@
 #pragma once
+#include "enrollment-code.hpp"
 
 #include <string>
 #include <vector>
@@ -460,6 +461,8 @@ public:
     const ResourceUsageFormPageResult &getFormPageResultScratch() const { return resourceFormPageResultScratch; }
 
 private:
+    EnrollmentCode enrollmentCode;
+    void sendEnrollmentRequest(bool force = false);
     Logger logger;
     IReaderTransport &transport;
 

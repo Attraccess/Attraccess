@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 @Injectable()
@@ -17,7 +17,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
 
   constructor(
     @InjectRepository(ResourceIntroducer)
-    private resourceIntroducerRepository: Repository<ResourceIntroducer>
+    private resourceIntroducerRepository: Repository<ResourceIntroducer>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -54,6 +54,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
       // Check if the user is an introducer for this resource group
       const introducer = await this.resourceIntroducerRepository.findOne({
         where: {
+          type: ResourceIntroducerType.INTRODUCER,
           user: {
             id: user.id,
           },

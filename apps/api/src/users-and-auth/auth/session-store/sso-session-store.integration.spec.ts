@@ -314,7 +314,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       }
     });
 
-    it('cookie-only OIDC logout revokes concurrent refreshes while preserving independent and later logins', async () => {
+    it('cookie-only OIDC logout preserves concurrent refreshes and independent logins', async () => {
       await create('original', oidc);
       await create('independent', oidc);
       await create('local');
@@ -350,16 +350,16 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         undefined,
       );
       try {
-        expect(await service.frontchannel(1, undefined, undefined, 'original')).toBe(true);
+        expect(await service.frontchannel(1, undefined, undefined, 'original')).toBe(false);
       } finally {
         capture.mockRestore();
       }
       expect(await store.validateSession('original')).toBeNull();
-      expect(await store.validateSession('rotated-again')).toBeNull();
-      expect(await sessions.refreshSession('rotated-again')).toBeNull();
+      expect(await store.validateSession('rotated-again')).not.toBeNull();
+      expect(await sessions.refreshSession('rotated-again')).not.toBeNull();
       for (const token of ['independent', 'local', 'later-login'])
         expect(await store.validateSession(token)).not.toBeNull();
-      expect(dec).toHaveBeenCalledTimes(1);
+      expect(dec).not.toHaveBeenCalled();
     });
 
     it.each([oidc, saml])(

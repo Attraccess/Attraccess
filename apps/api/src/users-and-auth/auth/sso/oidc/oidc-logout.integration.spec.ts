@@ -269,8 +269,8 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
     // notification must preserve its cookie as well as its stored session.
     expect(await service.frontchannel(1, issuer, 'browser', 'new-cookie')).toBe(false);
     expect(await service.frontchannel(1, undefined, undefined)).toBe(false);
-    expect(await service.frontchannel(1, undefined, undefined, 'cookie')).toBe(true);
-    expect(sessions.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
+    expect(await service.frontchannel(1, undefined, undefined, 'cookie')).toBe(false);
+    expect(sessions.revokeLogoutSession).not.toHaveBeenCalled();
     sessions.getLogoutSession.mockResolvedValue({ id: 'other-session', ssoContext: { ...context, providerId: 2 } });
     expect(await service.frontchannel(1, undefined, undefined, 'other-cookie')).toBe(false);
     await expect(service.frontchannel(1, issuer, undefined)).rejects.toThrow();

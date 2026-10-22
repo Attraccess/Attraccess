@@ -29,22 +29,15 @@ Before you begin, make sure:
 > [!NOTE]
 > The reader's display shows its connection status and IP address once connected.
 
-## Step 2: Register the Reader in Attraccess
+## Step 2: Approve the reader in Attraccess
 
-1. Open Attraccess in your browser
-2. Open the **Devices** group in the sidebar
-3. Click on **Attractap Readers**
-4. Click **Add Reader**
-5. Enter the reader details:
+1. Update unregistered readers to firmware 1.7.0 or later supporting enrollment codes. Existing registered readers reconnect with their saved credentials.
+2. Connect the reader to your local Attraccess URL. Its screen shows a cryptographically random `XXX-XXX` code and QR code. Displayless variants print the code on their local serial console; it is not written to remote logs.
+3. Sign in with `resources.update`, open **Devices → Attractap Readers → Add reader** and enter the current code or scan it with your camera.
+4. Check that the code belongs to the intended reader and click **Approve**. Scanning fills the form; it never opens a URL or approves automatically.
+5. The reader receives and saves its credentials only after approval. Open the resulting reader to rename it and configure resources.
 
-| Field | Description |
-|-------|-------------|
-| **Name** | A descriptive name (e.g. "Laser Cutter Reader") |
-| **Description** | Optional description of the reader's location or purpose |
-
-6. Click **Save**
-
-<!-- TODO: Screenshot of the Add Reader dialog -->
+The code changes every 30 seconds. If it expires, disconnects, collides with another code or an approval is already running, use the current code and retry. Camera access needs a secure browser context; manual entry remains available. Reader and companion QR codes are type-specific and cannot be interchanged.
 
 ## Step 3: Assign Resources to the Reader
 
@@ -93,3 +86,31 @@ The reader communicates with the Attraccess backend via WebSocket. The connectio
 - [Hardware](attractap/hardware.md) -- Hardware variants and components
 - [RFID Cards](attractap/rfid-cards.md) -- Register and manage RFID cards
 - [Resources](resources/overview.md) -- Manage machines and doors
+
+
+## Enrollment limits and recovery
+
+Pending enrollment exists only in the server process owning the live socket. Restarting the server discards it; reconnect and use a fresh code. Multiple replicas require routing approval to that same process; shared enrollment across replicas is not supported. No device row, token or device authority exists before approval. A failed or uncertain credential delivery cannot replay credentials; remove any approved but unreachable registration and enroll again with a fresh code.
+
+| Limit | Value |
+|-------|-------|
+| Pending sockets | 128 total, 8 per peer IP |
+| Initial announcement / absolute connection lifetime | 10 seconds / 5 minutes |
+| Code validity / announcements | 30 seconds / 3 per socket per 30 seconds |
+| Pending frame / metadata | 4 KiB (including fragmented frames) / 1 KiB |
+| Connection attempts per minute | 10 per peer IP, 100 total |
+| Approval attempts per minute | 5 per account, 20 per IP, 100 total |
+| Counter capacity | 10,000 entries; new entries rejected when full |
+
+Devices behind a proxy share its peer-IP connection limits. Native devices need no Origin header; a browser-supplied Origin must be explicitly allowed. Enrollment and valid-device reconnect use the local server without external Internet access. The QR format is `attraccess-enroll:v1:reader:ABC-123`; never publish a current code in a screenshot or log from a real deployment.
+
+## Physical validation checklist
+
+Hardware checks below have **not been performed** for ATT-1149. The operator explicitly skipped physical validation because hardware was unavailable. Software and simulated-device tests do not establish these results.
+
+- [ ] Verify the rotating code on a real reader display and serial output.
+- [ ] Scan the real reader code and approve enrollment in the web UI.
+- [ ] Reboot the reader and verify that saved credentials reconnect without enrollment.
+- [ ] Start and end real equipment use, including with external internet access disconnected.
+
+Record the firmware revision, device model and result when performing each check.

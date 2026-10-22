@@ -117,7 +117,7 @@ export class DesktopFixture {
     this.root = mkdtempSync(join(tmpdir(), 'attractap-desktop-control-'));
   }
 
-  async start() {
+  async start(approveEnrollment?: (code: string) => Promise<void>) {
     if (this.simulator) throw new Error('Stop the owned probe before restarting');
     this.control = join(this.root, `launch-${++this.launch}`);
     mkdirSync(this.control);
@@ -148,9 +148,20 @@ export class DesktopFixture {
       child.once('error', () => resolveExit());
     });
     try {
-      await waitFor(() => {
+      let approvedCode: string | undefined;
+      await waitFor(async () => {
         if (spawnError) throw spawnError;
         this.assertRunning();
+        const enrollmentFile = join(this.control, 'enrollment-code');
+        if (approveEnrollment && existsSync(enrollmentFile)) {
+          this.assertPrivateFile(enrollmentFile);
+          const code = readFileSync(enrollmentFile, 'utf8');
+          if (/^[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(code) && code !== approvedCode) {
+            this.diagnostics.remember(code);
+            await approveEnrollment(code);
+            approvedCode = code;
+          }
+        }
         return existsSync(join(this.control, 'ready'));
       }, 'reader authentication');
     } catch (error) {

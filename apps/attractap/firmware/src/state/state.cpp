@@ -215,3 +215,7 @@ State::NetworkQualityState State::getNetworkQualityState()
 
     return state;
 }
+
+std::string State::enrollment_code;
+void State::setEnrollmentCode(std::string code) { StateLock lock(state_mutex); enrollment_code = code; }
+std::string State::getEnrollmentCode() { StateLock lock(state_mutex); return enrollment_code; }

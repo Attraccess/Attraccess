@@ -1,3 +1,7 @@
+import { DeviceEnrollmentService } from '../device-enrollment/device-enrollment.service';
+import { ApproveEnrollmentDto, ApproveEnrollmentResponseDto } from '../device-enrollment/approve-enrollment.dto';
+import { Post, Req } from '@nestjs/common';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import {
   Body,
   ClassSerializerInterceptor,
@@ -103,6 +107,20 @@ export class CompanionDownloadController {
 @Controller('companion-devices')
 @UseInterceptors(ClassSerializerInterceptor)
 export class CompanionController {
+  @Inject(DeviceEnrollmentService)
+  private readonly enrollment: DeviceEnrollmentService;
+
+  @Post('enrollment/approve')
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'Approve a pending companion enrollment', operationId: 'approveCompanionEnrollment' })
+  @ApiResponse({ status: 201, type: ApproveEnrollmentResponseDto })
+  async approveEnrollment(
+    @Body() body: ApproveEnrollmentDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ApproveEnrollmentResponseDto> {
+    return this.enrollment.approve('companion', body.code, req.user, req.ip || req.socket.remoteAddress || 'unknown');
+  }
+
   public constructor(
     @Inject(CompanionService) private readonly service: CompanionService,
     @Inject(CompanionGateway) private readonly gateway: CompanionGateway,
@@ -133,7 +151,10 @@ export class CompanionController {
 
   @Get(':id/resources')
   @Auth()
-  @ApiOperation({ summary: 'List resources that reference this companion device', operationId: 'getCompanionDeviceResources' })
+  @ApiOperation({
+    summary: 'List resources that reference this companion device',
+    operationId: 'getCompanionDeviceResources',
+  })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 404 })
@@ -151,10 +172,7 @@ export class CompanionController {
   @ApiBody({ type: RenameCompanionDeviceDto })
   @ApiResponse({ status: 200, type: CompanionDevice })
   @ApiResponse({ status: 404 })
-  async rename(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: RenameCompanionDeviceDto,
-  ): Promise<CompanionDevice> {
+  async rename(@Param('id', ParseIntPipe) id: number, @Body() dto: RenameCompanionDeviceDto): Promise<CompanionDevice> {
     const device = await this.service.findById(id);
     if (!device) throw new NotFoundException(`Companion device ${id} not found`);
     const updated = await this.service.updateName(id, dto.name);
@@ -175,5 +193,4 @@ export class CompanionController {
     this.gateway.disconnectDevice(id);
     await this.service.delete(id);
   }
-
 }

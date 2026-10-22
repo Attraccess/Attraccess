@@ -273,3 +273,39 @@ describe('live topic React lifecycle', () => {
     hook.unmount();
   });
 });
+
+it('clears a resource snapshot and cancels pending responses on denial, then recovers', async () => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const key = ['useResourcesServiceResourceUsageGetActiveSession', { resourceId: 7 }];
+  queryClient.setQueryData(key, { usage: { id: 99, user: { username: 'Private user' } } });
+  const hook = renderHook(() => useLiveUpdates({ topic: 'resource', resourceId: 7, onUpdate: vi.fn() }), {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={queryClient}>
+        <LiveUpdatesProvider userId={1}>{children}</LiveUpdatesProvider>
+      </QueryClientProvider>
+    ),
+  });
+  let complete!: (value: unknown) => void;
+  const request = queryClient
+    .fetchQuery({
+      queryKey: key,
+      queryFn: () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    })
+    .catch(() => undefined);
+  const subscription = state.clients[state.clients.length - 1].subscriptions[0];
+  act(() => subscription.onUnavailable());
+  expect(hook.result.current.unavailable).toBe(true);
+  expect(queryClient.getQueryData(key)).toBeUndefined();
+  complete({ usage: { id: 100, user: { username: 'Late private user' } } });
+  await request;
+  expect(queryClient.getQueryData(key)).toBeUndefined();
+  act(() => subscription.onUpdate({ inUse: false }));
+  expect(hook.result.current.unavailable).toBe(false);
+  act(() => subscription.onUnavailable());
+  act(() => subscription.onReconnect());
+  expect(hook.result.current.unavailable).toBe(false);
+  hook.unmount();
+});

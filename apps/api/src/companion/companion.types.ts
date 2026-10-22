@@ -4,6 +4,16 @@ import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-v
 
 // ─── Client → Server DTOs ────────────────────────────────────────────────────
 
+export class CompanionEnrollmentDto {
+  @ApiProperty({ description: 'Locally displayed rotating XXX-XXX enrollment code' })
+  @IsString()
+  enrollmentCode!: string;
+}
+export class CompanionEnrollmentStatusDto {
+  @ApiProperty({ description: 'Enrollment state or error; never includes credentials or the code' })
+  message!: string;
+}
+
 export class CompanionAuthenticateDto {
   @ApiProperty({ description: 'Stored device ID (omit on first run)', required: false })
   @IsOptional()
@@ -42,6 +52,10 @@ export class CompanionResourceDto {
 }
 
 export class CompanionRegisterResponseDto {
+  @ApiProperty()
+  enrollmentVersion!: number;
+  @ApiProperty()
+  enrollmentCode!: string;
   @ApiProperty({ description: 'Assigned device ID — persist in OS keychain' })
   id!: number;
 
@@ -137,6 +151,7 @@ export enum CompanionEventType {
   COMPANION_REQUEST_AUTHENTICATION = 'COMPANION_REQUEST_AUTHENTICATION',
   COMPANION_AUTHENTICATE = 'COMPANION_AUTHENTICATE',
   COMPANION_REGISTER = 'COMPANION_REGISTER',
+  COMPANION_ENROLLMENT_STATUS = 'COMPANION_ENROLLMENT_STATUS',
   COMPANION_REGISTER_RESPONSE = 'COMPANION_REGISTER_RESPONSE',
   COMPANION_AUTHENTICATED = 'COMPANION_AUTHENTICATED',
   COMPANION_UNAUTHORIZED = 'COMPANION_UNAUTHORIZED',
@@ -152,6 +167,7 @@ export enum CompanionEventType {
 }
 
 export interface CompanionAuthenticatePayload {
+  enrollmentCode?: string;
   id?: number;
   token?: string;
   platform?: string;

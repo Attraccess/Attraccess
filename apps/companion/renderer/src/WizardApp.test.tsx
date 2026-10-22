@@ -2,11 +2,20 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { WizardApp } from './WizardApp';
 import type { CompanionBridge } from './types';
+vi.mock('react-qrcode-logo', () => ({
+  QRCode: ({ value }: { value: string }) => <span data-testid="qr-code">{value}</span>,
+}));
 vi.mock('@attraccess/ui', () => ({ ThemeToggle: () => null }));
+let enrollment: Parameters<CompanionBridge['onEnrollment']>[0];
 let init: Parameters<CompanionBridge['onInit']>[0];
 let registered: Parameters<CompanionBridge['onRegistered']>[0];
 let wsStatus: Parameters<CompanionBridge['onWsStatus']>[0];
 const bridge = {
+  getEnrollment: vi.fn(),
+  onEnrollment: (cb: typeof enrollment) => {
+    enrollment = cb;
+    return () => undefined;
+  },
   checkHealth: vi.fn(),
   register: vi.fn(),
   getPermissions: vi.fn(),
@@ -33,6 +42,7 @@ const bridge = {
 beforeEach(() => {
   vi.resetAllMocks();
   window.companion = bridge;
+  bridge.getEnrollment.mockResolvedValue({ code: null });
   bridge.getSettings.mockResolvedValue({ idleTimeoutMinutes: 15, foregroundApp: true, usbDevices: true });
   bridge.getPermissions.mockResolvedValue({ needed: false, accessibility: true });
   bridge.isPinSet.mockResolvedValue(true);
@@ -72,6 +82,11 @@ it('validates server reachability, registers a normalized URL, and handles regis
   await waitFor(() => expect(bridge.register).toHaveBeenCalledWith('https://workspace.test'));
   act(() => wsStatus('connected'));
   expect(screen.getByText('Connected — awaiting registration…')).toBeTruthy();
+  act(() => enrollment({ code: 'ABC-123' }));
+  expect(screen.getByLabelText('Enrollment code').textContent).toBe('ABC-123');
+  act(() => enrollment({ code: 'DEF-456' }));
+  expect(screen.getByLabelText('Enrollment code').textContent).toBe('DEF-456');
+  expect(screen.getByTestId('qr-code').textContent).toBe('attraccess-enroll:v1:companion:DEF-456');
   act(() => registered({ id: 7 }));
   expect(screen.getByText(/7/)).toBeTruthy();
 });

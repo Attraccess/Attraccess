@@ -1,5 +1,5 @@
 import { BadRequestException, type ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { type ResourceIntroducer } from '@attraccess/database-entities';
+import { type ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
 import { type Repository } from 'typeorm';
 import { IsResourceGroupIntroducerGuard } from './isIntroducerGuard';
 const repository = { findOne: jest.fn() };
@@ -23,7 +23,9 @@ it('requires a numeric group and checks introductions for exactly that user and 
   await expect(guard.canActivate(context(user, 'not-a-number'))).rejects.toBeInstanceOf(BadRequestException);
   repository.findOne.mockResolvedValueOnce({ id: 1 }).mockResolvedValueOnce(null);
   await expect(guard.canActivate(context(user, '3'))).resolves.toBe(true);
-  expect(repository.findOne).toHaveBeenLastCalledWith({ where: { user: { id: 7 }, resourceGroup: { id: 3 } } });
+  expect(repository.findOne).toHaveBeenLastCalledWith({
+    where: { type: ResourceIntroducerType.INTRODUCER, user: { id: 7 }, resourceGroup: { id: 3 } },
+  });
   await expect(guard.canActivate(context(user, '4'))).resolves.toBe(false);
 });
 it('fails closed when introduction lookup is unavailable', async () => {

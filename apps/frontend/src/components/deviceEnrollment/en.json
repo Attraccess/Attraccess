@@ -1,0 +1,20 @@
+{
+  "add": { "reader": "Enroll reader", "companion": "Enroll companion" },
+  "title": { "reader": "Approve reader enrollment", "companion": "Approve companion enrollment" },
+  "instructions": "Enter or scan the code currently displayed on the device. Codes change every 30 seconds. Check the device, then explicitly approve it.",
+  "code": "Enrollment code",
+  "scan": "Scan QR code",
+  "stopScan": "Stop camera",
+  "approve": "Approve device",
+  "close": "Close",
+  "states": {
+    "success": "Device approved. It will reconnect with its new credentials.",
+    "denied": "You must be signed in with permission to manage equipment.",
+    "expired": "The code expired or the device disconnected. Enter its current code.",
+    "throttled": "Too many attempts. Wait one minute before trying again.",
+    "busy": "Approval is busy or the device changed codes. Check the current code and try again.",
+    "failed": "Enrollment failed. Check the connection and use a fresh code. Credentials are never resent.",
+    "invalidScan": "This is not a current enrollment QR code for this device type.",
+    "camera": "Camera unavailable or permission denied. Enter the code manually."
+  }
+}

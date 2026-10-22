@@ -35,7 +35,9 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     super();
   }
 
-  async validate(req: Request & { authSession?: LogoutSession }): Promise<User> {
+  async validate(
+    req: Request & { authSession?: LogoutSession; authSessionSource?: 'cookie' | 'bearer' },
+  ): Promise<User> {
     const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
@@ -73,16 +75,17 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     const authenticated = await this.sessionService.authenticateSession(token);
 
     if (!authenticated) {
-      this.logger.debug(`Invalid or expired session token: ${token.substring(0, 8)}...`);
+      this.logger.debug('Invalid or expired session token');
       throw new UnauthorizedException('Invalid or expired session');
     }
 
     const { user, session } = authenticated;
     req.authSession = session;
+    req.authSessionSource = fromAuthorizationHeader ? 'bearer' : 'cookie';
 
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
     (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
-      await this.rbacService.getEffectivePermissions(user.id),
+      await this.rbacService.getEffectivePermissions(user.id, true),
     );
     (user as AuthenticatedUser).authenticationMethod = 'session';
 
@@ -106,11 +109,11 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   private extractTokenFromRequest(req: Request): { token: string | null; fromAuthorizationHeader: boolean } {
     // Priority 1: Authorization header with Bearer token
     const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7).trim();
-      if (token) {
-        return { token, fromAuthorizationHeader: true };
+    if (authHeader !== undefined) {
+      if (!authHeader.startsWith('Bearer ') || !authHeader.substring(7).trim()) {
+        throw new UnauthorizedException('Invalid Authorization header');
       }
+      return { token: authHeader.substring(7).trim(), fromAuthorizationHeader: true };
     }
 
     // Priority 2: Session cookie

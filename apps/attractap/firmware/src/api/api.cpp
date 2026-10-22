@@ -20,6 +20,7 @@ void API::updateSateInfo()
 
     this->loopIsEnabled = websocketState.connected && (networkState.wifi_connected || networkState.ethernet_connected);
 
+    if (!this->loopIsEnabled) { enrollmentCode.clear(); State::setEnrollmentCode(""); }
     if (!this->loopIsEnabled && apiState.authenticated)
     {
         State::setApiState(false, "");
@@ -50,6 +51,7 @@ void API::loop()
 {
     this->transport.loop();
     this->updateSateInfo();
+    if (this->loopIsEnabled && !this->isRegistered() && !enrollmentCode.value().empty()) this->sendEnrollmentRequest();
 
     // Only send heartbeat when connection is usable
     if (this->loopIsEnabled)
@@ -163,6 +165,11 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     if (strcmp(eventType, "READER_REGISTER") == 0)
     {
         this->onRegistrationData(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "READER_ENROLLMENT_STATUS") == 0)
+    {
+        const char *message = inboundDoc["data"]["payload"]["message"] | "";
+        if (strcmp(message, "CODE_COLLISION") == 0 || strcmp(message, "ENROLLMENT_FAILED") == 0) this->sendEnrollmentRequest(true);
     }
     else if (strcmp(eventType, "READER_UNAUTHORIZED") == 0)
     {

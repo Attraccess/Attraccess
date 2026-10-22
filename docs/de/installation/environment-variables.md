@@ -109,3 +109,13 @@ In Containern benötigt die API Schreibrechte für den Pfad. Mounten Sie das Ver
 - [Docker Compose Installation](installation/docker-compose.md)
 - [SSL einrichten](installation/ssl-setup.md)
 - [Sicherheit](settings/security.md)
+
+
+## Browser-Ursprünge konfigurieren
+
+| Variable | Zweck |
+|----------|-------|
+| `ATTRACCESS_FRONTEND_URL` | Exakte separate Frontend-URL, etwa `https://ui.example.org`. Ihr Ursprung wird erlaubt. |
+| `ATTRACCESS_ALLOWED_ORIGINS` | Weitere kommagetrennte exakte Ursprünge, etwa `https://ui.example.org,http://localhost:4201`. Keine Platzhalter oder Pfade. |
+
+Die gespeicherte Anwendungs-URL (vor der Einrichtung ersatzweise `ATTRACCESS_URL`) liefert den primären erlaubten Ursprung. Konfigurieren Sie ihn vor der entfernten Einrichtung. Host-/Weiterleitungs-Header und `ATTRACCESS_PUBLIC_INTERNET_URL` erweitern diese Liste nicht. Ein Proxy muss Origin und Referer erhalten. Browser-Anfragen und Geräte-WebSockets im Browser verwenden dieselbe Prüfung. `pnpm serve` ergänzt automatisch den tatsächlich vergebenen Frontend-Ursprung. Siehe [Sicherheitseinstellungen](settings/security.md).

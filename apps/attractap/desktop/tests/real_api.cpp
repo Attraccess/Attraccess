@@ -307,7 +307,24 @@ int main(int argc, char **argv)
     const auto screenshots = control / "screenshots";
     createScreenshotDirectory(screenshots);
     DesktopSimulator simulator(argv[1], 0, argv[3]);
-    if (!waitFor([&] { return simulator.authenticated(); }, simulator, 15000)) return 1;
+    std::string publishedCode;
+    const auto enrollmentFile = control / "enrollment-code";
+    if (!waitFor([&] {
+        const auto code = State::getEnrollmentCode();
+        if (!code.empty() && code != publishedCode)
+        {
+            // A local operator reads the displayed code. Keep this test control
+            // private and out of retained logs and screenshots.
+            const int descriptor = open(enrollmentFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, S_IRUSR | S_IWUSR);
+            if (descriptor < 0) throw std::runtime_error("Cannot publish private enrollment control");
+            const auto written = write(descriptor, code.data(), code.size());
+            close(descriptor);
+            if (written != static_cast<ssize_t>(code.size())) throw std::runtime_error("Cannot write enrollment control");
+            publishedCode = code;
+        }
+        return simulator.authenticated();
+    }, simulator, 15000)) return 1;
+    std::filesystem::remove(enrollmentFile);
     std::ofstream(control / "ready") << "authenticated\n";
 
     // Numbered files avoid blocking stdin while the real websocket and LVGL

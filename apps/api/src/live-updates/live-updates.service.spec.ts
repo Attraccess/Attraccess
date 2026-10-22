@@ -118,6 +118,7 @@ describe('bundled server lifecycle', () => {
     expect(source.observed).toBe(true);
     source.next({ data: { keepalive: true } });
     source.next({ data: { id: 3 } });
+    await jest.advanceTimersByTimeAsync(0);
     expect(packets.filter((p) => p.type === 'event')).toEqual([
       { type: 'event', event: { topic: 'messaging', eventType: 'update', payload: { id: 3 } } },
     ]);
@@ -172,6 +173,7 @@ describe('bundled server lifecycle', () => {
       subscription: { topic: 'billing' },
       reason: 'Topic unavailable',
     });
+    await jest.advanceTimersByTimeAsync(0);
     expect(packets).toContainEqual({
       type: 'event',
       event: { topic: 'messaging', eventType: 'update', payload: { id: 5 } },
@@ -281,5 +283,31 @@ describe('bundled server lifecycle', () => {
     await service.update(id, user, { ...body([{ topic: 'notifications' }]), present: true });
     expect(presence).toHaveBeenCalledTimes(1);
     expect(presence).toHaveBeenCalledWith(user.id, id, false);
+  });
+  it('checks session revocation before every emission and drops queued private events', async () => {
+    const revalidate = jest.fn().mockRejectedValue(new Error('Session revoked'));
+    service.open(id, user, revalidate).subscribe(({ data }) => packets.push(data));
+    await service.update(id, user, body([{ topic: 'resource', resourceId: 1 }]));
+    source.next({ data: { inUse: true } });
+    source.next({ data: { inUse: false } });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(revalidate).toHaveBeenCalledTimes(1);
+    expect(packets.filter((packet) => packet.type === 'event')).toEqual([]);
+    expect(source.observed).toBe(false);
+    expect(packets).toContainEqual({
+      type: 'rejected',
+      subscription: { topic: 'resource', resourceId: 1 },
+      reason: 'Topic unavailable',
+    });
+  });
+
+  it('rechecks topic permissions before delivery without waiting for lease renewal', async () => {
+    service.open(id, user, async () => user).subscribe(({ data }) => packets.push(data));
+    await service.update(id, user, body([{ topic: 'resource', resourceId: 1 }]));
+    authorize.mockResolvedValue(new Map([['resource:1', 'Permission revoked']]));
+    source.next({ data: { inUse: true } });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(packets.filter((packet) => packet.type === 'event')).toEqual([]);
+    expect(source.observed).toBe(false);
   });
 });

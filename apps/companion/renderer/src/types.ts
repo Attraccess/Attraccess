@@ -12,6 +12,8 @@ export interface CompanionSettings {
 }
 
 export interface CompanionBridge {
+  getEnrollment: () => Promise<{ code: string | null }>;
+  onEnrollment: (cb: (data: { code: string | null; message?: string }) => void) => () => void;
   checkHealth: (url: string) => Promise<boolean>;
   register: (url: string) => Promise<void>;
   getPermissions: () => Promise<Permissions>;
@@ -24,7 +26,14 @@ export interface CompanionBridge {
   getSettings: () => Promise<CompanionSettings>;
   saveSettings: (s: CompanionSettings) => Promise<void>;
   enableAdminOverride: (pin: string) => Promise<boolean>;
-  onInit: (cb: (data: { serverUrl?: string; requirePin?: 'settings' | 'quit' | 'admin-override'; registered: boolean; connected: boolean }) => void) => void;
+  onInit: (
+    cb: (data: {
+      serverUrl?: string;
+      requirePin?: 'settings' | 'quit' | 'admin-override';
+      registered: boolean;
+      connected: boolean;
+    }) => void,
+  ) => void;
   onWsStatus: (cb: (status: 'connected' | 'disconnected') => void) => void;
   onRegistered: (cb: (data: { id: number }) => void) => void;
   onAuthenticated: (cb: (data: unknown) => void) => void;

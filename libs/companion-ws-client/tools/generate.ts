@@ -155,14 +155,17 @@ export class CompanionWsClient extends EventEmitter {
 
   private openSocket() {
     const url = this.serverUrl.replace(/^http/, 'ws') + '/api/companion/websocket';
-    this.ws = new WebSocket(url);
+    const socket = new WebSocket(url);
+    this.ws = socket;
 
-    this.ws.on('open', () => {
+    socket.on('open', () => {
+      if (this.ws !== socket || this.stopped) return;
       this.reconnectDelay = 2000;
       this.emit('connected');
     });
 
-    this.ws.on('message', (raw) => {
+    socket.on('message', (raw) => {
+      if (this.ws !== socket || this.stopped) return;
       try {
         const msg = JSON.parse(raw.toString()) as { event: string; data: unknown };
         this.dispatch(msg.event, msg.data);
@@ -171,12 +174,14 @@ export class CompanionWsClient extends EventEmitter {
       }
     });
 
-    this.ws.on('close', () => {
+    socket.on('close', () => {
+      if (this.ws !== socket || this.stopped) return;
+      this.ws = null;
       this.emit('disconnected');
       if (!this.stopped) this.scheduleReconnect();
     });
 
-    this.ws.on('error', () => {
+    socket.on('error', () => {
       // close fires after error; reconnect handled there
     });
   }
@@ -195,7 +200,9 @@ export class CompanionWsClient extends EventEmitter {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.ws?.close();
+    const socket = this.ws;
+    this.ws = null;
+    socket?.close();
   }
 
   // ─── Send methods (Client → Server) ──────────────────────────────────────

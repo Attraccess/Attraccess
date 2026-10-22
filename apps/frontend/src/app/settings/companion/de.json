@@ -66,8 +66,8 @@
         "description": "Wenn du dazu aufgefordert wirst, gib die URL dieses Attraccess-Servers ein."
       },
       "register": {
-        "title": "Automatische Registrierung",
-        "description": "Die Companion-App registriert sich selbst — sie erscheint in der Tabelle \"Registrierte Geräte\" oben."
+        "title": "Gerät freigeben",
+        "description": "Verwende Companion ab Version 1.9.0. Klicke oben auf Companion anmelden, gib den Code aus der Companion-App ein oder scanne ihn und bestätige die Freigabe. Der Code wechselt alle 30 Sekunden. Erst nach der Freigabe erscheint das Gerät in der Tabelle."
       },
       "name": {
         "title": "Gerät benennen",

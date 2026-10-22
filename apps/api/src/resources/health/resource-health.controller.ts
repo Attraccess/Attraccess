@@ -1,3 +1,4 @@
+import { ResourceActivityPolicy } from '../activity/resource-activity-policy.service';
 import { Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
@@ -9,7 +10,10 @@ import { CanManageMaintenance } from '../maintenances/canManageMaintenance.decor
 @Controller('resources/:resourceId/health')
 @Auth()
 export class ResourceHealthController {
-  constructor(private readonly healthService: ResourceHealthService) {}
+  constructor(
+    private readonly healthService: ResourceHealthService,
+    private readonly activity: ResourceActivityPolicy,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -23,7 +27,9 @@ export class ResourceHealthController {
   @ApiResponse({ status: 404, description: 'Resource not found' })
   async getResourceHealth(
     @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceHealthSummaryDto> {
+    await this.activity.assertRead(resourceId, req.user);
     return await this.healthService.getSummary(resourceId);
   }
 

@@ -1,3 +1,6 @@
+import { setDeviceFrameLimit } from '../../../../device-enrollment/device-frame-limit';
+import { DeviceEnrollmentService } from '../../../../device-enrollment/device-enrollment.service';
+import { sendDeviceCredentials } from '../../../../device-enrollment/send-device-credentials';
 import { SettingsService } from '../../../../settings/settings.service';
 import { WebSocket } from 'ws';
 import { WebsocketService } from '../../websocket.service';
@@ -6,13 +9,15 @@ import { AttractapService } from '../../../attractap.service';
 import { verifyToken } from '../../websocket.utils';
 import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
-import { AuditService } from '../../../../audit/audit.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { readerServerTime } from '../../websocket-reader-payloads';
 
 @Injectable()
 export class AttractapAuthHandler {
   private readonly logger = new Logger(AttractapAuthHandler.name);
+
+  @Inject(DeviceEnrollmentService)
+  private enrollment: DeviceEnrollmentService;
 
   @Inject(AttractapService)
   private attractapService: AttractapService;
@@ -23,9 +28,6 @@ export class AttractapAuthHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
-  @Inject(AuditService)
-  private audit: AuditService;
-
   @Inject(SettingsService)
   private settingsService: SettingsService;
 
@@ -33,33 +35,59 @@ export class AttractapAuthHandler {
   private websocketService: WebsocketService;
 
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    this.logger.debug('Received REGISTER event');
-    const response = await this.attractapService.createNewReader(data.payload.firmware);
-    await this.audit
-      .recordAttractap({
-        action: 'reader.registered',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: response.reader.id,
-        details: { source: 'reader-websocket' },
-      })
-      .catch(() => undefined);
-
-    this.logger.debug(
-      `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`,
-    );
-
-    await socket.sendMessage(
-      new AttractapEvent(AttractapEventType.READER_REGISTER, {
-        id: response.reader.id,
-        token: response.token,
-      }),
-    );
+    if (socket.readerId) return;
+    try {
+      this.enrollment.announce(
+        socket,
+        'reader',
+        data.payload?.enrollmentCode,
+        data.payload?.firmware,
+        async (current) => {
+          const response = await this.attractapService.createNewReader(data.payload?.firmware, current);
+          let attempted = false;
+          return {
+            id: response.reader.id,
+            deliver: async () => {
+              if (socket.readyState !== WebSocket.OPEN) throw new Error('Device disconnected');
+              attempted = true;
+              await sendDeviceCredentials(
+                socket as unknown as WebSocket,
+                new AttractapEvent(AttractapEventType.READER_REGISTER, {
+                  id: response.reader.id,
+                  token: response.token,
+                  enrollmentVersion: 1,
+                  enrollmentCode: data.payload.enrollmentCode,
+                }),
+              );
+            },
+            discard: async () => {
+              if (!attempted) await this.attractapService.deleteReader(response.reader.id);
+            },
+          };
+        },
+        (message) => {
+          if (socket.readyState === WebSocket.OPEN)
+            (socket as unknown as WebSocket).send(
+              JSON.stringify(new AttractapEvent(AttractapEventType.READER_ENROLLMENT_STATUS, { message })),
+            );
+        },
+      );
+    } catch (error) {
+      if (socket.readyState === WebSocket.OPEN)
+        (socket as unknown as WebSocket).send(
+          JSON.stringify(
+            new AttractapEvent(AttractapEventType.READER_ENROLLMENT_STATUS, {
+              message: error instanceof Error ? error.message : 'ENROLLMENT_FAILED',
+            }),
+          ),
+        );
+    }
   }
 
   public async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     if (socket.readyState !== WebSocket.OPEN) return;
-    this.logger.debug('processing READER_AUTHENTICATE event', data);
+    setDeviceFrameLimit(socket, false);
+    this.logger.debug('processing READER_AUTHENTICATE event');
 
     const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
       message: 'PLEASE_REREGISTER',
@@ -90,7 +118,9 @@ export class AttractapAuthHandler {
     if (!isCurrentAttempt()) return;
     if (!reader) {
       this.logger.error('No reader-config found for socket, sending UNAUTHORIZED response to client');
-      return await socket.sendMessage(unauthorizedResponse);
+      await socket.sendMessage(unauthorizedResponse);
+      if (previousReaderId && isCurrentAttempt()) (socket as unknown as WebSocket).close();
+      return;
     }
 
     this.logger.debug('Checking if token is valid');
@@ -98,7 +128,9 @@ export class AttractapAuthHandler {
     if (!isCurrentAttempt()) return;
     if (!isValidToken) {
       this.logger.error('Invalid token, sending UNAUTHORIZED response to client');
-      return await socket.sendMessage(unauthorizedResponse);
+      await socket.sendMessage(unauthorizedResponse);
+      if (previousReaderId && isCurrentAttempt()) (socket as unknown as WebSocket).close();
+      return;
     }
 
     const storedLanguage = await this.settingsService.getDefaultLanguage();
@@ -106,6 +138,7 @@ export class AttractapAuthHandler {
     // A broadcast during the read supersedes its snapshot, even before this
     // socket becomes eligible for language broadcasts.
     const language = this.websocketService.readerLanguage ?? storedLanguage;
+    this.enrollment.authenticated(socket);
     socket.readerId = reader.id;
     socket.readerName = reader.name;
     this.metricsService.attractapReaderConnected.set({ reader_id: String(reader.id), reader_name: reader.name }, 1);

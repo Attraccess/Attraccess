@@ -241,15 +241,22 @@ export class AttractapService {
     });
   }
 
-  public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
+  public async createNewReader(
+    firmware?: AttractapFirmwareVersion,
+    current?: () => boolean,
+  ): Promise<{ reader: Attractap; token: string }> {
     const token = randomBytes(12).toString('base64url').slice(0, 16);
     const apiTokenHash = await securelyHashToken(token);
 
-    const reader = await this.readerRepository.save({
-      apiTokenHash,
-      name: randomBytes(3).toString('base64url').slice(0, 4),
-      firmware,
-    });
+    const data = { apiTokenHash, name: randomBytes(3).toString('base64url').slice(0, 4), firmware };
+    const reader = current
+      ? await this.readerRepository.manager.transaction(async (manager) => {
+          if (!current()) throw new Error('Enrollment expired');
+          const created = await manager.save(Attractap, data);
+          if (!current()) throw new Error('Enrollment expired');
+          return created;
+        })
+      : await this.readerRepository.save(data);
 
     return {
       reader,

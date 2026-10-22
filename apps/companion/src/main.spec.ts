@@ -152,7 +152,8 @@ it('registers then authenticates immediately and restores the server lock state'
   expect(startIdleDetection).toHaveBeenCalled();
   socket.emit('request_authentication');
   expect(socket.sendRegister).toHaveBeenCalledTimes(1);
-  socket.emit('register_response', { id: 4, token: 'fixture-token' });
+  const code = (socket.sendRegister as jest.Mock).mock.calls[0][0].enrollmentCode;
+  socket.emit('register_response', { id: 4, token: 'fixture-token', enrollmentVersion: 1, enrollmentCode: code });
   await tick();
   expect(saveCredentials).toHaveBeenCalledWith({ serverUrl: 'https://workspace.test', id: 4, token: 'fixture-token' });
   expect(socket.sendAuthenticate).toHaveBeenCalledWith(
@@ -224,4 +225,23 @@ it('blocks quitting a locked kiosk and requires a PIN otherwise', () => {
   lifecycle.get('before-quit')?.(event);
   expect(hideKioskOverlay).toHaveBeenCalled();
   expect(state.allowQuit).toBe(false);
+});
+
+it('ignores unsolicited, stale and mismatched registration credentials', async () => {
+  const socket = await register();
+  socket.emit('register_response', { id: 9, token: 'unsolicited', enrollmentVersion: 1, enrollmentCode: 'ABC-123' });
+  socket.emit('request_authentication');
+  const code = (socket.sendRegister as jest.Mock).mock.calls[0][0].enrollmentCode;
+  socket.emit('register_response', { id: 9, token: 'legacy' });
+  socket.emit('register_response', {
+    id: 9,
+    token: 'wrong-code',
+    enrollmentVersion: 1,
+    enrollmentCode: code === 'ABC-123' ? 'DEF-456' : 'ABC-123',
+  });
+  socket.emit('disconnected');
+  socket.emit('register_response', { id: 9, token: 'disconnected', enrollmentVersion: 1, enrollmentCode: code });
+  await tick();
+  expect(saveCredentials).not.toHaveBeenCalled();
+  expect(socket.sendAuthenticate).not.toHaveBeenCalled();
 });

@@ -1,3 +1,4 @@
+import { parseAllowedOrigins } from '../common/security/browser-origin-policy';
 import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
 import { logDestinationsSchema, logLevelsSchema } from '../logging/logging.config';
@@ -37,6 +38,7 @@ export const AppEnvSchema = z
     LOG_FILE_PATH: z.string().optional(),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
     ATTRACCESS_URL: z.string().url().optional(),
+    ATTRACCESS_ALLOWED_ORIGINS: z.string().optional().transform(parseAllowedOrigins),
     ATTRACCESS_FRONTEND_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
     VERSION: z.string().default(resolveAppVersion()),

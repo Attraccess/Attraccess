@@ -42,3 +42,5 @@ bool DemoStore::deleteCard(uint8_t index) {
     demoCards.erase(demoCards.begin() + index);
     return true;
 }
+
+std::string State::getEnrollmentCode() { return Fixtures::enrollmentCode; }

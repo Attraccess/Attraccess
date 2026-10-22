@@ -1,3 +1,6 @@
+import { ValidateInResponseTo } from '@node-saml/node-saml';
+import { SESSION_STORE, SessionStore } from '../../session-store/session-store';
+import { browserBoundSamlCache } from './saml-request-cache';
 import { SsoSessionRequest } from '../sso-session-request';
 import { DOMParser } from '@xmldom/xmldom';
 import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
@@ -51,6 +54,14 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
       try {
         const samlOptions = SSOSamlStrategy.buildPassportConfig(moduleRef, requestOptions, bootstrapLogger);
+        samlOptions.validateInResponseTo = ValidateInResponseTo.always;
+        samlOptions.requestIdExpirationPeriodMs = 10 * 60 * 1000;
+        samlOptions.cacheProvider = browserBoundSamlCache(
+          moduleRef.get<SessionStore>(SESSION_STORE, { strict: false }),
+          req,
+          requestOptions.providerId,
+          requestOptions.callbackUrl.startsWith('https:'),
+        );
         return done(null, samlOptions);
       } catch (error) {
         const reason = error instanceof Error ? error.message : 'Unknown error';

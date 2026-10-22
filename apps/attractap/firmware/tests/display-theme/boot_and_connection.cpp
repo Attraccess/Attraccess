@@ -49,3 +49,26 @@ void testInit(Renderer &renderer)
     lv_obj_send_event(lv_obj_get_parent(requireObject(screen.root, &lv_label_class, "Einstellungen")), LV_EVENT_CLICKED, nullptr);
     expect(opened, "Production settings event callback");
 }
+
+void testDeviceEnrollment(Renderer &renderer)
+{
+    InitScreen init;
+    init.init();
+    ScreenGuard screen(init.getScreen(), &init);
+    Fixtures::enrollmentCode = "ABC-123";
+    Fixtures::nowMs += 1000;
+    init.loop();
+    requireObject(screen.root, &lv_label_class, "ABC-123");
+    renderer.capture("device-enrollment-german");
+    FirmwareI18n::refreshTree(screen.root, "en");
+    renderer.capture("device-enrollment-english");
+    Fixtures::enrollmentCode = "DEF-456";
+    Fixtures::nowMs += 1000;
+    init.loop();
+    requireObject(screen.root, &lv_label_class, "DEF-456");
+    renderer.capture("device-enrollment-rotated");
+    Fixtures::enrollmentCode.clear();
+    Fixtures::nowMs += 1000;
+    init.loop();
+    renderer.capture("device-enrollment-cleared");
+}

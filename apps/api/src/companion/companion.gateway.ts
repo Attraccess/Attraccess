@@ -22,6 +22,8 @@ import { CompanionGatewayService } from './companion-gateway.service';
 
 import {
   CompanionAuthenticateDto,
+  CompanionEnrollmentDto,
+  CompanionEnrollmentStatusDto,
   CompanionAuthenticatePayload,
   CompanionEventType,
   CompanionSocket,
@@ -53,6 +55,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   // ─── Connection lifecycle ─────────────────────────────────────────────────
 
   public handleConnection(client: WebSocket) {
+    if (client.readyState !== 1) return;
     const id = randomBytes(4).toString('base64url').slice(0, 6);
 
     const sendEvent = (type: CompanionEventType, payload: unknown = {}) => {
@@ -76,11 +79,14 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('COMPANION_REGISTER')
   @AsyncApiPub({
     channel: 'COMPANION_REGISTER',
-    message: { name: 'COMPANION_REGISTER', payload: Object },
+    message: { name: 'COMPANION_REGISTER', payload: CompanionEnrollmentDto },
     summary: 'Register a new companion device (first run)',
   })
-  async onRegister(@ConnectedSocket() socket: CompanionSocket): Promise<void> {
-    await this.authHandler.handleAuthenticate(socket, {});
+  async onRegister(
+    @ConnectedSocket() socket: CompanionSocket,
+    @MessageBody() body: CompanionEnrollmentDto,
+  ): Promise<void> {
+    await this.authHandler.handleAuthenticate(socket, body ?? {});
   }
 
   @SubscribeMessage('COMPANION_AUTHENTICATE')
@@ -117,6 +123,22 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   })
   protected _specRegisterResponse() {
     /* emitted by CompanionAuthHandler.registerNewDevice */
+  }
+
+  @AsyncApiSub({
+    channel: 'COMPANION_UNAUTHORIZED',
+    message: { name: 'COMPANION_UNAUTHORIZED', payload: CompanionEnrollmentStatusDto },
+  })
+  protected _specUnauthorized() {
+    /* emitted by CompanionAuthHandler */
+  }
+
+  @AsyncApiSub({
+    channel: 'COMPANION_ENROLLMENT_STATUS',
+    message: { name: 'COMPANION_ENROLLMENT_STATUS', payload: CompanionEnrollmentStatusDto },
+  })
+  protected _specEnrollmentStatus() {
+    /* emitted by DeviceEnrollmentService */
   }
 
   @AsyncApiSub({

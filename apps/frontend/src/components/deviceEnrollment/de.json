@@ -1,0 +1,20 @@
+{
+  "add": { "reader": "Lesegerät anmelden", "companion": "Companion anmelden" },
+  "title": { "reader": "Lesegerät freigeben", "companion": "Companion freigeben" },
+  "instructions": "Aktuellen Code vom Gerät eingeben oder scannen. Der Code wechselt alle 30 Sekunden. Gerät prüfen und ausdrücklich freigeben.",
+  "code": "Anmeldecode",
+  "scan": "QR-Code scannen",
+  "stopScan": "Kamera stoppen",
+  "approve": "Gerät freigeben",
+  "close": "Schließen",
+  "states": {
+    "success": "Gerät freigegeben. Es verbindet sich mit seinen neuen Zugangsdaten.",
+    "denied": "Eine Anmeldung mit Berechtigung zur Geräteverwaltung ist erforderlich.",
+    "expired": "Code abgelaufen oder Gerät getrennt. Aktuellen Code eingeben.",
+    "throttled": "Zu viele Versuche. Bitte eine Minute warten.",
+    "busy": "Freigabe läuft oder der Code hat sich geändert. Aktuellen Code prüfen und erneut versuchen.",
+    "failed": "Anmeldung fehlgeschlagen. Verbindung prüfen und neuen Code verwenden. Zugangsdaten werden nicht erneut gesendet.",
+    "invalidScan": "Dies ist kein aktueller Anmelde-QR-Code für diesen Gerätetyp.",
+    "camera": "Kamera nicht verfügbar oder Zugriff verweigert. Code manuell eingeben."
+  }
+}

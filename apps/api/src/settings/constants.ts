@@ -6,6 +6,7 @@ export const APP_KEYS = {
   publicInternetUrl: 'public_internet_url',
   licenseKey: 'license_key',
   defaultLanguage: 'default_language',
+  activityVisibility: 'activity_visibility',
 } as const;
 
 export const METRICS_PARENT = 'metrics';

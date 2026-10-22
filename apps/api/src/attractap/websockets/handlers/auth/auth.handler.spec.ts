@@ -14,11 +14,13 @@ const mockVerifyToken = verifyToken as jest.Mock;
 
 describe('AttractapAuthHandler', () => {
   let handler: AttractapAuthHandler;
+  const enrollment = { announce: jest.fn(), authenticated: jest.fn() };
   let mockSocket: {
     id: string;
     readerId: number | null;
     readerName: string | null;
     readyState: number;
+    close: jest.Mock;
     state: Record<string, unknown>;
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
@@ -45,6 +47,7 @@ describe('AttractapAuthHandler', () => {
       readerName: null,
       readyState: WebSocket.OPEN,
       state: {},
+      close: jest.fn(),
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
     };
@@ -63,6 +66,7 @@ describe('AttractapAuthHandler', () => {
     };
     mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
+    (handler as any).enrollment = enrollment;
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
@@ -72,64 +76,19 @@ describe('AttractapAuthHandler', () => {
   });
 
   describe('handleReaderRegister', () => {
-    it('creates a new reader with the firmware payload and sends READER_REGISTER response', async () => {
-      const data = { payload: { firmware: 'fw-1.2.3' } } as AttractapEvent['data'];
-      mockAttractapService.createNewReader.mockResolvedValue({
-        reader: { id: 99 },
-        token: 'tok-abc',
-      });
-
+    it('announces pending enrollment without creating a reader or sending credentials', async () => {
+      const data = { payload: { enrollmentCode: 'ABC-123' } } as AttractapEvent['data'];
       await handler.handleReaderRegister(mockSocket as any, data);
-
-      expect(mockAttractapService.createNewReader).toHaveBeenCalledWith('fw-1.2.3');
-      expect(mockAudit.recordAttractap).toHaveBeenCalledWith({
-        action: 'reader.registered',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: 99,
-        details: { source: 'reader-websocket' },
-      });
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.READER_REGISTER,
-            payload: { id: 99, token: 'tok-abc' },
-          }),
-        }),
+      expect(enrollment.announce).toHaveBeenCalledWith(
+        mockSocket,
+        'reader',
+        'ABC-123',
+        undefined,
+        expect.any(Function),
+        expect.any(Function),
       );
-    });
-
-    it('forwards the created reader id and token exactly', async () => {
-      const data = { payload: { firmware: undefined } } as AttractapEvent['data'];
-      mockAttractapService.createNewReader.mockResolvedValue({
-        reader: { id: 7 },
-        token: 'another-token',
-      });
-
-      await handler.handleReaderRegister(mockSocket as any, data);
-
-      expect(mockAttractapService.createNewReader).toHaveBeenCalledWith(undefined);
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.READER_REGISTER,
-            payload: { id: 7, token: 'another-token' },
-          }),
-        }),
-      );
-    });
-
-    it('sends the registration response when audit persistence rejects', async () => {
-      mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 7 }, token: 'another-token' });
-      mockAudit.recordAttractap.mockRejectedValueOnce(new Error('audit unavailable'));
-
-      await expect(
-        handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data']),
-      ).resolves.toBeUndefined();
-
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ payload: { id: 7, token: 'another-token' } }) }),
-      );
+      expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
+      expect(mockSocket.readerId).toBeNull();
     });
   });
 

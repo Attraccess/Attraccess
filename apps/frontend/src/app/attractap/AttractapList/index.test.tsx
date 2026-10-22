@@ -5,6 +5,7 @@ import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-
 import { describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
 
+vi.mock('../../../components/deviceEnrollment', () => ({ DeviceEnrollment: () => null }));
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
   useAttractapServiceGetFirmwares: () => ({ data: [] }),
@@ -21,8 +22,9 @@ vi.mock('../../../components/pageHeader', () => ({
   PageAction: () => null,
 }));
 vi.mock('../HardwareSetup', () => ({
-  AttractapHardwareSetup: ({ children }: { children: (fn: () => void) => React.ReactNode }) =>
-    <div data-testid="hardware-setup">{children(vi.fn())}</div>,
+  AttractapHardwareSetup: ({ children }: { children: (fn: () => void) => React.ReactNode }) => (
+    <div data-testid="hardware-setup">{children(vi.fn())}</div>
+  ),
 }));
 vi.mock('../HardwareSetup/WebSerialConsole', () => ({ WebSerialConsole: () => null }));
 vi.mock('../AttractapEditor/AttractapEditor', () => ({ AttractapEditor: () => null }));

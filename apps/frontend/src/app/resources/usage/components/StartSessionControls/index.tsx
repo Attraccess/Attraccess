@@ -94,6 +94,7 @@ export function useStartSessionControlsStateOutput(
   return {
     resourceId: model.resourceId,
     insufficientBalanceDesiredAmount: model.insufficientBalanceDesiredAmount,
+    activityUnavailable: model.activityUnavailable,
     divProps: model.divProps,
     resource: model.resource,
     t: model.t,
@@ -251,7 +252,7 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
 export function useStartSessionControlsStateInputs(
   props: Readonly<StartSessionControlsProps> & React.HTMLAttributes<HTMLDivElement>,
 ) {
-  const { resourceId, insufficientBalanceDesiredAmount, requiresSupervision, ...divProps } = props;
+  const { resourceId, insufficientBalanceDesiredAmount, requiresSupervision, activityUnavailable, ...divProps } = props;
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
@@ -355,6 +356,7 @@ export function useStartSessionControlsStateInputs(
     resourceId,
     insufficientBalanceDesiredAmount,
     requiresSupervision,
+    activityUnavailable,
     divProps,
     resource,
     needsSupervisor,
@@ -385,6 +387,8 @@ export interface StartSessionControlsProps {
    * prop — see `needsSupervisor` below.
    */
   requiresSupervision?: boolean;
+  /** Do not imply the resource is idle when activity is private. */
+  activityUnavailable?: boolean;
 }
 
 export function StartSessionControls(
@@ -393,6 +397,7 @@ export function StartSessionControls(
   const {
     resourceId,
     insufficientBalanceDesiredAmount,
+    activityUnavailable,
     divProps,
     resource,
     t,
@@ -435,6 +440,7 @@ export function StartSessionControls(
         {resource?.type === 'machine' && (
           <MachineStartControls
             t={t}
+            activityUnavailable={activityUnavailable}
             selectedProjectId={selectedProjectId}
             onProjectChange={setSelectedProjectId}
             onStart={() => void handleStartSession()}

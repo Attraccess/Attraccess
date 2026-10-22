@@ -51,6 +51,36 @@ void InitScreen::init()
    this->createApiRows(statesContainer);
 
    this->createConnectionDetails(statesContainer);
+   this->enrollmentPanel = lv_obj_create(this->screen);
+   lv_obj_set_size(this->enrollmentPanel, lv_pct(100), lv_pct(100));
+   lv_obj_center(this->enrollmentPanel);
+   DisplayTheme::applyScreen(this->enrollmentPanel);
+   lv_obj_set_flex_flow(this->enrollmentPanel, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->enrollmentPanel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_style_pad_row(this->enrollmentPanel, 18, 0);
+   lv_obj_remove_flag(this->enrollmentPanel, LV_OBJ_FLAG_SCROLLABLE);
+   auto instructions = lv_label_create(this->enrollmentPanel);
+   lv_obj_set_width(instructions, lv_pct(95));
+   lv_obj_set_style_text_align(instructions, LV_TEXT_ALIGN_CENTER, 0);
+   lv_obj_set_style_text_font(instructions, &attractap_font_montserrat_latin1_18, 0);
+   FirmwareI18n::setLabel(instructions, FirmwareI18n::Message::DeviceEnrollmentInstructions);
+   this->enrollmentLabel = lv_label_create(this->enrollmentPanel);
+   lv_obj_set_style_text_font(this->enrollmentLabel, &lv_font_montserrat_26, 0);
+   // A white quiet zone keeps the QR readable against the dark screen.
+   auto qrFrame = lv_obj_create(this->enrollmentPanel);
+   lv_obj_set_size(qrFrame, 244, 244);
+   lv_obj_set_style_bg_color(qrFrame, lv_color_white(), 0);
+   lv_obj_set_style_bg_opa(qrFrame, LV_OPA_COVER, 0);
+   lv_obj_set_style_border_width(qrFrame, 0, 0);
+   lv_obj_set_style_radius(qrFrame, 0, 0);
+   lv_obj_set_style_pad_all(qrFrame, 0, 0);
+   lv_obj_remove_flag(qrFrame, LV_OBJ_FLAG_SCROLLABLE);
+   this->enrollmentQr = lv_qrcode_create(qrFrame);
+   lv_qrcode_set_size(this->enrollmentQr, 200);
+   lv_qrcode_set_dark_color(this->enrollmentQr, lv_color_black());
+   lv_qrcode_set_light_color(this->enrollmentQr, lv_color_white());
+   lv_obj_center(this->enrollmentQr);
+   lv_obj_add_flag(this->enrollmentPanel, LV_OBJ_FLAG_HIDDEN);
 
    // init() applied resetState (= PENDING visuals) to every row above; keep the
    // change-detection caches in sync so loop() only re-styles on real transitions.
@@ -106,6 +136,8 @@ void InitScreen::destroy()
    }
    lv_obj_del(this->screen);
    this->screen = nullptr;
+   this->enrollmentPanel = this->enrollmentLabel = this->enrollmentQr = nullptr;
+   this->lastEnrollmentCode.clear();
    this->wifiSpinner = nullptr;
    this->wifiLabel = nullptr;
    this->ethernetSpinner = nullptr;
@@ -334,6 +366,17 @@ void InitScreen::loop()
    }
    this->lastLoopRefreshMs = now;
 
+   const auto enrollmentCode = State::getEnrollmentCode();
+   if (enrollmentCode != this->lastEnrollmentCode) {
+      this->lastEnrollmentCode = enrollmentCode;
+      if (enrollmentCode.empty()) lv_obj_add_flag(this->enrollmentPanel, LV_OBJ_FLAG_HIDDEN);
+      else {
+         FirmwareI18n::setLabel(this->enrollmentLabel, FirmwareI18n::Text::literal(enrollmentCode) /* i18n-data: Locally generated enrollment code; preserve exact contents. */);
+         const auto payload = std::string("attraccess-enroll:v1:reader:") + enrollmentCode;
+         lv_qrcode_update(this->enrollmentQr, payload.data(), payload.size());
+         lv_obj_remove_flag(this->enrollmentPanel, LV_OBJ_FLAG_HIDDEN);
+      }
+   }
    State::NetworkState networkState = State::getNetworkState();
    // TODO: extend network state and network interface classes to be more descriptive (in progress, success, error and maybe error reason)
    if (networkState.wifi_connected)

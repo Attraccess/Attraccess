@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
 import { LiveSubscription } from '@attraccess/shared';
@@ -89,6 +89,11 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
   const { topic, resourceId, enabled = true } = props;
   const latest = useRef({ props, client });
   latest.current = { props, client };
+  const [unavailableOwner, setUnavailableOwner] = useState<{
+    client: LiveUpdateClient;
+    topic: CoreLiveTopic;
+    resourceId?: number;
+  } | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!enabled || !client) return;
@@ -103,13 +108,34 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
     const unsubscribe = client.subscribe(
       subscription,
       (payload) => {
-        if (matches()) return latest.current.props.onUpdate(payload as LivePayloads[T]);
+        if (matches()) {
+          setUnavailableOwner(null);
+          return latest.current.props.onUpdate(payload as LivePayloads[T]);
+        }
       },
       () => {
-        if (matches()) return latest.current.props.onReconnect?.();
+        if (matches()) {
+          setUnavailableOwner(null);
+          return latest.current.props.onReconnect?.();
+        }
       },
       () => {
-        if (matches()) return latest.current.props.onUnavailable?.();
+        if (matches()) {
+          setUnavailableOwner({ client, topic, resourceId });
+          if (topic === 'resource') {
+            const filters = {
+              predicate: (query: { queryKey: readonly unknown[] }) =>
+                query.queryKey.some(
+                  (part) =>
+                    part !== null && typeof part === 'object' && 'resourceId' in part && part.resourceId === resourceId,
+                ),
+            };
+            // Cancel before clearing so a response already in flight cannot restore private data.
+            void queryClient.cancelQueries(filters);
+            void queryClient.resetQueries(filters);
+          }
+          return latest.current.props.onUnavailable?.();
+        }
       },
     );
     const cleanup = () => {
@@ -124,5 +150,13 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
     };
   }, [client, topic, resourceId, enabled, queryClient]);
   // Feature state can use this identity to reset on authentication-context changes.
-  return { abort: useCallback(() => unsubscribeRef.current?.(), []), owner: client };
+  return {
+    abort: useCallback(() => unsubscribeRef.current?.(), []),
+    owner: client,
+    unavailable:
+      unavailableOwner?.client === client &&
+      unavailableOwner?.topic === topic &&
+      unavailableOwner?.resourceId === resourceId &&
+      client !== null,
+  };
 }

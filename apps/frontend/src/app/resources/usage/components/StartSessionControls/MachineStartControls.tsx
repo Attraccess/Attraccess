@@ -12,6 +12,7 @@ interface MachineStartControlsProps {
   onStart: () => void;
   onStartWithNotes: () => void;
   isStarting: boolean;
+  activityUnavailable?: boolean;
 }
 
 export function MachineStartControls({
@@ -21,10 +22,11 @@ export function MachineStartControls({
   onStart,
   onStartWithNotes,
   isStarting,
+  activityUnavailable,
 }: MachineStartControlsProps) {
   return (
     <>
-      <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
+      {!activityUnavailable && <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>}
       <ProjectsSelect
         value={selectedProjectId}
         onChange={onProjectChange}
@@ -32,19 +34,19 @@ export function MachineStartControls({
         placeholder={t('machine.project.placeholder')}
       />
       <ButtonGroup className="w-full">
-        <Button isPending={isStarting} onPress={onStart}><PlayIcon className="w-4 h-4" />
+        <Button isPending={isStarting} onPress={onStart}>
+          <PlayIcon className="w-4 h-4" />
           {t('machine.startSession')}
         </Button>
         <Dropdown>
-          <DropdownTrigger className={`${buttonVariants({ isIconOnly: true })} inline-flex items-center justify-center`}>
+          <DropdownTrigger
+            className={`${buttonVariants({ isIconOnly: true })} inline-flex items-center justify-center`}
+          >
             <ChevronDownIcon />
           </DropdownTrigger>
           <DropdownPopover>
             <DropdownMenu aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
-              <DropdownItem
-                key="startWithNotes" id="startWithNotes"
-                onPress={onStartWithNotes}
-              >
+              <DropdownItem key="startWithNotes" id="startWithNotes" onPress={onStartWithNotes}>
                 {t('machine.alternativeStartSessionOptionsMenu.startWithNotes.label')}
               </DropdownItem>
             </DropdownMenu>

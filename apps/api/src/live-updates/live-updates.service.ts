@@ -8,7 +8,7 @@ import {
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { LIVE_UPDATES_SESSION_CHANGED, LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
 import { Observable, Subscriber, Subscription } from 'rxjs';
-import { finalize } from 'rxjs/operators';
+import { concatMap, finalize } from 'rxjs/operators';
 import { Mutex } from 'async-mutex';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { LiveTopicsService, LiveTopicValidationException } from './live-topics.service';
@@ -23,6 +23,7 @@ interface Connection {
   expiresAt: number;
   revision: number;
   mutex: Mutex;
+  revalidate?: () => Promise<AuthenticatedUser>;
 }
 
 @Injectable()
@@ -34,7 +35,11 @@ export class LiveUpdatesService implements OnModuleDestroy {
     private readonly metrics: SseInstrumentation,
   ) {}
 
-  open(id: string, user: AuthenticatedUser): Observable<{ data: LivePacket }> {
+  open(
+    id: string,
+    user: AuthenticatedUser,
+    revalidate?: () => Promise<AuthenticatedUser>,
+  ): Observable<{ data: LivePacket }> {
     if (!LiveConnectionIdSchema.safeParse(id).success) {
       throw new BadRequestException('Invalid connection identifier');
     }
@@ -49,6 +54,7 @@ export class LiveUpdatesService implements OnModuleDestroy {
         expiresAt: Date.now() + 30_000,
         revision: -1,
         mutex: new Mutex(),
+        revalidate,
       };
       this.connections.set(id, connection);
       subscriber.next({ data: { type: 'ready' } });
@@ -123,7 +129,16 @@ export class LiveUpdatesService implements OnModuleDestroy {
         if (connection.subscriber.closed) return;
         const sub = this.metrics
           .wrapTopic(subscription.topic, source)
-          .pipe(finalize(() => this.topics.setPresence(subscription, user.id, connection.id, false)))
+          .pipe(
+            concatMap(async (packet) => {
+              const freshUser = await connection.revalidate?.();
+              const principal = freshUser ? { ...freshUser, jwtTokenId: user.jwtTokenId } : user;
+              const denied = await this.topics.authorize([subscription], principal);
+              if (denied.has(key)) throw new Error('Topic access revoked');
+              return packet;
+            }),
+            finalize(() => this.topics.setPresence(subscription, user.id, connection.id, false)),
+          )
           .subscribe({
             next: ({ data }) => {
               if ('keepalive' in data) return;

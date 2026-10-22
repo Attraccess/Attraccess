@@ -1,3 +1,5 @@
+import { DeviceEnrollmentService } from '../device-enrollment/device-enrollment.service';
+import { ApproveEnrollmentDto, ApproveEnrollmentResponseDto } from '../device-enrollment/approve-enrollment.dto';
 import { Attractap, Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import {
@@ -50,6 +52,20 @@ import { ResetNfcCardDto } from './dtos/reset-rfid-card.dto';
 @UseInterceptors(ClassSerializerInterceptor)
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class AttractapController {
+  @Inject(DeviceEnrollmentService)
+  private readonly enrollment: DeviceEnrollmentService;
+
+  @Post('enrollment/approve')
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'Approve a pending reader enrollment', operationId: 'approveReaderEnrollment' })
+  @ApiResponse({ status: 201, type: ApproveEnrollmentResponseDto })
+  async approveEnrollment(
+    @Body() body: ApproveEnrollmentDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ApproveEnrollmentResponseDto> {
+    return this.enrollment.approve('reader', body.code, req.user, req.ip || req.socket.remoteAddress || 'unknown');
+  }
+
   public constructor(
     @Inject(AttractapGateway)
     protected readonly attractapGateway: AttractapGateway,

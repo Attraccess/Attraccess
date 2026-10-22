@@ -5,6 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { ActiveSessionDisplay } from '../ActiveSessionDisplay';
 import { OtherUserSessionDisplay } from '../OtherUserSessionDisplay';
+import { ResourceIntroducersList } from '../../../../../components/ResourceIntroducersList';
 import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
 import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
@@ -14,6 +15,7 @@ import {
   useResourcesServiceResourceUsageGetActiveSessionKey,
   useResourcesServiceResourceUsageCanControlKey,
   Resource,
+  ResourceIntroducerType,
   useResourcesServiceResourceUsageCanControl,
   useResourceMaintenancesServiceFindMaintenances,
   SupervisionMode,
@@ -56,11 +58,12 @@ export function ResourceUsageSession({
     queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
   }, [queryClient]);
 
-  useLiveUpdates({
+  const { unavailable } = useLiveUpdates({
     topic: 'resource',
     resourceId,
+    onReconnect: invalidateSessionQueries,
     onUpdate: (data: { eventType?: string; inUse?: boolean }) => {
-      if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
+      if (!data.eventType || SESSION_EVENTS.has(data.eventType)) {
         invalidateSessionQueries();
       }
     },
@@ -75,10 +78,11 @@ export function ResourceUsageSession({
     resourceId,
   });
 
-  const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourcesServiceResourceUsageGetActiveSession(
-    { resourceId },
-    undefined,
-  );
+  const {
+    data: activeSessionResponse,
+    isLoading: isLoadingSession,
+    isError: sessionUnavailable,
+  } = useResourcesServiceResourceUsageGetActiveSession({ resourceId }, undefined);
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
@@ -102,7 +106,23 @@ export function ResourceUsageSession({
     includeActive: true,
   });
 
+  const privateActivityUnavailable = unavailable || sessionUnavailable;
+
   const renderContent = () => {
+    if (privateActivityUnavailable)
+      return (
+        <>
+          <ResourceIntroducersList resourceId={resourceId} type={ResourceIntroducerType.INTRODUCER} />
+          {supervisionEnabled && !isLoadingIntroStatus && !isLoadingIntroducers && (
+            <StartSessionControls
+              resourceId={resourceId}
+              activityUnavailable
+              insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+              requiresSupervision={!canStartSession}
+            />
+          )}
+        </>
+      );
     if (isLoading) {
       return (
         <div className="flex justify-center py-4">
@@ -163,12 +183,14 @@ export function ResourceUsageSession({
       <div className="space-y-4">
         <RetrainingStatusBanner resourceId={resourceId} />
         {renderContent()}
-        {!isLoading && !(activeMaintenances?.data?.length && activeMaintenances.data.length > 0) && (
-          <div className="flex justify-end gap-2">
-            <RequestMaintenanceButton resourceId={resourceId} />
-            <InstantMaintenanceButton resourceId={resourceId} />
-          </div>
-        )}
+        {!privateActivityUnavailable &&
+          !isLoading &&
+          !(activeMaintenances?.data?.length && activeMaintenances.data.length > 0) && (
+            <div className="flex justify-end gap-2">
+              <RequestMaintenanceButton resourceId={resourceId} />
+              <InstantMaintenanceButton resourceId={resourceId} />
+            </div>
+          )}
       </div>
     </FlatSection>
   );

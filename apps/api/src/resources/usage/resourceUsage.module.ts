@@ -1,3 +1,4 @@
+import { ResourceActivityPolicyModule } from '../activity/resource-activity-policy.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
@@ -24,6 +25,7 @@ import { ResourceMeteringModule } from '../metering/resource-metering.module';
 
 @Module({
   imports: [
+    ResourceActivityPolicyModule,
     ResourceTransactionsModule,
     TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
     RbacModule,

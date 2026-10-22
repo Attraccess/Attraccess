@@ -23,6 +23,7 @@ import { SettingsService } from '../settings/settings.service';
 import { AttractapGateway } from '../attractap/websockets/websocket.gateway';
 import { WebsocketService } from '../attractap/websockets/websocket.service';
 import { AttractapEventType, AuthenticatedWebSocket } from '../attractap/websockets/websocket.types';
+import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { SupervisionService } from '../resources/supervision/supervision.service';
 import { bootstrap } from '../main.bootstrap';
@@ -59,6 +60,7 @@ describe('desktop simulator against an isolated real API', () => {
     const address = app.getHttpServer().address();
     if (!address || typeof address === 'string') throw new Error('API did not bind TCP');
     endpoint = `http://127.0.0.1:${address.port}`;
+    await app.get(SettingsService).updateAppSettings({ url: endpoint });
   }, 420_000);
 
   afterEach(async () => {
@@ -90,7 +92,18 @@ describe('desktop simulator against an isolated real API', () => {
 
   async function start(scenario: string, pin = '1234') {
     fixture = new DesktopFixture(endpoint, scenario);
-    await fixture.start();
+    const setupName = `setup-${scenario}-${await db.getRepository(User).count()}`;
+    const administrator = await db.getRepository(User).save({
+      username: setupName,
+      email: `${setupName}@example.invalid`,
+      isEmailVerified: true,
+    });
+    await api().get(RbacService).assignRoleByKey(administrator.id, 'administrator');
+    const readersBeforeApproval = await db.getRepository(Attractap).count();
+    await fixture.start(async (code) => {
+      expect(await db.getRepository(Attractap).count()).toBe(readersBeforeApproval);
+      expect((await request(administrator, '/attractap/readers/enrollment/approve', { code })).status).toBe(201);
+    });
     const observed = await fixture.command('inspect');
     expect(observed.authenticated).toBe(true);
     expect(observed.networkAvailable).toBe(true);
@@ -169,7 +182,7 @@ describe('desktop simulator against an isolated real API', () => {
     // Authentication and authorization are real; no guard or workflow handler is replaced.
     return fetch(`${endpoint}${prefix}${path}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Origin: endpoint },
       body: JSON.stringify(body),
       signal,
     });

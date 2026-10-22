@@ -23,7 +23,9 @@ export class CompanionService {
     if (existsSync(manifestPath)) {
       try {
         this.manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as CompanionManifestDto;
-        this.logger.log(`Loaded companion manifest: version=${this.manifest.version}, platforms=${this.manifest.platforms.length}`);
+        this.logger.log(
+          `Loaded companion manifest: version=${this.manifest.version}, platforms=${this.manifest.platforms.length}`,
+        );
       } catch (err) {
         this.logger.error(`Failed to parse companions.json: ${(err as Error).message}`);
       }
@@ -65,14 +67,20 @@ export class CompanionService {
 
   // --- Device management ---
 
-  async createDevice(): Promise<{ device: CompanionDevice; token: string }> {
+  async createDevice(current?: () => boolean): Promise<{ device: CompanionDevice; token: string }> {
     const token = randomBytes(32).toString('hex');
     const salt = await genSalt(10);
     const tokenHash = await hash(token, salt);
     const name = randomBytes(3).toString('base64url').slice(0, 4);
 
     const device = this.deviceRepo.create({ name, tokenHash });
-    await this.deviceRepo.save(device);
+    if (current) {
+      await this.deviceRepo.manager.transaction(async (manager) => {
+        if (!current()) throw new Error('Enrollment expired');
+        await manager.save(CompanionDevice, device);
+        if (!current()) throw new Error('Enrollment expired');
+      });
+    } else await this.deviceRepo.save(device);
     this.logger.log(`Registered new companion device id=${device.id}`);
     return { device, token };
   }
@@ -86,7 +94,10 @@ export class CompanionService {
   }
 
   async touchLastConnection(device: CompanionDevice, appVersion?: string): Promise<void> {
-    await this.deviceRepo.update(device.id, { lastConnection: new Date(), ...(appVersion !== undefined && { appVersion }) });
+    await this.deviceRepo.update(device.id, {
+      lastConnection: new Date(),
+      ...(appVersion !== undefined && { appVersion }),
+    });
   }
 
   async findAll(): Promise<CompanionDevice[]> {

@@ -33,6 +33,7 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
     const result = await fixture.authController.createSession(mockRequest, mockResponse, {
@@ -72,6 +73,7 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
     const result = await fixture.authController.createSession(mockRequest, mockResponse, { tokenLocation: 'cookie' });
@@ -202,6 +204,7 @@ describe('AuthController', () => {
         accept: 'application/json',
         'user-agent': 'curl/7.68.0',
       },
+      authSessionSource: 'bearer',
       cookies: {},
       ip: '127.0.0.1',
       connection: { remoteAddress: '127.0.0.1' },
@@ -209,9 +212,10 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
-    const result = await fixture.authController.refreshSession(mockRequest, mockResponse, 'body');
+    const result = await fixture.authController.refreshSession(mockRequest, mockResponse, { tokenLocation: 'body' });
 
     expect(result).toEqual({
       authToken: 'new-session-token',
@@ -243,9 +247,10 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
-    const result = await fixture.authController.refreshSession(mockRequest, mockResponse, 'cookie');
+    const result = await fixture.authController.refreshSession(mockRequest, mockResponse, { tokenLocation: 'cookie' });
 
     expect(result).toEqual({
       authToken: '',
@@ -327,9 +332,41 @@ describe('AuthController', () => {
       headers: { authorization: 'Bearer ended-session' },
       cookies: {},
     } as unknown as AuthenticatedRequest;
-    await expect(fixture.authController.refreshSession(request, {} as Response, 'body')).rejects.toThrow(
-      'ended or expired',
-    );
+    await expect(
+      fixture.authController.refreshSession(request, { setHeader: jest.fn() } as unknown as Response, {
+        tokenLocation: 'body',
+      }),
+    ).rejects.toThrow('ended or expired');
     expect(fixture.sessionService.createSession).not.toHaveBeenCalled();
+  });
+
+  it.each(['cookie', 'body'] as const)(
+    'never returns a body token for cookie refresh requested as %s',
+    async (tokenLocation) => {
+      const request = {
+        user: { id: 7 },
+        headers: {},
+        authSessionSource: 'cookie',
+        cookies: { 'auth-session': 'current-session-token' },
+      } as unknown as import('./session-request').SessionAuthenticatedRequest;
+      const response = { setHeader: jest.fn() } as unknown as Response;
+      expect((await fixture.authController.refreshSession(request, response, { tokenLocation })).authToken).toBe('');
+      expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
+      expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalledWith(response, 'new-session-token');
+    },
+  );
+
+  it('keeps mixed bearer and cookie refresh responses cookie-only', async () => {
+    const request = {
+      user: { id: 7 },
+      headers: { authorization: 'Bearer current-session-token' },
+      authSessionSource: 'bearer',
+      cookies: { 'auth-session': 'other-cookie-token' },
+    } as unknown as import('./session-request').SessionAuthenticatedRequest;
+    const response = { setHeader: jest.fn() } as unknown as Response;
+    expect((await fixture.authController.refreshSession(request, response, { tokenLocation: 'body' })).authToken).toBe(
+      '',
+    );
+    expect(fixture.cookieConfigService.setAuthCookie).toHaveBeenCalled();
   });
 });

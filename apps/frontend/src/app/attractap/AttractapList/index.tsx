@@ -1,3 +1,4 @@
+import { DeviceEnrollment } from '../../../components/deviceEnrollment';
 import {
   Button,
   Card,
@@ -141,6 +142,7 @@ export function AttractapList() {
 
   return (
     <>
+      <DeviceEnrollment type="reader" />
       <AttractapHardwareSetup
         openDeviceSettings={(deviceId) => {
           setOpenedReaderEditor(Number(deviceId));

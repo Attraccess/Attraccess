@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AppSettingsDto {
+  @ApiProperty({ enum: ['all-resources', 'introduced-resources'], default: 'all-resources' })
+  activityVisibility!: 'all-resources' | 'introduced-resources';
+
   @ApiProperty({
     description: 'The application URL used for redirects, links, and API callbacks.',
     example: 'https://attraccess.example.com',

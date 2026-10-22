@@ -1,3 +1,6 @@
+import { ResourceActivityPolicy } from './activity/resource-activity-policy.service';
+import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
+import { assertAccessListAuthority } from './introductions/access-list-policy';
 import {
   Controller,
   Get,
@@ -31,6 +34,8 @@ export class ResourcesController {
   constructor(
     private readonly resourcesService: ResourcesService,
     private readonly resourceImageService: ResourceImageService,
+    private readonly activity: ResourceActivityPolicy,
+    private readonly introducers: ResourceIntroducersService,
   ) {}
 
   private transformResource(resource: Resource): Resource {
@@ -52,7 +57,11 @@ export class ResourcesController {
   @Auth('resources.create')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('image'))
-  async createOne(@Body() createDto: CreateResourceDto, @Req() req: AuthenticatedRequest, @UploadedFile() image?: FileUpload): Promise<Resource> {
+  async createOne(
+    @Body() createDto: CreateResourceDto,
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() image?: FileUpload,
+  ): Promise<Resource> {
     const resource = await this.resourcesService.createResource(createDto, image, req.user);
     return this.transformResource(resource);
   }
@@ -88,6 +97,7 @@ export class ResourcesController {
       groupId: query.groupId,
       onlyInUseByUserId: query.onlyInUseByMe ? req.user.id : undefined,
       onlyWithPermissionForUserId,
+      ...(query.onlyInUseByMe ? { activityAllowed: (ids: number[]) => this.activity.filterReadable(ids, req.user) } : {}),
     });
 
     resources.data = resources.data.map((resource) => {
@@ -97,15 +107,17 @@ export class ResourcesController {
   }
 
   @Get('in-use')
+  @Auth()
   @ApiOperation({ summary: 'Get all resources in use', operationId: 'getAllResourcesInUse' })
   @ApiResponse({
     status: 200,
     description: 'List of resources in use.',
     type: [Resource],
   })
-  async getAllInUse(): Promise<Resource[]> {
+  async getAllInUse(@Req() req: AuthenticatedRequest): Promise<Resource[]> {
     const resources = await this.resourcesService.listResources({
       onlyInUse: true,
+      activityAllowed: (ids) => this.activity.filterReadable(ids, req.user),
       returnUsingUser: true,
     });
     return resources.data.map((resource) => this.transformResource(resource));
@@ -127,9 +139,18 @@ export class ResourcesController {
     status: 404,
     description: 'Resource not found',
   })
-  async getOneById(@Param('id', ParseIntPipe) id: number): Promise<Resource> {
+  async getOneById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<Resource> {
     const resource = await this.resourcesService.getResourceById(id);
-    return this.transformResource(resource);
+    const result = { ...resource };
+    if (!(await this.activity.canRead(id, req.user))) delete result.usages;
+    else result.usages = result.usages?.filter((usage) => usage.endTime === null && !usage.lifecyclePending);
+    try {
+      await assertAccessListAuthority(req.user, () => this.introducers.isIntroducer(id, req.user.id, true));
+    } catch {
+      delete result.introductions;
+      delete result.introducers;
+    }
+    return this.transformResource(result);
   }
 
   @Put(':id')

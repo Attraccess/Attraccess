@@ -34,8 +34,8 @@ describe('People introduction visibility', () => {
     await expect(controller.getPeople(2, request(['resources.read']))).rejects.toThrow(ForbiddenException);
     expect(introductions.getMany).not.toHaveBeenCalled();
   });
-  it('preserves the existing direct-only endpoint', async () => {
-    await controller.getManyByResource(2);
+  it('preserves direct-only results for authorized callers', async () => {
+    await controller.getManyByResource(2, request(['resources.access.manage']));
     expect(introductions.getMany).toHaveBeenCalledWith(2);
   });
 });
@@ -52,19 +52,16 @@ describe('ResourceIntroductionsController', () => {
     );
   });
 
-  it.each(['grant', 'revoke'] as const)(
-    'delegates the authenticated user on introduction %s',
-    async (action) => {
-      const data = { comment: 'Approved' };
-      const req = { user: { id: 9 } } as AuthenticatedRequest;
+  it.each(['grant', 'revoke'] as const)('delegates the authenticated user on introduction %s', async (action) => {
+    const data = { comment: 'Approved' };
+    const req = { user: { id: 9 } } as AuthenticatedRequest;
 
-      await controller[action](7, 3, data, req);
+    await controller[action](7, 3, data, req);
 
-      expect(resourceIntroductionsService[action]).toHaveBeenCalledWith(7, 3, data, {
-        performedByUserId: 9,
-        authenticationMethod: undefined,
-        apiTokenId: undefined,
-      });
-    },
-  );
+    expect(resourceIntroductionsService[action]).toHaveBeenCalledWith(7, 3, data, {
+      performedByUserId: 9,
+      authenticationMethod: undefined,
+      apiTokenId: undefined,
+    });
+  });
 });

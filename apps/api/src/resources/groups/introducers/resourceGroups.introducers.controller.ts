@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { assertAccessListAuthority } from '../../introductions/access-list-policy';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducer } from '@attraccess/database-entities';
 import { ResourceGroupsIntroducersService } from './resourceGroups.introducers.service';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { IsResourceGroupIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from '../../introducers/dtos/grantIntroducer.dto';
 
@@ -12,6 +13,7 @@ export class ResourceGroupsIntroducersController {
   constructor(private readonly resourceGroupsIntroducersService: ResourceGroupsIntroducersService) {}
 
   @Get()
+  @Auth()
   @ApiOperation({ summary: 'Get all introducers for a resource group', operationId: 'resourceGroupIntroducersGetMany' })
   @ApiParam({ name: 'groupId', description: 'The ID of the resource group', type: Number })
   @ApiResponse({
@@ -23,11 +25,18 @@ export class ResourceGroupsIntroducersController {
     status: 404,
     description: 'The resource group has not been found.',
   })
-  async getMany(@Param('groupId', ParseIntPipe) groupId: number): Promise<ResourceIntroducer[]> {
+  async getMany(
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceIntroducer[]> {
+    await assertAccessListAuthority(req.user, () =>
+      this.resourceGroupsIntroducersService.isIntroducer({ groupId, userId: req.user.id }),
+    );
     return await this.resourceGroupsIntroducersService.getMany(groupId);
   }
 
   @Get('/:userId/is-introducer')
+  @Auth()
   @ApiOperation({
     summary: 'Check if a user is an introducer for a resource group',
     operationId: 'resourceGroupIntroducersIsIntroducer',
@@ -42,7 +51,12 @@ export class ResourceGroupsIntroducersController {
   async isIntroducer(
     @Param('userId', ParseIntPipe) userId: number,
     @Param('groupId', ParseIntPipe) groupId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<IsResourceGroupIntroducerResponseDto> {
+    if (userId !== req.user.id)
+      await assertAccessListAuthority(req.user, () =>
+        this.resourceGroupsIntroducersService.isIntroducer({ groupId, userId: req.user.id }),
+      );
     return {
       isIntroducer: await this.resourceGroupsIntroducersService.isIntroducer({ groupId, userId }),
     };

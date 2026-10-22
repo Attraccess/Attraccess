@@ -130,6 +130,7 @@ export async function main() {
     resolved.frontendPort = await resolvePort('VITE_PORT', 4200, 'Frontend');
     resolved.previewPort = await resolvePort('VITE_PREVIEW_PORT', 4300, 'Preview');
     childEnv.VITE_PORT = String(resolved.frontendPort);
+    childEnv.ATTRACCESS_FRONTEND_URL = url(resolved.frontendPort);
     childEnv.VITE_PREVIEW_PORT = String(resolved.previewPort);
     if (resolved.apiPort !== undefined) {
       childEnv.VITE_API_PROXY_TARGET = `http://localhost:${resolved.apiPort}`;

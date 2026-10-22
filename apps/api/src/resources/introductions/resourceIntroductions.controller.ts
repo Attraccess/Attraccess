@@ -1,3 +1,4 @@
+import { assertAccessListAuthority } from './access-list-policy';
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req, ForbiddenException } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
@@ -16,13 +17,20 @@ export class ResourceIntroductionsController {
   ) {}
 
   @Get()
+  @Auth()
   @ApiOperation({ summary: 'Get all introductions for a resource', operationId: 'resourceIntroductionsGetMany' })
   @ApiResponse({
     status: 200,
     description: 'All introductions for a resource',
     type: [ResourceIntroduction],
   })
-  async getManyByResource(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceIntroduction[]> {
+  async getManyByResource(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceIntroduction[]> {
+    await assertAccessListAuthority(req.user, () =>
+      this.resourceIntroducersService.isIntroducer(resourceId, req.user.id, true),
+    );
     return await this.resourceIntroductionsService.getMany(resourceId);
   }
 
@@ -64,7 +72,9 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceIntroductionsService.grant(resourceId, userId, data, {
-      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+      performedByUserId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
     });
   }
 
@@ -86,7 +96,9 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
-      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+      performedByUserId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
     });
   }
 
@@ -105,7 +117,7 @@ export class ResourceIntroductionsController {
   @IsResourceIntroducer()
   async getHistory(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
     return await this.resourceIntroductionsService.getHistoryByResourceIdAndUserId(resourceId, userId);
   }

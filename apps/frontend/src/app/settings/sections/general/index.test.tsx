@@ -69,6 +69,7 @@ describe('GeneralSection', () => {
           publicInternetUrl: null,
           licenseKey: undefined,
           defaultLanguage: 'en',
+          activityVisibility: 'all-resources',
         },
       },
     });
@@ -80,6 +81,24 @@ describe('GeneralSection', () => {
     const reloaded = render(<GeneralSection />);
     expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
     expect(saveBar(reloaded.container)).toBeNull();
+  });
+
+  it('saves and discards activity visibility using the existing draft flow', async () => {
+    const view = render(<GeneralSection />);
+    await userEvent.click(screen.getByRole('button', { name: /inputs.activityVisibility.label$/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'inputs.activityVisibility.introduced' }));
+    expect(saveBar(view.container)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestBody: { app: expect.objectContaining({ activityVisibility: 'introduced-resources' }) },
+      }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.discard' }));
+    expect(screen.getByRole('button', { name: /inputs.activityVisibility.label$/ })).toHaveTextContent(
+      'inputs.activityVisibility.all',
+    );
+    expect(saveBar(view.container)).toBeNull();
   });
 
   it('prevents edits during a pending save and preserves the draft after failure', async () => {
@@ -193,6 +212,7 @@ describe('GeneralSection', () => {
           publicInternetUrl: null,
           licenseKey: undefined,
           defaultLanguage: 'de',
+          activityVisibility: 'all-resources',
         },
       },
     });
@@ -214,7 +234,13 @@ describe('GeneralSection', () => {
 
     expect(saveSettings).toHaveBeenCalledWith({
       requestBody: {
-        app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined, defaultLanguage: 'de' },
+        app: {
+          url: 'https://example.org',
+          publicInternetUrl: null,
+          licenseKey: undefined,
+          defaultLanguage: 'de',
+          activityVisibility: 'all-resources',
+        },
       },
     });
   });
@@ -315,6 +341,7 @@ describe('GeneralSection — Enter key', () => {
           publicInternetUrl: null,
           licenseKey: undefined,
           defaultLanguage: 'de',
+          activityVisibility: 'all-resources',
         },
       },
     });

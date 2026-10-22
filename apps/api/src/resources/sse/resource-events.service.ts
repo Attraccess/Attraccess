@@ -115,7 +115,8 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
       usage: { resource },
     } = event;
     this.emitToResource(resource.id, {
-      ...event,
+      resourceId: resource.id,
+      timestamp: new Date().toISOString(),
       inUse: true,
       eventType: ResourceSessionStartedEvent.EVENT_NAME,
     });

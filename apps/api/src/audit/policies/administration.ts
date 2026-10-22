@@ -91,6 +91,7 @@ export const SETTING_KEYS = [
   'app.url',
   'app.publicInternetUrl',
   'app.defaultLanguage',
+  'app.activityVisibility',
   'app.licenseKeyConfigured',
   'app.licenseKeyChanged',
   'smtp.service',
@@ -170,6 +171,8 @@ export const pkg = {
 };
 
 export const rules: Record<string, { subject: string; fields: Record<string, Check> }> = {
+  'device.enrollment_approved': { subject: 'device', fields: { deviceType: enumeration('reader', 'companion') } },
+  'device.enrolled': { subject: 'device', fields: { deviceType: enumeration('reader', 'companion') } },
   'settings.updated': { subject: 'setting', fields: settings },
   'settings.api_key.generated': {
     subject: 'setting',
@@ -304,6 +307,7 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditEvent)
 
 function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
+  if (key === 'app.activityVisibility') return ['all-resources', 'introduced-resources'].includes(value);
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
