@@ -1,11 +1,10 @@
+import { userOperationsFake } from './persistence/operations.test-fixture';
+import { USER_WRITES, UserOperations } from './persistence/port';
+import { operationTransactionsFake } from '../../database/testing/operation-transactions.test-fixture';
 import { DatabaseTransactions, OperationToken, TransactionScope } from '../../database/transaction-scope';
 import { UserPersistence } from './persistence/port';
-import { TypeormUserPersistence } from './persistence/typeorm-adapter';
 import { SettingsService } from '../../settings/settings.service';
-import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, EntityManager, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { LicenseService } from '../../license/license.service';
@@ -36,25 +35,14 @@ const mockRbacService = {
 export function registerUsersServiceFixture() {
   let service: UsersService;
 
-  let userRepository: jest.Mocked<Repository<User>>;
-
-  let dataSource: jest.Mocked<DataSource>;
-
+  let persistence: jest.Mocked<UserPersistence>;
+  let driver: ReturnType<typeof operationTransactionsFake>;
   let emailService: { sendUsernameChangedEmail: jest.Mock; sendVerificationEmail: jest.Mock };
 
-  let repositories: [Repository<AuthenticationDetail>, Repository<Session>, Repository<ResourceUsage>];
-  const bind = (manager: EntityManager) => {
-    const repo = <T extends ObjectLiteral>(type: EntityTarget<T>, fallback: Repository<T>): Repository<T> =>
-      manager.getRepository ? manager.getRepository(type) : fallback;
-    return new TypeormUserPersistence(
-      repo(User, userRepository),
-      repo(AuthenticationDetail, repositories[0]),
-      repo(Session, repositories[1]),
-      repo(ResourceUsage, repositories[2]),
-      manager,
-    );
-  };
   beforeEach(async () => {
+    persistence = userOperationsFake();
+    driver = operationTransactionsFake();
+    driver.bind(USER_WRITES, persistence);
     settingsService.getDefaultLanguage.mockResolvedValue('en');
     mockRbacService.assignRoleByKey.mockClear();
     mockRbacService.assignDefaultRoles.mockClear();
@@ -65,31 +53,8 @@ export function registerUsersServiceFixture() {
       providers: [
         UsersService,
         { provide: SettingsService, useValue: settingsService },
-        {
-          provide: UserPersistence,
-          useFactory: (users, auth, sessions, usages) => new TypeormUserPersistence(users, auth, sessions, usages),
-          inject: [
-            getRepositoryToken(User),
-            getRepositoryToken(AuthenticationDetail),
-            getRepositoryToken(Session),
-            getRepositoryToken(ResourceUsage),
-          ],
-        },
-        {
-          provide: DatabaseTransactions,
-          useFactory: (source: DataSource) =>
-            new DatabaseTransactions({
-              backend: 'sqlite',
-              run: async (_conflicts, work) =>
-                source.transaction(async (manager) =>
-                  work({
-                    resolve: <T extends object>(_token: OperationToken<T>) =>
-                      bind(manager as EntityManager) as unknown as T,
-                  }),
-                ),
-            }),
-          inject: [DataSource],
-        },
+        { provide: UserPersistence, useValue: persistence },
+        { provide: DatabaseTransactions, useValue: driver.transactions },
         {
           provide: LicenseService,
           useValue: {
@@ -104,55 +69,9 @@ export function registerUsersServiceFixture() {
           },
         },
         {
-          provide: DataSource,
-          useValue: {
-            // Call the callback with a mock EntityManager that delegates save() to
-            // userRepository.save so per-test mocks on the repository still apply.
-            transaction: jest.fn().mockImplementation(async (cb: (em: unknown) => Promise<unknown>) => {
-              const em = {
-                save: jest.fn().mockImplementation((entity: unknown) => userRepository.save(entity as User)),
-              };
-              return cb(em);
-            }),
-          },
-        },
-        {
           provide: TokenHashService,
           useValue: {
             hashToken: jest.fn((token: string) => `hashed:${token}`),
-          },
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: {
-            findOne: jest.fn(),
-            find: jest.fn(),
-            save: jest.fn(),
-            create: jest.fn((data) => Object.assign(new User(), data)),
-            delete: jest.fn(),
-            softDelete: jest.fn(),
-            update: jest.fn(),
-            findAndCount: jest.fn(),
-            createQueryBuilder: jest.fn(),
-            count: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(AuthenticationDetail),
-          useValue: {
-            delete: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(Session),
-          useValue: {
-            delete: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(ResourceUsage),
-          useValue: {
-            count: jest.fn(),
           },
         },
         {
@@ -167,25 +86,18 @@ export function registerUsersServiceFixture() {
     }).compile();
 
     service = module.get<UsersService>(UsersService);
-    userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
-    repositories = [
-      module.get(getRepositoryToken(AuthenticationDetail)),
-      module.get(getRepositoryToken(Session)),
-      module.get(getRepositoryToken(ResourceUsage)),
-    ];
-    dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
     emailService = module.get(EmailService) as unknown as {
       sendUsernameChangedEmail: jest.Mock;
       sendVerificationEmail: jest.Mock;
     };
   });
   return {
-    parentScope(manager: unknown): TransactionScope {
+    parentScope(operations: UserOperations): TransactionScope {
       return {
-        backend: 'sqlite',
+        backend: 'fake',
         conflicts: { resourceIds: [], accountIds: [] },
         afterCommit: jest.fn(),
-        resolve: <T extends object>(_token: OperationToken<T>) => bind(manager as EntityManager) as unknown as T,
+        resolve: <T extends object>(_token: OperationToken<T>) => operations as unknown as T,
       };
     },
     get settingsService() {
@@ -200,11 +112,11 @@ export function registerUsersServiceFixture() {
     get service() {
       return service;
     },
-    get userRepository() {
-      return userRepository;
+    get persistence() {
+      return persistence;
     },
-    get dataSource() {
-      return dataSource;
+    get driver() {
+      return driver;
     },
     get emailService() {
       return emailService;

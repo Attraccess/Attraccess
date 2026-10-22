@@ -1,11 +1,10 @@
 import { SumupPersistence } from '../persistence/port';
-import { TypeormSumupPersistence } from '../persistence/typeorm-adapter';
+
 // Tests for SumUpService billing integration with mocked SDK
 // FEATURE: Billing SumUp integration
 
-import { BillingTransaction, Setting } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+
 import { AuditService } from '../../audit/audit.service';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
@@ -45,18 +44,14 @@ const mockReadersCreateCheckout = jest.fn();
 
 const mockTransactionsGet = jest.fn();
 export function registerSumUpServiceFixture() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockSettingRepository: any = {
-    findOneBy: jest.fn(),
-    update: jest.fn(),
-    insert: jest.fn(),
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockBillingTransactionRepository: any = {
-    save: jest.fn(),
-    findOneBy: jest.fn(),
-    findBy: jest.fn(),
+  const persistence: jest.Mocked<SumupPersistence> = {
+    writeCredentials: jest.fn(),
+    apiKey: jest.fn(),
+    merchantCode: jest.fn(),
+    transactionByReference: jest.fn(),
+    saveTransaction: jest.fn(),
+    pendingTransactions: jest.fn(),
+    createTopup: jest.fn(),
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,12 +81,6 @@ export function registerSumUpServiceFixture() {
   let service: SumUpService;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let settingRepository: any;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let billingTransactionRepository: any;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let encryptionService: any;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,12 +98,7 @@ export function registerSumUpServiceFixture() {
     mockReadersDelete.mockReset();
     mockReadersCreateCheckout.mockReset();
     mockTransactionsGet.mockReset();
-    mockSettingRepository.findOneBy.mockReset();
-    mockSettingRepository.update.mockReset();
-    mockSettingRepository.insert.mockReset();
-    mockBillingTransactionRepository.save.mockReset();
-    mockBillingTransactionRepository.findOneBy.mockReset();
-    mockBillingTransactionRepository.findBy.mockReset();
+    Object.values(persistence).forEach((operation) => operation.mockReset());
     mockEncryptionService.encrypt.mockReset();
     mockEncryptionService.decrypt.mockReset();
     mockLiveNotificationsService.notifyTransactionUpdate.mockReset();
@@ -131,9 +115,7 @@ export function registerSumUpServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SumUpService,
-        { provide: SumupPersistence, useClass: TypeormSumupPersistence },
-        { provide: getRepositoryToken(Setting), useValue: mockSettingRepository },
-        { provide: getRepositoryToken(BillingTransaction), useValue: mockBillingTransactionRepository },
+        { provide: SumupPersistence, useValue: persistence },
         { provide: EncryptionService, useValue: mockEncryptionService },
         { provide: SettingsService, useValue: mockSettingsService },
         { provide: LiveNotificationsService, useValue: mockLiveNotificationsService },
@@ -148,8 +130,6 @@ export function registerSumUpServiceFixture() {
     }).compile();
 
     service = module.get(SumUpService);
-    settingRepository = module.get(getRepositoryToken(Setting));
-    billingTransactionRepository = module.get(getRepositoryToken(BillingTransaction));
     encryptionService = module.get(EncryptionService);
     liveNotificationsService = module.get(LiveNotificationsService);
     billingService = module.get(BillingService);
@@ -158,11 +138,8 @@ export function registerSumUpServiceFixture() {
   const merchantCode = 'M123';
 
   const withApiKey = () => {
-    settingRepository.findOneBy.mockImplementation(({ key }: { key: string }) => {
-      if (key === 'apiKey') return Promise.resolve({ value: 'enc' });
-      if (key === 'merchantCode') return Promise.resolve({ value: merchantCode });
-      return Promise.resolve(null);
-    });
+    persistence.apiKey.mockResolvedValue({ value: 'enc' });
+    persistence.merchantCode.mockResolvedValue({ value: merchantCode });
     encryptionService.decrypt.mockReturnValue('token');
   };
 
@@ -195,11 +172,8 @@ export function registerSumUpServiceFixture() {
     get service() {
       return service;
     },
-    get settingRepository() {
-      return settingRepository;
-    },
-    get billingTransactionRepository() {
-      return billingTransactionRepository;
+    get persistence() {
+      return persistence;
     },
     get encryptionService() {
       return encryptionService;

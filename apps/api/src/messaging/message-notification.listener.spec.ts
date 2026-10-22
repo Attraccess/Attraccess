@@ -1,8 +1,6 @@
 import { MessageNotificationPersistence } from './persistence/port';
-import { TypeormMessageNotificationPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConversationParticipant, Message, User } from '@attraccess/database-entities';
+import { ConversationParticipant, Message, User } from '@attraccess/application-models';
 import { MessageNotificationListener } from './message-notification.listener';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';
@@ -11,8 +9,7 @@ import { NotificationCategory, NotificationChannel } from '../notifications/noti
 
 describe('MessageNotificationListener', () => {
   let listener: MessageNotificationListener;
-  let participantRepository: { find: jest.Mock; update: jest.Mock };
-  let userRepository: { findOne: jest.Mock };
+  let persistence: jest.Mocked<MessageNotificationPersistence>;
   let liveService: { isOnline: jest.Mock };
   let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
 
@@ -51,8 +48,11 @@ describe('MessageNotificationListener', () => {
       .filter((request) => request.channels.includes(NotificationChannel.TOAST));
 
   beforeEach(async () => {
-    participantRepository = { find: jest.fn(), update: jest.fn().mockResolvedValue(undefined) };
-    userRepository = { findOne: jest.fn().mockResolvedValue({ id: SENDER_ID, username: 'alice' } as User) };
+    persistence = {
+      participantsWithUsers: jest.fn(),
+      markNotified: jest.fn().mockResolvedValue(undefined),
+      sender: jest.fn().mockResolvedValue({ id: SENDER_ID, username: 'alice' } as User),
+    };
     liveService = { isOnline: jest.fn().mockReturnValue(false) };
     notifications = {
       dispatch: jest.fn().mockResolvedValue(undefined),
@@ -62,9 +62,7 @@ describe('MessageNotificationListener', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MessageNotificationListener,
-        { provide: MessageNotificationPersistence, useFactory: () => new TypeormMessageNotificationPersistence(participantRepository as never, userRepository as never) },
-        { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: MessageNotificationPersistence, useValue: persistence },
         { provide: MessagingLiveService, useValue: liveService },
         { provide: NotificationDispatchService, useValue: notifications },
       ],
@@ -74,7 +72,7 @@ describe('MessageNotificationListener', () => {
   });
 
   it('dispatches message email and push for an offline recipient through the shared notification path', async () => {
-    participantRepository.find.mockResolvedValue([
+    persistence.participantsWithUsers.mockResolvedValue([
       buildParticipant(),
       buildParticipant({ id: 51, userId: SENDER_ID, user: { id: SENDER_ID, username: 'alice' } as User }),
     ]);
@@ -96,7 +94,7 @@ describe('MessageNotificationListener', () => {
   });
 
   it('dispatches in-app toasts through the shared message notification channel for every recipient', async () => {
-    participantRepository.find.mockResolvedValue([buildParticipant()]);
+    persistence.participantsWithUsers.mockResolvedValue([buildParticipant()]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
 
@@ -115,7 +113,7 @@ describe('MessageNotificationListener', () => {
   });
 
   it('never dispatches to the sender', async () => {
-    participantRepository.find.mockResolvedValue([
+    persistence.participantsWithUsers.mockResolvedValue([
       buildParticipant({ id: 51, userId: SENDER_ID, user: { id: SENDER_ID, username: 'alice' } as User }),
     ]);
 
@@ -126,7 +124,7 @@ describe('MessageNotificationListener', () => {
 
   it('does not dispatch offline email or push for an online recipient', async () => {
     liveService.isOnline.mockReturnValue(true);
-    participantRepository.find.mockResolvedValue([buildParticipant()]);
+    persistence.participantsWithUsers.mockResolvedValue([buildParticipant()]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
 
@@ -135,29 +133,27 @@ describe('MessageNotificationListener', () => {
 
   it('records the email delivery marker only when the shared dispatcher sends email', async () => {
     const participant = buildParticipant();
-    participantRepository.find.mockResolvedValue([participant]);
+    persistence.participantsWithUsers.mockResolvedValue([participant]);
 
     const message = buildMessage();
     await listener.handleMessageCreated(new MessageCreatedEvent(message));
     await offlineDispatches()[0].sendEmail(participant.user);
 
-    expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
-      participant.user,
-      NotificationCategory.MESSAGES,
-      { message: { conversationId: 10, senderName: 'alice', preview: 'Hello there' } },
-    );
-    expect(participantRepository.update).toHaveBeenCalledWith({ id: 50 }, { lastNotifiedAt: message.createdAt });
+    expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(participant.user, NotificationCategory.MESSAGES, {
+      message: { conversationId: 10, senderName: 'alice', preview: 'Hello there' },
+    });
+    expect(persistence.markNotified).toHaveBeenCalledWith(50, message.createdAt);
   });
 
   it('does not re-send email within the same unread burst', async () => {
     const participant = buildParticipant({ lastNotifiedAt: new Date('2025-01-18T11:00:00.000Z'), lastReadAt: null });
-    participantRepository.find.mockResolvedValue([participant]);
+    persistence.participantsWithUsers.mockResolvedValue([participant]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
     await offlineDispatches()[0].sendEmail(participant.user);
 
     expect(notifications.sendEmailTemplate).not.toHaveBeenCalled();
-    expect(participantRepository.update).not.toHaveBeenCalled();
+    expect(persistence.markNotified).not.toHaveBeenCalled();
   });
 
   it('does not re-send email when notified after the last read', async () => {
@@ -165,7 +161,7 @@ describe('MessageNotificationListener', () => {
       lastReadAt: new Date('2025-01-18T10:00:00.000Z'),
       lastNotifiedAt: new Date('2025-01-18T11:00:00.000Z'),
     });
-    participantRepository.find.mockResolvedValue([participant]);
+    persistence.participantsWithUsers.mockResolvedValue([participant]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
     await offlineDispatches()[0].sendEmail(participant.user);
@@ -178,7 +174,7 @@ describe('MessageNotificationListener', () => {
       lastNotifiedAt: new Date('2025-01-18T10:00:00.000Z'),
       lastReadAt: new Date('2025-01-18T11:00:00.000Z'),
     });
-    participantRepository.find.mockResolvedValue([participant]);
+    persistence.participantsWithUsers.mockResolvedValue([participant]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
     await offlineDispatches()[0].sendEmail(participant.user);
@@ -187,14 +183,16 @@ describe('MessageNotificationListener', () => {
   });
 
   it('skips email recipients without an email address', async () => {
-    const participant = buildParticipant({ user: { id: RECIPIENT_ID, username: 'bob', email: null } as unknown as User });
-    participantRepository.find.mockResolvedValue([participant]);
+    const participant = buildParticipant({
+      user: { id: RECIPIENT_ID, username: 'bob', email: null } as unknown as User,
+    });
+    persistence.participantsWithUsers.mockResolvedValue([participant]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
     await offlineDispatches()[0].sendEmail(participant.user);
 
     expect(notifications.sendEmailTemplate).not.toHaveBeenCalled();
-    expect(participantRepository.update).not.toHaveBeenCalled();
+    expect(persistence.markNotified).not.toHaveBeenCalled();
   });
 
   it('isolates per-recipient dispatch failures so other recipients are still processed', async () => {
@@ -204,7 +202,7 @@ describe('MessageNotificationListener', () => {
       userId: 3,
       user: { id: 3, username: 'carol', email: 'carol@example.com' } as User,
     });
-    participantRepository.find.mockResolvedValue([failing, other]);
+    persistence.participantsWithUsers.mockResolvedValue([failing, other]);
     notifications.dispatch.mockImplementation((request) => {
       if (request.channels.includes(NotificationChannel.EMAIL) && request.recipients[0].id === RECIPIENT_ID) {
         return Promise.reject(new Error('push down'));
@@ -218,7 +216,7 @@ describe('MessageNotificationListener', () => {
   });
 
   it('truncates long push previews', async () => {
-    participantRepository.find.mockResolvedValue([buildParticipant()]);
+    persistence.participantsWithUsers.mockResolvedValue([buildParticipant()]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage({ content: 'x'.repeat(200) })));
 
@@ -226,7 +224,7 @@ describe('MessageNotificationListener', () => {
   });
 
   it('dispatches push per message even within the same email burst', async () => {
-    participantRepository.find.mockResolvedValue([
+    persistence.participantsWithUsers.mockResolvedValue([
       buildParticipant({ lastNotifiedAt: new Date('2025-01-18T11:00:00.000Z'), lastReadAt: null }),
     ]);
 
@@ -236,8 +234,8 @@ describe('MessageNotificationListener', () => {
   });
 
   it('falls back to a generic sender name when the sender is missing', async () => {
-    userRepository.findOne.mockResolvedValue(null);
-    participantRepository.find.mockResolvedValue([buildParticipant()]);
+    persistence.sender.mockResolvedValue(null);
+    persistence.participantsWithUsers.mockResolvedValue([buildParticipant()]);
 
     await listener.handleMessageCreated(new MessageCreatedEvent(buildMessage()));
 

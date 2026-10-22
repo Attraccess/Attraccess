@@ -1,9 +1,6 @@
 import { MqttPersistence } from './persistence/port';
-import { TypeormMqttPersistence } from './persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { MqttClientService } from './mqtt-client.service';
-import { MqttServer } from '@attraccess/database-entities';
 import * as mqtt from 'mqtt';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -14,10 +11,13 @@ import { MqttClientServiceTestScope } from './mqtt-client.service.spec';
 import { MqttClientServicePrivate } from './mqtt-client.service.spec.mqtt-client-service-private';
 
 export async function resetTestFixture(scope: MqttClientServiceTestScope) {
-  scope.mockRepository = {
-    findOne: jest.fn(),
-    findOneBy: jest.fn().mockResolvedValue(scope.mockServer),
-    update: jest.fn(),
+  scope.persistence = {
+    readServer: jest.fn().mockResolvedValue(scope.mockServer),
+    listServers: jest.fn(),
+    createServer: jest.fn(),
+    saveServer: jest.fn(),
+    removeServer: jest.fn(),
+    setEncryptedPassword: jest.fn(),
   };
 
   scope.mockEventEmitter = {
@@ -34,11 +34,7 @@ export async function resetTestFixture(scope: MqttClientServiceTestScope) {
   scope.moduleRef = await Test.createTestingModule({
     providers: [
       MqttClientService,
-      { provide: MqttPersistence, useClass: TypeormMqttPersistence },
-      {
-        provide: getRepositoryToken(MqttServer),
-        useValue: scope.mockRepository,
-      },
+      { provide: MqttPersistence, useValue: scope.persistence },
       {
         provide: EventEmitter2,
         useValue: scope.mockEventEmitter,

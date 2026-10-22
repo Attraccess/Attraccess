@@ -1,8 +1,6 @@
 import { UsageNoteRecipients } from '../persistence/port';
-import { TypeormUsageNoteRecipients } from '../persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/application-models';
 import { ResourceUsageNoteNotificationListener } from './notes.listener';
 import { ResourceUsageNoteAddedEvent } from '../events/resource-usage.events';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
@@ -11,9 +9,7 @@ import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 
 describe('ResourceUsageNoteNotificationListener', () => {
   let listener: ResourceUsageNoteNotificationListener;
-  let resourceRepository: { findOne: jest.Mock };
-  let introducerRepository: { find: jest.Mock };
-  let userRepository: { findBy: jest.Mock };
+  let persistence: jest.Mocked<UsageNoteRecipients>;
   let notifications: { dispatch: jest.Mock };
   let rbacService: { getUserIdsWithPermission: jest.Mock };
 
@@ -34,23 +30,22 @@ describe('ResourceUsageNoteNotificationListener', () => {
   const setAdmins = (admins: User[]) => {
     const ids = admins.map((u) => u.id);
     rbacService.getUserIdsWithPermission.mockResolvedValue(ids);
-    userRepository.findBy.mockResolvedValue(admins);
+    persistence.users.mockResolvedValue(admins);
   };
 
   beforeEach(async () => {
-    resourceRepository = { findOne: jest.fn().mockResolvedValue(buildResource()) };
-    introducerRepository = { find: jest.fn().mockResolvedValue([]) };
+    persistence = {
+      resourceWithGroups: jest.fn().mockResolvedValue(buildResource()),
+      introducers: jest.fn().mockResolvedValue([]),
+      users: jest.fn().mockResolvedValue([]),
+    };
     rbacService = { getUserIdsWithPermission: jest.fn().mockResolvedValue([]) };
-    userRepository = { findBy: jest.fn().mockResolvedValue([]) };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        { provide: UsageNoteRecipients, useFactory: () => new TypeormUsageNoteRecipients(resourceRepository as never, introducerRepository as never, userRepository as never) },
+        { provide: UsageNoteRecipients, useValue: persistence },
         ResourceUsageNoteNotificationListener,
-        { provide: getRepositoryToken(Resource), useValue: resourceRepository },
-        { provide: getRepositoryToken(ResourceIntroducer), useValue: introducerRepository },
-        { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: NotificationDispatchService, useValue: notifications },
         { provide: RbacService, useValue: rbacService },
       ],
@@ -64,9 +59,13 @@ describe('ResourceUsageNoteNotificationListener', () => {
       { id: 2, email: 'admin@example.com' } as User,
       { id: AUTHOR_ID, email: 'alice@example.com' } as User, // author also admin -> excluded
     ]);
-    introducerRepository.find.mockResolvedValue([
-      { user: { id: 3, email: 'intro@example.com' } as User },
-      { user: { id: 2, email: 'admin@example.com' } as User }, // dup of admin -> deduped
+    persistence.introducers.mockResolvedValue([
+      {
+        user: { id: 3, email: 'intro@example.com' } as User,
+      } as unknown as import('@attraccess/application-models').ResourceIntroducer,
+      {
+        user: { id: 2, email: 'admin@example.com' } as User,
+      } as unknown as import('@attraccess/application-models').ResourceIntroducer, // dup of admin -> deduped
     ]);
 
     await listener.handleNoteAdded(buildEvent());
@@ -89,7 +88,11 @@ describe('ResourceUsageNoteNotificationListener', () => {
   });
 
   it('skips users without an email', async () => {
-    introducerRepository.find.mockResolvedValue([{ user: { id: 3, email: null } as User }]);
+    persistence.introducers.mockResolvedValue([
+      {
+        user: { id: 3, email: null } as User,
+      } as unknown as import('@attraccess/application-models').ResourceIntroducer,
+    ]);
 
     await listener.handleNoteAdded(buildEvent());
 
@@ -97,7 +100,7 @@ describe('ResourceUsageNoteNotificationListener', () => {
   });
 
   it('does nothing when the resource is missing', async () => {
-    resourceRepository.findOne.mockResolvedValue(null);
+    persistence.resourceWithGroups.mockResolvedValue(null);
 
     await listener.handleNoteAdded(buildEvent());
 
@@ -105,13 +108,18 @@ describe('ResourceUsageNoteNotificationListener', () => {
   });
 
   it('includes group introducers when the resource belongs to groups', async () => {
-    resourceRepository.findOne.mockResolvedValue(buildResource({ groups: [{ id: 9 } as Resource['groups'][number]] }));
-    introducerRepository.find.mockResolvedValue([{ user: { id: 4, email: 'group@example.com' } as User }]);
+    persistence.resourceWithGroups.mockResolvedValue(
+      buildResource({ groups: [{ id: 9 } as Resource['groups'][number]] }),
+    );
+    persistence.introducers.mockResolvedValue([
+      {
+        user: { id: 4, email: 'group@example.com' } as User,
+      } as unknown as import('@attraccess/application-models').ResourceIntroducer,
+    ]);
 
     await listener.handleNoteAdded(buildEvent());
 
-    const whereArg = introducerRepository.find.mock.calls[0][0].where;
-    expect(whereArg).toEqual(expect.arrayContaining([{ resourceId: RESOURCE_ID }]));
+    expect(persistence.introducers).toHaveBeenCalledWith(RESOURCE_ID, [9]);
     expect(notifications.dispatch).toHaveBeenCalledTimes(1);
   });
 });

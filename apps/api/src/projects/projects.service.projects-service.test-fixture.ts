@@ -1,9 +1,6 @@
 import { ProjectPersistence } from './persistence/port';
-import { TypeormProjectPersistence } from './persistence/typeorm-adapter';
-import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
+
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { FileStorageService } from '../common/services/file-storage.service';
 import { EmailService } from '../email/email.service';
@@ -16,37 +13,10 @@ const mockMetricsService = {
   projectsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
 };
 
-export type MockQueryBuilder = {
-  leftJoinAndSelect: jest.Mock;
-  leftJoin: jest.Mock;
-  where: jest.Mock;
-  andWhere: jest.Mock;
-  orderBy: jest.Mock;
-  addOrderBy: jest.Mock;
-  skip: jest.Mock;
-  take: jest.Mock;
-  getMany: jest.Mock;
-  getCount: jest.Mock;
-};
-
-const createMockQueryBuilder = (): MockQueryBuilder => ({
-  leftJoinAndSelect: jest.fn().mockReturnThis(),
-  leftJoin: jest.fn().mockReturnThis(),
-  where: jest.fn().mockReturnThis(),
-  andWhere: jest.fn().mockReturnThis(),
-  orderBy: jest.fn().mockReturnThis(),
-  addOrderBy: jest.fn().mockReturnThis(),
-  skip: jest.fn().mockReturnThis(),
-  take: jest.fn().mockReturnThis(),
-  getMany: jest.fn().mockResolvedValue([]),
-  getCount: jest.fn().mockResolvedValue(0),
-});
 export function registerProjectsServiceFixture() {
   let service: ProjectsService;
 
-  let projectRepository: jest.Mocked<Repository<Project>>;
-
-  let resourceUsageRepository: jest.Mocked<Repository<ResourceUsage>>;
+  let persistence: jest.Mocked<ProjectPersistence>;
 
   let fileStorageService: { saveFile: jest.Mock; deleteFile: jest.Mock };
 
@@ -56,48 +26,32 @@ export function registerProjectsServiceFixture() {
     getAccessOrThrow: jest.Mock;
   };
 
-  let projectMemberRepository: jest.Mocked<Repository<ProjectMember>>;
-
-  let projectInvitationRepository: jest.Mocked<Repository<ProjectInvitation>>;
-
-  let userRepository: jest.Mocked<Repository<User>>;
-
   let audit: { recordProject: jest.Mock };
 
   beforeEach(async () => {
-    const queryBuilder = createMockQueryBuilder();
-    projectRepository = {
-      createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
-      save: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      findOneByOrFail: jest.fn(),
-    } as unknown as jest.Mocked<Repository<Project>>;
-
-    resourceUsageRepository = {
-      update: jest.fn(),
-    } as unknown as jest.Mocked<Repository<ResourceUsage>>;
-    Object.assign(projectRepository, {
-      manager: {
-        transaction: jest.fn(async (work) =>
-          work({
-            getRepository: (entity: unknown) =>
-              entity === ResourceUsage ? resourceUsageRepository : projectRepository,
-          }),
-        ),
-      },
-    });
-
-    projectMemberRepository = {
-      findOne: jest.fn(),
-      save: jest.fn(),
-      delete: jest.fn(),
-    } as unknown as jest.Mocked<Repository<ProjectMember>>;
-    projectInvitationRepository = {
-      findOne: jest.fn(),
-      save: jest.fn(),
-    } as unknown as jest.Mocked<Repository<ProjectInvitation>>;
-    userRepository = { findOne: jest.fn() } as unknown as jest.Mocked<Repository<User>>;
+    const invitation = jest.fn();
+    const membership = jest.fn();
+    persistence = {
+      accessiblePage: jest.fn(),
+      accessibleCount: jest.fn(),
+      setArchived: jest.fn(),
+      requireProject: jest.fn(),
+      members: jest.fn(),
+      member: membership,
+      membership,
+      removeMember: jest.fn(),
+      addMember: jest.fn(),
+      projectInvitations: jest.fn(),
+      pendingInvitations: jest.fn(),
+      pendingInvitation: invitation,
+      invitationWithRelations: invitation,
+      saveInvitation: jest.fn(),
+      invite: jest.fn(),
+      findUser: jest.fn(),
+      createProject: jest.fn(),
+      saveProject: jest.fn(),
+      deleteWithUsageDetachment: jest.fn(),
+    };
     audit = { recordProject: jest.fn().mockResolvedValue(undefined) };
 
     fileStorageService = {
@@ -114,12 +68,7 @@ export function registerProjectsServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectsService,
-        { provide: ProjectPersistence, useClass: TypeormProjectPersistence },
-        { provide: getRepositoryToken(Project), useValue: projectRepository },
-        { provide: getRepositoryToken(ProjectMember), useValue: projectMemberRepository },
-        { provide: getRepositoryToken(ProjectInvitation), useValue: projectInvitationRepository },
-        { provide: getRepositoryToken(ResourceUsage), useValue: resourceUsageRepository },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: ProjectPersistence, useValue: persistence },
         { provide: FileStorageService, useValue: fileStorageService },
         { provide: ProjectAccessService, useValue: projectAccessService },
         { provide: EmailService, useValue: { sendProjectInvitationEmail: jest.fn() } },
@@ -139,32 +88,17 @@ export function registerProjectsServiceFixture() {
     get mockMetricsService() {
       return mockMetricsService;
     },
-    get createMockQueryBuilder() {
-      return createMockQueryBuilder;
-    },
     get service() {
       return service;
     },
-    get projectRepository() {
-      return projectRepository;
-    },
-    get resourceUsageRepository() {
-      return resourceUsageRepository;
+    get persistence() {
+      return persistence;
     },
     get fileStorageService() {
       return fileStorageService;
     },
     get projectAccessService() {
       return projectAccessService;
-    },
-    get projectMemberRepository() {
-      return projectMemberRepository;
-    },
-    get projectInvitationRepository() {
-      return projectInvitationRepository;
-    },
-    get userRepository() {
-      return userRepository;
     },
     get audit() {
       return audit;

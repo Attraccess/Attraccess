@@ -1,19 +1,17 @@
 import { RateLimitPersistence } from './persistence/port';
-import { TypeormRateLimitPersistence } from './persistence/typeorm-adapter';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { User } from '@attraccess/database-entities';
+import { User } from '@attraccess/application-models';
 import { BruteForceProtectionService } from './brute-force.service';
 import { SettingsService } from '../../settings/settings.service';
 import { TooManyAuthAttemptsException, AccountLockedException } from './exceptions';
 
 describe('BruteForceProtectionService', () => {
   let service: BruteForceProtectionService;
-  let userRepo: { update: jest.Mock };
+  let persistence: jest.Mocked<RateLimitPersistence>;
   let settings: { getRateLimitPolicy: jest.Mock };
 
   beforeEach(async () => {
-    userRepo = { update: jest.fn().mockResolvedValue(undefined) };
+    persistence = { recordFailureState: jest.fn(), lockAccount: jest.fn(), clearAccount: jest.fn() };
     settings = {
       getRateLimitPolicy: jest.fn().mockResolvedValue({
         maxAttempts: 3,
@@ -26,8 +24,7 @@ describe('BruteForceProtectionService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         BruteForceProtectionService,
-        { provide: RateLimitPersistence, useClass: TypeormRateLimitPersistence },
-        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: RateLimitPersistence, useValue: persistence },
         { provide: SettingsService, useValue: settings },
       ],
     }).compile();
@@ -122,9 +119,7 @@ describe('BruteForceProtectionService', () => {
       for (let i = 0; i < 3; i += 1) {
         await service.recordFailure('login', '1.1.1.1', 42);
       }
-      const lockoutCall = userRepo.update.mock.calls.find(([, update]) => update?.lockedUntil instanceof Date);
-      expect(lockoutCall).toBeDefined();
-      expect((lockoutCall as [unknown, unknown])[0]).toEqual({ id: 42 });
+      expect(persistence.lockAccount).toHaveBeenCalledWith(42, expect.any(Date));
     });
 
     it('rejects when assertAccountAllowed sees future lockedUntil', async () => {
@@ -141,10 +136,7 @@ describe('BruteForceProtectionService', () => {
 
     it('unlocks an account', async () => {
       await service.unlockAccount(7);
-      expect(userRepo.update).toHaveBeenCalledWith(
-        { id: 7 },
-        expect.objectContaining({ lockedUntil: null, failedLoginAttempts: 0, firstFailedLoginAt: null }),
-      );
+      expect(persistence.clearAccount).toHaveBeenCalledWith(7);
     });
   });
 

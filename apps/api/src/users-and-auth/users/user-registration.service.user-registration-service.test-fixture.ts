@@ -1,8 +1,5 @@
 import { SignupDomainPersistence } from './persistence/port';
-import { TypeormSignupDomainPersistence } from './persistence/typeorm-adapter';
-import { Setting } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EmailService } from '../../email/email.service';
 import { AuthService } from '../auth/auth.service';
 import { PasswordPolicyService } from '../password-policy/password-policy.service';
@@ -19,19 +16,16 @@ export function registerUserRegistrationServiceFixture() {
 
   let emailService: EmailService;
 
-  let settingRepository: { findOne: jest.Mock; update: jest.Mock };
+  let persistence: jest.Mocked<SignupDomainPersistence>;
 
   beforeEach(async () => {
+    persistence = { readWhitelist: jest.fn(), updateWhitelist: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserRegistrationService,
         // Real SignupDomainService so the domain-whitelist check is genuinely exercised
         SignupDomainService,
-        { provide: SignupDomainPersistence, useClass: TypeormSignupDomainPersistence },
-        {
-          provide: getRepositoryToken(Setting),
-          useValue: { findOne: jest.fn(), update: jest.fn() },
-        },
+        { provide: SignupDomainPersistence, useValue: persistence },
         {
           provide: UsersService,
           useValue: {
@@ -73,7 +67,6 @@ export function registerUserRegistrationServiceFixture() {
     usersService = module.get<UsersService>(UsersService);
     authService = module.get<AuthService>(AuthService);
     emailService = module.get<EmailService>(EmailService);
-    settingRepository = module.get(getRepositoryToken(Setting));
   });
   return {
     get service() {
@@ -88,8 +81,8 @@ export function registerUserRegistrationServiceFixture() {
     get emailService() {
       return emailService;
     },
-    get settingRepository() {
-      return settingRepository;
+    get persistence() {
+      return persistence;
     },
   };
 }

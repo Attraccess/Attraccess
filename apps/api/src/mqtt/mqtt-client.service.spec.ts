@@ -1,10 +1,10 @@
-import { MqttServer } from '@attraccess/database-entities';
+import { MqttPersistence } from './persistence/port';
+
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TestingModule } from '@nestjs/testing';
 import * as mqtt from 'mqtt';
 import { EventEmitter } from 'node:events';
-import { Repository } from 'typeorm';
 import { inheritTestScope } from './../test-utils/inherit-test-scope';
 import { MqttClientService } from './mqtt-client.service';
 import { resetTestFixture } from './mqtt-client.service.setup.test-fixture';
@@ -53,7 +53,7 @@ jest.mock('mqtt', () => {
       emit: emitter.emit.bind(emitter),
     };
     // Simulate successful connect asynchronously
-    setImmediate(() => client.emit('connect'));
+    setImmediate(() => client.emit('connect', undefined));
     return client;
   }
 
@@ -65,7 +65,7 @@ jest.mock('mqtt', () => {
 describe('MqttClientService', () => {
   let service: MqttClientService;
   let moduleRef: TestingModule;
-  let mockRepository: Partial<Repository<MqttServer>>;
+  let persistence: jest.Mocked<MqttPersistence>;
   let mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
   let mockExternalCallTimer: { time: jest.Mock };
 
@@ -103,11 +103,11 @@ describe('MqttClientService', () => {
     set moduleRef(value: typeof moduleRef) {
       moduleRef = value;
     },
-    get mockRepository() {
-      return mockRepository;
+    get persistence() {
+      return persistence;
     },
-    set mockRepository(value: typeof mockRepository) {
-      mockRepository = value;
+    set persistence(value: typeof persistence) {
+      persistence = value;
     },
     get mockExternalCallTimer() {
       return mockExternalCallTimer;
@@ -171,7 +171,7 @@ describe('MqttClientService', () => {
       jest.restoreAllMocks();
       jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
       jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
-      (scope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (scope.persistence.readServer as jest.Mock).mockResolvedValue({
         ...scope.mockServer,
         ...serverOverrides,
       });
@@ -254,7 +254,7 @@ describe('MqttClientService', () => {
       const first = internal.getOrCreateClient(1);
       const second = internal.getOrCreateClient(1);
       client.connected = true;
-      client.emit('connect');
+      client.emit('connect', undefined);
 
       await expect(first).resolves.toBe(client);
       await expect(second).resolves.toBe(client);
@@ -276,7 +276,7 @@ describe('MqttClientService', () => {
 
       const retry = internal.getOrCreateClient(1);
       client.connected = true;
-      client.emit('connect');
+      client.emit('connect', undefined);
       await expect(retry).resolves.toBe(client);
     });
 
@@ -290,7 +290,7 @@ describe('MqttClientService', () => {
 
       const retry = (connectionOwnershipScope.service as unknown as MqttClientServicePrivate).getOrCreateClient(1);
       unreachable.connected = true;
-      unreachable.emit('connect');
+      unreachable.emit('connect', undefined);
       await expect(retry).resolves.toBe(unreachable);
       expect(mqtt.connect).not.toHaveBeenCalled();
     });
@@ -305,7 +305,7 @@ describe('MqttClientService', () => {
       await waiting;
       const replacement = internal.clients.get(1);
       previous.connected = true;
-      previous.emit('connect');
+      previous.emit('connect', undefined);
       expect(internal.clients.get(1)).toBe(replacement);
       expect(previous.end).toHaveBeenCalledWith(true);
     });
@@ -326,11 +326,11 @@ describe('MqttClientService', () => {
         set mockExternalCallTimer(value: typeof scope.mockExternalCallTimer) {
           scope.mockExternalCallTimer = value;
         },
-        get mockRepository() {
-          return scope.mockRepository;
+        get persistence() {
+          return scope.persistence;
         },
-        set mockRepository(value: typeof scope.mockRepository) {
-          scope.mockRepository = value;
+        set persistence(value: typeof scope.persistence) {
+          scope.persistence = value;
         },
         get mockServer() {
           return scope.mockServer;
@@ -404,7 +404,7 @@ describe('MqttClientService', () => {
 
     it('should use server defaults when no options are provided', async () => {
       // Arrange
-      (publishScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (publishScope.persistence.readServer as jest.Mock).mockResolvedValue({
         ...publishScope.mockServer,
         defaultPublishQos: 1,
         defaultPublishRetain: true,
@@ -432,7 +432,7 @@ describe('MqttClientService', () => {
 
     it('should prefer per-call options over server defaults', async () => {
       // Arrange
-      (publishScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (publishScope.persistence.readServer as jest.Mock).mockResolvedValue({
         ...publishScope.mockServer,
         defaultPublishQos: 0,
         defaultPublishRetain: true,
@@ -467,11 +467,11 @@ describe('MqttClientService', () => {
         set service(value: typeof scope.service) {
           scope.service = value;
         },
-        get mockRepository() {
-          return scope.mockRepository;
+        get persistence() {
+          return scope.persistence;
         },
-        set mockRepository(value: typeof scope.mockRepository) {
-          scope.mockRepository = value;
+        set persistence(value: typeof scope.persistence) {
+          scope.persistence = value;
         },
         get mockServer() {
           return scope.mockServer;
@@ -492,7 +492,7 @@ describe('MqttClientService', () => {
       await subscribeScope.service.subscribe(1, 'devices/#');
       (client.subscribe as jest.Mock).mockClear();
 
-      client.emit('connect');
+      client.emit('connect', undefined);
 
       expect(client.subscribe).toHaveBeenCalledWith('devices/#', { qos: 0 }, expect.any(Function));
     });
@@ -511,9 +511,9 @@ describe('MqttClientService', () => {
         (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
           callback?.(new Error('Subscribe error'));
         },
-      );
+      ) as unknown as mqtt.MqttClient['subscribe'];
 
-      client.emit('connect');
+      client.emit('connect', undefined);
 
       expect(servicePrivate.subscriptions.get(1)?.get('devices/#')?.effectiveQos).toBeUndefined();
     });
@@ -532,7 +532,7 @@ describe('MqttClientService', () => {
     });
 
     it('retains a server default QoS that is higher than a later request', async () => {
-      (subscribeScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (subscribeScope.persistence.readServer as jest.Mock).mockResolvedValue({
         ...subscribeScope.mockServer,
         defaultSubscribeQos: 2,
       });
@@ -558,7 +558,7 @@ describe('MqttClientService', () => {
         (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
           callback?.(new Error('Subscribe error'));
         },
-      );
+      ) as unknown as mqtt.MqttClient['subscribe'];
       jest
         .spyOn(subscribeScope.service as unknown as MqttClientServicePrivate, 'getOrCreateClient')
         .mockResolvedValue(mockClient);
@@ -587,11 +587,11 @@ describe('MqttClientService', () => {
         set service(value: typeof scope.service) {
           scope.service = value;
         },
-        get mockRepository() {
-          return scope.mockRepository;
+        get persistence() {
+          return scope.persistence;
         },
-        set mockRepository(value: typeof scope.mockRepository) {
-          scope.mockRepository = value;
+        set persistence(value: typeof scope.persistence) {
+          scope.persistence = value;
         },
         get mockServer() {
           return scope.mockServer;
@@ -616,7 +616,7 @@ describe('MqttClientService', () => {
       const internal = refreshConnectionScope.useRealConnections();
       const previous = await internal.getOrCreateClient(1);
       await refreshConnectionScope.service.subscribe(1, 'devices/#', 2);
-      (refreshConnectionScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (refreshConnectionScope.persistence.readServer as jest.Mock).mockResolvedValue({
         ...refreshConnectionScope.mockServer,
         host: 'new-broker.test',
         port: 8883,
@@ -675,7 +675,7 @@ describe('MqttClientService', () => {
         expect(refreshConnectionScope.mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(0);
         expect(replacement.end).not.toHaveBeenCalled();
         replacement.connected = true;
-        replacement.emit('connect');
+        replacement.emit('connect', undefined);
         expect(internal.clients.get(1)).toBe(replacement);
         expect(replacement.subscribe).toHaveBeenCalledWith('devices/#', { qos: 2 }, expect.any(Function));
         expect(refreshConnectionScope.mockMetricsService.mqttServersHealthy.set).toHaveBeenLastCalledWith(1);
@@ -694,7 +694,7 @@ describe('MqttClientService', () => {
       const pending = internal.getOrCreateClient(1, true);
       const rejected = pending.catch((error) => error);
       await new Promise(setImmediate);
-      (refreshConnectionScope.mockRepository.findOneBy as jest.Mock).mockResolvedValue({
+      (refreshConnectionScope.persistence.readServer as jest.Mock).mockResolvedValue({
         ...refreshConnectionScope.mockServer,
         host: 'new-broker.test',
       });
@@ -734,11 +734,11 @@ describe('MqttClientService', () => {
         get mockServer() {
           return scope.mockServer;
         },
-        get mockRepository() {
-          return scope.mockRepository;
+        get persistence() {
+          return scope.persistence;
         },
-        set mockRepository(value: typeof scope.mockRepository) {
-          scope.mockRepository = value;
+        set persistence(value: typeof scope.persistence) {
+          scope.persistence = value;
         },
       },
       scope,
@@ -782,7 +782,7 @@ describe('MqttClientService', () => {
         (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
           callback?.(new Error('Subscribe error'));
         },
-      );
+      ) as unknown as mqtt.MqttClient['subscribe'];
 
       await expect(unsubscribeScope.service.unsubscribe(1, 'sensors/+', 2)).rejects.toThrow('Subscribe error');
 
@@ -811,7 +811,7 @@ describe('MqttClientService', () => {
             callback?.();
           }
         },
-      );
+      ) as unknown as mqtt.MqttClient['subscribe'];
 
       const lowerQos = unsubscribeScope.service.unsubscribe(1, 'sensors/+', 2);
       await new Promise(setImmediate);
@@ -830,7 +830,7 @@ describe('MqttClientService', () => {
     it('does not re-subscribe after the final consumer unsubscribes during the server lookup', async () => {
       const mockClient = mqtt.connect({});
       let resolveServerLookup!: (server: typeof unsubscribeScope.mockServer) => void;
-      (unsubscribeScope.mockRepository.findOneBy as jest.Mock).mockImplementationOnce(
+      (unsubscribeScope.persistence.readServer as jest.Mock).mockImplementationOnce(
         () =>
           new Promise<typeof unsubscribeScope.mockServer>((resolve) => {
             resolveServerLookup = resolve;
@@ -898,7 +898,7 @@ export type MqttClientServiceTestScope = {
   service: MqttClientService;
   mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
   moduleRef: TestingModule;
-  mockRepository: Partial<Repository<MqttServer>>;
+  persistence: jest.Mocked<MqttPersistence>;
   mockExternalCallTimer: { time: jest.Mock };
   mockServer: {
     id: number;

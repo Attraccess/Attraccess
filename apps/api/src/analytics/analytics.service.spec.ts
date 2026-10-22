@@ -1,19 +1,15 @@
 import { AnalyticsPersistence } from './persistence/port';
-import { TypeormAnalyticsPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsService } from './analytics.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { BillingTransaction, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
-import { Between, Repository } from 'typeorm';
+
 import { DateRangeValue } from './dtos/dateRangeValue';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
-  let repository: jest.Mocked<Repository<ResourceUsage>>;
-
-  const mockRepository = {
-    findAndCount: jest.fn(),
+  const persistence: jest.Mocked<AnalyticsPersistence> = {
+    usageReportPage: jest.fn(),
+    billingReportPage: jest.fn(),
   };
   const operatingAttributionService = {
     getForResources: jest.fn(),
@@ -23,15 +19,7 @@ describe('AnalyticsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AnalyticsService,
-        { provide: AnalyticsPersistence, useClass: TypeormAnalyticsPersistence },
-        {
-          provide: getRepositoryToken(ResourceUsage),
-          useValue: mockRepository,
-        },
-        {
-          provide: getRepositoryToken(BillingTransaction),
-          useValue: {},
-        },
+        { provide: AnalyticsPersistence, useValue: persistence },
         {
           provide: ResourceOperatingAttributionService,
           useValue: operatingAttributionService,
@@ -40,9 +28,6 @@ describe('AnalyticsService', () => {
     }).compile();
 
     service = module.get<AnalyticsService>(AnalyticsService);
-    repository = module.get<Repository<ResourceUsage>>(getRepositoryToken(ResourceUsage)) as jest.Mocked<
-      Repository<ResourceUsage>
-    >;
   });
 
   afterEach(() => {
@@ -75,24 +60,18 @@ describe('AnalyticsService', () => {
         },
       ];
 
-      mockRepository.findAndCount.mockResolvedValue([expectedResourceUsage, 1]);
+      persistence.usageReportPage.mockResolvedValue([
+        expectedResourceUsage as unknown as import('@attraccess/application-models').ResourceUsage[],
+        1,
+      ]);
 
       const result = await service.getResourceUsageHoursInDateRange(dateRange);
 
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {
-          startTime: Between(dateRange.start, dateRange.end),
-          usageAction: ResourceUsageAction.Usage,
-          lifecyclePending: false,
-        },
-        order: {
-          id: 'DESC',
-          userId: 'DESC',
-          startTime: 'DESC',
-        },
-        relations: ['user', 'resource', 'supervisorUser'],
-        skip: 0,
-        take: 500,
+      expect(persistence.usageReportPage).toHaveBeenCalledWith({
+        start: dateRange.start,
+        end: dateRange.end,
+        page: 1,
+        limit: 500,
       });
 
       expect(result).toEqual([expectedResourceUsage, 1]);
@@ -104,11 +83,16 @@ describe('AnalyticsService', () => {
         end: new Date('2023-01-31'),
       };
 
-      mockRepository.findAndCount.mockResolvedValue([[], 1000]);
+      persistence.usageReportPage.mockResolvedValue([[], 1000]);
 
       await service.getResourceUsageHoursInDateRange(dateRange, 2, 100);
 
-      expect(repository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ skip: 100, take: 100 }));
+      expect(persistence.usageReportPage).toHaveBeenCalledWith({
+        start: dateRange.start,
+        end: dateRange.end,
+        page: 2,
+        limit: 100,
+      });
     });
 
     it('should return an empty array when no records are found', async () => {
@@ -117,7 +101,7 @@ describe('AnalyticsService', () => {
         end: new Date('2023-02-28'),
       };
 
-      mockRepository.findAndCount.mockResolvedValue([[], 0]);
+      persistence.usageReportPage.mockResolvedValue([[], 0]);
 
       const result = await service.getResourceUsageHoursInDateRange(dateRange);
 

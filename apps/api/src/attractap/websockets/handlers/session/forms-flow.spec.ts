@@ -1,17 +1,9 @@
+import { formsOperationsFake } from '../../../../resources/forms/persistence/operations.test-fixture';
 import { FormsPersistence } from '../../../../resources/forms/persistence/port';
-import { TypeormFormsPersistence } from '../../../../resources/forms/persistence/typeorm-adapter';
 import { DatabaseTransactions } from '../../../../database/transaction-scope';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  Form,
-  FormField,
-  FormFieldType,
-  FormSubmission,
-  Resource,
-  ResourceFormAction,
-} from '@attraccess/database-entities';
+import { Form, FormField, FormFieldType, ResourceFormAction } from '@attraccess/application-models';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { AttractapSessionHandler } from './session.handler';
@@ -80,25 +72,19 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
       .mockResolvedValue({ id: 999, userId: 7, startTime: new Date(0), endTime: new Date(1426999) });
     form.isRequiredOnResourceUsageEnd = false;
 
-    const formRepo = { find: jest.fn().mockResolvedValue([form]), findOne: jest.fn().mockResolvedValue(form) };
-    const resourceRepo = { findOne: jest.fn().mockResolvedValue({ id: RESOURCE_ID } as Resource) };
+    const fake = formsOperationsFake();
+    fake.persistence.resource.mockResolvedValue({ id: RESOURCE_ID } as never);
+    fake.persistence.required.mockResolvedValue([form]);
+    fake.persistence.list.mockResolvedValue([form]);
+    fake.persistence.form.mockResolvedValue(form);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFormsService,
-        {
-          provide: FormsPersistence,
-          useValue: new TypeormFormsPersistence({
-            getRepository: (entity: unknown) => (entity === Form ? formRepo : resourceRepo),
-          } as never),
-        },
-        { provide: DatabaseTransactions, useValue: {} },
+        { provide: FormsPersistence, useValue: fake.persistence },
+        { provide: DatabaseTransactions, useValue: fake.transactions },
         AttractapFormsHandler,
         AttractapSessionHandler,
-        { provide: getRepositoryToken(Form), useValue: formRepo },
-        { provide: getRepositoryToken(FormField), useValue: { find: jest.fn() } },
-        { provide: getRepositoryToken(FormSubmission), useValue: { save: jest.fn() } },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepo },
         { provide: ResourceActionGuard, useValue: { validateResourceAction: jest.fn().mockResolvedValue(true) } },
         { provide: AttractapService, useValue: { findReaderById: jest.fn().mockResolvedValue(null) } },
         { provide: UsersService, useValue: { findOne: jest.fn().mockResolvedValue({ id: 7 }) } },

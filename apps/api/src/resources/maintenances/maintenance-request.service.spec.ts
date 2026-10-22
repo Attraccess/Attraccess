@@ -22,7 +22,13 @@ describe('MaintenanceRequestService', () => {
       resource: jest.fn(),
       createRequest: jest.fn(
         async (resource, userId, reason, status) =>
-          ({ id: 10, resourceId: resource.id, createdByUserId: userId, reason, status }) as ResourceMaintenanceRequest,
+          ({
+            id: 10,
+            resourceId: resource.id,
+            createdByUserId: userId,
+            reason,
+            status,
+          }) as unknown as ResourceMaintenanceRequest,
       ),
       requestPage: jest.fn(),
       requestWithRelations: jest.fn(),
@@ -84,7 +90,7 @@ describe('MaintenanceRequestService', () => {
         resourceId: 1,
         reason: 'broken',
         status: MaintenanceRequestStatus.OPEN,
-      } as ResourceMaintenanceRequest);
+      } as unknown as ResourceMaintenanceRequest);
 
       const result = await service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.DISMISS);
 
@@ -99,7 +105,7 @@ describe('MaintenanceRequestService', () => {
         resourceId: 1,
         reason: 'broken',
         status: MaintenanceRequestStatus.OPEN,
-      } as ResourceMaintenanceRequest);
+      } as unknown as ResourceMaintenanceRequest);
       maintenanceService.createMaintenance.mockResolvedValue({ id: 99 });
 
       const result = await service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.CONVERT);
@@ -118,7 +124,7 @@ describe('MaintenanceRequestService', () => {
         id: 5,
         resourceId: 2,
         status: MaintenanceRequestStatus.OPEN,
-      } as ResourceMaintenanceRequest);
+      } as unknown as ResourceMaintenanceRequest);
       await expect(service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.DISMISS)).rejects.toThrow(
         NotFoundException,
       );
@@ -129,7 +135,7 @@ describe('MaintenanceRequestService', () => {
         id: 5,
         resourceId: 1,
         status: MaintenanceRequestStatus.DISMISSED,
-      } as ResourceMaintenanceRequest);
+      } as unknown as ResourceMaintenanceRequest);
       await expect(service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.DISMISS)).rejects.toThrow(
         BadRequestException,
       );

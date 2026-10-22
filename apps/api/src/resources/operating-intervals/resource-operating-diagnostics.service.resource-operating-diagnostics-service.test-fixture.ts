@@ -32,7 +32,9 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
 
   let attributionService: jest.Mocked<Pick<ResourceOperatingAttributionService, 'getForResource'>>;
 
-  let operatingMetrics: jest.Mocked<OperatingMetricsRecorder>;
+  let operatingMetrics: jest.Mocked<
+    Pick<OperatingMetricsRecorder, 'recordTransition' | 'setResourceState' | 'recordDataQualityFailures'>
+  >;
 
   let service: ResourceOperatingDiagnosticsService;
 
@@ -55,7 +57,7 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
     service = new ResourceOperatingDiagnosticsService(
       persistence,
       attributionService as unknown as ResourceOperatingAttributionService,
-      operatingMetrics,
+      operatingMetrics as unknown as OperatingMetricsRecorder,
     );
   });
   return {

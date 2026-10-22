@@ -1,5 +1,5 @@
-import { TypeormAttractapResourceReader } from '../../../persistence/typeorm-adapter';
-import { SupervisionMode, User } from '@attraccess/database-entities';
+import { AttractapResourceReader } from '../../../persistence/port';
+import { SupervisionMode, User } from '@attraccess/application-models';
 import { AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapSupervisionHandler } from './supervision.handler';
 
@@ -23,7 +23,7 @@ export function registerAttractapSupervisionHandlerFixture() {
 
   let usersService: { findOne: jest.Mock };
 
-  let resourceRepository: { findOne: jest.Mock };
+  let resourceReader: jest.Mocked<AttractapResourceReader>;
 
   const requester = { id: 1, username: 'requester' } as User;
 
@@ -81,8 +81,10 @@ export function registerAttractapSupervisionHandlerFixture() {
       createReaderRequest: jest.fn().mockReturnValue({ requestId: 'req-1', expiresAt: new Date(0) }),
     };
     usersService = { findOne: jest.fn().mockResolvedValue({ id: 2, username: 'supervisor' }) };
-    resourceRepository = {
-      findOne: jest.fn().mockResolvedValue({ id: RESOURCE_ID, supervisionMode: SupervisionMode.SUPERVISION_REQUIRED }),
+    resourceReader = {
+      findResource: jest
+        .fn()
+        .mockResolvedValue({ id: RESOURCE_ID, supervisionMode: SupervisionMode.SUPERVISION_REQUIRED }),
     };
 
     handler = new AttractapSupervisionHandler();
@@ -92,7 +94,7 @@ export function registerAttractapSupervisionHandlerFixture() {
       resourceUsageService,
       supervisionService,
       usersService,
-      resourceReader: new TypeormAttractapResourceReader(resourceRepository as never),
+      resourceReader,
     });
   });
   return {
@@ -114,8 +116,8 @@ export function registerAttractapSupervisionHandlerFixture() {
     get usersService() {
       return usersService;
     },
-    get resourceRepository() {
-      return resourceRepository;
+    get resourceReader() {
+      return resourceReader;
     },
     get requester() {
       return requester;

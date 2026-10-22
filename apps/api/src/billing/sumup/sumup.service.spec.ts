@@ -2,42 +2,18 @@ import { registerSumUpServiceFixture } from './service.test-fixture';
 import { SumupTransactionEventType } from '../dto/sumup/sumup-transaction-callback.dto';
 import { BadRequestException } from '@nestjs/common';
 import { SUMUP_TOPUP_TRANSACTION_PREFIX } from './sumup.service';
-import { BillingTransactionStatus, BillingTransaction } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
+import type { PendingTopup } from '../persistence/port';
 
 describe('SumUpService', () => {
   const fixture = registerSumUpServiceFixture();
 
   describe('setApiKey', () => {
-    it('stores encrypted API key and merchant code via update when existing', async () => {
+    it('stores the encrypted API key with its verified merchant code', async () => {
       fixture.mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
-      fixture.settingRepository.findOneBy.mockResolvedValue({ id: 1, value: 'enc' });
       fixture.encryptionService.encrypt.mockReturnValue('encrypted');
-
       await fixture.service.setApiKey('token');
-
-      expect(fixture.settingRepository.update).toHaveBeenCalledWith(1, { value: 'encrypted' });
-      expect(fixture.settingRepository.update).toHaveBeenCalledWith(1, { value: 'M123' });
-      expect(fixture.settingRepository.insert).not.toHaveBeenCalled();
-    });
-
-    it('stores encrypted API key and merchant code via insert when missing', async () => {
-      fixture.mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
-      fixture.settingRepository.findOneBy.mockResolvedValue(null);
-      fixture.encryptionService.encrypt.mockReturnValue('encrypted');
-
-      await fixture.service.setApiKey('token');
-
-      expect(fixture.settingRepository.insert).toHaveBeenCalledWith({
-        parent: 'sumup',
-        key: 'apiKey',
-        value: 'encrypted',
-      });
-      expect(fixture.settingRepository.insert).toHaveBeenCalledWith({
-        parent: 'sumup',
-        key: 'merchantCode',
-        value: 'M123',
-      });
-      expect(fixture.settingRepository.update).not.toHaveBeenCalled();
+      expect(fixture.persistence.writeCredentials).toHaveBeenCalledWith('encrypted', 'M123');
     });
 
     it.each([
@@ -48,31 +24,31 @@ describe('SumUpService', () => {
       ],
     ])('throws and stores nothing when %s', async (_case, meResponse) => {
       fixture.mockSumUpGet.mockResolvedValue(meResponse);
-      fixture.settingRepository.findOneBy.mockResolvedValue(null);
+      fixture.persistence.apiKey.mockResolvedValue(null);
 
       await expect(fixture.service.setApiKey('token')).rejects.toBeInstanceOf(BadRequestException);
-      expect(fixture.settingRepository.insert).not.toHaveBeenCalled();
-      expect(fixture.settingRepository.update).not.toHaveBeenCalled();
+      expect(fixture.persistence.writeCredentials).not.toHaveBeenCalled();
+      expect(fixture.persistence.writeCredentials).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException on invalid API key', async () => {
       fixture.mockSumUpGet.mockRejectedValue(new Error('invalid'));
 
       await expect(fixture.service.setApiKey('bad')).rejects.toBeInstanceOf(BadRequestException);
-      expect(fixture.settingRepository.insert).not.toHaveBeenCalled();
-      expect(fixture.settingRepository.update).not.toHaveBeenCalled();
+      expect(fixture.persistence.writeCredentials).not.toHaveBeenCalled();
+      expect(fixture.persistence.writeCredentials).not.toHaveBeenCalled();
     });
   });
 
   describe('getIsEnabled', () => {
     it('returns false when key missing', async () => {
-      fixture.settingRepository.findOneBy.mockResolvedValue(null);
+      fixture.persistence.apiKey.mockResolvedValue(null);
 
       await expect(fixture.service.getIsEnabled()).resolves.toBe(false);
     });
 
     it('returns false when decryption fails', async () => {
-      fixture.settingRepository.findOneBy.mockResolvedValue({ value: 'enc' });
+      fixture.persistence.apiKey.mockResolvedValue({ value: 'enc' });
       fixture.encryptionService.decrypt.mockImplementation(() => {
         throw new Error('bad');
       });
@@ -81,7 +57,7 @@ describe('SumUpService', () => {
     });
 
     it('returns true when decryption succeeds', async () => {
-      fixture.settingRepository.findOneBy.mockResolvedValue({ value: 'enc' });
+      fixture.persistence.apiKey.mockResolvedValue({ value: 'enc' });
       fixture.encryptionService.decrypt.mockReturnValue('token');
 
       await expect(fixture.service.getIsEnabled()).resolves.toBe(true);
@@ -161,7 +137,9 @@ describe('SumUpService', () => {
       fixture.withApiKey();
       fixture.billingService.getConfiguration.mockResolvedValue({ currency: 'EUR', minorUnit: 2 });
       fixture.mockReadersCreateCheckout.mockResolvedValue({ data: { client_transaction_id: 'tx123' } });
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: BillingTransaction) => ({ id: 1, ...t }));
+      fixture.persistence.createTopup.mockImplementation(
+        async (t: PendingTopup) => ({ id: 1, ...t }) as import('@attraccess/application-models').BillingTransaction,
+      );
 
       const tx = await fixture.service.topUpWithReader(42, 'reader-1', 500);
 
@@ -174,7 +152,7 @@ describe('SumUpService', () => {
           return_url: 'https://example.com/api/billing/top-up/sumup/callback',
         }),
       );
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith({
+      expect(fixture.persistence.createTopup).toHaveBeenCalledWith({
         userId: 42,
         amount: 500,
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:tx123`,
@@ -241,7 +219,7 @@ describe('SumUpService', () => {
     });
 
     it('throws when transaction not found', async () => {
-      fixture.billingTransactionRepository.findOneBy.mockResolvedValue(null);
+      fixture.persistence.transactionByReference.mockResolvedValue(null);
       await expect(callPrivate('tx1')).rejects.toEqual(new BadRequestException('Sumup transaction not found'));
     });
 
@@ -253,15 +231,17 @@ describe('SumUpService', () => {
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:tx1`,
         status: BillingTransactionStatus.Pending,
       };
-      fixture.billingTransactionRepository.findOneBy.mockResolvedValue(transaction);
+      fixture.persistence.transactionByReference.mockResolvedValue(
+        transaction as unknown as import('@attraccess/application-models').BillingTransaction,
+      );
       fixture.mockTransactionsGet.mockResolvedValue({ status: 'SUCCESSFUL' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: any) => t);
+      fixture.persistence.saveTransaction.mockImplementation(async (t: any) => t);
 
       await callPrivate('tx1');
 
       const saved = { ...transaction, status: BillingTransactionStatus.Completed };
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith(saved);
+      expect(fixture.persistence.saveTransaction).toHaveBeenCalledWith(saved);
       expect(fixture.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(saved);
       expect(fixture.mockAuditService.recordBillingTransaction).toHaveBeenCalledWith({
         transactionId: 10,
@@ -279,13 +259,15 @@ describe('SumUpService', () => {
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:tx2`,
         status: BillingTransactionStatus.Pending,
       };
-      fixture.billingTransactionRepository.findOneBy.mockResolvedValue(transaction);
+      fixture.persistence.transactionByReference.mockResolvedValue(
+        transaction as unknown as import('@attraccess/application-models').BillingTransaction,
+      );
       fixture.mockTransactionsGet.mockResolvedValue({ status: 'FAILED' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: any) => t);
+      fixture.persistence.saveTransaction.mockImplementation(async (t: any) => t);
 
       await callPrivate('tx2');
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith({
+      expect(fixture.persistence.saveTransaction).toHaveBeenCalledWith({
         ...transaction,
         status: BillingTransactionStatus.Failed,
       });
@@ -305,17 +287,21 @@ describe('SumUpService', () => {
         status: BillingTransactionStatus.Pending,
       };
       const otherTx = { id: 3, externalReference: `other:xyz`, status: BillingTransactionStatus.Pending };
-      fixture.billingTransactionRepository.findBy.mockResolvedValue([badRefTx, okTx, otherTx]);
+      fixture.persistence.pendingTransactions.mockResolvedValue([
+        badRefTx as unknown as import('@attraccess/application-models').BillingTransaction,
+        okTx as unknown as import('@attraccess/application-models').BillingTransaction,
+        otherTx as unknown as import('@attraccess/application-models').BillingTransaction,
+      ]);
       const spyUpdate = jest
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .spyOn<any, any>(fixture.service as any, 'updateTransactionStatusBySumupServer')
         .mockResolvedValue(undefined);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: any) => t);
+      fixture.persistence.saveTransaction.mockImplementation(async (t: any) => t);
 
       await fixture.service.processPendingTransactions();
 
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith(
+      expect(fixture.persistence.saveTransaction).toHaveBeenCalledWith(
         expect.objectContaining({ id: 1, status: BillingTransactionStatus.Failed }),
       );
       expect(spyUpdate).toHaveBeenCalledWith('abc');

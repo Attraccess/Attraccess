@@ -1,6 +1,5 @@
-import { TypeormTwoFactorPersistence } from './persistence/typeorm-adapter';
-import type { Repository } from 'typeorm';
-import type { AuthenticationDetail, Setting, User } from '@attraccess/database-entities';
+import { TwoFactorPersistence } from './persistence/port';
+import type { User } from '@attraccess/application-models';
 import type { SettingsService } from '../../settings/settings.service';
 import type { EncryptionService } from '../../encryption/encryption.service';
 import type { MetricsService } from '../../metrics/metrics.service';
@@ -12,7 +11,13 @@ jest.mock('otplib', () => ({
 }));
 const otp = jest.requireMock('otplib') as { verify: jest.Mock; generateURI: jest.Mock };
 describe('TwoFactorService enrollment and login', () => {
-  const repository = { findOne: jest.fn(), save: jest.fn(), delete: jest.fn() };
+  const persistence: jest.Mocked<TwoFactorPersistence> = {
+    findDetail: jest.fn(),
+    saveDetail: jest.fn(),
+    removeDetail: jest.fn(),
+    readPolicy: jest.fn(),
+    writePolicy: jest.fn(),
+  };
   const settings = { getUrl: jest.fn().mockResolvedValue('https://workspace.test') };
   const encryption = {
     encrypt: jest.fn((secret: string) => `encrypted:${secret}`),
@@ -23,22 +28,19 @@ describe('TwoFactorService enrollment and login', () => {
   let service: TwoFactorService;
   beforeEach(() => {
     jest.clearAllMocks();
-    repository.findOne.mockReset();
+    persistence.findDetail.mockReset();
     otp.verify.mockResolvedValue({ valid: true });
     service = new TwoFactorService(
-      new TypeormTwoFactorPersistence(
-        repository as unknown as Repository<AuthenticationDetail>,
-        {} as Repository<Setting>,
-      ),
+      persistence,
       settings as unknown as SettingsService,
       encryption as unknown as EncryptionService,
       metrics as unknown as MetricsService,
     );
   });
   it('stores an encrypted setup secret without enabling two-factor authentication prematurely', async () => {
-    repository.findOne.mockResolvedValue(null);
+    persistence.findDetail.mockResolvedValue(null);
     expect(await service.createSetup(user)).toEqual({ secret: 'TOTP-FIXTURE', otpauthUrl: 'otpauth://fixture' });
-    expect(repository.save).toHaveBeenCalledWith(
+    expect(persistence.saveDetail).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 7, totpSecret: 'encrypted:TOTP-FIXTURE', totpEnabledAt: null }),
     );
     expect(otp.generateURI).toHaveBeenCalledWith({
@@ -49,13 +51,15 @@ describe('TwoFactorService enrollment and login', () => {
     });
   });
   it('enables only initialized factors after validating a normalized code', async () => {
-    repository.findOne.mockResolvedValueOnce(null);
+    persistence.findDetail.mockResolvedValueOnce(null);
     await expect(service.enable(user, '123456')).rejects.toThrow('TwoFactorNotInitialized');
     const detail = { id: 9, totpSecret: 'encrypted:TOTP-FIXTURE', totpEnabledAt: null };
-    repository.findOne.mockResolvedValue(detail);
+    persistence.findDetail.mockResolvedValue(
+      detail as unknown as import('@attraccess/application-models').AuthenticationDetail,
+    );
     otp.verify.mockResolvedValueOnce({ valid: false });
     await expect(service.enable(user, '000000')).rejects.toThrow('TwoFactorInvalidCode');
-    expect(repository.save).not.toHaveBeenCalled();
+    expect(persistence.saveDetail).not.toHaveBeenCalled();
     await service.enable(user, '123 456');
     expect(otp.verify).toHaveBeenLastCalledWith({
       secret: 'TOTP-FIXTURE',
@@ -63,28 +67,38 @@ describe('TwoFactorService enrollment and login', () => {
       strategy: 'totp',
       epochTolerance: 30,
     });
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ totpEnabledAt: expect.any(Date) }));
-    repository.findOne.mockResolvedValue(repository.save.mock.calls.at(-1)?.[0]);
+    expect(persistence.saveDetail).toHaveBeenCalledWith(expect.objectContaining({ totpEnabledAt: expect.any(Date) }));
+    persistence.findDetail.mockResolvedValue(
+      persistence.saveDetail.mock.calls.at(-1)?.[0] as import('@attraccess/application-models').AuthenticationDetail,
+    );
     await expect(service.enable(user, '123456')).rejects.toThrow('TwoFactorAlreadyEnabled');
   });
   it('requires and validates a code for enabled factors while allowing unconfigured users through this check', async () => {
-    repository.findOne.mockResolvedValueOnce(null);
+    persistence.findDetail.mockResolvedValueOnce(null);
     await expect(service.assertTwoFactorForLogin(user, undefined)).resolves.toBeUndefined();
-    repository.findOne.mockResolvedValue({ id: 9, totpSecret: 'encrypted:TOTP-FIXTURE', totpEnabledAt: new Date() });
+    persistence.findDetail.mockResolvedValue({
+      id: 9,
+      totpSecret: 'encrypted:TOTP-FIXTURE',
+      totpEnabledAt: new Date(),
+    } as unknown as import('@attraccess/application-models').AuthenticationDetail);
     await expect(service.assertTwoFactorForLogin(user, undefined)).rejects.toThrow('TwoFactorRequired');
     otp.verify.mockResolvedValueOnce(false);
     await expect(service.assertTwoFactorForLogin(user, '000000')).rejects.toThrow('TwoFactorInvalidCode');
     await expect(service.assertTwoFactorForLogin(user, '123456')).resolves.toBeUndefined();
   });
   it('disables only enabled factors after successful verification', async () => {
-    repository.findOne.mockResolvedValueOnce(null);
+    persistence.findDetail.mockResolvedValueOnce(null);
     await expect(service.disable(user, '123456')).rejects.toThrow('TwoFactorNotEnabled');
-    repository.findOne.mockResolvedValue({ id: 9, totpSecret: 'encrypted:TOTP-FIXTURE', totpEnabledAt: new Date() });
+    persistence.findDetail.mockResolvedValue({
+      id: 9,
+      totpSecret: 'encrypted:TOTP-FIXTURE',
+      totpEnabledAt: new Date(),
+    } as unknown as import('@attraccess/application-models').AuthenticationDetail);
     otp.verify.mockResolvedValueOnce({ valid: false });
     await expect(service.disable(user, '000000')).rejects.toThrow('TwoFactorInvalidCode');
-    expect(repository.delete).not.toHaveBeenCalled();
+    expect(persistence.removeDetail).not.toHaveBeenCalled();
     await service.disable(user, '123456');
-    expect(repository.delete).toHaveBeenCalledWith(9);
+    expect(persistence.removeDetail).toHaveBeenCalledWith(9);
     expect(metrics.auth2faUsageTotal.inc).toHaveBeenCalledWith({ action: 'disable' });
   });
 });

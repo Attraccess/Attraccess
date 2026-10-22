@@ -26,7 +26,7 @@ describe('SsoService', () => {
     it('should return an array of SSO providers', async () => {
       const result = await fixture.service.getAllProviders();
       expect(result).toEqual([fixture.mockSSOProvider]);
-      expect(fixture.ssoProviderRepository.find).toHaveBeenCalled();
+      expect(fixture.persistence.allProviders).toHaveBeenCalled();
     });
   });
 
@@ -34,10 +34,7 @@ describe('SsoService', () => {
     it('should return a single SSO provider with OIDC configuration', async () => {
       const result = await fixture.service.getProviderByTypeAndIdWithConfiguration(SSOProviderType.OIDC, 1);
       expect(result).toEqual(fixture.mockSSOProviderWithOIDCConfig);
-      expect(fixture.ssoProviderRepository.findOne).toHaveBeenCalledWith({
-        where: { type: SSOProviderType.OIDC, id: 1 },
-        relations: ['oidcConfiguration'],
-      });
+      expect(fixture.persistence.providerByType).toHaveBeenCalledWith(1, SSOProviderType.OIDC);
     });
   });
 
@@ -45,14 +42,11 @@ describe('SsoService', () => {
     it('should return a single SSO provider by ID', async () => {
       const result = await fixture.service.getProviderById(1);
       expect(result).toEqual(fixture.mockSSOProviderWithOIDCConfig);
-      expect(fixture.ssoProviderRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 1 },
-        relations: ['oidcConfiguration', 'samlConfiguration'],
-      });
+      expect(fixture.persistence.providerById).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException if provider not found', async () => {
-      jest.spyOn(fixture.ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
+      jest.spyOn(fixture.persistence, 'providerById').mockResolvedValueOnce(null);
       await expect(fixture.service.getProviderById(999)).rejects.toThrow(NotFoundException);
     });
   });
@@ -77,12 +71,9 @@ describe('SsoService', () => {
 
       const result = await fixture.service.createProvider(createProviderDto);
 
-      expect(fixture.ssoProviderRepository.create).toHaveBeenCalledWith({
-        name: createProviderDto.name,
-        type: createProviderDto.type,
-      });
-      expect(fixture.ssoProviderRepository.save).toHaveBeenCalled();
-      expect(fixture.oidcConfigRepository.create).toHaveBeenCalledWith(
+      expect(fixture.persistence.createProvider).toHaveBeenCalledWith(createProviderDto.name, createProviderDto.type);
+      expect(fixture.persistence.createProvider).toHaveBeenCalled();
+      expect(fixture.persistence.createOidcConfiguration).toHaveBeenCalledWith(
         expect.objectContaining({
           endSessionURL: 'https://new-issuer.com/logout',
           jwksURL: 'https://new-issuer.com/jwks',
@@ -94,7 +85,7 @@ describe('SsoService', () => {
     });
 
     it('rolls back provider creation when the committed provider cannot be reloaded', async () => {
-      jest.spyOn(fixture.ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
+      jest.spyOn(fixture.persistence, 'providerById').mockResolvedValueOnce(null);
 
       await expect(
         fixture.service.createProvider({
@@ -110,7 +101,7 @@ describe('SsoService', () => {
           },
         }),
       ).rejects.toThrow('Provider not found after create');
-      expect(fixture.ssoProviderRepository.manager.transaction).toHaveBeenCalled();
+      expect(fixture.driver.run).toHaveBeenCalled();
     });
   });
 
@@ -118,34 +109,34 @@ describe('SsoService', () => {
     it('should update an existing provider', async () => {
       const updateDto = { name: 'Updated Provider' };
 
-      jest.spyOn(fixture.ssoProviderRepository, 'update').mockResolvedValueOnce(undefined);
+      jest.spyOn(fixture.persistence, 'renameProvider').mockResolvedValueOnce(undefined);
 
       const result = await fixture.service.updateProvider(1, updateDto);
 
-      expect(fixture.ssoProviderRepository.update).toHaveBeenCalledWith(1, { name: updateDto.name });
+      expect(fixture.persistence.renameProvider).toHaveBeenCalledWith(1, updateDto.name);
       expect(result).toEqual(fixture.mockSSOProviderWithOIDCConfig);
     });
 
     it('does not commit a provider update when its configuration write fails', async () => {
-      fixture.oidcConfigRepository.update.mockRejectedValueOnce(new Error('configuration write failed'));
+      fixture.persistence.patchOidcConfiguration.mockRejectedValueOnce(new Error('configuration write failed'));
 
       await expect(
         fixture.service.updateProvider(1, { oidcConfiguration: { issuer: 'https://changed.example.com' } }),
       ).rejects.toThrow('configuration write failed');
-      expect(fixture.ssoProviderRepository.manager.transaction).toHaveBeenCalled();
-      expect(fixture.ssoProviderRepository.update).not.toHaveBeenCalled();
+      expect(fixture.driver.run).toHaveBeenCalled();
+      expect(fixture.persistence.renameProvider).not.toHaveBeenCalled();
     });
 
     it('rolls back a provider update when the committed provider cannot be reloaded', async () => {
       jest
-        .spyOn(fixture.ssoProviderRepository, 'findOne')
+        .spyOn(fixture.persistence, 'providerById')
         .mockResolvedValueOnce(fixture.mockSSOProviderWithOIDCConfig)
         .mockResolvedValueOnce(null);
 
       await expect(fixture.service.updateProvider(1, { name: 'Changed Provider' })).rejects.toThrow(
         'Provider not found after update',
       );
-      expect(fixture.ssoProviderRepository.manager.transaction).toHaveBeenCalled();
+      expect(fixture.driver.run).toHaveBeenCalled();
     });
   });
 
@@ -164,7 +155,7 @@ describe('SsoService', () => {
       });
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
-      const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      const updateCall = (fixture.persistence.patchOidcConfiguration as jest.Mock).mock.calls[0];
       expect(updateCall[1]).not.toHaveProperty('clientSecret');
     });
 
@@ -174,7 +165,7 @@ describe('SsoService', () => {
       });
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
-      const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      const updateCall = (fixture.persistence.patchOidcConfiguration as jest.Mock).mock.calls[0];
       expect(updateCall[1]).not.toHaveProperty('clientSecret');
     });
 
@@ -184,7 +175,7 @@ describe('SsoService', () => {
       });
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
-      const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      const updateCall = (fixture.persistence.patchOidcConfiguration as jest.Mock).mock.calls[0];
       expect(updateCall[1]).not.toHaveProperty('clientSecret');
     });
 
@@ -194,7 +185,7 @@ describe('SsoService', () => {
       });
 
       expect(fixture.encryptionService.encrypt).toHaveBeenCalledWith('new-secret');
-      const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      const updateCall = (fixture.persistence.patchOidcConfiguration as jest.Mock).mock.calls[0];
       expect(updateCall[1]).toHaveProperty('clientSecret', 'enc:new-secret');
     });
   });
@@ -206,19 +197,17 @@ describe('SsoService', () => {
       signingAlgorithms: ['RS256'],
     };
     await fixture.service.updateProvider(1, { oidcConfiguration: settings });
-    expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith({ ssoProviderId: 1 }, settings);
+    expect(fixture.persistence.patchOidcConfiguration).toHaveBeenLastCalledWith(1, settings);
     await fixture.service.updateProvider(1, { oidcConfiguration: { clientId: 'changed-client' } });
-    expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
-      { ssoProviderId: 1 },
-      { clientId: 'changed-client' },
-    );
+    expect(fixture.persistence.patchOidcConfiguration).toHaveBeenLastCalledWith(1, { clientId: 'changed-client' });
     await fixture.service.updateProvider(1, {
       oidcConfiguration: { endSessionURL: null, jwksURL: null, signingAlgorithms: null },
     });
-    expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
-      { ssoProviderId: 1 },
-      { endSessionURL: null, jwksURL: null, signingAlgorithms: null },
-    );
+    expect(fixture.persistence.patchOidcConfiguration).toHaveBeenLastCalledWith(1, {
+      endSessionURL: null,
+      jwksURL: null,
+      signingAlgorithms: null,
+    });
     await expect(
       fixture.service.updateProvider(1, { oidcConfiguration: { signingAlgorithms: ['HS256'] } }),
     ).rejects.toThrow('Unsupported');
@@ -239,7 +228,7 @@ describe('SsoService', () => {
         oidcConfiguration: { ...baseOidcUpdate, roleMappings: asMappings(null) },
       });
 
-      const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      const updateCall = (fixture.persistence.patchOidcConfiguration as jest.Mock).mock.calls[0];
       expect(updateCall[1]).toHaveProperty('roleMappings', null);
     });
 
@@ -248,7 +237,7 @@ describe('SsoService', () => {
         oidcConfiguration: { ...baseOidcUpdate, roleMappings: {} },
       });
 
-      const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      const updateCall = (fixture.persistence.patchOidcConfiguration as jest.Mock).mock.calls[0];
       expect(updateCall[1]).toHaveProperty('roleMappings');
       expect(updateCall[1].roleMappings).toEqual({});
     });
@@ -258,7 +247,7 @@ describe('SsoService', () => {
         oidcConfiguration: { ...baseOidcUpdate },
       });
 
-      const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
+      const updateCall = (fixture.persistence.patchOidcConfiguration as jest.Mock).mock.calls[0];
       expect(updateCall[1]).not.toHaveProperty('roleMappings');
     });
   });
@@ -267,12 +256,12 @@ describe('SsoService', () => {
     it('should delete a provider and its OIDC configuration', async () => {
       await fixture.service.deleteProvider(1);
 
-      expect(fixture.oidcConfigRepository.delete).toHaveBeenCalledWith(fixture.mockOIDCConfig.id);
-      expect(fixture.ssoProviderRepository.delete).toHaveBeenCalledWith(1);
+      expect(fixture.persistence.removeOidcConfiguration).toHaveBeenCalledWith(fixture.mockOIDCConfig.id);
+      expect(fixture.persistence.removeProvider).toHaveBeenCalledWith(1);
     });
 
     it('should throw NotFoundException if provider not found', async () => {
-      jest.spyOn(fixture.ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
+      jest.spyOn(fixture.persistence, 'providerById').mockResolvedValueOnce(null);
 
       await expect(fixture.service.deleteProvider(999)).rejects.toThrow(NotFoundException);
     });
@@ -322,7 +311,7 @@ describe('SsoService', () => {
     });
 
     it('encrypts private key material when provided', async () => {
-      jest.spyOn(fixture.samlConfigRepository, 'create');
+      jest.spyOn(fixture.persistence, 'createSamlConfiguration');
 
       await callCreateSAMLConfiguration({
         ...baseSamlConfig,
@@ -332,7 +321,7 @@ describe('SsoService', () => {
       });
 
       expect(fixture.encryptionService.encrypt).toHaveBeenCalledWith(expect.stringContaining('BEGIN PRIVATE KEY'));
-      expect(fixture.samlConfigRepository.create).toHaveBeenCalledWith(
+      expect(fixture.persistence.createSamlConfiguration).toHaveBeenCalledWith(
         expect.objectContaining({
           spSigningCertificate: 'ABC',
           spSigningKeyEncrypted: expect.stringContaining('BEGIN PRIVATE KEY'),
@@ -343,7 +332,7 @@ describe('SsoService', () => {
 
     it('updates all SAML options and can explicitly clear sensitive signing material', async () => {
       jest
-        .mocked(fixture.samlConfigRepository.findOne)
+        .mocked(fixture.persistence.samlConfiguration)
         .mockResolvedValue({ ...baseSamlConfig, spSigningKeyEncrypted: 'enc:old-key' } as SSOProviderSAMLConfiguration);
       const update = (
         fixture.service as unknown as { updateSAMLConfiguration: (id: number, config: object) => Promise<unknown> }
@@ -365,8 +354,8 @@ describe('SsoService', () => {
         spSigningCertificate: '-----BEGIN CERTIFICATE-----SPCERT-----END CERTIFICATE-----',
         spSigningPrivateKey: '-----BEGIN PRIVATE KEY-----new-secret-----END PRIVATE KEY-----',
       });
-      expect(fixture.samlConfigRepository.update).toHaveBeenCalledWith(
-        { ssoProviderId: 1 },
+      expect(fixture.persistence.patchSamlConfiguration).toHaveBeenCalledWith(
+        1,
         expect.objectContaining({
           entryPoint: 'https://new-idp.example/sso',
           issuer: 'new-issuer',
@@ -392,23 +381,20 @@ describe('SsoService', () => {
         spSigningCertificate: '',
         spSigningPrivateKey: '',
       });
-      expect(fixture.samlConfigRepository.update).toHaveBeenLastCalledWith(
-        { ssoProviderId: 1 },
-        {
-          signRequest: false,
-          provisioningSecret: null,
-          roleMappings: null,
-          spSigningCertificate: null,
-          spSigningKeyEncrypted: null,
-          spSigningKeyEncryptionKeyId: null,
-        },
-      );
-      jest.mocked(fixture.samlConfigRepository.findOne).mockResolvedValue(null);
+      expect(fixture.persistence.patchSamlConfiguration).toHaveBeenLastCalledWith(1, {
+        signRequest: false,
+        provisioningSecret: null,
+        roleMappings: null,
+        spSigningCertificate: null,
+        spSigningKeyEncrypted: null,
+        spSigningKeyEncryptionKeyId: null,
+      });
+      jest.mocked(fixture.persistence.samlConfiguration).mockResolvedValue(null);
       await expect(update(1, {})).rejects.toThrow('SAML configuration not found');
     });
 
     it('does not re-encrypt a canonical-equivalent signing key', async () => {
-      jest.mocked(fixture.samlConfigRepository.findOne).mockResolvedValue({
+      jest.mocked(fixture.persistence.samlConfiguration).mockResolvedValue({
         ...baseSamlConfig,
         spSigningKeyEncrypted: 'enc:-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----',
       } as SSOProviderSAMLConfiguration);
@@ -422,7 +408,7 @@ describe('SsoService', () => {
       });
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
-      expect(fixture.samlConfigRepository.update).toHaveBeenCalledWith({ ssoProviderId: 1 }, {});
+      expect(fixture.persistence.patchSamlConfiguration).toHaveBeenCalledWith(1, {});
     });
   });
 });

@@ -1,35 +1,20 @@
 import { BillingLivePersistence } from '../persistence/port';
-import { TypeormBillingLivePersistence } from '../persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { LiveNotificationsService } from './live-notifications.service';
-import { BillingTransaction } from '@attraccess/database-entities';
+import { BillingTransaction } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 
 describe('LiveNotificationsService', () => {
   let service: LiveNotificationsService;
-  let billingTransactionRepository: jest.Mocked<Repository<BillingTransaction>>;
+  let persistence: jest.Mocked<BillingLivePersistence>;
 
   beforeEach(async () => {
+    persistence = { transactionWithItems: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LiveNotificationsService,
-        { provide: BillingLivePersistence, useClass: TypeormBillingLivePersistence },
-        {
-          provide: getRepositoryToken(BillingTransaction),
-          useValue: {
-            findOneBy: jest.fn(),
-            findOne: jest.fn(),
-          },
-        },
-      ],
+      providers: [LiveNotificationsService, { provide: BillingLivePersistence, useValue: persistence }],
     }).compile();
 
     service = module.get(LiveNotificationsService);
-    billingTransactionRepository = module.get(getRepositoryToken(BillingTransaction)) as jest.Mocked<
-      Repository<BillingTransaction>
-    >;
   });
 
   it('should be defined', () => {
@@ -49,34 +34,33 @@ describe('LiveNotificationsService', () => {
   describe('notifyTransactionUpdate', () => {
     it('emits the transaction on the user subject when found by id', async () => {
       const transaction = { id: 123, userId: 77, items: [] } as unknown as BillingTransaction;
-      // service uses findOne with relations
-      billingTransactionRepository.findOne.mockResolvedValue(transaction);
+      persistence.transactionWithItems.mockResolvedValue(transaction);
 
       const received: Array<{ data: BillingTransaction }> = [];
       service.getTransactionSubject(77).subscribe((payload) => received.push(payload));
 
       await service.notifyTransactionUpdate(123);
 
-      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith({ where: { id: 123 }, relations: ['items'] });
+      expect(persistence.transactionWithItems).toHaveBeenCalledWith(123);
       expect(received).toHaveLength(1);
       expect(received[0]).toEqual({ data: transaction });
     });
 
     it('emits when called with a transaction object as input', async () => {
       const tx = { id: 555, userId: 5, items: [] } as unknown as BillingTransaction;
-      billingTransactionRepository.findOne.mockResolvedValue(tx);
+      persistence.transactionWithItems.mockResolvedValue(tx);
 
       const nextSpy = jest.fn();
       service.getTransactionSubject(5).subscribe(nextSpy);
 
       await service.notifyTransactionUpdate(tx);
 
-      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith({ where: { id: 555 }, relations: ['items'] });
+      expect(persistence.transactionWithItems).toHaveBeenCalledWith(555);
       expect(nextSpy).toHaveBeenCalledWith({ data: tx });
     });
 
     it('throws BadRequestException when transaction not found', async () => {
-      billingTransactionRepository.findOne.mockResolvedValue(null);
+      persistence.transactionWithItems.mockResolvedValue(null);
 
       await expect(service.notifyTransactionUpdate(999)).rejects.toBeInstanceOf(BadRequestException);
     });

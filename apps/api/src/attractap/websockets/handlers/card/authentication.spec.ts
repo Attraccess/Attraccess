@@ -227,7 +227,7 @@ describe('AttractapCardHandler', () => {
       );
       handleCardAuthenticationRequestScope.resourceUsageService.canControllResource.mockResolvedValueOnce(true);
       handleCardAuthenticationRequestScope.resourceIntroducersService.isIntroducer.mockResolvedValueOnce(false);
-      handleCardAuthenticationRequestScope.resourceRepository.findOne.mockResolvedValueOnce({
+      handleCardAuthenticationRequestScope.resourceReader.findResource.mockResolvedValueOnce({
         id: 10,
         supervisionMode: 'supervision_required',
       });
@@ -252,7 +252,7 @@ describe('AttractapCardHandler', () => {
       );
       handleCardAuthenticationRequestScope.resourceUsageService.canControllResource.mockResolvedValueOnce(false);
       handleCardAuthenticationRequestScope.resourceIntroducersService.isIntroducer.mockResolvedValueOnce(false);
-      handleCardAuthenticationRequestScope.resourceRepository.findOne.mockResolvedValueOnce({
+      handleCardAuthenticationRequestScope.resourceReader.findResource.mockResolvedValueOnce({
         id: 10,
         supervisionMode: 'supervision_allowed',
       });

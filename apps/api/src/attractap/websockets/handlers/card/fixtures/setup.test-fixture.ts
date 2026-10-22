@@ -1,4 +1,4 @@
-import { TypeormAttractapResourceReader } from '../../../../persistence/typeorm-adapter';
+import { AttractapResourceReader } from '../../../../persistence/port';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the original handler test policy for partial protocol mocks. */
 import { SettingsService } from '../../../../../settings/settings.service';
 import { AttractapCardHandler } from '../card.handler';
@@ -29,8 +29,8 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   scope.resourceIntroducersService = { isIntroducer: jest.fn().mockResolvedValue(false) };
   scope.metricsService = { attractapNfcTapsTotal: { inc: jest.fn() } };
   // Default: a resource that does not support supervision (introduction_required).
-  scope.resourceRepository = {
-    findOne: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }),
+  scope.resourceReader = {
+    findResource: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }),
   };
   scope.rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
   scope.audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
@@ -45,7 +45,7 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   (scope.handler as any).resourceUsageService = scope.resourceUsageService;
   (scope.handler as any).resourceIntroducersService = scope.resourceIntroducersService;
   (scope.handler as any).metricsService = scope.metricsService;
-  (scope.handler as any).resourceReader = new TypeormAttractapResourceReader(scope.resourceRepository as never);
+  (scope.handler as any).resourceReader = scope.resourceReader satisfies jest.Mocked<AttractapResourceReader>;
   (scope.handler as any).rbacService = scope.rbacService;
   (scope.handler as any).audit = scope.audit;
 }

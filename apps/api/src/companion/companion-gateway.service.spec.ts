@@ -1,10 +1,8 @@
 import { CompanionPersistence } from './persistence/port';
-import { TypeormCompanionPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CompanionGatewayService } from './companion-gateway.service';
-import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/application-models';
 import { CompanionEventType, CompanionSocket } from './companion.types';
 
 function makeSocket(deviceId: number | null, overrides: Partial<CompanionSocket> = {}): CompanionSocket {
@@ -17,13 +15,15 @@ function makeSocket(deviceId: number | null, overrides: Partial<CompanionSocket>
   } as unknown as CompanionSocket;
 }
 
-const mockDeviceRepo = { findOne: jest.fn(), update: jest.fn() };
-const mockFlowNodeRepo = {
-  createQueryBuilder: jest.fn().mockReturnValue({
-    innerJoinAndSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  }),
+const persistence: jest.Mocked<CompanionPersistence> = {
+  register: jest.fn(),
+  findById: jest.fn(),
+  touchConnection: jest.fn(),
+  listDevices: jest.fn(),
+  rename: jest.fn(),
+  remove: jest.fn(),
+  setLocked: jest.fn(),
+  lockCommandNodes: jest.fn().mockResolvedValue([]),
 };
 
 describe('CompanionGatewayService', () => {
@@ -34,9 +34,7 @@ describe('CompanionGatewayService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompanionGatewayService,
-        { provide: CompanionPersistence, useClass: TypeormCompanionPersistence },
-        { provide: getRepositoryToken(CompanionDevice), useValue: mockDeviceRepo },
-        { provide: getRepositoryToken(ResourceFlowNode), useValue: mockFlowNodeRepo },
+        { provide: CompanionPersistence, useValue: persistence },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
@@ -59,7 +57,7 @@ describe('CompanionGatewayService', () => {
       const result = await service.sendLockCommand(999);
 
       expect(result).toBe(false);
-      expect(mockDeviceRepo.update).toHaveBeenCalledWith(999, { locked: true });
+      expect(persistence.setLocked).toHaveBeenCalledWith(999, true);
     });
   });
 
@@ -78,7 +76,7 @@ describe('CompanionGatewayService', () => {
       const result = await service.sendUnlockCommand(999);
 
       expect(result).toBe(false);
-      expect(mockDeviceRepo.update).toHaveBeenCalledWith(999, { locked: false });
+      expect(persistence.setLocked).toHaveBeenCalledWith(999, false);
     });
   });
 
@@ -112,12 +110,7 @@ describe('CompanionGatewayService', () => {
         { type: 'output.companion.lock-pc', data: { deviceId: 99 }, resource: { id: 44, name: 'Other' } },
       ];
 
-      const qb = {
-        innerJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(mockNodes),
-      };
-      mockFlowNodeRepo.createQueryBuilder.mockReturnValue(qb);
+      persistence.lockCommandNodes.mockResolvedValue(mockNodes as unknown as ResourceFlowNode[]);
 
       const resources = await service.getResourcesForDevice(10);
       expect(resources).toHaveLength(2);

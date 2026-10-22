@@ -1,9 +1,8 @@
 import { TypeormGroupPersistence } from './persistence/typeorm-adapter';
 import { GroupPersistence } from './persistence/port';
 
-import { Resource, ResourceGroup, ResourceIntroducer, ResourceIntroduction } from '@attraccess/database-entities';
+import { ResourceGroup } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
 import { DataSource, EntitySchema } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
@@ -11,8 +10,18 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { ResourceGroupsService } from './resourceGroups.service';
 
 describe('ResourceGroupsService audit events', () => {
-  const groupRepository = { create: jest.fn(), save: jest.fn(), findOne: jest.fn(), delete: jest.fn() };
-  const resourceRepository = { findOne: jest.fn() };
+  const persistence: jest.Mocked<GroupPersistence> = {
+    visibleGroups: jest.fn(),
+    hasVisibleResources: jest.fn(),
+    group: jest.fn(),
+    resource: jest.fn(),
+    createGroup: jest.fn(),
+    saveGroup: jest.fn(),
+    deleteGroup: jest.fn(),
+    introducerCount: jest.fn(),
+    hasActiveIntroduction: jest.fn(),
+    groupsOfResource: jest.fn(),
+  };
   const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
   let service: ResourceGroupsService;
 
@@ -22,16 +31,7 @@ describe('ResourceGroupsService audit events', () => {
       await Test.createTestingModule({
         providers: [
           ResourceGroupsService,
-          {
-            provide: GroupPersistence,
-            useValue: new TypeormGroupPersistence({
-              getRepository: (entity: unknown) => (entity === ResourceGroup ? groupRepository : resourceRepository),
-            } as never),
-          },
-          { provide: getRepositoryToken(ResourceGroup), useValue: groupRepository },
-          { provide: getRepositoryToken(Resource), useValue: resourceRepository },
-          { provide: getRepositoryToken(ResourceIntroducer), useValue: {} },
-          { provide: getRepositoryToken(ResourceIntroduction), useValue: {} },
+          { provide: GroupPersistence, useValue: persistence },
           { provide: EventEmitter2, useValue: { emit: jest.fn() } },
           { provide: MetricsService, useValue: { resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn() } } },
           { provide: AuditService, useValue: audit },
@@ -42,8 +42,8 @@ describe('ResourceGroupsService audit events', () => {
 
   it('audits group creation and safe updates', async () => {
     const group = { id: 5, name: 'Workshop', description: 'Old description', isHidden: false } as ResourceGroup;
-    groupRepository.create.mockReturnValue(group);
-    groupRepository.save.mockResolvedValue(group);
+    persistence.createGroup.mockResolvedValue(group);
+    persistence.saveGroup.mockResolvedValue(group);
     await service.createOne({ name: 'Workshop' }, { id: 9 });
     expect(audit.recordResource).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -54,7 +54,7 @@ describe('ResourceGroupsService audit events', () => {
     );
 
     jest.spyOn(service, 'getOne').mockResolvedValue(group);
-    groupRepository.save.mockResolvedValue({
+    persistence.saveGroup.mockResolvedValue({
       ...group,
       name: 'Machines',
       description: 'New description',
@@ -78,8 +78,8 @@ describe('ResourceGroupsService audit events', () => {
   it('audits membership changes and deletion without group descriptions', async () => {
     const group = { id: 5, name: 'Workshop', isHidden: false, resources: [] } as ResourceGroup;
     jest.spyOn(service, 'getOne').mockResolvedValue(group);
-    resourceRepository.findOne.mockResolvedValue({ id: 7 });
-    groupRepository.save.mockResolvedValue(group);
+    persistence.resource.mockResolvedValue({ id: 7 } as unknown as import('@attraccess/application-models').Resource);
+    persistence.saveGroup.mockResolvedValue(group);
     await service.addResource(5, 7, { id: 9 });
     expect(audit.recordResource).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -97,7 +97,7 @@ describe('ResourceGroupsService audit events', () => {
       }),
     );
 
-    groupRepository.delete.mockResolvedValue({ affected: 1 });
+    persistence.deleteGroup.mockResolvedValue(1);
     await service.deleteOne(5, { id: 9 });
     expect(audit.recordResource).toHaveBeenLastCalledWith(
       expect.objectContaining({

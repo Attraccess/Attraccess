@@ -1,8 +1,7 @@
-import { TypeormAttractapPersistence } from './persistence/typeorm-adapter';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { AuditService } from '../audit/audit.service';
-import { DeleteResult, Repository } from 'typeorm';
-import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
+import { attractapOperationsFake } from './persistence/operations.test-fixture';
+import { AttractapPersistence } from './persistence/port';
+
+import { AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/application-models';
 import { AttractapService } from './attractap.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -13,12 +12,7 @@ import { AttractapFirmwareService } from './firmware.service';
 
 describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID card notifications (%s)', (locale) => {
   let service: AttractapService;
-  let nfcCardRepository: {
-    findOne: jest.Mock;
-    update: jest.Mock;
-    delete: jest.Mock;
-    manager: { transaction: jest.Mock };
-  };
+  let persistence: jest.Mocked<AttractapPersistence>;
   let notifications: { dispatch: jest.Mock };
 
   const user = { id: 12, username: 'jane', locale } as User;
@@ -26,22 +20,10 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
 
   beforeEach(() => {
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
-    nfcCardRepository = {
-      findOne: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      manager: {
-        transaction: jest.fn(),
-      },
-    };
-
-    service = makeService(
-      nfcCardRepository as unknown as Repository<NFCCard>,
-      {} as Repository<Attractap>,
-      {} as Repository<AttractapCrashReport>,
+    persistence = attractapOperationsFake();
+    service = new AttractapService(
+      persistence,
       { emit: jest.fn() } as never,
-      {} as Repository<Resource>,
-      {} as Repository<User>,
       {
         encrypt: jest.fn((value: string) => `encrypted:${value}`),
         decryptIfEncrypted: jest.fn((value: string) => value),
@@ -55,12 +37,7 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
   });
 
   it('notifies the card owner when an RFID card is registered', async () => {
-    nfcCardRepository.manager.transaction.mockImplementation(async (callback) => {
-      return callback({
-        update: jest.fn().mockResolvedValue(undefined),
-        save: jest.fn().mockResolvedValue(card),
-      });
-    });
+    persistence.registerActiveCard.mockResolvedValue(card);
 
     await service.createNFCCard(user, { uid: card.uid, key: card.key, keyNo: card.keyNo });
 
@@ -84,18 +61,7 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
   });
 
   it('notifies the card owner when an RFID card is activated', async () => {
-    nfcCardRepository.manager.transaction.mockImplementation(async (callback) => {
-      return callback({
-        findOne: jest.fn().mockResolvedValue(card),
-        createQueryBuilder: jest.fn().mockReturnValue({
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue(undefined),
-        }),
-        save: jest.fn().mockResolvedValue(card),
-      });
-    });
+    persistence.activateCard.mockResolvedValue(card);
 
     await service.activateNFCCard(card.id);
 
@@ -117,8 +83,7 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
   });
 
   it('notifies the card owner when an RFID card is deactivated', async () => {
-    nfcCardRepository.update.mockResolvedValue({ affected: 1 } as never);
-    nfcCardRepository.findOne.mockResolvedValue(card as never);
+    persistence.cardById.mockResolvedValue(card as never);
 
     await service.deactivateNFCCard(card.id);
 
@@ -140,8 +105,8 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
   });
 
   it('notifies the card owner when an RFID card is deleted', async () => {
-    nfcCardRepository.findOne.mockResolvedValue(card as never);
-    nfcCardRepository.delete.mockResolvedValue({ affected: 1 } as DeleteResult);
+    persistence.cardById.mockResolvedValue(card as never);
+    persistence.removeCard.mockResolvedValue(true);
 
     await service.deleteNFCCard(card.id);
 
@@ -173,25 +138,22 @@ describe('AttractapService reader maintenance and crash reports', () => {
       firmware: { name: 'Reader', variant: 'standard', version: '1.0', capabilities: { resourceSelection: false } },
       resources: [],
     };
-    const readers = { findOne: jest.fn().mockResolvedValue(reader), save: jest.fn(async (value) => value) };
-    const reports = {
-      save: jest.fn(async (value) => ({ id: 7, ...value })),
-      update: jest.fn(),
-      find: jest.fn().mockResolvedValue([]),
-    };
+    const persistence = attractapOperationsFake();
+    const readerLookup = jest.fn().mockResolvedValue(reader);
+    persistence.readerWithResources = readerLookup;
+    persistence.readerFirmware = readerLookup;
+    persistence.saveReader.mockImplementation(async (value) => value);
+    persistence.recordCrash.mockImplementation(async (value) => ({ id: 7, ...value }) as AttractapCrashReport);
+    persistence.readerCrashReports.mockResolvedValue([]);
     const events = { emit: jest.fn() };
-    const resources = { find: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]) };
+    persistence.resourcesByIds.mockImplementation(async (ids) => ids.map((id) => ({ id }) as Resource));
     const symbolication = {
       symbolicate: jest.fn().mockResolvedValue({ buildId: 'build', status: 'completed', backtrace: 'task: main' }),
     };
     const firmware = { getFirmwareDefinition: jest.fn().mockReturnValue({ version: '2.0' }) };
-    const service = makeService(
-      {} as never,
-      readers as never,
-      reports as never,
+    const service = new AttractapService(
+      persistence,
       events as never,
-      resources as never,
-      {} as never,
       {} as never,
       {} as never,
       symbolication as never,
@@ -199,13 +161,13 @@ describe('AttractapService reader maintenance and crash reports', () => {
       {} as never,
       {} as never,
     );
-    return { service, readers, reader, reports, events, resources, symbolication, firmware };
+    return { service, persistence, reader, events, symbolication, firmware };
   };
   it('updates reader settings, limits resources for unsupported firmware, and emits the saved reader', async () => {
-    const { service, readers, events } = setup();
+    const { service, persistence, events } = setup();
     const result = await service.updateReader(4, { name: 'Renamed', ledBrightness: 0, connectedResourceIds: [1, 2] });
     expect(result).toMatchObject({ name: 'Renamed', ledBrightness: 0, resources: [{ id: 1 }] });
-    expect(readers.save).toHaveBeenCalledWith(result);
+    expect(persistence.saveReader).toHaveBeenCalledWith(result);
     expect(events.emit).toHaveBeenCalledTimes(1);
   });
   it('allows resource selection when supported and can clear attachments without emitting an event', async () => {
@@ -216,7 +178,7 @@ describe('AttractapService reader maintenance and crash reports', () => {
     expect(events.emit).not.toHaveBeenCalled();
   });
   it('normalizes crash report metrics and avoids symbolication when no dump is provided', async () => {
-    const { service, reports, symbolication } = setup();
+    const { service, persistence, symbolication } = setup();
     const report = await service.createCrashReport(4, {
       resetReason: 'panic',
       heapFreeBytes: 123.9,
@@ -231,13 +193,13 @@ describe('AttractapService reader maintenance and crash reports', () => {
       coredumpSize: null,
       symbolicationStatus: null,
     });
-    expect(reports.save).toHaveBeenCalledWith(
+    expect(persistence.recordCrash).toHaveBeenCalledWith(
       expect.objectContaining({ attractapId: 4, rebootReason: null, wsState: null }),
     );
     expect(symbolication.symbolicate).not.toHaveBeenCalled();
   });
   it('symbolicates the binary dump but omits its bytes from the response', async () => {
-    const { service, symbolication, reports } = setup();
+    const { service, symbolication, persistence } = setup();
     const report = await service.createCrashReport(4, {
       resetReason: 'panic',
       coredumpBase64: Buffer.from('dump').toString('base64'),
@@ -253,41 +215,15 @@ describe('AttractapService reader maintenance and crash reports', () => {
       symbolicationStatus: 'completed',
       symbolizedBacktrace: 'task: main',
     });
-    expect(reports.update).toHaveBeenCalledWith(7, expect.objectContaining({ coredumpBuildId: 'build' }));
+    expect(persistence.recordSymbolication).toHaveBeenCalledWith(7, 'completed', 'task: main', 'build');
   });
   it('looks up installed and server firmware while listing crash reports', async () => {
-    const { service, firmware, readers } = setup();
+    const { service, firmware, persistence } = setup();
     expect(await service.getCrashReportsForReader(4)).toEqual([]);
     expect(firmware.getFirmwareDefinition).toHaveBeenCalledWith('Reader', 'standard');
-    readers.findOne.mockResolvedValue(null);
+    persistence.readerFirmware.mockResolvedValue(null);
     firmware.getFirmwareDefinition.mockClear();
     expect(await service.getCrashReportsForReader(99)).toEqual([]);
     expect(firmware.getFirmwareDefinition).not.toHaveBeenCalled();
   });
 });
-
-function makeService(
-  cards: Repository<NFCCard>,
-  readers: Repository<Attractap>,
-  crashes: Repository<AttractapCrashReport>,
-  events: EventEmitter2,
-  resources: Repository<Resource>,
-  users: Repository<User>,
-  encryption: EncryptionService,
-  metrics: MetricsService,
-  symbolication: CoredumpSymbolicationService,
-  firmware: AttractapFirmwareService,
-  notifications: NotificationDispatchService,
-  audit: AuditService,
-): AttractapService {
-  return new AttractapService(
-    new TypeormAttractapPersistence(cards, readers, crashes, resources, users),
-    events,
-    encryption,
-    metrics,
-    symbolication,
-    firmware,
-    notifications,
-    audit,
-  );
-}

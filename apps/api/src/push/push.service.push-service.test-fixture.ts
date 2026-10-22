@@ -1,8 +1,6 @@
 import { PushPersistence } from './persistence/port';
-import { TypeormPushPersistence } from './persistence/typeorm-adapter';
-import { PushSubscription } from '@attraccess/database-entities';
+import { PushSubscription } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import * as webpush from 'web-push';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
@@ -20,15 +18,7 @@ const VALID_PUBLIC_KEY = Buffer.alloc(65, 4).toString('base64url');
 
 const VALID_PRIVATE_KEY = Buffer.alloc(32, 7).toString('base64url');
 export function registerPushServiceFixture() {
-  let subscriptionRepository: {
-    find: jest.Mock;
-    findOne: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
-    delete: jest.Mock;
-    count: jest.Mock;
-    createQueryBuilder: jest.Mock;
-  };
+  let persistence: jest.Mocked<PushPersistence>;
 
   let settingsStore: {
     getPlainSetting: jest.Mock;
@@ -43,14 +33,11 @@ export function registerPushServiceFixture() {
     getSmtpConfiguration: jest.Mock;
   };
 
-  let deleteExecute: jest.Mock;
-
   async function createService(): Promise<PushService> {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PushService,
-        { provide: PushPersistence, useClass: TypeormPushPersistence },
-        { provide: getRepositoryToken(PushSubscription), useValue: subscriptionRepository },
+        { provide: PushPersistence, useValue: persistence },
         { provide: SettingsStoreService, useValue: settingsStore },
         { provide: SettingsService, useValue: settingsService },
       ],
@@ -81,17 +68,13 @@ export function registerPushServiceFixture() {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    deleteExecute = jest.fn().mockResolvedValue({ affected: 0 });
-    subscriptionRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      create: jest.fn((data) => data),
-      save: jest.fn((data) => Promise.resolve(data)),
-      delete: jest.fn(),
-      count: jest.fn().mockResolvedValue(0),
-      createQueryBuilder: jest.fn(() => ({
-        delete: () => ({ execute: deleteExecute }),
-      })),
+    persistence = {
+      countSubscriptions: jest.fn().mockResolvedValue(0),
+      removeAllSubscriptions: jest.fn().mockResolvedValue(0),
+      registerSubscription: jest.fn(),
+      removeOwnedSubscription: jest.fn(),
+      listUserSubscriptions: jest.fn(),
+      removeStaleSubscription: jest.fn(),
     };
     settingsStore = {
       getPlainSetting: jest.fn(),
@@ -119,17 +102,14 @@ export function registerPushServiceFixture() {
     get VALID_PRIVATE_KEY() {
       return VALID_PRIVATE_KEY;
     },
-    get subscriptionRepository() {
-      return subscriptionRepository;
+    get persistence() {
+      return persistence;
     },
     get settingsStore() {
       return settingsStore;
     },
     get settingsService() {
       return settingsService;
-    },
-    get deleteExecute() {
-      return deleteExecute;
     },
     get createService() {
       return createService;

@@ -1,9 +1,6 @@
 import { AuthenticationPersistence } from './persistence/port';
-import { TypeormAuthenticationPersistence } from './persistence/typeorm-adapter';
-import { AuthenticationDetail } from '@attraccess/database-entities';
+import { AuthenticationDetail } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
@@ -20,24 +17,27 @@ const mockMetricsService = {
   authLoginTotal: { inc: jest.fn() },
 };
 
-const AuthenticationDetailRepository = getRepositoryToken(AuthenticationDetail);
 export function registerAuthServiceFixture() {
   let authService: AuthService;
 
-  let authenticationDetailRepository: Repository<AuthenticationDetail>;
+  let persistence: jest.Mocked<AuthenticationPersistence>;
 
   let usersService: UsersService;
 
   beforeEach(async () => {
+    persistence = {
+      ssoIdentity: jest.fn(),
+      ssoCount: jest.fn(),
+      detail: jest.fn(),
+      updateSubject: jest.fn(),
+      removeDetail: jest.fn(),
+      saveAuthentication: jest.fn(async (value) => value as AuthenticationDetail),
+    };
     const module: TestingModule = await Test.createTestingModule({
       imports: [],
       providers: [
         AuthService,
-        {
-          provide: AuthenticationPersistence,
-          useFactory: (repo) => new TypeormAuthenticationPersistence(repo),
-          inject: [AuthenticationDetailRepository],
-        },
+        { provide: AuthenticationPersistence, useValue: persistence },
         {
           provide: UsersService,
           useValue: {
@@ -47,17 +47,6 @@ export function registerAuthServiceFixture() {
             isSSOUser: jest.fn().mockResolvedValue(false),
           },
         },
-        {
-          provide: AuthenticationDetailRepository,
-          useValue: {
-            findOne: jest.fn(),
-            count: jest.fn(),
-            create: jest.fn((value) => value),
-            save: jest.fn(async (value) => value),
-            update: jest.fn(),
-          },
-        },
-
         {
           provide: EmailService,
           useValue: {
@@ -84,7 +73,6 @@ export function registerAuthServiceFixture() {
     }).compile();
 
     authService = module.get<AuthService>(AuthService);
-    authenticationDetailRepository = module.get<typeof authenticationDetailRepository>(AuthenticationDetailRepository);
     usersService = module.get<UsersService>(UsersService);
 
     // Reset all mocks before each test
@@ -97,8 +85,8 @@ export function registerAuthServiceFixture() {
     get authService() {
       return authService;
     },
-    get authenticationDetailRepository() {
-      return authenticationDetailRepository;
+    get persistence() {
+      return persistence;
     },
     get usersService() {
       return usersService;

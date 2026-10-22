@@ -1,35 +1,31 @@
 import { NotificationPersistence } from './persistence/port';
-import { TypeormNotificationPersistence } from './persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotificationPreference } from '@attraccess/database-entities';
+import { NotificationPreference } from '@attraccess/application-models';
 import { NotificationCategory, NotificationChannel } from './notification-types';
 import { NotificationPreferenceService } from './notification-preference.service';
 
 describe('NotificationPreferenceService', () => {
   let service: NotificationPreferenceService;
-  let repository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
+  let persistence: jest.Mocked<NotificationPersistence>;
 
   beforeEach(async () => {
-    repository = {
-      findOne: jest.fn(),
-      create: jest.fn().mockImplementation((data) => ({ ...data })),
-      save: jest.fn().mockImplementation(async (data) => data),
+    persistence = {
+      readPreferences: jest.fn(),
+      saveCategoryChannels: jest.fn(
+        async (userId, categoryChannels, existing) =>
+          ({ ...existing, userId, categoryChannels }) as NotificationPreference,
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        NotificationPreferenceService,
-        { provide: NotificationPersistence, useClass: TypeormNotificationPersistence },
-        { provide: getRepositoryToken(NotificationPreference), useValue: repository },
-      ],
+      providers: [NotificationPreferenceService, { provide: NotificationPersistence, useValue: persistence }],
     }).compile();
 
     service = module.get(NotificationPreferenceService);
   });
 
   it('returns default enabled channel preferences when the user has no row', async () => {
-    repository.findOne.mockResolvedValue(null);
+    persistence.readPreferences.mockResolvedValue(null);
 
     const result = await service.getPreferences(5);
 
@@ -56,11 +52,11 @@ describe('NotificationPreferenceService', () => {
   });
 
   it('maps legacy messaging booleans into the structured message category', async () => {
-    repository.findOne.mockResolvedValue({
+    persistence.readPreferences.mockResolvedValue({
       messagesEmailOnOffline: false,
       messagesPushEnabled: true,
       categoryChannels: null,
-    });
+    } as NotificationPreference);
 
     const result = await service.getPreferences(5);
     const messages = result.categories.find((entry) => entry.category === NotificationCategory.MESSAGES);
@@ -69,7 +65,7 @@ describe('NotificationPreferenceService', () => {
   });
 
   it('creates a row and updates one channel without changing other defaults', async () => {
-    repository.findOne.mockResolvedValue(null);
+    persistence.readPreferences.mockResolvedValue(null);
 
     const result = await service.updatePreferences(5, {
       category: NotificationCategory.MAINTENANCE_REQUESTS,
@@ -77,16 +73,16 @@ describe('NotificationPreferenceService', () => {
     });
     const maintenance = result.categories.find((entry) => entry.category === NotificationCategory.MAINTENANCE_REQUESTS);
 
-    expect(repository.create).toHaveBeenCalledWith({ userId: 5, categoryChannels: expect.any(String) });
+    expect(persistence.saveCategoryChannels).toHaveBeenCalledWith(5, expect.any(String), null);
     expect(maintenance?.channels).toEqual({ email: true, push: false, toast: true });
   });
 
   it('checks whether a single category channel is enabled', async () => {
-    repository.findOne.mockResolvedValue({
+    persistence.readPreferences.mockResolvedValue({
       categoryChannels: JSON.stringify({
         [NotificationCategory.PROJECT_INVITATIONS]: { email: true, push: false, toast: true },
       }),
-    });
+    } as NotificationPreference);
 
     await expect(
       service.isChannelEnabled(5, NotificationCategory.PROJECT_INVITATIONS, NotificationChannel.PUSH),

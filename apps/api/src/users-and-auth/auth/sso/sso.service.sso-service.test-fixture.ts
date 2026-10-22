@@ -1,33 +1,13 @@
-import { DatabaseTransactions, OperationToken } from '../../../database/transaction-scope';
-import { SsoPersistence } from '../persistence/port';
-import { ssoTransactionOperations, TypeormSsoPersistence } from '../persistence/typeorm-adapter';
-import { EntityManager } from 'typeorm';
-import {
-  SSOProvider,
-  SSOProviderOIDCConfiguration,
-  SSOProviderSAMLConfiguration,
-  SSOProviderType,
-} from '@attraccess/database-entities';
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { SsoPersistence, SSO_WRITES } from '../persistence/port';
+import { operationTransactionsFake } from '../../../database/testing/operation-transactions.test-fixture';
+import { SSOProvider, SSOProviderOIDCConfiguration, SSOProviderType } from '@attraccess/application-models';
 import { EncryptionService } from '../../../encryption/encryption.service';
-import { LicenseService } from '../../../license/license.service';
 import { SSOService } from './sso.service';
-
-const SSOProviderRepository = getRepositoryToken(SSOProvider);
-
-const SSOProviderOIDCConfigurationRepository = getRepositoryToken(SSOProviderOIDCConfiguration);
-
-const SSOProviderSAMLConfigurationRepository = getRepositoryToken(SSOProviderSAMLConfiguration);
 export function registerSsoServiceFixture() {
   let service: SSOService;
 
-  let ssoProviderRepository: Repository<SSOProvider>;
-
-  let oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>;
-
-  let samlConfigRepository: Repository<SSOProviderSAMLConfiguration>;
+  let persistence: jest.Mocked<SsoPersistence>;
+  let driver: ReturnType<typeof operationTransactionsFake>;
 
   let encryptionService: EncryptionService;
 
@@ -58,129 +38,59 @@ export function registerSsoServiceFixture() {
 
   const mockSSOProviderWithOIDCConfig = { ...mockSSOProvider };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SSOService,
-        {
-          provide: SsoPersistence,
-          useFactory: (providers, oidc, saml) => new TypeormSsoPersistence(providers, oidc, saml),
-          inject: [
-            SSOProviderRepository,
-            SSOProviderOIDCConfigurationRepository,
-            SSOProviderSAMLConfigurationRepository,
-          ],
-        },
-        {
-          provide: DatabaseTransactions,
-          useFactory: (providers: Repository<SSOProvider>) =>
-            new DatabaseTransactions({
-              backend: 'sqlite',
-              run: (_conflicts, work) =>
-                providers.manager.transaction(async (manager: EntityManager) =>
-                  work({
-                    resolve: <T extends object>(_token: OperationToken<T>): T =>
-                      ssoTransactionOperations(manager) as unknown as T,
-                  }),
-                ),
-            }),
-          inject: [SSOProviderRepository],
-        },
-        {
-          provide: LicenseService,
-          useValue: {
-            verifyLicense: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: SSOProviderRepository,
-          useValue: {
-            find: jest.fn().mockResolvedValue([mockSSOProvider]),
-            findOne: jest.fn().mockResolvedValue(mockSSOProviderWithOIDCConfig),
-            create: jest.fn().mockReturnValue(mockSSOProvider),
-            save: jest.fn().mockResolvedValue(mockSSOProvider),
-            delete: jest.fn().mockResolvedValue({ affected: 1 }),
-            update: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: SSOProviderOIDCConfigurationRepository,
-          useValue: {
-            create: jest.fn().mockReturnValue(mockOIDCConfig),
-            save: jest.fn().mockResolvedValue(mockOIDCConfig),
-            findOne: jest.fn().mockResolvedValue(mockOIDCConfig),
-            delete: jest.fn().mockResolvedValue({ affected: 1 }),
-            update: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
-          provide: SSOProviderSAMLConfigurationRepository,
-          useValue: {
-            create: jest.fn().mockReturnValue({}),
-            save: jest.fn().mockResolvedValue({}),
-            findOne: jest.fn().mockResolvedValue({
-              id: 99,
-              ssoProviderId: 1,
-              entryPoint: 'https://idp',
-              issuer: 'https://sp',
-              certificate: 'CERT',
-              signRequest: false,
-              wantAssertionsSigned: false,
-              wantAuthnResponseSigned: true,
-              forceAuthn: false,
-            }),
-            update: jest.fn().mockResolvedValue(undefined),
-            delete: jest.fn().mockResolvedValue({ affected: 1 }),
-          },
-        },
-        {
-          provide: EncryptionService,
-          useValue: {
-            encrypt: jest.fn((value: string) => `enc:${value}`),
-            decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
-            isEncrypted: jest.fn((value: string) => value.startsWith('enc:')),
-            encryptIfPlain: jest.fn((value: string) => (value.startsWith('enc:') ? value : `enc:${value}`)),
-            decryptIfEncrypted: jest.fn((value: string) =>
-              value?.startsWith('enc:') ? value.replace(/^enc:/, '') : value,
-            ),
-          },
-        },
-      ],
-    }).compile();
-
-    service = module.get<SSOService>(SSOService);
-    ssoProviderRepository = module.get<Repository<SSOProvider>>(SSOProviderRepository);
-    oidcConfigRepository = module.get<Repository<SSOProviderOIDCConfiguration>>(SSOProviderOIDCConfigurationRepository);
-    samlConfigRepository = module.get<Repository<SSOProviderSAMLConfiguration>>(SSOProviderSAMLConfigurationRepository);
-    Object.assign(ssoProviderRepository, {
-      manager: {
-        transaction: jest.fn(
-          (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) =>
-            callback({
-              getRepository: (entity) =>
-                entity === SSOProvider
-                  ? ssoProviderRepository
-                  : entity === SSOProviderOIDCConfiguration
-                    ? oidcConfigRepository
-                    : samlConfigRepository,
-            }),
-        ),
-      },
-    });
-    encryptionService = module.get<EncryptionService>(EncryptionService);
+  beforeEach(() => {
+    const provider = jest.fn().mockResolvedValue(mockSSOProviderWithOIDCConfig);
+    persistence = {
+      allProviders: jest.fn().mockResolvedValue([mockSSOProvider]),
+      providerById: provider,
+      providerByType: provider,
+      createProvider: jest.fn().mockResolvedValue(mockSSOProvider),
+      renameProvider: jest.fn(),
+      removeProvider: jest.fn(),
+      createOidcConfiguration: jest.fn().mockResolvedValue(mockOIDCConfig),
+      oidcConfiguration: jest.fn().mockResolvedValue(mockOIDCConfig),
+      patchOidcConfiguration: jest.fn(),
+      removeOidcConfiguration: jest.fn(),
+      createSamlConfiguration: jest.fn().mockResolvedValue({}),
+      samlConfiguration: jest.fn().mockResolvedValue({
+        id: 99,
+        ssoProviderId: 1,
+        entryPoint: 'https://idp',
+        issuer: 'https://sp',
+        certificate: 'CERT',
+        signRequest: false,
+        wantAssertionsSigned: false,
+        wantAuthnResponseSigned: true,
+        forceAuthn: false,
+      }),
+      patchSamlConfiguration: jest.fn(),
+      removeSamlConfiguration: jest.fn(),
+    };
+    driver = operationTransactionsFake();
+    driver.bind(SSO_WRITES, persistence);
+    encryptionService = {
+      encrypt: jest.fn((value: string) => `enc:${value}`),
+      decrypt: jest.fn((value: string) => value.replace(/^enc:/, '')),
+      isEncrypted: jest.fn((value: string) => value.startsWith('enc:')),
+      encryptIfPlain: jest.fn((value: string) => (value.startsWith('enc:') ? value : `enc:${value}`)),
+      decryptIfEncrypted: jest.fn((value: string) => (value?.startsWith('enc:') ? value.replace(/^enc:/, '') : value)),
+    } as unknown as EncryptionService;
+    service = new SSOService(
+      persistence,
+      driver.transactions,
+      { verifyLicense: jest.fn().mockResolvedValue(undefined) } as never,
+      encryptionService,
+    );
   });
   return {
     get service() {
       return service;
     },
-    get ssoProviderRepository() {
-      return ssoProviderRepository;
+    get persistence() {
+      return persistence;
     },
-    get oidcConfigRepository() {
-      return oidcConfigRepository;
-    },
-    get samlConfigRepository() {
-      return samlConfigRepository;
+    get driver() {
+      return driver;
     },
     get encryptionService() {
       return encryptionService;

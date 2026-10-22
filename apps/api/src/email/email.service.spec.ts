@@ -1,3 +1,4 @@
+import { EmailRecipientPersistence } from './persistence/port';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
@@ -7,9 +8,8 @@ import {
   Resource,
   ResourceUsage,
   User,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { createTransport } from 'nodemailer';
-import { TypeormEmailRecipientPersistence } from './persistence/typeorm-adapter';
 import { EmailLayoutService } from './../email-layout/email-layout.service';
 import {
   EMAIL_TEMPLATE_DEFAULTS,
@@ -162,9 +162,7 @@ describe('EmailService', () => {
       time: <T>(_target: string, _operation: string, fn: () => Promise<T>) => fn(),
     };
 
-    const userRepository = {
-      findOne: jest.fn(),
-    };
+    const persistence: jest.Mocked<EmailRecipientPersistence> = { user: jest.fn() };
 
     const service = new EmailService(
       settingsService as unknown as SettingsService,
@@ -172,10 +170,10 @@ describe('EmailService', () => {
       emailLayoutService as unknown as EmailLayoutService,
       metricsService as unknown as MetricsService,
       externalCallTimer as unknown as ExternalCallTimer,
-      new TypeormEmailRecipientPersistence(userRepository as never),
+      persistence,
     );
 
-    return { service, sendMail, close, settingsService, emailTemplateService, emailLayoutService, userRepository };
+    return { service, sendMail, close, settingsService, emailTemplateService, emailLayoutService, persistence };
   };
   const scope = {
     get setup() {
@@ -314,15 +312,15 @@ describe('EmailService', () => {
         ),
       );
       const user = scope.makeUser({ creditBalance: 1234, locale, billingFactor: 20 });
-      const usage = Object.assign(new ResourceUsage(), {
+      const usage = Object.assign({} as ResourceUsage, {
         startTime: new Date('2026-09-20T10:00:00Z'),
         endTime: new Date('2026-09-20T10:01:01.001Z'),
         usageInMinutes: 999,
         billingFactor: 80,
-        resource: Object.assign(new Resource(), { id: 3, name: 'Laser <script>unsafe</script>' }),
+        resource: Object.assign({} as Resource, { id: 3, name: 'Laser <script>unsafe</script>' }),
       });
-      const item = (values: Partial<BillingTransactionItem>) => Object.assign(new BillingTransactionItem(), values);
-      const transaction = Object.assign(new BillingTransaction(), {
+      const item = (values: Partial<BillingTransactionItem>) => Object.assign({} as BillingTransactionItem, values);
+      const transaction = Object.assign({} as BillingTransaction, {
         amount: -94,
         items: [
           item({ name: 'PER_SESSION', quantity: 1, unitPrice: 100 }),
@@ -440,14 +438,14 @@ describe('EmailService', () => {
       const { service, sendMail, user, usage, transaction } = shippedUsageReceiptScope.setupReceipt('en');
       transaction.amount = -45;
       transaction.items = [
-        Object.assign(new BillingTransactionItem(), {
+        Object.assign({} as BillingTransactionItem, {
           name: 'Energy (kWh)',
           quantity: 1,
           unitPrice: 45,
           meterQuantity: '1.5',
           meterCreditsPerUnit: 30,
         }),
-        Object.assign(new BillingTransactionItem(), {
+        Object.assign({} as BillingTransactionItem, {
           name: 'PER_MINUTE',
           quantity: 1,
           unitPrice: 0,
@@ -470,7 +468,7 @@ describe('EmailService', () => {
     it('preserves every cent of a large captured meter rate in receipts', async () => {
       const { service, sendMail, user, usage, transaction } = shippedUsageReceiptScope.setupReceipt('en');
       transaction.items = [
-        Object.assign(new BillingTransactionItem(), {
+        Object.assign({} as BillingTransactionItem, {
           name: 'Heartbeats',
           quantity: 1,
           unitPrice: 0,
@@ -487,7 +485,7 @@ describe('EmailService', () => {
       user.creditBalance = Number.MAX_SAFE_INTEGER;
       transaction.amount = -Number.MAX_SAFE_INTEGER;
       transaction.items = [
-        Object.assign(new BillingTransactionItem(), {
+        Object.assign({} as BillingTransactionItem, {
           name: 'Heartbeats',
           quantity: 1,
           unitPrice: Number.MAX_SAFE_INTEGER,
@@ -573,8 +571,8 @@ describe('EmailService', () => {
   });
 
   it('loads a full recipient before sending access-change email for id-only notification recipients', async () => {
-    const { service, sendMail, userRepository } = scope.setup();
-    userRepository.findOne.mockResolvedValue(scope.makeUser({ id: 7, username: 'riley', email: 'riley@example.com' }));
+    const { service, sendMail, persistence } = scope.setup();
+    persistence.user.mockResolvedValue(scope.makeUser({ id: 7, username: 'riley', email: 'riley@example.com' }));
 
     await service.sendAccessChangeEmail({ id: 7 } as User, {
       title: 'Your group access changed',
@@ -582,7 +580,7 @@ describe('EmailService', () => {
       url: '/resource-groups/5',
     });
 
-    expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: 7 } });
+    expect(persistence.user).toHaveBeenCalledWith(7);
     const callArg = (sendMail as jest.Mock).mock.calls[0][0];
     expect(callArg.to).toBe('riley@example.com');
     expect(callArg.html).toContain('Hello riley');
@@ -983,7 +981,7 @@ export type EmailServiceTestScope = {
     settingsService: { getUrl: any; getSmtpConfiguration: any; buildSmtpTransportOptions: any };
     emailTemplateService: { findOne: any; getTranslationsMap: any; getExactTranslationsMap: any };
     emailLayoutService: { renderWithTemplate: any };
-    userRepository: { findOne: any };
+    persistence: jest.Mocked<EmailRecipientPersistence>;
   };
   makeUser: (overrides?: Partial<User>) => User;
 };

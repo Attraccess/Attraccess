@@ -1,9 +1,7 @@
 import { PasskeyPersistence } from '../persistence/port';
-import { TypeormPasskeyPersistence } from '../persistence/typeorm-adapter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
+import { Passkey, PasskeyChallenge, User } from '@attraccess/application-models';
 import { PasskeyService } from './passkey.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
@@ -22,9 +20,7 @@ function clientDataFor(challenge: string): string {
 
 describe('PasskeyService', () => {
   let service: PasskeyService;
-  let passkeyRepo: Record<string, jest.Mock>;
-  let challengeRepo: Record<string, jest.Mock>;
-  let userRepo: Record<string, jest.Mock>;
+  let persistence: jest.Mocked<PasskeyPersistence>;
   let getUrl: jest.Mock;
 
   const storedPasskey = {
@@ -37,31 +33,25 @@ describe('PasskeyService', () => {
   } as Passkey;
 
   beforeEach(async () => {
-    passkeyRepo = {
-      find: jest.fn().mockResolvedValue([]),
-      findOneBy: jest.fn().mockResolvedValue(storedPasskey),
-      delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      update: jest.fn().mockResolvedValue({ affected: 1 }),
-      create: jest.fn((v) => v),
-      save: jest.fn((v) => Promise.resolve(v)),
-    };
-    challengeRepo = {
-      insert: jest.fn().mockResolvedValue(undefined),
-      delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      findOneBy: jest.fn().mockResolvedValue(null),
-    };
-    userRepo = {
-      findOneBy: jest.fn().mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: true } as User),
+    persistence = {
+      listForUser: jest.fn().mockResolvedValue([]),
+      removeOwned: jest.fn().mockResolvedValue(true),
+      findOwned: jest.fn(),
+      findCredential: jest.fn().mockResolvedValue(storedPasskey),
+      savePasskey: jest.fn(),
+      registerPasskey: jest.fn(),
+      recordAuthentication: jest.fn(),
+      findUser: jest.fn().mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: true } as User),
+      removeExpiredChallenges: jest.fn(),
+      storeChallenge: jest.fn(),
+      consumeChallenge: jest.fn().mockResolvedValue(null),
     };
     getUrl = jest.fn().mockResolvedValue('https://make.example.com');
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasskeyService,
-        { provide: PasskeyPersistence, useClass: TypeormPasskeyPersistence },
-        { provide: getRepositoryToken(Passkey), useValue: passkeyRepo },
-        { provide: getRepositoryToken(PasskeyChallenge), useValue: challengeRepo },
-        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: PasskeyPersistence, useValue: persistence },
         { provide: SettingsService, useValue: { getUrl } },
       ],
     }).compile();
@@ -110,12 +100,14 @@ describe('PasskeyService', () => {
     const response = { id: 'cred-1', response: { clientDataJSON: clientDataFor('auth-challenge') } };
 
     function issueChallenge(overrides: Partial<PasskeyChallenge> = {}) {
-      challengeRepo.findOneBy.mockResolvedValue({
+      const challenge = {
         challenge: 'auth-challenge',
         userId: null,
         expiresAt: new Date(Date.now() + 60_000),
         ...overrides,
-      });
+      } as PasskeyChallenge;
+      persistence.consumeChallenge.mockResolvedValue(challenge);
+      return challenge;
     }
 
     it('signs the user in and bumps the signature counter', async () => {
@@ -124,7 +116,7 @@ describe('PasskeyService', () => {
       const user = await service.verifyAuthentication(response as never);
 
       expect(user.id).toBe(42);
-      expect(passkeyRepo.update).toHaveBeenCalledWith(7, expect.objectContaining({ counter: 4, backedUp: true }));
+      expect(persistence.recordAuthentication).toHaveBeenCalledWith(7, 4, true, expect.any(Date));
     });
 
     it('burns the challenge so an assertion cannot be replayed', async () => {
@@ -132,12 +124,12 @@ describe('PasskeyService', () => {
 
       await service.verifyAuthentication(response as never);
 
-      expect(challengeRepo.delete).toHaveBeenCalledWith({ challenge: 'auth-challenge' });
+      expect(persistence.consumeChallenge).toHaveBeenCalledWith('auth-challenge');
     });
 
     it('accepts only one concurrent claim of a challenge', async () => {
-      issueChallenge();
-      challengeRepo.delete.mockResolvedValueOnce({ affected: 1 }).mockResolvedValueOnce({ affected: 0 });
+      const challenge = issueChallenge();
+      persistence.consumeChallenge.mockResolvedValueOnce(challenge).mockResolvedValueOnce(null);
       const results = await Promise.allSettled([
         service.verifyAuthentication(response as never),
         service.verifyAuthentication(response as never),
@@ -149,7 +141,7 @@ describe('PasskeyService', () => {
     });
 
     it('rejects an unknown challenge', async () => {
-      challengeRepo.findOneBy.mockResolvedValue(null);
+      persistence.consumeChallenge.mockResolvedValue(null);
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(BadRequestException);
     });
@@ -168,7 +160,7 @@ describe('PasskeyService', () => {
 
     it('rejects a credential that is not registered', async () => {
       issueChallenge();
-      passkeyRepo.findOneBy.mockResolvedValue(null);
+      persistence.findCredential.mockResolvedValue(null);
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(UnauthorizedException);
     });
@@ -182,7 +174,7 @@ describe('PasskeyService', () => {
 
     it('refuses a user whose email is not verified, so a passkey cannot skip re-verification', async () => {
       issueChallenge();
-      userRepo.findOneBy.mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: false } as User);
+      persistence.findUser.mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: false } as User);
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(UserEmailNotVerifiedException);
     });
@@ -192,11 +184,11 @@ describe('PasskeyService', () => {
     it('only deletes passkeys owned by the user', async () => {
       await service.delete(42, 7);
 
-      expect(passkeyRepo.delete).toHaveBeenCalledWith({ id: 7, userId: 42 });
+      expect(persistence.removeOwned).toHaveBeenCalledWith(42, 7);
     });
 
     it('throws when the passkey belongs to somebody else', async () => {
-      passkeyRepo.delete.mockResolvedValue({ affected: 0 });
+      persistence.removeOwned.mockResolvedValue(false);
 
       await expect(service.delete(1, 7)).rejects.toThrow(NotFoundException);
     });
