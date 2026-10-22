@@ -124,22 +124,36 @@ export async function measure(options: Options, output: string, fixture = new As
       2,
     );
   }
-  async function writeReport() {
+  let checkpoint: Promise<void> | undefined;
+  function writeReport() {
     // Checkpoints share the event loop with command delivery and acknowledgement.
     // Never block it on evidence storage, especially a shared host filesystem.
     const temporary = join(output, 'measurements.json.next');
-    await writeFile(temporary, reportContents());
-    await rename(temporary, join(output, 'measurements.json'));
+    const operation = (async () => {
+      await writeFile(temporary, reportContents());
+      await rename(temporary, join(output, 'measurements.json'));
+    })();
+    checkpoint = operation;
+    return operation.finally(() => {
+      if (checkpoint === operation) checkpoint = undefined;
+    });
   }
+  let terminating = false;
   const interrupt = () => {
+    if (terminating) return;
+    terminating = true;
     outcome = 'interrupted';
-    try {
-      // Exit immediately after the synchronous final snapshot. An in-progress
-      // checkpoint cannot replace it because its rename needs the event loop.
-      writeFileSync(join(output, 'measurements.json'), reportContents());
-    } finally {
-      process.exit(143);
-    }
+    const flush = () => {
+      try {
+        writeFileSync(join(output, 'measurements.json'), reportContents());
+      } finally {
+        process.exit(143);
+      }
+    };
+    // A rename already submitted to the filesystem can finish without another
+    // JS callback. Settle it first so it cannot replace the terminal snapshot.
+    if (checkpoint) void checkpoint.then(flush, flush);
+    else flush();
   };
   process.on('SIGTERM', interrupt);
   process.on('SIGINT', interrupt);

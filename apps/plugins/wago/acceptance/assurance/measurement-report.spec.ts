@@ -1,9 +1,11 @@
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AssuranceFixture } from './fixture';
 import { measure } from './measurement';
+import * as loadStage from './load-stage';
 
 const options = {
   durationSeconds: 12,
@@ -142,3 +144,53 @@ it('does not block command processing with synchronous checkpoint storage', asyn
   expect(report).toMatchObject({ outcome: 'failed', recommendation: null });
   expect(fixture.close).toHaveBeenCalledTimes(1);
 });
+
+it.each([false, true])(
+  'flushes interruption after an in-flight checkpoint settles (rename fails: %s)',
+  async (fails) => {
+    const fixture = new AssuranceFixture();
+    jest.spyOn(fixture, 'start').mockImplementation(async () => {
+      fixture.backend = { messageStatistics: { rejected: 0 } } as AssuranceFixture['backend'];
+    });
+    jest.spyOn(fixture, 'close').mockResolvedValue();
+    jest.spyOn(loadStage, 'runLoadStage').mockImplementationOnce(async (stage) => {
+      await stage.progress();
+      throw new Error('stop load');
+    });
+    const originalRename = fsPromises.rename;
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let entered!: () => void;
+    const renaming = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    jest.spyOn(fsPromises, 'rename').mockImplementationOnce(async (...args) => {
+      entered();
+      await blocked;
+      if (fails) throw new Error('rename failed');
+      await originalRename(...args);
+    });
+    let terminalReport: unknown;
+    const exit = jest.spyOn(process, 'exit').mockImplementation(() => {
+      terminalReport = JSON.parse(fs.readFileSync(join(directory, 'measurements.json'), 'utf8'));
+      return undefined as never;
+    });
+    const execution = expect(measure({ ...options, faults: [] }, directory, fixture)).rejects.toThrow(
+      fails ? 'rename failed' : 'stop load',
+    );
+    await renaming;
+    process.emit('SIGTERM');
+    process.emit('SIGTERM');
+    try {
+      expect(exit).not.toHaveBeenCalled();
+    } finally {
+      release();
+      await execution;
+    }
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(143);
+    expect(terminalReport).toMatchObject({ outcome: 'interrupted', recommendation: null });
+  },
+);
