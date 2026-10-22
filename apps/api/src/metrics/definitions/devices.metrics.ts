@@ -29,7 +29,7 @@ export function createDevicesMetrics(registry: Registry) {
 
   const attractapCrashReportsTotal = new Counter({
     name: 'attraccess_attractap_crash_reports_total',
-    help: 'Total number of crash reports received from Attractap readers',
+    help: 'Total reset reports received from Attractap readers, including power-on and software resets',
     labelNames: ['reader_id', 'reset_reason'],
     registers: [registry],
   });

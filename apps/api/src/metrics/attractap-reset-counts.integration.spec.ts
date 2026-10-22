@@ -170,7 +170,7 @@ describe('database-backed hourly reset counts', () => {
     }
   });
 
-  it('serializes overlapping refreshes through rendering and recovers after query failure', async () => {
+  it('shares coherent overlapping refreshes through rendering and recovers after query failure', async () => {
     await report(5, 'POWERON');
     const original = repo.createQueryBuilder.bind(repo);
     let release: () => void;
@@ -190,7 +190,8 @@ describe('database-backed hourly reset counts', () => {
     expect(query).toHaveBeenCalledTimes(1);
     release();
     expect(await first).toBe('first coherent scrape');
-    expect(await second).toContain(`${METRIC}{reader_id="5",reset_reason="POWERON"} 1`);
+    expect(await second).toBe('first coherent scrape');
+    expect(await service.getMetrics()).toContain(`${METRIC}{reader_id="5",reset_reason="POWERON"} 1`);
     query.mockImplementationOnce(() => {
       throw new Error('database unavailable');
     });

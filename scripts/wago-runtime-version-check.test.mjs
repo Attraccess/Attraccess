@@ -266,3 +266,24 @@ test('resolves scoped, unscoped and optional aliases with peer suffixes', () => 
   assert.ok(Object.hasOwn(result.snapshots, 'string-width@4.2.3'));
   assert.ok(Object.hasOwn(result.snapshots, '@scope/pkg@2.0.0(peer@1.0.0)'));
 });
+
+for (const kind of ['dependencies', 'optionalDependencies']) {
+  test(`tracks same-version peer resolution changes through snapshot ${kind}`, () => {
+    // pnpm v9 records resolved peers as ordinary/optional snapshot edges as
+    // well as in the contextual key. Peer version declarations are ranges,
+    // not additional resolved edges to parse from package metadata.
+    const lock = dependencyFixture();
+    const key = 'mqtt@1.0.0(@scope/peer@1.0.0)';
+    lock.importers['.'].dependencies.mqtt.version = '1.0.0(@scope/peer@1.0.0)';
+    lock.packages['mqtt@1.0.0'].peerDependencies = { '@scope/peer': '^1.0.0' };
+    lock.snapshots[key] = { [kind]: { '@scope/peer': '1.0.0' } };
+    delete lock.snapshots['mqtt@1.0.0'];
+    lock.packages['@scope/peer@1.0.0'] = { resolution: { integrity: 'original' } };
+    lock.snapshots['@scope/peer@1.0.0'] = {};
+    const collect = () => runtimeDependencies((path) => (path === 'package.json' ? '{}' : stringify(lock)));
+    const before = collect();
+    assert.equal(before.packages['@scope/peer@1.0.0'].resolution.integrity, 'original');
+    lock.packages['@scope/peer@1.0.0'].resolution.integrity = 'changed-without-version-bump';
+    assert.notDeepEqual(collect(), before);
+  });
+}

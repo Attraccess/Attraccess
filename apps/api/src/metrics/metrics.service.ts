@@ -51,7 +51,7 @@ export class MetricsService implements OnModuleInit {
   public readonly attractapFirmwareUpdatesTotal: Counter;
   public readonly attractapCrashReportsTotal: Counter;
   public readonly attractapResetReportsLastHour: Gauge;
-  private scrapeQueue: Promise<unknown> = Promise.resolve();
+  private scrapeInFlight?: Promise<string>;
 
   public readonly billingTransactionsTotal: Counter;
   public readonly billingTransactionAmount: Histogram;
@@ -174,9 +174,12 @@ export class MetricsService implements OnModuleInit {
   }
 
   async getMetrics(): Promise<string> {
-    // Keep refresh and rendering together: a later scrape must not replace the
-    // gauge while an earlier registry rendering is still collecting metrics.
-    const scrape = this.scrapeQueue.then(async () => {
+    // Overlapping scrapes share one refresh/render operation. Keep a timed-out
+    // operation installed until it settles, so a locked DB cannot grow a queue.
+    if (this.scrapeInFlight) return this.scrapeInFlight;
+    let expired = false;
+    const timeoutError = new Error('Metrics collection timed out after 5000ms');
+    const operation = (async () => {
       const now = new Date();
       const driver = this.crashReportRepository.manager.connection.driver;
       const column = this.crashReportRepository.metadata.findColumnWithPropertyName('createdAt');
@@ -192,6 +195,8 @@ export class MetricsService implements OnModuleInit {
         .groupBy('report.attractapId')
         .addGroupBy('report.resetReason')
         .getRawMany<{ readerId: number; resetReason: string; count: string | number }>();
+      // A request deadline cannot cancel SQLite work. Never publish late rows.
+      if (expired) throw timeoutError;
       const counts = new Map<string, { reader_id: string; reset_reason: string; count: number }>();
       for (const row of rows) {
         const reader_id = String(row.readerId);
@@ -206,8 +211,24 @@ export class MetricsService implements OnModuleInit {
         this.attractapResetReportsLastHour.set({ reader_id, reset_reason }, count);
       }
       return this.registry.metrics();
+    })();
+    let timer: ReturnType<typeof setTimeout>;
+    const deadline = new Promise<string>((_, reject) => {
+      timer = setTimeout(() => {
+        expired = true;
+        reject(timeoutError);
+      }, 5_000);
     });
-    this.scrapeQueue = scrape.catch(() => undefined);
+    const scrape = Promise.race([operation, deadline]);
+    this.scrapeInFlight = scrape;
+    // Release only after the underlying query/render settles, including after a
+    // deadline. Subsequent scrapes fail promptly while that operation is stuck.
+    void operation
+      .finally(() => {
+        clearTimeout(timer);
+        this.scrapeInFlight = undefined;
+      })
+      .catch(() => undefined);
     return scrape;
   }
 

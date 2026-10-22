@@ -72,6 +72,55 @@ describe('MetricsService', () => {
     expect(service).toBeDefined();
   });
 
+  it('bounds a stuck query, rejects later scrapes without queueing, and discards late rows', async () => {
+    jest.useFakeTimers();
+    let release: (rows: { readerId: number; resetReason: string; count: number }[]) => void;
+    const delayed = new Promise<{ readerId: number; resetReason: string; count: number }[]>((resolve) => {
+      release = resolve;
+    });
+    mockResetQuery.getRawMany.mockReturnValueOnce(delayed);
+    try {
+      const first = service.getMetrics();
+      const firstFailure = expect(first).rejects.toThrow('Metrics collection timed out');
+      await jest.advanceTimersByTimeAsync(5_000);
+      await firstFailure;
+      for (let i = 0; i < 20; i++) {
+        await expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      }
+      expect(mockResetQuery.getRawMany).toHaveBeenCalledTimes(1);
+      release([{ readerId: 5, resetReason: 'PANIC', count: 99 }]);
+      await jest.advanceTimersByTimeAsync(0);
+      expect((await service.attractapResetReportsLastHour.get()).values).toEqual([]);
+      expect(await service.getMetrics()).not.toContain('reset_reason="PANIC"} 99');
+      expect(mockResetQuery.getRawMany).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('also bounds rendering and shares the deadline with overlapping scrapes', async () => {
+    jest.useFakeTimers();
+    let release: (text: string) => void;
+    const delayed = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const render = jest.spyOn(service.registry, 'metrics').mockReturnValueOnce(delayed);
+    try {
+      const first = expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      const second = expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      await jest.advanceTimersByTimeAsync(5_000);
+      await Promise.all([first, second]);
+      await expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      expect(render).toHaveBeenCalledTimes(1);
+      release('late response');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(await service.getMetrics()).toContain('attraccess_');
+    } finally {
+      render.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   describe('metric naming (issue #9: attraccess_ prefix)', () => {
     it('all custom metrics use attraccess_ prefix', async () => {
       const metricsOutput = await service.getMetrics();
