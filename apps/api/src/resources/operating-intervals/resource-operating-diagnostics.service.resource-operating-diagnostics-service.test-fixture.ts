@@ -1,5 +1,5 @@
-import { ResourceFlowNode, ResourceOperatingInterval } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { OperatingDiagnosticsPersistence } from './persistence/port';
+import { ResourceOperatingInterval } from '@attraccess/application-models';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import {
   ResourceOperatingAttributionService,
@@ -28,26 +28,26 @@ function summary(overrides: Partial<ResourceOperatingAttributionSummary> = {}): 
   };
 }
 export function registerResourceOperatingDiagnosticsServiceFixture() {
-  let intervalRepository: jest.Mocked<
-    Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'find' | 'findAndCount' | 'count'>
-  >;
-
-  let flowNodeRepository: jest.Mocked<Pick<Repository<ResourceFlowNode>, 'count'>>;
+  let persistence: jest.Mocked<OperatingDiagnosticsPersistence>;
 
   let attributionService: jest.Mocked<Pick<ResourceOperatingAttributionService, 'getForResource'>>;
 
-  let operatingMetrics: jest.Mocked<OperatingMetricsRecorder>;
+  let operatingMetrics: jest.Mocked<
+    Pick<OperatingMetricsRecorder, 'recordTransition' | 'setResourceState' | 'recordDataQualityFailures'>
+  >;
 
   let service: ResourceOperatingDiagnosticsService;
 
   beforeEach(() => {
-    intervalRepository = {
-      findOne: jest.fn(),
-      find: jest.fn().mockResolvedValue([]),
-      findAndCount: jest.fn().mockResolvedValue([[], 0]),
-      count: jest.fn().mockResolvedValue(0),
+    persistence = {
+      openInterval: jest.fn().mockResolvedValue(null),
+      latestInterval: jest.fn().mockResolvedValue(null),
+      intervalPage: jest.fn().mockResolvedValue([[], 0]),
+      trackingNodeCount: jest.fn().mockResolvedValue(0),
+      recentTransitions: jest.fn().mockResolvedValue([]),
+      openIntervalCount: jest.fn().mockResolvedValue(0),
+      overlappingWindow: jest.fn().mockResolvedValue([]),
     };
-    flowNodeRepository = { count: jest.fn().mockResolvedValue(0) };
     attributionService = { getForResource: jest.fn().mockResolvedValue(summary()) };
     operatingMetrics = {
       recordTransition: jest.fn(),
@@ -55,10 +55,9 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
       recordDataQualityFailures: jest.fn(),
     };
     service = new ResourceOperatingDiagnosticsService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      flowNodeRepository as unknown as Repository<ResourceFlowNode>,
+      persistence,
       attributionService as unknown as ResourceOperatingAttributionService,
-      operatingMetrics,
+      operatingMetrics as unknown as OperatingMetricsRecorder,
     );
   });
   return {
@@ -71,11 +70,8 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
     get summary() {
       return summary;
     },
-    get intervalRepository() {
-      return intervalRepository;
-    },
-    get flowNodeRepository() {
-      return flowNodeRepository;
+    get persistence() {
+      return persistence;
     },
     get attributionService() {
       return attributionService;

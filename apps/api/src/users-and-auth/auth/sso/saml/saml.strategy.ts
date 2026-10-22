@@ -1,6 +1,6 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { DOMParser } from '@xmldom/xmldom';
-import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 

@@ -1,3 +1,7 @@
+import { DataSource } from 'typeorm';
+import { SqliteTransactionDriver } from '../../database/sqlite/transactions';
+import { IntroductionPersistence, INTRODUCTION_OPERATIONS } from './persistence/port';
+import { TypeormIntroductionPersistence } from './persistence/typeorm-adapter';
 import { Module } from '@nestjs/common';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { ResourceIntroductionsController } from './resourceIntroductions.controller';
@@ -19,7 +23,17 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
     ResourceRetrainingModule,
   ],
   controllers: [ResourceIntroductionsController],
-  providers: [ResourceIntroductionsService],
+  providers: [
+    {
+      provide: IntroductionPersistence,
+      useFactory: (source: DataSource, driver: SqliteTransactionDriver) => {
+        driver.register(INTRODUCTION_OPERATIONS, (manager) => new TypeormIntroductionPersistence(manager));
+        return new TypeormIntroductionPersistence(source.manager);
+      },
+      inject: [DataSource, SqliteTransactionDriver],
+    },
+    ResourceIntroductionsService,
+  ],
   exports: [ResourceIntroductionsService],
 })
 export class ResourceIntroductionsModule {}

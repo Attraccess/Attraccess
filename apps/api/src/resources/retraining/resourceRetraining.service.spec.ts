@@ -1,7 +1,8 @@
+import { retrainingOperationsFake } from './persistence/operations.test-fixture';
 import { registerResourceRetrainingServiceEvaluateFixture } from './resourceRetraining.service.resource-retraining-service-evaluate.test-fixture';
 import { registerResourceRetrainingServiceStatusAggregationFixture } from './resourceRetraining.service.resource-retraining-service-status-aggregation.test-fixture';
 import { ResourceRetrainingService } from './resourceRetraining.service';
-import { IntroductionHistoryAction } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 
 describe('ResourceRetrainingService.evaluate', () => {
   const fixture = registerResourceRetrainingServiceEvaluateFixture();
@@ -100,23 +101,22 @@ describe('ResourceRetrainingService.evaluate', () => {
 
   it('records a system-origin required transition when the scheduled evaluation first notifies', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
-    const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
+    const stamps = { stampRequiredAudit: jest.fn(), stampNotification: jest.fn() };
     const service = new ResourceRetrainingService(
-      {
-        findOne: jest.fn().mockResolvedValue({
+      retrainingOperationsFake({
+        resource: jest.fn().mockResolvedValue({
           id: 1,
           name: 'Lathe',
           retrainingMaxAgeDays: 1,
           retrainingMaxInactivityDays: null,
           retrainingBlocksAccess: true,
         }),
-      } as never,
-      null as never,
-      { findOne: jest.fn().mockResolvedValue(null) } as never,
-      introductionRepository as never,
-      {
-        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
-      } as never,
+        resourceLastUsedAt: jest.fn().mockResolvedValue(null),
+        latestHistory: jest
+          .fn()
+          .mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
+        ...stamps,
+      }),
       null as never,
       null as never,
       audit as never,
@@ -133,12 +133,12 @@ describe('ResourceRetrainingService.evaluate', () => {
       subjectId: 1,
       details: { introductionId: 3, usageUserId: 2, retrainingReason: 'age' },
     });
-    expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
+    expect(stamps.stampRequiredAudit).toHaveBeenCalledWith(3, expect.any(Date));
   });
 
   it('retries failed email delivery without marking the notification delivered', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
-    const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
+    const stamps = { stampRequiredAudit: jest.fn(), stampNotification: jest.fn() };
     const email = {
       sendUserRetrainingEmail: jest
         .fn()
@@ -146,21 +146,20 @@ describe('ResourceRetrainingService.evaluate', () => {
         .mockResolvedValueOnce(undefined),
     };
     const service = new ResourceRetrainingService(
-      {
-        findOne: jest.fn().mockResolvedValue({
+      retrainingOperationsFake({
+        resource: jest.fn().mockResolvedValue({
           id: 1,
           name: 'Lathe',
           retrainingMaxAgeDays: 1,
           retrainingMaxInactivityDays: null,
           retrainingBlocksAccess: true,
         }),
-      } as never,
-      null as never,
-      { findOne: jest.fn().mockResolvedValue(null) } as never,
-      introductionRepository as never,
-      {
-        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
-      } as never,
+        resourceLastUsedAt: jest.fn().mockResolvedValue(null),
+        latestHistory: jest
+          .fn()
+          .mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
+        ...stamps,
+      }),
       null as never,
       email as never,
       audit as never,
@@ -178,39 +177,32 @@ describe('ResourceRetrainingService.evaluate', () => {
     };
 
     await expect(notify(introduction, new Date('2026-01-03T00:00:00.000Z'))).rejects.toThrow('SMTP unavailable');
-    expect(introductionRepository.update).not.toHaveBeenCalledWith(
-      3,
-      expect.objectContaining({ retrainingNotifiedAt: expect.any(Date) }),
-    );
+    expect(stamps.stampNotification).not.toHaveBeenCalledWith(3, expect.any(Date));
     await notify(introduction, new Date('2026-01-04T00:00:00.000Z'));
     expect(email.sendUserRetrainingEmail).toHaveBeenCalledTimes(2);
     expect(audit.recordResource).not.toHaveBeenCalled();
-    expect(introductionRepository.update).toHaveBeenCalledWith(
-      3,
-      expect.objectContaining({ retrainingNotifiedAt: expect.any(Date) }),
-    );
+    expect(stamps.stampNotification).toHaveBeenCalledWith(3, expect.any(Date));
   });
 
   it('retries a missing required event after the email has been delivered', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
-    const introductionRepository = { update: jest.fn() };
+    const stamps = { stampRequiredAudit: jest.fn(), stampNotification: jest.fn() };
     const email = { sendUserRetrainingEmail: jest.fn() };
     const service = new ResourceRetrainingService(
-      {
-        findOne: jest.fn().mockResolvedValue({
+      retrainingOperationsFake({
+        resource: jest.fn().mockResolvedValue({
           id: 1,
           name: 'Lathe',
           retrainingMaxAgeDays: 1,
           retrainingMaxInactivityDays: null,
           retrainingBlocksAccess: true,
         }),
-      } as never,
-      null as never,
-      { findOne: jest.fn().mockResolvedValue(null) } as never,
-      introductionRepository as never,
-      {
-        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
-      } as never,
+        resourceLastUsedAt: jest.fn().mockResolvedValue(null),
+        latestHistory: jest
+          .fn()
+          .mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
+        ...stamps,
+      }),
       null as never,
       email as never,
       audit as never,
@@ -230,17 +222,16 @@ describe('ResourceRetrainingService.evaluate', () => {
 
     expect(audit.recordResource).toHaveBeenCalledTimes(1);
     expect(email.sendUserRetrainingEmail).not.toHaveBeenCalled();
-    expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
+    expect(stamps.stampRequiredAudit).toHaveBeenCalledWith(3, expect.any(Date));
   });
 
   it('does not record retraining for a revoked introduction', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
     const service = new ResourceRetrainingService(
-      null as never,
-      null as never,
-      { findOne: jest.fn().mockResolvedValue(null) } as never,
-      { update: jest.fn() } as never,
-      { findOne: jest.fn().mockResolvedValue({ action: IntroductionHistoryAction.REVOKE }) } as never,
+      retrainingOperationsFake({
+        resourceLastUsedAt: jest.fn().mockResolvedValue(null),
+        latestHistory: jest.fn().mockResolvedValue({ action: IntroductionHistoryAction.REVOKE }),
+      }),
       null as never,
       null as never,
       audit as never,
@@ -257,21 +248,19 @@ describe('ResourceRetrainingService.evaluate', () => {
   it('uses the introduction marker after audit retention has removed the audit row', async () => {
     const audit = { recordResource: jest.fn().mockResolvedValue(true) };
     const service = new ResourceRetrainingService(
-      {
-        findOne: jest.fn().mockResolvedValue({
+      retrainingOperationsFake({
+        resource: jest.fn().mockResolvedValue({
           id: 1,
           name: 'Lathe',
           retrainingMaxAgeDays: 1,
           retrainingMaxInactivityDays: null,
           retrainingBlocksAccess: true,
         }),
-      } as never,
-      null as never,
-      { findOne: jest.fn().mockResolvedValue(null) } as never,
-      { update: jest.fn() } as never,
-      {
-        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
-      } as never,
+        resourceLastUsedAt: jest.fn().mockResolvedValue(null),
+        latestHistory: jest
+          .fn()
+          .mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
+      }),
       null as never,
       null as never,
       audit as never,
@@ -300,13 +289,13 @@ describe('ResourceRetrainingService status aggregation', () => {
   });
 
   it('keeps a fresh group introduction usable when the resource introduction is expired', async () => {
-    const { service, groups } = fixture.setup();
-    groups.findOne.mockResolvedValue({
+    const { service, persistence } = fixture.setup();
+    persistence.group.mockResolvedValue({
       id: 2,
       ...fixture.policy,
       retrainingMaxAgeDays: 100000,
-      resources: [{ id: 1 }],
-    });
+      resources: [{ id: 1 } as unknown as import('@attraccess/application-models').Resource],
+    } as import('@attraccess/application-models').ResourceGroup);
     expect(await service.getResourceRetrainingStatus(1, 4)).toMatchObject({
       hasIntroduction: true,
       isDue: false,
@@ -315,9 +304,18 @@ describe('ResourceRetrainingService status aggregation', () => {
   });
 
   it('reports no applicable policy without incorrectly dropping an existing introduction', async () => {
-    const { service, resources, groups } = fixture.setup();
-    resources.findOne.mockResolvedValue({ id: 1, ...fixture.policy, retrainingMaxAgeDays: null });
-    groups.findOne.mockResolvedValue({ id: 2, ...fixture.policy, retrainingMaxAgeDays: null, resources: [] });
+    const { service, persistence } = fixture.setup();
+    persistence.resource.mockResolvedValue({
+      id: 1,
+      ...fixture.policy,
+      retrainingMaxAgeDays: null,
+    } as unknown as import('@attraccess/application-models').Resource);
+    persistence.group.mockResolvedValue({
+      id: 2,
+      ...fixture.policy,
+      retrainingMaxAgeDays: null,
+      resources: [],
+    } as import('@attraccess/application-models').ResourceGroup);
     expect(await service.getResourceRetrainingStatus(1, 4)).toMatchObject({
       hasIntroduction: true,
       applies: false,
@@ -326,30 +324,40 @@ describe('ResourceRetrainingService status aggregation', () => {
   });
 
   it('reports missing or revoked introductions as unavailable', async () => {
-    const { service, introductions, history } = fixture.setup();
-    introductions.findOne.mockResolvedValue(null);
+    const { service, persistence } = fixture.setup();
+    persistence.introduction.mockResolvedValue(null);
     expect(await service.getResourceRetrainingStatus(1, 4)).toMatchObject({ hasIntroduction: false });
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
-    introductions.findOne.mockResolvedValue({ id: 3, resourceId: 1, receiverUserId: 4, createdAt: fixture.trainedAt });
-    history.findOne.mockResolvedValue(null);
+    persistence.introduction.mockResolvedValue({
+      id: 3,
+      resourceId: 1,
+      receiverUserId: 4,
+      createdAt: fixture.trainedAt,
+    } as import('@attraccess/application-models').ResourceIntroduction);
+    persistence.latestHistory.mockResolvedValue(null);
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
   });
 
   it('evaluates individual resource and group introductions and tolerates deleted targets', async () => {
-    const { service, introductions, resources, groups } = fixture.setup();
+    const { service, persistence } = fixture.setup();
     expect(await service.getIntroductionRetrainingStatus(3)).toMatchObject({ isDue: true });
-    introductions.findOne.mockResolvedValue({
+    persistence.introduction.mockResolvedValue({
       id: 3,
       resourceId: null,
       resourceGroupId: 2,
       receiverUserId: 4,
       createdAt: fixture.trainedAt,
-    });
+    } as import('@attraccess/application-models').ResourceIntroduction);
     expect(await service.getIntroductionRetrainingStatus(3)).toMatchObject({ isDue: true });
-    groups.findOne.mockResolvedValue(null);
+    persistence.group.mockResolvedValue(null as import('@attraccess/application-models').ResourceGroup);
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
-    introductions.findOne.mockResolvedValue({ id: 3, resourceId: 1, receiverUserId: 4, createdAt: fixture.trainedAt });
-    resources.findOne.mockResolvedValue(null);
+    persistence.introduction.mockResolvedValue({
+      id: 3,
+      resourceId: 1,
+      receiverUserId: 4,
+      createdAt: fixture.trainedAt,
+    } as import('@attraccess/application-models').ResourceIntroduction);
+    persistence.resource.mockResolvedValue(null);
     expect(await service.getIntroductionRetrainingStatus(3)).toBeNull();
   });
 });

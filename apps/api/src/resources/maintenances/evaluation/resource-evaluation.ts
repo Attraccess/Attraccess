@@ -16,12 +16,10 @@ import {
   ResourceMaintenanceScheduleTriggerType,
   UsageDurationUnit,
   ResourceMaintenanceScheduleDurationBasis,
-  Resource,
-  ResourceMaintenance,
-  ResourceUsage,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
-import { EntityManager, Repository } from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../../database/transaction-scope';
+import { MaintenanceEvaluationPersistence, MAINTENANCE_EVALUATION_OPERATIONS } from '../persistence/port';
 
 import {
   ResourceDurations,
@@ -143,14 +141,10 @@ export abstract class MaintenanceResourceEvaluation {
   async evaluateResource(resourceId: number): Promise<void> {
     // Avoid opening a SQLite transaction alongside session writes when no
     // enabled schedule can produce maintenance. Re-read inside for correctness.
-    if (!(await this.scheduleRepository.existsBy({ resourceId, enabled: true }))) return;
+    if (!(await this.persistence.hasEnabledSchedules(resourceId))) return;
     let createdMaintenanceId: number | undefined;
-    await this.scheduleRepository.manager.transaction(async (transactionalEntityManager) => {
-      const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);
-      const schedules = await scheduleRepo.find({
-        where: { resourceId, enabled: true },
-        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
-      });
+    await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (transactionalEntityManager) => {
+      const schedules = await this.evaluationOperations(transactionalEntityManager).enabledSchedules(resourceId);
 
       for (const schedule of schedules) {
         // Re-check active maintenance (another schedule might have just created one)
@@ -300,7 +294,7 @@ export abstract class MaintenanceResourceEvaluation {
   async shouldTrigger(
     schedule: ResourceMaintenanceSchedule,
     resourceId: number,
-    manager?: EntityManager,
+    manager?: TransactionScope,
   ): Promise<boolean> {
     const baseline = await this.getBaselineDate(resourceId, schedule.id, manager);
     const now = new Date();
@@ -332,55 +326,35 @@ export abstract class MaintenanceResourceEvaluation {
    * Get the baseline date for a schedule: when the last maintenance created by this schedule was done,
    * or the resource's creation date if no such maintenance exists.
    */
-  async getBaselineDate(resourceId: number, scheduleId: number, manager?: EntityManager): Promise<Date> {
-    const maintenanceRepository = manager?.getRepository(ResourceMaintenance) ?? this.maintenanceRepository;
-    const resourceRepository = manager?.getRepository(Resource) ?? this.resourceRepository;
-    const lastDone = await maintenanceRepository
-      .createQueryBuilder('m')
-      .where('m.resourceId = :resourceId', { resourceId })
-      .andWhere('m.maintenanceScheduleId = :scheduleId', { scheduleId })
-      .andWhere('m.endTime IS NOT NULL')
-      .orderBy('m.endTime', 'DESC')
-      .limit(1)
-      .getOne();
-
-    if (lastDone?.endTime) {
-      return lastDone.endTime;
-    }
-
-    const resource = await resourceRepository.findOne({
-      where: { id: resourceId },
-      select: ['id', 'createdAt'],
-    });
-    return resource?.createdAt ?? new Date(0);
+  async getBaselineDate(resourceId: number, scheduleId: number, manager?: TransactionScope): Promise<Date> {
+    const persistence = this.evaluationOperations(manager);
+    const endTime = await persistence.lastCompleted(resourceId, scheduleId);
+    if (endTime) return endTime;
+    return (await persistence.resourceCreationDate(resourceId)) ?? new Date(0);
   }
 
   /**
    * Count usage sessions for the resource since baseline (completed sessions only).
    */
-  protected async getUsageSessionCountSince(resourceId: number, since: Date, manager?: EntityManager): Promise<number> {
-    return (manager?.getRepository(ResourceUsage) ?? this.usageRepository)
-      .createQueryBuilder('usage')
-      .where('usage.resourceId = :resourceId', { resourceId })
-      .andWhere('usage.lifecyclePending = :lifecyclePending', { lifecyclePending: false })
-      .andWhere('usage.endTime IS NOT NULL')
-      .andWhere('usage.endTime >= :since', { since })
-      .getCount();
+  protected async getUsageSessionCountSince(
+    resourceId: number,
+    since: Date,
+    manager?: TransactionScope,
+  ): Promise<number> {
+    return this.evaluationOperations(manager).usageCount(resourceId, since);
   }
+
+  protected evaluationOperations(scope?: TransactionScope): MaintenanceEvaluationPersistence {
+    return scope ? scope.resolve(MAINTENANCE_EVALUATION_OPERATIONS) : this.persistence;
+  }
+  protected abstract readonly persistence: MaintenanceEvaluationPersistence;
+  protected abstract readonly transactions: DatabaseTransactions;
 
   protected abstract readonly pendingUsageEvals: Map<number, NodeJS.Timeout>;
 
   protected abstract readonly usageEvalFirstEventAt: Map<number, number>;
 
-  protected abstract readonly maintenanceRepository: Repository<ResourceMaintenance>;
-
-  protected abstract readonly resourceRepository: Repository<Resource>;
-
-  protected abstract readonly usageRepository: Repository<ResourceUsage>;
-
   protected abstract readonly operatingAttributionService: ResourceOperatingAttributionService;
-
-  protected abstract readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>;
 
   protected abstract readonly maintenanceService: ResourceMaintenanceService;
 

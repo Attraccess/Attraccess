@@ -1,3 +1,4 @@
+import { TypeormWagoFlowPersistence } from './persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { encodeMeasurement } from '../../measurement-contract';
 import { parseOperationalMessage } from '../protocol/index';
@@ -55,7 +56,14 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
     return {
-      service: new WagoFlowService(context),
+      service: new WagoFlowService(
+        context,
+        new TypeormWagoFlowPersistence(
+          () => context.getRepository(WagoController),
+          () => context.getRepository(WagoConfigurationRevision),
+          () => context.getRepository(WagoSettings),
+        ),
+      ),
       trigger,
       context,
       revisionQuery,

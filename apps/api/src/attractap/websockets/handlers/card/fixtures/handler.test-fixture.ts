@@ -24,7 +24,7 @@ export function createAttractapCardHandlerFixture() {
 
   let metricsService: { attractapNfcTapsTotal: { inc: jest.Mock } };
 
-  let resourceRepository: { findOne: jest.Mock };
+  let resourceReader: { findResource: jest.Mock };
 
   let rbacService: { getEffectivePermissions: jest.Mock };
 
@@ -109,11 +109,11 @@ export function createAttractapCardHandlerFixture() {
     set metricsService(value: typeof metricsService) {
       metricsService = value;
     },
-    get resourceRepository() {
-      return resourceRepository;
+    get resourceReader() {
+      return resourceReader;
     },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
+    set resourceReader(value: typeof resourceReader) {
+      resourceReader = value;
     },
     get rbacService() {
       return rbacService;

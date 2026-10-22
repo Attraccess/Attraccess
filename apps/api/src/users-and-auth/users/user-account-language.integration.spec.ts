@@ -1,5 +1,13 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { closeResourceTransactionConnection, SqliteTransactionDriver } from '../../database/sqlite/transactions';
+import { USER_WRITES } from './persistence/port';
+import { TypeormSettingsPersistence } from '../../settings/persistence/typeorm-adapter';
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import { TypeormUserPersistence, userTransactionOperations } from './persistence/typeorm-adapter';
 import { createMock } from '@golevelup/ts-jest';
-import { entities, Setting, User } from '@attraccess/database-entities';
+import { entities, AuthenticationDetail, ResourceUsage, Session, Setting, User } from '@attraccess/database-entities';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';
@@ -14,26 +22,38 @@ import { UsersService } from './users.service';
 
 describe('new account language persistence', () => {
   let source: DataSource;
+  let directory: string;
   let users: UsersService;
   let settings: SettingsService;
   let store: SettingsStoreService;
 
   beforeAll(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'account-language-'));
     source = await new DataSource({
       type: 'sqlite',
-      database: ':memory:',
+      database: join(directory, 'accounts.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), createMock<EncryptionService>());
+    store = new SettingsStoreService(
+      new TypeormSettingsPersistence(source.getRepository(Setting), source.getRepository(User)),
+      createMock<EncryptionService>(),
+    );
     settings = Object.assign(Object.create(SettingsService.prototype), { settingsStore: store });
+    const driver = new SqliteTransactionDriver(source);
+    driver.register(USER_WRITES, userTransactionOperations);
     // Execute production creation, transactions, persistence and language resolution.
     // Licensing, roles and metrics are unrelated collaborators for this regression.
     users = Object.assign(Object.create(UsersService.prototype), {
       logger: createMock<Logger>(),
-      userRepository: source.getRepository(User),
-      dataSource: source,
+      persistence: new TypeormUserPersistence(
+        source.getRepository(User),
+        source.getRepository(AuthenticationDetail),
+        source.getRepository(Session),
+        source.getRepository(ResourceUsage),
+      ),
+      transactions: new DatabaseTransactions(driver),
       licenseService: createMock<LicenseService>(),
       rbacService: createMock<RbacService>(),
       metricsService: createMock<MetricsService>(),
@@ -41,7 +61,9 @@ describe('new account language persistence', () => {
   }, 60_000);
 
   afterAll(async () => {
+    if (source) await closeResourceTransactionConnection(source);
     if (source?.isInitialized) await source.destroy();
+    if (directory) await rm(directory, { recursive: true, force: true });
   });
 
   it.each(['single', 'bulk'] as const)(

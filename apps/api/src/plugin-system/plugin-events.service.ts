@@ -4,7 +4,7 @@ import {
   SystemEventPayload,
   SystemEventResponse,
   SystemEventSubscription,
-} from '@attraccess/plugins-backend-sdk';
+} from '@attraccess/plugins-backend-sdk/v2';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 

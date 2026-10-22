@@ -19,5 +19,9 @@
   "attraccessVersion": {
     "min": "1.11.0"
   },
-  "permissions": ["DATABASE_ACCESS"]
+  "permissions": ["DATABASE_ACCESS"],
+  "persistence": {
+    "contractVersion": 2,
+    "supportedBackends": ["sqlite"]
+  }
 }

@@ -1,4 +1,4 @@
-import { ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceHealthStatus } from '@attraccess/application-models';
 
 export class ResourceHealthChangedEvent {
   static readonly EVENT_NAME = 'resource.health.changed';

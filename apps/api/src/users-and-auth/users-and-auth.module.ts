@@ -1,3 +1,22 @@
+import { UserPersistence, USER_WRITES } from './users/persistence/port';
+import { TypeormUserPersistence, userTransactionOperations } from './users/persistence/typeorm-adapter';
+import { AuthenticationPersistence, AUTHENTICATION_WRITES } from './auth/persistence/port';
+import {
+  TypeormAuthenticationPersistence,
+  authenticationTransactionOperations,
+} from './auth/persistence/typeorm-adapter';
+import { SqliteTransactionDriver } from '../database/sqlite/transactions';
+import { SSO_WRITES, SsoPersistence } from './auth/persistence/port';
+import { ssoTransactionOperations, TypeormSsoPersistence } from './auth/persistence/typeorm-adapter';
+import { SignupDomainPersistence } from './users/persistence/port';
+import { TypeormSignupDomainPersistence } from './users/persistence/typeorm-adapter';
+import { TwoFactorPersistence, SsoLinkSecretPersistence } from './auth/persistence/port';
+import { TypeormTwoFactorPersistence, TypeormSsoLinkSecretPersistence } from './auth/persistence/typeorm-adapter';
+import { ApiTokenPersistence, PasskeyPersistence } from './auth/persistence/port';
+import { TypeormApiTokenPersistence, TypeormPasskeyPersistence } from './auth/persistence/typeorm-adapter';
+import { RateLimitPersistence } from './rate-limiting/persistence/port';
+import { TypeormRateLimitPersistence } from './rate-limiting/persistence/typeorm-adapter';
+import { TypeormSessionUserReader } from './auth/session-store/persistence/user-reader';
 import { SsoLogoutService } from './auth/sso/sso-logout.service';
 import { SsoLogoutController } from './auth/sso/sso-logout.controller';
 import { OidcTokenVerifier } from './auth/sso/oidc/oidc-token-verifier.service';
@@ -156,7 +175,7 @@ export const sessionStoreProvider = {
     tokenHashService: TokenHashService,
   ): SessionStore => {
     if (valkeyClient) {
-      return new ValkeySessionStore(valkeyClient, userRepo, tokenHashService);
+      return new ValkeySessionStore(valkeyClient, new TypeormSessionUserReader(userRepo), tokenHashService);
     }
     return new SqliteSessionStore(sessionRepo, tokenHashService);
   },
@@ -191,16 +210,48 @@ export const sessionStoreProvider = {
   providers: [
     sessionStoreProvider,
     UsersService,
+    {
+      provide: UserPersistence,
+      useFactory: (
+        driver: SqliteTransactionDriver,
+        users: Repository<User>,
+        auth: Repository<AuthenticationDetail>,
+        sessions: Repository<Session>,
+        usages: Repository<ResourceUsage>,
+      ) => {
+        driver.register(USER_WRITES, userTransactionOperations);
+        return new TypeormUserPersistence(users, auth, sessions, usages);
+      },
+      inject: [
+        SqliteTransactionDriver,
+        getRepositoryToken(User),
+        getRepositoryToken(AuthenticationDetail),
+        getRepositoryToken(Session),
+        getRepositoryToken(ResourceUsage),
+      ],
+    },
     SignupDomainService,
+    { provide: SignupDomainPersistence, useClass: TypeormSignupDomainPersistence },
     UserRegistrationService,
     UserPasswordService,
     UserInvitationService,
     UserPermissionsService,
     AuthService,
+    {
+      provide: AuthenticationPersistence,
+      useFactory: (driver: SqliteTransactionDriver, details: Repository<AuthenticationDetail>) => {
+        driver.register(AUTHENTICATION_WRITES, authenticationTransactionOperations);
+        return new TypeormAuthenticationPersistence(details);
+      },
+      inject: [SqliteTransactionDriver, getRepositoryToken(AuthenticationDetail)],
+    },
     SessionService,
     TwoFactorService,
+    { provide: TwoFactorPersistence, useClass: TypeormTwoFactorPersistence },
     PasskeyService,
+    { provide: PasskeyPersistence, useClass: TypeormPasskeyPersistence },
     ApiTokenService,
+    { provide: ApiTokenPersistence, useClass: TypeormApiTokenPersistence },
     ApiTokenRequestRateLimitService,
     {
       provide: APP_INTERCEPTOR,
@@ -209,6 +260,24 @@ export const sessionStoreProvider = {
     LocalStrategy,
     SessionStrategy,
     SSOService,
+    {
+      provide: SsoPersistence,
+      useFactory: (
+        driver: SqliteTransactionDriver,
+        providers: Repository<SSOProvider>,
+        oidc: Repository<SSOProviderOIDCConfiguration>,
+        saml: Repository<SSOProviderSAMLConfiguration>,
+      ) => {
+        driver.register(SSO_WRITES, ssoTransactionOperations);
+        return new TypeormSsoPersistence(providers, oidc, saml);
+      },
+      inject: [
+        SqliteTransactionDriver,
+        getRepositoryToken(SSOProvider),
+        getRepositoryToken(SSOProviderOIDCConfiguration),
+        getRepositoryToken(SSOProviderSAMLConfiguration),
+      ],
+    },
     SsoLogoutService,
     OidcTokenVerifier,
     CookieConfigService,
@@ -219,8 +288,10 @@ export const sessionStoreProvider = {
     SSOSamlPassportGuard,
     SSOSamlStrategy,
     SSOLinkTokenService,
+    { provide: SsoLinkSecretPersistence, useClass: TypeormSsoLinkSecretPersistence },
     AccountLinkingExceptionFilter,
     BruteForceProtectionService,
+    { provide: RateLimitPersistence, useClass: TypeormRateLimitPersistence },
     AuthAuditLogger,
     AuthRateLimitInterceptor,
     LoginRateLimitGuard,

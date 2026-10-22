@@ -24,7 +24,7 @@ import { NpmPluginService, InstalledNpmPlugin, NpmPluginAuditState } from './npm
 
 import { PluginService } from './plugin.service';
 
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk/v2';
 
 import { randomUUID } from 'crypto';
 

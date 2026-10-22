@@ -3,11 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceGroup } from './resourceGroup.entity';
-
-export enum ResourceIntroducerType {
-  INTRODUCER = 'introducer',
-  MAINTAINER = 'maintainer',
-}
+import { ResourceIntroducerType } from '@attraccess/application-models';
 
 @Entity()
 export class ResourceIntroducer {
@@ -77,3 +73,5 @@ export class ResourceIntroducer {
   @JoinColumn({ name: 'resourceGroupId' })
   resourceGroup!: ResourceGroup | null;
 }
+
+export { ResourceIntroducerType } from '@attraccess/application-models';

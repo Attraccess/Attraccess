@@ -1,3 +1,7 @@
+import { SqliteAuditTransactionObserver } from './persistence/transaction-observer';
+import { SqliteAuditPersistence } from './persistence/sqlite-audit-storage';
+import { User } from '@attraccess/database-entities';
+import { TypeormSettingsPersistence } from '../settings/persistence/typeorm-adapter';
 import { AuditLog, entities, Setting } from '@attraccess/database-entities';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -78,8 +82,11 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), null);
-    audit = new AuditService(source, store);
+    store = new SettingsStoreService(
+      new TypeormSettingsPersistence(source.getRepository(Setting), source.getRepository(User)),
+      null,
+    );
+    audit = new AuditService(new SqliteAuditPersistence(source), store, new SqliteAuditTransactionObserver(source));
     settings = new SettingsService(null, store, { getSettings: async () => ({}) } as never, null, events);
     const module = await Test.createTestingModule({
       controllers: [AuditController, SettingsController],
@@ -191,7 +198,10 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     const repository = source.getRepository(Setting);
     await repository.delete({ parent: 'app', key: 'default_language' });
     if (value !== null) await repository.save(repository.create({ parent: 'app', key: 'default_language', value }));
-    const persistedStore = new SettingsStoreService(repository, null);
+    const persistedStore = new SettingsStoreService(
+      new TypeormSettingsPersistence(repository, source.getRepository(User)),
+      null,
+    );
     const settings = new SettingsService(null, persistedStore, null);
     expect((await settings.getAppSettings()).defaultLanguage).toBe(expected);
     expect(await settings.getDefaultLanguage()).toBe(expected);

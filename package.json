@@ -13,7 +13,8 @@
     "services": "node --experimental-strip-types scripts/services-compose.mts",
     "crap-score": "nx run-many -t crap-score --parallel=2",
     "crap-score:affected": "nx affected -t crap-score --parallel=2",
-    "test:tooling": "nx run @attraccess/source:test"
+    "test:tooling": "nx run @attraccess/source:test",
+    "test:persistence-boundaries": "node tools/eslint-rules/persistence-boundaries.spec.cjs"
   },
   "private": true,
   "dependencies": {
@@ -168,6 +169,7 @@
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^21.2.0",
     "@cyclonedx/cdxgen": "^12.7.1",
+    "@jest/globals": "30.4.1",
     "@nx/esbuild": "22.7.12",
     "@nx/eslint": "22.7.12",
     "@nx/eslint-plugin": "22.7.12",

@@ -1,3 +1,5 @@
+import { bindWagoPersistenceFixture } from './wago-service.test-fixture';
+import { createWagoRegistryPersistence } from './controllers/persistence/typeorm-adapter';
 import { createHash } from 'node:crypto';
 import { createMock } from '@golevelup/ts-jest';
 import type { PluginContext, PluginMqttMessage, Repository } from '@attraccess/plugins-backend-sdk';
@@ -55,18 +57,21 @@ function fixture(claimed = true) {
       }),
     }),
   });
-  const service = new WagoService(context);
+  const service = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(
+    context,
+  );
   service['controllers'] = createMock<Repository<WagoController>>({
     findOneBy: jest.fn().mockResolvedValue(controller),
-    save: jest.fn(async (row) => row),
+    save: jest.fn(async (row) => Object.assign(controller, row)),
   });
   service['enrollments'] = createMock<Repository<WagoEnrollment>>({
     findOneBy: jest.fn().mockResolvedValue(enrollment),
-    save: jest.fn(async (row) => row),
+    save: jest.fn(async (row) => Object.assign(enrollment, row)),
   });
   service['revisions'] = createMock<Repository<WagoConfigurationRevision>>({
     find: jest.fn().mockResolvedValue([revision]),
   });
+  bindWagoPersistenceFixture(service, context as unknown as PluginContext);
   jest
     .spyOn(service, 'getSettings')
     .mockResolvedValue({ id: 1, operationalPrefix: 'attraccess/wago', defaultMqttServerId: 2 });

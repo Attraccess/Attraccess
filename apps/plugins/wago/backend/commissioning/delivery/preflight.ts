@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk';
+import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk/v2';
 import { X509Certificate } from 'node:crypto';
 
 /** Validate local configuration before SSH or broker credential provisioning. */

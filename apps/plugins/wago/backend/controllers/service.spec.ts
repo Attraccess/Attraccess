@@ -1,3 +1,4 @@
+import { createWagoRegistryPersistence } from './persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoController } from './entity';
 import { WagoEnrollment } from './enrollment.entity';
@@ -213,7 +214,7 @@ describe('WagoService connection monitoring', () => {
 
   it('resolves repositories only after the host module initializes', async () => {
     const context = { getRepository: jest.fn() } as unknown as PluginContext;
-    new WagoService(context);
+    ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(context);
 
     expect(context.getRepository).not.toHaveBeenCalled();
   });

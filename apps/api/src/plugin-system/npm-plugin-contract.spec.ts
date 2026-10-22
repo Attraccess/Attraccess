@@ -22,6 +22,35 @@ const validPackage = {
 };
 
 describe('parseNpmPluginPackage', () => {
+  it('preserves the neutral persistence declaration in the package and loader manifest', () => {
+    const persistence = { contractVersion: 2, supportedBackends: ['sqlite'] };
+    const { pkg, manifest } = parseNpmPluginPackage(
+      { ...validPackage, attraccess: { ...validPackage.attraccess, persistence } },
+      '1.9.0',
+    );
+    expect(pkg.attraccess.persistence).toEqual(persistence);
+    expect(manifest.persistence).toEqual(persistence);
+  });
+
+  it('keeps undeclared legacy packages on the SQLite compatibility path', () => {
+    expect(parseNpmPluginPackage(validPackage, '1.9.0').manifest.persistence).toBeUndefined();
+  });
+
+  it.each([
+    { contractVersion: 2, supportedBackends: ['postgres'] },
+    { contractVersion: 1, supportedBackends: ['sqlite'] },
+    { contractVersion: 2, supportedBackends: [] },
+    { contractVersion: 2, supportedBackends: [''] },
+    { contractVersion: 2, supportedBackends: ['sqlite'], unknown: true },
+  ])(
+    'rejects unsupported or malformed persistence declarations before returning an install manifest',
+    (persistence) => {
+      expect(() =>
+        parseNpmPluginPackage({ ...validPackage, attraccess: { ...validPackage.attraccess, persistence } }, '1.9.0'),
+      ).toThrow();
+    },
+  );
+
   it('maps the npm contract into the existing loader manifest', () => {
     const { manifest } = parseNpmPluginPackage(validPackage, '1.9.0');
     expect(manifest).toMatchObject({

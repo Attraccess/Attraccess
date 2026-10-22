@@ -1,4 +1,4 @@
-import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import { EventEmitter } from 'node:events';
 import { request, RequestOptions } from 'node:https';
 import { rootCertificates } from 'node:tls';

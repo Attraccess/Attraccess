@@ -1,10 +1,11 @@
+import { mapResponse } from '../../transport/response-mapper';
 import { recordAdministrationSafely, safeAuditHost } from '../../audit/policies/administration';
 import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { MqttServer } from '@attraccess/database-entities';
+import { MqttServer } from '../../transport/models/mqttServer.dto';
 import { MqttServerService } from './mqtt-server.service';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { AuditService } from '../../audit/audit.service';
 
 @ApiTags('MQTT')
@@ -24,7 +25,7 @@ export class MqttServerController {
     type: [MqttServer],
   })
   async getAll(): Promise<MqttServer[]> {
-    return this.mqttServerService.findAll();
+    return (await this.mqttServerService.findAll()).map((server) => mapResponse(MqttServer, server));
   }
 
   @Get(':id')
@@ -36,7 +37,7 @@ export class MqttServerController {
   })
   @ApiResponse({ status: 404, description: 'MQTT server not found' })
   async getOneById(@Param('id', ParseIntPipe) id: number): Promise<MqttServer> {
-    return this.mqttServerService.findOne(id);
+    return mapResponse(MqttServer, await this.mqttServerService.findOne(id));
   }
 
   @Post()
@@ -52,7 +53,7 @@ export class MqttServerController {
   ): Promise<MqttServer> {
     const server = await this.mqttServerService.create(createMqttServerDto);
     await this.record(req, 'mqtt_server.created', server, createMqttServerDto.password !== undefined);
-    return server;
+    return mapResponse(MqttServer, server);
   }
 
   @Put(':id')
@@ -70,7 +71,7 @@ export class MqttServerController {
   ): Promise<MqttServer> {
     return this.mqttServerService.update(id, updateMqttServerDto).then(async (server) => {
       await this.record(req, 'mqtt_server.updated', server, updateMqttServerDto.password !== undefined);
-      return server;
+      return mapResponse(MqttServer, server);
     });
   }
 

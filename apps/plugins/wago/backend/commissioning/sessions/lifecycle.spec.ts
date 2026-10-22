@@ -1,3 +1,6 @@
+import { createSqliteDeviceOperations } from '../../runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../persistence/typeorm-adapter';
+import { createSqliteManagementStore } from '../../management/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { createHash, X509Certificate } from 'node:crypto';
 import { rootCertificates } from 'node:tls';
@@ -35,7 +38,11 @@ describe('WagoCommissioningService security and lifecycle', () => {
     const repository = {
       find: jest.fn().mockResolvedValue([]),
       findOneBy: jest.fn().mockResolvedValue(session),
-      save: jest.fn(async (value) => value),
+      save: jest.fn(async (value) => {
+        const stored = await repository.findOneBy.getMockImplementation()?.({ id: value.id });
+        if (stored) Object.assign(stored, value);
+        return value;
+      }),
     };
     const wago = {
       registerCommissioningDiscoveryHandler: jest.fn(),
@@ -52,7 +59,13 @@ describe('WagoCommissioningService security and lifecycle', () => {
       secrets: { encrypt: jest.fn().mockReturnValue('ciphertext'), decrypt: jest.fn().mockReturnValue(verifier) },
       logger: { warn: jest.fn() },
     };
-    const service = new Service(context as unknown as PluginContext, wago as unknown as WagoService);
+    const service = new Service(
+      context as unknown as PluginContext,
+      wago as unknown as WagoService,
+      createSqliteManagementStore(context as unknown as PluginContext),
+      createSqliteCommissioningPersistence(context as unknown as PluginContext),
+      createSqliteDeviceOperations(context as unknown as PluginContext),
+    );
     service['sessions'] = repository as never;
     const inspect = jest.fn().mockRejectedValue(new Error('arbitrary-secret'));
     const sudo = jest.fn().mockResolvedValue('');
@@ -287,8 +300,14 @@ describe('WagoCommissioningService security and lifecycle', () => {
     // Runtime availability comes only from the verified server-owned catalog.
     const digest = createHash('sha256').update(Buffer.from('mock runtime bundle')).digest('hex');
     return class extends WagoCommissioningService {
-      constructor(context: PluginContext, wago: WagoService) {
-        super(context, wago, {
+      constructor(
+        context: PluginContext,
+        wago: WagoService,
+        managementStore: ConstructorParameters<typeof WagoCommissioningService>[2],
+        persistence: ConstructorParameters<typeof WagoCommissioningService>[3],
+        operations: ConstructorParameters<typeof WagoCommissioningService>[4],
+      ) {
+        super(context, wago, managementStore, persistence, operations, {
           has: async () => true,
           current: async () => ({ digest }),
           acquire: async () => ({
@@ -407,6 +426,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
         const persisted: string[] = [];
         repository.save.mockImplementation(async (value) => {
           persisted.push(JSON.stringify(value));
+          Object.assign(session, value);
           return value;
         });
         const result = await service.deliver(1, {
@@ -567,9 +587,16 @@ describe('WagoCommissioningService security and lifecycle', () => {
         getRepository: jest.fn().mockReturnValue(repository),
       } as unknown as PluginContext;
 
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {
+            registerCommissioningDiscoveryHandler: jest.fn(),
+          } as unknown as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))(context);
 
       expect(context.getRepository).not.toHaveBeenCalled();
 
@@ -591,16 +618,27 @@ describe('WagoCommissioningService security and lifecycle', () => {
       } as WagoCommissioningSession;
       const repository = {
         findOneBy: jest.fn().mockResolvedValue(session),
-        save: jest.fn().mockImplementation(async (value) => value),
+        save: jest.fn().mockImplementation(async (value) => {
+          const stored = await repository.findOneBy.getMockImplementation()?.({ id: value.id });
+          if (stored) Object.assign(stored, value);
+          return value;
+        }),
       };
       const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
       let releaseDelivery!: () => void;
       const delivery = new Promise<void>((resolve) => (releaseDelivery = resolve));
       const wago = { revokeEnrollmentById: jest.fn().mockResolvedValue(undefined) } as unknown as WagoService;
-      const service = new WagoCommissioningService(context, {
-        ...wago,
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {
+            ...wago,
+            registerCommissioningDiscoveryHandler: jest.fn(),
+          } as unknown as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))(context);
       service.onApplicationBootstrap();
 
       const inProgressDelivery = service['withDeliveryLock'](session.id, () => delivery);
@@ -630,9 +668,16 @@ describe('WagoCommissioningService security and lifecycle', () => {
           ]),
       };
       const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {
+            registerCommissioningDiscoveryHandler: jest.fn(),
+          } as unknown as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))(context);
       service['sessions'] = repository as never;
 
       const [listed] = await service.list();
@@ -656,12 +701,23 @@ describe('WagoCommissioningService security and lifecycle', () => {
       } as WagoCommissioningSession;
       const repository = {
         findOneBy: jest.fn().mockResolvedValue(session),
-        save: jest.fn().mockImplementation(async (value) => value),
+        save: jest.fn().mockImplementation(async (value) => {
+          const stored = await repository.findOneBy.getMockImplementation()?.({ id: value.id });
+          if (stored) Object.assign(stored, value);
+          return value;
+        }),
       };
       const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {
+            registerCommissioningDiscoveryHandler: jest.fn(),
+          } as unknown as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))(context);
       service.onApplicationBootstrap();
 
       await expect(service.confirmHostKey(session.id, 'SHA256:other')).rejects.toThrow('does not match');
@@ -677,9 +733,16 @@ describe('WagoCommissioningService security and lifecycle', () => {
       const session = { id: 1, state: 'awaiting_identity_confirmation' } as WagoCommissioningSession;
       const repository = { findOneBy: jest.fn().mockResolvedValue(session) };
       const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          {
+            registerCommissioningDiscoveryHandler: jest.fn(),
+          } as unknown as WagoService,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))(context);
       service.onApplicationBootstrap();
 
       await expect(service.deliver(session.id)).rejects.toThrow('cannot be delivered in its current state');
@@ -699,7 +762,14 @@ describe('WagoCommissioningService security and lifecycle', () => {
         revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
         deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
       } as unknown as WagoService;
-      const service = new WagoCommissioningService(context, wago);
+      const service = ((context: PluginContext) =>
+        new WagoCommissioningService(
+          context,
+          wago,
+          createSqliteManagementStore(context),
+          createSqliteCommissioningPersistence(context),
+          createSqliteDeviceOperations(context),
+        ))(context);
       service.onApplicationBootstrap();
 
       await service.remove(session.id);
@@ -745,7 +815,11 @@ describe('WagoCommissioningService security and lifecycle', () => {
           ) ?? null
         );
       }),
-      save: jest.fn().mockImplementation(async (value) => value),
+      save: jest.fn().mockImplementation(async (value) => {
+        const stored = await repository.findOneBy.getMockImplementation()?.({ id: value.id });
+        if (stored) Object.assign(stored, value);
+        return value;
+      }),
     };
     const registerCommissioningDiscoveryHandler = jest.fn();
     const wago = {
@@ -756,7 +830,14 @@ describe('WagoCommissioningService security and lifecycle', () => {
       getRepository: jest.fn().mockReturnValue(repository),
       secrets: secrets,
     } as unknown as PluginContext;
-    const service = new WagoCommissioningService(context, wago);
+    const service = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        wago,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+      ))(context);
     await service.onApplicationBootstrap();
 
     const handler = registerCommissioningDiscoveryHandler.mock.calls[0][0] as (controller: {

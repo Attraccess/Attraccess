@@ -1,3 +1,7 @@
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import { SqliteTransactionDriver } from '../../database/sqlite/transactions';
+import { OPERATING_INTERVAL_WRITES } from './persistence/port';
+import { operatingIntervalTransactionOperations } from './persistence/typeorm-adapter';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceOperatingInterval } from '@attraccess/database-entities';
 import { DataSource, EntitySchema } from 'typeorm';
@@ -10,6 +14,12 @@ import { ResourceOperatingInterval1783500000000 } from '../../database/migration
 import { OperatingTransitionProvenance1784300000000 } from '../../database/migrations/1784300000000-operating-transition-provenance';
 import { closeResourceTransactionConnection } from '../../database/run-serialized-transaction';
 import { ResourceOperatingStateChangedEvent } from './events/resource-operating-state-changed.event';
+
+function operatingTransactions(source: DataSource): DatabaseTransactions {
+  const driver = new SqliteTransactionDriver(source);
+  driver.register(OPERATING_INTERVAL_WRITES, operatingIntervalTransactionOperations);
+  return new DatabaseTransactions(driver);
+}
 
 const IntervalSchema = new EntitySchema<ResourceOperatingInterval>({
   name: 'ResourceOperatingInterval',
@@ -52,11 +62,7 @@ describe('Operating interval persistence', () => {
     await new OperatingTransitionProvenance1784300000000().up(runner);
     await runner.release();
     eventEmitter = new EventEmitter2();
-    service = new ResourceOperatingIntervalService(
-      source.getRepository(ResourceOperatingInterval),
-      metrics,
-      eventEmitter,
-    );
+    service = new ResourceOperatingIntervalService(operatingTransactions(source), metrics, eventEmitter);
   });
 
   afterEach(async () => {
@@ -91,20 +97,12 @@ describe('Operating interval persistence', () => {
   it('preserves millisecond boundaries and provenance across service restarts and rejects clock regression', async () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(new Date('2026-09-19T12:00:00.123Z'));
     await service.transition(1, 'operating', { flowNodeId: 'start-node', flowRunId: 'start-run' });
-    service = new ResourceOperatingIntervalService(
-      source.getRepository(ResourceOperatingInterval),
-      metrics,
-      eventEmitter,
-    );
+    service = new ResourceOperatingIntervalService(operatingTransactions(source), metrics, eventEmitter);
     jest.setSystemTime(new Date('2026-09-19T12:00:00.122Z'));
     await expect(service.transition(1, 'idle')).rejects.toThrow('Server clock precedes the last operating transition');
     jest.setSystemTime(new Date('2026-09-19T12:01:00.456Z'));
     await service.transition(1, 'idle', { flowNodeId: 'stop-node', flowRunId: 'stop-run' });
-    service = new ResourceOperatingIntervalService(
-      source.getRepository(ResourceOperatingInterval),
-      metrics,
-      eventEmitter,
-    );
+    service = new ResourceOperatingIntervalService(operatingTransactions(source), metrics, eventEmitter);
     jest.setSystemTime(new Date('2026-09-19T12:01:00.455Z'));
     await expect(service.transition(1, 'operating')).rejects.toThrow(
       'Server clock precedes the last operating transition',

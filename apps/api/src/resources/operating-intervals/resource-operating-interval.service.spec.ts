@@ -1,5 +1,10 @@
-import { ResourceOperatingInterval } from '@attraccess/database-entities';
-import { EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { operationTransactionsFake } from '../../database/testing/operation-transactions.test-fixture';
+import {
+  OperatingIntervalOperations,
+  OPERATING_INTERVAL_WRITES,
+  OpenOperatingIntervalConflictError,
+} from './persistence/port';
+import { ResourceOperatingInterval } from '@attraccess/application-models';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
@@ -7,11 +12,14 @@ import { ResourceOperatingIntervalService } from './resource-operating-interval.
 describe('ResourceOperatingIntervalService', () => {
   let openInterval: ResourceOperatingInterval | null;
   let latestInterval: ResourceOperatingInterval | null;
-  let repository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'create' | 'save'>>;
-  let operatingMetrics: jest.Mocked<OperatingMetricsRecorder>;
+  let operations: jest.Mocked<OperatingIntervalOperations>;
+  let persist: jest.Mock<Promise<ResourceOperatingInterval>, [ResourceOperatingInterval]>;
+  let operatingMetrics: jest.Mocked<
+    Pick<OperatingMetricsRecorder, 'recordTransition' | 'setResourceState' | 'recordDataQualityFailures'>
+  >;
   let service: ResourceOperatingIntervalService;
   let eventEmitter: EventEmitter2;
-  let transaction: jest.Mock;
+  let transaction: ReturnType<typeof operationTransactionsFake>['run'];
 
   beforeEach(() => {
     openInterval = null;
@@ -21,25 +29,24 @@ describe('ResourceOperatingIntervalService', () => {
       setResourceState: jest.fn(),
       recordDataQualityFailures: jest.fn(),
     };
-    repository = {
-      findOne: jest.fn(async () => openInterval ?? latestInterval),
-      create: jest.fn((value) => value as ResourceOperatingInterval),
-      save: jest.fn(async (interval) => {
-        latestInterval = interval;
-        openInterval = interval.endTime === null ? interval : null;
-        return interval;
-      }),
+    persist = jest.fn(async (interval) => {
+      latestInterval = interval;
+      openInterval = interval.endTime === null ? interval : null;
+      return interval;
+    });
+    operations = {
+      lockResource: jest.fn(),
+      latestInterval: jest.fn(async (_resourceId: number) => openInterval ?? latestInterval),
+      createInterval: jest.fn(async (value) => persist(value as ResourceOperatingInterval)),
+      saveInterval: persist,
     };
-    transaction = jest.fn((callback) => callback(manager));
-    const manager = {
-      getRepository: jest.fn(() => repository),
-      transaction,
-      query: jest.fn(),
-    } as unknown as EntityManager;
+    const driver = operationTransactionsFake();
+    driver.bind(OPERATING_INTERVAL_WRITES, operations);
+    transaction = driver.run;
     eventEmitter = new EventEmitter2();
     service = new ResourceOperatingIntervalService(
-      { manager } as Repository<ResourceOperatingInterval>,
-      operatingMetrics,
+      driver.transactions,
+      operatingMetrics as unknown as OperatingMetricsRecorder,
       eventEmitter,
     );
   });
@@ -48,7 +55,7 @@ describe('ResourceOperatingIntervalService', () => {
 
   it('starts idle and ignores an idle transition', async () => {
     await expect(service.transition(1, 'idle')).resolves.toBeNull();
-    expect(repository.save).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
   });
 
   it('creates an open interval at the server timestamp with millisecond precision', async () => {
@@ -57,7 +64,7 @@ describe('ResourceOperatingIntervalService', () => {
 
     await service.transition(3, 'operating');
 
-    expect(repository.create).toHaveBeenCalledWith({
+    expect(operations.createInterval).toHaveBeenCalledWith({
       resourceId: 3,
       startTime: now,
       endTime: null,
@@ -66,7 +73,7 @@ describe('ResourceOperatingIntervalService', () => {
       endFlowNodeId: null,
       endFlowRunId: null,
     });
-    expect(repository.save).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 
   it('publishes state changes only after its transaction commits', async () => {
@@ -79,8 +86,8 @@ describe('ResourceOperatingIntervalService', () => {
       finishCommit = resolve;
     });
     const executeTransaction = transaction.getMockImplementation();
-    transaction.mockImplementation(async (callback) => {
-      const result = await executeTransaction(callback);
+    transaction.mockImplementation(async (conflicts, callback) => {
+      const result = await executeTransaction(conflicts, callback);
       finishWrite();
       await commit;
       return result;
@@ -114,8 +121,8 @@ describe('ResourceOperatingIntervalService', () => {
     await service.transition(3, 'operating');
     await service.transition(3, 'operating');
 
-    expect(repository.create).toHaveBeenCalledTimes(1);
-    expect(repository.save).toHaveBeenCalledTimes(1);
+    expect(operations.createInterval).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 
   it('closes a persisted open interval without requiring a usage session', async () => {
@@ -130,7 +137,7 @@ describe('ResourceOperatingIntervalService', () => {
 
     await service.transition(9, 'idle');
 
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ endTime: now }));
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({ endTime: now }));
   });
 
   it('rejects an idle transition before the persisted operating boundary without changing state', async () => {
@@ -145,7 +152,7 @@ describe('ResourceOperatingIntervalService', () => {
     await expect(service.transition(9, 'idle')).rejects.toThrow('Server clock precedes the last operating transition');
 
     expect(openInterval.endTime).toBeNull();
-    expect(repository.save).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
     expect(operatingMetrics.recordTransition).not.toHaveBeenCalled();
   });
 
@@ -161,7 +168,7 @@ describe('ResourceOperatingIntervalService', () => {
       jest.useFakeTimers().setSystemTime(new Date('2026-08-27T12:10:00.000Z'));
 
       await expect(service.transition(9, state)).rejects.toThrow('Server clock precedes the last operating transition');
-      expect(repository.save).not.toHaveBeenCalled();
+      expect(persist).not.toHaveBeenCalled();
 
       jest.setSystemTime(new Date('2026-08-27T12:10:00.001Z'));
       const result = await service.transition(9, state);
@@ -200,8 +207,8 @@ describe('ResourceOperatingIntervalService', () => {
   it('serializes conflicting transitions for the same resource in arrival order', async () => {
     await Promise.all([service.transition(3, 'operating'), service.transition(3, 'idle')]);
 
-    expect(repository.create).toHaveBeenCalledTimes(1);
-    expect(repository.save).toHaveBeenCalledTimes(2);
+    expect(operations.createInterval).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(2);
     expect(openInterval).toBeNull();
   });
 
@@ -215,13 +222,11 @@ describe('ResourceOperatingIntervalService', () => {
 
     await service.transition(9, 'idle');
 
-    expect(repository.save).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 
   it('treats an open-interval unique conflict as a duplicate operating transition', async () => {
-    repository.save.mockRejectedValueOnce(
-      Object.assign(new QueryFailedError('', [], new Error('UNIQUE constraint failed')), { code: 'SQLITE_CONSTRAINT' }),
-    );
+    operations.createInterval.mockRejectedValueOnce(new OpenOperatingIntervalConflictError('duplicate open interval'));
 
     await expect(service.transition(3, 'operating')).resolves.toBeNull();
   });

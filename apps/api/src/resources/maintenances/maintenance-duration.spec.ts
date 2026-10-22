@@ -1,3 +1,4 @@
+import { sqliteResourceFixture } from '../../database/conformance/sqlite-fixture';
 import { DataSource, EntitySchema } from 'typeorm';
 import {
   ResourceOperatingInterval,
@@ -73,17 +74,10 @@ describe('Maintenance duration from authoritative intervals', () => {
       synchronize: true,
       entities: [UsageSchema, IntervalSchema, AttemptSchema],
     }).initialize();
-    const usageRepository = dataSource.getRepository(ResourceUsage);
-    attribution = new ResourceOperatingAttributionService(
-      dataSource.getRepository(ResourceOperatingInterval),
-      usageRepository,
-      dataSource.getRepository(ResourceUsageLifecycleAttempt),
-    );
+    attribution = new ResourceOperatingAttributionService(sqliteResourceFixture(dataSource).attribution);
     evaluator = new MaintenanceScheduleEvaluatorService(
-      {} as never,
-      {} as never,
-      {} as never,
-      usageRepository,
+      sqliteResourceFixture(dataSource).maintenanceEvaluation,
+      sqliteResourceFixture(dataSource).transactions,
       {} as never,
       {} as never,
       {} as never,

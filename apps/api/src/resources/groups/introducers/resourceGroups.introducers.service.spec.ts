@@ -1,30 +1,32 @@
+import { GroupIntroducerPersistence } from '../persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/application-models';
 import { ResourceGroupsIntroducersService } from './resourceGroups.introducers.service';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
 
 describe('ResourceGroupsIntroducersService notifications', () => {
   let service: ResourceGroupsIntroducersService;
-  let repository: { find: jest.Mock; findOne: jest.Mock; create: jest.Mock; save: jest.Mock; remove: jest.Mock };
+  let persistence: jest.Mocked<GroupIntroducerPersistence>;
   let notifications: { dispatch: jest.Mock };
 
   beforeEach(async () => {
-    repository = {
-      find: jest.fn(),
-      findOne: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockImplementation((data) => data),
-      save: jest.fn().mockImplementation(async (data) => data),
-      remove: jest.fn().mockImplementation(async (data) => data),
+    persistence = {
+      grants: jest.fn(),
+      grant: jest.fn().mockResolvedValue(null),
+      createGrant: jest.fn(
+        async (groupId, userId, type) =>
+          ({ resourceGroupId: groupId, user: { id: userId }, type }) as ResourceIntroducer,
+      ),
+      removeGrant: jest.fn(async (grant) => grant),
     };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceGroupsIntroducersService,
-        { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
+        { provide: GroupIntroducerPersistence, useValue: persistence },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: NotificationDispatchService, useValue: notifications },
       ],
@@ -48,7 +50,7 @@ describe('ResourceGroupsIntroducersService notifications', () => {
   });
 
   it('notifies the user when group introducer or maintainer status is revoked', async () => {
-    repository.findOne.mockResolvedValue({
+    persistence.grant.mockResolvedValue({
       user: { id: 3 },
       type: ResourceIntroducerType.INTRODUCER,
     } as ResourceIntroducer);
@@ -66,9 +68,9 @@ describe('ResourceGroupsIntroducersService notifications', () => {
   });
 
   it('creates a second role without overwriting an existing one', async () => {
-    repository.findOne.mockImplementation(({ where }) =>
+    persistence.grant.mockImplementation((_groupId, _userId, type) =>
       Promise.resolve(
-        where.type === ResourceIntroducerType.INTRODUCER
+        type === ResourceIntroducerType.INTRODUCER
           ? ({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer)
           : null,
       ),
@@ -76,17 +78,7 @@ describe('ResourceGroupsIntroducersService notifications', () => {
 
     await service.grant(5, 3, ResourceIntroducerType.MAINTAINER);
 
-    expect(repository.findOne).toHaveBeenCalledWith({
-      where: {
-        resourceGroup: { id: 5 },
-        user: { id: 3 },
-        type: ResourceIntroducerType.MAINTAINER,
-      },
-    });
-    expect(repository.create).toHaveBeenCalledWith({
-      resourceGroup: { id: 5 },
-      user: { id: 3 },
-      type: ResourceIntroducerType.MAINTAINER,
-    });
+    expect(persistence.grant).toHaveBeenCalledWith(5, 3, ResourceIntroducerType.MAINTAINER);
+    expect(persistence.createGrant).toHaveBeenCalledWith(5, 3, ResourceIntroducerType.MAINTAINER);
   });
 });

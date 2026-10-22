@@ -1,10 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
 
@@ -29,6 +23,9 @@ export class ResourceMaintenanceScheduleUsageCountConfig {
   schedule!: ResourceMaintenanceSchedule;
 
   @Column({ type: 'int' })
-  @ApiProperty({ description: 'Trigger after this many usage sessions (since last maintenance done for this schedule)', example: 50 })
+  @ApiProperty({
+    description: 'Trigger after this many usage sessions (since last maintenance done for this schedule)',
+    example: 50,
+  })
   thresholdSessions!: number;
 }

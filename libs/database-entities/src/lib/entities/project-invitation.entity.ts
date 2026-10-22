@@ -12,13 +12,7 @@ import {
 import { Project } from './project';
 import { User } from './user.entity';
 import { ProjectMemberRole } from './project-member.entity';
-
-export enum ProjectInvitationStatus {
-  PENDING = 'pending',
-  ACCEPTED = 'accepted',
-  DECLINED = 'declined',
-  CANCELED = 'canceled',
-}
+import { ProjectInvitationStatus } from '@attraccess/application-models';
 
 @Entity('project_invitations')
 @Index('IDX_project_invitation_unique_by_user_and_status', ['invitedUserId', 'status'])
@@ -85,3 +79,5 @@ export class ProjectInvitation {
   @ApiProperty({ description: 'When the invitation was last updated' })
   updatedAt!: Date;
 }
+
+export { ProjectInvitationStatus } from '@attraccess/application-models';

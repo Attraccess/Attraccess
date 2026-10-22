@@ -64,8 +64,8 @@ function CapabilitiesPage() {
   const items: { title: string; body: string; icon: ComponentType<{ className?: string }> }[] = [
     { title: 'Backend controller', body: 'Adds GET /hello-world/greetings to the host API.', icon: ServerIcon },
     {
-      title: 'Injected repository',
-      body: "Reads users via context.getRepository('User') (needs READ_USERS).",
+      title: 'Host user operation',
+      body: 'Reads up to five user names via context.operations.users.list (needs READ_USERS).',
       icon: DatabaseIcon,
     },
     {
@@ -126,7 +126,7 @@ function HelloWorldPage() {
           <p className="hw:text-base hw:font-semibold hw:text-default-700">Greetings from the backend</p>
           <p className="hw:text-sm hw:text-default-500">
             Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads host users
-            through an injected repository (needs the <code>READ_USERS</code> permission).
+            through a host operation (needs the <code>READ_USERS</code> permission).
           </p>
         </Card.Header>
         <Card.Content>

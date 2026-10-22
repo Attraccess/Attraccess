@@ -1,8 +1,8 @@
-import { Resource, ResourceIntroducer, ResourceMaintenance } from '@attraccess/database-entities';
+import { Resource, ResourceMaintenance } from '@attraccess/application-models';
+import { MAINTENANCE_OPERATIONS, MaintenancePersistence } from './persistence/port';
+import { operationTransactionsFake } from '../../database/testing/operation-transactions.test-fixture';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { MetricsService } from '../../metrics/metrics.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { ResourceMaintenanceService } from './maintenance.service';
@@ -16,7 +16,7 @@ const mockMetricsService = {
 const mockResource = {
   id: 1,
   name: 'Test Resource',
-};
+} as Resource;
 
 const mockMaintenance = {
   id: 1,
@@ -24,56 +24,32 @@ const mockMaintenance = {
   endTime: null,
   reason: 'Test maintenance',
   resource: mockResource,
-};
+} as ResourceMaintenance;
 export function registerMaintenanceServiceFixture() {
   let service: ResourceMaintenanceService;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let maintenanceRepository: Repository<any>;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let resourceRepository: Repository<any>;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let resourceIntroducerRepository: Repository<any>;
+  let persistence: jest.Mocked<MaintenancePersistence>;
+  let transactionDriver: ReturnType<typeof operationTransactionsFake>;
 
   beforeEach(async () => {
+    persistence = {
+      resource: jest.fn(),
+      maintenance: jest.fn(),
+      page: jest.fn(),
+      hasActive: jest.fn(),
+      activeResourceIds: jest.fn(),
+      managedResourcePairs: jest.fn(),
+      directIntroducer: jest.fn(),
+      groupIntroducer: jest.fn(),
+      createMaintenance: jest.fn(),
+      saveMaintenance: jest.fn(),
+    };
+    transactionDriver = operationTransactionsFake();
+    transactionDriver.bind(MAINTENANCE_OPERATIONS, persistence);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceMaintenanceService,
-        {
-          provide: getRepositoryToken(ResourceMaintenance),
-          useValue: {
-            create: jest.fn(),
-            save: jest.fn(),
-            findOne: jest.fn(),
-            remove: jest.fn(),
-            createQueryBuilder: jest.fn(() => ({
-              leftJoinAndSelect: jest.fn().mockReturnThis(),
-              where: jest.fn().mockReturnThis(),
-              andWhere: jest.fn().mockReturnThis(),
-              orderBy: jest.fn().mockReturnThis(),
-              skip: jest.fn().mockReturnThis(),
-              take: jest.fn().mockReturnThis(),
-              getCount: jest.fn(),
-              getMany: jest.fn(),
-            })),
-            find: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(Resource),
-          useValue: {
-            findOne: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(ResourceIntroducer),
-          useValue: {
-            findOne: jest.fn(),
-            createQueryBuilder: jest.fn(),
-          },
-        },
+        { provide: MaintenancePersistence, useValue: persistence },
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
@@ -90,12 +66,6 @@ export function registerMaintenanceServiceFixture() {
     }).compile();
 
     service = module.get<ResourceMaintenanceService>(ResourceMaintenanceService);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    maintenanceRepository = module.get<Repository<any>>(getRepositoryToken(ResourceMaintenance));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resourceRepository = module.get<Repository<any>>(getRepositoryToken(Resource));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resourceIntroducerRepository = module.get<Repository<any>>(getRepositoryToken(ResourceIntroducer));
   });
   return {
     get mockResource() {
@@ -107,14 +77,11 @@ export function registerMaintenanceServiceFixture() {
     get service() {
       return service;
     },
-    get maintenanceRepository() {
-      return maintenanceRepository;
+    get persistence() {
+      return persistence;
     },
-    get resourceRepository() {
-      return resourceRepository;
-    },
-    get resourceIntroducerRepository() {
-      return resourceIntroducerRepository;
+    get transactionDriver() {
+      return transactionDriver;
     },
   };
 }

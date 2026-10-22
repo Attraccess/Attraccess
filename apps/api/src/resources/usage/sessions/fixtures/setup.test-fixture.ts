@@ -1,14 +1,9 @@
+import { usageOperationsFake } from './operations.test-fixture';
+import { DatabaseTransactions } from '../../../../database/transaction-scope';
+import { UsagePersistence } from '../../persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceUsageService } from '../resource-usage.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  Resource,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  User,
-  ResourceBillingConfiguration,
-} from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { ResourceBillingConfiguration } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourcesService } from '../../../resources.service';
 import { ResourceIntroductionsService } from '../../../introductions/resouceIntroductions.service';
@@ -28,22 +23,14 @@ import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { VALKEY_CLIENT } from '../../../../valkey/valkey.module';
 import { AuditService } from '../../../../audit/audit.service';
 import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
+
 export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
+  scope.operations = usageOperationsFake(scope.lifecycleAttempts);
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       ResourceUsageService,
-      {
-        provide: getRepositoryToken(Resource),
-        useFactory: scope.mockRepository,
-      },
-      {
-        provide: getRepositoryToken(ResourceUsage),
-        useFactory: scope.mockRepository,
-      },
-      {
-        provide: getRepositoryToken(User),
-        useFactory: scope.mockRepository,
-      },
+      { provide: UsagePersistence, useValue: scope.operations.persistence },
+      { provide: DatabaseTransactions, useValue: scope.operations.transactionDriver.transactions },
       {
         provide: ResourcesService,
         useValue: scope.mockResourcesService,
@@ -125,9 +112,6 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
 
   scope.lifecycleAttempts.clear();
   scope.service = module.get<ResourceUsageService>(ResourceUsageService);
-  scope.resourceRepository = module.get(getRepositoryToken(Resource));
-  scope.resourceUsageRepository = module.get(getRepositoryToken(ResourceUsage));
-  scope.userRepository = module.get(getRepositoryToken(User));
   scope.resourceIntroductionService = module.get(ResourceIntroductionsService);
   scope.resourceIntroducersService = module.get(ResourceIntroducersService);
   scope.resourceGroupsIntroductionsService = module.get(ResourceGroupsIntroductionsService);
@@ -141,84 +125,6 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
     runFlow: jest.Mock;
     trackResourceActivity: jest.Mock;
   };
-
-  // Provide transaction-capable manager on the repository
-  scope.transactionalEntityManager = {
-    createQueryBuilder: jest.fn(() => ({
-      update: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      into: jest.fn().mockReturnThis(),
-      values: jest.fn().mockReturnThis(),
-      execute: jest.fn().mockResolvedValue({}),
-    })),
-    update: jest.fn().mockResolvedValue({ affected: 1 }),
-    save: jest.fn(async (entity, data) => {
-      if (entity === ResourceUsageLifecycleAttempt) scope.lifecycleAttempts.set(data.id, data);
-      return data;
-    }),
-    delete: jest.fn(async (entity, criteria) => {
-      if (entity === ResourceUsageLifecycleAttempt)
-        scope.lifecycleAttempts.delete(typeof criteria === 'string' ? criteria : criteria.id);
-      return { affected: 1 };
-    }),
-    find: jest.fn(async () => [...scope.lifecycleAttempts.values()]),
-    findOneOrFail: jest.fn((entity, opts) => scope.resourceUsageRepository.findOne(opts)),
-    transaction: jest.fn(async (cb: (em: typeof scope.transactionalEntityManager) => Promise<unknown>) =>
-      cb(scope.transactionalEntityManager),
-    ),
-    // Ensure code paths that use getRepository(Entity).findOne work in tests
-    getRepository: jest.fn((entity) => {
-      if (entity === Resource) {
-        return { findOne: scope.resourceRepository.findOne } as unknown as Repository<Resource>;
-      }
-      if (entity === ResourceUsage) {
-        return { findOne: scope.resourceUsageRepository.findOne } as unknown as Repository<ResourceUsage>;
-      }
-      if (entity === User) {
-        return { findOne: scope.userRepository.findOne } as unknown as Repository<User>;
-      }
-      return { findOne: jest.fn() } as unknown as Repository<unknown>;
-    }),
-    // direct calls used in service
-    findOne: jest.fn((entity, opts) => {
-      if (entity === ResourceUsageLifecycleAttempt) {
-        return (
-          [...scope.lifecycleAttempts.values()].find(
-            (attempt) =>
-              (!opts.where.id || attempt.id === opts.where.id) &&
-              (!opts.where.resourceId || attempt.resourceId === opts.where.resourceId),
-          ) ?? null
-        );
-      }
-      if (entity === ResourceUsage) {
-        if (opts.where.lifecyclePending && !opts.where.userId) return null; // Reservation gate.
-        return scope.resourceUsageRepository.findOne(opts as never);
-      }
-      if (entity === Resource) {
-        return scope.resourceRepository.findOne(opts as never);
-      }
-      return null;
-    }),
-  } as unknown as {
-    createQueryBuilder: jest.Mock;
-    getRepository: jest.Mock;
-    findOne: jest.Mock;
-    update: jest.Mock;
-    transaction: jest.Mock;
-    save: jest.Mock;
-    delete: jest.Mock;
-    find: jest.Mock;
-    findOneOrFail: jest.Mock;
-  };
-
-  // @ts-expect-error augment mock with manager
-  scope.resourceUsageRepository.manager = {
-    transaction: jest.fn(async (cb: (em: typeof scope.transactionalEntityManager) => Promise<unknown>) =>
-      cb(scope.transactionalEntityManager),
-    ),
-  } as unknown as { transaction: jest.Mock };
 
   scope.mockResourceFormsService.prepareRequiredSubmissions.mockResolvedValue([]);
   // Silence and stub billing call inside transaction

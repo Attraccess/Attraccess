@@ -1,0 +1,32 @@
+{
+  "name": "application-models",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/application-models/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:core", "persistence:neutral"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/application-models",
+        "tsConfig": "libs/application-models/tsconfig.lib.json",
+        "packageJson": "libs/application-models/package.json",
+        "main": "libs/application-models/src/index.ts"
+      }
+    },
+    "nx-release-publish": {
+      "options": {
+        "packageRoot": "dist/{projectRoot}",
+        "registry": "https://registry.npmjs.org/",
+        "access": "public"
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/application-models"
+      }
+    }
+  }
+}

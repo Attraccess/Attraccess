@@ -1,3 +1,4 @@
+import { PasswordPolicyOverride } from '../../transport/models/password-policy-override.dto';
 // Admin password policy endpoints: full read, partial update, per-role override CRUD with audit logs
 // FEATURE: Password policy admin surface (admin-only, hot-reload, audit logged, server-side preview)
 
@@ -16,8 +17,8 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { PasswordPolicyOverride, PasswordPolicyRole } from '@attraccess/database-entities';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+import { PasswordPolicyRole } from '@attraccess/application-models';
 import { PasswordPolicyConfig } from '@attraccess/shared';
 import { AuditContext, PasswordPolicyService, POLICY_FIELDS } from './password-policy.service';
 import {

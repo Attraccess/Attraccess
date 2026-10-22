@@ -1,13 +1,9 @@
-import {
-  AuthenticationDetail,
-  PasswordHistory,
-  PasswordPolicy,
-  PasswordPolicyOverride,
-  PasswordPolicyRole,
-} from '@attraccess/database-entities';
+import { operationTransactionsFake } from '../../database/testing/operation-transactions.test-fixture';
+import { PASSWORD_POLICY_WRITES } from './persistence/port';
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import { PasswordPolicyPersistence } from './persistence/port';
+import { PasswordPolicy, PasswordPolicyOverride, PasswordPolicyRole } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { RbacService } from '../rbac/rbac.service';
 import { HibpClient } from './hibp.client';
@@ -68,89 +64,42 @@ export function registerPasswordPolicyServiceFixture() {
     requestId: 'fixture-request',
   };
 
-  let repo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock };
-
-  let overrideRepo: {
-    find: jest.Mock;
-    findOne: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
-    merge: jest.Mock;
-    delete: jest.Mock;
-  };
-
-  let historyRepo: {
-    find: jest.Mock;
-    save: jest.Mock;
-    create: jest.Mock;
-    createQueryBuilder: jest.Mock;
-  };
-
-  let authDetailRepo: { findOne: jest.Mock };
-
+  let persistence: jest.Mocked<PasswordPolicyPersistence>;
   let hibp: { check: jest.Mock };
 
   let zxcvbn: { evaluate: jest.Mock };
-
-  let dataSource: { transaction: jest.Mock };
 
   let rbacService: { getEffectivePermissions: jest.Mock };
 
   beforeEach(async () => {
     identityAudit.record.mockReset();
-    repo = {
-      findOne: jest.fn(async () => buildRow()),
-      create: jest.fn((row) => row),
-      save: jest.fn(async (row) => row),
-      update: jest.fn(async () => ({ affected: 1 })),
+    persistence = {
+      policy: jest.fn(async () => buildRow()),
+      override: jest.fn().mockResolvedValue(null),
+      overrides: jest.fn().mockResolvedValue([]),
+      savePolicy: jest.fn(async (row) => row as PasswordPolicy),
+      saveOverride: jest.fn(async (row) => row as PasswordPolicyOverride),
+      removeOverride: jest.fn(),
+      recordHistory: jest.fn(),
+      currentPassword: jest.fn().mockResolvedValue(null),
+      recentHistory: jest.fn().mockResolvedValue([]),
+      historyIdsToKeep: jest.fn().mockResolvedValue([]),
+      deleteOtherHistory: jest.fn(),
     };
-    overrideRepo = {
-      find: jest.fn(async () => []),
-      findOne: jest.fn(async () => null),
-      create: jest.fn((row) => row),
-      save: jest.fn(async (row) => row),
-      merge: jest.fn((target, source) => Object.assign(target, source)),
-      delete: jest.fn(async () => ({ affected: 1 })),
-      remove: jest.fn(async (row) => row),
-    } as never;
-    const deleteBuilder = {
-      delete: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      execute: jest.fn(async () => ({ affected: 0 })),
-    };
-    historyRepo = {
-      find: jest.fn(async () => []),
-      save: jest.fn(async (row) => row),
-      create: jest.fn((row) => row),
-      createQueryBuilder: jest.fn(() => deleteBuilder),
-    };
-    authDetailRepo = { findOne: jest.fn(async () => null) };
     hibp = { check: jest.fn(async () => ({ pwned: false, count: 0, available: true })) };
     zxcvbn = {
       evaluate: jest.fn(() => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] })),
     };
-    const repoByEntity = new Map<unknown, unknown>([
-      [PasswordPolicy, repo],
-      [PasswordPolicyOverride, overrideRepo],
-    ]);
-    const fakeManager = {
-      getRepository: (entity: unknown) => repoByEntity.get(entity) ?? {},
-    };
-    dataSource = {
-      transaction: jest.fn(async (cb: (mgr: typeof fakeManager) => Promise<unknown>) => cb(fakeManager)),
-    };
+    const driver = operationTransactionsFake();
+    driver.bind(PASSWORD_POLICY_WRITES, persistence);
     rbacService = { getEffectivePermissions: jest.fn(async () => new Set<string>()) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordPolicyService,
+        { provide: PasswordPolicyPersistence, useValue: persistence },
+        { provide: DatabaseTransactions, useValue: driver.transactions },
         { provide: IdentityAuditService, useValue: identityAudit },
-        { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
-        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: overrideRepo },
-        { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
-        { provide: getRepositoryToken(AuthenticationDetail), useValue: authDetailRepo },
-        { provide: DataSource, useValue: dataSource },
         { provide: HibpClient, useValue: hibp },
         { provide: ZxcvbnService, useValue: zxcvbn },
         { provide: RbacService, useValue: rbacService },
@@ -174,17 +123,8 @@ export function registerPasswordPolicyServiceFixture() {
     get audit() {
       return audit;
     },
-    get repo() {
-      return repo;
-    },
-    get overrideRepo() {
-      return overrideRepo;
-    },
-    get historyRepo() {
-      return historyRepo;
-    },
-    get authDetailRepo() {
-      return authDetailRepo;
+    get persistence() {
+      return persistence;
     },
     get hibp() {
       return hibp;

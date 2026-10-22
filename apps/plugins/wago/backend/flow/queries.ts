@@ -6,7 +6,7 @@ import { type WagoConfigurationSnapshot } from '../configuration/model';
 
 import { wagoFlowPreview } from './preview';
 
-import { type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
+import { type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk/v2';
 
 import { operationalWildcardTopic } from '../protocol/index';
 
@@ -120,10 +120,7 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
     const controllers = await this.cached(validationContext, controllerCacheKey, () =>
       previewOnly && typeof config.controllerId !== 'number'
         ? Promise.resolve([])
-        : this.controllers.find({
-            where: { trustState: 'claimed', ...(previewOnly ? { id: config.controllerId as number } : {}) },
-            order: { name: 'ASC' },
-          }),
+        : this.persistence.claimedControllers(previewOnly ? (config.controllerId as number) : undefined, true),
     );
     const selected =
       typeof config.controllerId === 'number'
@@ -131,12 +128,7 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
         : undefined;
     const revision = selected
       ? await this.cached(validationContext, `wago-applied-revision:${selected.id}`, async () => {
-          const [latest] = await this.revisions.find({
-            where: { controllerId: selected.id, state: 'applied' },
-            order: { revision: 'DESC' },
-            take: 1,
-          });
-          return latest ?? null;
+          return this.persistence.latestAppliedRevision(selected.id);
         })
       : null;
     const snapshot: WagoConfigurationSnapshot | null = revision ? JSON.parse(revision.snapshot) : null;
@@ -217,9 +209,9 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
   }
 
   async refresh(): Promise<void> {
-    const settings = await this.settings.findOneBy({ id: 1 });
+    const settings = await this.persistence.settings();
     if (!settings) return;
-    const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
+    const controllers = await this.persistence.claimedControllers();
     const controllerIds = new Set(controllers.map((controller) => controller.id));
     for (const id of this.offlineControllers) if (!controllerIds.has(id)) this.offlineControllers.delete(id);
     for (const id of this.unavailableHardware) if (!controllerIds.has(id)) this.unavailableHardware.delete(id);

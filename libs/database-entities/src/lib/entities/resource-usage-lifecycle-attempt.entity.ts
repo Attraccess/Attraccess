@@ -1,12 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Resource } from './resource.entity';
-import { FormSubmission } from './form';
-import { BillingTransactionItem } from './billing-transaction-item.entity';
-
-export type LifecycleBillingItem = Pick<
-  BillingTransactionItem,
-  'name' | 'description' | 'externalReference' | 'unitPrice' | 'quantity'
-> & { usageId: number };
+import type { FormSubmissionDraft } from '@attraccess/application-models';
+import { LifecycleBillingItem } from '@attraccess/application-models';
 
 /** A reservation, never a completed usage or bill. Interrupted attempts are aborted, not replayed. */
 @Entity()
@@ -35,7 +30,7 @@ export class ResourceUsageLifecycleAttempt {
   transitionTime!: Date;
 
   @Column({ type: 'simple-json' })
-  formSubmissions!: FormSubmission[];
+  formSubmissions!: FormSubmissionDraft[];
 
   @Column({ type: 'simple-json' })
   billingItems!: LifecycleBillingItem[];
@@ -43,3 +38,5 @@ export class ResourceUsageLifecycleAttempt {
   @CreateDateColumn()
   createdAt!: Date;
 }
+
+export { LifecycleBillingItem } from '@attraccess/application-models';

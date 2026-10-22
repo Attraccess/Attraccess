@@ -1,4 +1,4 @@
-import { Resource, ResourceType, ResourceUsage, ResourceUsageAction, User } from '@attraccess/database-entities';
+import { Resource, ResourceType, ResourceUsage, ResourceUsageAction, User } from '@attraccess/application-models';
 
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 
@@ -40,7 +40,7 @@ describe('ResourceUsageService', () => {
   });
 
   describe('door actions', () => {
-    const mockUser: User = { id: 5 } as User;
+    const mockUser: User = { id: 5 } as unknown as User;
     const doorResource: Resource = {
       id: 10,
       name: 'Front Door',
@@ -50,21 +50,10 @@ describe('ResourceUsageService', () => {
     } as Resource;
     const doorActionsScope = inheritTestScope(
       {
-        get resourceRepository() {
-          return scope.resourceRepository;
-        },
-        set resourceRepository(value: typeof scope.resourceRepository) {
-          scope.resourceRepository = value;
-        },
         get doorResource() {
           return doorResource;
         },
-        get resourceUsageRepository() {
-          return scope.resourceUsageRepository;
-        },
-        set resourceUsageRepository(value: typeof scope.resourceUsageRepository) {
-          scope.resourceUsageRepository = value;
-        },
+
         get service() {
           return scope.service;
         },
@@ -94,7 +83,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('should lock a door and emit event', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue(doorActionsScope.doorResource);
+      doorActionsScope.operations.persistence.resource.mockResolvedValue(doorActionsScope.doorResource);
       const saved = {
         id: 100,
         resourceId: 10,
@@ -105,12 +94,12 @@ describe('ResourceUsageService', () => {
         endTime: new Date(),
         endNotes: null,
       } as unknown as ResourceUsage;
-      doorActionsScope.resourceUsageRepository.save.mockResolvedValue(saved);
-      doorActionsScope.resourceUsageRepository.findOne.mockResolvedValue(saved);
+      doorActionsScope.operations.persistence.saveUsage.mockResolvedValue(saved);
+      doorActionsScope.operations.sessionRead.mockResolvedValue(saved);
 
       const result = await doorActionsScope.service.lockDoor(10, doorActionsScope.mockUser);
 
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
       expect(doorActionsScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
         expect.any(Object),
@@ -128,7 +117,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('should unlock a door and emit event', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue(doorActionsScope.doorResource);
+      doorActionsScope.operations.persistence.resource.mockResolvedValue(doorActionsScope.doorResource);
       const saved = {
         id: 101,
         resourceId: 10,
@@ -139,12 +128,12 @@ describe('ResourceUsageService', () => {
         endTime: new Date(),
         endNotes: null,
       } as unknown as ResourceUsage;
-      doorActionsScope.resourceUsageRepository.save.mockResolvedValue(saved);
-      doorActionsScope.resourceUsageRepository.findOne.mockResolvedValue(saved);
+      doorActionsScope.operations.persistence.saveUsage.mockResolvedValue(saved);
+      doorActionsScope.operations.sessionRead.mockResolvedValue(saved);
 
       const result = await doorActionsScope.service.unlockDoor(10, doorActionsScope.mockUser);
 
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
       expect(doorActionsScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
         expect.any(Object),
@@ -162,7 +151,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('should unlatch a door when supported and emit event', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue({
+      doorActionsScope.operations.persistence.resource.mockResolvedValue({
         ...doorActionsScope.doorResource,
         separateUnlockAndUnlatch: true,
       } as Resource);
@@ -176,12 +165,12 @@ describe('ResourceUsageService', () => {
         endTime: new Date(),
         endNotes: null,
       } as unknown as ResourceUsage;
-      doorActionsScope.resourceUsageRepository.save.mockResolvedValue(saved);
-      doorActionsScope.resourceUsageRepository.findOne.mockResolvedValue(saved);
+      doorActionsScope.operations.persistence.saveUsage.mockResolvedValue(saved);
+      doorActionsScope.operations.sessionRead.mockResolvedValue(saved);
 
       const result = await doorActionsScope.service.unlatchDoor(10, doorActionsScope.mockUser);
 
-      expect(result).toBe(saved);
+      expect(result).toEqual(saved);
       expect(doorActionsScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
         expect.any(Object),
@@ -199,7 +188,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('should propagate emitAsync errors from door lock', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue(doorActionsScope.doorResource);
+      doorActionsScope.operations.persistence.resource.mockResolvedValue(doorActionsScope.doorResource);
       const saved = {
         id: 100,
         resourceId: 10,
@@ -208,15 +197,15 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         endTime: new Date(),
       } as unknown as ResourceUsage;
-      doorActionsScope.resourceUsageRepository.save.mockResolvedValue(saved);
-      doorActionsScope.resourceUsageRepository.findOne.mockResolvedValue(saved);
+      doorActionsScope.operations.persistence.saveUsage.mockResolvedValue(saved);
+      doorActionsScope.operations.sessionRead.mockResolvedValue(saved);
       doorActionsScope.eventEmitter.emitAsync.mockRejectedValueOnce(new Error('Flow error'));
 
       await expect(doorActionsScope.service.lockDoor(10, doorActionsScope.mockUser)).rejects.toThrow('Flow error');
     });
 
     it('should propagate emitAsync errors from door unlock', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue(doorActionsScope.doorResource);
+      doorActionsScope.operations.persistence.resource.mockResolvedValue(doorActionsScope.doorResource);
       const saved = {
         id: 101,
         resourceId: 10,
@@ -225,15 +214,15 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         endTime: new Date(),
       } as unknown as ResourceUsage;
-      doorActionsScope.resourceUsageRepository.save.mockResolvedValue(saved);
-      doorActionsScope.resourceUsageRepository.findOne.mockResolvedValue(saved);
+      doorActionsScope.operations.persistence.saveUsage.mockResolvedValue(saved);
+      doorActionsScope.operations.sessionRead.mockResolvedValue(saved);
       doorActionsScope.eventEmitter.emitAsync.mockRejectedValueOnce(new Error('Flow error'));
 
       await expect(doorActionsScope.service.unlockDoor(10, doorActionsScope.mockUser)).rejects.toThrow('Flow error');
     });
 
     it('should propagate emitAsync errors from door unlatch', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue({
+      doorActionsScope.operations.persistence.resource.mockResolvedValue({
         ...doorActionsScope.doorResource,
         separateUnlockAndUnlatch: true,
       } as Resource);
@@ -245,15 +234,15 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         endTime: new Date(),
       } as unknown as ResourceUsage;
-      doorActionsScope.resourceUsageRepository.save.mockResolvedValue(saved);
-      doorActionsScope.resourceUsageRepository.findOne.mockResolvedValue(saved);
+      doorActionsScope.operations.persistence.saveUsage.mockResolvedValue(saved);
+      doorActionsScope.operations.sessionRead.mockResolvedValue(saved);
       doorActionsScope.eventEmitter.emitAsync.mockRejectedValueOnce(new Error('Flow error'));
 
       await expect(doorActionsScope.service.unlatchDoor(10, doorActionsScope.mockUser)).rejects.toThrow('Flow error');
     });
 
     it('should throw when operating non-door resource', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue({
+      doorActionsScope.operations.persistence.resource.mockResolvedValue({
         ...doorActionsScope.doorResource,
         type: ResourceType.Machine,
       } as Resource);
@@ -267,7 +256,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('should throw when unlatching unsupported door', async () => {
-      doorActionsScope.resourceRepository.findOne.mockResolvedValue({
+      doorActionsScope.operations.persistence.resource.mockResolvedValue({
         ...doorActionsScope.doorResource,
         separateUnlockAndUnlatch: false,
       } as Resource);
@@ -279,7 +268,7 @@ describe('ResourceUsageService', () => {
   });
 
   describe('canControllResource (cache)', () => {
-    const mockUser: User = { id: 1, systemPermissions: { canManageResources: false } } as User;
+    const mockUser: User = { id: 1, systemPermissions: { canManageResources: false } } as unknown as User;
     const resourceId = 42;
     const canControllResourceCacheScope = inheritTestScope(
       {
@@ -431,7 +420,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('clears only the specific entry on ResourceIntroducerChangedEvent', async () => {
-      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as User;
+      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as unknown as User;
       await canControllResourceCacheScope.service.canControllResource(
         canControllResourceCacheScope.resourceId,
         canControllResourceCacheScope.mockUser,
@@ -525,7 +514,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('evicts only the changed user without scanning other authorization entries', async () => {
-      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as User;
+      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as unknown as User;
       await canControllResourceCacheScope.service.canControllResource(
         canControllResourceCacheScope.resourceId,
         canControllResourceCacheScope.mockUser,
@@ -551,11 +540,11 @@ describe('ResourceUsageService', () => {
       const privilegedUser = {
         ...canControllResourceCacheScope.mockUser,
         effectivePermissions: new Set(['resources.update']),
-      } as User;
+      } as unknown as User;
       const restrictedUser = {
         ...canControllResourceCacheScope.mockUser,
         effectivePermissions: new Set<string>(),
-      } as User;
+      } as unknown as User;
       canControllResourceCacheScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(false);
       canControllResourceCacheScope.resourceIntroducersService.canMaintain.mockResolvedValue(false);
 
@@ -659,7 +648,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('uses cache even when transactionalEntityManager is provided', async () => {
-      const fakeTem = {} as import('typeorm').EntityManager;
+      const fakeTem = {} as import('../../../database/transaction-scope').TransactionScope;
 
       // First call (no TEM) populates the cache.
       await canControllResourceCacheScope.service.canControllResource(

@@ -5,10 +5,34 @@ import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { AuthController } from './auth.controller';
 import { Response } from 'express';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { User } from '@attraccess/database-entities';
+import { User } from '@attraccess/application-models';
 
 describe('AuthController', () => {
   const fixture = registerAuthControllerFixture();
+
+  it('projects plain authenticated records without exposing private or unknown fields at the session response boundary', async () => {
+    const user = {
+      id: 1,
+      username: 'testuser',
+      email: 'private@example.com',
+      twoFactorSecret: 'secret',
+      unknown: 'private',
+      authenticationMethod: 'session',
+      effectivePermissions: new Set(['resources.read']),
+    };
+    const result = await fixture.authController.refreshSession(
+      { user, headers: { authorization: 'Bearer current-session-token' } } as unknown as AuthenticatedRequest,
+      {} as Response,
+      'body',
+    );
+    expect(result.user).toMatchObject({ id: 1, username: 'testuser', authenticationMethod: 'session' });
+    expect(result.user).not.toHaveProperty('email');
+    expect(result.user).not.toHaveProperty('twoFactorSecret');
+    expect(result.user).not.toHaveProperty('unknown');
+    expect((result.user as unknown as { effectivePermissions: Set<string> }).effectivePermissions).toEqual(
+      user.effectivePermissions,
+    );
+  });
 
   it('should be defined', () => {
     expect(fixture.authController).toBeDefined();

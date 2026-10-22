@@ -1,10 +1,14 @@
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
-
-export type WagoNetworkChangePhase = 'connecting' | 'provisioning' | 'applying' | 'verifying' | 'saving' | 'completed';
+import type {
+  WagoNetworkChange as WagoNetworkChangeRecord,
+  WagoMqttCredentialRetirement as WagoMqttCredentialRetirementRecord,
+} from './record';
+import type { WagoNetworkChangePhase } from './record';
+export type { WagoNetworkChangePhase } from './record';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/adapter';
 
 /** Durable roll-forward intent. Only an explicit public projection may leave the backend. */
 @Entity({ name: 'plugin_wago_network_changes' })
-export class WagoNetworkChange {
+export class WagoNetworkChange implements WagoNetworkChangeRecord {
   @PrimaryColumn({ type: 'integer', name: 'controller_id' }) controllerId!: number;
   @Column({ type: 'integer', name: 'session_id' }) sessionId!: number;
   @Column({ type: 'varchar' }) fingerprint!: string;
@@ -20,7 +24,7 @@ export class WagoNetworkChange {
  * Migration success never relies on revocation through an unreachable broker.
  */
 @Entity({ name: 'plugin_wago_mqtt_credential_retirements' })
-export class WagoMqttCredentialRetirement {
+export class WagoMqttCredentialRetirement implements WagoMqttCredentialRetirementRecord {
   @PrimaryColumn({ type: 'integer', name: 'controller_id' }) controllerId!: number;
   @PrimaryColumn({ type: 'integer', name: 'mqtt_server_id' }) mqttServerId!: number;
 }

@@ -1,4 +1,4 @@
-import { ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
+import { ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/application-models';
 import { BillingService } from '../../../../billing/charges/billing.service';
 import { ProjectsService } from '../../../../projects/projects.service';
 import { ResourceFormsService } from '../../../forms/forms.service';
@@ -27,7 +27,7 @@ export function createResourceUsageMocks() {
   const lifecycleAttempts = new Map<string, ResourceUsageLifecycleAttempt>();
 
   const mockRepository = () => ({
-    find: jest.fn(),
+    find: jest.fn().mockResolvedValue([]),
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),

@@ -1,10 +1,10 @@
-import { WagoConfigurationRevision } from './revision.entity';
+import { WagoConfigurationRevision } from './revision.record';
 
 import { WagoAudit, wagoAuditSummary } from '../audit/index';
 
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 
-import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk/v2';
 
 import {
   applyPreset,
@@ -25,7 +25,7 @@ import {
   type ConfigurationEditorMetadata,
 } from './editor';
 
-import { WagoConfigurationDraft } from './draft.entity';
+import { WagoConfigurationDraft } from './draft.record';
 
 import { applySelectedChanges, parsePresetProvenance } from '../controllers/model';
 
@@ -40,25 +40,7 @@ export abstract class WagoDrafts extends WagoRegistry {
     await this.claimedController(controllerId);
     const pageOffset = Number.isSafeInteger(offset) && offset > 0 ? offset : 0;
     const pageLimit = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
-    const revisions = await this.revisions.find({
-      where: { controllerId },
-      order: { revision: 'DESC' },
-      select: [
-        'id',
-        'controllerId',
-        'revision',
-        'contentHash',
-        'state',
-        'rejectionErrors',
-        'rejectionAcknowledgedAt',
-        'rejectionAcknowledgedBy',
-        'publishedAt',
-        'reportedAt',
-        'presetProvenance',
-      ],
-      skip: pageOffset,
-      take: pageLimit,
-    });
+    const revisions = await this.configuration.revisionPage(controllerId, pageOffset, pageLimit);
     return { revisions, offset: pageOffset, limit: pageLimit };
   }
 
@@ -135,7 +117,7 @@ export abstract class WagoDrafts extends WagoRegistry {
               },
             ]);
         draft.updatedAt = new Date().toISOString();
-        return this.drafts.save(draft);
+        return this.configuration.saveDraft(draft);
       };
       // Classification and before/after evidence belong to this same configuration lock.
       return principal
@@ -153,7 +135,7 @@ export abstract class WagoDrafts extends WagoRegistry {
 
   protected async draftForPreset(controllerId: number): Promise<WagoConfigurationDraft> {
     await this.claimedController(controllerId);
-    const draft = await this.drafts.findOneBy({ controllerId });
+    const draft = await this.configuration.draft(controllerId);
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     return draft;
   }
@@ -270,16 +252,12 @@ export abstract class WagoDrafts extends WagoRegistry {
 
   async getConfigurationBaseline(controllerId: number): Promise<WagoConfigurationRevision | null> {
     await this.claimedController(controllerId);
-    const [revision] = await this.revisions.find({
-      where: { controllerId, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
-    });
+    const revision = await this.configuration.latestRevision(controllerId, true);
     return revision ?? null;
   }
 
   async getDraft(controllerId: number): Promise<WagoConfigurationDraft | null> {
     await this.claimedController(controllerId);
-    return this.drafts.findOneBy({ controllerId });
+    return this.configuration.draft(controllerId);
   }
 }

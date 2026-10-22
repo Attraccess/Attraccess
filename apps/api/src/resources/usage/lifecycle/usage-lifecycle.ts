@@ -1,7 +1,6 @@
+import type { FormSubmissionDraft } from '@attraccess/application-models';
 import {
   BillingTransaction,
-  BillingTransactionItem,
-  FormSubmission,
   ResourceFlowNodeType,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
@@ -10,23 +9,22 @@ import {
   ResourceUsageAction,
   User,
   Project,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { ConflictException, Logger } from '@nestjs/common';
 
-import { EntityManager, IsNull, Repository } from 'typeorm';
-
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import { DatabaseTransactions, TransactionScope } from '../../../database/transaction-scope';
+import { UsagePersistence, USAGE_OPERATIONS } from '../persistence/port';
+import { FORM_OPERATIONS } from '../../forms/persistence/port';
+import { BILLING_OPERATIONS } from '../../../billing/persistence/port';
 
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
-
-import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
 
 import { ExternalEffectFailureError } from '../../flows/errors/external-effect-failure.error';
 
 import { FlowExecutionError } from '../../flows/errors/flow-execution.error';
 
-import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { SystemEvent } from '@attraccess/plugins-backend-sdk/v2';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -120,9 +118,12 @@ export type UsageFlowPayload = {
 };
 
 export abstract class UsageLifecycle {
-  protected async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
+  protected async applyLifecycleDrafts(
+    manager: TransactionScope,
+    attempt: ResourceUsageLifecycleAttempt,
+  ): Promise<void> {
     for (const submission of attempt.formSubmissions) {
-      await manager.save(FormSubmission, {
+      await manager.resolve(FORM_OPERATIONS).saveSubmission({
         formId: submission.formId,
         resourceUsageId: submission.resourceUsageId,
         userId: submission.userId,
@@ -131,32 +132,26 @@ export abstract class UsageLifecycle {
       });
     }
     for (const { usageId, quantity, ...item } of attempt.billingItems) {
-      const transaction = await manager.findOne(BillingTransaction, { where: { resourceUsageId: usageId } });
+      const transaction = await manager.resolve(BILLING_OPERATIONS).usageTransaction(usageId);
       if (!transaction) throw new ConflictException('The usage billing transaction is missing');
-      const where = {
-        billingTransactionId: transaction.id,
-        ...item,
-        description: item.description === null ? IsNull() : item.description,
-        externalReference: item.externalReference === null ? IsNull() : item.externalReference,
-      };
-      const existing = await manager.findOne(BillingTransactionItem, { where });
+      const existing = await manager.resolve(BILLING_OPERATIONS).matchingItem(transaction.id, item);
       if (existing) {
-        await manager.update(BillingTransactionItem, existing.id, { quantity: existing.quantity + quantity });
+        await manager.resolve(BILLING_OPERATIONS).updateItemQuantity(existing.id, existing.quantity + quantity);
       } else {
-        await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...item, quantity });
+        await manager.resolve(BILLING_OPERATIONS).saveItem({ billingTransactionId: transaction.id, ...item, quantity });
       }
     }
   }
 
   protected async abortLifecycleAttempt(attemptId: string, resourceId: number): Promise<void> {
-    const aborted = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
+    const aborted = await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (manager) => {
+      const attempt = await this.usageOperations(manager).attempt(attemptId, resourceId);
       if (!attempt) return false;
       if (attempt.candidateUsageId !== null) {
         await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
-        await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+        await this.usageOperations(manager).deletePendingCandidate(attempt.candidateUsageId);
       }
-      await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+      await this.usageOperations(manager).deleteAttempt(attemptId, resourceId);
       return true;
     });
     if (aborted)
@@ -168,33 +163,31 @@ export abstract class UsageLifecycle {
 
   /** A flow may end the tentative session it was started for before it becomes visible. */
   async cancelLifecycleCandidate(attemptId: string, resourceId: number): Promise<void> {
-    await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+    await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (manager) => {
       const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
-      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+      const result = await this.usageOperations(manager).deletePendingCandidate(attempt.candidateUsageId);
+      if (result === 0) throw new ConflictException('The tentative usage session no longer exists');
       // Keep the reservation until the owning flow has settled all of its branches.
-      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+      await this.usageOperations(manager).clearAttemptCandidate(attemptId, resourceId);
     });
   }
 
   /** Claim and discard the candidate before dispatching stopped-flow effects. */
   async endLifecycleCandidate(attemptId: string, resourceId: number, endNotes: string): Promise<void> {
-    const candidate = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+    const candidate = await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (manager) => {
       const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
-      const candidate = await manager.findOneOrFail(ResourceUsage, {
-        where: { id: attempt.candidateUsageId, lifecyclePending: true },
-        relations: ['resource', 'user', 'project'],
-      });
-      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+      const candidate = await this.usageOperations(manager).candidate(attempt.candidateUsageId);
+      if (!candidate) throw new ConflictException('The tentative usage session no longer exists');
+      const result = await this.usageOperations(manager).deletePendingCandidate(attempt.candidateUsageId);
+      if (result === 0) throw new ConflictException('The tentative usage session no longer exists');
       // Keep the reservation until the owning flow has settled all of its branches.
-      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+      await this.usageOperations(manager).clearAttemptCandidate(attemptId, resourceId);
       return candidate;
     });
 
@@ -211,20 +204,30 @@ export abstract class UsageLifecycle {
 
   /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
   public async recoverInterruptedLifecycles(): Promise<void> {
-    const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const recovered = await recoverOrphanedUsages(manager);
-      if (recovered)
-        this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
-      const attempts = await manager.find(ResourceUsageLifecycleAttempt);
-      for (const attempt of attempts) {
-        if (attempt.candidateUsageId !== null) {
-          await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
-          await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+    const recoveryResources = await this.persistence.recoveryResourceIds();
+    const resourceIds = await this.transactions.run(
+      { resourceIds: recoveryResources, accountIds: [] },
+      async (manager) => {
+        if (
+          (await this.usageOperations(manager).recoveryResourceIds()).some(
+            (id) => !manager.conflicts.resourceIds.includes(id),
+          )
+        )
+          throw new ConflictException('Usage recovery scope changed');
+        const recovered = await this.usageOperations(manager).recoverOrphans();
+        if (recovered)
+          this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
+        const attempts = await this.usageOperations(manager).attempts();
+        for (const attempt of attempts) {
+          if (attempt.candidateUsageId !== null) {
+            await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
+            await this.usageOperations(manager).deletePendingCandidate(attempt.candidateUsageId);
+          }
+          await this.usageOperations(manager).deleteAttempt(attempt.id);
         }
-        await manager.delete(ResourceUsageLifecycleAttempt, attempt.id);
-      }
-      return attempts.map((attempt) => attempt.resourceId);
-    });
+        return attempts.map((attempt) => attempt.resourceId);
+      },
+    );
     for (const resourceId of resourceIds) {
       this.eventEmitter.emit(
         ResourceUsageLifecycleAbortedEvent.EVENT_NAME,
@@ -234,7 +237,7 @@ export abstract class UsageLifecycle {
   }
 
   protected async runUsageFlow(
-    manager: EntityManager | undefined,
+    manager: TransactionScope | undefined,
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
     payload: object,
@@ -261,29 +264,29 @@ export abstract class UsageLifecycle {
     }
   }
 
-  protected async persistAttributedOperatingDuration(usage: ResourceUsage, manager: EntityManager): Promise<void> {
+  protected async persistAttributedOperatingDuration(usage: ResourceUsage, manager: TransactionScope): Promise<void> {
     const attributedOperatingDurationInMinutes = this.operatingAttributionService
       ? await this.operatingAttributionService.getForUsage(usage, manager)
       : 0;
-    await manager.update(ResourceUsage, usage.id, { attributedOperatingDurationInMinutes });
+    await this.usageOperations(manager).setAttributedDuration(usage.id, attributedOperatingDurationInMinutes);
     usage.attributedOperatingDurationInMinutes = attributedOperatingDurationInMinutes;
   }
 
-  protected async assertLifecycleAvailable(manager: EntityManager, resourceId: number): Promise<void> {
+  protected async assertLifecycleAvailable(manager: TransactionScope, resourceId: number): Promise<void> {
     if (
-      (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) ||
-      (await manager.findOne(ResourceUsage, { where: { resourceId, endTime: IsNull(), lifecyclePending: true } }))
+      (await this.usageOperations(manager).attemptForResource(resourceId)) ||
+      (await this.usageOperations(manager).pendingUsageExists(resourceId))
     ) {
       throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
     }
   }
 
   protected async getLifecycleAttempt(
-    manager: EntityManager,
+    manager: TransactionScope,
     id: string,
     resourceId: number,
   ): Promise<ResourceUsageLifecycleAttempt> {
-    const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id, resourceId } });
+    const attempt = await this.usageOperations(manager).attempt(id, resourceId);
     if (!attempt) throw new ConflictException('The usage lifecycle attempt is no longer active');
     return attempt;
   }
@@ -295,15 +298,16 @@ export abstract class UsageLifecycle {
     usageId: number | undefined,
     item: Omit<LifecycleBillingItem, 'usageId'>,
   ): Promise<void> {
-    await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+    await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, async (manager) => {
       const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
       const targetUsageId = attempt.previousUsageId ?? attempt.candidateUsageId;
       if (targetUsageId === null || (usageId !== undefined && usageId !== targetUsageId)) {
         throw new ConflictException('Billing item does not belong to this usage lifecycle attempt');
       }
-      await manager.update(ResourceUsageLifecycleAttempt, attempt.id, {
-        billingItems: [...attempt.billingItems, { ...item, usageId: targetUsageId }],
-      });
+      await this.usageOperations(manager).setAttemptBillingItems(attempt.id, [
+        ...attempt.billingItems,
+        { ...item, usageId: targetUsageId },
+      ]);
     });
   }
 
@@ -313,7 +317,11 @@ export abstract class UsageLifecycle {
 
   protected abstract readonly operatingAttributionService: ResourceOperatingAttributionService | undefined;
 
-  protected abstract readonly resourceUsageRepository: Repository<ResourceUsage>;
+  protected abstract readonly persistence: UsagePersistence;
+  protected abstract readonly transactions: DatabaseTransactions;
+  protected usageOperations(scope?: TransactionScope): UsagePersistence {
+    return scope ? scope.resolve(USAGE_OPERATIONS) : this.persistence;
+  }
 
   protected abstract readonly metering?: ResourceMeteringService;
 
@@ -321,7 +329,7 @@ export abstract class UsageLifecycle {
 
   protected abstract getResourceUsageFlowPayload(
     resourceUsage: ResourceUsage,
-    formSubmissions?: FormSubmission[],
+    formSubmissions?: FormSubmissionDraft[],
   ): UsageFlowPayload;
 
   protected abstract cacheCleanupInterval: ReturnType<typeof setInterval> | null;
@@ -349,7 +357,7 @@ export abstract class UsageLifecycle {
     resourceId: number,
     user: User,
     canUpdateResource: boolean,
-    transactionalEntityManager?: EntityManager,
+    scope?: TransactionScope,
   ): Promise<boolean>;
 
   protected abstract readonly ACCESS_CACHE_TTL_MS: 30000;
@@ -380,7 +388,7 @@ export abstract class UsageLifecycle {
     resourceId: number,
     user: User,
     canUpdateResource: boolean,
-    transactionalEntityManager: EntityManager | undefined,
+    scope: TransactionScope | undefined,
     generation: number,
   ): Promise<boolean>;
 
@@ -394,43 +402,32 @@ export abstract class UsageLifecycle {
 
   public abstract assertSupportsSupervision(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
+    scope?: TransactionScope,
     preloadedResource?: Resource,
   ): Promise<Resource>;
-
-  protected abstract readonly userRepository: Repository<User>;
-
-  protected abstract readonly resourceRepository: Repository<Resource>;
 
   protected abstract readonly resourceMaintenanceService: ResourceMaintenanceService;
 
   protected abstract readonly resourceHealthService: ResourceHealthService;
 
-  public abstract canControllResource(
-    resourceId: number,
-    user: User,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<boolean>;
+  public abstract canControllResource(resourceId: number, user: User, scope?: TransactionScope): Promise<boolean>;
 
   protected abstract getResource(
     resourceId: number,
     user: User,
     opts: { checkMaintenance: boolean; checkControlPermission: boolean },
-    transactionalEntityManager?: EntityManager,
+    scope?: TransactionScope,
   ): Promise<Resource>;
 
   public abstract validateSupervisedStart(
     resourceId: number,
     requester: User,
     supervisorUserId: number,
-    transactionalEntityManager?: EntityManager,
+    scope?: TransactionScope,
     preloadedResource?: Resource,
   ): Promise<void>;
 
-  public abstract getActiveSession(
-    resourceId: number,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<ResourceUsage | null>;
+  public abstract getActiveSession(resourceId: number, scope?: TransactionScope): Promise<ResourceUsage | null>;
 
   protected abstract readonly billingService: BillingService;
 
@@ -448,8 +445,8 @@ export abstract class UsageLifecycle {
     resource: Resource;
     createdSession: ResourceUsage;
     existingActiveSession: ResourceUsage;
-    attempt: import('typeorm').DeepPartial<ResourceUsageLifecycleAttempt> & ResourceUsageLifecycleAttempt;
-    formSubmissions: FormSubmission[];
+    attempt: ResourceUsageLifecycleAttempt;
+    formSubmissions: FormSubmissionDraft[];
   }>;
 
   protected abstract notifySessionStarted(
@@ -467,7 +464,7 @@ export abstract class UsageLifecycle {
 
   protected abstract readonly audit: AuditService;
 
-  protected abstract emitUsageEvent(usageId: number, transactionalEntityManager?: EntityManager): Promise<void>;
+  protected abstract emitUsageEvent(usageId: number, scope?: TransactionScope): Promise<void>;
 
   protected abstract emitSystemUsageEvent(
     event: SystemEvent.RESOURCE_USAGE_STARTED | SystemEvent.RESOURCE_USAGE_ENDED,
@@ -491,6 +488,4 @@ export abstract class UsageLifecycle {
     user: User,
     action: ResourceUsageAction,
   ): Promise<ResourceUsage>;
-
-  protected abstract readonly DETAIL_RELATIONS: string[];
 }

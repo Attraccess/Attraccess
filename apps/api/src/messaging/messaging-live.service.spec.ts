@@ -1,25 +1,19 @@
+import { MessagingLivePersistence } from './persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { firstValueFrom, take, toArray } from 'rxjs';
-import { ConversationParticipant, Message } from '@attraccess/database-entities';
+import { ConversationParticipant, Message } from '@attraccess/application-models';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';
 
 describe('MessagingLiveService', () => {
   let service: MessagingLiveService;
-  let participantRepository: { find: jest.Mock };
-  let messageRepository: { findOne: jest.Mock };
+  let persistence: jest.Mocked<MessagingLivePersistence>;
 
   beforeEach(async () => {
-    participantRepository = { find: jest.fn() };
-    messageRepository = { findOne: jest.fn() };
+    persistence = { participants: jest.fn(), messageWithSender: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MessagingLiveService,
-        { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
-        { provide: getRepositoryToken(Message), useValue: messageRepository },
-      ],
+      providers: [MessagingLiveService, { provide: MessagingLivePersistence, useValue: persistence }],
     }).compile();
 
     service = module.get(MessagingLiveService);
@@ -46,25 +40,23 @@ describe('MessagingLiveService', () => {
   });
 
   it('pushes the new message to every recipient except the sender', async () => {
-    participantRepository.find.mockResolvedValue([
+    persistence.participants.mockResolvedValue([
       { userId: 5 } as ConversationParticipant,
       { userId: 9 } as ConversationParticipant,
     ]);
 
     const message = { id: 3, conversationId: 1, senderId: 5 } as Message;
     const messageWithSender = { ...message, sender: { id: 5, username: 'sender' } } as Message;
-    messageRepository.findOne.mockResolvedValue(messageWithSender);
+    persistence.messageWithSender.mockResolvedValue(messageWithSender);
 
-    const recipientEvents = firstValueFrom(
-      service.getUserMessageSubject(9).pipe(take(1), toArray()),
-    );
+    const recipientEvents = firstValueFrom(service.getUserMessageSubject(9).pipe(take(1), toArray()));
 
     const senderEvents: { data: Message }[] = [];
     service.getUserMessageSubject(5).subscribe((event) => senderEvents.push(event));
 
     await service.notifyNewMessage(new MessageCreatedEvent(message));
 
-    expect(messageRepository.findOne).toHaveBeenCalledWith({ where: { id: 3 }, relations: ['sender'] });
+    expect(persistence.messageWithSender).toHaveBeenCalledWith(3);
     await expect(recipientEvents).resolves.toEqual([{ data: messageWithSender }]);
     expect(senderEvents).toHaveLength(0);
   });

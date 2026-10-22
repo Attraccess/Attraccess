@@ -1,3 +1,4 @@
+import { createSqliteCommissioningPersistence } from '../persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoCommissioningSession } from './session.entity';
 import { WagoController } from '../../controllers/entity';
@@ -28,7 +29,7 @@ describe('commissioning verification', () => {
   }
 
   it('does not claim hardware or hardening success from MQTT evidence alone', async () => {
-    expect(await commissioningVerification(context(), session)).toEqual({
+    expect(await commissioningVerification(createSqliteCommissioningPersistence(context()), session)).toEqual({
       controllerId: 1,
       permanentConnection: true,
       enrollmentRevoked: true,
@@ -42,10 +43,12 @@ describe('commissioning verification', () => {
 
   it('rejects stale heartbeat, old enrollment and rejected configuration evidence', async () => {
     const result = await commissioningVerification(
-      context(
-        { ...controller, lastHeartbeatAt: '2020-01-01T00:00:00.000Z' },
-        { ...enrollment, hardwareId: 'another-controller' },
-        { ...revision, state: 'rejected' },
+      createSqliteCommissioningPersistence(
+        context(
+          { ...controller, lastHeartbeatAt: '2020-01-01T00:00:00.000Z' },
+          { ...enrollment, hardwareId: 'another-controller' },
+          { ...revision, state: 'rejected' },
+        ),
       ),
       session,
     );
@@ -55,7 +58,10 @@ describe('commissioning verification', () => {
   });
 
   it('requires a heartbeat from the current enrollment', async () => {
-    const result = await commissioningVerification(context({ ...controller, enrollmentId: 99 }), session);
+    const result = await commissioningVerification(
+      createSqliteCommissioningPersistence(context({ ...controller, enrollmentId: 99 })),
+      session,
+    );
     expect(result.permanentConnection).toBe(false);
   });
 });

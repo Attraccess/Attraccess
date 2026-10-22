@@ -1,19 +1,5 @@
-// TypeORM entity for the Shelly device registry.
-//
-// The schema is owned by the plugin migration
-// (backend/migrations/*-create-shelly-devices.ts) — the host runs with
-// `synchronize: false`, so this entity only *describes* the existing
-// `plugin_shelly_devices` table for repository access; it never creates or
-// alters it. Column names/types therefore mirror the migration exactly.
-//
-// The host registers this class into the shared DataSource (declared via the
-// `entities` export in plugin.ts) so `context.getRepository(ShellyDevice)`
-// resolves. Decorators are imported from the SDK, which re-exports the host's
-// single TypeORM copy — never add a `typeorm` dependency to the plugin.
-//
-// NOTE: the bundler (esbuild) does not emit decorator *type* metadata, so every
-// column declares an explicit `type`.
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
+// SQLite metadata only. Released plugin migration owns the physical schema.
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/adapter';
 import type { AuthState } from '../types';
 
 // Namespaced so the plugin's table never collides with a host table.

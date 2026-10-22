@@ -1,4 +1,6 @@
-import { Auth, AuthenticatedRequest, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
+import { mapResponse } from '../../transport/response-mapper';
+import { Auth, AuthenticatedRequest, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk/v2';
+import { ResourceFlowNode } from '../../transport/models/resourceFlowNode.dto';
 
 import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Post, Sse, Req, Put } from '@nestjs/common';
 
@@ -194,7 +196,9 @@ export class ResourceFlowsController {
     description: 'Insufficient permissions to manage resources',
   })
   async getButtons(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceFlowNode[]> {
-    return await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
+    return (await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON)).map((record) =>
+      mapResponse(ResourceFlowNode, record),
+    );
   }
 
   @Get('node-schemas')

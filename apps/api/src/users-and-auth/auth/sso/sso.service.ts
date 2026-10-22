@@ -3,13 +3,13 @@ import {
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   SSOProviderType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { Injectable, BadRequestException } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { DatabaseTransactions } from '../../../database/transaction-scope';
 
-import { Repository, DeepPartial } from 'typeorm';
+import { SSO_WRITES, SsoPersistence, SsoProviderOperations, SamlConfigurationChanges } from '../persistence/port';
 
 import { EncryptionService } from '../../../encryption/encryption.service';
 
@@ -34,29 +34,20 @@ import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from './logout-endpoints';
 @Injectable()
 export class SSOService {
   public constructor(
-    @InjectRepository(SSOProvider)
-    protected ssoProviderRepository: Repository<SSOProvider>,
-    @InjectRepository(SSOProviderOIDCConfiguration)
-    protected oidcConfigRepository: Repository<SSOProviderOIDCConfiguration>,
-    @InjectRepository(SSOProviderSAMLConfiguration)
-    protected samlConfigRepository: Repository<SSOProviderSAMLConfiguration>,
+    protected readonly persistence: SsoPersistence,
+    protected readonly transactions: DatabaseTransactions,
     protected licenseService: LicenseService,
     protected readonly encryptionService: EncryptionService,
   ) {}
 
   public async getAllProviders(): Promise<SSOProvider[]> {
-    const providers = await this.ssoProviderRepository.find({
-      relations: ['oidcConfiguration', 'samlConfiguration'],
-    });
+    const providers = await this.persistence.allProviders();
     providers.forEach((provider) => this.decryptProviderSecrets(provider));
     return providers;
   }
 
   public async getProviderById(id: number): Promise<SSOProvider> {
-    const provider = await this.ssoProviderRepository.findOne({
-      where: { id },
-      relations: ['oidcConfiguration', 'samlConfiguration'],
-    });
+    const provider = await this.persistence.providerById(id);
 
     if (!provider) {
       throw new SSOProviderNotFoundException();
@@ -70,20 +61,7 @@ export class SSOService {
     ssoType: SSOProviderType,
     providerId: number,
   ): Promise<SSOProvider | null> {
-    const relations: string[] = [];
-
-    if (ssoType === SSOProviderType.OIDC) {
-      relations.push('oidcConfiguration');
-    }
-
-    if (ssoType === SSOProviderType.SAML) {
-      relations.push('samlConfiguration');
-    }
-
-    const provider = await this.ssoProviderRepository.findOne({
-      where: { type: ssoType, id: providerId },
-      relations,
-    });
+    const provider = await this.persistence.providerByType(providerId, ssoType);
     if (provider) {
       this.decryptProviderSecrets(provider);
     }
@@ -96,34 +74,22 @@ export class SSOService {
       modules: [LicenseModuleType.SSO],
     });
 
-    const savedProvider = await this.ssoProviderRepository.manager.transaction(async (manager) => {
-      const providerRepository = manager.getRepository(SSOProvider);
-      const newProvider = providerRepository.create({ name: createDto.name, type: createDto.type });
-      const provider = await providerRepository.save(newProvider);
+    const savedProvider = await this.transactions.run({ resourceIds: [], accountIds: [] }, async (scope) => {
+      const operations = scope.resolve(SSO_WRITES);
+      const provider = await operations.createProvider(createDto.name, createDto.type);
       switch (createDto.type) {
         case SSOProviderType.OIDC:
           if (!createDto.oidcConfiguration) throw new BadRequestException('Missing OIDC configuration payload');
-          await this.createOIDCConfiguration(
-            provider.id,
-            createDto.oidcConfiguration,
-            manager.getRepository(SSOProviderOIDCConfiguration),
-          );
+          await this.createOIDCConfiguration(provider.id, createDto.oidcConfiguration, operations);
           break;
         case SSOProviderType.SAML:
           if (!createDto.samlConfiguration) throw new BadRequestException('Missing SAML configuration payload');
-          await this.createSAMLConfiguration(
-            provider.id,
-            createDto.samlConfiguration,
-            manager.getRepository(SSOProviderSAMLConfiguration),
-          );
+          await this.createSAMLConfiguration(provider.id, createDto.samlConfiguration, operations);
           break;
         default:
           throw new BadRequestException(`Unsupported SSO provider type: ${createDto.type}`);
       }
-      const loaded = await providerRepository.findOne({
-        where: { type: provider.type, id: provider.id },
-        relations: [provider.type === SSOProviderType.OIDC ? 'oidcConfiguration' : 'samlConfiguration'],
-      });
+      const loaded = await operations.providerByType(provider.id, provider.type);
       if (!loaded) throw new BadRequestException('Provider not found after create');
       this.decryptProviderSecrets(loaded);
       return loaded;
@@ -135,26 +101,16 @@ export class SSOService {
     await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
 
-    return this.ssoProviderRepository.manager.transaction(async (manager) => {
+    return this.transactions.run({ resourceIds: [], accountIds: [] }, async (scope) => {
+      const operations = scope.resolve(SSO_WRITES);
       if (provider.type === SSOProviderType.OIDC && updateDto.oidcConfiguration) {
-        await this.updateOIDCConfiguration(
-          provider.id,
-          updateDto.oidcConfiguration,
-          manager.getRepository(SSOProviderOIDCConfiguration),
-        );
+        await this.updateOIDCConfiguration(provider.id, updateDto.oidcConfiguration, operations);
       }
       if (provider.type === SSOProviderType.SAML && updateDto.samlConfiguration) {
-        await this.updateSAMLConfiguration(
-          provider.id,
-          updateDto.samlConfiguration,
-          manager.getRepository(SSOProviderSAMLConfiguration),
-        );
+        await this.updateSAMLConfiguration(provider.id, updateDto.samlConfiguration, operations);
       }
-      if (updateDto.name) await manager.getRepository(SSOProvider).update(provider.id, { name: updateDto.name });
-      const updated = await manager.getRepository(SSOProvider).findOne({
-        where: { type: provider.type, id: provider.id },
-        relations: [provider.type === SSOProviderType.OIDC ? 'oidcConfiguration' : 'samlConfiguration'],
-      });
+      if (updateDto.name) await operations.renameProvider(provider.id, updateDto.name);
+      const updated = await operations.providerByType(provider.id, provider.type);
       if (!updated) throw new BadRequestException('Provider not found after update');
       this.decryptProviderSecrets(updated);
       return updated;
@@ -164,19 +120,18 @@ export class SSOService {
   public async deleteProvider(id: number): Promise<void> {
     await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
-    await this.ssoProviderRepository.manager.transaction(async (manager) => {
-      if (provider.oidcConfiguration)
-        await manager.getRepository(SSOProviderOIDCConfiguration).delete(provider.oidcConfiguration.id);
-      if (provider.samlConfiguration)
-        await manager.getRepository(SSOProviderSAMLConfiguration).delete(provider.samlConfiguration.id);
-      await manager.getRepository(SSOProvider).delete(id);
+    await this.transactions.run({ resourceIds: [], accountIds: [] }, async (scope) => {
+      const operations = scope.resolve(SSO_WRITES);
+      if (provider.oidcConfiguration) await operations.removeOidcConfiguration(provider.oidcConfiguration.id);
+      if (provider.samlConfiguration) await operations.removeSamlConfiguration(provider.samlConfiguration.id);
+      await operations.removeProvider(id);
     });
   }
 
   protected async createSAMLConfiguration(
     providerId: number,
     config: CreateSAMLConfigurationDto,
-    repository = this.samlConfigRepository,
+    operations: SsoProviderOperations = this.persistence,
   ): Promise<SSOProviderSAMLConfiguration> {
     if (config.logoutURL) trustedEndpoint(config.logoutURL);
     if (config.logoutURL && !config.idpIssuer?.trim())
@@ -196,9 +151,7 @@ export class SSOService {
     void unusedSpCert;
     void unusedSpKey;
 
-    type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
-
-    const newConfig = repository.create({
+    const newConfig = {
       ...persistableConfig,
       certificate: normalizedCertificate,
       provisioningSecret: encryptedProvisioningSecret,
@@ -206,18 +159,18 @@ export class SSOService {
       spSigningKeyEncrypted: encryptedPrivateKey,
       spSigningKeyEncryptionKeyId: encryptedPrivateKey ? this.getEncryptionKeyId() : null,
       ssoProviderId: providerId,
-    } as DeepPartial<SAMLConfigEntity>);
+    } satisfies SamlConfigurationChanges;
 
-    return repository.save(newConfig);
+    return operations.createSamlConfiguration(newConfig);
   }
 
   protected async updateSAMLConfiguration(
     providerId: number,
     config: UpdateSAMLConfigurationDto,
-    repository = this.samlConfigRepository,
+    operations: SsoProviderOperations = this.persistence,
   ): Promise<SSOProviderSAMLConfiguration> {
     if (config.logoutURL) trustedEndpoint(config.logoutURL);
-    const existing = await repository.findOne({ where: { ssoProviderId: providerId } });
+    const existing = await operations.samlConfiguration(providerId);
     if (!existing) {
       throw new BadRequestException('SAML configuration not found for provider');
     }
@@ -300,8 +253,8 @@ export class SSOService {
     if (nextLogoutURL && !nextIdpIssuer?.trim()) throw new BadRequestException('SAML logout requires an IdP issuer');
     this.ensureSigningMaterialAvailability(Boolean(nextSignRequest || nextLogoutURL), nextSigningCert, nextSigningKey);
 
-    await repository.update({ ssoProviderId: providerId }, payload);
-    return repository.findOne({ where: { ssoProviderId: providerId } });
+    await operations.patchSamlConfiguration(providerId, payload);
+    return operations.samlConfiguration(providerId);
   }
 
   protected normalizeCertificate(cert: string): string {
@@ -359,23 +312,23 @@ export class SSOService {
   protected async createOIDCConfiguration(
     providerId: number,
     config: CreateOIDCConfigurationDto,
-    repository = this.oidcConfigRepository,
+    operations: SsoProviderOperations = this.persistence,
   ): Promise<SSOProviderOIDCConfiguration> {
     this.validateOidcLogoutConfig(config);
     const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
-    const newConfig = repository.create({
+    const newConfig = {
       ...config,
       clientSecret: encryptedSecret,
       ssoProviderId: providerId,
-    });
+    };
 
-    return repository.save(newConfig);
+    return operations.createOidcConfiguration(newConfig);
   }
 
   protected async updateOIDCConfiguration(
     providerId: number,
     updateConfig: UpdateOIDCConfigurationDto,
-    repository = this.oidcConfigRepository,
+    operations: SsoProviderOperations = this.persistence,
   ): Promise<SSOProviderOIDCConfiguration> {
     this.validateOidcLogoutConfig(updateConfig);
     const payload: Partial<SSOProviderOIDCConfiguration> = {};
@@ -419,8 +372,8 @@ export class SSOService {
       payload.roleMappings = updateConfig.roleMappings;
     }
 
-    await repository.update({ ssoProviderId: providerId }, payload);
-    return repository.findOne({ where: { ssoProviderId: providerId } });
+    await operations.patchOidcConfiguration(providerId, payload);
+    return operations.oidcConfiguration(providerId);
   }
 
   /**

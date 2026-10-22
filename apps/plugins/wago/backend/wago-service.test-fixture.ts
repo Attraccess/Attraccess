@@ -1,3 +1,11 @@
+import type { PluginBackendAdapters } from '@attraccess/plugins-backend-sdk/adapter';
+import type {
+  PluginContext as NeutralPluginContext,
+  PluginPersistenceContext,
+  PluginOperationToken,
+} from '@attraccess/plugins-backend-sdk/v2';
+import plugin from './plugin';
+import { createWagoRegistryPersistence } from './controllers/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoController } from './controllers/entity';
 import { WagoEnrollment } from './controllers/enrollment.entity';
@@ -39,7 +47,11 @@ export function createWagoServiceFixture(
           controllers.find((item) => ('id' in where ? item.id === where.id : item.hardwareId === where.hardwareId)) ??
           null,
       ),
-    save: jest.fn().mockImplementation(async (value) => value),
+    save: jest.fn().mockImplementation(async (value) => {
+      const existing = controllers.find((row) => row.id === value.id);
+      if (existing) Object.assign(existing, value);
+      return value;
+    }),
     delete: jest.fn(),
   };
   const enrollmentQuery = {
@@ -51,7 +63,11 @@ export function createWagoServiceFixture(
     find: jest.fn().mockResolvedValue(enrollments),
     findOneBy: jest.fn(),
     create: jest.fn((value) => value),
-    save: jest.fn().mockImplementation(async (value) => value),
+    save: jest.fn().mockImplementation(async (value) => {
+      const existing = enrollments.find((row) => row.id === value.id);
+      if (existing) Object.assign(existing, value);
+      return value;
+    }),
     delete: jest.fn(),
     createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
   };
@@ -109,7 +125,9 @@ export function createWagoServiceFixture(
     },
     getMqttCredentialProvisioning: jest.fn(),
   } as unknown as PluginContext;
-  const service = new WagoService(context);
+  const service = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(
+    context,
+  );
   services.push(service);
   // Unit tests invoke service methods directly, outside Nest's module lifecycle.
   Object.assign(service, {
@@ -119,6 +137,7 @@ export function createWagoServiceFixture(
     drafts: draftRepository,
     revisions: revisionRepository,
   });
+  bindWagoPersistenceFixture(service, context);
   return {
     service,
     controllerRepository,
@@ -130,4 +149,77 @@ export function createWagoServiceFixture(
     context,
     subscriptions,
   };
+}
+
+/** Bind the existing repository fakes to real adapters; application services receive only ports. */
+export function bindWagoPersistenceFixture(service: WagoService, context: PluginContext): void {
+  const records = service as unknown as Record<string, object>;
+  const names = new Map<unknown, string>([
+    [WagoController, 'controllers'],
+    [WagoEnrollment, 'enrollments'],
+    [WagoSettings, 'settings'],
+    [WagoConfigurationDraft, 'drafts'],
+    [WagoConfigurationRevision, 'revisions'],
+  ]);
+  const implementationContext = {
+    get dataSource() {
+      return context.dataSource;
+    },
+    getRepository: (entity: unknown) => {
+      const repository = records[names.get(entity) ?? ''];
+      if (!repository) throw new Error('Fixture has no repository for this operation');
+      return { ...repository, create: (input: unknown) => input };
+    },
+  } as unknown as PluginContext;
+  const [registry, configuration] = createWagoRegistryPersistence(implementationContext);
+  Object.assign(service, { registry, configuration });
+  Object.assign(service['commands']['dependencies'], { registry, configuration });
+}
+
+/** Exercise the v2 registration with real adapter factories, without exposing fixture connections to services. */
+export function withWagoPersistenceFixture(
+  context: PluginContext,
+  implementation: PluginBackendAdapters = plugin,
+): NeutralPluginContext {
+  const instances = new Map<symbol, object>();
+  const targets = new Map<symbol, object>();
+  const persistence: PluginPersistenceContext = {
+    resolve: <T>(token: PluginOperationToken<T>): T => {
+      if (!instances.has(token.id)) {
+        const operation = implementation.persistenceAdapters
+          .flatMap((entry) => entry.operations ?? [])
+          .find((entry) => entry.token.id === token.id);
+        if (!operation) throw new Error(`Fixture has no registered operation: ${token.description}`);
+        instances.set(
+          token.id,
+          new Proxy(
+            {},
+            {
+              get: (_target, key) => {
+                if (!token.methods.includes(key)) return undefined;
+                return (...args: unknown[]) => {
+                  if (!targets.has(token.id)) {
+                    const source = context.dataSource;
+                    if (!source?.isInitialized) throw new Error('Fixture database is not initialized');
+                    targets.set(
+                      token.id,
+                      operation.create({ backend: 'sqlite', dataSource: source, manager: source.manager }) as object,
+                    );
+                  }
+                  const target = targets.get(token.id);
+                  return Reflect.apply(Reflect.get(target, key), target, args);
+                };
+              },
+            },
+          ),
+        );
+      }
+      return instances.get(token.id) as T;
+    },
+  };
+  const neutral = { ...context, persistence };
+  Reflect.deleteProperty(neutral, 'getRepository');
+  Reflect.deleteProperty(neutral, 'dataSource');
+  Reflect.deleteProperty(neutral, 'get');
+  return neutral as unknown as NeutralPluginContext;
 }

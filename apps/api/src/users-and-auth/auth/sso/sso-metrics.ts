@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { MetricsService } from '../../../metrics/metrics.service';
 
 export type SSOLoginFailureReason = 'guard_rejected' | 'invalid_assertion' | 'linking_failed' | 'provider_error';

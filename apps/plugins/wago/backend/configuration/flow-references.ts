@@ -1,9 +1,9 @@
-import { ResourceFlowNode, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { WagoConfigurationPersistence } from './persistence/port';
 import type { WagoConfigurationSnapshot } from './model';
 import { configurationImpacts } from './editor';
 
 export async function configurationFlowImpacts(
-  context: PluginContext,
+  persistence: WagoConfigurationPersistence,
   controllerId: number,
   previous: WagoConfigurationSnapshot | null,
   current: WagoConfigurationSnapshot,
@@ -21,13 +21,7 @@ export async function configurationFlowImpacts(
       impacts.push({ channelId: channel.id, message: 'An input used by this channel as a guard or feedback changed.' });
     }
   }
-  const nodes = await context.dataSource
-    .getRepository(ResourceFlowNode)
-    .createQueryBuilder('node')
-    .select(['node.id', 'node.resourceId', 'node.type', 'node.data'])
-    .where('node.type LIKE :type', { type: 'plugin.wago.%' })
-    .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
-    .getMany();
+  const nodes = await persistence.flowReferences(controllerId);
   // Commands pin the applied revision, even when their channel is unchanged.
   for (const node of nodes) {
     const channelId = node.data?.channelId;

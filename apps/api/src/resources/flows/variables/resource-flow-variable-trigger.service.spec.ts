@@ -1,7 +1,6 @@
+import { FlowTriggerPersistence } from '../persistence/port';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ResourceFlowNode, ResourceFlowNodeType, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceFlowNodeType, ResourceFlowVariableScope } from '@attraccess/application-models';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 import { ResourceFlowVariableTriggerService } from './resource-flow-variable-trigger.service';
 import { ResourceFlowsExecutorService } from '../execution/resource-flows-executor.service';
@@ -22,12 +21,12 @@ const node = (
 
 describe('ResourceFlowVariableTriggerService', () => {
   let triggerService: ResourceFlowVariableTriggerService;
-  let nodeRepo: jest.Mocked<Repository<ResourceFlowNode>>;
+  let persistence: jest.Mocked<FlowTriggerPersistence>;
   let executor: jest.Mocked<ResourceFlowsExecutorService>;
   let variables: jest.Mocked<ResourceFlowVariablesService>;
 
   beforeEach(async () => {
-    nodeRepo = { find: jest.fn() } as never;
+    persistence = { variableTriggers: jest.fn() };
     executor = { startFlow: jest.fn() } as never;
     variables = {
       getMany: jest.fn(async () => ({ a: 1 })),
@@ -36,7 +35,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFlowVariableTriggerService,
-        { provide: getRepositoryToken(ResourceFlowNode), useValue: nodeRepo },
+        { provide: FlowTriggerPersistence, useValue: persistence },
         { provide: ResourceFlowsExecutorService, useValue: executor },
         { provide: ResourceFlowVariablesService, useValue: variables },
       ],
@@ -46,7 +45,7 @@ describe('ResourceFlowVariableTriggerService', () => {
   });
 
   it('starts flow only for nodes whose watches match the event', async () => {
-    nodeRepo.find.mockResolvedValueOnce([
+    persistence.variableTriggers.mockResolvedValueOnce([
       node('match', 7, [{ scope: 'resource', key: 'a' }]),
       node('miss', 8, [{ scope: 'resource', key: 'other' }]),
     ]);
@@ -60,7 +59,9 @@ describe('ResourceFlowVariableTriggerService', () => {
   });
 
   it('drops same-source events when source=exclude-self', async () => {
-    nodeRepo.find.mockResolvedValueOnce([node('self', 7, [{ scope: 'global', key: 'k' }], 'exclude-self')]);
+    persistence.variableTriggers.mockResolvedValueOnce([
+      node('self', 7, [{ scope: 'global', key: 'k' }], 'exclude-self'),
+    ]);
 
     await triggerService.handle(
       new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'k', 0, 1, new Date(), 7),
@@ -70,7 +71,7 @@ describe('ResourceFlowVariableTriggerService', () => {
   });
 
   it('payload exposes change meta and current watched values', async () => {
-    nodeRepo.find.mockResolvedValueOnce([node('n', 7, [{ scope: 'global', key: 'k' }])]);
+    persistence.variableTriggers.mockResolvedValueOnce([node('n', 7, [{ scope: 'global', key: 'k' }])]);
     const changedAt = new Date();
 
     await triggerService.handle(

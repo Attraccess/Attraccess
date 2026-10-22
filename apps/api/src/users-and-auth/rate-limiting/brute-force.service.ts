@@ -1,7 +1,6 @@
-import { User } from '@attraccess/database-entities';
+import type { User } from '@attraccess/application-models';
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { RateLimitPersistence } from './persistence/port';
 import { FixedWindowCounterStore, WindowCounterEntry } from '../../common/rate-limiting/fixed-window-counter';
 import { SettingsService } from '../../settings/settings.service';
 import { recordFailure as recordFailureImplementation } from './brute-force-failure';
@@ -54,8 +53,7 @@ export class BruteForceProtectionService {
   private readonly nowFn: () => number = () => Date.now();
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly persistence: RateLimitPersistence,
     private readonly settingsService: SettingsService,
   ) {}
 
@@ -127,7 +125,7 @@ export class BruteForceProtectionService {
         ipCounters: getContextOwner().ipCounters,
         ipCoarseCounters: getContextOwner().ipCoarseCounters,
         accountCounters: getContextOwner().accountCounters,
-        userRepository: getContextOwner().userRepository,
+        persistence: getContextOwner().persistence,
       },
       scope,
       ip,
@@ -147,26 +145,12 @@ export class BruteForceProtectionService {
       return;
     }
     this.accountCounters.delete(userId);
-    await this.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil: null,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await this.persistence.clearAccount(userId);
   }
 
   async unlockAccount(userId: number): Promise<void> {
     this.accountCounters.delete(userId);
-    await this.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil: null,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await this.persistence.clearAccount(userId);
   }
 
   private upsertCounter<K>(

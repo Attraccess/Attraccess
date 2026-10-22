@@ -5,7 +5,7 @@ import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
-import type { WagoManagedAccess } from '../access.entity';
+import type { WagoManagedAccess } from '../access.record';
 import { MANAGEMENT_USERNAME } from '../provisioning/provision';
 import { restoreManagementKey } from '../../../management/key';
 import type { RuntimeStorageDiagnostic, RuntimeUpdateFailure } from '../../update/coordinator';

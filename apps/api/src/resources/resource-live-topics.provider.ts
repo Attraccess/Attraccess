@@ -1,9 +1,7 @@
-import { Resource } from '@attraccess/database-entities';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { ResourceEventPersistence } from './persistence/port';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
 import { defer } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { LiveTopicProvider } from '../live-updates/live-topic-provider';
@@ -20,7 +18,7 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
 
   constructor(
     private readonly registry: LiveTopicsService,
-    @InjectRepository(Resource) private readonly resources: Repository<Resource>,
+    private readonly resources: ResourceEventPersistence,
     private readonly resourceEvents: ResourceEventsService,
     private readonly flowLogs: FlowLogRecorderService,
   ) {}
@@ -35,8 +33,7 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
   ): Promise<ReadonlyMap<string, string>> {
     // Both resource topics share one lookup per set/renewal, even for overlapping IDs.
     const ids = [...new Set(subscriptions.map((subscription) => subscription.resourceId))];
-    const resources = await this.resources.find({ where: { id: In(ids) }, select: { id: true } });
-    const existingIds = new Set(resources.map((resource) => resource.id));
+    const existingIds = new Set(await this.resources.existingIds(ids));
     const rejected = new Map<string, string>();
     for (const subscription of subscriptions) {
       if (subscription.topic === 'flow-logs' && !user.effectivePermissions?.has('resources.update')) {

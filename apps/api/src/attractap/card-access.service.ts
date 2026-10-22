@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuthenticatedUser, NFCCard } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser, NFCCard } from '@attraccess/plugins-backend-sdk/v2';
 import { AttractapService } from './attractap.service';
 import { UsersService } from '../users-and-auth/users/users.service';
 

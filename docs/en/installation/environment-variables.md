@@ -4,23 +4,23 @@ All configuration options for Attraccess that can be set via environment variabl
 
 ## Required Settings
 
-| Variable | Description |
-|----------|-------------|
-| `AUTH_SESSION_SECRET` | Secret key for encrypting session data. Use a random, long value. |
-| `ATTRACCESS_URL` | The URL where users access Attraccess, e.g. `https://attraccess.your-domain.com` |
+| Variable              | Description                                                                      |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `AUTH_SESSION_SECRET` | Secret key for encrypting session data. Use a random, long value.                |
+| `ATTRACCESS_URL`      | The URL where users access Attraccess, e.g. `https://attraccess.your-domain.com` |
 
 ## Application
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ATTRACCESS_URL` | `http://localhost:3000` | Main application URL |
-| `ATTRACCESS_PUBLIC_INTERNET_URL` | – | Public URL for external callbacks (e.g. SumUp payments). Only needed if different from `ATTRACCESS_URL`. |
-| `LOG_LEVELS` | `error,warn,log` | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose` |
-| `LOG_DESTINATIONS` | `console` | Comma-separated registered API log drivers: initially `console`, `file`. Names are trimmed, lowercased and deduplicated. |
-| `LOG_FILE_PATH` | `<STORAGE_ROOT>/api.log` | Optional override when selecting `file`; defaults to `api.log` at the storage root (`./storage` when `STORAGE_ROOT` is unset). Explicit overrides must be non-blank; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |
-| `LICENSE_KEY` | – | Seeds the license key when a new database is initialized. For existing installations, change the stored key under Settings → Application Settings. |
-| `TZ` | – | Time zone, e.g. `Europe/Berlin` |
-| `TRUST_PROXY` | – | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy. |
+| Variable                         | Default                  | Description                                                                                                                                                                                                                                                                            |
+| -------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ATTRACCESS_URL`                 | `http://localhost:3000`  | Main application URL                                                                                                                                                                                                                                                                   |
+| `ATTRACCESS_PUBLIC_INTERNET_URL` | –                        | Public URL for external callbacks (e.g. SumUp payments). Only needed if different from `ATTRACCESS_URL`.                                                                                                                                                                               |
+| `LOG_LEVELS`                     | `error,warn,log`         | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose`                                                                                                                                                                                                                 |
+| `LOG_DESTINATIONS`               | `console`                | Comma-separated registered API log drivers: initially `console`, `file`. Names are trimmed, lowercased and deduplicated.                                                                                                                                                               |
+| `LOG_FILE_PATH`                  | `<STORAGE_ROOT>/api.log` | Optional override when selecting `file`; defaults to `api.log` at the storage root (`./storage` when `STORAGE_ROOT` is unset). Explicit overrides must be non-blank; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |
+| `LICENSE_KEY`                    | –                        | Seeds the license key when a new database is initialized. For existing installations, change the stored key under Settings → Application Settings.                                                                                                                                     |
+| `TZ`                             | –                        | Time zone, e.g. `Europe/Berlin`                                                                                                                                                                                                                                                        |
+| `TRUST_PROXY`                    | –                        | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy.                       |
 
 > [!NOTE]
 > `TRUST_PROXY` is **off by default**. Behind a reverse proxy, every request otherwise appears to come from the proxy IP, so auth rate limiting throttles all users together instead of the real attacker. Set it to match your proxy chain (usually `1`). Trusting more hops than actually exist lets clients spoof their IP — see [Security](settings/security.md#reverse-proxies-and-the-real-client-ip). Takes effect after a restart.
@@ -41,65 +41,73 @@ Configuration changes take effect after restarting the API. Buffered startup log
 
 In containers, give the API write access to the file path and mount its directory if logs must survive container replacement. Rotation, retention, remote drivers, per-driver levels and live reconfiguration are not included. Only API application/framework logs are routed: persisted audit records, opt-in flow recordings, frontend, firmware, companion and dev-launcher output retain their own behavior. Generated `storage/` and `log/` files are gitignored. Developers can [register another transport](developer/logging.md).
 
+## Relational database
+
+| Variable        | Default  | Description                                                                                                                                          |
+| --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_TYPE` | `sqlite` | Relational backend. Only `sqlite` is implemented; unknown, empty or differently cased values reject startup before connections or plugin migrations. |
+
+The database path is `<STORAGE_ROOT>/attraccess.sqlite`. A relative `STORAGE_ROOT` resolves from the API process working directory; without it, local runs use `./storage`. Runtime, migration CLI and development seed/integrity tools share this path resolution. Changing the selector does not transfer data. PostgreSQL and multi-instance coordination remain ATT-584 work; see [Adding a database backend](developer/adding-a-database-backend.md).
+
 ## Storage
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `STORAGE_ROOT` | `/app/storage` | Base directory for all persistent data |
-| `MAX_FILE_SIZE_BYTES` | `10485760` | Maximum file size for uploads (default: 10 MB) |
-| `CACHE_MAX_AGE_DAYS` | `7` | How long images stay in cache (days) |
+| Variable              | Default        | Description                                    |
+| --------------------- | -------------- | ---------------------------------------------- |
+| `STORAGE_ROOT`        | `/app/storage` | Base directory for all persistent data         |
+| `MAX_FILE_SIZE_BYTES` | `10485760`     | Maximum file size for uploads (default: 10 MB) |
+| `CACHE_MAX_AGE_DAYS`  | `7`            | How long images stay in cache (days)           |
 
 ## Email (SMTP)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SMTP_SERVICE` | `SMTP` | Email service: `SMTP` or `Outlook365` |
-| `SMTP_HOST` | `localhost` | SMTP server hostname |
-| `SMTP_PORT` | `1025` | SMTP port |
-| `SMTP_SECURE` | `false` | Enable TLS encryption (`true`/`false`) |
-| `SMTP_USER` | – | SMTP username |
-| `SMTP_PASS` | – | SMTP password |
-| `SMTP_FROM` | – | Sender email address |
+| Variable       | Default     | Description                            |
+| -------------- | ----------- | -------------------------------------- |
+| `SMTP_SERVICE` | `SMTP`      | Email service: `SMTP` or `Outlook365`  |
+| `SMTP_HOST`    | `localhost` | SMTP server hostname                   |
+| `SMTP_PORT`    | `1025`      | SMTP port                              |
+| `SMTP_SECURE`  | `false`     | Enable TLS encryption (`true`/`false`) |
+| `SMTP_USER`    | –           | SMTP username                          |
+| `SMTP_PASS`    | –           | SMTP password                          |
+| `SMTP_FROM`    | –           | Sender email address                   |
 
 > [!NOTE]
 > When using `Outlook365`, host, port and secure are set automatically (`smtp.office365.com`, port `587`). You only need to provide username, password and sender address.
 
 ## SSL / TLS
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable                                | Default | Description                            |
+| --------------------------------------- | ------- | -------------------------------------- |
 | `SSL_GENERATE_SELF_SIGNED_CERTIFICATES` | `false` | Auto-generate self-signed certificates |
-| `SSL_KEY_FILE` | – | Path to SSL private key file |
-| `SSL_CERT_FILE` | – | Path to SSL certificate file |
+| `SSL_KEY_FILE`                          | –       | Path to SSL private key file           |
+| `SSL_CERT_FILE`                         | –       | Path to SSL certificate file           |
 
 > [!TIP]
 > For most setups, we recommend a [reverse proxy](installation/ssl-setup.md) for SSL instead of the built-in SSL support.
 
 ## Session
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AUTH_SESSION_SECRET` | – | **Required.** Secret key for session encryption |
-| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days) |
-| `VALKEY_URL` | – | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of SQLite — required for horizontal scaling. Falls back to SQLite when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
+| Variable                 | Default     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_SESSION_SECRET`    | –           | **Required.** Secret key for session encryption                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days)                                                                                                                                                                                                                                                                                                                                                                                               |
+| `VALKEY_URL`             | –           | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of SQLite. Shared sessions are only one prerequisite for horizontal scaling; this release still requires a single active API coordinator. Falls back to SQLite when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
 
 > [!NOTE]
 > The bundled Docker Compose variants (Balena, Coolify) include a `valkey/valkey:8-alpine` sidecar and set `VALKEY_URL` automatically. For external deployments, point `VALKEY_URL` at your own Valkey/Redis instance.
 
 ## Plugins
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PLUGIN_DIR` | `/app/storage/plugins` | Directory for plugins |
-| `DISABLE_PLUGINS` | `false` | Disable the plugin system |
-| `RESTART_BY_EXIT` | `false` | Automatically restart on crash |
+| Variable          | Default                | Description                    |
+| ----------------- | ---------------------- | ------------------------------ |
+| `PLUGIN_DIR`      | `/app/storage/plugins` | Directory for plugins          |
+| `DISABLE_PLUGINS` | `false`                | Disable the plugin system      |
+| `RESTART_BY_EXIT` | `false`                | Automatically restart on crash |
 
 ## Static Files
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable                    | Default                   | Description            |
+| --------------------------- | ------------------------- | ---------------------- |
 | `STATIC_FRONTEND_FILE_PATH` | `/app/dist/apps/frontend` | Path to frontend build |
-| `STATIC_DOCS_FILE_PATH` | `/app/docs` | Path to documentation |
+| `STATIC_DOCS_FILE_PATH`     | `/app/docs`               | Path to documentation  |
 
 > [!NOTE]
 > These variables do not normally need to be changed. They are only relevant if you run Attraccess without Docker.

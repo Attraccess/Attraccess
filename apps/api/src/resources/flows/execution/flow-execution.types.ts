@@ -1,4 +1,4 @@
-import { Resource } from '@attraccess/database-entities';
+import { Resource } from '@attraccess/application-models';
 import { MeteringRunContext } from '../node-executors';
 
 export interface FlowExecutionOptions {

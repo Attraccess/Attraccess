@@ -1,10 +1,12 @@
+import { User } from '../../transport/models/user.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Body, Controller, Get, Optional, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { User } from '@attraccess/database-entities';
+
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { BooleanDto } from '../../types/boolean.dto';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { VerifyEmailDto } from './dtos/verifyEmail.dto';
@@ -88,7 +90,7 @@ export class UsersRegistrationController {
       details: {},
       request: { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     });
-    return user;
+    return mapResponse(User, await user);
   }
 
   @Get('local-signup-enabled')
@@ -157,7 +159,7 @@ export class UsersRegistrationController {
     description: 'Invalid input data.',
   })
   async acceptInvitation(@Body() body: AcceptInvitationDto): Promise<User> {
-    return this.registrationService.acceptInvitation(body);
+    return mapResponse(User, await this.registrationService.acceptInvitation(body));
   }
 
   @Post('reset-password')

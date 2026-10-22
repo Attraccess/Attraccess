@@ -1,3 +1,6 @@
+import { createSqliteManagedPersistence } from './persistence/typeorm-adapter';
+import { createSqliteDeviceOperations } from '../persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../../commissioning/persistence/typeorm-adapter';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
@@ -66,6 +69,9 @@ export async function resetTestFixture(scope: ManagedRuntimeFixture) {
     } as unknown as WagoService,
     { current: async () => scope.artifact } as WagoRuntimeArtifactsService,
     {} as unknown as WagoCommissioningReadiness,
+    createSqliteCommissioningPersistence(scope.context),
+    createSqliteDeviceOperations(scope.context),
+    createSqliteManagedPersistence(scope.context),
   );
   scope.service.onApplicationBootstrap();
   scope.rootProbe = jest.fn(async () => true);

@@ -1,8 +1,11 @@
 import { BadRequestException, Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { ResourceOperatingDiagnosticsService } from './resource-operating-diagnostics.service';
-import { OperatingDiagnosticsPageQueryDto, OperatingDiagnosticsRangeQueryDto } from './dtos/operating-diagnostics-query.dto';
+import {
+  OperatingDiagnosticsPageQueryDto,
+  OperatingDiagnosticsRangeQueryDto,
+} from './dtos/operating-diagnostics-query.dto';
 import {
   OperatingDataQualityReportDto,
   OperatingStateDto,
@@ -37,7 +40,11 @@ export class ResourceOperatingDiagnosticsController {
     summary: 'List recent operating-timeline transitions, newest first, paginated by interval row',
     operationId: 'resourceOperatingDiagnosticsGetTransitions',
   })
-  @ApiResponse({ status: 200, description: 'Transition history retrieved successfully.', type: OperatingTransitionPageDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Transition history retrieved successfully.',
+    type: OperatingTransitionPageDto,
+  })
   getTransitions(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: OperatingDiagnosticsPageQueryDto,
@@ -55,7 +62,11 @@ export class ResourceOperatingDiagnosticsController {
     summary: 'Report operating-timeline data-quality failures for a resource',
     operationId: 'resourceOperatingDiagnosticsGetDataQuality',
   })
-  @ApiResponse({ status: 200, description: 'Data-quality report retrieved successfully.', type: OperatingDataQualityReportDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Data-quality report retrieved successfully.',
+    type: OperatingDataQualityReportDto,
+  })
   getDataQuality(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: OperatingDiagnosticsRangeQueryDto,
@@ -70,7 +81,11 @@ export class ResourceOperatingDiagnosticsController {
     summary: 'Recompute derived operating durations from the authoritative timeline and compare',
     operationId: 'resourceOperatingDiagnosticsVerifyTimeline',
   })
-  @ApiResponse({ status: 200, description: 'Timeline verification completed successfully.', type: OperatingTimelineVerificationDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Timeline verification completed successfully.',
+    type: OperatingTimelineVerificationDto,
+  })
   verifyTimeline(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: OperatingDiagnosticsRangeQueryDto,

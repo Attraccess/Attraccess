@@ -1,3 +1,14 @@
+import { TypeormIntroductionPersistence } from '../introductions/persistence/typeorm-adapter';
+import { DataSource } from 'typeorm';
+import { SqliteTransactionDriver } from '../../database/sqlite/transactions';
+import {
+  GroupIntroducerPersistence,
+  GroupPersistence,
+  GroupIntroductionPersistence,
+  GROUP_INTRODUCTION_OPERATIONS,
+  GROUP_OPERATIONS,
+} from './persistence/port';
+import { TypeormGroupIntroducerPersistence, TypeormGroupPersistence } from './persistence/typeorm-adapter';
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
@@ -31,9 +42,29 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
   ],
   controllers: [ResourceGroupsController, ResourceGroupsIntroductionsController, ResourceGroupsIntroducersController],
   providers: [
+    {
+      provide: GroupIntroductionPersistence,
+      useFactory: (source: DataSource, driver: SqliteTransactionDriver) => {
+        driver.register(GROUP_INTRODUCTION_OPERATIONS, (manager) => new TypeormIntroductionPersistence(manager));
+        return new TypeormIntroductionPersistence(source.manager);
+      },
+      inject: [DataSource, SqliteTransactionDriver],
+    },
+    {
+      provide: GroupPersistence,
+      useFactory: (source: DataSource, driver: SqliteTransactionDriver) => {
+        driver.register(GROUP_OPERATIONS, (manager) => new TypeormGroupPersistence(manager));
+        return new TypeormGroupPersistence(source.manager);
+      },
+      inject: [DataSource, SqliteTransactionDriver],
+    },
     ResourceGroupsService,
     ResourceGroupsIntroductionsService,
     ResourceGroupsIntroducersService,
+    {
+      provide: GroupIntroducerPersistence,
+      useClass: TypeormGroupIntroducerPersistence,
+    },
     IsResourceGroupIntroducerGuard,
   ],
   exports: [

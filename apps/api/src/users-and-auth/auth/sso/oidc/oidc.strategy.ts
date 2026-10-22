@@ -1,7 +1,7 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { OidcTokenVerifier, OidcVerificationUnavailableError } from './oidc-token-verifier.service';
 import { EncryptionService } from '../../../../encryption/encryption.service';
-import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 

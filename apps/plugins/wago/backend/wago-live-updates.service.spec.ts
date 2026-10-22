@@ -1,4 +1,5 @@
 import type { AuthenticatedUser, PluginContext, PluginLiveTopic } from '@attraccess/plugins-backend-sdk';
+import { WagoDiagnosticsPersistence } from './flow/persistence/port';
 import { WagoLiveUpdatesService } from './wago-live-updates.service';
 import { WagoService } from './controllers/service';
 import { WagoCommissioningService } from './commissioning/service';
@@ -9,7 +10,7 @@ import { WagoNetworkChangeService } from './network/service';
 describe('WAGO bundled status sources', () => {
   function setup() {
     const topics = new Map<string, PluginLiveTopic>();
-    const existsBy = jest.fn(async () => true);
+    const existsBy = jest.fn(async (_where?: { id: number }) => true);
     const context = {
       liveUpdates: {
         register: (topic: PluginLiveTopic) => {
@@ -27,6 +28,7 @@ describe('WAGO bundled status sources', () => {
       { get } as unknown as WagoDiagnosticsService,
       {} as WagoManagedRuntimeService,
       {} as WagoNetworkChangeService,
+      { targetExists: (_kind, id) => existsBy({ id }) } as WagoDiagnosticsPersistence,
     );
     service.onModuleInit();
     return { topics, existsBy, get };

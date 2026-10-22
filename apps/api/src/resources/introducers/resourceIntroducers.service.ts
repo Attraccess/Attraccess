@@ -1,12 +1,12 @@
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
+import { ResourceIntroducerPersistence, RESOURCE_INTRODUCER_OPERATIONS } from './persistence/port';
 
-import { EntityManager, Repository, In } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
@@ -25,10 +25,7 @@ export const t = createTranslator({ en, de });
 @Injectable()
 export class ResourceIntroducersService {
   constructor(
-    @InjectRepository(ResourceIntroducer)
-    protected readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    @Inject(ResourceIntroducerPersistence) protected readonly persistence: ResourceIntroducerPersistence,
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly notifications: NotificationDispatchService,
@@ -37,25 +34,8 @@ export class ResourceIntroducersService {
   protected readonly logger = new Logger(ResourceIntroducersService.name);
 
   public async getMany(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducer[]> {
-    const directIntroducers = await this.resourceIntroducerRepository.find({
-      where: { resourceId, ...(type ? { type } : {}) },
-      relations: ['user'],
-    });
-
-    // Introducers granted at the group level apply to every resource in the group,
-    // so they must be listed alongside the resource's own introducers.
-    const groupQuery = this.resourceIntroducerRepository
-      .createQueryBuilder('introducer')
-      .leftJoinAndSelect('introducer.user', 'user')
-      .innerJoin('introducer.resourceGroup', 'group')
-      .innerJoin('group.resources', 'resource')
-      .where('resource.id = :resourceId', { resourceId });
-
-    if (type) {
-      groupQuery.andWhere('introducer.type = :type', { type });
-    }
-
-    const groupIntroducers = await groupQuery.getMany();
+    const directIntroducers = await this.persistence.directGrants([resourceId], type);
+    const groupIntroducers = await this.persistence.groupGrants(resourceId, type);
 
     // A user can have both roles; prefer a direct grant over an inherited grant of the same role.
     const byUserAndType = new Map<string, ResourceIntroducer>();
@@ -74,13 +54,13 @@ export class ResourceIntroducersService {
     resourceId: number,
     userId: number,
     type?: ResourceIntroducerType,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<ResourceIntroducer | null> {
-    const resourceIntroducerRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceIntroducer)
-      : this.resourceIntroducerRepository;
+    return this.operations(transactionalEntityManager).directGrant(resourceId, userId, type);
+  }
 
-    return await resourceIntroducerRepository.findOne({ where: { resourceId, userId, ...(type ? { type } : {}) } });
+  protected operations(scope?: TransactionScope): ResourceIntroducerPersistence {
+    return scope ? scope.resolve(RESOURCE_INTRODUCER_OPERATIONS) : this.persistence;
   }
 
   protected notifyAccessChange(
@@ -99,10 +79,10 @@ export class ResourceIntroducersService {
           ? 'grantedIntroducer'
           : 'revokedIntroducer';
 
-    void this.userRepository
-      .findOne({ where: { id: userId }, select: ['id', 'locale'] })
+    void this.persistence
+      .recipient(userId)
       .then((user) => {
-        const recipient = user ?? ({ id: userId } as User);
+        const recipient = (user ?? { id: userId }) as User; // Dispatch accepts the existing id/locale projection.
         return this.notifications.dispatch({
           category: NotificationCategory.ACCESS_CHANGES,
           recipients: [recipient],
@@ -135,10 +115,9 @@ export class ResourceIntroducersService {
       return existingIntroducer;
     }
 
-    const introducer = this.resourceIntroducerRepository.create({ resourceId, userId, type });
     let savedIntroducer: ResourceIntroducer;
     try {
-      savedIntroducer = await this.resourceIntroducerRepository.save(introducer);
+      savedIntroducer = await this.persistence.createGrant(resourceId, userId, type);
     } catch (error) {
       const concurrentGrant = await this.getByResourceIdAndUserId(resourceId, userId, type);
       if (concurrentGrant) {
@@ -164,7 +143,7 @@ export class ResourceIntroducersService {
       return;
     }
 
-    await this.resourceIntroducerRepository.remove(introducer);
+    await this.persistence.removeGrant(introducer);
     this.notifyAccessChange(resourceId, userId, introducer.type, false);
     this.eventEmitter.emit(
       ResourceIntroducerChangedEvent.EVENT_NAME,
@@ -185,34 +164,14 @@ export class ResourceIntroducersService {
       return new Map();
     }
 
-    const directIntroducers = await this.resourceIntroducerRepository.find({
-      where: { resourceId: In(uniqueResourceIds), ...(type ? { type } : {}) },
-      relations: ['user'],
-    });
+    const directIntroducers = await this.persistence.directGrants(uniqueResourceIds, type);
     for (const introducer of directIntroducers) {
       if (introducer.user) introducersByResourceId.get(introducer.resourceId)?.set(introducer.userId, introducer);
     }
 
-    const groupQuery = this.resourceIntroducerRepository
-      .createQueryBuilder('introducer')
-      .leftJoinAndSelect('introducer.user', 'user')
-      .innerJoin('introducer.resourceGroup', 'group')
-      .innerJoin('group.resources', 'resource')
-      .where('resource.id IN (:...resourceIds)', { resourceIds: uniqueResourceIds })
-      .addSelect('resource.id', 'resourceId');
-
-    if (type) {
-      groupQuery.andWhere('introducer.type = :type', { type });
-    }
-
-    // Preserve TypeORM's introducer_id alias: entity hydration needs the primary key.
-    const { raw, entities: groupIntroducers } = await groupQuery.getRawAndEntities();
-    const groupIntroducersById = new Map(groupIntroducers.map((introducer) => [introducer.id, introducer]));
-    for (const { introducer_id: introducerId, resourceId } of raw) {
-      const introducer = groupIntroducersById.get(Number(introducerId));
-      if (introducer?.user) {
-        introducersByResourceId.get(Number(resourceId))?.set(introducer.userId, introducer);
-      }
+    const inherited = await this.persistence.inheritedGrants(uniqueResourceIds, type);
+    for (const { resourceId, grant } of inherited) {
+      if (grant.user) introducersByResourceId.get(resourceId)?.set(grant.userId, grant);
     }
 
     return new Map(
@@ -227,7 +186,7 @@ export class ResourceIntroducersService {
     resourceId: number,
     userId: number,
     includeGroups: boolean,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     return this.hasAccess(
       resourceId,
@@ -242,7 +201,7 @@ export class ResourceIntroducersService {
     resourceId: number,
     userId: number,
     includeGroups: boolean,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     return this.hasAccess(resourceId, userId, includeGroups, null, transactionalEntityManager);
   }
@@ -252,7 +211,7 @@ export class ResourceIntroducersService {
     userId: number,
     includeGroups: boolean,
     requiredType: ResourceIntroducerType | null,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     const introducer = await this.getByResourceIdAndUserId(
       resourceId,
@@ -265,26 +224,8 @@ export class ResourceIntroducersService {
       return true;
     }
 
-    if (includeGroups) {
-      const resourceIntroducerRepository = transactionalEntityManager
-        ? transactionalEntityManager.getRepository(ResourceIntroducer)
-        : this.resourceIntroducerRepository;
-
-      const query = resourceIntroducerRepository
-        .createQueryBuilder('introducer')
-        .leftJoin('introducer.resourceGroup', 'group')
-        .leftJoin('group.resources', 'resource')
-        .where('resource.id = :resourceId', { resourceId })
-        .andWhere('introducer.userId = :userId', { userId });
-
-      if (requiredType !== null) {
-        query.andWhere('introducer.type = :requiredType', { requiredType });
-      }
-
-      const groupIntroducers = await query.getMany();
-
-      return groupIntroducers.length > 0;
-    }
+    if (includeGroups)
+      return this.operations(transactionalEntityManager).hasGroupGrant(resourceId, userId, requiredType);
 
     return false;
   }

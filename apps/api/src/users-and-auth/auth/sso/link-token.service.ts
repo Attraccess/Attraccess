@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SSOProviderType, Setting } from '@attraccess/database-entities';
+import { SsoLinkSecretPersistence } from '../persistence/port';
+import { SSOProviderType } from '@attraccess/application-models';
 import { EncryptionService } from '../../../encryption/encryption.service';
 
 export interface SSOLinkTokenPayload {
@@ -18,15 +17,12 @@ export interface SSOLinkTokenPayload {
 export class SSOLinkTokenService {
   private readonly logger = new Logger(SSOLinkTokenService.name);
   private readonly defaultTtlMs = 10 * 60 * 1000; // 10 minutes
-  private readonly secretParent = 'auth';
-  private readonly secretKey = 'sso_link_token_secret';
   private readonly secretRefreshMs = 5 * 60 * 1000; // 5 minutes
   private cachedSecret: string | null = null;
   private lastFetchedAt = 0;
 
   constructor(
-    @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
+    private readonly persistence: SsoLinkSecretPersistence,
     private readonly encryptionService: EncryptionService,
   ) {}
 
@@ -91,16 +87,13 @@ export class SSOLinkTokenService {
       return this.cachedSecret;
     }
 
-    const existing = await this.settingRepository.findOneBy({
-      parent: this.secretParent,
-      key: this.secretKey,
-    });
+    const existing = await this.persistence.readSecret();
 
     if (existing?.value) {
       const decrypted = this.encryptionService.decryptIfEncrypted(existing.value) ?? existing.value;
       if (!this.encryptionService.isEncrypted(existing.value)) {
         const encrypted = this.encryptionService.encrypt(decrypted);
-        await this.settingRepository.update(existing.id, { value: encrypted });
+        await this.persistence.updateSecret(existing.id, encrypted);
       }
       this.cachedSecret = decrypted;
       this.lastFetchedAt = now;
@@ -111,26 +104,19 @@ export class SSOLinkTokenService {
     const encrypted = this.encryptionService.encrypt(generated);
 
     try {
-      await this.settingRepository.insert({
-        parent: this.secretParent,
-        key: this.secretKey,
-        value: encrypted,
-      });
+      await this.persistence.insertSecret(encrypted);
       this.cachedSecret = generated;
       this.lastFetchedAt = now;
       return generated;
     } catch (error) {
       this.logger.warn('Race detected when creating SSO link token secret, retrying fetch', error as Error);
-      const afterInsert = await this.settingRepository.findOneBy({
-        parent: this.secretParent,
-        key: this.secretKey,
-      });
+      const afterInsert = await this.persistence.readSecret();
 
       if (afterInsert?.value) {
         const decrypted = this.encryptionService.decryptIfEncrypted(afterInsert.value) ?? afterInsert.value;
         if (!this.encryptionService.isEncrypted(afterInsert.value)) {
           const encryptedAfter = this.encryptionService.encrypt(decrypted);
-          await this.settingRepository.update(afterInsert.id, { value: encryptedAfter });
+          await this.persistence.updateSecret(afterInsert.id, encryptedAfter);
         }
         this.cachedSecret = decrypted;
         this.lastFetchedAt = now;

@@ -1,6 +1,6 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
 import { ApiTokenRequestRateLimitService } from './api-token-request-rate-limit.service';
 

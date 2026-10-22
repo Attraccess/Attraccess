@@ -1,16 +1,14 @@
+import { resourceCatalogOperationsFake } from './persistence/operations.test-fixture';
+import { ResourceCatalogPersistence } from './persistence/port';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { DocumentationType, Resource, ResourceType } from '@attraccess/database-entities';
+import { DocumentationType, ResourceType } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { getRepositoryToken } from '@nestjs/typeorm';
-
 import { randomUUID } from 'node:crypto';
-
-import { Repository } from 'typeorm';
 
 import { projectResourceAuditEvent } from './../audit/audit-policy';
 
@@ -35,54 +33,23 @@ import { ResourcesService } from './resources.service';
 import { mockMetricsService } from './resources.service.spec.mock-metrics-service';
 
 export type ResourcesServiceTestScope = {
-  resourceRepository: jest.Mocked<Repository<Resource>>;
+  persistence: jest.Mocked<ResourceCatalogPersistence>;
   mockResourceImageService: { saveImage: any; deleteImage: any; getPublicPath: any };
   service: ResourcesService;
   audit: { recordResource: any };
-  mockResourceRepository: () => {
-    find: any;
-    findOne: any;
-    findAndCount: any;
-    count: any;
-    create: any;
-    save: any;
-    delete: any;
-    softDelete: any;
-    createQueryBuilder: any;
-  };
+  mockPersistence: typeof resourceCatalogOperationsFake;
 };
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
 
-  let resourceRepository: jest.Mocked<Repository<Resource>>;
+  let persistence: jest.Mocked<ResourceCatalogPersistence>;
 
   const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
 
   // ResourceImageService is injected but not directly used in these tests
 
-  const mockResourceRepository = () => ({
-    find: jest.fn(),
-    findOne: jest.fn(),
-    findAndCount: jest.fn(),
-    count: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-    delete: jest.fn(),
-    softDelete: jest.fn(),
-    createQueryBuilder: jest.fn(() => ({
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      skip: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
-      getSql: jest.fn().mockReturnValue('SELECT * FROM resource'),
-      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      getOne: jest.fn(),
-    })),
-  });
+  const mockPersistence = resourceCatalogOperationsFake;
 
   const mockResourceImageService = {
     saveImage: jest.fn(),
@@ -91,11 +58,11 @@ describe('ResourcesService', () => {
   };
 
   const scope = {
-    get resourceRepository() {
-      return resourceRepository;
+    get persistence() {
+      return persistence;
     },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
+    set persistence(value: typeof persistence) {
+      persistence = value;
     },
     get mockResourceImageService() {
       return mockResourceImageService;
@@ -109,8 +76,8 @@ describe('ResourcesService', () => {
     get audit() {
       return audit;
     },
-    get mockResourceRepository() {
-      return mockResourceRepository;
+    get mockPersistence() {
+      return mockPersistence;
     },
   };
 
@@ -118,10 +85,7 @@ describe('ResourcesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourcesService,
-        {
-          provide: getRepositoryToken(Resource),
-          useFactory: mockResourceRepository,
-        },
+        { provide: ResourceCatalogPersistence, useFactory: mockPersistence },
         {
           provide: ResourceImageService,
           useValue: mockResourceImageService,
@@ -145,7 +109,7 @@ describe('ResourcesService', () => {
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
-    resourceRepository = module.get(getRepositoryToken(Resource)) as jest.Mocked<Repository<Resource>>;
+    persistence = module.get(ResourceCatalogPersistence);
     audit.recordResource.mockClear();
     // ResourceImageService is available but not directly used in tests
   });
@@ -159,11 +123,11 @@ describe('ResourcesService', () => {
         set service(value: typeof scope.service) {
           scope.service = value;
         },
-        get resourceRepository() {
-          return scope.resourceRepository;
+        get persistence() {
+          return scope.persistence;
         },
-        set resourceRepository(value: typeof scope.resourceRepository) {
-          scope.resourceRepository = value;
+        set persistence(value: typeof scope.persistence) {
+          scope.persistence = value;
         },
         get audit() {
           return scope.audit;
@@ -209,21 +173,21 @@ describe('ResourcesService', () => {
       });
 
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(existingResource);
-      updateResourceScope.resourceRepository.save.mockResolvedValue(updatedResource);
+      updateResourceScope.persistence.saveResource.mockResolvedValue(updatedResource);
 
       const result = await updateResourceScope.service.updateResource(resourceId, updateDto);
 
       expect(result).toEqual(updatedResource);
       expect(updateResourceScope.service.getResourceById).toHaveBeenCalledWith(resourceId);
-      expect(updateResourceScope.resourceRepository.save).toHaveBeenCalled();
+      expect(updateResourceScope.persistence.saveResource).toHaveBeenCalled();
     });
 
     it('audits changed safe fields without metadata or documentation', async () => {
-      const existingResource = createMockResource({ id: 1, name: 'Old', type: ResourceType.Lock });
+      const existingResource = createMockResource({ id: 1, name: 'Old', type: ResourceType.Door });
       const updatedResource = createMockResource({ id: 1, name: 'New', type: ResourceType.Machine });
       updatedResource.metadata = { password: 'secret' };
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(existingResource);
-      updateResourceScope.resourceRepository.save.mockResolvedValue(updatedResource);
+      updateResourceScope.persistence.saveResource.mockResolvedValue(updatedResource);
 
       await updateResourceScope.service.updateResource(
         1,
@@ -238,7 +202,7 @@ describe('ResourcesService', () => {
           details: {
             'before.name': 'Old',
             'after.name': 'New',
-            'before.type': ResourceType.Lock,
+            'before.type': ResourceType.Door,
             'after.type': ResourceType.Machine,
             changedFields: '["name","type","metadata"]',
           },
@@ -250,9 +214,14 @@ describe('ResourcesService', () => {
       const existingResource = createMockResource({ id: 1, name: 'Old', metadata: null });
       const updatedResource = createMockResource({ id: 1, name: 'New', metadata: {} });
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(existingResource);
-      updateResourceScope.resourceRepository.save.mockResolvedValue(updatedResource);
+      updateResourceScope.persistence.saveResource.mockResolvedValue(updatedResource);
 
-      await updateResourceScope.service.updateResource(1, { name: 'New', metadata: {} }, undefined, { id: 9 });
+      await updateResourceScope.service.updateResource(
+        1,
+        { name: 'New', metadata: {} } as UpdateResourceDto,
+        undefined,
+        { id: 9 },
+      );
 
       expect(updateResourceScope.audit.recordResource).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -266,9 +235,14 @@ describe('ResourcesService', () => {
       const existingResource = createMockResource({ id: 1, name: '"'.repeat(5000) });
       const updatedResource = createMockResource({ id: 1, name: '\\'.repeat(5000) + '🚪'.repeat(5000) });
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(existingResource);
-      updateResourceScope.resourceRepository.save.mockResolvedValue(updatedResource);
+      updateResourceScope.persistence.saveResource.mockResolvedValue(updatedResource);
 
-      await updateResourceScope.service.updateResource(1, { name: updatedResource.name }, undefined, { id: 9 });
+      await updateResourceScope.service.updateResource(
+        1,
+        { name: updatedResource.name } as UpdateResourceDto,
+        undefined,
+        { id: 9 },
+      );
 
       const details = updateResourceScope.audit.recordResource.mock.calls[0][0].details;
       expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
@@ -284,9 +258,11 @@ describe('ResourcesService', () => {
       const existingResource = createMockResource({ id: 1, allowTakeOver: false });
       const updatedResource = createMockResource({ id: 1, allowTakeOver: true });
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(existingResource);
-      updateResourceScope.resourceRepository.save.mockResolvedValue(updatedResource);
+      updateResourceScope.persistence.saveResource.mockResolvedValue(updatedResource);
 
-      await updateResourceScope.service.updateResource(1, { allowTakeOver: true }, undefined, { id: 9 });
+      await updateResourceScope.service.updateResource(1, { allowTakeOver: true } as UpdateResourceDto, undefined, {
+        id: 9,
+      });
 
       expect(updateResourceScope.audit.recordResource).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -299,9 +275,11 @@ describe('ResourcesService', () => {
     it('does not audit an unchanged resubmission', async () => {
       const resource = createMockResource({ id: 1, allowTakeOver: false });
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(resource);
-      updateResourceScope.resourceRepository.save.mockResolvedValue(resource);
+      updateResourceScope.persistence.saveResource.mockResolvedValue(resource);
 
-      await updateResourceScope.service.updateResource(1, { allowTakeOver: false }, undefined, { id: 9 });
+      await updateResourceScope.service.updateResource(1, { allowTakeOver: false } as UpdateResourceDto, undefined, {
+        id: 9,
+      });
 
       expect(updateResourceScope.audit.recordResource).not.toHaveBeenCalled();
     });
@@ -311,9 +289,9 @@ describe('ResourcesService', () => {
       const updatedResource = createMockResource({ id: 1, imageFilename: 'resource-1.png' });
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(resource);
       updateResourceScope.mockResourceImageService.saveImage.mockResolvedValue('resource-1.png');
-      updateResourceScope.resourceRepository.save.mockResolvedValue(updatedResource);
+      updateResourceScope.persistence.saveResource.mockResolvedValue(updatedResource);
 
-      await updateResourceScope.service.updateResource(1, {}, {} as never, { id: 9 });
+      await updateResourceScope.service.updateResource(1, {} as UpdateResourceDto, {} as never, { id: 9 });
 
       expect(updateResourceScope.audit.recordResource).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -343,11 +321,11 @@ describe('ResourcesService', () => {
   describe('deleteResource', () => {
     const deleteResourceScope = inheritTestScope(
       {
-        get resourceRepository() {
-          return scope.resourceRepository;
+        get persistence() {
+          return scope.persistence;
         },
-        set resourceRepository(value: typeof scope.resourceRepository) {
-          scope.resourceRepository = value;
+        set persistence(value: typeof scope.persistence) {
+          scope.persistence = value;
         },
         get service() {
           return scope.service;
@@ -363,21 +341,17 @@ describe('ResourcesService', () => {
     );
 
     it('should delete a resource', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({
-        affected: 1,
-        raw: {},
-        generatedMaps: [],
-      });
+      (deleteResourceScope.persistence.softDeleteResource as jest.Mock).mockResolvedValue(true);
 
       await deleteResourceScope.service.deleteResource(1);
 
-      expect(deleteResourceScope.resourceRepository.softDelete).toHaveBeenCalledWith(1);
+      expect(deleteResourceScope.persistence.softDeleteResource).toHaveBeenCalledWith(1);
     });
 
     it('audits deletion with the pre-delete safe projection', async () => {
       const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
-      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+      deleteResourceScope.persistence.softDeleteResource.mockResolvedValue(true);
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
@@ -397,7 +371,7 @@ describe('ResourcesService', () => {
         type: ResourceType.Machine,
       });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
-      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+      deleteResourceScope.persistence.softDeleteResource.mockResolvedValue(true);
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
@@ -413,11 +387,7 @@ describe('ResourcesService', () => {
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({
-        affected: 0,
-        raw: {},
-        generatedMaps: [],
-      });
+      (deleteResourceScope.persistence.softDeleteResource as jest.Mock).mockResolvedValue(false);
 
       await expect(deleteResourceScope.service.deleteResource(999)).rejects.toThrow(ResourceNotFoundException);
     });

@@ -1,8 +1,9 @@
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
+import type { WagoManagementEntity as WagoManagementEntityRecord } from './record';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/adapter';
 
 /** Coordinator registers this entity and WagoManagement1780000000010. Never return it from an API. */
 @Entity({ name: 'plugin_wago_management' })
-export class WagoManagementEntity {
+export class WagoManagementEntity implements WagoManagementEntityRecord {
   @PrimaryColumn({ type: 'integer', name: 'controller_id' }) controllerId!: number;
   @Column({ type: 'text', name: 'metadata_json', nullable: true }) metadataJson!: string | null;
   @Column({ type: 'text', name: 'encrypted_private_key', nullable: true, select: false }) encryptedPrivateKey!:

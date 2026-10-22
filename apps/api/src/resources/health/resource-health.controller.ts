@@ -1,6 +1,6 @@
 import { Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
 import { CanManageMaintenance } from '../maintenances/canManageMaintenance.decorator';
@@ -21,9 +21,7 @@ export class ResourceHealthController {
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiResponse({ status: 200, description: 'Health summary', type: ResourceHealthSummaryDto })
   @ApiResponse({ status: 404, description: 'Resource not found' })
-  async getResourceHealth(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-  ): Promise<ResourceHealthSummaryDto> {
+  async getResourceHealth(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceHealthSummaryDto> {
     return await this.healthService.getSummary(resourceId);
   }
 

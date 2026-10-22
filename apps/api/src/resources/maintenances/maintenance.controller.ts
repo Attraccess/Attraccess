@@ -1,6 +1,7 @@
-import { ResourceMaintenance } from '@attraccess/database-entities';
+import { ResourceMaintenance } from '../../transport/models/resource.maintenance.dto';
+import { mapResponse } from '../../transport/response-mapper';
 
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 
 import { Controller, Get, NotFoundException, Param, ParseIntPipe, Query, Req, Body, Post } from '@nestjs/common';
 
@@ -127,7 +128,8 @@ export class ResourceMaintenanceController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: ListMaintenancesDto,
   ): Promise<PaginatedMaintenanceResponse> {
-    return await this.maintenanceService.findMaintenances(resourceId, query);
+    const page = await this.maintenanceService.findMaintenances(resourceId, query);
+    return { ...page, data: page.data.map((record) => mapResponse(ResourceMaintenance, record)) };
   }
 
   @Get(':maintenanceId')
@@ -169,7 +171,7 @@ export class ResourceMaintenanceController {
       throw new NotFoundException('Maintenance not found');
     }
 
-    return maintenance;
+    return mapResponse(ResourceMaintenance, await maintenance);
   }
 
   @Post()
@@ -210,7 +212,10 @@ export class ResourceMaintenanceController {
     @Body() dto: CreateMaintenanceDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenance> {
-    return await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id);
+    return mapResponse(
+      ResourceMaintenance,
+      await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id),
+    );
   }
 
   @Post(':maintenanceId/finish')
@@ -264,9 +269,12 @@ export class ResourceMaintenanceController {
       throw new NotFoundException('Maintenance not found');
     }
 
-    return await this.maintenanceService.finishMaintenance(maintenanceId, {
-      userId: request.user?.id,
-      notes: dto?.notes,
-    });
+    return mapResponse(
+      ResourceMaintenance,
+      await this.maintenanceService.finishMaintenance(maintenanceId, {
+        userId: request.user?.id,
+        notes: dto?.notes,
+      }),
+    );
   }
 }

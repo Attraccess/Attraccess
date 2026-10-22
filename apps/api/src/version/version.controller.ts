@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { VersionService } from './version.service';
 import { SystemInfoDto } from './dto/system-info.dto';
 import { VersionInfoDto } from './dto/version-info.dto';

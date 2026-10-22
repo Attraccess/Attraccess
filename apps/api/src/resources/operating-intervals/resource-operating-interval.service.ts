@@ -1,11 +1,14 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { ResourceOperatingInterval } from '@attraccess/database-entities';
-import { EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import {
+  OPERATING_INTERVAL_WRITES,
+  OpenOperatingIntervalConflictError,
+  OperatingIntervalOperations,
+} from './persistence/port';
+import { ResourceOperatingInterval } from '@attraccess/application-models';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceOperatingStateChangedEvent } from './events/resource-operating-state-changed.event';
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 
 export type ResourceOperatingState = 'operating' | 'idle';
 
@@ -26,8 +29,7 @@ export class ResourceOperatingIntervalService {
   private readonly transitionChains = new Map<number, Promise<unknown>>();
 
   constructor(
-    @InjectRepository(ResourceOperatingInterval)
-    private readonly intervalRepository: Repository<ResourceOperatingInterval>,
+    private readonly transactions: DatabaseTransactions,
     private readonly operatingMetrics: OperatingMetricsRecorder,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -61,8 +63,13 @@ export class ResourceOperatingIntervalService {
     const next = previous
       .catch(() => undefined)
       .then(() =>
-        runSerializedTransaction(this.intervalRepository.manager, (manager) =>
-          this.persistTransitionWithConflictHandling(resourceId, state, manager, provenance),
+        this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, (scope) =>
+          this.persistTransitionWithConflictHandling(
+            resourceId,
+            state,
+            scope.resolve(OPERATING_INTERVAL_WRITES),
+            provenance,
+          ),
         ),
       );
     this.transitionChains.set(resourceId, next);
@@ -79,13 +86,13 @@ export class ResourceOperatingIntervalService {
   private async persistTransitionWithConflictHandling(
     resourceId: number,
     state: ResourceOperatingState,
-    manager: EntityManager,
+    operations: OperatingIntervalOperations,
     provenance?: OperatingTransitionProvenance,
   ): Promise<ResourceOperatingInterval | null> {
     try {
-      return await this.persistTransition(resourceId, state, manager, provenance);
+      return await this.persistTransition(resourceId, state, operations, provenance);
     } catch (error) {
-      if (state === 'operating' && this.isOpenIntervalUniqueConflict(error)) {
+      if (state === 'operating' && error instanceof OpenOperatingIntervalConflictError) {
         return null;
       }
       throw error;
@@ -95,17 +102,11 @@ export class ResourceOperatingIntervalService {
   private async persistTransition(
     resourceId: number,
     state: ResourceOperatingState,
-    manager: EntityManager,
+    operations: OperatingIntervalOperations,
     provenance?: OperatingTransitionProvenance,
   ): Promise<ResourceOperatingInterval | null> {
-    // Updating the parent row acquires a database-backed per-resource write lock.
-    await manager.query('UPDATE "resource" SET "id" = "id" WHERE "id" = ?', [resourceId]);
-
-    const repository = manager.getRepository(ResourceOperatingInterval);
-    const latestInterval = await repository.findOne({
-      where: { resourceId },
-      order: { startTime: 'DESC', id: 'DESC' },
-    });
+    await operations.lockResource(resourceId);
+    const latestInterval = await operations.latestInterval(resourceId);
     // Read the clock after obtaining the write lock so queued assignments use their application time.
     const transitionTime = new Date();
     const lastTransitionTime = latestInterval?.endTime ?? latestInterval?.startTime;
@@ -122,7 +123,7 @@ export class ResourceOperatingIntervalService {
       openInterval.endTime = transitionTime;
       openInterval.endFlowNodeId = provenance?.flowNodeId ?? null;
       openInterval.endFlowRunId = provenance?.flowRunId ?? null;
-      return repository.save(openInterval);
+      return operations.saveInterval(openInterval);
     }
 
     if (openInterval) {
@@ -130,25 +131,14 @@ export class ResourceOperatingIntervalService {
     }
 
     // The transition timestamp is deliberately taken inside the server-side transaction.
-    return repository.save(
-      repository.create({
-        resourceId,
-        startTime: transitionTime,
-        endTime: null,
-        startFlowNodeId: provenance?.flowNodeId ?? null,
-        startFlowRunId: provenance?.flowRunId ?? null,
-        endFlowNodeId: null,
-        endFlowRunId: null,
-      }),
-    );
-  }
-
-  private isOpenIntervalUniqueConflict(error: unknown): boolean {
-    if (!(error instanceof QueryFailedError)) {
-      return false;
-    }
-
-    const code = (error as QueryFailedError & { code?: string | number }).code;
-    return code === '23505' || (code === 'SQLITE_CONSTRAINT' && error.message.includes('UNIQUE constraint failed'));
+    return operations.createInterval({
+      resourceId,
+      startTime: transitionTime,
+      endTime: null,
+      startFlowNodeId: provenance?.flowNodeId ?? null,
+      startFlowRunId: provenance?.flowRunId ?? null,
+      endFlowNodeId: null,
+      endFlowRunId: null,
+    });
   }
 }

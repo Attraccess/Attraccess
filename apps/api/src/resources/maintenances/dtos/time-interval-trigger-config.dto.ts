@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsPositive } from 'class-validator';
-import { UsageDurationUnit } from '@attraccess/database-entities';
+import { UsageDurationUnit } from '@attraccess/application-models';
 
 /**
  * Config for TIME_INTERVAL trigger. Uses duration + unit (same pattern as USAGE_HOURS).

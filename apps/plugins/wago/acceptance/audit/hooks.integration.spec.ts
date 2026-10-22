@@ -1,4 +1,11 @@
-import { AuditLog, Setting, entities } from '@attraccess/database-entities';
+import { SqliteAuditTransactionObserver } from '../../../../api/src/audit/persistence/transaction-observer';
+import { SqliteAuditPersistence } from '../../../../api/src/audit/persistence/sqlite-audit-storage';
+import { createSqliteDeviceOperations } from '../../backend/runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../../backend/commissioning/persistence/typeorm-adapter';
+import { createSqliteManagementStore } from '../../backend/management/persistence/typeorm-adapter';
+import { createWagoRegistryPersistence } from '../../backend/controllers/persistence/typeorm-adapter';
+import { TypeormSettingsPersistence } from '../../../../api/src/settings/persistence/typeorm-adapter';
+import { AuditLog, Setting, User, entities } from '@attraccess/database-entities';
 import httpRequest from 'supertest';
 import { AuditService } from '../../../../api/src/audit/audit.service';
 import { SettingsStoreService } from '../../../../api/src/settings/settings-store.service';
@@ -6,7 +13,7 @@ import { WagoCommissioningSession } from '../../backend/commissioning/sessions/s
 import { WagoCommissioningService } from '../../backend/commissioning/service';
 import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
 import { WagoController } from '../../backend/controllers/entity';
-import { WagoCredentialRotationEntity } from '../../backend/credentials/service';
+import { WagoCredentialRotationEntity } from '../../backend/credentials/persistence/schema';
 import { WagoService } from '../../backend/controllers/service';
 import { AuditFixtureState, privateValue, snapshot, verifier, pluginId, FixtureMqtt } from './fixture.test-utils';
 import type { PluginAuditDomainDeclaration, PluginContext } from '@attraccess/plugins-backend-sdk';
@@ -42,7 +49,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     const schema = await new DataSource({
       type: 'sqlite',
       database: join(state.schemaDirectory, 'schema.sqlite'),
-      entities: [...Object.values(entities), ...plugin.entities],
+      entities: [...Object.values(entities), ...plugin.persistenceAdapters.flatMap((entry) => entry.entities ?? [])],
       migrations: [...Object.values(coreMigrations), ...Object.values(wagoMigrations)],
       synchronize: false,
     }).initialize();
@@ -65,10 +72,17 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     state.db = await new DataSource({
       type: 'sqlite',
       database: join(state.directory, 'fixture.sqlite'),
-      entities: [...Object.values(entities), ...plugin.entities],
+      entities: [...Object.values(entities), ...plugin.persistenceAdapters.flatMap((entry) => entry.entities ?? [])],
       synchronize: false,
     }).initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      new SqliteAuditPersistence(state.db),
+      new SettingsStoreService(
+        new TypeormSettingsPersistence(state.db.getRepository(Setting), state.db.getRepository(User)),
+        null,
+      ),
+      new SqliteAuditTransactionObserver(state.db),
+    );
     await state.audit.onModuleInit();
     state.mqtt = new FixtureMqtt();
     state.revoke.mockReset().mockResolvedValue(undefined);
@@ -115,7 +129,9 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
         revoke: state.revoke,
       }),
     };
-    state.wago = new WagoService(state.context);
+    state.wago = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(
+      state.context,
+    );
     jest.spyOn(state.wago, 'createEnrollment');
     await state.wago.onApplicationBootstrap();
     state.artifacts = new WagoRuntimeArtifactsService();
@@ -151,7 +167,15 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       image,
       manifest: artifactManifest,
     });
-    state.commissioning = new WagoCommissioningService(state.context, state.wago, state.artifacts);
+    state.commissioning = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        state.wago,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+        state.artifacts,
+      ))(state.context);
     // Replace only transport boundaries; delivery, inspection, leases and automatic claim remain real.
     state.commissioning['run'] = jest.fn(async (_host, _fingerprint, _credential, _command, input) => {
       if (input === Buffer.from(CLOCK_INSPECTION_SCRIPT).toString('base64')) {
@@ -318,10 +342,27 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      new SqliteAuditPersistence(state.db),
+      new SettingsStoreService(
+        new TypeormSettingsPersistence(state.db.getRepository(Setting), state.db.getRepository(User)),
+        null,
+      ),
+      new SqliteAuditTransactionObserver(state.db),
+    );
     await state.audit.onModuleInit();
-    state.wago = new WagoService(state.context);
-    state.commissioning = new WagoCommissioningService(state.context, state.wago, state.artifacts);
+    state.wago = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(
+      state.context,
+    );
+    state.commissioning = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        state.wago,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+        state.artifacts,
+      ))(state.context);
     state.commissioning['run'] = jest.fn(async () => '');
     state.commissioning['copyTo'] = jest.fn(async () => undefined);
     await state.mountApi();
@@ -393,7 +434,14 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      new SqliteAuditPersistence(state.db),
+      new SettingsStoreService(
+        new TypeormSettingsPersistence(state.db.getRepository(Setting), state.db.getRepository(User)),
+        null,
+      ),
+      new SqliteAuditTransactionObserver(state.db),
+    );
     await state.audit.onModuleInit();
     expect(await state.db.getRepository(AuditLog).find({ order: { id: 'ASC' } })).toEqual(before);
     expect((await state.audit.list({ limit: 100 })).items).toHaveLength(4);

@@ -1,6 +1,6 @@
 import { UseGuards, applyDecorators } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import { DualAuthGuard } from '@attraccess/plugins-backend-sdk/v2';
 import { IsResourceGroupIntroducerGuard } from './isIntroducerGuard';
 
 /**
@@ -17,6 +17,6 @@ export function IsResourceGroupIntroducer() {
     ApiUnauthorizedResponse({ description: 'User is not authenticated' }),
     ApiForbiddenResponse({
       description: 'User does not have permission to introduce users to this resource group',
-    })
+    }),
   );
 }

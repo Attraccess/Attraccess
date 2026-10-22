@@ -1,8 +1,8 @@
-import { User } from '@attraccess/database-entities';
+import { User } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, forwardRef, BadRequestException } from '@nestjs/common';
 
-import { EntityManager } from 'typeorm';
+import { TransactionScope } from '../../database/transaction-scope';
 
 import { EmailService } from '../../email/email.service';
 
@@ -44,16 +44,16 @@ export class UserInvitationService {
     await this.usersService.ensureLicenseForNewUsers(candidates.length);
 
     return this.usersService
-      .withTransaction(async (manager: EntityManager) => {
+      .withTransaction(async (scope: TransactionScope) => {
         const createdUsers = await this.usersService.createMany(candidates, {
           grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
-          manager,
+          manager: scope,
           actorId: options?.actorId,
         });
 
         for (const user of createdUsers) {
-          const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
-          await this.emailService.sendUserInvitationEmail(user, verificationToken, manager);
+          const verificationToken = await this.authService.generateEmailVerificationToken(user, scope);
+          await this.emailService.sendUserInvitationEmail(user, verificationToken, scope);
         }
 
         return createdUsers;

@@ -1,10 +1,6 @@
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
-} from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { OperatingAttributionPersistence, OPERATING_ATTRIBUTION_READS } from './persistence/port';
+import { operationTransactionsFake } from '../../database/testing/operation-transactions.test-fixture';
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/application-models';
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 
 const at = (time: string) => new Date(`2026-08-28T${time}.000Z`);
@@ -25,38 +21,21 @@ export function registerResourceOperatingAttributionServiceFixture() {
 
   let service: ResourceOperatingAttributionService;
 
-  let intervalRepository: jest.Mocked<
-    Pick<Repository<ResourceOperatingInterval>, 'createQueryBuilder' | 'find' | 'existsBy'>
-  >;
-
-  let usageRepository: jest.Mocked<Pick<Repository<ResourceUsage>, 'find'>>;
-
-  let lifecycleAttemptRepository: jest.Mocked<Pick<Repository<ResourceUsageLifecycleAttempt>, 'find'>>;
-
-  let availabilityQuery: {
-    select: jest.Mock;
-    where: jest.Mock;
-    getRawMany: jest.Mock;
-  };
+  let persistence: jest.Mocked<OperatingAttributionPersistence>;
+  let transactionDriver: ReturnType<typeof operationTransactionsFake>;
 
   beforeEach(() => {
-    availabilityQuery = {
-      select: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      getRawMany: jest.fn().mockResolvedValue([]),
+    persistence = {
+      intervals: jest.fn().mockResolvedValue([]),
+      usages: jest.fn().mockResolvedValue([]),
+      hasData: jest.fn().mockResolvedValue(true),
+      resourcesWithData: jest.fn().mockResolvedValue([]),
+      pendingEnds: jest.fn().mockResolvedValue([]),
+      durationRows: jest.fn().mockResolvedValue({ intervals: [], usages: [] }),
     };
-    intervalRepository = {
-      find: jest.fn(),
-      existsBy: jest.fn().mockResolvedValue(true),
-      createQueryBuilder: jest.fn().mockReturnValue(availabilityQuery),
-    };
-    usageRepository = { find: jest.fn() };
-    lifecycleAttemptRepository = { find: jest.fn().mockResolvedValue([]) };
-    service = new ResourceOperatingAttributionService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      usageRepository as unknown as Repository<ResourceUsage>,
-      lifecycleAttemptRepository as Repository<ResourceUsageLifecycleAttempt>,
-    );
+    transactionDriver = operationTransactionsFake();
+    transactionDriver.bind(OPERATING_ATTRIBUTION_READS, persistence);
+    service = new ResourceOperatingAttributionService(persistence);
   });
   return {
     get at() {
@@ -74,14 +53,11 @@ export function registerResourceOperatingAttributionServiceFixture() {
     get service() {
       return service;
     },
-    get intervalRepository() {
-      return intervalRepository;
+    get persistence() {
+      return persistence;
     },
-    get usageRepository() {
-      return usageRepository;
-    },
-    get availabilityQuery() {
-      return availabilityQuery;
+    get transactionDriver() {
+      return transactionDriver;
     },
   };
 }

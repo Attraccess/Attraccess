@@ -1,6 +1,7 @@
+import { EmailRecipientPersistence } from '../email/persistence/port';
+import { UsageNoteRecipients } from '../resources/usage/persistence/port';
 import { createMock } from '@golevelup/ts-jest';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   EmailTemplate,
   EmailTemplateType,
@@ -101,9 +102,15 @@ describe('Notification email language fallback', () => {
         { provide: NotificationPreferenceService, useValue: preferences },
         { provide: NotificationLiveService, useValue: createMock<NotificationLiveService>() },
         { provide: PushService, useValue: push },
-        { provide: getRepositoryToken(User), useValue: users },
-        { provide: getRepositoryToken(Resource), useValue: resources },
-        { provide: getRepositoryToken(ResourceIntroducer), useValue: introducers },
+        { provide: EmailRecipientPersistence, useValue: { user: async () => recipient } },
+        {
+          provide: UsageNoteRecipients,
+          useValue: {
+            resourceWithGroups: () => resources.findOne({ where: { id: resource.id } }),
+            users: () => users.findBy({}),
+            introducers: () => introducers.find(),
+          },
+        },
         { provide: RbacService, useValue: rbac },
       ],
     }).compile();

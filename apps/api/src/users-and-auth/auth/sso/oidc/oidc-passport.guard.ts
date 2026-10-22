@@ -1,6 +1,6 @@
 import { ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, isAccountLinkingFailure, isSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
 

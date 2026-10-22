@@ -1,8 +1,9 @@
-import { FormSubmission, Resource, ResourceUsage, User, SupervisionMode } from '@attraccess/database-entities';
+import type { FormSubmissionDraft } from '@attraccess/application-models';
+import { Resource, ResourceUsage, User, SupervisionMode } from '@attraccess/application-models';
 
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
-import { EntityManager } from 'typeorm';
+import { TransactionScope } from '../../../database/transaction-scope';
 
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 
@@ -10,7 +11,7 @@ import { ResourceNotFoundException } from '../../../exceptions/resource.notFound
 
 import { ResourceUnhealthyException } from '../../../exceptions/resource.unhealthy.exception';
 
-import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk/v2';
 
 import { OnEvent } from '@nestjs/event-emitter';
 
@@ -39,15 +40,11 @@ export abstract class UsageAuthorization extends UsageLifecycle {
     resourceId: number,
     user: User,
     opts: { checkMaintenance: boolean; checkControlPermission: boolean },
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<Resource> {
     const { checkMaintenance, checkControlPermission } = opts;
 
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-
-    const resource = await resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.usageOperations(transactionalEntityManager).resource(resourceId);
     if (!resource) {
       this.logger.warn(`Resource ${resourceId} not found`);
       throw new ResourceNotFoundException(resourceId);
@@ -111,7 +108,7 @@ export abstract class UsageAuthorization extends UsageLifecycle {
     return resource;
   }
 
-  protected getResourceUsageFlowPayload(resourceUsage: ResourceUsage, formSubmissions?: FormSubmission[]) {
+  protected getResourceUsageFlowPayload(resourceUsage: ResourceUsage, formSubmissions?: FormSubmissionDraft[]) {
     const normalizedFormSubmissions = formSubmissions ?? [];
     const mappedFormSubmissions: {
       [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
@@ -177,7 +174,7 @@ export abstract class UsageAuthorization extends UsageLifecycle {
     resourceId: number,
     requester: User,
     supervisorUserId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
     preloadedResource?: Resource,
   ): Promise<void> {
     await this.assertSupportsSupervision(resourceId, transactionalEntityManager, preloadedResource);
@@ -186,11 +183,7 @@ export abstract class UsageAuthorization extends UsageLifecycle {
       throw new BadRequestException('You cannot supervise your own session');
     }
 
-    const userRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(User)
-      : this.userRepository;
-
-    const supervisor = await userRepository.findOne({ where: { id: supervisorUserId } });
+    const supervisor = await this.usageOperations(transactionalEntityManager).user(supervisorUserId);
     if (!supervisor) {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
@@ -214,14 +207,10 @@ export abstract class UsageAuthorization extends UsageLifecycle {
    */
   public async assertSupportsSupervision(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
     preloadedResource?: Resource,
   ): Promise<Resource> {
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-
-    const resource = preloadedResource ?? (await resourceRepository.findOne({ where: { id: resourceId } }));
+    const resource = preloadedResource ?? (await this.usageOperations(transactionalEntityManager).resource(resourceId));
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
     }
@@ -239,7 +228,7 @@ export abstract class UsageAuthorization extends UsageLifecycle {
   public async canControllResource(
     resourceId: number,
     user: User,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     const requestPermissions = (user as AuthenticatedUser).effectivePermissions;
     // API tokens may have a narrower effective permission set than their owning user session.
@@ -290,7 +279,7 @@ export abstract class UsageAuthorization extends UsageLifecycle {
     resourceId: number,
     user: User,
     canUpdateResource: boolean,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
     if (canUpdateResource) {
       return true;
@@ -362,7 +351,7 @@ export abstract class UsageAuthorization extends UsageLifecycle {
     resourceId: number,
     user: User,
     canUpdateResource: boolean,
-    transactionalEntityManager: EntityManager | undefined,
+    transactionalEntityManager: TransactionScope | undefined,
     generation: number,
   ): Promise<boolean> {
     const result = await this.canControllResourceUncached(

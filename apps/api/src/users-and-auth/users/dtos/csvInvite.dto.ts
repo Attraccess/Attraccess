@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsArray, IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { User } from '@attraccess/database-entities';
+import { User } from '../../../transport/models/user.dto';
 
 export class CsvInviteConfigDto {
   @ApiProperty({ description: 'CSV column header containing the email' })
@@ -24,7 +24,8 @@ export class CsvInviteConfigDto {
 
   @ApiProperty({
     required: false,
-    description: 'CSV column header whose value is an RBAC role key to assign to each invited user (in addition to default roles)',
+    description:
+      'CSV column header whose value is an RBAC role key to assign to each invited user (in addition to default roles)',
     example: 'role',
   })
   @IsOptional()

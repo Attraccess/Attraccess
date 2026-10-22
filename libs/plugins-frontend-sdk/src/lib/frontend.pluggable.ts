@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import type { User } from '@attraccess/application-models';
 import { ReactNode } from 'react';
 import { IPlugin } from 'react-pluggable';
 import { RouteConfig } from './frontend.routing';

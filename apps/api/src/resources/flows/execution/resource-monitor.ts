@@ -2,22 +2,20 @@ import { Logger } from '@nestjs/common';
 import {
   ResourceFlowNode,
   ResourceFlowNodeType,
-  ResourceUsage,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSource,
   ResourceHealthStatus,
   InputResourceActivityNoActivityNodeDataSchema,
-} from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+} from '@attraccess/application-models';
+import { FlowEventPersistence } from '../persistence/port';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
 import { NodeProcessingResult, heartbeatKey } from '../node-executors';
-import { activeUsageSql } from '../../usage/sessions/active-usage';
 
 /** Minute-based activity triggers and heartbeat expiry share the executor's live state. */
 export class FlowResourceMonitor {
   constructor(
-    private readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    private readonly persistence: FlowEventPersistence,
     private readonly resourceActivity: Map<number, Date>,
     private readonly heartbeatLastSeen: Map<string, Date>,
     private readonly resourceHealthService: ResourceHealthService,
@@ -27,9 +25,7 @@ export class FlowResourceMonitor {
   ) {}
 
   public async checkHealthHeartbeats() {
-    const heartbeatNodes = await this.flowNodeRepository.find({
-      where: { type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT },
-    });
+    const heartbeatNodes = await this.persistence.nodesByType(ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT);
 
     const validKeys = new Set<string>();
     for (const node of heartbeatNodes) {
@@ -93,12 +89,7 @@ export class FlowResourceMonitor {
     await this.cronTimer.time('flow_minute_tick', async () => {
       const now = new Date();
 
-      const onResourceInactivityNodes = await this.flowNodeRepository
-        .createQueryBuilder('node')
-        .innerJoin(ResourceUsage, 'usage', `usage.resourceId = node.resourceId AND ${activeUsageSql('usage')}`)
-        .where('node.type = :type', { type: ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY })
-        .distinct(true)
-        .getMany();
+      const onResourceInactivityNodes = await this.persistence.activeInactivityNodes();
 
       await Promise.all(
         onResourceInactivityNodes.map(async (node) => {

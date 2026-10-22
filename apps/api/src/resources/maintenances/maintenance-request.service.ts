@@ -1,12 +1,6 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import {
-  MaintenanceRequestStatus,
-  Resource,
-  ResourceMaintenanceRequest,
-  User,
-} from '@attraccess/database-entities';
+import { MaintenanceRequestPersistence } from './persistence/port';
+import { MaintenanceRequestStatus, ResourceMaintenanceRequest, User } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
@@ -19,10 +13,7 @@ export class MaintenanceRequestService {
   private readonly logger = new Logger(MaintenanceRequestService.name);
 
   constructor(
-    @InjectRepository(ResourceMaintenanceRequest)
-    private readonly requestRepository: Repository<ResourceMaintenanceRequest>,
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    private readonly persistence: MaintenanceRequestPersistence,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly maintenanceService: ResourceMaintenanceService,
@@ -32,19 +23,12 @@ export class MaintenanceRequestService {
    * Create a maintenance request for a resource (any authenticated user reporting a broken machine).
    */
   async createRequest(resourceId: number, userId: number, reason: string): Promise<ResourceMaintenanceRequest> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.persistence.resource(resourceId);
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
 
-    const request = this.requestRepository.create({
-      resource,
-      reason,
-      status: MaintenanceRequestStatus.OPEN,
-      createdByUser: { id: userId } as User,
-    });
-
-    const saved = await this.requestRepository.save(request);
+    const saved = await this.persistence.createRequest(resource, userId, reason, MaintenanceRequestStatus.OPEN);
     this.eventEmitter.emit(
       ResourceMaintenanceRequestCreatedEvent.EVENT_NAME,
       new ResourceMaintenanceRequestCreatedEvent(resourceId, saved.id),
@@ -60,20 +44,13 @@ export class MaintenanceRequestService {
     options: ListMaintenanceRequestsDto = {},
   ): Promise<PaginatedMaintenanceRequestResponse> {
     const { page = 1, limit = 10, status = MaintenanceRequestStatus.OPEN } = options;
-    const skip = (page - 1) * limit;
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.persistence.resource(resourceId);
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
 
-    const [data, total] = await this.requestRepository.findAndCount({
-      where: { resourceId, status },
-      relations: ['createdByUser', 'resolvedByUser', 'resultingMaintenance'],
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
-    });
+    const [data, total] = await this.persistence.requestPage(resourceId, page, limit, status);
 
     return { data, total, page, limit };
   }
@@ -82,10 +59,7 @@ export class MaintenanceRequestService {
    * Get a single request by ID with audit relations.
    */
   async getRequestById(requestId: number): Promise<ResourceMaintenanceRequest> {
-    const request = await this.requestRepository.findOne({
-      where: { id: requestId },
-      relations: ['createdByUser', 'resolvedByUser', 'resultingMaintenance'],
-    });
+    const request = await this.persistence.requestWithRelations(requestId);
     if (!request) {
       throw new NotFoundException(`Maintenance request with ID ${requestId} not found`);
     }
@@ -129,6 +103,6 @@ export class MaintenanceRequestService {
     request.resolvedByUser = { id: userId } as User;
     request.resolvedAt = new Date();
 
-    return await this.requestRepository.save(request);
+    return await this.persistence.saveRequest(request);
   }
 }

@@ -1,3 +1,10 @@
+import { DatabaseTransactions } from '../database/transaction-scope';
+import { SqliteTransactionDriver, closeResourceTransactionConnection } from '../database/sqlite/transactions';
+import { AUDIT_COMMIT_BOUNDARY } from './persistence/port';
+import { SqliteAuditTransactionObserver, sqliteAuditCommitBoundary } from './persistence/transaction-observer';
+import { SqliteAuditPersistence } from './persistence/sqlite-audit-storage';
+import { User } from '@attraccess/database-entities';
+import { TypeormSettingsPersistence } from '../settings/persistence/typeorm-adapter';
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import { ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -32,8 +39,15 @@ describe('durable audit SQLite', () => {
     await fixture.source.query(
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
-    fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
-    fixture.service = new AuditService(fixture.source, fixture.store);
+    fixture.store = new SettingsStoreService(
+      new TypeormSettingsPersistence(fixture.source.getRepository(Setting), fixture.source.getRepository(User)),
+      null,
+    );
+    fixture.service = new AuditService(
+      new SqliteAuditPersistence(fixture.source),
+      fixture.store,
+      new SqliteAuditTransactionObserver(fixture.source),
+    );
     await fixture.service.onModuleInit();
     expect((await fixture.service.list(new AuditQueryDto())).items).toEqual([
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
@@ -177,12 +191,39 @@ describe('durable audit SQLite', () => {
           status: 'pending',
           source: 'resource-usage',
         },
-        manager,
+        sqliteAuditCommitBoundary(manager),
       );
       expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
     });
     await expect(receipt).resolves.toEqual({ status: 'recorded' });
     expect((await fixture.service.list({ limit: 1 })).items[0]).toMatchObject({ subjectId: 8, domain: 'billing' });
+  });
+
+  it.each([false, true])('binds commit receipts to neutral transaction operations (rollback=%s)', async (rollback) => {
+    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
+    const driver = new SqliteTransactionDriver(fixture.source);
+    const observer = fixture.source.subscribers.find(
+      (entry) => entry instanceof SqliteAuditTransactionObserver,
+    ) as SqliteAuditTransactionObserver;
+    driver.register(AUDIT_COMMIT_BOUNDARY, (manager) => observer.bind(manager));
+    const transactions = new DatabaseTransactions(driver);
+    let receipt: Promise<{ status: string }> | undefined;
+    try {
+      const phase = transactions.run({ resourceIds: [7], accountIds: [42] }, async (scope) => {
+        receipt = fixture.service.recordBillingTransactionAfterCommit(
+          { transactionId: 18, userId: 42, amount: 0, status: 'pending', source: 'resource-usage' },
+          scope.resolve(AUDIT_COMMIT_BOUNDARY),
+        );
+        expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
+        if (rollback) throw new Error('rollback neutral phase');
+      });
+      if (rollback) await expect(phase).rejects.toThrow('rollback neutral phase');
+      else await phase;
+      await expect(receipt).resolves.toEqual({ status: rollback ? 'unavailable' : 'recorded' });
+      expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(rollback ? 0 : 1);
+    } finally {
+      await closeResourceTransactionConnection(fixture.source);
+    }
   });
 
   it('discards a billing event when its originating transaction rolls back', async () => {
@@ -198,7 +239,7 @@ describe('durable audit SQLite', () => {
             status: 'pending',
             source: 'resource-usage',
           },
-          manager,
+          sqliteAuditCommitBoundary(manager),
         );
         throw new Error('rollback');
       }),
@@ -220,7 +261,7 @@ describe('durable audit SQLite', () => {
           status: 'pending',
           source: 'resource-usage',
         },
-        manager,
+        sqliteAuditCommitBoundary(manager),
       );
       await expect(
         manager.transaction(async (nestedManager) => {
@@ -232,7 +273,7 @@ describe('durable audit SQLite', () => {
               status: 'pending',
               source: 'resource-usage',
             },
-            nestedManager,
+            sqliteAuditCommitBoundary(nestedManager),
           );
           throw new Error('nested rollback');
         }),
@@ -257,7 +298,7 @@ describe('durable audit SQLite', () => {
             status: 'pending',
             source: 'resource-usage',
           },
-          nestedManager,
+          sqliteAuditCommitBoundary(nestedManager),
         );
       });
       await expect(
@@ -270,7 +311,7 @@ describe('durable audit SQLite', () => {
               status: 'pending',
               source: 'resource-usage',
             },
-            nestedManager,
+            sqliteAuditCommitBoundary(nestedManager),
           );
           throw new Error('nested rollback');
         }),
@@ -331,7 +372,7 @@ describe('durable audit SQLite', () => {
     });
     await fixture.source.query(`CREATE TRIGGER fail_audit_cleanup BEFORE DELETE ON audit_log
       BEGIN SELECT RAISE(ROLLBACK, 'cleanup delete failure'); END`);
-    const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+    const storage = (fixture.service as unknown as { persistence: { storage: DataSource } }).persistence.storage;
     const originalTransaction = storage.transaction.bind(storage);
     let releaseCleanup!: () => void;
     const cleanupPaused = new Promise<void>((resolve) => {
@@ -386,7 +427,7 @@ describe('durable audit SQLite', () => {
       userAgent: null,
       details: { revision: 1 },
     });
-    const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+    const storage = (fixture.service as unknown as { persistence: { storage: DataSource } }).persistence.storage;
     const originalTransaction = storage.transaction.bind(storage);
     let releaseCleanup!: () => void;
     const cleanupPaused = new Promise<void>((resolve) => {
@@ -431,7 +472,11 @@ describe('durable audit SQLite', () => {
     ]) {
       for (const [key, value] of Object.entries(disabled))
         await fixture.store.setPlainSetting('audit', key, JSON.stringify(value));
-      const sink = new AuditService(fixture.source, fixture.store);
+      const sink = new AuditService(
+        new SqliteAuditPersistence(fixture.source),
+        fixture.store,
+        new SqliteAuditTransactionObserver(fixture.source),
+      );
       await sink.onModuleInit();
       expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
       await sink.onModuleDestroy();
@@ -477,14 +522,21 @@ describe('durable audit SQLite', () => {
     await expect(settings.updateAuditSettings({ secret: 'never' } as never)).rejects.toThrow();
     await settings.updateAuditSettings({ enabled: false, domains: [], retention_days: 2 });
     await fixture.service.onModuleDestroy();
-    fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
+    fixture.store = new SettingsStoreService(
+      new TypeormSettingsPersistence(fixture.source.getRepository(Setting), fixture.source.getRepository(User)),
+      null,
+    );
     expect(await readAuditSettings(fixture.store)).toEqual({
       enabled: false,
       domains: [],
       plugin_domains_disabled: [],
       retention_days: 2,
     });
-    fixture.service = new AuditService(fixture.source, fixture.store);
+    fixture.service = new AuditService(
+      new SqliteAuditPersistence(fixture.source),
+      fixture.store,
+      new SqliteAuditTransactionObserver(fixture.source),
+    );
     await fixture.service.onModuleInit();
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
     await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
@@ -667,8 +719,15 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
         }),
       },
     ]);
-    const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
-    const migratedAudit = new AuditService(source, migratedStore);
+    const migratedStore = new SettingsStoreService(
+      new TypeormSettingsPersistence(source.getRepository(Setting), source.getRepository(User)),
+      null,
+    );
+    const migratedAudit = new AuditService(
+      new SqliteAuditPersistence(source),
+      migratedStore,
+      new SqliteAuditTransactionObserver(source),
+    );
     await migratedAudit.onModuleInit();
     const migratedList = await new AuditController(migratedAudit).list({ limit: 10 });
     const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);

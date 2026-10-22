@@ -1,6 +1,6 @@
+import { usageOperationsFake } from './operations.test-fixture';
 import { ResourceUsageService } from '../resource-usage.service';
-import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { ResourceUsageLifecycleAttempt } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceIntroductionsService } from '../../../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../../../introducers/resourceIntroducers.service';
@@ -15,18 +15,11 @@ import { mockRbacService } from './rbac.test-fixture';
 import { mockPluginEventsService } from './plugin-events.test-fixture';
 import { mockMetricsService } from './metrics.test-fixture';
 import { mockAuditService } from './audit.test-fixture';
-import { mockRepository } from './repository.test-fixture';
-import type { MockQueryBuilder } from './query-builder.test-fixture';
 
 export function createResourceUsageServiceFixture() {
   let service: ResourceUsageService;
 
-  let resourceUsageRepository: jest.Mocked<Repository<ResourceUsage>>;
-
-  let resourceRepository: jest.Mocked<Repository<Resource>>;
-
-  let userRepository: jest.Mocked<Repository<User>>;
-
+  let operations: ReturnType<typeof usageOperationsFake>;
   let resourceIntroductionService: jest.Mocked<ResourceIntroductionsService>;
 
   let resourceIntroducersService: jest.Mocked<ResourceIntroducersService>;
@@ -50,17 +43,6 @@ export function createResourceUsageServiceFixture() {
   // Expose transactional entity manager for assertions
   const lifecycleAttempts = new Map<string, ResourceUsageLifecycleAttempt>();
 
-  let transactionalEntityManager: {
-    createQueryBuilder: jest.Mock;
-    getRepository: jest.Mock;
-    findOne: jest.Mock;
-    update: jest.Mock;
-    transaction: jest.Mock;
-    save: jest.Mock;
-    delete: jest.Mock;
-    find: jest.Mock;
-    findOneOrFail: jest.Mock;
-  };
   const mockEventEmitter = {
     emit: jest.fn(),
     emitAsync: jest.fn().mockResolvedValue([]),
@@ -128,25 +110,14 @@ export function createResourceUsageServiceFixture() {
     prepareRequiredSubmissions: jest.fn(),
   } as unknown as jest.Mocked<ResourceFormsService>;
 
-  const createMockQueryBuilder = (getOneResult: ResourceUsage | null = null): MockQueryBuilder => ({
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getOne: jest.fn().mockResolvedValue(getOneResult),
-    insert: jest.fn().mockReturnThis(),
-    into: jest.fn().mockReturnThis(),
-    values: jest.fn().mockReturnThis(),
-    execute: jest.fn().mockResolvedValue({ identifiers: [{ id: 1 }] }),
-    update: jest.fn().mockReturnThis(),
-    set: jest.fn().mockReturnThis(),
-  });
-
   const scope = {
-    get resourceUsageRepository() {
-      return resourceUsageRepository;
+    get operations() {
+      return operations;
     },
-    set resourceUsageRepository(value: typeof resourceUsageRepository) {
-      resourceUsageRepository = value;
+    set operations(value: typeof operations) {
+      operations = value;
     },
+
     get service() {
       return service;
     },
@@ -158,18 +129,6 @@ export function createResourceUsageServiceFixture() {
     },
     set projectsService(value: typeof projectsService) {
       projectsService = value;
-    },
-    get resourceRepository() {
-      return resourceRepository;
-    },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
-    },
-    get userRepository() {
-      return userRepository;
-    },
-    set userRepository(value: typeof userRepository) {
-      userRepository = value;
     },
     get resourceIntroductionService() {
       return resourceIntroductionService;
@@ -228,15 +187,6 @@ export function createResourceUsageServiceFixture() {
     get lifecycleAttempts() {
       return lifecycleAttempts;
     },
-    get transactionalEntityManager() {
-      return transactionalEntityManager;
-    },
-    set transactionalEntityManager(value: typeof transactionalEntityManager) {
-      transactionalEntityManager = value;
-    },
-    get mockRepository() {
-      return mockRepository;
-    },
     get mockEventEmitter() {
       return mockEventEmitter;
     },
@@ -275,9 +225,6 @@ export function createResourceUsageServiceFixture() {
     },
     get mockResourceFormsService() {
       return mockResourceFormsService;
-    },
-    get createMockQueryBuilder() {
-      return createMockQueryBuilder;
     },
     get mockMetricsService() {
       return mockMetricsService;

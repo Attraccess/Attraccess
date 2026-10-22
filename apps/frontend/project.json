@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/frontend/src",
   "projectType": "application",
-  "tags": ["type:app", "scope:core"],
+  "tags": ["type:app", "scope:core", "persistence:neutral"],
   "targets": {
     "build": {
       "dependsOn": ["react-query-client:build", "copy-dependency-list"],

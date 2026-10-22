@@ -1,4 +1,4 @@
-import { ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceUsage, User } from '@attraccess/application-models';
 import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 
 export interface PendingSupervisionRequest {

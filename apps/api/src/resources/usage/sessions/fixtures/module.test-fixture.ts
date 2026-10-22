@@ -1,7 +1,8 @@
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { usageOperationsFake } from './operations.test-fixture';
+import { DatabaseTransactions } from '../../../../database/transaction-scope';
+import { UsagePersistence } from '../../persistence/port';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditService } from '../../../../audit/audit.service';
 import { BillingService } from '../../../../billing/charges/billing.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -20,13 +21,13 @@ import { ResourcesService } from '../../../resources.service';
 import { ResourceRetrainingService } from '../../../retraining/resourceRetraining.service';
 import { createResourceUsageMocks } from './mocks.test-fixture';
 import { ResourceUsageService } from '../resource-usage.service';
+
 export function createResourceUsageTestingModule(mocks: ReturnType<typeof createResourceUsageMocks>) {
   const {
     mockRbacService,
     mockPluginEventsService,
     mockMetricsService,
     mockAuditService,
-    mockRepository,
     mockEventEmitter,
     mockResourcesService,
     mockResourceIntroductionService,
@@ -41,21 +42,12 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
     mockProjectsService,
     mockResourceFormsService,
   } = mocks;
+  const operations = usageOperationsFake(mocks.lifecycleAttempts);
   return Test.createTestingModule({
     providers: [
       ResourceUsageService,
-      {
-        provide: getRepositoryToken(Resource),
-        useFactory: mockRepository,
-      },
-      {
-        provide: getRepositoryToken(ResourceUsage),
-        useFactory: mockRepository,
-      },
-      {
-        provide: getRepositoryToken(User),
-        useFactory: mockRepository,
-      },
+      { provide: UsagePersistence, useValue: operations.persistence },
+      { provide: DatabaseTransactions, useValue: operations.transactionDriver.transactions },
       {
         provide: ResourcesService,
         useValue: mockResourcesService,

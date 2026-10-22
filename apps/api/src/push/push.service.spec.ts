@@ -69,7 +69,7 @@ describe('PushService', () => {
   describe('replaceVapidKeys', () => {
     it('regenerates the pair and deletes all subscriptions when no override is given', async () => {
       const service = await fixture.createService();
-      fixture.subscriptionRepository.count.mockResolvedValue(3);
+      fixture.persistence.removeAllSubscriptions.mockResolvedValue(3);
 
       const result = await service.replaceVapidKeys();
 
@@ -77,7 +77,7 @@ describe('PushService', () => {
         keys: { publicKey: 'generated-public', privateKey: 'generated-private' },
         deletedSubscriptions: 3,
       });
-      expect(fixture.deleteExecute).toHaveBeenCalled();
+      expect(fixture.persistence.removeAllSubscriptions).toHaveBeenCalled();
       expect(fixture.settingsStore.setPlainSetting).toHaveBeenCalledWith(
         PUSH_PARENT,
         PUSH_KEYS.vapidPublicKey,
@@ -118,7 +118,7 @@ describe('PushService', () => {
       const service = await fixture.createService();
 
       await expect(service.replaceVapidKeys({ publicKey, privateKey })).rejects.toThrow(BadRequestException);
-      expect(fixture.deleteExecute).not.toHaveBeenCalled();
+      expect(fixture.persistence.removeAllSubscriptions).not.toHaveBeenCalled();
       expect(fixture.settingsStore.setPlainSetting).not.toHaveBeenCalled();
     });
   });
@@ -132,12 +132,12 @@ describe('PushService', () => {
         fixture.makeSubscription({ id: 1, endpoint: 'https://push.example.com/sub-1' }),
         fixture.makeSubscription({ id: 2, endpoint: 'https://push.example.com/sub-2' }),
       ];
-      fixture.subscriptionRepository.find.mockResolvedValue(subscriptions);
+      fixture.persistence.listUserSubscriptions.mockResolvedValue(subscriptions);
       fixture.mockedWebpush.sendNotification.mockResolvedValue({} as never);
 
       await service.sendToUser(42, { title: 'Hello', body: 'World', url: '/messages?conversation=1' });
 
-      expect(fixture.subscriptionRepository.find).toHaveBeenCalledWith({ where: { userId: 42 } });
+      expect(fixture.persistence.listUserSubscriptions).toHaveBeenCalledWith(42);
       expect(fixture.mockedWebpush.sendNotification).toHaveBeenCalledTimes(2);
       expect(fixture.mockedWebpush.sendNotification).toHaveBeenCalledWith(
         {
@@ -159,7 +159,7 @@ describe('PushService', () => {
       const service = await fixture.createService();
       fixture.givenStoredKeys('stored-public', 'stored-private');
       fixture.settingsService.getSmtpConfiguration.mockResolvedValue({ from: '' });
-      fixture.subscriptionRepository.find.mockResolvedValue([fixture.makeSubscription()]);
+      fixture.persistence.listUserSubscriptions.mockResolvedValue([fixture.makeSubscription()]);
       fixture.mockedWebpush.sendNotification.mockResolvedValue({} as never);
 
       await service.sendToUser(42, { title: 'Hello', body: 'World' });
@@ -175,7 +175,7 @@ describe('PushService', () => {
 
     it('does nothing when the user has no subscriptions', async () => {
       const service = await fixture.createService();
-      fixture.subscriptionRepository.find.mockResolvedValue([]);
+      fixture.persistence.listUserSubscriptions.mockResolvedValue([]);
 
       await service.sendToUser(42, { title: 'Hello', body: 'World' });
 
@@ -186,30 +186,29 @@ describe('PushService', () => {
     it.each([404, 410])('prunes the subscription when the push service responds with %s', async (statusCode) => {
       const service = await fixture.createService();
       fixture.givenStoredKeys('stored-public', 'stored-private');
-      fixture.subscriptionRepository.find.mockResolvedValue([fixture.makeSubscription({ id: 7 })]);
+      fixture.persistence.listUserSubscriptions.mockResolvedValue([fixture.makeSubscription({ id: 7 })]);
       fixture.mockedWebpush.sendNotification.mockRejectedValue(Object.assign(new Error('gone'), { statusCode }));
 
       await service.sendToUser(42, { title: 'Hello', body: 'World' });
 
-      expect(fixture.subscriptionRepository.delete).toHaveBeenCalledWith({ id: 7 });
+      expect(fixture.persistence.removeStaleSubscription).toHaveBeenCalledWith(7);
     });
 
     it('keeps the subscription and does not throw on other send errors', async () => {
       const service = await fixture.createService();
       fixture.givenStoredKeys('stored-public', 'stored-private');
-      fixture.subscriptionRepository.find.mockResolvedValue([fixture.makeSubscription({ id: 7 })]);
+      fixture.persistence.listUserSubscriptions.mockResolvedValue([fixture.makeSubscription({ id: 7 })]);
       fixture.mockedWebpush.sendNotification.mockRejectedValue(Object.assign(new Error('boom'), { statusCode: 500 }));
 
       await expect(service.sendToUser(42, { title: 'Hello', body: 'World' })).resolves.toBeUndefined();
 
-      expect(fixture.subscriptionRepository.delete).not.toHaveBeenCalled();
+      expect(fixture.persistence.removeStaleSubscription).not.toHaveBeenCalled();
     });
   });
 
   describe('upsertSubscription', () => {
-    it('creates a new subscription for an unknown endpoint', async () => {
+    it('passes a new subscription and current timestamp to persistence', async () => {
       const service = await fixture.createService();
-      fixture.subscriptionRepository.findOne.mockResolvedValue(null);
 
       await service.upsertSubscription(42, {
         endpoint: 'https://push.example.com/new',
@@ -217,7 +216,7 @@ describe('PushService', () => {
         userAgent: 'TestBrowser/1.0',
       });
 
-      expect(fixture.subscriptionRepository.save).toHaveBeenCalledWith(
+      expect(fixture.persistence.registerSubscription).toHaveBeenCalledWith(
         expect.objectContaining({
           endpoint: 'https://push.example.com/new',
           userId: 42,
@@ -229,20 +228,18 @@ describe('PushService', () => {
       );
     });
 
-    it('updates the existing subscription for a known endpoint (re-subscribe / user switch)', async () => {
+    it('passes rotated credentials and the current owner to persistence', async () => {
       const service = await fixture.createService();
       const existing = fixture.makeSubscription({ id: 5, userId: 1, endpoint: 'https://push.example.com/sub-1' });
-      fixture.subscriptionRepository.findOne.mockResolvedValue(existing);
+      fixture.persistence.registerSubscription.mockResolvedValue(existing);
 
       await service.upsertSubscription(42, {
         endpoint: 'https://push.example.com/sub-1',
         keys: { p256dh: 'rotated-p256dh', auth: 'rotated-auth' },
       });
 
-      expect(fixture.subscriptionRepository.create).not.toHaveBeenCalled();
-      expect(fixture.subscriptionRepository.save).toHaveBeenCalledWith(
+      expect(fixture.persistence.registerSubscription).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 5,
           userId: 42,
           p256dh: 'rotated-p256dh',
           auth: 'rotated-auth',
@@ -257,10 +254,7 @@ describe('PushService', () => {
 
       await service.deleteSubscription(42, 'https://push.example.com/sub-1');
 
-      expect(fixture.subscriptionRepository.delete).toHaveBeenCalledWith({
-        userId: 42,
-        endpoint: 'https://push.example.com/sub-1',
-      });
+      expect(fixture.persistence.removeOwnedSubscription).toHaveBeenCalledWith(42, 'https://push.example.com/sub-1');
     });
   });
 });

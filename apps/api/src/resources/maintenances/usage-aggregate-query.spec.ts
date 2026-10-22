@@ -1,5 +1,5 @@
 import { DataSource, EntitySchema } from 'typeorm';
-import { buildScheduleEvaluationQuery, formatDbDate } from './maintenance-schedule-evaluator.service';
+import { buildScheduleEvaluationQuery, formatDbDate } from './persistence/typeorm-adapter';
 
 /**
  * Exercises the usage-aggregate SQL against a real SQLite database.

@@ -1,7 +1,6 @@
+import { SupervisedUsageHistory } from '../persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { In, IsNull, Not } from 'typeorm';
-import { AutoIntroductionTarget, Resource, ResourceUsage } from '@attraccess/database-entities';
+import { AutoIntroductionTarget, Resource } from '@attraccess/application-models';
 import { SupervisedUsageAutoPromotionListener } from './supervised-usage-auto-promotion.listener';
 import { ResourceSupervisedUsageEndedEvent } from '../events/resource-usage.events';
 import { ResourceIntroductionsService } from '../../introductions/resouceIntroductions.service';
@@ -9,8 +8,7 @@ import { ResourceGroupsIntroductionsService } from '../../groups/introductions/r
 
 describe('SupervisedUsageAutoPromotionListener', () => {
   let listener: SupervisedUsageAutoPromotionListener;
-  let usageRepository: { count: jest.Mock };
-  let resourceRepository: { findOne: jest.Mock; find: jest.Mock };
+  let persistence: jest.Mocked<SupervisedUsageHistory>;
   let introductionsService: { hasValidIntroduction: jest.Mock; grant: jest.Mock };
   let groupIntroductionsService: { hasValidIntroduction: jest.Mock; grant: jest.Mock };
 
@@ -31,10 +29,10 @@ describe('SupervisedUsageAutoPromotionListener', () => {
   const event = new ResourceSupervisedUsageEndedEvent(RESOURCE_ID, USER_ID, SUPERVISOR_ID, 99);
 
   beforeEach(async () => {
-    usageRepository = { count: jest.fn().mockResolvedValue(0) };
-    resourceRepository = {
-      findOne: jest.fn().mockResolvedValue(buildResource()),
-      find: jest.fn().mockResolvedValue([]),
+    persistence = {
+      resource: jest.fn().mockResolvedValue(buildResource()),
+      completedCount: jest.fn().mockResolvedValue(0),
+      groupResourceIds: jest.fn().mockResolvedValue([]),
     };
     introductionsService = {
       hasValidIntroduction: jest.fn().mockResolvedValue(false),
@@ -47,9 +45,8 @@ describe('SupervisedUsageAutoPromotionListener', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: SupervisedUsageHistory, useValue: persistence },
         SupervisedUsageAutoPromotionListener,
-        { provide: getRepositoryToken(ResourceUsage), useValue: usageRepository },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepository },
         { provide: ResourceIntroductionsService, useValue: introductionsService },
         { provide: ResourceGroupsIntroductionsService, useValue: groupIntroductionsService },
       ],
@@ -60,18 +57,11 @@ describe('SupervisedUsageAutoPromotionListener', () => {
 
   describe('RESOURCE target', () => {
     it('grants a resource introduction once the threshold is reached, with the supervisor as tutor', async () => {
-      usageRepository.count.mockResolvedValue(3);
+      persistence.completedCount.mockResolvedValue(3);
 
       await listener.handleSupervisedUsageEnded(event);
 
-      expect(usageRepository.count).toHaveBeenCalledWith({
-        where: {
-          resourceId: RESOURCE_ID,
-          userId: USER_ID,
-          supervisorUserId: Not(IsNull()),
-          endTime: Not(IsNull()),
-        },
-      });
+      expect(persistence.completedCount).toHaveBeenCalledWith([RESOURCE_ID], USER_ID);
       expect(introductionsService.grant).toHaveBeenCalledWith(RESOURCE_ID, USER_ID, undefined, {
         tutorUserId: SUPERVISOR_ID,
         performedByUserId: null,
@@ -81,7 +71,7 @@ describe('SupervisedUsageAutoPromotionListener', () => {
     });
 
     it('does not grant when the threshold has not been reached', async () => {
-      usageRepository.count.mockResolvedValue(2);
+      persistence.completedCount.mockResolvedValue(2);
 
       await listener.handleSupervisedUsageEnded(event);
 
@@ -89,18 +79,18 @@ describe('SupervisedUsageAutoPromotionListener', () => {
     });
 
     it('is idempotent: skips when a valid introduction already exists', async () => {
-      usageRepository.count.mockResolvedValue(5);
+      persistence.completedCount.mockResolvedValue(5);
       introductionsService.hasValidIntroduction.mockResolvedValue(true);
 
       await listener.handleSupervisedUsageEnded(event);
 
-      expect(usageRepository.count).not.toHaveBeenCalled();
+      expect(persistence.completedCount).not.toHaveBeenCalled();
       expect(introductionsService.grant).not.toHaveBeenCalled();
     });
 
     it('defaults to a resource introduction when the target is null', async () => {
-      resourceRepository.findOne.mockResolvedValue(buildResource({ autoIntroductionTarget: null }));
-      usageRepository.count.mockResolvedValue(3);
+      persistence.resource.mockResolvedValue(buildResource({ autoIntroductionTarget: null }));
+      persistence.completedCount.mockResolvedValue(3);
 
       await listener.handleSupervisedUsageEnded(event);
 
@@ -117,20 +107,13 @@ describe('SupervisedUsageAutoPromotionListener', () => {
       buildResource({ autoIntroductionTarget: AutoIntroductionTarget.GROUP, autoIntroductionGroupId: GROUP_ID });
 
     it('counts supervised usages summed across all resources in the group and grants a group introduction', async () => {
-      resourceRepository.findOne.mockResolvedValue(groupResource());
-      resourceRepository.find.mockResolvedValue([{ id: 7 }, { id: 8 }, { id: 9 }] as Resource[]);
-      usageRepository.count.mockResolvedValue(3); // group-wide sum across the three resources
+      persistence.resource.mockResolvedValue(groupResource());
+      persistence.groupResourceIds.mockResolvedValue([7, 8, 9]);
+      persistence.completedCount.mockResolvedValue(3); // group-wide sum across the three resources
 
       await listener.handleSupervisedUsageEnded(event);
 
-      expect(usageRepository.count).toHaveBeenCalledWith({
-        where: {
-          resourceId: In([7, 8, 9]),
-          userId: USER_ID,
-          supervisorUserId: Not(IsNull()),
-          endTime: Not(IsNull()),
-        },
-      });
+      expect(persistence.completedCount).toHaveBeenCalledWith([7, 8, 9], USER_ID);
       expect(groupIntroductionsService.grant).toHaveBeenCalledWith(GROUP_ID, USER_ID, undefined, {
         tutorUserId: SUPERVISOR_ID,
         performedByUserId: null,
@@ -140,9 +123,9 @@ describe('SupervisedUsageAutoPromotionListener', () => {
     });
 
     it('does not grant when the group-wide sum is below the threshold', async () => {
-      resourceRepository.findOne.mockResolvedValue(groupResource());
-      resourceRepository.find.mockResolvedValue([{ id: 7 }, { id: 8 }] as Resource[]);
-      usageRepository.count.mockResolvedValue(2);
+      persistence.resource.mockResolvedValue(groupResource());
+      persistence.groupResourceIds.mockResolvedValue([7, 8]);
+      persistence.completedCount.mockResolvedValue(2);
 
       await listener.handleSupervisedUsageEnded(event);
 
@@ -150,18 +133,18 @@ describe('SupervisedUsageAutoPromotionListener', () => {
     });
 
     it('is idempotent: skips when a valid group introduction already exists', async () => {
-      resourceRepository.findOne.mockResolvedValue(groupResource());
+      persistence.resource.mockResolvedValue(groupResource());
       groupIntroductionsService.hasValidIntroduction.mockResolvedValue(true);
 
       await listener.handleSupervisedUsageEnded(event);
 
-      expect(resourceRepository.find).not.toHaveBeenCalled();
-      expect(usageRepository.count).not.toHaveBeenCalled();
+      expect(persistence.groupResourceIds).not.toHaveBeenCalled();
+      expect(persistence.completedCount).not.toHaveBeenCalled();
       expect(groupIntroductionsService.grant).not.toHaveBeenCalled();
     });
 
     it('skips when the group target has no autoIntroductionGroupId', async () => {
-      resourceRepository.findOne.mockResolvedValue(
+      persistence.resource.mockResolvedValue(
         groupResource() &&
           buildResource({ autoIntroductionTarget: AutoIntroductionTarget.GROUP, autoIntroductionGroupId: null }),
       );
@@ -174,16 +157,16 @@ describe('SupervisedUsageAutoPromotionListener', () => {
 
   describe('auto-promotion disabled', () => {
     it('does nothing when supervisedUsagesUntilIntroduction is null', async () => {
-      resourceRepository.findOne.mockResolvedValue(buildResource({ supervisedUsagesUntilIntroduction: null }));
+      persistence.resource.mockResolvedValue(buildResource({ supervisedUsagesUntilIntroduction: null }));
 
       await listener.handleSupervisedUsageEnded(event);
 
-      expect(usageRepository.count).not.toHaveBeenCalled();
+      expect(persistence.completedCount).not.toHaveBeenCalled();
       expect(introductionsService.grant).not.toHaveBeenCalled();
     });
 
     it('does nothing when the resource no longer exists', async () => {
-      resourceRepository.findOne.mockResolvedValue(null);
+      persistence.resource.mockResolvedValue(null);
 
       await listener.handleSupervisedUsageEnded(event);
 

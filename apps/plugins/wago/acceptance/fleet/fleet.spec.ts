@@ -1,4 +1,9 @@
-/* eslint-disable @nx/enforce-module-boundaries -- Acceptance deliberately connects the standalone runtime, plugin and real host graph executor. */
+// Acceptance connects the standalone runtime, plugin and real host graph executor.
+import { DatabaseTransactions } from '../../../../api/src/database/transaction-scope';
+import { FlowExecutionPersistence, FlowEventPersistence } from '../../../../api/src/resources/flows/persistence/port';
+import { withWagoPersistenceFixture } from '../../backend/wago-service.test-fixture';
+import { createWagoRegistryPersistence } from '../../backend/controllers/persistence/typeorm-adapter';
+import { TypeormWagoFlowPersistence } from '../../backend/flow/persistence/typeorm-adapter';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import 'reflect-metadata';
@@ -37,7 +42,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     state.database = new DataSource({
       type: 'sqlite',
       database: ':memory:',
-      entities: plugin.entities,
+      entities: plugin.persistenceAdapters.flatMap((entry) => entry.entities ?? []),
       synchronize: true,
     });
     await state.database.initialize();
@@ -117,12 +122,22 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
       // This is the real host SDK forwarding boundary, not a test flow callback.
       flows: { trigger: (type, matches, payload) => executor.triggerPluginFlows('wago', type, matches, payload) },
     } as unknown as PluginContext;
-    state.backend = new WagoService(context);
-    state.flow = new WagoFlowService(context);
-    const module = plugin.register(context);
+    state.backend = ((context: PluginContext) => new WagoService(context, ...createWagoRegistryPersistence(context)))(
+      context,
+    );
+    state.flow = new WagoFlowService(
+      context,
+      new TypeormWagoFlowPersistence(
+        () => context.getRepository(WagoController),
+        () => context.getRepository(WagoConfigurationRevision),
+        () => context.getRepository(WagoSettings),
+      ),
+    );
+    const neutralContext = withWagoPersistenceFixture(context);
+    const module = plugin.register(neutralContext);
     // The plugin binds its flow node factories through the 'wago-flow-services' factory
     // provider when Nest initialises the module. Invoke it the same way with the real
-    // service instances so plugin.flowNodes(context) resolves against the production graph.
+    // service instances so plugin.flowNodes(neutralContext) resolves against the production graph.
     const binding = (module.providers ?? []).find(
       (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === 'wago-flow-services',
     );
@@ -134,33 +149,45 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     );
     state.flowBinding = bound;
     if (typeof plugin.flowNodes !== 'function') throw new Error('Missing production node factory');
-    registerPluginFlowNodes('wago', plugin.flowNodes(context));
+    registerPluginFlowNodes('wago', plugin.flowNodes(neutralContext));
     // Only host persistence for the saved graph and unrelated application services
     // are fixtures. Node dispatch, edge traversal, read/wait/command and acks are real.
-    const dependencies = [
-      {
-        find: async ({ where }) => state.nodes.filter((node) => node.type === where.type),
-        findOne: async ({ where }) => state.nodes.find((node) => node.id === where.id),
+    const execution: FlowExecutionPersistence = {
+      resource: async () => ({ id: 1, name: 'Fixture resource', metadata: {} }) as never,
+      button: async (_resourceId, id) => state.nodes.find((node) => node.id === id) ?? null,
+      triggers: async (_resourceId, type) => state.nodes.filter((node) => node.type === type),
+      outgoingEdges: async (id, handle) =>
+        state.edges.filter((edge) => edge.source === id && (!handle || edge.sourceHandle === handle)),
+      node: async (id) => state.nodes.find((node) => node.id === id) ?? null,
+    };
+    const events: FlowEventPersistence = {
+      nodesByType: async (type) => state.nodes.filter((node) => node.type === type),
+      pageNodesByType: async (type, afterId, limit) =>
+        state.nodes.filter((node) => node.type === type && (!afterId || node.id > afterId)).slice(0, limit),
+      activeInactivityNodes: async () => [],
+    };
+    const transactions = new DatabaseTransactions({
+      backend: 'sqlite',
+      run: async () => {
+        throw new Error('The read/wait/command graph must not perform a host database write');
       },
-      {
-        find: async ({ where }) =>
-          state.edges.filter(
-            (edge) => edge.source === where.source && (!where.sourceHandle || edge.sourceHandle === where.sourceHandle),
-          ),
-      },
-      { findOne: async () => ({ id: 1, name: 'Fixture resource', metadata: {} }) },
-      { record: (log: Log) => state.logs.push(log) },
-      {},
-      {},
-      {},
+    });
+    const dependencies: ConstructorParameters<typeof ResourceFlowsExecutorService> = [
+      execution,
+      transactions,
+      { record: (log: Log) => state.logs.push(log) } as never,
+      {} as never,
+      {} as never,
       new EventEmitter2(),
-      {},
-      { getAll: async () => ({ resource: {}, global: {} }) },
-      { time: (_name, run) => run() },
-      { timeFlow: (_name, run) => run(), timeNode: (_name, run) => run() },
-      {},
-      {},
-    ] as unknown as ConstructorParameters<typeof ResourceFlowsExecutorService>;
+      {} as never,
+      { getAll: async () => ({ resource: {}, global: {} }) } as never,
+      { time: (_name, run) => run() } as never,
+      { timeFlow: (_name, run) => run(), timeNode: (_name, run) => run() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      events,
+    ];
     const executor = new ResourceFlowsExecutorService(...dependencies);
     await state.backend.onApplicationBootstrap();
     await state.flow.onModuleInit();

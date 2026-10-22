@@ -1,4 +1,4 @@
-import { Resource, SupervisionMode, User } from '@attraccess/database-entities';
+import { SupervisionMode, User } from '@attraccess/application-models';
 
 import {
   Inject,
@@ -10,9 +10,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { AttractapResourceReader } from '../../../persistence/port';
 
 import { SupervisionService, ReaderSupervisionCallbacks } from '../../../../resources/supervision/supervision.service';
 
@@ -45,8 +43,8 @@ export class AttractapSupervisionHandler implements OnModuleInit {
   @Inject(SupervisionService)
   protected supervisionService: SupervisionService;
 
-  @InjectRepository(Resource)
-  protected resourceRepository: Repository<Resource>;
+  @Inject(AttractapResourceReader)
+  protected resourceReader: AttractapResourceReader;
 
   /**
    * Registers this handler as the service's reader-arming port. A registration hook rather than an
@@ -214,7 +212,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       return;
     }
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.resourceReader.findResource(resourceId);
     if (!resource) {
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.SUPERVISION_REQUEST, { error: 'RESOURCE_NOT_FOUND' }),

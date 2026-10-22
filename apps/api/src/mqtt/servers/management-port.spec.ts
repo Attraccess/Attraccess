@@ -1,3 +1,4 @@
+import { TypeormMqttPersistence } from '../persistence/typeorm-adapter';
 import 'reflect-metadata';
 import { instanceToPlain } from 'class-transformer';
 import { DataSource, Repository } from 'typeorm';
@@ -67,7 +68,7 @@ describe('MQTT managementPort migration, persistence and service', () => {
     }
     repository = dataSource.getRepository(MqttServer);
     service = new MqttServerService(
-      repository,
+      new TypeormMqttPersistence(repository),
       encryption as unknown as EncryptionService,
       metrics as unknown as MetricsService,
     );

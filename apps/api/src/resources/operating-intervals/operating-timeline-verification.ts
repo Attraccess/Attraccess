@@ -2,7 +2,6 @@
 // All views are derived directly from `resource_operating_interval` rows; there are no persisted
 // aggregates yet, so verification recomputes derived durations from the timeline and compares.
 
-import { IsNull, LessThan, MoreThan } from 'typeorm';
 import {
   OperatingTimelineVerificationCheckDto,
   OperatingTimelineVerificationDto,
@@ -11,7 +10,7 @@ import type { ResourceOperatingDiagnosticsService } from './resource-operating-d
 import { unionDurationMs } from './resource-operating-diagnostics.service';
 
 interface ResourceOperatingDiagnosticsServiceOperatingTimelineVerificationContext {
-  intervalRepository: ResourceOperatingDiagnosticsService['intervalRepository'];
+  persistence: ResourceOperatingDiagnosticsService['persistence'];
   attributionService: ResourceOperatingDiagnosticsService['attributionService'];
 }
 export async function verifyTimeline(
@@ -20,13 +19,7 @@ export async function verifyTimeline(
   from: Date,
   to: Date,
 ): Promise<OperatingTimelineVerificationDto> {
-  const intervals = await context.intervalRepository.find({
-    where: [
-      { resourceId, startTime: LessThan(to), endTime: IsNull() },
-      { resourceId, startTime: LessThan(to), endTime: MoreThan(from) },
-    ],
-    order: { startTime: 'ASC' },
-  });
+  const intervals = await context.persistence.overlappingWindow(resourceId, from, to);
 
   const recomputedOperatingDurationMs = unionDurationMs(
     intervals.map((interval) => ({

@@ -1,3 +1,6 @@
+import { createSqliteDeviceOperations } from '../runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from './persistence/typeorm-adapter';
+import { createSqliteManagementStore } from '../management/persistence/typeorm-adapter';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { auditCommissioning, commissioningPrincipal } from './audit';
 import { WagoCommissioningService } from './service';
@@ -47,7 +50,14 @@ describe('commissioning uses the shared ATT-983 audit sink', () => {
   });
 
   it('classifies recovery by its outcome rather than its display heading', async () => {
-    const service = new WagoCommissioningService(context, {} as WagoService);
+    const service = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        {} as WagoService,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+      ))(context);
     service['recoverWhileAudited'] = jest
       .fn()
       .mockResolvedValue({ state: 'revoked', failureReason: null, progressStep: 'A renamed heading' });

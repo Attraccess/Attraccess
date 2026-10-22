@@ -1,5 +1,5 @@
 import { registerResourceIntroducersServiceFixture } from './resourceIntroducers.service.resource-introducers-service.test-fixture';
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/application-models';
 import { NotificationCategory } from './../../notifications/notification-types';
 
 describe('ResourceIntroducersService', () => {
@@ -22,16 +22,9 @@ describe('ResourceIntroducersService', () => {
         user: { id: 20 },
       } as unknown as ResourceIntroducer;
 
-      fixture.repository.find.mockResolvedValue([directIntroducer]);
+      fixture.persistence.directGrants.mockResolvedValue([directIntroducer]);
 
-      const groupQuery = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([groupIntroducer]),
-      };
-      fixture.repository.createQueryBuilder.mockReturnValue(groupQuery);
+      fixture.persistence.groupGrants.mockResolvedValue([groupIntroducer]);
 
       const result = await fixture.service.getMany(1);
 
@@ -54,16 +47,9 @@ describe('ResourceIntroducersService', () => {
         user: { id: 10 },
       } as unknown as ResourceIntroducer;
 
-      fixture.repository.find.mockResolvedValue([directIntroducer]);
+      fixture.persistence.directGrants.mockResolvedValue([directIntroducer]);
 
-      const groupQuery = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([groupIntroducer]),
-      };
-      fixture.repository.createQueryBuilder.mockReturnValue(groupQuery);
+      fixture.persistence.groupGrants.mockResolvedValue([groupIntroducer]);
 
       const result = await fixture.service.getMany(1);
 
@@ -83,7 +69,7 @@ describe('ResourceIntroducersService', () => {
         type: ResourceIntroducerType.MAINTAINER,
         user: { id: 10 },
       } as ResourceIntroducer;
-      fixture.repository.find.mockResolvedValue([introducer, maintainer]);
+      fixture.persistence.directGrants.mockResolvedValue([introducer, maintainer]);
 
       const result = await fixture.service.getMany(1);
 
@@ -107,33 +93,17 @@ describe('ResourceIntroducersService', () => {
         type: ResourceIntroducerType.INTRODUCER,
         user: { id: 20 },
       } as unknown as ResourceIntroducer;
-      fixture.repository.find.mockResolvedValue([directIntroducer]);
+      fixture.persistence.directGrants.mockResolvedValue([directIntroducer]);
 
-      const groupQuery = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getRawAndEntities: jest.fn().mockResolvedValue({
-          raw: [
-            { introducer_id: 2, resourceId: 1 },
-            { introducer_id: 2, resourceId: 2 },
-          ],
-          entities: [groupIntroducer],
-        }),
-      };
-      fixture.repository.createQueryBuilder.mockReturnValue(groupQuery);
+      fixture.persistence.inheritedGrants.mockResolvedValue([
+        { resourceId: 1, grant: groupIntroducer },
+        { resourceId: 2, grant: groupIntroducer },
+      ]);
 
       const result = await fixture.service.getManyForResources([1, 2], ResourceIntroducerType.INTRODUCER);
 
-      expect(fixture.repository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          relations: ['user'],
-          where: expect.objectContaining({ type: ResourceIntroducerType.INTRODUCER }),
-        }),
-      );
-      expect(groupQuery.where).toHaveBeenCalledWith('resource.id IN (:...resourceIds)', { resourceIds: [1, 2] });
+      expect(fixture.persistence.directGrants).toHaveBeenCalledWith([1, 2], ResourceIntroducerType.INTRODUCER);
+      expect(fixture.persistence.inheritedGrants).toHaveBeenCalledWith([1, 2], ResourceIntroducerType.INTRODUCER);
       expect(result).toEqual(
         new Map([
           [1, [directIntroducer, groupIntroducer]],
@@ -145,59 +115,55 @@ describe('ResourceIntroducersService', () => {
 
   describe('isIntroducer', () => {
     it('returns true for a direct introducer row', async () => {
-      fixture.repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
+      fixture.persistence.directGrant.mockResolvedValue({
+        type: ResourceIntroducerType.INTRODUCER,
+      } as ResourceIntroducer);
       await expect(fixture.service.isIntroducer(1, 2, false)).resolves.toBe(true);
     });
 
     it('returns false for a maintainer row (maintainers cannot give introductions)', async () => {
-      fixture.repository.findOne.mockImplementation(({ where }) =>
-        Promise.resolve(
-          where.type === ResourceIntroducerType.MAINTAINER ? ({ type: where.type } as ResourceIntroducer) : null,
-        ),
+      fixture.persistence.directGrant.mockImplementation((_resourceId, _userId, type) =>
+        Promise.resolve(type === ResourceIntroducerType.MAINTAINER ? ({ type: type } as ResourceIntroducer) : null),
       );
       await expect(fixture.service.isIntroducer(1, 2, false)).resolves.toBe(false);
-      expect(fixture.repository.findOne).toHaveBeenCalledWith({
-        where: { resourceId: 1, userId: 2, type: ResourceIntroducerType.INTRODUCER },
-      });
+      expect(fixture.persistence.directGrant).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER);
     });
 
     it('returns false when there is no row', async () => {
-      fixture.repository.findOne.mockResolvedValue(null);
+      fixture.persistence.directGrant.mockResolvedValue(null);
       await expect(fixture.service.isIntroducer(1, 2, false)).resolves.toBe(false);
     });
   });
 
   describe('canMaintain', () => {
     it('returns true for a maintainer row', async () => {
-      fixture.repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.MAINTAINER } as ResourceIntroducer);
+      fixture.persistence.directGrant.mockResolvedValue({
+        type: ResourceIntroducerType.MAINTAINER,
+      } as ResourceIntroducer);
       await expect(fixture.service.canMaintain(1, 2, false)).resolves.toBe(true);
     });
 
     it('returns true for an introducer row', async () => {
-      fixture.repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
+      fixture.persistence.directGrant.mockResolvedValue({
+        type: ResourceIntroducerType.INTRODUCER,
+      } as ResourceIntroducer);
       await expect(fixture.service.canMaintain(1, 2, false)).resolves.toBe(true);
     });
 
     it('returns false when there is no row', async () => {
-      fixture.repository.findOne.mockResolvedValue(null);
+      fixture.persistence.directGrant.mockResolvedValue(null);
       await expect(fixture.service.canMaintain(1, 2, false)).resolves.toBe(false);
     });
   });
 
   describe('grant', () => {
     it('creates a maintainer row when none exists', async () => {
-      fixture.repository.findOne.mockResolvedValue(null);
-      fixture.repository.create.mockImplementation((data) => data);
-      fixture.repository.save.mockImplementation(async (data) => data);
+      fixture.persistence.directGrant.mockResolvedValue(null);
 
       const result = await fixture.service.grant(1, 2, ResourceIntroducerType.MAINTAINER);
       await Promise.resolve(); // flush notification promise chain
 
-      expect(fixture.repository.create).toHaveBeenCalledWith({
-        resourceId: 1,
-        userId: 2,
-        type: ResourceIntroducerType.MAINTAINER,
-      });
+      expect(fixture.persistence.createGrant).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.MAINTAINER);
       expect(result.type).toBe(ResourceIntroducerType.MAINTAINER);
       expect(fixture.eventEmitter.emit).toHaveBeenCalled();
       expect(fixture.notifications.dispatch).toHaveBeenCalledWith(
@@ -229,53 +195,37 @@ describe('ResourceIntroducersService', () => {
     });
 
     it('defaults to introducer when no type is provided', async () => {
-      fixture.repository.findOne.mockResolvedValue(null);
-      fixture.repository.create.mockImplementation((data) => data);
-      fixture.repository.save.mockImplementation(async (data) => data);
+      fixture.persistence.directGrant.mockResolvedValue(null);
 
       await fixture.service.grant(1, 2);
       await Promise.resolve(); // flush notification promise chain
 
-      expect(fixture.repository.create).toHaveBeenCalledWith({
-        resourceId: 1,
-        userId: 2,
-        type: ResourceIntroducerType.INTRODUCER,
-      });
+      expect(fixture.persistence.createGrant).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER);
       const defaultsReq = fixture.notifications.dispatch.mock.calls[0][0];
       expect(defaultsReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
     });
 
     it('creates a second row when the user already holds the other role', async () => {
-      fixture.repository.findOne.mockImplementation(({ where }) =>
-        Promise.resolve(
-          where.type === ResourceIntroducerType.MAINTAINER ? ({ type: where.type } as ResourceIntroducer) : null,
-        ),
+      fixture.persistence.directGrant.mockImplementation((_resourceId, _userId, type) =>
+        Promise.resolve(type === ResourceIntroducerType.MAINTAINER ? ({ type: type } as ResourceIntroducer) : null),
       );
-      fixture.repository.create.mockImplementation((data) => data);
-      fixture.repository.save.mockImplementation(async (data) => data);
 
       const result = await fixture.service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
       await Promise.resolve(); // flush notification promise chain
 
       expect(result.type).toBe(ResourceIntroducerType.INTRODUCER);
-      expect(fixture.repository.findOne).toHaveBeenCalledWith({
-        where: { resourceId: 1, userId: 2, type: ResourceIntroducerType.INTRODUCER },
-      });
-      expect(fixture.repository.create).toHaveBeenCalledWith({
-        resourceId: 1,
-        userId: 2,
-        type: ResourceIntroducerType.INTRODUCER,
-      });
+      expect(fixture.persistence.directGrant).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER);
+      expect(fixture.persistence.createGrant).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER);
       expect(fixture.eventEmitter.emit).toHaveBeenCalled();
     });
 
     it('does not re-save when the existing row already matches', async () => {
       const existing = { type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer;
-      fixture.repository.findOne.mockResolvedValue(existing);
+      fixture.persistence.directGrant.mockResolvedValue(existing);
 
       await fixture.service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
 
-      expect(fixture.repository.save).not.toHaveBeenCalled();
+      expect(fixture.persistence.createGrant).not.toHaveBeenCalled();
       expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
       expect(fixture.notifications.dispatch).not.toHaveBeenCalled();
     });
@@ -283,18 +233,15 @@ describe('ResourceIntroducersService', () => {
 
   describe('revoke', () => {
     it('notifies the user when resource introducer or maintainer access is revoked', async () => {
-      fixture.repository.findOne.mockResolvedValue({
+      fixture.persistence.directGrant.mockResolvedValue({
         userId: 2,
         type: ResourceIntroducerType.MAINTAINER,
       } as ResourceIntroducer);
-      fixture.repository.remove.mockImplementation(async (data) => data);
 
       await fixture.service.revoke(1, 2, ResourceIntroducerType.MAINTAINER);
       await Promise.resolve(); // flush notification promise chain
 
-      expect(fixture.repository.findOne).toHaveBeenCalledWith({
-        where: { resourceId: 1, userId: 2, type: ResourceIntroducerType.MAINTAINER },
-      });
+      expect(fixture.persistence.directGrant).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.MAINTAINER);
 
       const revokeReq = fixture.notifications.dispatch.mock.calls[0][0];
       expect(revokeReq.category).toBe(NotificationCategory.ACCESS_CHANGES);

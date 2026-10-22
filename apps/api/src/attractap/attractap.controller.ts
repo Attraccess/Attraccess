@@ -1,4 +1,6 @@
-import { Attractap, Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { mapResponse } from '../transport/response-mapper';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+import { Attractap } from '../transport/models/attractap.dto';
 
 import {
   Body,
@@ -83,7 +85,7 @@ export class AttractapController {
 
       return {
         message: 'Reader updated successfully',
-        reader: updatedReader,
+        reader: mapResponse(Attractap, updatedReader),
       };
     } catch (error) {
       if (error.message?.includes('not found')) {
@@ -105,7 +107,9 @@ export class AttractapController {
     // `resources` is a plain ManyToMany with no eager loading, so without this the relation is
     // absent from the response entirely. Callers that group readers by resource — the supervised
     // start popup (ATT-816) — silently see every reader as unattached.
-    return await this.attractapService.getAllReaders({ relations: ['resources'] });
+    return (await this.attractapService.getAllReaders({ relations: ['resources'] })).map((record) =>
+      mapResponse(Attractap, record),
+    );
   }
 
   @Get(':readerId')
@@ -119,7 +123,7 @@ export class AttractapController {
   })
   @ApiResponse({ status: 404, description: 'Reader not found' })
   async getReaderById(@Param('readerId', ParseIntPipe) readerId: number): Promise<Attractap> {
-    return await this.attractapService.findReaderById(readerId);
+    return mapResponse(Attractap, await this.attractapService.findReaderById(readerId));
   }
 
   @Delete(':readerId')

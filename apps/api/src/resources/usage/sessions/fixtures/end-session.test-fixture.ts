@@ -1,5 +1,4 @@
-import { ResourceUsage, User } from '@attraccess/database-entities';
-import { SelectQueryBuilder } from 'typeorm';
+import { ResourceUsage, User } from '@attraccess/application-models';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
 
@@ -15,28 +14,14 @@ export function createEndSessionFixture(parentScope: ResourceUsageServiceTestSco
       user: { id: 1, username: 'owner' } as User,
     } as ResourceUsage;
     const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'note text' };
-    parentScope.resourceUsageRepository.findOne
+    parentScope.operations.sessionRead
       .mockResolvedValueOnce(mockActiveSession)
       .mockResolvedValueOnce(mockUpdatedSession)
       .mockResolvedValueOnce(mockUpdatedSession);
-    const mockUpdateQueryBuilder = parentScope.createMockQueryBuilder(null);
-    (mockUpdateQueryBuilder.update as jest.Mock).mockReturnValue(mockUpdateQueryBuilder);
-    parentScope.resourceUsageRepository.createQueryBuilder.mockReturnValue(
-      mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-    );
   };
 
   const scope = inheritTestScope(
     {
-      get resourceUsageRepository() {
-        return parentScope.resourceUsageRepository;
-      },
-      set resourceUsageRepository(value: typeof parentScope.resourceUsageRepository) {
-        parentScope.resourceUsageRepository = value;
-      },
-      get createMockQueryBuilder() {
-        return parentScope.createMockQueryBuilder;
-      },
       get service() {
         return parentScope.service;
       },
@@ -55,12 +40,7 @@ export function createEndSessionFixture(parentScope: ResourceUsageServiceTestSco
       get mockAuditService() {
         return parentScope.mockAuditService;
       },
-      get transactionalEntityManager() {
-        return parentScope.transactionalEntityManager;
-      },
-      set transactionalEntityManager(value: typeof parentScope.transactionalEntityManager) {
-        parentScope.transactionalEntityManager = value;
-      },
+
       get flowExecutorService() {
         return parentScope.flowExecutorService;
       },

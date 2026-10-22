@@ -1,4 +1,4 @@
-import type { PluginAuditActionPolicy, PluginAuditDomainDeclaration } from '@attraccess/plugins-backend-sdk';
+import type { PluginAuditActionPolicy, PluginAuditDomainDeclaration } from '@attraccess/plugins-backend-sdk/v2';
 import { WAGO_PRESETS } from '../configuration/model';
 
 /**

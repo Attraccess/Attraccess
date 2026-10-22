@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MqttServerConnectionConfig, MqttServerHostProvider } from '@attraccess/plugins-backend-sdk';
+import { MqttServerConnectionConfig, MqttServerHostProvider } from '@attraccess/plugins-backend-sdk/v2';
 import { MqttServerService } from './servers/mqtt-server.service';
 
 /**

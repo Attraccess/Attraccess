@@ -1,6 +1,7 @@
-import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk/v2';
 import { ApiProperty } from '@nestjs/swagger';
 import { PluginDependency } from './dependencies';
+import type { PluginPersistenceDeclaration } from '@attraccess/plugins-backend-sdk/v2';
 
 export class PluginMainFrontend {
   @ApiProperty({
@@ -111,6 +112,13 @@ export class PluginDependencyInfo {
 }
 
 export class PluginManifest {
+  @ApiProperty({
+    type: Object,
+    required: false,
+    description: 'Persistence contract and implemented database backends. Omitted for legacy SQLite-only plugins.',
+  })
+  persistence?: PluginPersistenceDeclaration;
+
   @ApiProperty({ type: [PluginDependencyInfo], required: false })
   dependencies?: PluginDependency[];
 

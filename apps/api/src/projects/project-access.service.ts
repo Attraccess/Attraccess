@@ -1,23 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Project, ProjectMember, ProjectMemberRole } from '@attraccess/database-entities';
+import { ProjectAccessPersistence } from './persistence/port';
+import { Project, ProjectMember, ProjectMemberRole } from '@attraccess/application-models';
 import { ProjectAccessInfoDto, ProjectWithAccessDto } from './dto/project-access.dto';
 
 @Injectable()
 export class ProjectAccessService {
-  constructor(
-    @InjectRepository(Project)
-    private readonly projectRepository: Repository<Project>,
-    @InjectRepository(ProjectMember)
-    private readonly projectMemberRepository: Repository<ProjectMember>,
-  ) {}
+  constructor(private readonly persistence: ProjectAccessPersistence) {}
 
   async ensureOwner(userId: number, projectId: number): Promise<Project> {
-    const project = await this.projectRepository.findOne({
-      where: { id: projectId, owner: { id: userId } },
-      relations: { owner: true },
-    });
+    const project = await this.persistence.ownedProject(userId, projectId);
 
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -27,10 +18,7 @@ export class ProjectAccessService {
   }
 
   async getAccessOrThrow(userId: number, projectId: number): Promise<ProjectWithAccessDto> {
-    const project = await this.projectRepository.findOne({
-      where: { id: projectId },
-      relations: { owner: true },
-    });
+    const project = await this.persistence.projectWithOwner(projectId);
 
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -41,12 +29,7 @@ export class ProjectAccessService {
       return this.applyAccessMetadata(project, null, true);
     }
 
-    const membership = await this.projectMemberRepository.findOne({
-      where: {
-        project: { id: projectId },
-        user: { id: userId },
-      },
-    });
+    const membership = await this.persistence.membership(userId, projectId);
 
     if (!membership) {
       throw new NotFoundException('Project not found');
@@ -61,12 +44,7 @@ export class ProjectAccessService {
     }
 
     const projectIds = projects.map((project) => project.id);
-    const memberships = await this.projectMemberRepository.find({
-      where: {
-        user: { id: userId },
-        project: { id: In(projectIds) },
-      },
-    });
+    const memberships = await this.persistence.memberships(userId, projectIds);
 
     const membershipByProjectId = new Map<number, ProjectMember>();
     memberships.forEach((membership) => {
@@ -106,4 +84,3 @@ export class ProjectAccessService {
     return membership.role === ProjectMemberRole.VIEWER ? false : false;
   }
 }
-

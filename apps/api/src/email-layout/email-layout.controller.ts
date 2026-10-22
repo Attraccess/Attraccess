@@ -1,7 +1,7 @@
 import { recordAdministrationSafely } from '../audit/policies/administration';
 import { Controller, Get, HttpCode, HttpStatus, Body, Patch, Post, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 import { AuditService } from '../audit/audit.service';
 import { EmailLayoutService } from './email-layout.service';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';

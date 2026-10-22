@@ -5,8 +5,7 @@ import {
   ResourceUsageAction,
   User,
   SupervisionMode,
-} from '@attraccess/database-entities';
-import { SelectQueryBuilder } from 'typeorm';
+} from '@attraccess/application-models';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
 
@@ -39,27 +38,17 @@ export function createSupervisedStartFixture(parentScope: ResourceUsageServiceTe
     } as ResourceUsage;
     const finalizedSession = { ...createdSession, isFinalized: true };
 
-    parentScope.resourceUsageRepository.findOne
+    parentScope.operations.sessionRead
       .mockResolvedValueOnce(null) // getActiveSession
       .mockResolvedValueOnce(createdSession) // newly created session
       .mockResolvedValueOnce(finalizedSession) // finalized session for return
       .mockResolvedValueOnce(finalizedSession); // emitUsageEvent fetch
 
-    const mockQueryBuilder = parentScope.createMockQueryBuilder(null);
-    (parentScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-      mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-    );
-    return { finalizedSession, mockQueryBuilder };
+    return { finalizedSession };
   };
 
   const scope = inheritTestScope(
     {
-      get resourceRepository() {
-        return parentScope.resourceRepository;
-      },
-      set resourceRepository(value: typeof parentScope.resourceRepository) {
-        parentScope.resourceRepository = value;
-      },
       get supervisedResource() {
         return supervisedResource;
       },
@@ -69,12 +58,7 @@ export function createSupervisedStartFixture(parentScope: ResourceUsageServiceTe
       set resourceMaintenanceService(value: typeof parentScope.resourceMaintenanceService) {
         parentScope.resourceMaintenanceService = value;
       },
-      get userRepository() {
-        return parentScope.userRepository;
-      },
-      set userRepository(value: typeof parentScope.userRepository) {
-        parentScope.userRepository = value;
-      },
+
       get supervisor() {
         return supervisor;
       },

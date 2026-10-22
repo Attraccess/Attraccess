@@ -1,16 +1,16 @@
-import { type PluginMqttSubscription, type PluginContext, type Repository } from '@attraccess/plugins-backend-sdk';
+import { type PluginMqttSubscription, type PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 
 import { Inject } from '@nestjs/common';
 
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import { WagoConfigurationRevision } from '../configuration/revision.record';
 
-import { WagoController } from '../controllers/entity';
+import { WagoController } from '../controllers/record';
 
 import { WagoService } from '../controllers/service';
 
 import { type WagoConfigurationSnapshot } from '../configuration/model';
 
-import { WagoSettings } from '../controllers/settings.entity';
+import { WagoFlowPersistence } from './persistence/port';
 
 import { PLUGIN_CONTEXT } from './model';
 
@@ -18,9 +18,12 @@ import { CachedState, Waiter, OperationalStream, NodeKind } from './model';
 
 import { type WagoOperationalMessage } from '../protocol/index';
 
+export type WagoFlowContext = Pick<PluginContext, 'mqtt' | 'logger' | 'flows'>;
+
 export abstract class WagoFlowServiceState {
   constructor(
-    @Inject(PLUGIN_CONTEXT) protected readonly context: PluginContext,
+    @Inject(PLUGIN_CONTEXT) protected readonly context: WagoFlowContext,
+    protected readonly persistence: WagoFlowPersistence,
     @Inject(WagoService) protected readonly wago?: WagoService,
   ) {}
 
@@ -55,19 +58,6 @@ export abstract class WagoFlowServiceState {
   protected messageQueue: Promise<void> = Promise.resolve();
 
   protected refreshTimer: ReturnType<typeof setInterval> | null = null;
-
-  // Plugin registration precedes the host datasource; resolve repositories only when used.
-  protected get controllers(): Repository<WagoController> {
-    return this.context.getRepository(WagoController);
-  }
-
-  protected get revisions(): Repository<WagoConfigurationRevision> {
-    return this.context.getRepository(WagoConfigurationRevision);
-  }
-
-  protected get settings(): Repository<WagoSettings> {
-    return this.context.getRepository(WagoSettings);
-  }
 
   abstract onModuleInit(): Promise<void>;
 

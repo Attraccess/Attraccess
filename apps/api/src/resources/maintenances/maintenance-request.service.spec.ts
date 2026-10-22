@@ -1,44 +1,44 @@
+import { MaintenanceRequestPersistence } from './persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MaintenanceRequestService } from './maintenance-request.service';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { ResolveMaintenanceRequestAction } from './dtos/resolve-maintenance-request.dto';
-import { MaintenanceRequestStatus, Resource, ResourceMaintenanceRequest } from '@attraccess/database-entities';
+import { MaintenanceRequestStatus, Resource, ResourceMaintenanceRequest } from '@attraccess/application-models';
 
-const mockResource = { id: 1, name: 'Test Resource' };
+const mockResource = { id: 1, name: 'Test Resource' } as Resource;
 
 describe('MaintenanceRequestService', () => {
   let service: MaintenanceRequestService;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let requestRepository: Repository<any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let resourceRepository: Repository<any>;
+  let persistence: jest.Mocked<MaintenanceRequestPersistence>;
   let eventEmitter: EventEmitter2;
   let maintenanceService: { createMaintenance: jest.Mock };
 
   beforeEach(async () => {
     maintenanceService = { createMaintenance: jest.fn() };
+    persistence = {
+      resource: jest.fn(),
+      createRequest: jest.fn(
+        async (resource, userId, reason, status) =>
+          ({
+            id: 10,
+            resourceId: resource.id,
+            createdByUserId: userId,
+            reason,
+            status,
+          }) as unknown as ResourceMaintenanceRequest,
+      ),
+      requestPage: jest.fn(),
+      requestWithRelations: jest.fn(),
+      saveRequest: jest.fn(async (request) => request),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceRequestService,
-        {
-          provide: getRepositoryToken(ResourceMaintenanceRequest),
-          useValue: {
-            create: jest.fn((v) => v),
-            save: jest.fn((v) => Promise.resolve({ id: 10, ...v })),
-            findOne: jest.fn(),
-            findAndCount: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(Resource),
-          useValue: { findOne: jest.fn() },
-        },
+        { provide: MaintenanceRequestPersistence, useValue: persistence },
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
@@ -51,8 +51,6 @@ describe('MaintenanceRequestService', () => {
     }).compile();
 
     service = module.get(MaintenanceRequestService);
-    requestRepository = module.get(getRepositoryToken(ResourceMaintenanceRequest));
-    resourceRepository = module.get(getRepositoryToken(Resource));
     eventEmitter = module.get(EventEmitter2);
   });
 
@@ -62,12 +60,17 @@ describe('MaintenanceRequestService', () => {
 
   describe('createRequest', () => {
     it('creates an open request and emits an event', async () => {
-      jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(mockResource);
+      persistence.resource.mockResolvedValue(mockResource);
 
       const result = await service.createRequest(1, 7, 'It is broken');
 
       expect(result.status).toBe(MaintenanceRequestStatus.OPEN);
-      expect(requestRepository.save).toHaveBeenCalled();
+      expect(persistence.createRequest).toHaveBeenCalledWith(
+        mockResource,
+        7,
+        'It is broken',
+        MaintenanceRequestStatus.OPEN,
+      );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         ResourceMaintenanceRequestCreatedEvent.EVENT_NAME,
         expect.objectContaining({ resourceId: 1, requestId: 10 }),
@@ -75,19 +78,19 @@ describe('MaintenanceRequestService', () => {
     });
 
     it('throws when resource is missing', async () => {
-      jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(null);
+      persistence.resource.mockResolvedValue(null);
       await expect(service.createRequest(999, 7, 'x')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('resolveRequest', () => {
     it('dismisses an open request without creating a maintenance', async () => {
-      jest.spyOn(requestRepository, 'findOne').mockResolvedValue({
+      persistence.requestWithRelations.mockResolvedValue({
         id: 5,
         resourceId: 1,
         reason: 'broken',
         status: MaintenanceRequestStatus.OPEN,
-      });
+      } as unknown as ResourceMaintenanceRequest);
 
       const result = await service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.DISMISS);
 
@@ -97,12 +100,12 @@ describe('MaintenanceRequestService', () => {
     });
 
     it('converts an open request into an instant maintenance', async () => {
-      jest.spyOn(requestRepository, 'findOne').mockResolvedValue({
+      persistence.requestWithRelations.mockResolvedValue({
         id: 5,
         resourceId: 1,
         reason: 'broken',
         status: MaintenanceRequestStatus.OPEN,
-      });
+      } as unknown as ResourceMaintenanceRequest);
       maintenanceService.createMaintenance.mockResolvedValue({ id: 99 });
 
       const result = await service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.CONVERT);
@@ -117,22 +120,22 @@ describe('MaintenanceRequestService', () => {
     });
 
     it('throws when the request belongs to another resource', async () => {
-      jest.spyOn(requestRepository, 'findOne').mockResolvedValue({
+      persistence.requestWithRelations.mockResolvedValue({
         id: 5,
         resourceId: 2,
         status: MaintenanceRequestStatus.OPEN,
-      });
+      } as unknown as ResourceMaintenanceRequest);
       await expect(service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.DISMISS)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('throws when the request is already resolved', async () => {
-      jest.spyOn(requestRepository, 'findOne').mockResolvedValue({
+      persistence.requestWithRelations.mockResolvedValue({
         id: 5,
         resourceId: 1,
         status: MaintenanceRequestStatus.DISMISSED,
-      });
+      } as unknown as ResourceMaintenanceRequest);
       await expect(service.resolveRequest(1, 5, 7, ResolveMaintenanceRequestAction.DISMISS)).rejects.toThrow(
         BadRequestException,
       );

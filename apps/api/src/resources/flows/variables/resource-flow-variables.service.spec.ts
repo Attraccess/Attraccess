@@ -1,64 +1,57 @@
+import { FlowVariablePersistence } from '../persistence/port';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ResourceFlowVariable, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowVariable, ResourceFlowVariableScope } from '@attraccess/application-models';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 
-const isNullOp = (v: unknown): boolean =>
-  v !== null && typeof v === 'object' && (v as Record<string, unknown>)['_type'] === 'isNull';
-
-const matchResourceId = (whereRid: unknown, rowRid: number | null): boolean =>
-  isNullOp(whereRid) ? rowRid === null : (whereRid ?? null) === rowRid;
-
 describe('ResourceFlowVariablesService', () => {
   let service: ResourceFlowVariablesService;
-  let repo: jest.Mocked<Repository<ResourceFlowVariable>>;
+  let persistence: jest.Mocked<FlowVariablePersistence>;
   let emitter: { emit: jest.Mock };
   let store: ResourceFlowVariable[];
 
   beforeEach(async () => {
     store = [];
-    repo = {
-      findOne: jest.fn(
-        ({ where }) =>
-          store.find(
-            (r) => r.scope === where.scope && r.key === where.key && matchResourceId(where.resourceId, r.resourceId),
-          ) ?? null,
+    persistence = {
+      findValue: jest.fn(
+        async (scope, resourceId, key) =>
+          store.find((row) => row.scope === scope && row.resourceId === resourceId && row.key === key) ?? null,
       ),
-      find: jest.fn(({ where }) =>
-        store.filter((r) =>
-          (Array.isArray(where) ? where : [where]).some(
-            (w) => r.scope === w.scope && matchResourceId(w.resourceId, r.resourceId),
-          ),
-        ),
+      findValues: jest.fn(async (scope, resourceId, keys) =>
+        store.filter((row) => row.scope === scope && row.resourceId === resourceId && keys.includes(row.key)),
       ),
-      save: jest.fn(async (row) => {
-        const idx = store.findIndex(
-          (r) => r.scope === row.scope && r.key === row.key && (row.resourceId ?? null) === r.resourceId,
+      visibleValues: jest.fn(async (resourceId, ordered) => {
+        const rows = store.filter(
+          (row) => row.scope === ResourceFlowVariableScope.GLOBAL || row.resourceId === resourceId,
         );
-        const persisted = { ...row, id: row.id ?? store.length + 1, updatedAt: new Date() } as ResourceFlowVariable;
-        if (idx >= 0) store[idx] = persisted;
+        return ordered ? rows.sort((a, b) => a.key.localeCompare(b.key)) : rows;
+      }),
+      storeValue: jest.fn(async (row) => {
+        const index = store.findIndex(
+          (existing) =>
+            existing.scope === row.scope && existing.key === row.key && existing.resourceId === row.resourceId,
+        );
+        const persisted = {
+          ...row,
+          id: store[index]?.id ?? store.length + 1,
+          updatedAt: new Date(),
+        } as ResourceFlowVariable;
+        if (index >= 0) store[index] = persisted;
         else store.push(persisted);
         return persisted;
       }),
-      delete: jest.fn(async (criteria) => {
-        const before = store.length;
-        store = store.filter(
-          (r) =>
-            !(r.scope === criteria.scope && r.key === criteria.key && (criteria.resourceId ?? null) === r.resourceId),
-        );
-        return { affected: before - store.length, raw: [] };
+      removeValue: jest.fn(async (scope, resourceId, key) => {
+        store = store.filter((row) => !(row.scope === scope && row.resourceId === resourceId && row.key === key));
       }),
-    } as unknown as jest.Mocked<Repository<ResourceFlowVariable>>;
+    };
 
     emitter = { emit: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFlowVariablesService,
-        { provide: getRepositoryToken(ResourceFlowVariable), useValue: repo },
+        { provide: FlowVariablePersistence, useValue: persistence },
         { provide: EventEmitter2, useValue: emitter },
       ],
     }).compile();

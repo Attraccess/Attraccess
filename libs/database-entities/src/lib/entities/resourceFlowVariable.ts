@@ -11,13 +11,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
-
-export enum ResourceFlowVariableScope {
-  RESOURCE = 'resource',
-  GLOBAL = 'global',
-}
-
-export type ResourceFlowVariableValueType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+import { ResourceFlowVariableScope, ResourceFlowVariableValueType } from '@attraccess/application-models';
 
 @Entity()
 @Unique('UQ_resource_flow_variable_scope_resource_key', ['scope', 'resourceId', 'key'])
@@ -44,7 +38,7 @@ export class ResourceFlowVariable {
   value!: string;
 
   @Column({ type: 'varchar' })
-  @ApiProperty({ description: 'Value JSON type tag' })
+  @ApiProperty({ type: String, description: 'Value JSON type tag' })
   valueType!: ResourceFlowVariableValueType;
 
   @CreateDateColumn()
@@ -59,3 +53,5 @@ export class ResourceFlowVariable {
   @JoinColumn({ name: 'resourceId' })
   resource!: Resource | null;
 }
+
+export { ResourceFlowVariableScope, ResourceFlowVariableValueType } from '@attraccess/application-models';

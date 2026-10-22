@@ -1,6 +1,2 @@
-export enum ResourceUsageAction {
-  Usage = 'usage',
-  DoorLock = 'door.lock',
-  DoorUnlock = 'door.unlock',
-  DoorUnlatch = 'door.unlatch',
-}
+// Historical SQLite/schema import path; shared values have one neutral owner.
+export { ResourceUsageAction } from '@attraccess/application-models';

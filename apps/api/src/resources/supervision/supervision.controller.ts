@@ -1,10 +1,12 @@
+import { ResourceUsage } from '../../transport/models/resourceUsage.dto';
+import { mapResponse } from '../../transport/response-mapper';
 import { Response } from 'express';
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, Res, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { ResourceUsage } from '@attraccess/database-entities';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
+
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
@@ -50,7 +52,10 @@ export class SupervisionController {
     };
     res.on('close', onClose);
     try {
-      return await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto, controller.signal);
+      return mapResponse(
+        ResourceUsage,
+        await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto, controller.signal),
+      );
     } finally {
       res.off('close', onClose);
     }
@@ -93,12 +98,18 @@ export class SupervisionController {
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'You are not the requested supervisor for this session.' })
   @ApiResponse({ status: 404, description: 'The request was not found or has already expired.' })
-  approveRequest(@Param('requestId') requestId: string, @Req() req: AuthenticatedRequest): Promise<ResourceUsage> {
-    return this.supervisionService.approve(
-      requestId,
-      req.user,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+  async approveRequest(
+    @Param('requestId') requestId: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceUsage> {
+    return mapResponse(
+      ResourceUsage,
+      await this.supervisionService.approve(
+        requestId,
+        req.user,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 

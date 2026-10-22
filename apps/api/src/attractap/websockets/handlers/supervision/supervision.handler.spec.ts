@@ -2,7 +2,7 @@ import { registerAttractapSupervisionHandlerFixture } from './handler.test-fixtu
 import type { SocketState } from './handler.test-fixture';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
-import { SupervisionMode } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 describe('AttractapSupervisionHandler', () => {
   const fixture = registerAttractapSupervisionHandlerFixture();
@@ -173,10 +173,10 @@ describe('AttractapSupervisionHandler', () => {
 
     it('refuses a resource that does not allow supervised sessions', async () => {
       const socket = tappedSocket();
-      fixture.resourceRepository.findOne.mockResolvedValue({
+      fixture.resourceReader.findResource.mockResolvedValue({
         id: fixture.RESOURCE_ID,
         supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
-      });
+      } as unknown as import('@attraccess/application-models').Resource);
 
       await request(socket);
 

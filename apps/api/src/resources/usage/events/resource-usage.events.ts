@@ -2,7 +2,7 @@
  * Events emitted when resource usage status changes
  */
 
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import type { Resource, ResourceUsage, User } from '@attraccess/application-models';
 
 export class ResourceSessionStartedEvent {
   public static readonly EVENT_NAME = 'resource.usage.session_started';

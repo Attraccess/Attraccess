@@ -1,8 +1,10 @@
+import { ResourceIntroducer } from '../../../transport/models/resourceIntroducer.dto';
+import { mapResponse } from '../../../transport/response-mapper';
 import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ResourceIntroducer } from '@attraccess/database-entities';
+
 import { ResourceGroupsIntroducersService } from './resourceGroups.introducers.service';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth } from '@attraccess/plugins-backend-sdk/v2';
 import { IsResourceGroupIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from '../../introducers/dtos/grantIntroducer.dto';
 
@@ -24,7 +26,9 @@ export class ResourceGroupsIntroducersController {
     description: 'The resource group has not been found.',
   })
   async getMany(@Param('groupId', ParseIntPipe) groupId: number): Promise<ResourceIntroducer[]> {
-    return await this.resourceGroupsIntroducersService.getMany(groupId);
+    return (await this.resourceGroupsIntroducersService.getMany(groupId)).map((record) =>
+      mapResponse(ResourceIntroducer, record),
+    );
   }
 
   @Get('/:userId/is-introducer')
@@ -65,7 +69,10 @@ export class ResourceGroupsIntroducersController {
     @Param('groupId', ParseIntPipe) groupId: number,
     @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
-    return await this.resourceGroupsIntroducersService.grant(groupId, userId, body?.type);
+    return mapResponse(
+      ResourceIntroducer,
+      await this.resourceGroupsIntroducersService.grant(groupId, userId, body?.type),
+    );
   }
 
   @Post('/:userId/revoke')
@@ -85,6 +92,9 @@ export class ResourceGroupsIntroducersController {
     @Param('groupId', ParseIntPipe) groupId: number,
     @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
-    return this.resourceGroupsIntroducersService.revoke(groupId, userId, body?.type);
+    return mapResponse(
+      ResourceIntroducer,
+      await this.resourceGroupsIntroducersService.revoke(groupId, userId, body?.type),
+    );
   }
 }

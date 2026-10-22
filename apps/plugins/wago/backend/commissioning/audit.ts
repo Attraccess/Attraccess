@@ -1,5 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
-import type { AuthenticatedRequest, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { AuthenticatedRequest, PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 import { randomUUID } from 'node:crypto';
 
 // Structurally identical to ATT-983's PluginAuditPrincipal. The commissioning
@@ -28,7 +28,7 @@ export function commissioningPrincipal(request: Pick<AuthenticatedRequest, 'user
 }
 
 export async function auditCommissioning<T>(
-  context: PluginContext,
+  context: Pick<PluginContext, 'audit' | 'logger'>,
   principal: CommissioningPrincipal | null,
   id: number,
   action:
@@ -46,7 +46,7 @@ export async function auditCommissioning<T>(
   succeeded: (result: T) => boolean = () => true,
 ): Promise<T> {
   const operationId = randomUUID();
-  const host = context as PluginContext & {
+  const host = context as Pick<PluginContext, 'audit' | 'logger'> & {
     audit?: {
       record(event: {
         action: string;

@@ -1,6 +1,7 @@
-import { User } from '@attraccess/database-entities';
+import { User } from '../../transport/models/user.dto';
+import { mapResponse } from '../../transport/response-mapper';
 
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 
 import {
   BadRequestException,
@@ -95,7 +96,7 @@ export class UsersAdminController {
       throw new UserNotFoundException(id);
     }
 
-    return user;
+    return mapResponse(User, await user);
   }
 
   @Delete(':id')
@@ -177,7 +178,9 @@ export class UsersAdminController {
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
     return {
       ...result,
-      data: canReadUsers ? result.data : result.data.map(({ id, username }) => ({ id, username })),
+      data: canReadUsers
+        ? result.data.map((record) => mapResponse(User, record))
+        : result.data.map(({ id, username }) => ({ id, username })),
       nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }
@@ -224,7 +227,7 @@ export class UsersAdminController {
   ): Promise<User> {
     const user = await this.usersService.changeUsername(id, body.username, request.user);
     await this.record('user_updated', id, request, 'username');
-    return user;
+    return mapResponse(User, await user);
   }
 
   @Patch(':id/email')
@@ -239,7 +242,7 @@ export class UsersAdminController {
     try {
       const user = await this.usersService.changeEmail(id, body.email, request.user);
       await this.record('user_updated', id, request, 'email');
-      return user;
+      return mapResponse(User, await user);
     } catch (error) {
       throw mapEmailSendError(error);
     }
@@ -256,7 +259,7 @@ export class UsersAdminController {
   ): Promise<User> {
     const user = await this.usersService.changeBillingFactor(id, body.billingFactor);
     await this.record('user_updated', id, request, 'billingFactor');
-    return user;
+    return mapResponse(User, await user);
   }
 
   protected record(

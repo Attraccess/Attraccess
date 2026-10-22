@@ -1,17 +1,27 @@
+// Keep plugin execution in Jest's realm, just as the production loader shares the host realm.
+jest.mock('vm', () => ({ ...jest.requireActual('vm'), runInThisContext: (source: string) => eval(source) }));
+jest.mock('module', () => ({ ...jest.requireActual('module'), createRequire: () => require }));
+import { assertPluginBackendSupport } from './persistence/port';
+import { resetPluginFlowRegistry } from './flows/node-registry';
+import { resetPluginAuditRegistry } from './audit/audit-registry';
 import { registerPluginModuleFixture } from './plugin.module.plugin-module.test-fixture';
 import 'reflect-metadata';
 import { EMPTY } from 'rxjs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
-import { User } from '@attraccess/database-entities';
+import { entities, User } from '@attraccess/database-entities';
 import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from './plugin.module';
 import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 import { dataSourceConfig } from './../database/datasource';
-import { mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'path';
+import { Test } from '@nestjs/testing';
+import { parseNpmPluginPackage } from './npm/contract-validation';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -24,11 +34,213 @@ import { SettingsModule } from './../settings/settings.module';
 import { LiveTopicsModule } from './../live-updates/live-topics.module';
 import { MqttModule } from './../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
+import { SqlitePluginAdapters } from './persistence/plugin-adapters';
+import { pluginOperationToken } from '@attraccess/plugins-backend-sdk/v2';
+import type { PluginContext as NeutralPluginContext } from '@attraccess/plugins-backend-sdk/v2';
 
 describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
 
   describe('forRoot', () => {
+    it.each(['direct', 'npm'])(
+      'loads WAGO from the shipped %s manifest through host context selection',
+      async (kind) => {
+        resetPluginFlowRegistry();
+        resetPluginAuditRegistry();
+        const wago = resolve(__dirname, '../../../plugins/wago');
+        const manifest =
+          kind === 'direct'
+            ? JSON.parse(readFileSync(join(wago, 'plugin.json'), 'utf8'))
+            : parseNpmPluginPackage(JSON.parse(readFileSync(join(wago, 'package.json'), 'utf8')), '1.11.0').manifest;
+        expect(manifest.persistence).toEqual({ contractVersion: 2, supportedBackends: ['sqlite'] });
+        expect(() => assertPluginBackendSupport(manifest, 'postgres')).toThrow('does not support');
+        mkdirSync(join(fixture.root, 'wago/dist'), { recursive: true });
+        writeFileSync(join(fixture.root, 'wago/plugin.json'), JSON.stringify(manifest));
+        execFileSync(process.execPath, [
+          resolve(wago, '../scripts/esbuild-backend.mjs'),
+          '--entry',
+          join(wago, 'backend/plugin.ts'),
+          '--outfile',
+          join(fixture.root, 'wago/dist/index.js'),
+        ]);
+        PluginModule.resetHostReferences();
+        const host = PluginModule.forRoot();
+        const registration = host.imports.find(
+          (entry) => typeof entry === 'object' && 'module' in entry && entry.module.name === 'WagoPluginModule',
+        );
+        expect(registration).toBeDefined();
+        new PluginModule({} as DataSource, new EventEmitter2(), { get: () => ({ clearPlugin: jest.fn() }) } as never);
+        const compiled = await Test.createTestingModule({ imports: [registration as never] }).compile();
+        try {
+          const providers = (registration as { providers: unknown[] }).providers;
+          const service = providers.find((entry) => typeof entry === 'function' && entry.name === 'WagoService');
+          expect(compiled.get(service as never)).toBeDefined();
+        } finally {
+          await compiled.close();
+          PluginModule.resetHostReferences();
+          resetPluginFlowRegistry();
+          resetPluginAuditRegistry();
+        }
+      },
+    );
+
+    it('loads the neutral SDK through the production loader and supplies only guarded host operations', async () => {
+      mkdirSync(join(fixture.root, 'neutral/dist'), { recursive: true });
+      writeFileSync(
+        join(fixture.root, 'neutral/plugin.json'),
+        JSON.stringify({
+          name: 'neutral',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
+          permissions: [PluginPermission.READ_USERS],
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(
+        join(fixture.root, 'neutral/dist/index.js'),
+        `
+        const { PLUGIN_CONTEXT } = require('@attraccess/plugins-backend-sdk/v2');
+        class NeutralModule {}
+        module.exports = { default: {
+          persistence: { contractVersion: 2, supportedBackends: ['sqlite'] },
+          register: context => ({ module: NeutralModule, providers: [{ provide: PLUGIN_CONTEXT, useValue: context }] })
+        }};
+      `,
+      );
+      PluginModule.resetHostReferences();
+      const loaded = PluginModule.forRoot();
+      const neutralModule = loaded.imports.find(
+        (entry) => typeof entry === 'object' && 'module' in entry && entry.module.name === 'NeutralModule',
+      ) as {
+        providers: Array<{ provide: symbol; useValue: NeutralPluginContext }>;
+      };
+      const context = neutralModule.providers[0].useValue;
+      expect(neutralModule.providers[0].provide).toBe(Symbol.for('attraccess.plugin.context'));
+      expect(context).not.toHaveProperty('dataSource');
+      expect(context).not.toHaveProperty('getRepository');
+      expect(context).not.toHaveProperty('get');
+      expect(() => context.operations.resources.findById(1)).toThrow(PluginPermissionError);
+      const source = await new DataSource({
+        type: 'sqlite',
+        database: ':memory:',
+        entities: Object.values(entities),
+        synchronize: true,
+      }).initialize();
+      try {
+        await source.getRepository(User).save({ username: 'reader', email: 'reader@example.test' });
+        new PluginModule(source, new EventEmitter2(), {} as ModuleRef);
+        expect(await context.operations.users.list({ limit: 5 })).toEqual([{ id: 1, username: 'reader' }]);
+        expect(() => context.persistence.resolve(pluginOperationToken('undeclared'))).toThrow(PluginPermissionError);
+      } finally {
+        PluginModule.resetHostReferences();
+        await source.destroy();
+      }
+    });
+
+    it('resolves neutral operations lazily and replaces adapters after the configuration source closes', async () => {
+      const token = pluginOperationToken<{ read(): string }>('connection identity', ['read']);
+      let current: DataSource | undefined;
+      const first = new DataSource({ type: 'sqlite', database: ':memory:' });
+      const second = new DataSource({ type: 'sqlite', database: ':memory:' });
+      const create = jest.fn(({ dataSource }) => ({ read: () => dataSource.name }));
+      const registry = new SqlitePluginAdapters({ backend: 'sqlite', operations: [{ token, create }] }, () => {
+        if (!current) throw new Error('Host source is not yet available');
+        return current;
+      });
+      const scope = registry.bind();
+      const operations = scope.resolve(token);
+      expect(create).not.toHaveBeenCalled();
+      await first.initialize();
+      await second.initialize();
+      try {
+        current = first;
+        const read = operations.read;
+        read();
+        expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ dataSource: first, manager: first.manager }));
+        await first.destroy();
+        current = second;
+        read();
+        expect(create).toHaveBeenLastCalledWith(
+          expect.objectContaining({ dataSource: second, manager: second.manager }),
+        );
+        expect(create).toHaveBeenCalledTimes(2);
+      } finally {
+        if (first.isInitialized) await first.destroy();
+        if (second.isInitialized) await second.destroy();
+      }
+    });
+
+    it('hides private adapter fields and exposes only registered methods', async () => {
+      const source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+      try {
+        const token = pluginOperationToken<{ read(): number }>('reviewed reader', ['read']);
+        const registry = new SqlitePluginAdapters(
+          { backend: 'sqlite', operations: [{ token, create: () => ({ read: () => 7, manager: source.manager }) }] },
+          () => source,
+        );
+        const operations = registry.bind().resolve(token);
+        expect(operations.read()).toBe(7);
+        expect(operations).not.toHaveProperty('manager');
+        expect(Object.keys(operations)).toEqual([]);
+        expect(Object.getPrototypeOf(operations)).toBe(Object.prototype);
+        expect(() => Object.assign(operations, { manager: source.manager })).toThrow('read-only');
+      } finally {
+        await source.destroy();
+      }
+    });
+
+    it('rejects closed and cross-connection plugin operation scopes', async () => {
+      const source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+      const other = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+      try {
+        const token = pluginOperationToken<{ read(): string }>('read', ['read']);
+        const registry = new SqlitePluginAdapters(
+          { backend: 'sqlite', operations: [{ token, create: () => ({ read: () => 'value' }) }] },
+          () => source,
+        );
+        let open = true;
+        const scope = registry.bind(source.manager, () => {
+          if (!open) throw new Error('Scope closed');
+        });
+        const read = scope.resolve(token).read;
+        expect(read()).toBe('value');
+        open = false;
+        expect(read).toThrow('Scope closed');
+        expect(() => scope.resolve(token)).toThrow('Scope closed');
+        expect(() => registry.bind(other.manager).resolve(token).read()).toThrow(
+          'different database backend or connection',
+        );
+        expect(() => registry.bind().resolve(pluginOperationToken('unregistered'))).toThrow('No adapter registered');
+      } finally {
+        await source.destroy();
+        await other.destroy();
+      }
+    });
+
+    it('rejects unsupported plugin backends before evaluating their entry or registering entities', () => {
+      const registry = dataSourceConfig.entities as unknown[];
+      const previous = [...registry];
+      mkdirSync(join(fixture.root, 'unsupported/dist'), { recursive: true });
+      writeFileSync(
+        join(fixture.root, 'unsupported/plugin.json'),
+        JSON.stringify({
+          name: 'unsupported',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          persistence: { contractVersion: 2, supportedBackends: ['postgres'] },
+          permissions: [PluginPermission.DATABASE_ACCESS],
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(join(fixture.root, 'unsupported/dist/index.js'), 'throw new Error("entry was evaluated")');
+      PluginModule.forRoot();
+      expect(registry).toEqual(previous);
+      const plugin = PluginService.getPluginsWithLoadStatus().find(({ name }) => name === 'unsupported');
+      expect(plugin?.status).toBe('error');
+      expect(plugin?.error).toContain('does not support the selected database backend');
+    });
+
     it.each([false, true])('registers unique declared entities only with database access: %s', (allowed) => {
       const registry = dataSourceConfig.entities as unknown[];
       const previous = [...registry];

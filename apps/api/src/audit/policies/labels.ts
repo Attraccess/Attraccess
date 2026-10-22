@@ -1,5 +1,5 @@
-import { AuditLog, Project, Resource, ResourceGroup, User } from '@attraccess/database-entities';
-import { DataSource } from 'typeorm';
+import type { AuditLog } from '@attraccess/application-models';
+import { AuditLabelReader, AuditLabelRow } from '../persistence/port';
 import { AuditEntryDto } from '../dto/audit-response.dto';
 
 const name = (value: unknown): string | undefined =>
@@ -33,22 +33,13 @@ function recordedSubjectLabel(entry: AuditLog): string | undefined {
 }
 
 async function currentNames(
-  source: DataSource,
-  entity: typeof User | typeof Resource | typeof ResourceGroup | typeof Project,
+  read: (ids: readonly number[]) => Promise<AuditLabelRow[]>,
   ids: Array<number | null>,
-  field: 'username' | 'name',
 ): Promise<Map<number, string>> {
   const uniqueIds = [...new Set(ids.filter((id): id is number => Number.isSafeInteger(id) && Number(id) > 0))];
-  if (!uniqueIds.length || !source.hasMetadata(entity)) return new Map();
+  if (!uniqueIds.length) return new Map();
   try {
-    // At most one bounded query per entity kind, selecting no credentials, relations, or configuration.
-    const rows = await source
-      .createQueryBuilder()
-      .select('subject.id', 'id')
-      .addSelect(`subject.${field}`, 'label')
-      .from(entity, 'subject')
-      .where('subject.id IN (:...ids)', { ids: uniqueIds })
-      .getRawMany<{ id: number; label: string }>();
+    const rows = await read(uniqueIds);
     return new Map(rows.filter((row) => name(row.label)).map((row) => [row.id, row.label]));
   } catch {
     // Readable history must remain available when optional current-name lookup fails.
@@ -57,25 +48,23 @@ async function currentNames(
 }
 
 /** Adds explicitly labelled read-time names without mutating immutable historical rows. */
-export async function auditEntriesWithLabels(source: DataSource, entries: AuditLog[]): Promise<AuditEntryDto[]> {
+export async function auditEntriesWithLabels(reader: AuditLabelReader, entries: AuditLog[]): Promise<AuditEntryDto[]> {
   const subjects = (domain: string, type: string) =>
     entries
       .filter((entry) => entry.domain === domain && entry.subjectType === type && !recordedSubjectLabel(entry))
       .map((entry) => entry.subjectId);
   const [users, resources, groups, projects] = await Promise.all([
     currentNames(
-      source,
-      User,
+      (ids) => reader.userNames(ids),
       [
         ...entries.filter((entry) => !name(entry.details.actorUsername)).map((entry) => entry.actorId),
         ...subjects('identity', 'identity.user'),
         ...subjects('sso', 'user'),
       ],
-      'username',
     ),
-    currentNames(source, Resource, subjects('resource', 'resource'), 'name'),
-    currentNames(source, ResourceGroup, subjects('resource', 'resource_group'), 'name'),
-    currentNames(source, Project, subjects('project', 'project'), 'name'),
+    currentNames((ids) => reader.resourceNames(ids), subjects('resource', 'resource')),
+    currentNames((ids) => reader.groupNames(ids), subjects('resource', 'resource_group')),
+    currentNames((ids) => reader.projectNames(ids), subjects('project', 'project')),
   ]);
   return entries.map((entry) => {
     const recordedActor = name(entry.details.actorUsername);

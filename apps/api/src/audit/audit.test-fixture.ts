@@ -1,3 +1,7 @@
+import { SqliteAuditTransactionObserver } from './persistence/transaction-observer';
+import { SqliteAuditPersistence } from './persistence/sqlite-audit-storage';
+import { User } from '@attraccess/database-entities';
+import { TypeormSettingsPersistence } from '../settings/persistence/typeorm-adapter';
 import { AuditLog, Setting } from '@attraccess/database-entities';
 import type { PluginAuditDomainDeclaration } from '@attraccess/plugins-backend-sdk';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
@@ -112,8 +116,11 @@ export function setupAuditDatabase() {
     await source.query(
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
-    store = new SettingsStoreService(source.getRepository(Setting), null);
-    service = new AuditService(source, store);
+    store = new SettingsStoreService(
+      new TypeormSettingsPersistence(source.getRepository(Setting), source.getRepository(User)),
+      null,
+    );
+    service = new AuditService(new SqliteAuditPersistence(source), store, new SqliteAuditTransactionObserver(source));
     await service.onModuleInit();
   });
 

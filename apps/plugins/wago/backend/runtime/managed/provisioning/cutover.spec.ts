@@ -1,3 +1,6 @@
+import { createSqliteManagedPersistence } from '../persistence/typeorm-adapter';
+import { createSqliteDeviceOperations } from '../../persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../../../commissioning/persistence/typeorm-adapter';
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { createHash } from 'node:crypto';
 import { DataSource } from 'typeorm';
@@ -486,6 +489,9 @@ describe('managed cutover and reboot evidence', () => {
             ready: policyConfirmed,
           }),
         } as unknown as WagoCommissioningReadiness,
+        createSqliteCommissioningPersistence(db.manager),
+        createSqliteDeviceOperations(db.manager),
+        createSqliteManagedPersistence(db.manager),
       );
       let installed = '0'.repeat(64);
       const oldImage = `sha256:${'0'.repeat(64)}`;

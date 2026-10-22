@@ -1,4 +1,4 @@
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 
 import { Body, Controller, ForbiddenException, Get, Patch, Post, Req, Delete } from '@nestjs/common';
 

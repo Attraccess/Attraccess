@@ -1,8 +1,10 @@
+import { WagoManagedPersistence } from './persistence/port';
+import { WagoCommissioningPersistence } from '../../commissioning/persistence/port';
 import { Inject } from '@nestjs/common';
 
-import { PluginContext, Repository, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { PluginContext, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk/v2';
 
-import { WagoManagedAccess, WagoRuntimeUpdateEntity } from './access.entity';
+import { WagoManagedAccess } from './access.record';
 
 import { WagoDeviceOperations } from '../device-operations';
 
@@ -16,9 +18,9 @@ import {
   type ManagedRuntimeUpdateHost,
 } from '../update/coordinator';
 
-import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
+import { WagoCommissioningSession } from '../../commissioning/sessions/session.record';
 
-import { WagoController } from '../../controllers/entity';
+import { WagoController } from '../../controllers/record';
 
 import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
 
@@ -41,21 +43,26 @@ import { type BuildRuntimeArtifact } from '../artifacts/build';
 
 export abstract class WagoManagedRuntimeServiceState {
   constructor(
-    @Inject(Symbol.for('attraccess.plugin.context')) protected readonly context: PluginContext,
+    @Inject(Symbol.for('attraccess.plugin.context'))
+    protected readonly context: Omit<PluginContext, 'operations' | 'persistence'>,
     @Inject(WagoService) protected readonly wago: WagoService,
     @Inject(WagoRuntimeArtifactsService) protected readonly artifacts: WagoRuntimeArtifactsService,
     @Inject(WagoCommissioningReadiness) protected readonly readiness: WagoCommissioningReadiness,
+    @Inject(WagoCommissioningPersistence) protected readonly commissioningPersistence: WagoCommissioningPersistence,
+    @Inject(WagoDeviceOperations) protected readonly operations: WagoDeviceOperations,
+    @Inject(WagoManagedPersistence) protected readonly persistence: WagoManagedPersistence,
   ) {}
 
-  protected access!: Repository<WagoManagedAccess>;
-
-  protected updates!: Repository<WagoRuntimeUpdateEntity>;
-
-  protected sessions!: Repository<WagoCommissioningSession>;
-
-  protected controllers!: Repository<WagoController>;
-
-  protected operations!: WagoDeviceOperations;
+  protected async requiredSession(id: number): Promise<WagoCommissioningSession> {
+    const session = await this.commissioningPersistence.session(id);
+    if (!session) throw new Error('Commissioning session not found');
+    return session;
+  }
+  protected async requiredController(id: number): Promise<WagoController> {
+    const controller = await this.commissioningPersistence.controller(id, true);
+    if (!controller) throw new Error('Claimed controller not found');
+    return controller;
+  }
 
   protected coordinator!: WagoRuntimeUpdateCoordinator;
 

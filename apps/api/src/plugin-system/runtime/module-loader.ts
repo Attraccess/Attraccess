@@ -1,4 +1,6 @@
 import * as pluginsBackendSdk from '@attraccess/plugins-backend-sdk';
+import * as neutralPluginsBackendSdk from '@attraccess/plugins-backend-sdk/v2';
+import * as pluginAdapterSdk from '@attraccess/plugins-backend-sdk/adapter';
 import { readFileSync } from 'fs';
 import { createRequire, Module as NodeModuleClass } from 'module';
 import { dirname, isAbsolute } from 'path';
@@ -17,6 +19,8 @@ import { runInThisContext } from 'vm';
 // decorator identity).
 const HOST_BUNDLED_MODULES: Record<string, unknown> = {
   '@attraccess/plugins-backend-sdk': pluginsBackendSdk,
+  '@attraccess/plugins-backend-sdk/v2': neutralPluginsBackendSdk,
+  '@attraccess/plugins-backend-sdk/adapter': pluginAdapterSdk,
 };
 
 // Loads a plugin's CommonJS entry so that its *externalized* host-shared packages

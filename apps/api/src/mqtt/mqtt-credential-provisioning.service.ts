@@ -6,7 +6,7 @@ import type {
   ManualMqttCredentialInstructions,
   MqttServerConnectionConfig,
   ProvisionedMqttCredential,
-} from '@attraccess/plugins-backend-sdk';
+} from '@attraccess/plugins-backend-sdk/v2';
 import { MqttServerHostProviderService } from './mqtt-server-host.provider';
 
 export interface MqttCredentialProviderAvailability {

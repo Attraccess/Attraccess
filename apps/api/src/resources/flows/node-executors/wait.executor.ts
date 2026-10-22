@@ -1,4 +1,4 @@
-import { ResourceFlowNode, WaitNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, WaitNodeDataSchema } from '@attraccess/application-models';
 import z from 'zod';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 

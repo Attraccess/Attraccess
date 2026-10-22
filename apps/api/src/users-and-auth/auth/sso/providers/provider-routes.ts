@@ -1,6 +1,8 @@
-import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider as SSOProviderResponse } from '../../../../transport/models/ssoProvider.dto';
+import { mapResponse } from '../../../../transport/response-mapper';
+import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/application-models';
 
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 
 import {
   BadRequestException,
@@ -182,11 +184,11 @@ export abstract class SsoProviderRoutes {
   @ApiResponse({
     status: 200,
     description: 'The list of SSO providers',
-    type: SSOProvider,
+    type: SSOProviderResponse,
     isArray: true,
   })
-  async getAll(): Promise<SSOProvider[]> {
-    return this.ssoService.getAllProviders();
+  async getAll(): Promise<SSOProviderResponse[]> {
+    return (await this.ssoService.getAllProviders()).map((provider) => mapResponse(SSOProviderResponse, provider));
   }
 
   @Get('providers/:id')
@@ -200,7 +202,7 @@ export abstract class SsoProviderRoutes {
   @ApiResponse({
     status: 200,
     description: 'The SSO provider with full configuration',
-    type: SSOProvider,
+    type: SSOProviderResponse,
   })
   @ApiResponse({
     status: 403,
@@ -210,12 +212,12 @@ export abstract class SsoProviderRoutes {
     status: 404,
     description: 'Provider not found',
   })
-  async getOneById(@Param('id') id: string): Promise<SSOProvider> {
+  async getOneById(@Param('id') id: string): Promise<SSOProviderResponse> {
     const providerId = parseInt(id, 10);
     const provider = await this.ssoService.getProviderById(providerId);
     const withConfig = await this.ssoService.getProviderByTypeAndIdWithConfiguration(provider.type, providerId);
     if (!withConfig) throw new SSOProviderNotFoundException();
-    return withConfig;
+    return mapResponse(SSOProviderResponse, withConfig);
   }
 
   @Post('providers')
@@ -225,13 +227,16 @@ export abstract class SsoProviderRoutes {
   @ApiResponse({
     status: 201,
     description: 'The SSO provider has been created',
-    type: SSOProvider,
+    type: SSOProviderResponse,
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions',
   })
-  async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
+  async createOne(
+    @Body() createDto: CreateSSOProviderDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<SSOProviderResponse> {
     const oidcMappings = createDto.oidcConfiguration?.roleMappings;
     const samlMappings = createDto.samlConfiguration?.roleMappings;
     if (oidcMappings !== undefined || samlMappings !== undefined) {
@@ -243,7 +248,7 @@ export abstract class SsoProviderRoutes {
     }
     const provider = await this.ssoService.createProvider(createDto);
     await this.recordProviderAudit('created', request, provider);
-    return provider;
+    return mapResponse(SSOProviderResponse, provider);
   }
 
   @Put('providers/:id')
@@ -258,7 +263,7 @@ export abstract class SsoProviderRoutes {
   @ApiResponse({
     status: 200,
     description: 'The SSO provider has been updated',
-    type: SSOProvider,
+    type: SSOProviderResponse,
   })
   @ApiResponse({
     status: 403,
@@ -272,7 +277,7 @@ export abstract class SsoProviderRoutes {
     @Param('id') id: string,
     @Body() updateDto: UpdateSSOProviderDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<SSOProvider> {
+  ): Promise<SSOProviderResponse> {
     const providerId = parseInt(id, 10);
     const before = await this.ssoService.getProviderById(providerId);
 
@@ -289,7 +294,7 @@ export abstract class SsoProviderRoutes {
 
     const provider = await this.ssoService.updateProvider(providerId, updateDto);
     await this.recordProviderAudit('updated', request, provider, before, this.providerRotationFlags(before, provider));
-    return provider;
+    return mapResponse(SSOProviderResponse, provider);
   }
 
   @Delete('providers/:id')
@@ -352,7 +357,7 @@ export abstract class SsoProviderRoutes {
     providerType: SSOProviderType,
     providerId: number,
     payload: SSOProvisioningUserDto,
-  ): Promise<import('@attraccess/database-entities').User>;
+  ): Promise<import('@attraccess/application-models').User>;
 
   protected abstract readonly sessionService: SessionService;
 

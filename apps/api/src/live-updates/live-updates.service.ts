@@ -5,7 +5,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 import { LIVE_UPDATES_SESSION_CHANGED, LivePacket, LiveSubscription, liveSubscriptionKey } from '@attraccess/shared';
 import { Observable, Subscriber, Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';

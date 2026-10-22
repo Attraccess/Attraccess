@@ -16,8 +16,6 @@ import { scanHostKey } from '../delivery/host-identity';
 
 import { commissioningAcceptanceScript } from '../delivery/accept';
 
-import { WagoCommissioningSession } from './session.entity';
-
 import { createWagoManagementService } from '../../management/store';
 
 import { runtimeBundleStreamReceiver } from '../../runtime/install';
@@ -26,11 +24,11 @@ import { WagoCommissioningServiceState } from '../state';
 
 export abstract class WagoCommissioningSessions extends WagoCommissioningServiceState {
   async verification(id: number) {
-    const session = await this.sessions.findOneBy({ id });
+    const session = await this.persistence.session(id);
     if (!session) throw new NotFoundException('commissioning session not found');
     const settings = this.readiness ? await this.wago.getSettings() : null;
     const runtime = this.readiness?.observe(session.mqttServerId, session.hardwareId, settings.operationalPrefix);
-    const verification = await commissioningVerification(this.context, session, runtime);
+    const verification = await commissioningVerification(this.persistence, session, runtime);
     const security = session.managementControllerId
       ? await this.management.status(session.managementControllerId)
       : null;
@@ -49,7 +47,7 @@ export abstract class WagoCommissioningSessions extends WagoCommissioningService
   async list(limit = 50, offset = 0): Promise<CommissioningSessionResponse[]> {
     const take = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 50;
     const skip = Number.isSafeInteger(offset) ? Math.max(offset, 0) : 0;
-    const sessions = await this.sessions.find({ order: { updatedAt: 'DESC' }, take, skip });
+    const sessions = await this.persistence.recentSessions(skip, take);
     return Promise.all(sessions.map((session) => this.toResponse(session)));
   }
 
@@ -65,7 +63,7 @@ export abstract class WagoCommissioningSessions extends WagoCommissioningService
     )
       throw new ConflictException('Confirm the isolated service connection and physical controller identity.');
     return this.withDeliveryLock(id, async () => {
-      const session = await this.sessions.findOneBy({ id });
+      const session = await this.persistence.session(id);
       if (!session) throw new NotFoundException('commissioning session not found');
       if (session.state !== 'awaiting_identity_confirmation')
         throw new ConflictException('commissioning session identity cannot be confirmed in its current state');
@@ -116,31 +114,29 @@ export abstract class WagoCommissioningSessions extends WagoCommissioningService
     }
     const hardwareId = `cc100-${createHash('sha256').update(hostKeyFingerprint).digest('hex').slice(0, 16)}`;
     const now = new Date().toISOString();
-    const session = await this.sessions.save(
-      this.sessions.create({
-        hardwareId,
-        mqttServerId: input.mqttServerId,
-        targetHost: input.targetHost,
-        hostKeyFingerprint,
-        firmwareBaseline: configuredFirmwareBaseline,
-        controllerName: input.name.trim(),
-        state: 'awaiting_identity_confirmation',
-        enrollmentExpiresAt: null,
-        enrollmentId: null,
-        // This verifier authenticates the first runtime announcement and is never exposed to an operator.
-        pairingCode: this.encryptVerifier(randomBytes(32).toString('base64url')),
-        initiatingPrincipal: principal ? JSON.stringify(principal) : null,
-        runtimeArtifactDigest: null,
-        codesysState: null,
-        progressPercent: 0,
-        progressStep: 'Confirm controller identity',
-        progressDetail: 'Verify the scanned SSH host-key fingerprint on the controller before delivery.',
-        auditLog: JSON.stringify([{ at: now, event: 'host_key_scanned' }]),
-        failureReason: null,
-        createdAt: now,
-        updatedAt: now,
-      }),
-    );
+    const session = await this.persistence.saveSession({
+      hardwareId,
+      mqttServerId: input.mqttServerId,
+      targetHost: input.targetHost,
+      hostKeyFingerprint,
+      firmwareBaseline: configuredFirmwareBaseline,
+      controllerName: input.name.trim(),
+      state: 'awaiting_identity_confirmation',
+      enrollmentExpiresAt: null,
+      enrollmentId: null,
+      // This verifier authenticates the first runtime announcement and is never exposed to an operator.
+      pairingCode: this.encryptVerifier(randomBytes(32).toString('base64url')),
+      initiatingPrincipal: principal ? JSON.stringify(principal) : null,
+      runtimeArtifactDigest: null,
+      codesysState: null,
+      progressPercent: 0,
+      progressStep: 'Confirm controller identity',
+      progressDetail: 'Verify the scanned SSH host-key fingerprint on the controller before delivery.',
+      auditLog: JSON.stringify([{ at: now, event: 'host_key_scanned' }]),
+      failureReason: null,
+      createdAt: now,
+      updatedAt: now,
+    });
     return this.toResponse(session);
   }
 
@@ -153,7 +149,6 @@ export abstract class WagoCommissioningSessions extends WagoCommissioningService
 
   async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
-    this.sessions = this.context.getRepository(WagoCommissioningSession);
     this.managedRuntime?.registerRootProbe(async (host, fingerprint, password) => {
       try {
         return (
@@ -200,12 +195,16 @@ export abstract class WagoCommissioningSessions extends WagoCommissioningService
         return false;
       }
     });
-    this.management = createWagoManagementService(this.context, {
-      execute: (target, credential, command, limits) =>
-        this.run(target.host, target.hostKeyFingerprint, credential, command, undefined, limits),
-      verifyNewKeyConnection: (target, username, privateKey, nonce, limits) =>
-        this.verifyManagementKey(target, username, privateKey, nonce, limits),
-    });
+    this.management = createWagoManagementService(
+      this.context,
+      {
+        execute: (target, credential, command, limits) =>
+          this.run(target.host, target.hostKeyFingerprint, credential, command, undefined, limits),
+        verifyNewKeyConnection: (target, username, privateKey, nonce, limits) =>
+          this.verifyManagementKey(target, username, privateKey, nonce, limits),
+      },
+      this.managementStore,
+    );
     try {
       await this.recoverSessions();
       await this.reconcileCompletedSessions();

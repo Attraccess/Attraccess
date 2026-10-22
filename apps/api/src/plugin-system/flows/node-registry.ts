@@ -6,7 +6,7 @@
  * Services that need the list import getRegisteredPluginFlowNodes() directly.
  */
 
-import type { PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk';
+import type { PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk/v2';
 
 // ponytail: Map keyed by type for O(1) lookup; registration order preserved via insertion order.
 interface RegisteredPluginFlowNode {
@@ -42,4 +42,9 @@ export function getPluginFlowNodeOwner(type: string): string | undefined {
 /** Returns all plugin-registered flow node definitions. */
 export function getRegisteredPluginFlowNodes(): PluginFlowNodeDefinition[] {
   return Array.from(_nodesMap.values(), ({ definition }) => definition);
+}
+
+/** Test helper: drops plugin registrations between isolated host fixtures. */
+export function resetPluginFlowRegistry(): void {
+  _nodesMap.clear();
 }

@@ -1,5 +1,6 @@
+import { TypeormUserPersistence } from '../persistence/typeorm-adapter';
 import { registerUsersServiceFixture } from '../users.service.users-service.test-fixture';
-import { User } from '@attraccess/database-entities';
+import { User, AuthenticationDetail, Session, ResourceUsage } from '@attraccess/database-entities';
 import { DataSource, EntitySchema } from 'typeorm';
 
 describe('UsersService', () => {
@@ -8,12 +9,9 @@ describe('UsersService', () => {
   describe('local login identifier lookup', () => {
     it('preserves existing username normalization', async () => {
       const user = { id: 7 } as User;
-      fixture.userRepository.findOne.mockResolvedValue(user);
-      await expect(fixture.service.findByLoginIdentifier(' Alice ')).resolves.toBe(user);
-      expect(fixture.userRepository.findOne).toHaveBeenCalledWith({
-        where: { username: 'alice' },
-        relations: undefined,
-      });
+      fixture.persistence.account.mockResolvedValue(user);
+      await expect(fixture.service.findByLoginIdentifier(' Alice ')).resolves.toEqual(user);
+      expect(fixture.persistence.account).toHaveBeenCalledWith({ username: 'alice' }, undefined);
     });
     describe('email lookup with stored case variants', () => {
       const schema = new EntitySchema<User>({
@@ -37,8 +35,17 @@ describe('UsersService', () => {
           { id: 7, email: 'Alice@Example.com' },
           { id: 8, email: 'a_btag@Example.com' },
         ]);
-        fixture.userRepository.findOne.mockImplementation((options) => repo.findOne(options));
-        fixture.userRepository.find.mockImplementation((options) => repo.find(options));
+        // This nested group is a real SQLite case-matching integration check.
+        const adapter = new TypeormUserPersistence(
+          repo,
+          db.getRepository(AuthenticationDetail),
+          db.getRepository(Session),
+          db.getRepository(ResourceUsage),
+        );
+        fixture.persistence.account.mockImplementation((lookup) => adapter.account(lookup));
+        fixture.persistence.caseInsensitiveEmailMatches.mockImplementation((email) =>
+          adapter.caseInsensitiveEmailMatches(email),
+        );
       });
 
       afterEach(async () => {
@@ -68,7 +75,8 @@ describe('UsersService', () => {
       'rejects malformed identifier %s without a query',
       async (identifier) => {
         await expect(fixture.service.findByLoginIdentifier(identifier)).resolves.toBeNull();
-        expect(fixture.userRepository.findOne).not.toHaveBeenCalled();
+        expect(fixture.persistence.account).not.toHaveBeenCalled();
+        expect(fixture.persistence.caseInsensitiveEmailMatches).not.toHaveBeenCalled();
       },
     );
   });

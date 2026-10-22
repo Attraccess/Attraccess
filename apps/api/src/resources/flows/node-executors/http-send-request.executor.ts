@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, HttpRequestNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, HttpRequestNodeDataSchema } from '@attraccess/application-models';
 import axios from 'axios';
 import z from 'zod';
 import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';

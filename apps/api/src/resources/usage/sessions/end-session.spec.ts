@@ -1,15 +1,6 @@
-import {
-  Resource,
-  ResourceFlowNodeType,
-  ResourceType,
-  ResourceUsage,
-  ResourceUsageAction,
-  User,
-} from '@attraccess/database-entities';
+import { Resource, ResourceFlowNodeType, ResourceType, ResourceUsage, User } from '@attraccess/application-models';
 
 import { BadRequestException } from '@nestjs/common';
-
-import { IsNull, SelectQueryBuilder } from 'typeorm';
 
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 
@@ -62,12 +53,6 @@ describe('ResourceUsageService', () => {
   describe('getActiveSession', () => {
     const getActiveSessionScope = inheritTestScope(
       {
-        get resourceUsageRepository() {
-          return scope.resourceUsageRepository;
-        },
-        set resourceUsageRepository(value: typeof scope.resourceUsageRepository) {
-          scope.resourceUsageRepository = value;
-        },
         get service() {
           return scope.service;
         },
@@ -80,26 +65,16 @@ describe('ResourceUsageService', () => {
 
     it('should return active session when it exists', async () => {
       const mockActiveSession = { id: 1, resourceId: 1, userId: 1, user: { id: 1 } as User } as ResourceUsage;
-      getActiveSessionScope.resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
+      getActiveSessionScope.operations.sessionRead.mockResolvedValue(mockActiveSession);
 
       const result = await getActiveSessionScope.service.getActiveSession(1);
 
-      expect(result).toBe(mockActiveSession);
-      expect(getActiveSessionScope.resourceUsageRepository.findOne).toHaveBeenCalledWith({
-        where: {
-          resourceId: 1,
-          endTime: IsNull(),
-          isFinalized: true,
-          lifecyclePending: false,
-          usageAction: ResourceUsageAction.Usage,
-        },
-        order: { startTime: 'DESC', id: 'DESC' },
-        relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
-      });
+      expect(result).toEqual(mockActiveSession);
+      expect(getActiveSessionScope.operations.persistence.activeSession).toHaveBeenCalledWith(1);
     });
 
     it('should return null when no active session exists', async () => {
-      getActiveSessionScope.resourceUsageRepository.findOne.mockResolvedValue(null);
+      getActiveSessionScope.operations.sessionRead.mockResolvedValue(null);
 
       const result = await getActiveSessionScope.service.getActiveSession(1);
 
@@ -119,25 +94,25 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Session completed' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Session completed',
+        attributedOperatingDurationInMinutes: 0,
+      };
 
       // Mock getActiveSession to return an active session, emitUsageEvent fetch, then final fetch
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession) // 1) getActiveSession
         .mockResolvedValueOnce(mockUpdatedSession) // 2) emitUsageEvent fetch
         .mockResolvedValueOnce(mockUpdatedSession); // 3) fetch updated session to return
 
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
       // Ensure update(ResourceUsage) is called: our mock returns chainable builder
-      (mockUpdateQueryBuilder.update as jest.Mock).mockReturnValue(mockUpdateQueryBuilder);
-      endSessionScope.resourceUsageRepository.createQueryBuilder.mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
 
       const result = await endSessionScope.service.endSession(1, endSessionScope.mockUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
-      expect(endSessionScope.resourceUsageRepository.manager.transaction).toHaveBeenCalled();
+      expect(result).toEqual(mockUpdatedSession);
+      expect(endSessionScope.operations.transactionDriver.run).toHaveBeenCalled();
       expect(endSessionScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
         expect.any(Object),
@@ -166,31 +141,32 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Auto-ended',
+        attributedOperatingDurationInMinutes: 0,
+      };
       const calls: string[] = [];
       let usageTransactionCommitted = false;
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
 
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-      endSessionScope.transactionalEntityManager.update.mockImplementation(async (entity, _id, values) => {
-        if (entity === ResourceUsage && values.endTime) calls.push('update');
-        return { affected: 1 };
+      endSessionScope.operations.persistence.endActiveUsage.mockImplementation(async () => {
+        calls.push('update');
+        return 1;
       });
       endSessionScope.flowExecutorService.runFlow.mockImplementation(async () => {
         expect(usageTransactionCommitted).toBe(true);
         calls.push('flow');
         return [];
       });
-      (endSessionScope.resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(
-        async (callback) => {
-          const result = await callback(endSessionScope.transactionalEntityManager);
+      (endSessionScope.operations.transactionDriver.run as jest.Mock).mockImplementationOnce(
+        async (_conflicts, callback) => {
+          const result = await callback({ resolve: () => endSessionScope.operations.persistence as never });
           usageTransactionCommitted = true;
           return result;
         },
@@ -229,24 +205,28 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Auto-ended',
+        attributedOperatingDurationInMinutes: 0,
+      };
       let usageTransactionCommitted = false;
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession);
       endSessionScope.flowExecutorService.runFlow.mockRejectedValueOnce(error);
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
+
       let sessionEnded = false;
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-      (mockUpdateQueryBuilder.execute as jest.Mock).mockImplementation(async () => {
+
+      endSessionScope.operations.persistence.endActiveUsage.mockImplementation(async () => {
         sessionEnded = true;
+        return 1;
       });
-      (endSessionScope.resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(
-        async (callback) => {
-          const result = await callback(endSessionScope.transactionalEntityManager);
+      (endSessionScope.operations.transactionDriver.run as jest.Mock).mockImplementationOnce(
+        async (_conflicts, callback) => {
+          const result = await callback({ resolve: () => endSessionScope.operations.persistence as never });
           usageTransactionCommitted = true;
           return result;
         },
@@ -264,7 +244,7 @@ describe('ResourceUsageService', () => {
       expect(endSessionScope.mockMetricsService.resourceUsageSessionsTotal.inc).not.toHaveBeenCalled();
       expect(usageTransactionCommitted).toBe(true);
       expect(sessionEnded).toBe(false);
-      expect(endSessionScope.transactionalEntityManager.update).not.toHaveBeenCalled();
+      expect(endSessionScope.operations.persistence.endActiveUsage).not.toHaveBeenCalled();
       expect(endSessionScope.billingService.chargeForResourceUsage).not.toHaveBeenCalled();
       expect(endSessionScope.mockAuditService.recordResource).not.toHaveBeenCalled();
       expect(endSessionScope.lifecycleAttempts.size).toBe(0);
@@ -289,19 +269,12 @@ describe('ResourceUsageService', () => {
         user: { id: 1, username: 'member' } as User,
         resource: { id: 1, type: ResourceType.Machine } as Resource,
       } as ResourceUsage;
-      const updateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
 
-      endSessionScope.resourceUsageRepository.findOne.mockImplementation(async ({ where }) => {
-        if (where?.id === usage.id || (where?.resourceId === usage.resourceId && usage.endTime === null)) {
-          return usage;
-        }
-        return null;
-      });
-      endSessionScope.resourceUsageRepository.findAndCount = jest.fn().mockResolvedValue([[usage], 1]);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(updateQueryBuilder);
-      endSessionScope.transactionalEntityManager.update.mockImplementation(async (entity, _id, values) => {
-        if (entity === ResourceUsage) Object.assign(usage, values);
-        return { affected: 1 };
+      endSessionScope.operations.sessionRead.mockResolvedValue(usage);
+      endSessionScope.operations.persistence.history.mockResolvedValue([[usage], 1]);
+      endSessionScope.operations.persistence.endActiveUsage.mockImplementation(async (_id, endTime, endNotes) => {
+        Object.assign(usage, { endTime, endNotes });
+        return 1;
       });
 
       // No-activity flows end a session with configured notes and skip interactive end forms.
@@ -324,10 +297,15 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: { id: 1 } as User,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Auto-ended',
+        attributedOperatingDurationInMinutes: 0,
+      };
       const billingError = new Error('Billing failed');
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession);
       endSessionScope.billingService.chargeForResourceUsage.mockRejectedValueOnce(billingError);
@@ -338,7 +316,7 @@ describe('ResourceUsageService', () => {
 
       expect(endSessionScope.billingService.chargeForResourceUsage).toHaveBeenCalledWith(
         mockUpdatedSession,
-        endSessionScope.transactionalEntityManager,
+        expect.objectContaining({ backend: 'fake', resolve: expect.any(Function) }),
       );
       expect(endSessionScope.flowExecutorService.runFlow).toHaveBeenCalledTimes(1);
       expect(endSessionScope.eventEmitter.emitAsync).not.toHaveBeenCalled();
@@ -364,17 +342,13 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: `[By #${managerUser.id} - ${managerUser.username}] ${dto.notes}`,
+        attributedOperatingDurationInMinutes: 0,
       };
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
-
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
 
       await endSessionScope.service.endSession(mockActiveSession.resourceId, managerUser, dto);
 
@@ -384,7 +358,7 @@ describe('ResourceUsageService', () => {
       expect(endedEmit).toBeDefined();
       const payload = endedEmit?.[1] as ResourceUsageSessionEndedEvent;
       expect(payload).toBeInstanceOf(ResourceUsageSessionEndedEvent);
-      expect(payload.usage).toBe(mockUpdatedSession);
+      expect(payload.usage).toEqual(mockUpdatedSession);
       expect(payload.endedBy).toEqual({ id: managerUser.id, username: managerUser.username });
     });
 
@@ -402,17 +376,13 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: 'Flow stop',
+        attributedOperatingDurationInMinutes: 0,
       };
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
-
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
 
       await endSessionScope.service.endSession(
         mockActiveSession.resourceId,
@@ -426,7 +396,7 @@ describe('ResourceUsageService', () => {
       );
       expect(endedEmit).toBeDefined();
       const payload = endedEmit?.[1] as ResourceUsageSessionEndedEvent;
-      expect(payload.usage).toBe(mockUpdatedSession);
+      expect(payload.usage).toEqual(mockUpdatedSession);
       expect(payload.endedBy).toBeNull();
     });
 
@@ -463,7 +433,7 @@ describe('ResourceUsageService', () => {
       const dto: EndUsageSessionDto = { notes: 'Session completed' };
 
       // Mock getActiveSession to return null (no active session)
-      endSessionScope.resourceUsageRepository.findOne.mockResolvedValue(null);
+      endSessionScope.operations.sessionRead.mockResolvedValue(null);
 
       await expect(endSessionScope.service.endSession(1, endSessionScope.mockUser, dto)).rejects.toThrow(
         new BadRequestException('No active session found'),
@@ -481,18 +451,21 @@ describe('ResourceUsageService', () => {
         user: sessionOwner,
         resource: { id: 12, name: 'Laser cutter' } as Resource,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Session completed' };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Session completed',
+        attributedOperatingDurationInMinutes: 0,
+      };
       let transactionStarted = false;
 
-      (endSessionScope.resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (cb) => {
+      (endSessionScope.operations.transactionDriver.run as jest.Mock).mockImplementationOnce(async (_conflicts, cb) => {
         transactionStarted = true;
-        return cb(endSessionScope.transactionalEntityManager);
+        return cb({ resolve: () => endSessionScope.operations.persistence as never });
       });
-      endSessionScope.resourceUsageRepository.findOne.mockImplementation(async () => {
+      endSessionScope.operations.sessionRead.mockImplementation(async () => {
         expect(transactionStarted).toBe(true);
-        return endSessionScope.resourceUsageRepository.findOne.mock.calls.length === 1
-          ? mockActiveSession
-          : mockUpdatedSession;
+        return endSessionScope.operations.sessionRead.mock.calls.length === 1 ? mockActiveSession : mockUpdatedSession;
       });
 
       await endSessionScope.service.endSession(mockActiveSession.resourceId, sessionOwner, dto);
@@ -521,27 +494,23 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
 
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, managerUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       expect(endSessionScope.resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
-      expect(endSessionScope.transactionalEntityManager.update).toHaveBeenCalled();
+      expect(endSessionScope.operations.persistence.endActiveUsage).toHaveBeenCalled();
       expect(endSessionScope.billingService.chargeForResourceUsage).toHaveBeenCalledWith(
         mockUpdatedSession,
-        endSessionScope.transactionalEntityManager,
+        expect.objectContaining({ backend: 'fake', resolve: expect.any(Function) }),
       );
       expect(endSessionScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
         ResourceSessionStartedEvent.EVENT_NAME,
@@ -572,22 +541,18 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceIntroducersService.canMaintain.mockResolvedValue(true);
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
 
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, introducerUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       expect(endSessionScope.resourceIntroducersService.canMaintain).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         introducerUser.id,
@@ -618,24 +583,20 @@ describe('ResourceUsageService', () => {
         ...mockActiveSession,
         endTime: new Date(),
         endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
       };
 
       endSessionScope.resourceIntroducersService.canMaintain.mockImplementation(
         async (_resId, _userId, includeGroupIntroducers) => (includeGroupIntroducers ? true : false),
       );
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
 
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, groupIntroducer, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       expect(endSessionScope.resourceIntroducersService.canMaintain).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
         groupIntroducer.id,
@@ -666,21 +627,21 @@ describe('ResourceUsageService', () => {
         user: sessionOwner,
       } as ResourceUsage;
       const prefixedNotes = `[By #${supervisorUser.id} - ${supervisorUser.username}] ${dto.notes}`;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: prefixedNotes };
+      const mockUpdatedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: prefixedNotes,
+        attributedOperatingDurationInMinutes: 0,
+      };
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
 
-      const mockUpdateQueryBuilder = endSessionScope.createMockQueryBuilder(null);
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-
       const result = await endSessionScope.service.endSession(mockActiveSession.resourceId, supervisorUser, dto);
 
-      expect(result).toBe(mockUpdatedSession);
+      expect(result).toEqual(mockUpdatedSession);
       // The supervisor short-circuits the authorization check; no introducer lookup needed.
       expect(endSessionScope.resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(endSessionScope.flowExecutorService.runFlow).toHaveBeenCalledWith(
@@ -704,16 +665,12 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: sessionOwner,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date() };
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), attributedOperatingDurationInMinutes: 0 };
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
-
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        endSessionScope.createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
 
       await endSessionScope.service.endSession(mockActiveSession.resourceId, supervisorUser, dto);
 
@@ -737,16 +694,12 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         user: sessionOwner,
       } as ResourceUsage;
-      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date() };
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), attributedOperatingDurationInMinutes: 0 };
 
-      endSessionScope.resourceUsageRepository.findOne
+      endSessionScope.operations.sessionRead
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession)
         .mockResolvedValueOnce(mockUpdatedSession);
-
-      (endSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        endSessionScope.createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
 
       await endSessionScope.service.endSession(mockActiveSession.resourceId, sessionOwner, dto);
 

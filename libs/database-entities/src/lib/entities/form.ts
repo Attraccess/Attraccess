@@ -12,19 +12,7 @@ import {
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
-
-export enum FormFieldType {
-  TEXT = 'text',
-  NUMBER = 'number',
-  BOOLEAN = 'boolean',
-  SELECT = 'select',
-}
-
-export enum ResourceFormAction {
-  START = 'start',
-  TAKEOVER = 'takeover',
-  END = 'end',
-}
+import { FormFieldType, ResourceFormAction } from '@attraccess/application-models';
 
 @Entity()
 export class Form {
@@ -175,3 +163,5 @@ export class FormSubmission {
   @ApiProperty({ description: 'The action that triggered the submission', enum: ResourceFormAction })
   action!: ResourceFormAction;
 }
+
+export { FormFieldType, ResourceFormAction } from '@attraccess/application-models';

@@ -7,7 +7,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ResourceMaintenanceService } from './maintenance.service';
-import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk/v2';
 
 @Injectable()
 export class CanManageMaintenanceGuard implements CanActivate {

@@ -5,122 +5,13 @@ import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-p
 import type { PluginAuditContext } from './plugin-audit';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
-/**
- * DI token under which the host registers its MqttServerHostProvider
- * implementation. The plugin context resolves the provider through this token;
- * plugins never reference it directly — they call getMqttServerConfig instead.
- */
-export const MQTT_SERVER_HOST_PROVIDER = Symbol.for('attraccess.plugin.mqttServerHostProvider');
-
-/**
- * Connection configuration for a single MQTT server, including its resolved
- * (decrypted) credentials. A generic, broker-agnostic shape carrying only the
- * fields a plugin needs to open a connection or call a server's management API.
- */
-export interface MqttServerConnectionConfig {
-  readonly id: number;
-  readonly name: string;
-  readonly host: string;
-  readonly port: number;
-  /** Management API port on the same host (1-65535). Null/omitted uses the provider default. */
-  readonly managementPort?: number | null;
-  readonly useTls: boolean;
-  /** PEM trust anchors for private PKI. Omitted by older hosts. */
-  readonly caCert?: string | null;
-  /** Integrations requiring authenticated TLS must reject this setting. */
-  readonly tlsInsecure?: boolean;
-  readonly tlsServername?: string | null;
-  readonly username: string | null;
-  /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
-  readonly password: string | null;
-  readonly clientId: string | null;
-}
-
-/**
- * Host-side provider that resolves an MQTT server's connection config. The core
- * application implements this — all credential decryption stays core-side — and
- * registers it under MQTT_SERVER_HOST_PROVIDER. Plugins reach it only through
- * PluginContext.getMqttServerConfig, gated by the ACCESS_MQTT_SERVERS permission.
- */
-export interface MqttServerHostProvider {
-  getServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
-}
-
-/** A message delivered to a plugin's MQTT subscription. */
-export interface PluginMqttMessage {
-  readonly serverId: number;
-  readonly topic: string;
-  readonly payload: Buffer;
-}
-
-/** Handle returned from an MQTT subscription. */
-export interface PluginMqttSubscription {
-  unsubscribe(): void;
-}
-
-export interface PluginMqttClient {
-  /**
-   * Subscribe through the host's shared MQTT connection. MQTT wildcards `+`
-   * and `#` are supported. Resolves after the broker acknowledges the
-   * subscription. Handlers run serially; each subscription buffers up to 100
-   * messages and drops new messages while full. The returned handle detaches
-   * the handler.
-   */
-  subscribe(
-    serverId: number,
-    topicFilter: string,
-    handler: (message: PluginMqttMessage) => void | Promise<void>,
-  ): Promise<PluginMqttSubscription>;
-
-  /** Publish through the host's shared MQTT connection. */
-  publish(
-    serverId: number,
-    topic: string,
-    payload: string | Buffer,
-    options?: { qos?: 0 | 1 | 2; retain?: boolean },
-  ): Promise<void>;
-
-  /** Reconnect using current configured settings and restore shared topic
-   * registrations. Optional for compatibility with older host runtimes.
-   */
-  refreshConnection?(serverId: number): Promise<void>;
-}
-
-/**
- * DI token under which a plugin's own services can inject the PluginContext.
- * The host publishes the context as a module-scoped provider with this token.
- */
-export const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
-
-/**
- * Subset of the host manifest exposed to a plugin at runtime. The host's
- * LoadedPluginManifest structurally satisfies this shape.
- */
-export interface PluginManifestInfo {
-  readonly id: string;
-  readonly name: string;
-  readonly version: string;
-  readonly pluginDirectory: string;
-}
-
-/** Host flow functionality available to plugins with the TRIGGER_FLOWS permission. */
-export interface PluginFlowsContext {
-  /**
-   * Starts a flow from every persisted trigger node of nodeType whose saved
-   * configuration matches the supplied external event.
-   */
-  trigger(
-    nodeType: string,
-    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
-    payload: object,
-  ): Promise<void>;
-}
-
-/** Host-managed encryption for secret material owned by this plugin. */
-export interface PluginSecretsContext {
-  encrypt(plaintext: string): string;
-  decrypt(ciphertext: string): string;
-}
+import {
+  MqttServerConnectionConfig,
+  PluginMqttClient,
+  PluginManifestInfo,
+  PluginFlowsContext,
+  PluginSecretsContext,
+} from './persistence/plugin-context';
 
 /**
  * Curated facade handed to a backend plugin at load time. It is the single,
@@ -189,3 +80,15 @@ export interface PluginContext {
 }
 
 export { PluginBackendModule } from './plugin-backend-module';
+export {
+  MQTT_SERVER_HOST_PROVIDER,
+  MqttServerConnectionConfig,
+  MqttServerHostProvider,
+  PluginMqttMessage,
+  PluginMqttSubscription,
+  PluginMqttClient,
+  PLUGIN_CONTEXT,
+  PluginManifestInfo,
+  PluginFlowsContext,
+  PluginSecretsContext,
+} from './persistence/plugin-context';

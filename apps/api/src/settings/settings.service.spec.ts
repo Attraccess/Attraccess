@@ -2,8 +2,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { validate } from 'class-validator';
 import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { User } from '@attraccess/database-entities';
+import { SettingsPersistence } from './persistence/port';
 import { SettingsService } from './settings.service';
 import { SettingsStoreService } from './settings-store.service';
 import { SmtpSettingsService } from './smtp-settings.service';
@@ -34,7 +33,7 @@ describe('SettingsService', () => {
     setSecretSetting: jest.Mock;
   };
   let smtpSettings: { getSettings: jest.Mock };
-  let userRepository: { count: jest.Mock };
+  let persistence: { countUsers: jest.Mock };
   let invalidator: { refresh: jest.Mock };
 
   beforeEach(async () => {
@@ -46,7 +45,7 @@ describe('SettingsService', () => {
       setSecretSetting: jest.fn().mockResolvedValue(undefined),
     };
     smtpSettings = { getSettings: jest.fn() };
-    userRepository = { count: jest.fn() };
+    persistence = { countUsers: jest.fn() };
     invalidator = { refresh: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
@@ -55,7 +54,7 @@ describe('SettingsService', () => {
         { provide: EventEmitter2, useValue: events },
         { provide: SettingsStoreService, useValue: store },
         { provide: SmtpSettingsService, useValue: smtpSettings },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: SettingsPersistence, useValue: persistence },
         { provide: METRICS_TOGGLE_INVALIDATOR, useValue: invalidator },
       ],
     }).compile();
@@ -214,7 +213,7 @@ describe('SettingsService', () => {
         passConfigured: false,
         from: 'noreply@attraccess.example',
       });
-      userRepository.count.mockResolvedValue(0);
+      persistence.countUsers.mockResolvedValue(0);
 
       const status = await service.getFirstTimeSetupStatus();
 

@@ -1,6 +1,7 @@
+import { WagoFlowPersistence } from './persistence/port';
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
-import { type PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { WagoFlowContext } from './state';
 
 import { WagoService } from '../controllers/service';
 
@@ -20,9 +21,9 @@ import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 
 import { type WagoConfigurationSnapshot } from '../configuration/model';
 
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import { WagoConfigurationRevision } from '../configuration/revision.record';
 
-import { WagoController } from '../controllers/entity';
+import { WagoController } from '../controllers/record';
 
 import { type WagoOperationalMessage, parseOperationalMessage } from '../protocol/index';
 
@@ -30,8 +31,12 @@ import { WagoFlowQueries } from './queries';
 
 @Injectable()
 export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, OnModuleDestroy {
-  constructor(@Inject(PLUGIN_CONTEXT) context: PluginContext, @Inject(WagoService) wago?: WagoService) {
-    super(context, wago);
+  constructor(
+    @Inject(PLUGIN_CONTEXT) context: WagoFlowContext,
+    @Inject(WagoFlowPersistence) persistence: WagoFlowPersistence,
+    @Inject(WagoService) wago?: WagoService,
+  ) {
+    super(context, persistence, wago);
   }
 
   protected async dispatch(): Promise<void> {
@@ -175,34 +180,13 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected async loadLatestAppliedRevisions(controllerIds: number[]): Promise<WagoConfigurationRevision[]> {
-    if (!controllerIds.length) return [];
-    return this.revisions
-      .createQueryBuilder('revision')
-      .innerJoin(
-        (query) =>
-          query
-            .subQuery()
-            .select('latest.controllerId', 'controllerId')
-            .addSelect('MAX(latest.revision)', 'revision')
-            .from(WagoConfigurationRevision, 'latest')
-            .where('latest.controllerId IN (:...controllerIds)', { controllerIds })
-            .andWhere('latest.state = :state', { state: 'applied' })
-            .groupBy('latest.controllerId'),
-        'latest',
-        'latest.controllerId = revision.controllerId AND latest.revision = revision.revision',
-      )
-      .where('revision.state = :state', { state: 'applied' })
-      .getMany();
+    return this.persistence.latestAppliedRevisions(controllerIds);
   }
 
   protected async channels(controllerId: number): Promise<WagoConfigurationSnapshot['logicalChannels']> {
     const cached = this.channelCache.get(controllerId);
     if (cached) return cached;
-    const [revision] = await this.revisions.find({
-      where: { controllerId, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
-    });
+    const revision = await this.persistence.latestAppliedRevision(controllerId);
     if (!revision) {
       this.channelCache.set(controllerId, []);
       return [];

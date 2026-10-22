@@ -1,11 +1,11 @@
+import { GroupIntroductionPersistence } from '../persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   IntroductionHistoryAction,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { ResourceGroupsIntroductionsService } from './resourceGroups.introductions.service';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
@@ -14,25 +14,20 @@ import { AuditService } from '../../../audit/audit.service';
 
 describe('ResourceGroupsIntroductionsService notifications', () => {
   let service: ResourceGroupsIntroductionsService;
-  let introductionRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock; find: jest.Mock };
-  let historyRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock };
+  let persistence: jest.Mocked<GroupIntroductionPersistence>;
   let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
   let retraining: { getIntroductionRetrainingStatus: jest.Mock };
   let audit: { recordResource: jest.Mock };
 
   beforeEach(async () => {
-    introductionRepository = {
-      findOne: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockImplementation((data) => ({ id: 10, ...data })),
-      save: jest.fn().mockImplementation(async (data) => ({ id: 10, ...data })),
-      update: jest.fn(),
-      find: jest.fn(),
-    };
-    historyRepository = {
-      findOne: jest.fn(),
-      create: jest.fn().mockImplementation((data) => data),
-      save: jest.fn().mockImplementation(async (data) => ({ id: 20, ...data })),
-      find: jest.fn(),
+    persistence = {
+      find: jest.fn().mockResolvedValue(null),
+      latest: jest.fn(),
+      list: jest.fn(),
+      history: jest.fn(),
+      setTutor: jest.fn(),
+      create: jest.fn(async (_subject, userId) => ({ id: 10, receiverUser: { id: userId } }) as ResourceIntroduction),
+      appendHistory: jest.fn(async (data) => ({ id: 20, ...data }) as unknown as ResourceIntroductionHistoryItem),
     };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
     retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
@@ -41,8 +36,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceGroupsIntroductionsService,
-        { provide: getRepositoryToken(ResourceIntroduction), useValue: introductionRepository },
-        { provide: getRepositoryToken(ResourceIntroductionHistoryItem), useValue: historyRepository },
+        { provide: GroupIntroductionPersistence, useValue: persistence },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: NotificationDispatchService, useValue: notifications },
         { provide: ResourceRetrainingService, useValue: retraining },
@@ -84,27 +78,38 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
   it('records the acting user for a granted introduction', async () => {
     await service.grant(5, 3, undefined, { performedByUserId: 9 });
 
-    expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'introduction.granted', actorId: 9, subjectType: 'resource_group', subjectId: 5,
-      details: { recipientUserId: 3 },
-    }));
+    expect(persistence.appendHistory).toHaveBeenCalledWith(expect.objectContaining({ performedByUserId: 9 }));
+    expect(audit.recordResource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'introduction.granted',
+        actorId: 9,
+        subjectType: 'resource_group',
+        subjectId: 5,
+        details: { recipientUserId: 3 },
+      }),
+    );
   });
 
   it('records a cleared event only when the renewed group introduction was due', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    retraining.getIntroductionRetrainingStatus.mockResolvedValueOnce({ isDue: true }).mockResolvedValueOnce({ isDue: false });
+    persistence.find.mockResolvedValue({ id: 10, receiverUser: { id: 3 } } as ResourceIntroduction);
+    retraining.getIntroductionRetrainingStatus
+      .mockResolvedValueOnce({ isDue: true })
+      .mockResolvedValueOnce({ isDue: false });
 
     await service.grant(5, 3);
 
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'retraining.cleared', subjectType: 'resource_group', subjectId: 5,
-      details: { introductionId: 10, usageUserId: 3 },
-    }));
+    expect(audit.recordResource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retraining.cleared',
+        subjectType: 'resource_group',
+        subjectId: 5,
+        details: { introductionId: 10, usageUserId: 3 },
+      }),
+    );
   });
 
   it('does not clear a group introduction when inactivity remains due after renewal', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+    persistence.find.mockResolvedValue({ id: 10, receiverUser: { id: 3 } } as ResourceIntroduction);
     retraining.getIntroductionRetrainingStatus.mockResolvedValue({ isDue: true });
 
     await service.grant(5, 3);
@@ -113,17 +118,22 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
   });
 
   it('records the acting user for a revoked introduction', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+    persistence.find.mockResolvedValue({ id: 10, receiverUser: { id: 3 } } as ResourceIntroduction);
 
     await service.revoke(5, 3, undefined, { performedByUserId: 9 });
 
-    expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({ action: 'introduction.revoked', actorId: 9 }));
+    expect(persistence.appendHistory).toHaveBeenCalledWith(expect.objectContaining({ performedByUserId: 9 }));
+    expect(audit.recordResource).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'introduction.revoked', actorId: 9 }),
+    );
   });
 
   it('does not notify when a group introduction is granted twice without an effective access change', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    historyRepository.findOne.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
+    persistence.find.mockResolvedValue({ id: 10, receiverUser: { id: 3 } } as ResourceIntroduction);
+    persistence.latest.mockResolvedValue({
+      id: 19,
+      action: IntroductionHistoryAction.GRANT,
+    } as ResourceIntroductionHistoryItem);
 
     await service.grant(5, 3);
 
@@ -131,8 +141,11 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
   });
 
   it('notifies the user when a group introduction is revoked', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    historyRepository.findOne.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
+    persistence.find.mockResolvedValue({ id: 10, receiverUser: { id: 3 } } as ResourceIntroduction);
+    persistence.latest.mockResolvedValue({
+      id: 19,
+      action: IntroductionHistoryAction.GRANT,
+    } as ResourceIntroductionHistoryItem);
 
     await service.revoke(5, 3);
 
@@ -148,8 +161,11 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
   });
 
   it('does not notify when a group introduction is revoked twice without an effective access change', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    historyRepository.findOne.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.REVOKE });
+    persistence.find.mockResolvedValue({ id: 10, receiverUser: { id: 3 } } as ResourceIntroduction);
+    persistence.latest.mockResolvedValue({
+      id: 19,
+      action: IntroductionHistoryAction.REVOKE,
+    } as ResourceIntroductionHistoryItem);
 
     await service.revoke(5, 3);
 

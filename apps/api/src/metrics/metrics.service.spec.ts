@@ -1,40 +1,24 @@
+import { MetricsPersistence } from './persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { MetricsService } from './metrics.service';
-import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session } from '@attraccess/database-entities';
-
 describe('MetricsService', () => {
   let service: MetricsService;
 
-  const mockQueryBuilder = {
-    select: jest.fn().mockReturnThis(),
-    addSelect: jest.fn().mockReturnThis(),
-    groupBy: jest.fn().mockReturnThis(),
-    getRawMany: jest.fn().mockResolvedValue([{ locale: 'en', count: '10' }]),
+  const snapshot = {
+    users: 10,
+    resources: 5,
+    projects: 3,
+    groups: 2,
+    mqttServers: 1,
+    activeUsageSessions: 4,
+    activeAuthSessions: 7,
+    localeCounts: [{ locale: 'en', count: 10 }],
   };
-  const mockUserRepo = {
-    count: jest.fn().mockResolvedValue(10),
-    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
-  };
-  const mockResourceRepo = { count: jest.fn().mockResolvedValue(5) };
-  const mockProjectRepo = { count: jest.fn().mockResolvedValue(3) };
-  const mockResourceGroupRepo = { count: jest.fn().mockResolvedValue(2) };
-  const mockMqttServerRepo = { count: jest.fn().mockResolvedValue(1) };
-  const mockResourceUsageRepo = { count: jest.fn().mockResolvedValue(4) };
-  const mockSessionRepo = { count: jest.fn().mockResolvedValue(7) };
+  const persistence: jest.Mocked<MetricsPersistence> = { snapshot: jest.fn().mockResolvedValue(snapshot) };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MetricsService,
-        { provide: getRepositoryToken(User), useValue: mockUserRepo },
-        { provide: getRepositoryToken(Resource), useValue: mockResourceRepo },
-        { provide: getRepositoryToken(Project), useValue: mockProjectRepo },
-        { provide: getRepositoryToken(ResourceGroup), useValue: mockResourceGroupRepo },
-        { provide: getRepositoryToken(MqttServer), useValue: mockMqttServerRepo },
-        { provide: getRepositoryToken(ResourceUsage), useValue: mockResourceUsageRepo },
-        { provide: getRepositoryToken(Session), useValue: mockSessionRepo },
-      ],
+      providers: [MetricsService, { provide: MetricsPersistence, useValue: persistence }],
     }).compile();
 
     service = module.get<MetricsService>(MetricsService);
@@ -83,19 +67,20 @@ describe('MetricsService', () => {
       expect(metricsOutput).toContain('attraccess_auth_active_sessions 7');
     });
 
-    it('queries active sessions (non-expired) for authActiveSessions', async () => {
+    it('requests a snapshot at the current time', async () => {
       await service.onModuleInit();
 
-      expect(mockSessionRepo.count).toHaveBeenCalledWith({
-        where: { expiresAt: expect.anything() },
-      });
+      expect(persistence.snapshot).toHaveBeenCalledWith(expect.any(Date));
     });
 
-    it('seeds usersPerLocale gauge from locale GROUP BY query', async () => {
-      mockQueryBuilder.getRawMany.mockResolvedValueOnce([
-        { locale: 'en', count: '8' },
-        { locale: 'de-DE', count: '2' },
-      ]);
+    it('seeds usersPerLocale gauge from normalized locale counts', async () => {
+      persistence.snapshot.mockResolvedValueOnce({
+        ...snapshot,
+        localeCounts: [
+          { locale: 'en', count: 8 },
+          { locale: 'de-DE', count: 2 },
+        ],
+      });
       await service.onModuleInit();
 
       const metricsOutput = await service.getMetrics();
@@ -136,7 +121,9 @@ describe('MetricsService', () => {
       service.authSsoLoginFailuresTotal.inc({ provider_type: 'oidc', reason: 'invalid_assertion' });
 
       const metrics = await service.getMetrics();
-      expect(metrics).toContain('attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1');
+      expect(metrics).toContain(
+        'attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1',
+      );
     });
 
     it('attractapFirmwareUpdatesTotal counter is defined', () => {
@@ -166,7 +153,9 @@ describe('MetricsService', () => {
 
       const metrics = await service.getMetrics();
       expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="success"} 1');
-      expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1');
+      expect(metrics).toContain(
+        'attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1',
+      );
     });
 
     it('uses attraccess_ prefix (consistent with naming convention)', async () => {

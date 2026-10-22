@@ -1,4 +1,4 @@
-import type { PluginFlowExecutionNodeDefinition } from '@attraccess/plugins-backend-sdk';
+import type { PluginFlowExecutionNodeDefinition } from '@attraccess/plugins-backend-sdk/v2';
 import type { WagoService } from '../controllers/service';
 import { WAGO_FLOW_PREVIEW_SCHEMA } from './preview';
 

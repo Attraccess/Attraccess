@@ -233,7 +233,13 @@ describe('UsersAdminController', () => {
       };
 
       const response = await controller.getOneById(user.id, mockRequest as AuthenticatedRequest);
-      expect(response).toEqual(user);
+      expect(response).toMatchObject({
+        id: user.id,
+        username: user.username,
+        isEmailVerified: true,
+        authenticationDetails: [],
+      });
+      expect(response).not.toHaveProperty('email');
     });
   });
 });

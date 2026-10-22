@@ -1,4 +1,17 @@
-import { entities, NFCCard, Resource, ResourceType, User } from '@attraccess/database-entities';
+import { TypeormUserPersistence } from '../../../users-and-auth/users/persistence/typeorm-adapter';
+import { TypeormAttractapPersistence, TypeormAttractapResourceReader } from '../../persistence/typeorm-adapter';
+import {
+  entities,
+  AuthenticationDetail,
+  Session,
+  ResourceUsage,
+  Attractap,
+  AttractapCrashReport,
+  NFCCard,
+  Resource,
+  ResourceType,
+  User,
+} from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';
@@ -43,7 +56,12 @@ describe('persisted web UI locale at card authentication', () => {
 
     // Keep production persistence and lookup methods; stub only unrelated collaborators.
     const usersService: UsersService = Object.assign(Object.create(UsersService.prototype), {
-      userRepository,
+      persistence: new TypeormUserPersistence(
+        userRepository,
+        source.getRepository(AuthenticationDetail),
+        source.getRepository(Session),
+        source.getRepository(ResourceUsage),
+      ),
       metricsService: {
         usersLocaleSyncsTotal: { inc: jest.fn() },
         usersPerLocale: { inc: jest.fn(), dec: jest.fn() },
@@ -51,7 +69,13 @@ describe('persisted web UI locale at card authentication', () => {
     });
     const profile = new UserProfileController(usersService);
     const attractapService: AttractapService = Object.assign(Object.create(AttractapService.prototype), {
-      nfcCardRepository: cardRepository,
+      persistence: new TypeormAttractapPersistence(
+        cardRepository,
+        source.getRepository(Attractap),
+        source.getRepository(AttractapCrashReport),
+        resourceRepository,
+        userRepository,
+      ),
       encryptionService: { decryptIfEncrypted: (value: string) => value },
     });
     let defaultLanguage = 'de';
@@ -61,7 +85,7 @@ describe('persisted web UI locale at card authentication', () => {
     const handler: AttractapCardHandler = Object.assign(new AttractapCardHandler(), {
       attractapService,
       settingsService,
-      resourceRepository,
+      resourceReader: new TypeormAttractapResourceReader(resourceRepository),
       metricsService: { attractapNfcTapsTotal: { inc: jest.fn() } },
       resourceUsageService: { canControllResource: async () => true },
       resourceIntroducersService: { isIntroducer: async () => false },

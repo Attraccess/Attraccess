@@ -1,21 +1,15 @@
 import {
   Resource,
   ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleTimeIntervalConfig,
-  ResourceMaintenanceScheduleUsageCountConfig,
-  ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleTriggerType,
   UsageDurationUnit,
-  ResourceMaintenance,
   ResourceMaintenanceScheduleDurationBasis,
   ResourceType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { MaintenanceSchedulePersistence } from './persistence/port';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -28,34 +22,18 @@ import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule
 @Injectable()
 export class MaintenanceScheduleService {
   constructor(
-    @InjectRepository(ResourceMaintenanceSchedule)
-    protected readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
-    @InjectRepository(ResourceMaintenanceScheduleUsageHoursConfig)
-    protected readonly usageHoursConfigRepository: Repository<ResourceMaintenanceScheduleUsageHoursConfig>,
-    @InjectRepository(ResourceMaintenanceScheduleUsageCountConfig)
-    protected readonly usageCountConfigRepository: Repository<ResourceMaintenanceScheduleUsageCountConfig>,
-    @InjectRepository(ResourceMaintenanceScheduleTimeIntervalConfig)
-    protected readonly timeIntervalConfigRepository: Repository<ResourceMaintenanceScheduleTimeIntervalConfig>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
+    protected readonly persistence: MaintenanceSchedulePersistence,
     protected readonly audit: AuditService,
     protected readonly evaluator: MaintenanceScheduleEvaluatorService,
   ) {}
 
   async findAllByResourceId(resourceId: number): Promise<ResourceMaintenanceSchedule[]> {
     await this.ensureResourceExists(resourceId);
-    return this.scheduleRepository.find({
-      where: { resourceId },
-      relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
-      order: { id: 'ASC' },
-    });
+    return this.persistence.schedules(resourceId);
   }
 
   async getOne(resourceId: number, scheduleId: number): Promise<ResourceMaintenanceSchedule> {
-    const schedule = await this.scheduleRepository.findOne({
-      where: { id: scheduleId, resourceId },
-      relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
-    });
+    const schedule = await this.persistence.schedule(resourceId, scheduleId);
     if (!schedule) {
       throw new NotFoundException('Maintenance schedule not found');
     }
@@ -82,9 +60,7 @@ export class MaintenanceScheduleService {
   }
 
   protected async removeConfigsForSchedule(scheduleId: number): Promise<void> {
-    await this.usageHoursConfigRepository.delete({ scheduleId });
-    await this.usageCountConfigRepository.delete({ scheduleId });
-    await this.timeIntervalConfigRepository.delete({ scheduleId });
+    await this.persistence.removeConfigurations(scheduleId);
   }
 
   protected async upsertConfigForSchedule(
@@ -99,35 +75,22 @@ export class MaintenanceScheduleService {
     switch (triggerType) {
       case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS:
         if (configs.usageHoursConfig) {
-          await this.usageHoursConfigRepository.save(
-            this.usageHoursConfigRepository.create({
-              scheduleId,
-              duration: configs.usageHoursConfig.duration,
-              unit: configs.usageHoursConfig.unit,
-            }),
+          await this.persistence.createUsageHours(
+            scheduleId,
+            configs.usageHoursConfig.duration,
+            configs.usageHoursConfig.unit,
           );
         }
         break;
       case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT:
         if (configs.usageCountConfig) {
-          await this.usageCountConfigRepository.save(
-            this.usageCountConfigRepository.create({
-              scheduleId,
-              thresholdSessions: configs.usageCountConfig.thresholdSessions,
-            }),
-          );
+          await this.persistence.createUsageCount(scheduleId, configs.usageCountConfig.thresholdSessions);
         }
         break;
       case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL:
         if (configs.timeIntervalConfig) {
           const { duration, unit } = configs.timeIntervalConfig;
-          await this.timeIntervalConfigRepository.save(
-            this.timeIntervalConfigRepository.create({
-              scheduleId,
-              duration,
-              unit,
-            }),
-          );
+          await this.persistence.createTimeInterval(scheduleId, duration, unit);
         }
         break;
     }
@@ -143,14 +106,13 @@ export class MaintenanceScheduleService {
     const resource = await this.ensureResourceExists(resourceId);
     this.validateDurationBasis(resource, dto.durationBasis);
 
-    const schedule = this.scheduleRepository.create({
+    const saved = await this.persistence.createSchedule({
       resourceId,
       name: dto.name ?? null,
       triggerType: dto.triggerType,
       durationBasis: dto.durationBasis ?? ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
       enabled: dto.enabled ?? true,
     });
-    const saved = await this.scheduleRepository.save(schedule);
 
     await this.upsertConfigForSchedule(saved.id, dto.triggerType, {
       usageHoursConfig: dto.usageHoursConfig,
@@ -191,7 +153,7 @@ export class MaintenanceScheduleService {
     const triggerType = dto.triggerType ?? schedule.triggerType;
     if (dto.triggerType !== undefined) schedule.triggerType = triggerType;
 
-    await this.scheduleRepository.save(schedule);
+    await this.persistence.saveSchedule(schedule);
 
     if (
       dto.triggerType !== undefined ||
@@ -234,15 +196,7 @@ export class MaintenanceScheduleService {
   ): Promise<void> {
     const schedule = await this.getOne(resourceId, scheduleId);
     const details = this.scheduleDetails(schedule);
-    await this.scheduleRepository.manager.transaction(async (manager) => {
-      await manager
-        .getRepository(ResourceMaintenance)
-        .update({ maintenanceSchedule: { id: scheduleId } }, { maintenanceSchedule: null });
-      await manager.getRepository(ResourceMaintenanceScheduleUsageHoursConfig).delete({ scheduleId });
-      await manager.getRepository(ResourceMaintenanceScheduleUsageCountConfig).delete({ scheduleId });
-      await manager.getRepository(ResourceMaintenanceScheduleTimeIntervalConfig).delete({ scheduleId });
-      await manager.getRepository(ResourceMaintenanceSchedule).remove(schedule);
-    });
+    await this.persistence.deleteAndDetachSchedule(schedule);
     await this.audit.recordResource({
       action: 'maintenance_schedule.deleted',
       actorId,
@@ -254,7 +208,7 @@ export class MaintenanceScheduleService {
   }
 
   protected async ensureResourceExists(resourceId: number): Promise<Resource> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.persistence.resource(resourceId);
     if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }

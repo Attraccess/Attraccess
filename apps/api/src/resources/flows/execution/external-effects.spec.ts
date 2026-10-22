@@ -1,16 +1,10 @@
-import {
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import axios from 'axios';
 
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { FlowExecutionPersistence, FlowEventPersistence } from '../persistence/port';
 
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 
@@ -45,9 +39,8 @@ export type ResourceFlowsExecutorServiceRunFlowTestScope = {
   edgesBySourceAndHandle: Record<string, Edge[]>;
   flowLogs: FlowLogRecorderService;
   operatingIntervals: { transition: jest.Mock };
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<Edge>>;
-  resourceRepository: Partial<Repository<Resource>>;
+  persistence: jest.Mocked<FlowExecutionPersistence>;
+  events: jest.Mocked<FlowEventPersistence>;
   eventEmitter: EventEmitter2;
   resourceHealthService: ResourceHealthService;
   variablesService: ResourceFlowVariablesService;
@@ -62,9 +55,8 @@ export type ResourceFlowsExecutorServiceMqttTestScope = {
   mqttClientService: MqttClientService;
   flowLogs: FlowLogRecorderService;
   createNode: typeof createNode;
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-  resourceRepository: Partial<Repository<Resource>>;
+  persistence: jest.Mocked<FlowExecutionPersistence>;
+  events: jest.Mocked<FlowEventPersistence>;
   resourceUsageService: ResourceUsageService;
   resourceHealthService: ResourceHealthService;
   variablesService: ResourceFlowVariablesService;
@@ -78,13 +70,9 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let service: ResourceFlowsExecutorService;
 
   // Repositories and dependencies
-  let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-
-  let flowEdgeRepository: Partial<Repository<Edge>>;
-
+  let persistence: jest.Mocked<FlowExecutionPersistence>;
+  let events: jest.Mocked<FlowEventPersistence>;
   let flowLogs: FlowLogRecorderService;
-
-  let resourceRepository: Partial<Repository<Resource>>;
 
   let mqttClientService: MqttClientService;
 
@@ -161,23 +149,17 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     set operatingIntervals(value: typeof operatingIntervals) {
       operatingIntervals = value;
     },
-    get flowNodeRepository() {
-      return flowNodeRepository;
+    get persistence() {
+      return persistence;
     },
-    set flowNodeRepository(value: typeof flowNodeRepository) {
-      flowNodeRepository = value;
+    set persistence(value: typeof persistence) {
+      persistence = value;
     },
-    get flowEdgeRepository() {
-      return flowEdgeRepository;
+    get events() {
+      return events;
     },
-    set flowEdgeRepository(value: typeof flowEdgeRepository) {
-      flowEdgeRepository = value;
-    },
-    get resourceRepository() {
-      return resourceRepository;
-    },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
+    set events(value: typeof events) {
+      events = value;
     },
     get eventEmitter() {
       return eventEmitter;
@@ -464,14 +446,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       data: { minInactivityMinutes: 5 },
     });
 
-    const qb = {
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      distinct: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([inactivityNode]),
-    } as unknown as SelectQueryBuilder<ResourceFlowNode>;
-    const flowNodeRepoWithQueryBuilder = scope.flowNodeRepository as { createQueryBuilder: jest.Mock };
-    flowNodeRepoWithQueryBuilder.createQueryBuilder = jest.fn(() => qb);
+    scope.events.activeInactivityNodes.mockResolvedValue([inactivityNode]);
 
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     const resourceActivity = (scope.service as unknown as { resourceActivity: Map<number, Date> }).resourceActivity;
@@ -524,11 +499,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         set resourceHealthService(value: typeof scope.resourceHealthService) {
           scope.resourceHealthService = value;
         },
-        get flowNodeRepository() {
-          return scope.flowNodeRepository;
-        },
-        set flowNodeRepository(value: typeof scope.flowNodeRepository) {
-          scope.flowNodeRepository = value;
+        get events() {
+          return scope.events;
         },
       },
       scope,
@@ -764,7 +736,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         data: { identifier: 'ir-bridge', timeoutSeconds: 60, unhealthyReason: 'no signal' },
       });
 
-      (healthNodesScope.flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+      healthNodesScope.events.nodesByType.mockResolvedValueOnce([heartbeatNode]);
 
       const heartbeatLastSeen = (healthNodesScope.service as unknown as { heartbeatLastSeen: Map<string, Date> })
         .heartbeatLastSeen;
@@ -792,7 +764,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         data: { identifier: '', timeoutSeconds: 60, unhealthyReason: '' },
       });
 
-      (healthNodesScope.flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+      healthNodesScope.events.nodesByType.mockResolvedValueOnce([heartbeatNode]);
 
       const heartbeatLastSeen = (healthNodesScope.service as unknown as { heartbeatLastSeen: Map<string, Date> })
         .heartbeatLastSeen;
@@ -812,7 +784,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         data: { identifier: '', timeoutSeconds: 60, unhealthyReason: '' },
       });
 
-      (healthNodesScope.flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+      healthNodesScope.events.nodesByType.mockResolvedValueOnce([heartbeatNode]);
 
       await healthNodesScope.service.checkHealthHeartbeats();
 
@@ -829,7 +801,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         data: { identifier: '', timeoutSeconds: 30, unhealthyReason: '' },
       });
 
-      (healthNodesScope.flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
+      healthNodesScope.events.nodesByType.mockResolvedValueOnce([heartbeatNode]);
 
       const heartbeatLastSeen = (healthNodesScope.service as unknown as { heartbeatLastSeen: Map<string, Date> })
         .heartbeatLastSeen;

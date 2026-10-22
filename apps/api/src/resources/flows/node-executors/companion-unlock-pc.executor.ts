@@ -1,4 +1,4 @@
-import { ResourceFlowNode, CompanionLockNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, CompanionLockNodeDataSchema } from '@attraccess/application-models';
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';

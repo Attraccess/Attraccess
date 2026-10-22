@@ -1,3 +1,4 @@
+import { BILLING_OPERATIONS } from '../../../billing/persistence/port';
 import {
   BillingTransaction,
   BillingTransactionStatus,
@@ -372,7 +373,7 @@ describe('Usage lifecycle persistence around external flows', () => {
 
   it('publishes neither the session nor its bill if pending transaction creation fails', async () => {
     scope.billing.handleResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
-      await manager.save(BillingTransaction, {
+      await manager.resolve(BILLING_OPERATIONS).createTransaction({
         resourceUsageId: session.id,
         userId: user.id,
         amount: 0,
@@ -435,13 +436,13 @@ describe('Usage lifecycle persistence around external flows', () => {
     const before = await scope.publishedState();
     const checkedBalances: number[] = [];
     scope.billing.validateResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
-      const storedUser = await manager.findOneByOrFail(User, { id: user.id });
+      const storedUser = await manager.resolve(BILLING_OPERATIONS).balance(user.id);
       checkedBalances.push(storedUser.creditBalance);
       if (storedUser.creditBalance < session.sessionDurationCreditsPerMinute) throw new InsufficientBalanceError();
     });
     scope.billing.handleResourceUsageStart.mockImplementation(async (resourceId, session, user, manager) => {
       await scope.billing.validateResourceUsageStart(resourceId, session, user, manager);
-      return manager.save(BillingTransaction, {
+      return manager.resolve(BILLING_OPERATIONS).createTransaction({
         resourceUsageId: session.id,
         userId: user.id,
         amount: 0,

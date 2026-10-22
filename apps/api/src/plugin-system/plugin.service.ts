@@ -18,7 +18,7 @@ import { FileUpload } from '../common/types/file-upload.types';
 
 import { PluginManifestSchema, LoadedPluginManifest, PluginManifest } from './plugin.manifest';
 
-import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
+import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk/v2';
 
 import { PluginBootGuard } from './runtime/boot-guard';
 

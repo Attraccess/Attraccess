@@ -2,12 +2,12 @@ import { Logger } from '@nestjs/common';
 
 import {
   ResourceFlowNode,
-  ResourceFlowEdge,
   ResourceFlowNodeType,
   getExternalEffectFailureBehavior,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
-import { Repository, EntityManager } from 'typeorm';
+import { TransactionScope } from '../../../database/transaction-scope';
+import { FlowExecutionPersistence, FLOW_EXECUTION_READS } from '../persistence/port';
 
 import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
@@ -15,7 +15,7 @@ import { FlowTimer } from '../../../metrics/instrumentation/flow/flow.helper';
 
 import { NodeExecutor, NodeProcessingResult } from '../node-executors/index';
 
-import { FlowExecutionContext, getFlowRepository } from './flow-execution-context';
+import { FlowExecutionContext } from './flow-execution-context';
 
 import { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
 import { ResourceFlowLogType } from '../dto/flow-log.dto';
@@ -49,8 +49,7 @@ export async function settleFlowBranches(branches: Promise<NodeProcessingResult[
 
 export class FlowExecutionEngine {
   public constructor(
-    protected readonly flowNodeRepository: Repository<ResourceFlowNode>,
-    protected readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
+    protected readonly persistence: FlowExecutionPersistence,
     protected readonly flowLogs: FlowLogRecorderService,
     protected readonly flowTimer: FlowTimer,
     protected readonly nodeExecutors: Record<ResourceFlowNodeType, NodeExecutor>,
@@ -62,20 +61,14 @@ export class FlowExecutionEngine {
     flowRunId: string,
     node: ResourceFlowNode,
     resultOfPreviousNode: NodeProcessingResult,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
     resourceContextCache?: Map<number, FlowResourceContext>,
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
-    const edgesRepository = getFlowRepository(ResourceFlowEdge, this.flowEdgeRepository, transactionManager);
-
-    const edgesFromThisNode = await edgesRepository.find({
-      where: {
-        source: node.id,
-        sourceHandle: resultOfPreviousNode.outputHandle,
-      },
-    });
+    const persistence = transactionManager ? transactionManager.resolve(FLOW_EXECUTION_READS) : this.persistence;
+    const edgesFromThisNode = await persistence.outgoingEdges(node.id, resultOfPreviousNode.outputHandle);
 
     if (edgesFromThisNode.length === 0) {
       this.logger.debug(
@@ -88,13 +81,9 @@ export class FlowExecutionEngine {
       `Found ${edgesFromThisNode.length} outgoing edge(s) from node ID: ${node.id} (Type: ${node.type})`,
     );
 
-    const flowNodeRepository = getFlowRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
-
     // Execute each edge individually instead of deduplicating target nodes
     const edgePromises = edgesFromThisNode.map(async (edge) => {
-      const targetNode = await flowNodeRepository.findOne({
-        where: { id: edge.target },
-      });
+      const targetNode = await persistence.node(edge.target);
 
       if (!targetNode) {
         this.logger.warn(`Target node ${edge.target} not found for edge from node ${node.id}`);
@@ -139,7 +128,7 @@ export class FlowExecutionEngine {
     flowRunId: string,
     node: ResourceFlowNode,
     resultOfPreviousNode: NodeProcessingResult,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
     resourceContextCache?: Map<number, FlowResourceContext>,
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
@@ -239,7 +228,7 @@ export class FlowExecutionEngine {
     flowRunId: string,
     node: ResourceFlowNode,
     input: object,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult> {
     // Core node types are looked up in the exhaustive record.
@@ -267,7 +256,7 @@ export class FlowExecutionEngine {
   public async startFlow(
     node: ResourceFlowNode | ResourceFlowNode[],
     data: NodeProcessingResult,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
     resourceContextCache: Map<number, FlowResourceContext> = new Map(),
     options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {

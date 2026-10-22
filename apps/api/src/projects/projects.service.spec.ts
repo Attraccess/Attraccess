@@ -1,12 +1,7 @@
+import { ProjectDeleteMissing } from './persistence/port';
+import { TypeormProjectPersistence } from './persistence/typeorm-adapter';
 import { registerProjectsServiceFixture } from './projects.service.projects-service.test-fixture';
-import {
-  Project,
-  entities,
-  ProjectInvitation,
-  ProjectMember,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { Project, entities, ProjectInvitation, ProjectMember, User } from '@attraccess/database-entities';
 import { CreateProjectDto } from './dto/create.dto';
 import { FileUpload } from './../common/types/file-upload.types';
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
@@ -26,19 +21,12 @@ describe('ProjectsService', () => {
 
   describe('findMany', () => {
     it('returns projects with access metadata', async () => {
-      const qb = fixture.createMockQueryBuilder();
-      qb.getMany.mockResolvedValueOnce([{ id: 1 } as Project]);
-      (fixture.projectRepository.createQueryBuilder as jest.Mock).mockReturnValueOnce(qb);
+      fixture.persistence.accessiblePage.mockResolvedValueOnce([{ id: 1 } as unknown as Project]);
       fixture.projectAccessService.addAccessMetadata.mockResolvedValueOnce([{ id: 1, access: { isOwner: true } }]);
 
       const result = await fixture.service.findMany(5, { page: 2, limit: 10 } as FindManyProjectsQueryDto);
 
-      expect(fixture.projectRepository.createQueryBuilder).toHaveBeenCalledWith('project');
-      expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('project.owner', 'owner');
-      expect(qb.leftJoin).toHaveBeenCalledWith('project.members', 'member', 'member.userId = :userId', { userId: 5 });
-      expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
-      expect(qb.skip).toHaveBeenCalledWith(10);
-      expect(qb.take).toHaveBeenCalledWith(10);
+      expect(fixture.persistence.accessiblePage).toHaveBeenCalledWith(5, 2, 10, false);
       expect(fixture.projectAccessService.addAccessMetadata).toHaveBeenCalledWith(5, [{ id: 1 }]);
       expect(result).toEqual([{ id: 1, access: { isOwner: true } }]);
     });
@@ -46,23 +34,18 @@ describe('ProjectsService', () => {
 
   describe('getTotalCount', () => {
     it('counts accessible projects for the user', async () => {
-      const qb = fixture.createMockQueryBuilder();
-      qb.getCount.mockResolvedValueOnce(7);
-      (fixture.projectRepository.createQueryBuilder as jest.Mock).mockReturnValueOnce(qb);
+      fixture.persistence.accessibleCount.mockResolvedValueOnce(7);
 
       const total = await fixture.service.getTotalCount(3);
 
-      expect(fixture.projectRepository.createQueryBuilder).toHaveBeenCalledWith('project');
-      expect(qb.leftJoin).toHaveBeenCalledWith('project.owner', 'owner');
-      expect(qb.leftJoin).toHaveBeenCalledWith('project.members', 'member', 'member.userId = :userId', { userId: 3 });
-      expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
+      expect(fixture.persistence.accessibleCount).toHaveBeenCalledWith(3, false);
       expect(total).toBe(7);
     });
   });
 
   describe('findOneById', () => {
     it('delegates to ProjectAccessService', async () => {
-      const project = { id: 9 } as Project;
+      const project = { id: 9 } as unknown as Project;
       fixture.projectAccessService.getAccessOrThrow.mockResolvedValueOnce(project);
 
       const result = await fixture.service.findOneById(1, 9);
@@ -75,11 +58,13 @@ describe('ProjectsService', () => {
   describe('create', () => {
     it('creates a project without logo', async () => {
       const payload = { name: 'New', description: 'Desc' } as CreateProjectDto;
-      fixture.projectRepository.save.mockImplementationOnce(async (entity: Project) => ({ id: 1, ...entity }));
+      fixture.persistence.createProject.mockImplementationOnce(
+        async (ownerId, name, description) => ({ id: 1, userId: ownerId, name, description }) as unknown as Project,
+      );
 
       const created = await fixture.service.create(2, payload);
 
-      expect(fixture.projectRepository.save).toHaveBeenCalledWith(expect.objectContaining(payload));
+      expect(fixture.persistence.createProject).toHaveBeenCalledWith(2, payload.name, payload.description);
       expect(created).toEqual(expect.objectContaining({ id: 1, name: 'New' }));
       expect(fixture.fileStorageService.saveFile).not.toHaveBeenCalled();
       expect(fixture.audit.recordProject).toHaveBeenCalledWith({
@@ -94,9 +79,12 @@ describe('ProjectsService', () => {
     });
 
     it('records a legacy empty project name as omitted instead of dropping the deletion event', async () => {
-      fixture.resourceUsageRepository.update.mockResolvedValue({} as never);
-      fixture.projectRepository.delete.mockResolvedValueOnce({ affected: 1 } as never);
-      fixture.projectAccessService.ensureOwner.mockResolvedValueOnce({ id: 99, name: '   ', logo: null } as Project);
+      fixture.persistence.deleteWithUsageDetachment.mockResolvedValueOnce(undefined);
+      fixture.projectAccessService.ensureOwner.mockResolvedValueOnce({
+        id: 99,
+        name: '   ',
+        logo: null,
+      } as unknown as Project);
 
       await fixture.service.deleteOne(7, 99);
 
@@ -114,9 +102,11 @@ describe('ProjectsService', () => {
         description: 'Desc',
         logo: Buffer.from('x') as unknown as FileUpload,
       } as CreateProjectDto;
-      fixture.projectRepository.save.mockImplementationOnce(async (entity: Project) => ({ id: 4, ...entity }));
+      fixture.persistence.createProject.mockImplementationOnce(
+        async (ownerId, name, description) => ({ id: 4, userId: ownerId, name, description }) as unknown as Project,
+      );
       fixture.fileStorageService.saveFile.mockResolvedValueOnce('logo.png');
-      fixture.projectRepository.save.mockImplementationOnce(async (entity: Project) => entity);
+      fixture.persistence.saveProject.mockImplementationOnce(async (entity: Project) => entity);
 
       const created = await fixture.service.create(2, payload);
 
@@ -141,7 +131,9 @@ describe('ProjectsService', () => {
         description: 'Desc',
         logo: Buffer.from('x') as unknown as FileUpload,
       } as CreateProjectDto;
-      fixture.projectRepository.save.mockImplementationOnce(async (entity: Project) => ({ id: 4, ...entity }));
+      fixture.persistence.createProject.mockImplementationOnce(
+        async (ownerId, name, description) => ({ id: 4, userId: ownerId, name, description }) as unknown as Project,
+      );
       fixture.fileStorageService.saveFile.mockRejectedValueOnce(new Error('storage unavailable'));
 
       await expect(fixture.service.create(2, payload)).rejects.toThrow('storage unavailable');
@@ -158,18 +150,16 @@ describe('ProjectsService', () => {
 
   describe('deleteOne', () => {
     it('unlinks resource usage entries before deleting the project', async () => {
-      fixture.resourceUsageRepository.update.mockResolvedValue({} as never);
-      fixture.projectRepository.delete.mockResolvedValueOnce({ affected: 1 } as never);
+      fixture.persistence.deleteWithUsageDetachment.mockResolvedValueOnce(undefined);
 
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce({
         id: 99,
         name: 'Deleted',
         logo: null,
-      } as Project);
+      } as unknown as Project);
       await fixture.service.deleteOne(7, 99);
 
-      expect(fixture.resourceUsageRepository.update).toHaveBeenCalledWith({ projectId: 99 }, { projectId: null });
-      expect(fixture.projectRepository.delete).toHaveBeenCalledWith(99);
+      expect(fixture.persistence.deleteWithUsageDetachment).toHaveBeenCalledWith(99);
       expect(fixture.audit.recordProject).toHaveBeenCalledWith({
         action: 'project.deleted',
         actorId: 7,
@@ -182,13 +172,12 @@ describe('ProjectsService', () => {
     });
 
     it('rolls back usage detachment when the project delete affects no row', async () => {
-      fixture.resourceUsageRepository.update.mockResolvedValue({} as never);
-      fixture.projectRepository.delete.mockResolvedValueOnce({ affected: 0 } as never);
+      fixture.persistence.deleteWithUsageDetachment.mockRejectedValueOnce(new ProjectDeleteMissing());
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce({
         id: 99,
         name: 'Deleted',
         logo: null,
-      } as Project);
+      } as unknown as Project);
 
       await expect(fixture.service.deleteOne(7, 99)).rejects.toBeInstanceOf(NotFoundException);
 
@@ -215,17 +204,18 @@ describe('ProjectsService', () => {
         const sqliteAudit = { recordProject: jest.fn().mockResolvedValue(undefined) };
         const sqliteMetrics = { projectsTotal: { inc: jest.fn(), dec: jest.fn() } };
         const sqliteService = new ProjectsService(
-          projects,
-          source.getRepository(ProjectMember),
-          source.getRepository(ProjectInvitation),
-          source.getRepository(User),
-          source.getRepository(ResourceUsage),
+          new TypeormProjectPersistence(
+            projects,
+            source.getRepository(ProjectMember),
+            source.getRepository(ProjectInvitation),
+            source.getRepository(User),
+          ),
           {} as FileStorageService,
           {
             ensureOwner: jest.fn().mockResolvedValue({ id: 1, name: 'Project', logo: null }),
-          } as unknown as ProjectAccessService,
+          } as unknown as unknown as ProjectAccessService,
           {} as EmailService,
-          sqliteMetrics as MetricsService,
+          sqliteMetrics as unknown as MetricsService,
           {} as NotificationDispatchService,
           sqliteAudit as unknown as AuditService,
         );
@@ -258,13 +248,13 @@ describe('ProjectsService', () => {
     });
 
     it('updates fields when project exists', async () => {
-      const existing = { id: 3, name: 'Old', description: 'Old', logo: null } as Project;
+      const existing = { id: 3, name: 'Old', description: 'Old', logo: null } as unknown as Project;
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
-      fixture.projectRepository.save.mockImplementation(async (entity: Project) => entity);
+      fixture.persistence.saveProject.mockImplementation(async (entity: Project) => entity);
 
       const updated = await fixture.service.updateOne(1, 3, { name: 'New' } as UpdateProjectDto);
 
-      expect(fixture.projectRepository.save).toHaveBeenCalledWith(expect.objectContaining({ id: 3, name: 'New' }));
+      expect(fixture.persistence.saveProject).toHaveBeenCalledWith(expect.objectContaining({ id: 3, name: 'New' }));
       expect(updated.name).toBe('New');
       expect(fixture.audit.recordProject).toHaveBeenCalledWith({
         action: 'project.updated',
@@ -285,11 +275,11 @@ describe('ProjectsService', () => {
     });
 
     it('replaces logos when requested', async () => {
-      const existing = { id: 3, name: 'Old', description: 'Old', logo: 'old.png' } as Project;
+      const existing = { id: 3, name: 'Old', description: 'Old', logo: 'old.png' } as unknown as Project;
       const payload = { logo: Buffer.from('n') as unknown as FileUpload } as UpdateProjectDto;
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
       fixture.fileStorageService.saveFile.mockResolvedValueOnce('new.png');
-      fixture.projectRepository.save.mockImplementation(async (entity: Project) => entity);
+      fixture.persistence.saveProject.mockImplementation(async (entity: Project) => entity);
 
       const result = await fixture.service.updateOne(1, 3, payload);
 
@@ -315,15 +305,15 @@ describe('ProjectsService', () => {
     });
 
     it('records an update when its only project save succeeds', async () => {
-      const existing = { id: 3, name: 'Old', description: 'Old', logo: 'old.png' } as Project;
+      const existing = { id: 3, name: 'Old', description: 'Old', logo: 'old.png' } as unknown as Project;
       const payload = { name: 'New', logo: Buffer.from('n') as unknown as FileUpload } as UpdateProjectDto;
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
       fixture.fileStorageService.saveFile.mockResolvedValueOnce('new.png');
-      fixture.projectRepository.save.mockImplementation(async (entity: Project) => entity);
+      fixture.persistence.saveProject.mockImplementation(async (entity: Project) => entity);
 
       await fixture.service.updateOne(1, 3, payload);
 
-      expect(fixture.projectRepository.save).toHaveBeenCalledTimes(1);
+      expect(fixture.persistence.saveProject).toHaveBeenCalledTimes(1);
       expect(fixture.audit.recordProject).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'project.updated',
@@ -333,9 +323,9 @@ describe('ProjectsService', () => {
     });
 
     it('does not record an update when safe state values are unchanged', async () => {
-      const existing = { id: 3, name: 'Same', description: 'Same', logo: null } as Project;
+      const existing = { id: 3, name: 'Same', description: 'Same', logo: null } as unknown as Project;
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
-      fixture.projectRepository.save.mockImplementation(async (entity: Project) => entity);
+      fixture.persistence.saveProject.mockImplementation(async (entity: Project) => entity);
 
       await fixture.service.updateOne(1, 3, { name: 'Same', description: 'Same' } as UpdateProjectDto);
 
@@ -344,9 +334,9 @@ describe('ProjectsService', () => {
 
     it('does not record an unchanged legacy long-name update', async () => {
       const longName = '😀'.repeat(100);
-      const existing = { id: 3, name: longName, description: 'Same', logo: null } as Project;
+      const existing = { id: 3, name: longName, description: 'Same', logo: null } as unknown as Project;
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
-      fixture.projectRepository.save.mockImplementation(async (entity: Project) => entity);
+      fixture.persistence.saveProject.mockImplementation(async (entity: Project) => entity);
 
       await fixture.service.updateOne(1, 3, { name: longName } as UpdateProjectDto);
 
@@ -354,9 +344,9 @@ describe('ProjectsService', () => {
     });
 
     it('records archive lifecycle changes with the initiating actor', async () => {
-      const project = { id: 3, name: 'Project', logo: null } as Project;
+      const project = { id: 3, name: 'Project', logo: null } as unknown as Project;
       fixture.projectAccessService.ensureOwner.mockResolvedValue(project);
-      fixture.projectRepository.update.mockResolvedValue({ affected: 1 } as never);
+      fixture.persistence.setArchived.mockResolvedValue(true);
 
       await fixture.service.archiveOne(2, 3);
       await fixture.service.unarchiveOne(2, 3);
@@ -382,32 +372,47 @@ describe('ProjectsService', () => {
     });
 
     it('returns the refetched lifecycle state without recording a duplicate event', async () => {
-      const archivedProject = { id: 3, name: 'Archived', archivedAt: new Date(), logo: null } as Project;
-      const activeProject = { id: 4, name: 'Active', archivedAt: null, logo: null } as Project;
-      const concurrentlyArchived = { id: 3, name: 'Archived', archivedAt: new Date(), logo: null } as Project;
-      const concurrentlyUnarchived = { id: 4, name: 'Active', archivedAt: null, logo: null } as Project;
+      const archivedProject = {
+        id: 3,
+        name: 'Archived',
+        archivedAt: new Date(),
+        logo: null,
+      } as unknown as Project;
+      const activeProject = { id: 4, name: 'Active', archivedAt: null, logo: null } as unknown as Project;
+      const concurrentlyArchived = {
+        id: 3,
+        name: 'Archived',
+        archivedAt: new Date(),
+        logo: null,
+      } as unknown as Project;
+      const concurrentlyUnarchived = {
+        id: 4,
+        name: 'Active',
+        archivedAt: null,
+        logo: null,
+      } as unknown as Project;
       fixture.projectAccessService.ensureOwner
         .mockResolvedValueOnce(archivedProject)
         .mockResolvedValueOnce(activeProject);
-      fixture.projectRepository.update.mockResolvedValue({ affected: 0 } as never);
-      fixture.projectRepository.findOneByOrFail
+      fixture.persistence.setArchived.mockResolvedValue(false);
+      fixture.persistence.requireProject
         .mockResolvedValueOnce(concurrentlyArchived)
         .mockResolvedValueOnce(concurrentlyUnarchived);
 
-      expect(await fixture.service.archiveOne(2, 3)).toBe(concurrentlyArchived);
-      expect(await fixture.service.unarchiveOne(2, 4)).toBe(concurrentlyUnarchived);
+      expect(await fixture.service.archiveOne(2, 3)).toEqual(concurrentlyArchived);
+      expect(await fixture.service.unarchiveOne(2, 4)).toEqual(concurrentlyUnarchived);
 
-      expect(fixture.projectRepository.save).not.toHaveBeenCalled();
-      expect(fixture.projectRepository.update).toHaveBeenCalledTimes(2);
-      expect(fixture.projectRepository.findOneByOrFail).toHaveBeenNthCalledWith(1, { id: 3 });
-      expect(fixture.projectRepository.findOneByOrFail).toHaveBeenNthCalledWith(2, { id: 4 });
+      expect(fixture.persistence.saveProject).not.toHaveBeenCalled();
+      expect(fixture.persistence.setArchived).toHaveBeenCalledTimes(2);
+      expect(fixture.persistence.requireProject).toHaveBeenNthCalledWith(1, 3);
+      expect(fixture.persistence.requireProject).toHaveBeenNthCalledWith(2, 4);
       expect(fixture.audit.recordProject).not.toHaveBeenCalled();
     });
   });
 
   describe('membership and invitation audit events', () => {
     it('records invitations sent and revoked by the project owner', async () => {
-      const project = { id: 3, name: 'Project', owner: { id: 2 } } as Project;
+      const project = { id: 3, name: 'Project', owner: { id: 2 } } as unknown as Project;
       const invitation = {
         id: 7,
         projectId: 3,
@@ -415,12 +420,12 @@ describe('ProjectsService', () => {
         invitedUserId: 9,
         requestedRole: 'viewer',
         status: 'pending',
-      } as ProjectInvitation;
+      } as unknown as ProjectInvitation;
       fixture.projectAccessService.ensureOwner.mockResolvedValue(project);
-      fixture.userRepository.findOne.mockResolvedValue({ id: 9 } as User);
-      fixture.projectMemberRepository.findOne.mockResolvedValue(null);
-      fixture.projectInvitationRepository.findOne.mockResolvedValueOnce(null).mockResolvedValue(invitation);
-      fixture.projectInvitationRepository.save.mockResolvedValue(invitation);
+      fixture.persistence.findUser.mockResolvedValue({ id: 9 } as User);
+      fixture.persistence.member.mockResolvedValue(null);
+      fixture.persistence.invitationWithRelations.mockResolvedValueOnce(null).mockResolvedValue(invitation);
+      fixture.persistence.invite.mockResolvedValue(invitation);
 
       await fixture.service.createProjectInvitation(2, 3, 9);
       await fixture.service.cancelProjectInvitation(2, 3, 7);
@@ -446,8 +451,8 @@ describe('ProjectsService', () => {
     });
 
     it('uses request foreign keys when auditing a newly created invitation', async () => {
-      const project = { id: 3, name: 'Project', owner: { id: 2 } } as Project;
-      const savedInvitation = { id: 7 } as ProjectInvitation;
+      const project = { id: 3, name: 'Project', owner: { id: 2 } } as unknown as Project;
+      const savedInvitation = { id: 7 } as unknown as ProjectInvitation;
       const invitation = {
         id: 7,
         projectId: 3,
@@ -455,12 +460,12 @@ describe('ProjectsService', () => {
         invitedUserId: 9,
         requestedRole: 'viewer',
         status: 'pending',
-      } as ProjectInvitation;
+      } as unknown as ProjectInvitation;
       fixture.projectAccessService.ensureOwner.mockResolvedValue(project);
-      fixture.userRepository.findOne.mockResolvedValue({ id: 9 } as User);
-      fixture.projectMemberRepository.findOne.mockResolvedValue(null);
-      fixture.projectInvitationRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(invitation);
-      fixture.projectInvitationRepository.save.mockResolvedValue(savedInvitation);
+      fixture.persistence.findUser.mockResolvedValue({ id: 9 } as User);
+      fixture.persistence.member.mockResolvedValue(null);
+      fixture.persistence.invitationWithRelations.mockResolvedValueOnce(null).mockResolvedValueOnce(invitation);
+      fixture.persistence.invite.mockResolvedValue(savedInvitation);
 
       await fixture.service.createProjectInvitation(2, 3, 9);
 
@@ -474,12 +479,12 @@ describe('ProjectsService', () => {
     });
 
     it('records the owner and affected membership after removal', async () => {
-      fixture.projectMemberRepository.findOne.mockResolvedValueOnce({
+      fixture.persistence.member.mockResolvedValueOnce({
         id: 8,
         userId: 9,
         role: 'viewer',
-      } as ProjectMember);
-      fixture.projectMemberRepository.delete.mockResolvedValueOnce({ affected: 1 } as never);
+      } as unknown as ProjectMember);
+      fixture.persistence.removeMember.mockResolvedValueOnce(true);
 
       await fixture.service.removeMember(2, 3, 8);
 
@@ -495,12 +500,12 @@ describe('ProjectsService', () => {
     });
 
     it('does not audit a membership removal that did not affect a row', async () => {
-      fixture.projectMemberRepository.findOne.mockResolvedValueOnce({
+      fixture.persistence.member.mockResolvedValueOnce({
         id: 8,
         userId: 9,
         role: 'viewer',
-      } as ProjectMember);
-      fixture.projectMemberRepository.delete.mockResolvedValueOnce({ affected: 0 } as never);
+      } as unknown as ProjectMember);
+      fixture.persistence.removeMember.mockResolvedValueOnce(false);
 
       await fixture.service.removeMember(2, 3, 8);
 
@@ -514,16 +519,16 @@ describe('ProjectsService', () => {
         invitedUserId: 9,
         requestedRole: 'viewer',
         status: 'pending',
-      } as ProjectInvitation;
-      fixture.projectInvitationRepository.findOne.mockResolvedValue(invitation);
-      fixture.projectInvitationRepository.save.mockResolvedValue(invitation);
-      fixture.projectMemberRepository.findOne.mockResolvedValue(null);
-      fixture.projectMemberRepository.save.mockResolvedValue({
+      } as unknown as ProjectInvitation;
+      fixture.persistence.invitationWithRelations.mockResolvedValue(invitation);
+      fixture.persistence.invite.mockResolvedValue(invitation);
+      fixture.persistence.member.mockResolvedValue(null);
+      fixture.persistence.addMember.mockResolvedValue({
         id: 8,
         projectId: 3,
         userId: 9,
         role: 'viewer',
-      } as ProjectMember);
+      } as unknown as ProjectMember);
 
       await fixture.service.acceptInvitation(9, 7);
 
@@ -554,9 +559,9 @@ describe('ProjectsService', () => {
         invitedUserId: 9,
         requestedRole: 'viewer',
         status: 'pending',
-      } as ProjectInvitation;
-      fixture.projectInvitationRepository.findOne.mockResolvedValue(invitation);
-      fixture.projectInvitationRepository.save.mockResolvedValue(invitation);
+      } as unknown as ProjectInvitation;
+      fixture.persistence.invitationWithRelations.mockResolvedValue(invitation);
+      fixture.persistence.invite.mockResolvedValue(invitation);
 
       await fixture.service.declineInvitation(9, 7);
 
@@ -578,11 +583,11 @@ describe('ProjectsService', () => {
         invitedUserId: 9,
         requestedRole: 'viewer',
         status: 'pending',
-      } as ProjectInvitation;
-      fixture.projectInvitationRepository.findOne.mockResolvedValue(invitation);
-      fixture.projectInvitationRepository.save.mockResolvedValue(invitation);
-      fixture.projectMemberRepository.findOne.mockResolvedValue(null);
-      fixture.projectMemberRepository.save.mockRejectedValueOnce(new Error('membership unavailable'));
+      } as unknown as ProjectInvitation;
+      fixture.persistence.invitationWithRelations.mockResolvedValue(invitation);
+      fixture.persistence.invite.mockResolvedValue(invitation);
+      fixture.persistence.member.mockResolvedValue(null);
+      fixture.persistence.addMember.mockRejectedValueOnce(new Error('membership unavailable'));
 
       await expect(fixture.service.acceptInvitation(9, 7)).rejects.toThrow('membership unavailable');
 
@@ -596,7 +601,9 @@ describe('ProjectsService', () => {
 
     it('projects legacy empty and long UTF-8 names without suppressing audit events', async () => {
       const longName = '😀'.repeat(100);
-      fixture.projectRepository.save.mockImplementationOnce(async (entity: Project) => ({ id: 1, ...entity }));
+      fixture.persistence.createProject.mockImplementationOnce(
+        async (ownerId, name, description) => ({ id: 1, userId: ownerId, name, description }) as unknown as Project,
+      );
 
       await fixture.service.create(2, { name: longName, description: 'Desc' } as CreateProjectDto);
 

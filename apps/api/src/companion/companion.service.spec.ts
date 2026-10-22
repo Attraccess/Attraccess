@@ -1,3 +1,4 @@
+import { CompanionPersistence } from './persistence/port';
 import { NotFoundException } from '@nestjs/common';
 import type { Repository } from 'typeorm';
 import type { CompanionDevice } from '@attraccess/database-entities';
@@ -45,7 +46,7 @@ function makeService(hasManifest = true): CompanionService {
   if (hasManifest) {
     fs.readFileSync.mockReturnValue(JSON.stringify(MANIFEST));
   }
-  return new CompanionService(mockRepo);
+  return new CompanionService(mockRepo as unknown as CompanionPersistence);
 }
 
 describe('CompanionService', () => {

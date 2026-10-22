@@ -1,20 +1,15 @@
-import { Resource, ResourceHealthState } from '@attraccess/database-entities';
+import { ResourceHealthPersistence } from './persistence/port';
+import { Resource, ResourceHealthState } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { ResourceHealthService } from './resource-health.service';
-
-type MockRepository<T = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
 const stubResource = (id: number): Resource => ({ id, name: `Resource ${id}` }) as unknown as Resource;
 export function registerResourceHealthServiceFixture() {
   let service: ResourceHealthService;
 
-  let healthRepo: MockRepository<ResourceHealthState>;
-
-  let resourceRepo: MockRepository<Resource>;
+  let persistence: jest.Mocked<ResourceHealthPersistence>;
 
   let eventEmitter: EventEmitter2;
 
@@ -26,58 +21,48 @@ export function registerResourceHealthServiceFixture() {
     records.length = 0;
     audit.recordResource.mockClear();
 
-    healthRepo = {
-      findOne: jest.fn(
-        async ({ where }: { where: Partial<ResourceHealthState> }) =>
-          records.find((r) => {
-            if (where.id !== undefined && r.id !== where.id) return false;
-            if (where.resourceId !== undefined && r.resourceId !== where.resourceId) return false;
-            if (where.identifier !== undefined && r.identifier !== where.identifier) return false;
-            return true;
-          }) ?? null,
+    persistence = {
+      findEntry: jest.fn(
+        async (resourceId, identifier) =>
+          records.find((row) => row.resourceId === resourceId && row.identifier === identifier) ?? null,
       ),
-      find: jest.fn(async ({ where }: { where: Partial<ResourceHealthState> }) =>
-        records.filter((r) => r.resourceId === where.resourceId),
+      findEntryById: jest.fn(
+        async (resourceId, entryId) =>
+          records.find((row) => row.resourceId === resourceId && row.id === entryId) ?? null,
       ),
-      count: jest.fn(
-        async ({ where }: { where: Partial<ResourceHealthState> }) =>
-          records.filter((r) => {
-            if (where.resourceId !== undefined && r.resourceId !== where.resourceId) return false;
-            if (where.status !== undefined && r.status !== where.status) return false;
-            return true;
-          }).length,
+      listEntries: jest.fn(async (resourceIds) => records.filter((row) => resourceIds.includes(row.resourceId))),
+      countUnhealthy: jest.fn(
+        async (resourceId) =>
+          records.filter((row) => row.resourceId === resourceId && row.status === 'unhealthy').length,
       ),
-      create: jest.fn((data: Partial<ResourceHealthState>) => ({ ...data })),
-      save: jest.fn(async (entity: ResourceHealthState) => {
-        const existingIdx = records.findIndex(
-          (r) => r.resourceId === entity.resourceId && r.identifier === entity.identifier,
+      findResource: jest.fn(async (resourceId) => (resourceId === 999 ? null : stubResource(resourceId))),
+      storeEntry: jest.fn(async (entry) => {
+        const index = records.findIndex(
+          (row) => row.resourceId === entry.resourceId && row.identifier === entry.identifier,
         );
-        if (existingIdx >= 0) {
-          records[existingIdx] = { ...records[existingIdx], ...entity };
-          return records[existingIdx];
+        if (index >= 0) {
+          records[index] = { ...records[index], ...entry };
+          return records[index];
         }
-        const persisted = { id: records.length + 1, createdAt: new Date(), updatedAt: new Date(), ...entity };
-        records.push(persisted as ResourceHealthState);
-        return persisted as ResourceHealthState;
+        const row = {
+          id: records.length + 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...entry,
+        } as ResourceHealthState;
+        records.push(row);
+        return row;
       }),
-      remove: jest.fn(async (entity: ResourceHealthState) => {
-        const idx = records.findIndex((r) => r.id === entity.id);
-        if (idx >= 0) records.splice(idx, 1);
-        return entity;
+      removeEntry: jest.fn(async (entry) => {
+        const index = records.findIndex((row) => row.id === entry.id);
+        if (index >= 0) records.splice(index, 1);
       }),
-    };
-
-    resourceRepo = {
-      findOne: jest.fn(async ({ where }: { where: { id: number } }) =>
-        where.id === 999 ? null : stubResource(where.id),
-      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceHealthService,
-        { provide: getRepositoryToken(ResourceHealthState), useValue: healthRepo },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepo },
+        { provide: ResourceHealthPersistence, useValue: persistence },
         EventEmitter2,
         { provide: AuditService, useValue: audit },
       ],

@@ -12,7 +12,11 @@ describe('concurrent account login attempts', () => {
   it('admits only the remaining guess across email/username and different IPs', async () => {
     const user = { id: 7, lockedUntil: null } as User;
     const bruteForce = new BruteForceProtectionService(
-      { update: jest.fn().mockResolvedValue(undefined) } as never,
+      {
+        recordFailureState: jest.fn().mockResolvedValue(undefined),
+        lockAccount: jest.fn().mockResolvedValue(undefined),
+        clearAccount: jest.fn().mockResolvedValue(undefined),
+      },
       {
         getRateLimitPolicy: async () => ({
           maxAttempts: 3,

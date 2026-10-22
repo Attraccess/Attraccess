@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
+import type { CompanionDevice } from '@attraccess/application-models';
+import { CompanionPersistence } from './persistence/port';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CompanionEventType, CompanionForegroundAppDto, CompanionIdleDto, CompanionUsbDeviceDto, CompanionSocket } from './companion.types';
+import {
+  CompanionEventType,
+  CompanionForegroundAppDto,
+  CompanionIdleDto,
+  CompanionUsbDeviceDto,
+  CompanionSocket,
+} from './companion.types';
 
 @Injectable()
 export class CompanionGatewayService {
@@ -13,26 +18,19 @@ export class CompanionGatewayService {
   readonly sockets = new Map<string, CompanionSocket>();
 
   public constructor(
-    @InjectRepository(CompanionDevice)
-    private readonly deviceRepository: Repository<CompanionDevice>,
-    @InjectRepository(ResourceFlowNode)
-    private readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    private readonly persistence: CompanionPersistence,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
   public getConnectedDevices(): CompanionDevice[] {
-    const deviceIds = [...new Set([...this.sockets.values()].map((s) => s.deviceId).filter((id): id is number => id !== null))];
+    const deviceIds = [
+      ...new Set([...this.sockets.values()].map((s) => s.deviceId).filter((id): id is number => id !== null)),
+    ];
     return deviceIds.map((id) => ({ id }) as CompanionDevice);
   }
 
   public async getResourcesForDevice(deviceId: number): Promise<Array<{ id: number; name: string }>> {
-    const nodes = await this.flowNodeRepository
-      .createQueryBuilder('node')
-      .innerJoinAndSelect('node.resource', 'resource')
-      .where('node.type IN (:...types)', {
-        types: ['output.companion.lock-pc', 'output.companion.unlock-pc'],
-      })
-      .getMany();
+    const nodes = await this.persistence.lockCommandNodes();
 
     const matchingNodes = nodes.filter((node) => {
       try {
@@ -56,12 +54,12 @@ export class CompanionGatewayService {
 
   public async sendLockCommand(deviceId: number): Promise<boolean> {
     // persist first so a restarted/offline device re-locks on next authenticate
-    await this.deviceRepository.update(deviceId, { locked: true });
+    await this.persistence.setLocked(deviceId, true);
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_LOCK_PC);
   }
 
   public async sendUnlockCommand(deviceId: number): Promise<boolean> {
-    await this.deviceRepository.update(deviceId, { locked: false });
+    await this.persistence.setLocked(deviceId, false);
     return this.sendCommandToDevice(deviceId, CompanionEventType.COMPANION_UNLOCK_PC);
   }
 

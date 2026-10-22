@@ -1,4 +1,4 @@
-import { ResourceFlowNode, IfNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNode, IfNodeDataSchema } from '@attraccess/application-models';
 import { get } from 'lodash-es';
 import z from 'zod';
 import { FlowExecutionError } from '../errors/flow-execution.error';

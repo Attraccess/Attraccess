@@ -1,4 +1,4 @@
-import { CompanionDevice } from '@attraccess/database-entities';
+import type { CompanionDevice } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 

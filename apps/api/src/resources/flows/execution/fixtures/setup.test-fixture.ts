@@ -1,14 +1,11 @@
+import { operationTransactionsFake } from '../../../../database/testing/operation-transactions.test-fixture';
+import { billingOperationsFake } from '../../../../billing/charges/fixtures/operations.test-fixture';
+import { BILLING_OPERATIONS } from '../../../../billing/persistence/port';
+import { FLOW_EXECUTION_READS } from '../../persistence/port';
 import { ResourceFlowsExecutorService } from '../resource-flows-executor.service';
 import { FlowLogRecorderService } from '../../logs/flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
-import { Repository, SelectQueryBuilder } from 'typeorm';
-import {
-  Resource,
-  ResourceFlowNode,
-  ResourceFlowEdge,
-  BillingTransactionItem,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import { MqttClientService } from '../../../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../../../usage/sessions/resource-usage.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -28,49 +25,34 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
   scope.initialNodes = [];
   scope.edgesBySourceAndHandle = {};
 
-  const defaultQueryBuilder = {
-    innerJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    distinct: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  } as unknown as SelectQueryBuilder<ResourceFlowNode>;
-
-  scope.flowNodeRepository = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    find: jest.fn(async ({ where, take }: any) => {
-      const { resourceId, type, id } = where || {};
-      const nodes = scope.initialNodes.filter((node) => {
-        const isAfterLastId = id === undefined || node.id > id._value;
-        return node.type === type && (resourceId === undefined || node.resourceId === resourceId) && isAfterLastId;
-      });
-      return take === undefined ? nodes : nodes.slice(0, take);
-    }),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    findOne: jest.fn(async ({ where }: any) => {
-      return scope.nodesById[where.id] ?? null;
-    }),
-    createQueryBuilder: jest.fn(() => defaultQueryBuilder),
+  const nodesOfType = (type: ResourceFlowNodeType, resourceId?: number) =>
+    scope.initialNodes.filter(
+      (node) => node.type === type && (resourceId === undefined || node.resourceId === resourceId),
+    );
+  scope.persistence = {
+    resource: jest.fn(
+      async (id) =>
+        ({ id, name: `Resource ${id}`, type: ResourceType.Machine, metadata: { zone: 'A' } }) as unknown as Resource,
+    ),
+    button: jest.fn(async (resourceId, id) =>
+      scope.nodesById[id]?.resourceId === resourceId ? scope.nodesById[id] : null,
+    ),
+    triggers: jest.fn(async (resourceId, type) => nodesOfType(type, resourceId)),
+    outgoingEdges: jest.fn(
+      async (id, handle) => (scope.edgesBySourceAndHandle[`${id}|${handle ?? ''}`] as ResourceFlowEdge[]) ?? [],
+    ),
+    node: jest.fn(async (id) => scope.nodesById[id] ?? null),
   };
-
-  scope.flowEdgeRepository = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    find: jest.fn(async ({ where }: any) => {
-      const key = `${where.source}|${where.sourceHandle ?? ''}`;
-      return scope.edgesBySourceAndHandle[key] ?? [];
-    }),
-  } as unknown as Repository<ResourceFlowEdge>;
-
+  scope.events = {
+    nodesByType: jest.fn(async (type) => nodesOfType(type)),
+    pageNodesByType: jest.fn(async (type, afterId, limit) =>
+      nodesOfType(type)
+        .filter((node) => afterId === undefined || node.id > afterId)
+        .slice(0, limit),
+    ),
+    activeInactivityNodes: jest.fn().mockResolvedValue([]),
+  };
   scope.flowLogs = new FlowLogRecorderService();
-
-  scope.resourceRepository = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    findOne: jest.fn(async ({ where }: any) => ({
-      id: where?.id ?? 1,
-      name: `Resource ${where?.id ?? 1}`,
-      type: ResourceType.Machine,
-      metadata: { zone: 'A' },
-    })),
-  } as unknown as Repository<Resource>;
 
   scope.mqttClientService = {
     publish: jest.fn(async () => undefined),
@@ -100,25 +82,18 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
     listForResource: jest.fn(async () => []),
   } as unknown as ResourceFlowVariablesService;
 
-  const billingItemRepoMock = {
-    manager: {
-      findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
-      findOneBy: jest.fn(),
-      save: jest.fn(async (_e: unknown, data: unknown) => data),
-      update: jest.fn(),
-      transaction: jest.fn(async (work) => work(billingItemRepoMock.manager)),
-    },
-  } as unknown as Repository<BillingTransactionItem>;
-
+  const transactionDriver = operationTransactionsFake();
+  transactionDriver.bind(FLOW_EXECUTION_READS, scope.persistence);
+  const billing = billingOperationsFake();
+  billing.pendingUsageTransaction.mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' } as never);
+  transactionDriver.bind(BILLING_OPERATIONS, billing);
   scope.operatingIntervals = { transition: jest.fn().mockResolvedValue(null) };
   scope.service = new ResourceFlowsExecutorService(
-    scope.flowNodeRepository as Repository<ResourceFlowNode>,
-    scope.flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-    scope.resourceRepository as Repository<Resource>,
+    scope.persistence,
+    transactionDriver.transactions,
     scope.flowLogs,
     scope.mqttClientService,
     scope.resourceUsageService,
-    billingItemRepoMock,
     scope.eventEmitter,
     scope.resourceHealthService,
     scope.variablesService,
@@ -133,5 +108,6 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
     } as unknown as CompanionGatewayService,
     scope.operatingIntervals as never,
     { report: jest.fn() } as never,
+    scope.events,
   );
 }

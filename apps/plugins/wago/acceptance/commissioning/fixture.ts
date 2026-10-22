@@ -1,3 +1,9 @@
+import { WagoCredentialPersistence } from '../../backend/credentials/persistence/port';
+import { TypeormWagoCredentialPersistence } from '../../backend/credentials/persistence/typeorm-adapter';
+import { WagoCredentialRotationEntity } from '../../backend/credentials/persistence/schema';
+import { createSqliteDeviceOperations } from '../../backend/runtime/persistence/typeorm-adapter';
+import { createSqliteCommissioningPersistence } from '../../backend/commissioning/persistence/typeorm-adapter';
+import { createSqliteManagementStore } from '../../backend/management/persistence/typeorm-adapter';
 import 'reflect-metadata';
 import { createCipheriv, createDecipheriv, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { WagoManagementEntity } from '../../backend/management/entity';
@@ -45,7 +51,7 @@ export async function commissioningFixture() {
   const database = new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: plugin.entities,
+    entities: plugin.persistenceAdapters.flatMap((entry) => entry.entities ?? []),
     synchronize: true,
   });
   let app: INestApplication | undefined;
@@ -135,7 +141,15 @@ export async function commissioningFixture() {
       getMqttServerConfig: async () => ({ host: 'broker.fixture.invalid', port: 8883, useTls: true }),
       getMqttCredentialProvisioning: () => ({ availableProviders: async () => [{ providerId: 'fixture' }] }),
     } as unknown as PluginContext;
-    const service = new WagoCommissioningService(context, wago as unknown as WagoService, catalog);
+    const service = ((context: PluginContext) =>
+      new WagoCommissioningService(
+        context,
+        wago as unknown as WagoService,
+        createSqliteManagementStore(context),
+        createSqliteCommissioningPersistence(context),
+        createSqliteDeviceOperations(context),
+        catalog,
+      ))(context);
     const transport = {
       failDelivery: true,
       failRecovery: true,
@@ -197,6 +211,14 @@ export async function commissioningFixture() {
         { provide: WagoCommissioningService, useValue: service },
         { provide: WagoService, useValue: wago },
         { provide: Symbol.for('attraccess.plugin.context'), useValue: context },
+        {
+          provide: WagoCredentialPersistence,
+          useFactory: () =>
+            new TypeormWagoCredentialPersistence(
+              () => database.getRepository(WagoController),
+              () => database.getRepository(WagoCredentialRotationEntity),
+            ),
+        },
         WagoCredentialRotationService,
       ],
     })

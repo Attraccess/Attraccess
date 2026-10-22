@@ -1,23 +1,19 @@
-import { EntityManager, LessThan, MoreThan } from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../database/transaction-scope';
+import { MeteringPersistence, METERING_OPERATIONS } from './persistence/port';
 
 import {
   ResourceMeter,
   ResourceMeteringOperation,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { MeteringReport } from '../flows/node-executors/index';
 
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
-
-import { requireMeter } from './metering-catalog';
+import { requireMeter, requireMeteringRecord } from './metering-catalog';
 
 import { toMeterValue, MeteringValueError, meterCharge } from './quantity';
 
-import { findActiveUsage } from '../usage/sessions/active-usage';
 import { ConflictException } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
@@ -29,18 +25,24 @@ export class MeteringOperationError extends Error {}
 
 export class MeteringReadings {
   public constructor(
-    protected readonly manager: EntityManager,
+    protected readonly persistence: MeteringPersistence,
+    protected readonly transactions: DatabaseTransactions,
     protected readonly freshAfter: ReadonlyMap<string, Date>,
   ) {}
 
+  protected bound(scope?: TransactionScope): MeteringPersistence {
+    return scope ? scope.resolve(METERING_OPERATIONS) : this.persistence;
+  }
+
   /** Wrong-meter, late and conflicting replies are rejected; repeated completions are idempotent. */
   async complete(operationId: string, report: MeteringReport): Promise<void> {
-    await runSerializedTransaction(this.manager, async (manager) => {
-      const operation = await manager.findOneOrFail(ResourceMeteringOperation, { where: { id: operationId } });
+    const reference = requireMeteringRecord(await this.persistence.operation(operationId), 'operation');
+    await this.transactions.run({ resourceIds: [reference.resourceId], accountIds: [] }, async (manager) => {
+      const operation = requireMeteringRecord(await this.bound(manager).operation(operationId), 'operation');
       const session = operation.sessionId
-        ? await manager.findOneOrFail(ResourceMeteringSession, { where: { id: operation.sessionId } })
+        ? requireMeteringRecord(await this.bound(manager).session(operation.sessionId), 'session')
         : null;
-      const meter = await requireMeter(manager, operation.resourceId, operation.meterId);
+      const meter = await requireMeter(this.bound(manager), operation.resourceId, operation.meterId);
       if ((operation.kind === 'start') !== (report.kind === 'ready'))
         throw new MeteringOperationError('The reply does not answer this request');
       if (report.kind === 'ready') {
@@ -63,29 +65,22 @@ export class MeteringReadings {
             : BigInt(0);
         // Accepting a new boundary makes older pending charges unrecoverable, even if
         // another start branch later fails and the tracking-only session is removed.
-        await manager.update(
-          ResourceMeteringSession,
-          {
-            resourceId: session.resourceId,
-            meterId: meter.id,
-            usageId: LessThan(session.usageId),
-            status: ResourceMeteringSessionStatus.Pending,
-          },
-          {
-            status: ResourceMeteringSessionStatus.Failed,
-            failureReason: 'The meter was re-initialized for a later session',
-          },
+        await this.bound(manager).failEarlierPendingSessions(
+          session.resourceId,
+          meter.id,
+          session.usageId,
+          'The meter was re-initialized for a later session',
         );
-        await manager.update(ResourceMeter, meter.id, {
+        await this.bound(manager).updateMeterState(meter.id, {
           counterValue: baseline,
           lifetimeValue: (BigInt(meter.lifetimeValue) + delta).toString(),
           latestObservedAt: new Date(),
         });
-        await manager.update(ResourceMeteringSession, session.id, {
+        await this.bound(manager).updateSession(session.id, {
           baselineValue: baseline,
           source: report.source ?? session.source,
         });
-        await manager.update(ResourceMeteringOperation, operation.id, {
+        await this.bound(manager).updateOperation(operation.id, {
           status: 'completed',
           completedAt: new Date(),
           source: report.source ?? null,
@@ -103,24 +98,21 @@ export class MeteringReadings {
         throw new MeteringOperationError('The collection was already answered or has expired');
       }
       if (!session) {
-        const attempt = await manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: operation.resourceId });
-        const activeUsage = await findActiveUsage(manager, operation.resourceId);
+        const attempt = await this.bound(manager).hasAttempt(operation.resourceId);
+        const activeUsage = await this.bound(manager).activeUsage(operation.resourceId);
         // Free meters may skip initialization or lose their session after a failed start.
         // Their fresh lifetime polls are valid while usage stays unchanged, but a
         // reply must not cross a usage boundary or bypass an active meter session.
-        const conflictingUsage = await manager
-          .createQueryBuilder(ResourceUsage, 'u')
-          .leftJoin(ResourceMeteringSession, 's', 's.usageId = u.id AND s.meterId = :meterId', { meterId: meter.id })
-          .where('u.resourceId = :resourceId', { resourceId: operation.resourceId })
-          .andWhere(
-            '(u.startTime >= :requestedAt OR u.endTime >= :requestedAt OR (u.id = :activeUsageId AND s.id IS NOT NULL))',
-            { requestedAt: operation.requestedAt, activeUsageId: activeUsage?.id ?? null },
-          )
-          .getExists();
+        const conflictingUsage = await this.bound(manager).conflictingIdleUsage(
+          operation.resourceId,
+          meter.id,
+          operation.requestedAt,
+          activeUsage?.id ?? null,
+        );
         if (attempt || conflictingUsage)
           throw new MeteringOperationError('The idle collection crossed a session boundary');
       } else if (session.status === ResourceMeteringSessionStatus.Pending) {
-        const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId } });
+        const usage = requireMeteringRecord(await this.bound(manager).usage(session.usageId), 'usage');
         // A current counter cannot distinguish consumption at session end from later idle use.
         // Only a device reading explicitly captured at the persisted end boundary may reconcile it.
         if (!report.observedAt || !usage.endTime || new Date(report.observedAt).getTime() !== usage.endTime.getTime())
@@ -132,7 +124,7 @@ export class MeteringReadings {
           ? this.freshAfter.get(operation.id)
           : new Date(operation.requestedAt.getTime() - INTERIM_MAX_AGE_MS);
       const reading = await this.acceptReading(manager, meter, session, report, freshAfter);
-      await manager.update(ResourceMeteringOperation, operation.id, {
+      await this.bound(manager).updateOperation(operation.id, {
         status: 'completed',
         completedAt: new Date(),
         totalValue: reading.total,
@@ -145,7 +137,7 @@ export class MeteringReadings {
   }
 
   protected async acceptReading(
-    manager: EntityManager,
+    manager: TransactionScope,
     meter: ResourceMeter,
     session: ResourceMeteringSession | null,
     report: Extract<MeteringReport, { kind: 'reading' }>,
@@ -158,7 +150,7 @@ export class MeteringReadings {
     // Increment-only starts do not update the meter's previous observation.
     // Apply the persisted usage boundary before attributing any reading to it.
     const usage = session
-      ? await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, select: { startTime: true } })
+      ? requireMeteringRecord(await this.bound(manager).usageStart(session.usageId), 'usage')
       : null;
     if (
       (usage && observedAt < usage.startTime) ||
@@ -183,14 +175,9 @@ export class MeteringReadings {
       );
     const delta = increment ? value : previous === null ? BigInt(0) : value - previous;
     if (!session && delta > BigInt(0))
-      await manager.update(
-        ResourceMeteringSession,
-        { meterId: meter.id, status: ResourceMeteringSessionStatus.Pending },
-        {
-          status: ResourceMeteringSessionStatus.Failed,
-          failureReason:
-            'The meter advanced outside the ended session; its final consumption can no longer be distinguished from idle consumption',
-        },
+      await this.bound(manager).failPendingSessions(
+        meter.id,
+        'The meter advanced outside the ended session; its final consumption can no longer be distinguished from idle consumption',
       );
     const sessionTotal = session ? BigInt(session.latestValue ?? '0') + delta : null;
     if (sessionTotal !== null && (sessionTotal < BigInt(0) || sessionTotal < BigInt(session?.latestValue ?? '0')))
@@ -201,14 +188,14 @@ export class MeteringReadings {
     )
       throw new MeteringOperationError('The metering session is closed');
     if (sessionTotal !== null && session) meterCharge(sessionTotal, session.creditsPerUnit);
-    await manager.update(ResourceMeter, meter.id, {
+    await this.bound(manager).updateMeterState(meter.id, {
       lifetimeValue: (BigInt(meter.lifetimeValue) + delta).toString(),
       // Keep an established cumulative counter aligned when increments report the same consumption.
       counterValue: increment ? (previous === null ? null : (previous + delta).toString()) : value.toString(),
       latestObservedAt: observedAt,
     });
     if (session && sessionTotal !== null)
-      await manager.update(ResourceMeteringSession, session.id, {
+      await this.bound(manager).updateSession(session.id, {
         latestValue: sessionTotal.toString(),
         latestObservedAt: observedAt,
         source: report.source ?? session.source,
@@ -233,25 +220,20 @@ export class MeteringReadings {
     resourceId: number,
     meterId: number,
     report: Extract<MeteringReport, { kind: 'reading' }>,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
     lifecycleAttemptId?: string,
     reportId?: string,
   ): Promise<void> {
-    const work = async (manager: EntityManager) => {
-      const meter = await requireMeter(manager, resourceId, meterId);
-      const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } });
+    const work = async (manager: TransactionScope) => {
+      const meter = await requireMeter(this.bound(manager), resourceId, meterId);
+      const attempt = await this.bound(manager).attempt(resourceId);
       if (attempt && attempt.id !== lifecycleAttemptId) throw new ConflictException('METER_LIFECYCLE_BUSY');
       const usageId = attempt
         ? (attempt.candidateUsageId ?? attempt.previousUsageId)
-        : (await findActiveUsage(manager, resourceId))?.id;
-      const session =
-        usageId == null
-          ? null
-          : await manager.findOne(ResourceMeteringSession, {
-              where: { resourceId, meterId, usageId, status: ResourceMeteringSessionStatus.Active },
-            });
+        : (await this.bound(manager).activeUsage(resourceId))?.id;
+      const session = usageId == null ? null : await this.bound(manager).activeSession(resourceId, meterId, usageId);
       const id = reportId ?? randomUUID();
-      const existing = await manager.findOne(ResourceMeteringOperation, { where: { id } });
+      const existing = await this.bound(manager).operation(id);
       if (existing) {
         if (
           existing.meterId === meterId &&
@@ -263,7 +245,7 @@ export class MeteringReadings {
         throw new MeteringOperationError('A conflicting reading was already recorded for this flow node');
       }
       const reading = await this.acceptReading(manager, meter, session, report);
-      await manager.save(ResourceMeteringOperation, {
+      await this.bound(manager).saveOperation({
         id,
         resourceId,
         meterId,
@@ -279,15 +261,12 @@ export class MeteringReadings {
         readingMode: report.mode ?? 'total',
       });
     };
-    if (transactionManager) await work(transactionManager);
-    else await runSerializedTransaction(this.manager, work);
+    await this.transactions.run({ resourceIds: [resourceId], accountIds: [] }, work, transactionManager);
   }
 
-  async assertMeterStillOwned(session: ResourceMeteringSession, manager = this.manager): Promise<void> {
+  async assertMeterStillOwned(session: ResourceMeteringSession, manager?: TransactionScope): Promise<void> {
     if (session.compromisedReason) throw new MeteringOperationError(session.compromisedReason);
-    const newer = await manager.count(ResourceMeteringSession, {
-      where: { resourceId: session.resourceId, meterId: session.meterId, usageId: MoreThan(session.usageId) },
-    });
+    const newer = await this.bound(manager).newerSessionCount(session.resourceId, session.meterId, session.usageId);
     if (newer > 0) throw new MeteringOperationError('A later session already uses the meter');
   }
 }

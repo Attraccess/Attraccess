@@ -1,3 +1,5 @@
+import { WagoControllerPersistence } from './persistence/port';
+import { WagoConfigurationPersistence } from '../configuration/persistence/port';
 import {
   Inject,
   Injectable,
@@ -7,17 +9,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { PluginContext } from '@attraccess/plugins-backend-sdk/v2';
 
 import { PLUGIN_CONTEXT, ENROLLMENT_RETRY_MS, STALE_AFTER_MS, MAX_PENDING_CONFIGURATION_REPORTS } from './model';
 
-import { WagoController } from './entity';
+import { WagoController } from './record';
 
-import { WagoEnrollment } from './enrollment.entity';
+import { WagoEnrollment } from './enrollment.record';
 
 import { hash, safeEqual, isClaimAcknowledgement } from './model';
 
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import { WagoConfigurationRevision } from '../configuration/revision.record';
 
 import { WagoControllerSummary } from './model';
 
@@ -38,8 +40,12 @@ export { WagoCredentialOperationUncertainError } from './model';
 
 @Injectable()
 export class WagoService extends WagoSubscriptions implements OnApplicationBootstrap, OnModuleDestroy {
-  constructor(@Inject(PLUGIN_CONTEXT) context: PluginContext) {
-    super(context);
+  constructor(
+    @Inject(PLUGIN_CONTEXT) context: Omit<PluginContext, 'operations' | 'persistence'>,
+    @Inject(WagoControllerPersistence) registry: WagoControllerPersistence,
+    @Inject(WagoConfigurationPersistence) configuration: WagoConfigurationPersistence,
+  ) {
+    super(context, registry, configuration);
   }
 
   protected scheduleSubscriptionRetry(): void {
@@ -71,7 +77,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected async claimedController(id: number): Promise<WagoController> {
-    const controller = await this.controllers.findOneBy({ id });
+    const controller = await this.registry.controller(id);
     if (!controller || controller.trustState !== 'claimed')
       throw new NotFoundException(`claimed WAGO controller ${id} not found`);
     if (!controller.mqttServerId) throw new ConflictException(`WAGO controller ${id} has no MQTT server`);
@@ -131,11 +137,11 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
         throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
       await assertOwned();
       enrollment.revokedAt = new Date().toISOString();
-      await this.enrollments.save(enrollment);
+      await this.registry.saveEnrollment(enrollment);
     }
     await assertOwned();
     enrollment.consumedAt = new Date().toISOString();
-    await this.enrollments.save(enrollment);
+    await this.registry.saveEnrollment(enrollment);
     const timer = this.enrollmentExpiryTimers.get(enrollment.id);
     if (timer) clearTimeout(timer);
     this.enrollmentExpiryTimers.delete(enrollment.id);
@@ -173,17 +179,12 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected activeEnrollments(): Promise<WagoEnrollment[]> {
-    return this.enrollments
-      .createQueryBuilder('enrollment')
-      .where('enrollment.consumedAt IS NULL')
-      .andWhere('enrollment.revokedAt IS NULL')
-      .andWhere('enrollment.expiresAt > :now', { now: new Date().toISOString() })
-      .getMany();
+    return this.registry.activeEnrollments(new Date().toISOString());
   }
 
   protected async activeEnrollment(id: number | null): Promise<WagoEnrollment | null> {
     if (!id) return null;
-    const enrollment = await this.enrollments.findOneBy({ id });
+    const enrollment = await this.registry.enrollment(id);
     return enrollment && this.isActiveEnrollment(enrollment) ? enrollment : null;
   }
 
@@ -192,11 +193,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
     serverId: number,
     hardwareId: string,
   ): Promise<WagoEnrollment | null> {
-    const enrollment = await this.enrollments.findOneBy({
-      secretHash: hash(secret),
-      mqttServerId: serverId,
-      hardwareId,
-    });
+    const enrollment = await this.registry.enrollmentBySecret(hash(secret), serverId, hardwareId);
     return enrollment && this.isActiveEnrollment(enrollment) ? enrollment : null;
   }
 
@@ -209,11 +206,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected async appliedRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
-    const [revision] = await this.revisions.find({
-      where: { controllerId, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
-    });
+    const revision = await this.configuration.latestRevision(controllerId, true);
     return revision ?? null;
   }
 
@@ -258,7 +251,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
       { qos: 1, retain: true },
     );
     revision.state = 'published';
-    return this.revisions.save(revision);
+    return this.configuration.saveRevision(revision);
   }
 
   protected configurationReportRevision(payload: Buffer): number | null {
@@ -329,13 +322,13 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
       return;
     }
     await this.withConfigurationLock(controllerId, async () => {
-      const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision });
+      const revision = await this.configuration.revision(controllerId, report.revision);
       if (!revision || revision.contentHash !== report.contentHash) return;
       if (revision.state !== 'published') return;
       revision.state = report.errors.length ? 'rejected' : 'applied';
       revision.rejectionErrors = report.errors.length ? JSON.stringify(report.errors) : null;
       revision.reportedAt = new Date().toISOString();
-      await this.revisions.save(revision);
+      await this.configuration.saveRevision(revision);
     });
   }
 

@@ -5,6 +5,16 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "exports": {
+    "./v2": {
+      "types": "./src/v2.d.ts",
+      "import": "./src/v2.js",
+      "default": "./src/v2.js"
+    },
+    "./adapter": {
+      "types": "./src/adapter.d.ts",
+      "import": "./src/adapter.js",
+      "default": "./src/adapter.js"
+    },
     "./package.json": "./package.json",
     ".": {
       "types": "./src/index.d.ts",
@@ -20,6 +30,7 @@
     "!**/*.tsbuildinfo"
   ],
   "dependencies": {
+    "@attraccess/application-models": "*",
     "tslib": "^2.8.1",
     "@attraccess/database-entities": "*",
     "@nestjs/common": "^11.1.0",

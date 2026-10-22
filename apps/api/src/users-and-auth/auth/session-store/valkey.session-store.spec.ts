@@ -1,6 +1,4 @@
 import type { Redis } from 'ioredis';
-import type { Repository } from 'typeorm';
-import type { User } from '@attraccess/database-entities';
 import type { TokenHashService } from '../../../encryption/token-hash.service';
 import { ValkeySessionStore } from './valkey.session-store';
 const now = new Date('2026-09-22T10:00:00Z');
@@ -22,13 +20,9 @@ describe('ValkeySessionStore', () => {
     expire: jest.fn(),
     scan: jest.fn(),
   };
-  const users = { findOne: jest.fn() },
+  const users = { findById: jest.fn() },
     hash = { hashToken: jest.fn((token: string) => `hashed-${token}`) };
-  const store = new ValkeySessionStore(
-    client as unknown as Redis,
-    users as unknown as Repository<User>,
-    hash as unknown as TokenHashService,
-  );
+  const store = new ValkeySessionStore(client as unknown as Redis, users, hash as unknown as TokenHashService);
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(now);
@@ -64,10 +58,10 @@ describe('ValkeySessionStore', () => {
     expect(await store.validateSession('missing')).toBeNull();
     expect(await store.validateSession('expired')).toBeNull();
     expect(client.del).toHaveBeenCalledWith('session:hashed-expired');
-    users.findOne.mockResolvedValue({ id: 7 });
+    users.findById.mockResolvedValue({ id: 7 });
     expect(await store.validateSession('live')).toEqual({ id: 7 });
     expect(client.expire).toHaveBeenCalledWith('session:hashed-live', 3600);
-    expect(users.findOne).toHaveBeenCalledWith({ where: { id: 7 } });
+    expect(users.findById).toHaveBeenCalledWith(7);
   });
   it('delegates rotation to one atomic store operation', async () => {
     client.eval.mockResolvedValueOnce(1).mockResolvedValueOnce(0);

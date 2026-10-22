@@ -1,3 +1,5 @@
+import { sqliteResourceFixture } from '../../database/conformance/sqlite-fixture';
+import { TypeormResourceRetrainingPersistence } from '../retraining/persistence/typeorm-adapter';
 import { DataSource, EntitySchema } from 'typeorm';
 import {
   ResourceIntroduction,
@@ -54,8 +56,7 @@ describe('inherited introduction query', () => {
       synchronize: true,
     }).initialize();
     service = new ResourceIntroductionsService(
-      source.getRepository(ResourceIntroduction),
-      source.getRepository(ResourceIntroductionHistoryItem),
+      sqliteResourceFixture(source).introductions,
       {} as never,
       {} as never,
       {} as never,
@@ -92,19 +93,14 @@ describe('inherited introduction query', () => {
   ])('uses the newest event ID when %s %s history timestamps match', async (id, kind) => {
     const historyRepository = source.getRepository(ResourceIntroductionHistoryItem);
     const groups = new ResourceGroupsIntroductionsService(
-      source.getRepository(ResourceIntroduction),
-      historyRepository,
+      sqliteResourceFixture(source).groupIntroductions,
       {} as never,
       {} as never,
       {} as never,
       {} as never,
     );
     const retraining = new RetrainingValidityProbe(
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      historyRepository,
+      new TypeormResourceRetrainingPersistence({} as never, {} as never, {} as never, {} as never, historyRepository),
       {} as never,
       {} as never,
       {} as never,

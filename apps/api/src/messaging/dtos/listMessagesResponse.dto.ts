@@ -1,4 +1,4 @@
-import { Message } from '@attraccess/database-entities';
+import { Message } from '../../transport/models/message.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaginatedResponse } from '../../types/response';
 

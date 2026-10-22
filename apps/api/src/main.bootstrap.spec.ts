@@ -16,6 +16,7 @@ import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { createCert } from 'mkcert';
 import { initializeProcessLogging } from './logging/process-logging';
+import { DatabaseErrors } from './database/backend';
 
 jest.mock('./logging/process-logging', () => ({
   initializeProcessLogging: jest.fn(() => ({ log: jest.fn(), error: jest.fn(), warn: jest.fn() })),
@@ -103,6 +104,7 @@ describe('API bootstrap ordering and configuration', () => {
     useGlobalInterceptors: jest.fn(),
   };
   const originalSkip = process.env.SKIP_DATABASE_MIGRATIONS;
+  const originalDatabaseType = process.env.DATABASE_TYPE;
   beforeEach(() => {
     jest.clearAllMocks();
     app.close.mockReset().mockImplementation(async () => {
@@ -116,6 +118,7 @@ describe('API bootstrap ordering and configuration', () => {
     });
     jest.mocked(existsSync).mockImplementation(jest.requireActual<typeof import('fs')>('fs').existsSync);
     delete process.env.SKIP_DATABASE_MIGRATIONS;
+    delete process.env.DATABASE_TYPE;
     appConfig.DISABLE_PLUGINS = false;
     appConfig.SSL_GENERATE_SELF_SIGNED_CERTIFICATES = false;
     appConfig.TRUST_PROXY = '1';
@@ -136,6 +139,21 @@ describe('API bootstrap ordering and configuration', () => {
     jest.restoreAllMocks();
     if (originalSkip === undefined) delete process.env.SKIP_DATABASE_MIGRATIONS;
     else process.env.SKIP_DATABASE_MIGRATIONS = originalSkip;
+    if (originalDatabaseType === undefined) delete process.env.DATABASE_TYPE;
+    else process.env.DATABASE_TYPE = originalDatabaseType;
+  });
+
+  it('rejects unavailable database engines before plugin or database mutations', async () => {
+    process.env.DATABASE_TYPE = 'postgres';
+    await expect(bootstrap()).rejects.toThrow('Unsupported DATABASE_TYPE');
+    expect(early.close).toHaveBeenCalled();
+    expect(PluginService.configure).not.toHaveBeenCalled();
+    expect(PluginModule.configure).not.toHaveBeenCalled();
+    expect(NpmPluginService.recoverBackups).not.toHaveBeenCalled();
+    expect(PluginMigrationService.runPendingUpMigrationsForAllPlugins).not.toHaveBeenCalled();
+    expect(NestFactory.create).not.toHaveBeenCalled();
+    expect(datasource.initialize).not.toHaveBeenCalled();
+    expect(datasource.runMigrations).not.toHaveBeenCalled();
   });
 
   describe('configuration request bodies (HTTP integration)', () => {
@@ -148,6 +166,7 @@ describe('API bootstrap ordering and configuration', () => {
           { provide: ConfigService, useValue: config },
           { provide: SettingsService, useValue: settings },
           { provide: DataSource, useValue: datasource },
+          { provide: DatabaseErrors, useValue: { isReadOnly: () => false } },
         ],
       }).compile();
       httpApp = module.createNestApplication<NestExpressApplication>({ logger: false });

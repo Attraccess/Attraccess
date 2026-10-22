@@ -3,9 +3,8 @@
 // FEATURE: Messaging push notifications for offline recipients
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConversationParticipant, Message, User } from '@attraccess/database-entities';
+import { MessageNotificationPersistence } from './persistence/port';
+import { ConversationParticipant, Message, User } from '@attraccess/application-models';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { MessagingLiveService } from './messaging-live.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
@@ -18,10 +17,7 @@ export class MessageNotificationListener {
   private readonly logger = new Logger(MessageNotificationListener.name);
 
   constructor(
-    @InjectRepository(ConversationParticipant)
-    private readonly participantRepository: Repository<ConversationParticipant>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    private readonly persistence: MessageNotificationPersistence,
     private readonly liveService: MessagingLiveService,
     private readonly notifications: NotificationDispatchService,
   ) {}
@@ -31,17 +27,14 @@ export class MessageNotificationListener {
     const message = event.message;
 
     try {
-      const participants = await this.participantRepository.find({
-        where: { conversationId: message.conversationId },
-        relations: ['user'],
-      });
+      const participants = await this.persistence.participantsWithUsers(message.conversationId);
 
       const recipients = participants.filter((participant) => participant.userId !== message.senderId);
       if (recipients.length === 0) {
         return;
       }
 
-      const sender = await this.userRepository.findOne({ where: { id: message.senderId } });
+      const sender = await this.persistence.sender(message.senderId);
       const senderName = sender?.username ?? 'Someone';
 
       await this.dispatchToast(recipients, message, senderName);
@@ -70,7 +63,9 @@ export class MessageNotificationListener {
     message: Message,
     senderName: string,
   ): Promise<void> {
-    const recipients = participants.map((participant) => participant.user).filter((user): user is User => Boolean(user));
+    const recipients = participants
+      .map((participant) => participant.user)
+      .filter((user): user is User => Boolean(user));
     if (recipients.length === 0) {
       return;
     }
@@ -133,7 +128,7 @@ export class MessageNotificationListener {
     });
 
     // Record the delivery marker so subsequent messages in this burst do not re-send.
-    await this.participantRepository.update({ id: participant.id }, { lastNotifiedAt: message.createdAt });
+    await this.persistence.markNotified(participant.id, message.createdAt);
   }
 
   private truncatePreview(content: string): string {

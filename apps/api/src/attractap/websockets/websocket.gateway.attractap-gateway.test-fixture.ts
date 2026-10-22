@@ -1,6 +1,5 @@
-import { Resource } from '@attraccess/database-entities';
+import { AttractapResourceReader } from '../persistence/port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/settings.service';
 
@@ -96,6 +95,10 @@ export function registerAttractapGatewayFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AttractapGateway,
+        {
+          provide: AttractapResourceReader,
+          useValue: { findResource: jest.fn() } satisfies jest.Mocked<AttractapResourceReader>,
+        },
         WebsocketService,
         { provide: AttractapService, useValue: attractapService },
         { provide: UsersService, useValue: {} },
@@ -119,7 +122,6 @@ export function registerAttractapGatewayFixture() {
         { provide: RbacService, useValue: {} },
         { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
         { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
-        { provide: getRepositoryToken(Resource), useValue: {} },
         ResourceListService,
         ResourceActionGuard,
         AttractapAuthHandler,

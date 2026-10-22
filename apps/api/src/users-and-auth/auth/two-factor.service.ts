@@ -1,10 +1,8 @@
-import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
+import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/application-models';
 
 import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { TwoFactorPersistence } from './persistence/port';
 
 import { EncryptionService } from '../../encryption/encryption.service';
 
@@ -14,25 +12,18 @@ import { SettingsService } from '../../settings/settings.service';
 
 import { TwoFactorPolicy } from './two-factor.dto';
 
-import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk/v2';
 
 @Injectable()
 export class TwoFactorService {
   constructor(
-    @InjectRepository(AuthenticationDetail)
-    protected readonly authenticationDetailRepository: Repository<AuthenticationDetail>,
-    @InjectRepository(Setting)
-    protected readonly settingRepository: Repository<Setting>,
+    protected readonly persistence: TwoFactorPersistence,
     protected readonly settingsService: SettingsService,
     protected readonly encryptionService: EncryptionService,
     protected readonly metricsService: MetricsService,
   ) {}
 
   protected readonly logger = new Logger(TwoFactorService.name);
-
-  protected readonly policyParent = 'auth';
-
-  protected readonly policyKey = 'two_factor_policy';
 
   protected otplibPromise: Promise<typeof import('otplib')> | null = null;
 
@@ -83,9 +74,7 @@ export class TwoFactorService {
   }
 
   protected async getTwoFactorDetail(userId: number): Promise<AuthenticationDetail | null> {
-    return this.authenticationDetailRepository.findOne({
-      where: { userId, type: AuthenticationType.TOTP },
-    });
+    return this.persistence.findDetail(userId);
   }
 
   /**
@@ -123,36 +112,14 @@ export class TwoFactorService {
   }
 
   async getPolicy(): Promise<TwoFactorPolicy> {
-    const setting = await this.settingRepository.findOneBy({
-      parent: this.policyParent,
-      key: this.policyKey,
-    });
-
-    if (setting?.value && Object.values(TwoFactorPolicy).includes(setting.value as TwoFactorPolicy)) {
-      return setting.value as TwoFactorPolicy;
-    }
+    const value = await this.persistence.readPolicy();
+    if (value && Object.values(TwoFactorPolicy).includes(value as TwoFactorPolicy)) return value as TwoFactorPolicy;
 
     return TwoFactorPolicy.OPTIONAL;
   }
 
   async setPolicy(policy: TwoFactorPolicy): Promise<void> {
-    const existing = await this.settingRepository.findOneBy({
-      parent: this.policyParent,
-      key: this.policyKey,
-    });
-
-    if (existing) {
-      await this.settingRepository.update(existing.id, {
-        value: policy,
-      });
-      return;
-    }
-
-    await this.settingRepository.insert({
-      parent: this.policyParent,
-      key: this.policyKey,
-      value: policy,
-    });
+    await this.persistence.writePolicy(policy);
   }
 
   protected isPolicyRequiredForUser(policy: TwoFactorPolicy, user: User): boolean {
@@ -202,14 +169,14 @@ export class TwoFactorService {
     if (existing) {
       existing.totpSecret = encryptedSecret;
       existing.totpEnabledAt = null;
-      await this.authenticationDetailRepository.save(existing);
+      await this.persistence.saveDetail(existing);
     } else {
-      const detail = new AuthenticationDetail();
-      detail.userId = user.id;
-      detail.type = AuthenticationType.TOTP;
-      detail.totpSecret = encryptedSecret;
-      detail.totpEnabledAt = null;
-      await this.authenticationDetailRepository.save(detail);
+      await this.persistence.saveDetail({
+        userId: user.id,
+        type: AuthenticationType.TOTP,
+        totpSecret: encryptedSecret,
+        totpEnabledAt: null,
+      });
     }
 
     this.metricsService.auth2faUsageTotal.inc({ action: 'setup' });
@@ -231,7 +198,7 @@ export class TwoFactorService {
     }
 
     detail.totpEnabledAt = new Date();
-    await this.authenticationDetailRepository.save(detail);
+    await this.persistence.saveDetail(detail);
     this.metricsService.auth2faUsageTotal.inc({ action: 'enable' });
   }
 
@@ -246,7 +213,7 @@ export class TwoFactorService {
       throw new UnauthorizedException('TwoFactorInvalidCode');
     }
 
-    await this.authenticationDetailRepository.delete(detail.id);
+    await this.persistence.removeDetail(detail.id);
     this.metricsService.auth2faUsageTotal.inc({ action: 'disable' });
   }
 }

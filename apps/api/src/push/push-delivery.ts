@@ -2,13 +2,13 @@
 // auto-generated on first use; admins can override them (which invalidates all subscriptions).
 // FEATURE: Push notification foundation
 
-import { PushSubscription } from '@attraccess/database-entities';
+import { PushSubscription } from '@attraccess/application-models';
 import * as webpush from 'web-push';
 import type { PushService } from './push.service';
 
 interface PushServicePushDeliveryContext {
   logger: PushService['logger'];
-  subscriptionRepository: PushService['subscriptionRepository'];
+  persistence: PushService['persistence'];
 }
 export async function sendToSubscription(
   context: PushServicePushDeliveryContext,
@@ -34,7 +34,7 @@ export async function sendToSubscription(
     // 404/410 mean the subscription is gone (browser unsubscribed / expired) - prune it.
     if (statusCode === 404 || statusCode === 410) {
       context.logger.debug(`Pruning stale push subscription ${subscription.id} (status ${statusCode})`);
-      await context.subscriptionRepository.delete({ id: subscription.id });
+      await context.persistence.removeStaleSubscription(subscription.id);
       return;
     }
 

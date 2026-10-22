@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum } from 'class-validator';
-import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 
 export class FormRequirementsQueryDto {
   @ApiProperty({
@@ -10,4 +10,3 @@ export class FormRequirementsQueryDto {
   @IsEnum(ResourceFormAction)
   action!: ResourceFormAction;
 }
-

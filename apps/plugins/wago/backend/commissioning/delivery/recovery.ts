@@ -2,13 +2,9 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 
 import { randomBytes } from 'node:crypto';
 
-import { WagoController } from '../../controllers/entity';
-
 import { type CommissioningOperationGuard } from '../../runtime/operation-guard';
 
 import { WagoDeviceOperations } from '../../runtime/device-operations';
-
-import { WagoDeviceOperation } from '../../runtime/managed/access.entity';
 
 import { SSH_TIMEOUT_MS } from '../model';
 
@@ -30,7 +26,7 @@ import { CC100_DIGITAL_PROFILE_ID } from '../../../shared/hardware-profile';
 
 import { rm } from 'node:fs/promises';
 
-import { WagoCommissioningSession } from '../sessions/session.entity';
+import { WagoCommissioningSession } from '../sessions/session.record';
 
 import { RuntimeDeliveryBundle } from '../model';
 
@@ -38,7 +34,7 @@ import { WagoCommissioningPlatform } from './platform';
 
 export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatform {
   protected async withControllerLock<T>(id: number, operation: () => Promise<T>): Promise<T> {
-    const session = await this.sessions.findOneBy({ id });
+    const session = await this.persistence.session(id);
     if (!session) throw new NotFoundException('commissioning session not found');
     const key = session.hostKeyFingerprint || session.targetHost || session.hardwareId;
     const previous = this.controllerLocks.get(key) ?? Promise.resolve();
@@ -62,7 +58,7 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
       let deviceOperations: WagoDeviceOperations | undefined;
       const owner = randomBytes(16).toString('hex');
       if (this.managedRuntime) {
-        deviceOperations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation));
+        deviceOperations = this.deviceOperations;
         if (!(await deviceOperations.acquire(key, owner, Date.now(), deadline + 60_000)))
           throw new ConflictException('Another controller operation is active. Retry after it finishes.');
       }
@@ -72,9 +68,7 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
         await deviceOperations?.assertOwned(key, owner);
       };
       try {
-        const enrolled = session.hardwareId
-          ? await this.context.getRepository(WagoController).findOneBy({ hardwareId: session.hardwareId })
-          : null;
+        const enrolled = session.hardwareId ? await this.persistence.controllerByHardware(session.hardwareId) : null;
         await this.managedRuntime?.assertNetworkSettled(enrolled?.id ?? null, session.hostKeyFingerprint ?? undefined);
         this.activeDeadlines.set(id, deadline);
         return await this.operationContext.run(guard, operation);
@@ -94,7 +88,7 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
     const suppliedCredential = requireDeliveryCredentials(input);
     return this.withControllerLock(id, () =>
       this.withDeliveryLock(id, async () => {
-        const session = await this.sessions.findOneBy({ id });
+        const session = await this.persistence.session(id);
         if (!session) throw new NotFoundException('commissioning session not found');
         if (
           ![
@@ -216,7 +210,7 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
   }
 
   protected async loadDeliverableSession(id: number): Promise<WagoCommissioningSession> {
-    const session = await this.sessions.findOneBy({ id });
+    const session = await this.persistence.session(id);
     if (!session) throw new NotFoundException('commissioning session not found');
     if (
       !['awaiting_delivery', 'delivering', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state)

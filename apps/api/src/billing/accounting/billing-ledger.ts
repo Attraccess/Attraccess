@@ -1,15 +1,13 @@
 import {
   BillingTransaction,
   BillingTransactionStatus,
-  User,
   ResourceBillingConfiguration,
-  BillingTransactionItem,
-  Setting,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 
 import { BadRequestException, Logger } from '@nestjs/common';
 
-import { EntityManager, Repository } from 'typeorm';
+import { DatabaseTransactions, TransactionScope } from '../../database/transaction-scope';
+import { BILLING_OPERATIONS, BillingPersistence } from '../persistence/port';
 
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
@@ -46,12 +44,8 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { LiveNotificationsService } from '../live-notifications/live-notifications.service';
 
 export abstract class BillingLedger {
-  async getBalance(userId: number, transactionalEntityManager?: EntityManager): Promise<number> {
-    const userRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(User)
-      : this.userRepository;
-
-    const user = await userRepository.findOneBy({ id: userId });
+  async getBalance(userId: number, scope?: TransactionScope): Promise<number> {
+    const user = await this.operations(scope).balance(userId);
     if (!user) {
       throw new UserNotFoundException(userId);
     }
@@ -60,23 +54,13 @@ export abstract class BillingLedger {
   }
 
   async getTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
-    const transaction = await this.billingTransactionRepository.findOne({
-      where: { resourceUsageId: usageId, userId },
-      select: ['id'],
-    });
-    return transaction?.id ?? null;
+    return this.persistence.transactionIdForUsage(usageId, userId);
   }
 
   async getHistory(userId: number, options: PaginationOptions): Promise<TransactionsDto> {
     const { page, limit } = options;
 
-    const [transactions, total] = await this.billingTransactionRepository.findAndCount({
-      where: { userId },
-      skip: (page - 1) * limit,
-      take: limit,
-      relations: this.DEFAULT_RELATIONS,
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+    const [transactions, total] = await this.persistence.history(userId, (page - 1) * limit, limit);
 
     return {
       data: transactions,
@@ -87,18 +71,11 @@ export abstract class BillingLedger {
   }
 
   async getTransaction(transactionId: number, userId?: number): Promise<BillingTransaction> {
-    return await this.billingTransactionRepository.findOne({
-      where: { id: transactionId, userId },
-      relations: this.DEFAULT_RELATIONS,
-    });
+    return this.persistence.transaction(transactionId, userId);
   }
 
   async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransaction | null> {
-    return this.billingTransactionRepository.findOneBy({
-      resourceUsageId,
-      userId,
-      status: BillingTransactionStatus.Completed,
-    });
+    return this.persistence.completedUsageCharge(resourceUsageId, userId);
   }
 
   async createManualTransaction(
@@ -107,28 +84,30 @@ export abstract class BillingLedger {
     amount: number,
     failOnInsufficientBalance = true,
   ): Promise<BillingTransaction> {
-    const user = await this.userRepository.findOneBy({ id: userId });
-    if (!user) {
-      throw new UserNotFoundException(userId);
-    }
+    const transaction = await this.transactions.run({ resourceIds: [], accountIds: [userId] }, async (scope) => {
+      const user = await this.operations(scope).balance(userId);
+      if (!user) {
+        throw new UserNotFoundException(userId);
+      }
 
-    if (amount % 1 !== 0) {
-      throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
-    }
+      if (amount % 1 !== 0) {
+        throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
+      }
 
-    const currentBalance = user.creditBalance;
+      const currentBalance = user.creditBalance;
 
-    const amountIsNegative = amount < 0;
+      const amountIsNegative = amount < 0;
 
-    if (amountIsNegative && failOnInsufficientBalance && currentBalance + amount < 0) {
-      throw new InsufficientBalanceError();
-    }
+      if (amountIsNegative && failOnInsufficientBalance && currentBalance + amount < 0) {
+        throw new InsufficientBalanceError();
+      }
 
-    const transaction = await this.billingTransactionRepository.save({
-      userId,
-      initiatorId,
-      amount,
-      status: BillingTransactionStatus.Completed,
+      return await this.operations(scope).createTransaction({
+        userId,
+        initiatorId,
+        amount,
+        status: BillingTransactionStatus.Completed,
+      });
     });
 
     this.liveNotificationsService.notifyTransactionUpdate(transaction);
@@ -155,23 +134,23 @@ export abstract class BillingLedger {
       throw new BillingTransactionNotFoundException();
     }
 
-    if (data.amount <= 0) {
-      throw new BadRequestException('Amount must be greater than 0');
-    }
-
-    if (data.amount > Math.abs(transaction.amount)) {
-      throw new RefundAmountHigherThanTransactionAmountException();
-    }
-
-    const refundAmount = transaction.amount > 0 ? -data.amount : data.amount;
-
-    const refundTransaction = await this.billingTransactionRepository.save({
-      userId: transaction.userId,
-      initiatorId: executingUserId,
-      amount: refundAmount,
-      status: BillingTransactionStatus.Completed,
-      refundOfId: transaction.id,
-    } as Partial<BillingTransaction>);
+    const refundTransaction = await this.transactions.run(
+      { resourceIds: [], accountIds: [transaction.userId] },
+      async (scope) => {
+        const current = await this.operations(scope).transaction(transactionId);
+        if (!current) throw new BillingTransactionNotFoundException();
+        if (data.amount <= 0) throw new BadRequestException('Amount must be greater than 0');
+        if (data.amount > Math.abs(current.amount)) throw new RefundAmountHigherThanTransactionAmountException();
+        const refundAmount = current.amount > 0 ? -data.amount : data.amount;
+        return this.operations(scope).createTransaction({
+          userId: current.userId,
+          initiatorId: executingUserId,
+          amount: refundAmount,
+          status: BillingTransactionStatus.Completed,
+          refundOfId: current.id,
+        });
+      },
+    );
 
     this.liveNotificationsService.notifyTransactionUpdate(refundTransaction);
     void this.auditService.recordBillingTransaction({
@@ -191,31 +170,13 @@ export abstract class BillingLedger {
       throw new BadRequestException('Invalid currency');
     }
 
-    const existingCurrency = await this.settingRepository.findOneBy({
-      parent: 'billing',
-      key: 'currency',
-    });
-
-    if (existingCurrency) {
-      await this.settingRepository.update(existingCurrency.id, {
-        value: nextConfigurationData.currency,
-      });
-    } else {
-      await this.settingRepository.insert({
-        parent: 'billing',
-        key: 'currency',
-        value: nextConfigurationData.currency,
-      });
-    }
+    await this.persistence.setCurrency(nextConfigurationData.currency);
 
     return await this.getConfiguration();
   }
 
   public async getConfiguration(): Promise<BillingConfigurationDto> {
-    const currency = await this.settingRepository.findOneBy({
-      parent: 'billing',
-      key: 'currency',
-    });
+    const currency = await this.persistence.currency();
     let currencyValue = Currency.EUR;
     if (currency) {
       currencyValue = (currency.value as Currency) ?? Currency.EUR;
@@ -241,21 +202,17 @@ export abstract class BillingLedger {
 
   public async getResourceBillingConfiguration(
     resourceId: number,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionScope,
   ): Promise<ResourceBillingConfiguration> {
-    const repository = transactionManager
-      ? transactionManager.getRepository(ResourceBillingConfiguration)
-      : this.resourceBillingConfigurationRepository;
-
-    let configuration = await repository.findOneBy({ resourceId });
+    const persistence = this.operations(transactionManager);
+    let configuration = await persistence.resourceConfiguration(resourceId);
     if (!configuration) {
-      configuration = repository.create({
+      configuration = await persistence.saveResourceConfiguration({
         resourceId,
         creditsPerUsage: 0,
         creditsPerMinute: 0,
         creditsPerOperatingMinute: 0,
       });
-      configuration = await repository.save(configuration);
     }
     return configuration;
   }
@@ -264,7 +221,7 @@ export abstract class BillingLedger {
     resourceId: number,
     data: UpdateResourceBillingConfigurationDto,
   ): Promise<ResourceBillingConfiguration> {
-    const configuration = await this.resourceBillingConfigurationRepository.findOneBy({ resourceId });
+    const configuration = await this.persistence.resourceConfiguration(resourceId);
     if (!configuration) {
       throw new ResourceBillingConfigurationNotFoundException(resourceId);
     }
@@ -312,7 +269,7 @@ export abstract class BillingLedger {
       );
     }
 
-    const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
+    const savedConfiguration = await this.persistence.saveResourceConfiguration(configuration);
     this.eventEmitter.emit(
       ResourceBillingConfigurationChangedEvent.EVENT_NAME,
       new ResourceBillingConfigurationChangedEvent(resourceId),
@@ -320,13 +277,12 @@ export abstract class BillingLedger {
     return savedConfiguration;
   }
 
-  protected abstract readonly settingRepository: Repository<Setting>;
+  protected operations(scope?: TransactionScope): BillingPersistence {
+    return scope ? scope.resolve(BILLING_OPERATIONS) : this.persistence;
+  }
 
-  protected abstract readonly userRepository: Repository<User>;
-
-  protected abstract readonly billingTransactionRepository: Repository<BillingTransaction>;
-
-  protected abstract DEFAULT_RELATIONS: string[];
+  protected abstract readonly persistence: BillingPersistence;
+  protected abstract readonly transactions: DatabaseTransactions;
 
   protected abstract readonly liveNotificationsService: LiveNotificationsService;
 
@@ -334,11 +290,7 @@ export abstract class BillingLedger {
 
   protected abstract readonly metricsService: MetricsService;
 
-  protected abstract readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>;
-
   protected abstract readonly eventEmitter: EventEmitter2;
-
-  protected abstract readonly billingTransactionItemRepository: Repository<BillingTransactionItem>;
 
   public abstract notifyResourceUsageCharge(transactionId: number): Promise<void>;
 

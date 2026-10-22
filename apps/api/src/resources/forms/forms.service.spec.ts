@@ -1,15 +1,9 @@
+import { formsOperationsFake } from './persistence/operations.test-fixture';
+import { DatabaseTransactions } from '../../database/transaction-scope';
+import { FormsPersistence } from './persistence/port';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  Form,
-  FormField,
-  FormFieldType,
-  FormSubmission,
-  Resource,
-  ResourceFormAction,
-} from '@attraccess/database-entities';
+import { Form, FormField, FormFieldType, Resource, ResourceFormAction } from '@attraccess/application-models';
 import { ResourceFormsService } from './forms.service';
-import { EntityManager } from 'typeorm';
 
 const makeField = (overrides: Partial<FormField>): FormField =>
   ({
@@ -25,8 +19,7 @@ const makeField = (overrides: Partial<FormField>): FormField =>
 
 describe('ResourceFormsService pagination + per-field validation', () => {
   let service: ResourceFormsService;
-  const formRepo = { find: jest.fn(), findOne: jest.fn() };
-  const resourceRepo = { findOne: jest.fn() };
+  let fake: ReturnType<typeof formsOperationsFake>;
 
   const form: Form = {
     id: 7,
@@ -45,17 +38,17 @@ describe('ResourceFormsService pagination + per-field validation', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    resourceRepo.findOne.mockResolvedValue({ id: 5 } as Resource);
-    formRepo.findOne.mockResolvedValue(form);
-    formRepo.find.mockResolvedValue([form]);
+    fake = formsOperationsFake();
+    fake.persistence.resource.mockResolvedValue({ id: 5 } as Resource);
+    fake.persistence.form.mockResolvedValue(form);
+    fake.persistence.list.mockResolvedValue([form]);
+    fake.persistence.required.mockResolvedValue([form]);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFormsService,
-        { provide: getRepositoryToken(Form), useValue: formRepo },
-        { provide: getRepositoryToken(FormField), useValue: { find: jest.fn() } },
-        { provide: getRepositoryToken(FormSubmission), useValue: { save: jest.fn() } },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepo },
+        { provide: FormsPersistence, useValue: fake.persistence },
+        { provide: DatabaseTransactions, useValue: fake.transactions },
       ],
     }).compile();
 
@@ -120,31 +113,29 @@ describe('ResourceFormsService pagination + per-field validation', () => {
   });
 
   it('validates lifecycle form drafts without publishing submissions', async () => {
-    const save = jest.fn();
-    const manager = {
-      getRepository: jest.fn((entity) => (entity === Form ? formRepo : { save })),
-    } as unknown as EntityManager;
-    const drafts = await service.prepareRequiredSubmissions({
-      resourceId: 5,
-      action: ResourceFormAction.START,
-      userId: 3,
-      resourceUsageId: 9,
-      manager,
-      submissions: [
-        {
-          formId: 7,
-          answers: [
-            { fieldId: 11, value: 'Alice' },
-            { fieldId: 13, value: true },
-            { fieldId: 14, value: 'blue' },
-          ],
-        },
-      ],
-    });
+    const drafts = await fake.transactions.run({ resourceIds: [5], accountIds: [3] }, (scope) =>
+      service.prepareRequiredSubmissions({
+        resourceId: 5,
+        action: ResourceFormAction.START,
+        userId: 3,
+        resourceUsageId: 9,
+        manager: scope,
+        submissions: [
+          {
+            formId: 7,
+            answers: [
+              { fieldId: 11, value: 'Alice' },
+              { fieldId: 13, value: true },
+              { fieldId: 14, value: 'blue' },
+            ],
+          },
+        ],
+      }),
+    );
     expect(drafts).toHaveLength(1);
     expect(drafts[0]).toMatchObject({ resourceUsageId: 9, userId: 3, formId: 7 });
     expect(drafts[0].data['11'].value).toBe('Alice');
-    expect(save).not.toHaveBeenCalled();
+    expect(fake.persistence.saveSubmission).not.toHaveBeenCalled();
   });
 });
 
@@ -157,30 +148,16 @@ describe('ResourceFormsService field updates', () => {
   };
   const makeService = () => {
     const form = { id: 7, resourceId: 5, name: 'Updated', fields: [] };
-    const fieldRepo = {
-      find: jest.fn().mockResolvedValue([{ id: 11 }, { id: 12 }]),
-      delete: jest.fn(),
-      update: jest.fn(),
-      insert: jest.fn(),
-    };
-    const formRepo = {
-      findOne: jest.fn().mockResolvedValue(form),
-      update: jest.fn(),
-      manager: { transaction: jest.fn() },
-    };
-    const manager = { getRepository: (entity: unknown) => (entity === Form ? formRepo : fieldRepo) };
-    formRepo.manager.transaction.mockImplementation((run) => run(manager));
-    const service = new ResourceFormsService(
-      formRepo as never,
-      fieldRepo as never,
-      {} as never,
-      { findOne: jest.fn().mockResolvedValue({ id: 5 }) } as never,
-    );
-    return { service, fieldRepo, formRepo };
+    const fake = formsOperationsFake();
+    fake.persistence.resource.mockResolvedValue({ id: 5 } as Resource);
+    fake.persistence.form.mockResolvedValue(form as Form);
+    fake.persistence.fields.mockResolvedValue([{ id: 11 }, { id: 12 }] as FormField[]);
+    const service = new ResourceFormsService(fake.persistence, fake.transactions);
+    return { service, persistence: fake.persistence, driver: fake.driver };
   };
 
   it('reconciles retained, deleted and new fields within the form transaction', async () => {
-    const { service, fieldRepo, formRepo } = makeService();
+    const { service, persistence, driver } = makeService();
     const updated = await service.update(5, 7, {
       ...defaults,
       name: 'Updated',
@@ -190,28 +167,31 @@ describe('ResourceFormsService field updates', () => {
       ],
     });
     expect(updated.name).toBe('Updated');
-    expect(formRepo.manager.transaction).toHaveBeenCalledTimes(1);
-    expect(fieldRepo.delete).toHaveBeenCalledWith([12]);
-    expect(fieldRepo.update).toHaveBeenCalledWith(11, expect.objectContaining({ name: 'Retained', isRequired: true }));
-    expect(fieldRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ formId: 7, name: 'New' }));
+    expect(driver.run).toHaveBeenCalledWith({ resourceIds: [5], accountIds: [] }, expect.any(Function));
+    expect(persistence.deleteFields).toHaveBeenCalledWith([12]);
+    expect(persistence.updateField).toHaveBeenCalledWith(
+      11,
+      expect.objectContaining({ name: 'Retained', isRequired: true }),
+    );
+    expect(persistence.insertField).toHaveBeenCalledWith(expect.objectContaining({ formId: 7, name: 'New' }));
   });
 
   it('rejects an existing field belonging to a different form', async () => {
-    const { service, fieldRepo } = makeService();
+    const { service, persistence } = makeService();
     await expect(
       service.update(5, 7, {
         ...defaults,
         fields: [{ id: 99, name: 'Foreign', type: FormFieldType.TEXT, position: 0, isRequired: false }],
       }),
     ).rejects.toThrow('Form field #99 not found on this form');
-    expect(fieldRepo.update).not.toHaveBeenCalled();
-    expect(fieldRepo.insert).not.toHaveBeenCalled();
+    expect(persistence.updateField).not.toHaveBeenCalled();
+    expect(persistence.insertField).not.toHaveBeenCalled();
   });
 
   it('removes all fields when the update supplies an empty field list', async () => {
-    const { service, fieldRepo } = makeService();
+    const { service, persistence } = makeService();
     await service.update(5, 7, { ...defaults, fields: [] });
-    expect(fieldRepo.delete).toHaveBeenCalledWith([11, 12]);
-    expect(fieldRepo.update).not.toHaveBeenCalled();
+    expect(persistence.deleteFields).toHaveBeenCalledWith([11, 12]);
+    expect(persistence.updateField).not.toHaveBeenCalled();
   });
 });

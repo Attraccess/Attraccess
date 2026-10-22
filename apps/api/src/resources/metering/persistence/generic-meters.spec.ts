@@ -1,3 +1,4 @@
+import { sqliteResourceFixture } from '../../../database/conformance/sqlite-fixture';
 import {
   BillingTransaction,
   BillingTransactionItem,
@@ -358,7 +359,7 @@ describe('Flow-defined metering', () => {
       expect(await genericMetersScope.source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
       if (ended) await genericMetersScope.usage.endSession(1, genericMetersScope.users[0], {} as never);
       await expect(
-        new MeteringReadings(genericMetersScope.source.manager, new Map()).complete('outstanding-idle', {
+        new MeteringReadings(sqliteResourceFixture(genericMetersScope.source).metering, sqliteResourceFixture(genericMetersScope.source).transactions, new Map()).complete('outstanding-idle', {
           kind: 'reading',
           value: '105',
         }),
@@ -452,7 +453,7 @@ describe('Flow-defined metering', () => {
         requestedAt: new Date(),
       });
       await expect(
-        new MeteringReadings(genericMetersScope.source.manager, new Map()).complete('queued-lifetime-poll', {
+        new MeteringReadings(sqliteResourceFixture(genericMetersScope.source).metering, sqliteResourceFixture(genericMetersScope.source).transactions, new Map()).complete('queued-lifetime-poll', {
           kind: 'reading',
           mode: 'increment',
           value: '5',

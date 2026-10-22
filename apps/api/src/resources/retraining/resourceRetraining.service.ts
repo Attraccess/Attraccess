@@ -1,17 +1,8 @@
-import {
-  Resource,
-  ResourceGroup,
-  ResourceIntroduction,
-  ResourceIntroductionHistoryItem,
-  ResourceUsage,
-  IntroductionHistoryAction,
-} from '@attraccess/database-entities';
+import { ResourceIntroduction, IntroductionHistoryAction } from '@attraccess/application-models';
 
 import { Injectable, Logger } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, In, IsNull, Not } from 'typeorm';
+import { ResourceRetrainingPersistence } from './persistence/port';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -52,16 +43,7 @@ export const EMPTY_EVALUATION: RetrainingEvaluation = {
 @Injectable()
 export class ResourceRetrainingService {
   constructor(
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceGroup)
-    protected readonly resourceGroupRepository: Repository<ResourceGroup>,
-    @InjectRepository(ResourceUsage)
-    protected readonly resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(ResourceIntroduction)
-    protected readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
-    @InjectRepository(ResourceIntroductionHistoryItem)
-    protected readonly historyRepository: Repository<ResourceIntroductionHistoryItem>,
+    protected readonly persistence: ResourceRetrainingPersistence,
     protected readonly resourceGroupsService: ResourceGroupsService,
     protected readonly emailService: EmailService,
     protected readonly audit: AuditService,
@@ -143,7 +125,7 @@ export class ResourceRetrainingService {
   }
 
   public async getIntroductionRetrainingStatus(introductionId: number): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({ where: { id: introductionId } });
+    const introduction = await this.persistence.introduction(introductionId);
     if (!introduction || !(await this.isValid(introduction.id))) return null;
     const trainedAt = await this.getTrainedAt(introduction);
     if (!trainedAt) return null;
@@ -160,14 +142,12 @@ export class ResourceRetrainingService {
     userId: number,
     now: Date,
   ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({
-      where: { resource: { id: resourceId }, receiverUser: { id: userId } },
-    });
+    const introduction = await this.persistence.resourceIntroduction(resourceId, userId);
     if (!introduction || !(await this.isValid(introduction.id))) {
       return null;
     }
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.persistence.resource(resourceId);
     if (!resource) {
       return null;
     }
@@ -182,14 +162,12 @@ export class ResourceRetrainingService {
     userId: number,
     now: Date,
   ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({
-      where: { resourceGroup: { id: groupId }, receiverUser: { id: userId } },
-    });
+    const introduction = await this.persistence.groupIntroduction(groupId, userId);
     if (!introduction || !(await this.isValid(introduction.id))) {
       return null;
     }
 
-    const group = await this.resourceGroupRepository.findOne({ where: { id: groupId } });
+    const group = await this.persistence.group(groupId);
     if (!group) {
       return null;
     }
@@ -228,12 +206,12 @@ export class ResourceRetrainingService {
     introduction: ResourceIntroduction,
   ): Promise<{ id: number; name: string; isGroup: boolean; policy: RetrainingPolicy } | null> {
     if (introduction.resourceId) {
-      const resource = await this.resourceRepository.findOne({ where: { id: introduction.resourceId } });
+      const resource = await this.persistence.resource(introduction.resourceId);
       return resource ? { id: resource.id, name: resource.name, isGroup: false, policy: resource } : null;
     }
 
     if (introduction.resourceGroupId) {
-      const group = await this.resourceGroupRepository.findOne({ where: { id: introduction.resourceGroupId } });
+      const group = await this.persistence.group(introduction.resourceGroupId);
       return group ? { id: group.id, name: group.name, isGroup: true, policy: group } : null;
     }
 
@@ -241,41 +219,27 @@ export class ResourceRetrainingService {
   }
 
   protected async getTrainedAt(introduction: ResourceIntroduction): Promise<Date | null> {
-    const latestGrant = await this.historyRepository.findOne({
-      where: { introduction: { id: introduction.id }, action: IntroductionHistoryAction.GRANT },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+    const latestGrant = await this.persistence.latestHistory(introduction.id, IntroductionHistoryAction.GRANT);
     return latestGrant?.createdAt ?? introduction.completedAt ?? introduction.createdAt ?? null;
   }
 
   protected async isValid(introductionId: number): Promise<boolean> {
-    const lastHistoryItem = await this.historyRepository.findOne({
-      where: { introduction: { id: introductionId } },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+    const lastHistoryItem = await this.persistence.latestHistory(introductionId);
     return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
   }
 
   protected async getResourceLastUsedAt(resourceId: number, userId: number): Promise<Date | null> {
-    const lastUsage = await this.resourceUsageRepository.findOne({
-      where: { resourceId, userId, endTime: Not(IsNull()) },
-      order: { endTime: 'DESC' },
-    });
-    return lastUsage?.endTime ?? null;
+    return this.persistence.resourceLastUsedAt(resourceId, userId);
   }
 
   protected async getGroupLastUsedAt(groupId: number, userId: number): Promise<Date | null> {
-    const group = await this.resourceGroupRepository.findOne({ where: { id: groupId }, relations: ['resources'] });
+    const group = await this.persistence.groupWithResources(groupId);
     const resourceIds = (group?.resources ?? []).map((resource) => resource.id);
     if (resourceIds.length === 0) {
       return null;
     }
 
-    const lastUsage = await this.resourceUsageRepository.findOne({
-      where: { resourceId: In(resourceIds), userId, endTime: Not(IsNull()) },
-      order: { endTime: 'DESC' },
-    });
-    return lastUsage?.endTime ?? null;
+    return this.persistence.resourcesLastUsedAt(resourceIds, userId);
   }
 
   protected addDays(date: Date, days: number): Date {
@@ -285,16 +249,7 @@ export class ResourceRetrainingService {
   @Cron('0 3 * * *')
   public async evaluateAndNotify(): Promise<void> {
     const now = new Date();
-    const introductions = await this.resourceIntroductionRepository
-      .createQueryBuilder('introduction')
-      .leftJoinAndSelect('introduction.receiverUser', 'receiverUser')
-      .leftJoin('introduction.resource', 'resource')
-      .leftJoin('introduction.resourceGroup', 'resourceGroup')
-      .where('resource.retrainingMaxAgeDays IS NOT NULL')
-      .orWhere('resource.retrainingMaxInactivityDays IS NOT NULL')
-      .orWhere('resourceGroup.retrainingMaxAgeDays IS NOT NULL')
-      .orWhere('resourceGroup.retrainingMaxInactivityDays IS NOT NULL')
-      .getMany();
+    const introductions = await this.persistence.configuredIntroductions();
 
     for (const introduction of introductions) {
       try {
@@ -343,7 +298,7 @@ export class ResourceRetrainingService {
         },
       });
       if (recorded) {
-        await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
+        await this.persistence.stampRequiredAudit(introduction.id, now);
       }
     }
     if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
@@ -357,6 +312,6 @@ export class ResourceRetrainingService {
       );
     }
     // A failed delivery must remain eligible for the next scheduled retry.
-    await this.resourceIntroductionRepository.update(introduction.id, { retrainingNotifiedAt: now });
+    await this.persistence.stampNotification(introduction.id, now);
   }
 }

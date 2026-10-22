@@ -30,7 +30,7 @@ describe('ProjectInvitationsController', () => {
     const result = await controller.listMyInvitations(req);
 
     expect(projectsService.listPendingInvitationsForUser).toHaveBeenCalledWith(1);
-    expect(result).toBe(invitations);
+    expect(result).toEqual(invitations);
   });
 
   it('accepts an invitation', async () => {
@@ -41,7 +41,7 @@ describe('ProjectInvitationsController', () => {
     const result = await controller.acceptInvitation(req, 3);
 
     expect(projectsService.acceptInvitation).toHaveBeenCalledWith(2, 3, 'session', undefined);
-    expect(result).toBe(invitation);
+    expect(result).toEqual(invitation);
   });
 
   it('declines an invitation', async () => {
@@ -52,6 +52,6 @@ describe('ProjectInvitationsController', () => {
     const result = await controller.declineInvitation(req, 5);
 
     expect(projectsService.declineInvitation).toHaveBeenCalledWith(4, 5, 'session', undefined);
-    expect(result).toBe(invitation);
+    expect(result).toEqual(invitation);
   });
 });
