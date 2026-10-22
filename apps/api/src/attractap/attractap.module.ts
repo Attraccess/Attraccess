@@ -1,3 +1,6 @@
+import { ReaderIdentityService } from './security/reader-identity.service';
+import { ReaderTimeService } from './security/reader-time.service';
+import { VerifiedCardSessionService } from './security/verified-card-session.service';
 import { Module } from '@nestjs/common';
 import { AttractapController } from './attractap.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -21,7 +24,14 @@ import { AttractapBillingHandler } from './websockets/handlers/billing/billing.h
 import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
 import { AttractapSupervisionHandler } from './websockets/handlers/supervision/supervision.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
+import {
+  Attractap,
+  AttractapReaderIdentity,
+  AttractapCrashReport,
+  NFCCard,
+  Resource,
+  User,
+} from '@attraccess/database-entities';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -48,7 +58,7 @@ import { SettingsModule } from '../settings/settings.module';
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    TypeOrmModule.forFeature([Attractap, AttractapCrashReport, NFCCard, Resource, User]),
+    TypeOrmModule.forFeature([AttractapReaderIdentity, Attractap, AttractapCrashReport, NFCCard, Resource, User]),
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,
@@ -70,6 +80,9 @@ import { SettingsModule } from '../settings/settings.module';
     ResourceOperatingAttributionModule,
   ],
   providers: [
+    ReaderIdentityService,
+    ReaderTimeService,
+    VerifiedCardSessionService,
     CardAccessService,
     AttractapService,
     WebsocketService,

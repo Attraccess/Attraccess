@@ -82,11 +82,11 @@ rollback, physical NFC and live networking remain unverified.
 
 ## Building
 
-Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
+Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. Offline DS preparation additionally uses the isolated `.tools/reader-provisioning` Python environment installed by shared setup. Its hashed dependency closure pins esp-secure-cert-tool 2.6.1 without modifying IDF or global Python. `esptool` comes from the selected tool environment; `cmake`/`ninja` are installed into the IDF tool set if needed.
 
 NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
-Build the four active variants: `attractap-touch`, `attractap-touch-v2`, `attractap-touch-demo` and `attractap-touch-v2-demo` (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
+Build all six existing variants by default (use `--variants` to select a subset). Production builds default to all four non-demo variants; demo variants cannot use the production profile:
 
 ```bash
 python3 build_firmwares.py
@@ -215,3 +215,14 @@ The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a use
 | `triggerSuccess()`  | Green        | Auth succeeded     |
 | `triggerError()`    | Red flash    | Auth failed        |
 | `triggerIndicate()` | Yellow flash | Card held too long |
+
+## Production security
+
+Production overlays are distinct from bridge/development and demo builds. See
+[production provisioning and claim limits](../../../docs/en/attractap/production-security.md),
+[credential lifecycle and recovery](../../../docs/en/attractap/security-lifecycle.md), and
+[hardware qualification](../../../docs/en/attractap/hardware-qualification.md).
+Unqualified production builds remain outside deployable catalogs. Hardware
+qualification and rollout are outstanding. Bridge OTA does not repartition or lock
+a reader. Card operations, reader top-ups and reader project requests deny until
+ATT-950 supplies actual verification. Firmware version 1.6.9 includes this foundation.

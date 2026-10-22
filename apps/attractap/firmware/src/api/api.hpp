@@ -1,303 +1,70 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <cstdint>
-#include <cstddef>
-
-struct ApiResources
-{
-    static constexpr size_t MAX_RESOURCES = 10;
-
-    static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
-
-    // 32 username characters plus the terminator.
-    static constexpr size_t MAX_USERNAME_LEN = 33;
-
-    static constexpr size_t MAX_HEALTH_REASON_LEN = 160;
-
-    static constexpr size_t MAX_INTRODUCERS = 8;
-
-    static constexpr size_t MAX_FLOW_BUTTONS = 7;
-
-    static constexpr size_t MAX_FLOW_BUTTON_LABEL_LEN = 32;
-
-    static constexpr size_t MAX_FLOW_BUTTON_ID_LEN = 48;
-
-    static constexpr size_t MAX_PROJECTS_PER_PAGE = 4;
-
-    static constexpr size_t MAX_FORMS_PER_REQUEST = 4;
-
-    static constexpr size_t MAX_FORM_PAGE_FIELDS = 1;
-
-    static constexpr size_t MAX_FORM_PAGE_ERRORS = MAX_FORM_PAGE_FIELDS;
-
-    static constexpr size_t MAX_SELECT_OPTIONS = 12;
-
-struct FlowButton
-    {
-        char id[MAX_FLOW_BUTTON_ID_LEN];
-        char label[MAX_FLOW_BUTTON_LABEL_LEN];
-    };
-
-struct ResourceBrief
-    {
-        uint32_t id;
-        uint8_t type; // 0: machine, 1: door (encode from API strings)
-        bool separateUnlockAndUnlatch;
-        bool allowTakeOver;
-        bool accessKnown = false;
-        bool canManageMaintenance = false;
-        bool hasIntroduction = false;
-        bool isIntroducer = false;
-        bool canManageResource = false;
-        bool requiresSupervisor = false;
-        char name[MAX_RESOURCE_NAME_LEN];
-        std::string description;
-        bool hasActiveUsage;
-        uint32_t activeUsageId = 0;
-        bool isUnderMaintenance;
-        bool isHealthy;
-        char healthReason[MAX_HEALTH_REASON_LEN];
-        char activeUser[MAX_USERNAME_LEN];
-        uint32_t activeStartEpoch;          // seconds since epoch (UTC)
-        int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
-        std::vector<std::string> introducers;
-        uint8_t flowButtonCount;
-        FlowButton flowButtons[MAX_FLOW_BUTTONS];
-    };
-
-struct ResourceList
-    {
-        uint32_t requestId = 0;
-        uint16_t count;
-        char authenticatedUsername[MAX_USERNAME_LEN] = {};
-        ResourceBrief items[MAX_RESOURCES];
-    };
-
-struct Project
-    {
-        uint32_t id;
-        std::string name;
-    };
-
-struct ProjectsOfUserResponse
-    {
-        uint16_t count;
-        uint32_t page = 1;
-        uint32_t limit = MAX_PROJECTS_PER_PAGE;
-        uint32_t total = 0;
-        bool hasMore = false;
-        Project items[MAX_PROJECTS_PER_PAGE];
-    };
-
-struct UsageStats
-    {
-        uint32_t resourceId = 0;
-        uint32_t usageId = 0;
-        int64_t operatingDurationMs = -1; // -1 means no operating data
-        int8_t isOperating = -1; // -1 unknown, 0 idle, 1 running
-        struct MeterValue {
-            std::string name;
-            std::string value;
-            int64_t creditsPerUnit = -1; // -1 means no captured rate was provided
-            std::string formattedRate;
-        };
-        std::vector<MeterValue> meters;
-    };
-
-struct ActionResult {
-        std::string type;
-        bool success = false;
-        uint32_t requestId = 0;
-        std::string error;
-        bool sumUpEnabled = false;
-        std::string billingTotal{};
-        bool hasDuration = false;
-        uint32_t durationSeconds = 0;
-        bool hasOwnership = false;
-        bool endedOwnSession = false;
-    };
-};
-
-struct ApiForms : public ApiResources
-{
-enum class ResourceUsageFormActionType : uint8_t
-    {
-        UNKNOWN,
-        START,
-        END,
-        TAKEOVER,
-    };
-
-enum class ResourceUsageFormFieldType : uint8_t
-    {
-        UNKNOWN,
-        TEXT,
-        NUMBER,
-        BOOLEAN,
-        SELECT,
-    };
-
-struct ResourceUsageFormFieldOptions
-    {
-        struct
-        {
-            bool hasPlaceholder = false;
-            std::string placeholder;
-            bool multiline = false;
-        } text;
-        struct
-        {
-            bool hasMin = false;
-            double min = 0;
-            bool hasMax = false;
-            double max = 0;
-            bool hasStep = false;
-            double step = 0;
-        } number;
-        struct
-        {
-            uint8_t count = 0;
-            std::string values[MAX_SELECT_OPTIONS];
-        } select;
-    };
-
-struct ResourceUsageFormField
-    {
-        uint32_t id = 0;
-        ResourceUsageFormFieldType type = ResourceUsageFormFieldType::UNKNOWN;
-        bool isRequired = false;
-        std::string name;
-        std::string description;
-        ResourceUsageFormFieldOptions options;
-        bool hasValue = false;
-        std::string value;
-    };
-
-struct ResourceUsageFormMeta
-    {
-        uint32_t id = 0;
-        std::string name;
-        uint32_t fieldCount = 0;
-    };
-
-struct ResourceUsageFormRequest
-    {
-        uint32_t requestId = 0;
-        uint32_t resourceId = 0;
-        ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
-        std::string resourceName;
-        uint8_t formCount = 0;
-        ResourceUsageFormMeta forms[MAX_FORMS_PER_REQUEST];
-    };
-
-struct ResourceUsageFormFieldsPage
-    {
-        uint32_t resourceId = 0;
-        ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
-        uint32_t formId = 0;
-        uint32_t offset = 0;
-        uint32_t totalFieldCount = 0;
-        uint8_t fieldCount = 0;
-        ResourceUsageFormField fields[MAX_FORM_PAGE_FIELDS];
-    };
-
-struct FormSubmissionAnswer
-    {
-        uint32_t fieldId = 0;
-        enum class ValueType : uint8_t
-        {
-            STRING,
-            NUMBER,
-            BOOLEAN,
-        } type = ValueType::STRING;
-        std::string stringValue;
-        double numberValue = 0;
-        bool boolValue = false;
-    };
-
-struct FormPageSubmission
-    {
-        uint32_t formId = 0;
-        uint32_t offset = 0;
-        uint8_t answerCount = 0;
-        FormSubmissionAnswer answers[MAX_FORM_PAGE_FIELDS];
-    };
-
-struct ResourceUsageFormPageResult
-    {
-        uint32_t resourceId = 0;
-        ResourceUsageFormActionType action = ResourceUsageFormActionType::UNKNOWN;
-        uint32_t formId = 0;
-        uint32_t offset = 0;
-        bool valid = false;
-        uint8_t errorCount = 0;
-        struct Error
-        {
-            uint32_t fieldId = 0;
-            std::string message;
-            std::string code;
-        } errors[MAX_FORM_PAGE_ERRORS];
-    };
-};
-
-struct ApiCards : public ApiForms
-{
-struct CardAuthenticationDetailsResponse
-    {
-        uint8_t keyNo;
-        uint8_t keyBytes[16];
-        uint8_t keyLen;
-        std::string error;
-        std::string username;
-        std::string language;
-        bool canManageResource;
-        bool hasIntroduction;
-        bool isIntroducer;
-        // Two-card supervision (ATT-493). supervisionMode is the resource policy; requiresSupervisor
-        // is the server's verdict for this user (true => starting a session requires supervisor
-        // approval; authentication itself still unlocks the resource details screen).
-        std::string supervisionMode;
-        bool requiresSupervisor;
-    };
-
-struct SupervisionRequestResult
-    {
-        bool success = false;
-        std::string error;
-        uint32_t timeoutMs = 0;
-        uint8_t supervisorCount = 0;
-        std::string supervisorNames[MAX_INTRODUCERS];
-    };
-
-struct SupervisorCardAuthenticationResponse
-    {
-        uint8_t keyNo = 0;
-        uint8_t keyBytes[16] = {0};
-        uint8_t keyLen = 0;
-        std::string error;
-        std::string username;
-    };
-
-struct SupervisionResolvedResult
-    {
-        bool success = false;
-        std::string error;
-        std::string supervisorUsername;
-    };
-
-struct SupervisionStartCommand
-    {
-        uint32_t resourceId = 0;
-        uint32_t timeoutMs = 0;
-        std::string requesterUsername;
-    };
-};
+#include "payloads.hpp"
 
 #include <functional>
 #include <atomic>
 #include <ArduinoJson.h>
+
+#ifdef ARDUINOJSON_VERSION_MAJOR
+#include <cstdlib>
+#include <algorithm>
+#include <cstring>
+#ifdef ESP_PLATFORM
+#include "esp_heap_caps.h"
+#endif
+
+// ArduinoJson 7's StaticJsonDocument capacity is only a compatibility hint.
+// Account for every allocation (including our aligned size header) instead.
+class ReaderJsonAllocator final : public ArduinoJson::Allocator
+{
+    struct alignas(std::max_align_t) Header { size_t bytes; };
+    size_t used = 0;
+    size_t peak = 0;
+public:
+    static constexpr size_t LIMIT = 32768;
+    void beginMessage() { peak = used; }
+    size_t peakBytes() const { return peak; }
+    size_t usedBytes() const { return used; }
+    void *allocate(size_t size) override { return reallocate(nullptr, size); }
+    void deallocate(void *pointer) override
+    {
+        if (!pointer) return;
+        auto *header = static_cast<Header *>(pointer) - 1;
+        used -= header->bytes;
+        // Clear transient parsed strings before releasing internal RAM.
+        volatile unsigned char *bytes = reinterpret_cast<unsigned char *>(header);
+        const size_t count = header->bytes;
+        for (size_t i = 0; i < count; ++i) bytes[i] = 0;
+        std::free(header);
+    }
+    void *reallocate(void *pointer, size_t size) override
+    {
+        if (!size) { deallocate(pointer); return nullptr; }
+        auto *old = pointer ? static_cast<Header *>(pointer) - 1 : nullptr;
+        const size_t previous = old ? old->bytes : 0;
+        if (size > LIMIT - sizeof(Header) || size + sizeof(Header) > LIMIT - used)
+            return nullptr;
+        const size_t total = size + sizeof(Header);
+#ifdef ESP_PLATFORM
+        auto *next = static_cast<Header *>(heap_caps_malloc(total, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+#else
+        auto *next = static_cast<Header *>(std::malloc(total));
+#endif
+        if (!next) return nullptr;
+        next->bytes = total;
+        used += total;
+        peak = std::max(peak, used);
+        // The old allocation remains counted until its replacement is copied
+        // and wiped. A failed allocation leaves the old data intact.
+        if (old) {
+            std::memcpy(next + 1, pointer, std::min(size, previous - sizeof(Header)));
+            deallocate(pointer);
+        }
+        return next + 1;
+    }
+};
+#endif
 
 struct ApiState : public ApiCards
 {
@@ -314,7 +81,7 @@ protected:
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
     uint32_t lastRequestedProjectsOfUserPage = -1;
     std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;
-    static constexpr size_t JSON_INBUF = 4608;
+    static constexpr size_t JSON_INBUF = 8192;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;
     uint32_t resourceListMessageCounter = 0;
@@ -324,7 +91,13 @@ protected:
     std::function<void(const UsageStats &)> usageStatsCallback;
     std::atomic<uint32_t> activeActionRequestId{0};
     ResourceList resourceListScratch;
-    StaticJsonDocument<6144> inboundDoc;
+#ifdef ARDUINOJSON_VERSION_MAJOR
+    ReaderJsonAllocator inboundAllocator;
+    JsonDocument inboundDoc{&inboundAllocator};
+#else
+    // Declaration-only screen harnesses do not instantiate or parse JSON.
+    StaticJsonDocument<32768> inboundDoc;
+#endif
     ProjectsOfUserResponse projectsOfUserResponseScratch;
     ResourceUsageFormRequest resourceFormsRequestScratch;
     ResourceUsageFormFieldsPage resourceFormFieldsScratch;
@@ -365,6 +138,7 @@ public:
 
 class API : public ApiState
 {
+    friend struct EnrollmentInputTest;
 public:
     explicit API(IReaderTransport &transport);
 

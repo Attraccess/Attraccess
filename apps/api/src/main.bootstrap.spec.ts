@@ -16,6 +16,9 @@ import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { createCert } from 'mkcert';
 import { initializeProcessLogging } from './logging/process-logging';
+import { ReaderIdentityService } from './attractap/security/reader-identity.service';
+import { ReaderTimeService } from './attractap/security/reader-time.service';
+import { ProtectedWsAdapter } from './attractap/websockets/protected-ws.adapter';
 
 jest.mock('./logging/process-logging', () => ({
   initializeProcessLogging: jest.fn(() => ({ log: jest.fn(), error: jest.fn(), warn: jest.fn() })),
@@ -85,6 +88,8 @@ describe('API bootstrap ordering and configuration', () => {
   const early = { get: jest.fn(() => config), close: jest.fn(), useLogger: jest.fn() };
   const app = {
     get: jest.fn((token: unknown) => {
+      if (token === ReaderIdentityService) return readerIdentities;
+      if (token === ReaderTimeService) return readerTime;
       if (token === ConfigService) return config;
       if (token === SettingsService) return settings;
       if (token === DataSource) return datasource;
@@ -102,6 +107,8 @@ describe('API bootstrap ordering and configuration', () => {
     useGlobalPipes: jest.fn(),
     useGlobalInterceptors: jest.fn(),
   };
+  const readerIdentities = { configuration: jest.fn(), detach: jest.fn() };
+  const readerTime = { reply: jest.fn() };
   const originalSkip = process.env.SKIP_DATABASE_MIGRATIONS;
   beforeEach(() => {
     jest.clearAllMocks();
@@ -148,6 +155,8 @@ describe('API bootstrap ordering and configuration', () => {
           { provide: ConfigService, useValue: config },
           { provide: SettingsService, useValue: settings },
           { provide: DataSource, useValue: datasource },
+          { provide: ReaderIdentityService, useValue: readerIdentities },
+          { provide: ReaderTimeService, useValue: readerTime },
         ],
       }).compile();
       httpApp = module.createNestApplication<NestExpressApplication>({ logger: false });
@@ -266,6 +275,9 @@ describe('API bootstrap ordering and configuration', () => {
     expect(datasource.runMigrations).toHaveBeenCalled();
     expect(app.set).toHaveBeenCalledWith('trust proxy', 1);
     expect(app.setGlobalPrefix).toHaveBeenCalledWith('api');
+    expect(app.get).toHaveBeenCalledWith(ReaderIdentityService);
+    expect(app.get).toHaveBeenCalledWith(ReaderTimeService);
+    expect(app.useWebSocketAdapter).toHaveBeenCalledWith(expect.any(ProtectedWsAdapter));
     expect(SwaggerModule.setup).toHaveBeenCalledWith('api', app, expect.any(Function));
   });
   it('honors migration skips and disabled plugins without opening the database', async () => {

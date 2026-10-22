@@ -45,6 +45,12 @@ void API::setSupervisionStartCallback(std::function<void(SupervisionStartCommand
 
 void API::onSupervisionStart(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    cancelSupervision();
+    return;
+#endif
+
     if (this->supervisionStartCallback == nullptr)
     {
         return;
@@ -76,6 +82,12 @@ void API::setSupervisionResolvedCallback(std::function<void(SupervisionResolvedR
 
 void API::onSupervisionRequestResult(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    if (supervisionRequestResultCallback) { SupervisionRequestResult denied{}; denied.error = "CARD_VERIFICATION_UNAVAILABLE"; supervisionRequestResultCallback(denied); }
+    return;
+#endif
+
     if (this->supervisionRequestResultCallback == nullptr)
     {
         return;
@@ -102,6 +114,12 @@ void API::onSupervisionRequestResult(JsonObject data)
 
 void API::onSupervisorCardAuthenticationData(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    if (supervisorCardAuthenticationResponseCallback) { SupervisorCardAuthenticationResponse denied{}; denied.error = "CARD_VERIFICATION_UNAVAILABLE"; supervisorCardAuthenticationResponseCallback(denied); }
+    return;
+#endif
+
     if (this->supervisorCardAuthenticationResponseCallback == nullptr)
     {
         return;
@@ -136,6 +154,12 @@ void API::onSupervisorCardAuthenticationData(JsonObject data)
 
 void API::onSupervisionResolved(JsonObject data)
 {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+    (void)data;
+    if (supervisionResolvedCallback) { SupervisionResolvedResult denied{}; denied.error = "CARD_VERIFICATION_UNAVAILABLE"; supervisionResolvedCallback(denied); }
+    return;
+#endif
+
     if (this->supervisionResolvedCallback == nullptr)
     {
         return;

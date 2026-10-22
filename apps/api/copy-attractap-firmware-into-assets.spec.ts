@@ -2,92 +2,114 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+const { copyFirmwareAssets } = require('./copy-attractap-firmware-into-assets.js');
+
 describe('firmware asset copying', () => {
   let root: string;
   let assets: string;
-  let warning: jest.SpyInstance;
-  let failure: jest.SpyInstance;
-  const origin = (name: string) => path.join(root, 'apps', name, 'firmware_output');
+  let source: string;
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'firmware-copy-test-'));
-    assets = path.join(root, 'apps/api/src/assets/attractap-firmwares');
-    jest.spyOn(console, 'log').mockImplementation(() => undefined);
-    warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    failure = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-  });
-  afterEach(() => {
-    jest.restoreAllMocks();
-    jest.dontMock('path');
-    jest.dontMock('child_process');
-    fs.rmSync(root, { recursive: true, force: true });
-  });
-  const run = () => {
-    jest.isolateModules(() => {
-      const actualPath = jest.requireActual('path');
-      jest.doMock('path', () => ({
-        ...actualPath,
-        resolve: (_dirname: string, relative: string) => actualPath.resolve(root, 'apps/api', relative),
-      }));
-      jest.doMock('child_process', () => ({
-        execSync: jest.fn((command: string) => {
-          const match = /^cp -r "([^"]+)" "([^"]+)"$/.exec(command);
-          if (!match || !match[1].startsWith(root) || !match[2].startsWith(root))
-            throw new Error('Unexpected copy command');
-          fs.cpSync(match[1], match[2], { recursive: true });
-        }),
-      }));
-      require('./copy-attractap-firmware-into-assets.js');
-    });
-  };
-  const writeOrigin = (name: string, manifest: unknown) => {
-    const dir = origin(name);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'firmwares.json'), JSON.stringify(manifest));
-    return dir;
-  };
-  it('combines manifests, copies images and sidecar directories, and removes stale assets', () => {
-    fs.mkdirSync(path.join(assets, 'stale-directory'), { recursive: true });
+    assets = path.join(root, 'assets');
+    source = path.join(root, 'source');
+    fs.mkdirSync(source);
+    fs.mkdirSync(assets);
     fs.writeFileSync(path.join(assets, 'stale.bin'), 'old');
-    const dir = writeOrigin('attractap/firmware', {
-      firmwares: [
-        { filename: 'firmware.bin', filenameOTA: 'ota.bin' },
-        { filename: 'missing.bin', filenameOTA: 'missing-ota.bin' },
-        { name: 'missing-filename' },
-      ],
-    });
-    fs.writeFileSync(path.join(dir, 'firmware.bin'), 'firmware');
-    fs.writeFileSync(path.join(dir, 'ota.bin'), 'ota');
-    fs.writeFileSync(path.join(dir, 'symbols.elf'), 'symbols');
-    fs.writeFileSync(path.join(dir, 'ignored.json'), '{}');
-    fs.mkdirSync(path.join(dir, 'debug'));
-    fs.writeFileSync(path.join(dir, 'debug/log.txt'), 'debug');
-    writeOrigin('attractap-touch-firmware', { firmwares: [] });
-    run();
-    expect(fs.readFileSync(path.join(assets, 'firmware.bin'), 'utf8')).toBe('firmware');
-    expect(fs.readFileSync(path.join(assets, 'ota.bin'), 'utf8')).toBe('ota');
-    expect(fs.readFileSync(path.join(assets, 'symbols.elf'), 'utf8')).toBe('symbols');
-    expect(fs.readFileSync(path.join(assets, 'debug/log.txt'), 'utf8')).toBe('debug');
-    expect(fs.existsSync(path.join(assets, 'stale.bin'))).toBe(false);
-    expect(fs.existsSync(path.join(assets, 'stale-directory'))).toBe(false);
-    expect(fs.existsSync(path.join(assets, 'ignored.json'))).toBe(false);
-    expect(JSON.parse(fs.readFileSync(path.join(assets, 'firmwares.json'), 'utf8')).firmwares).toHaveLength(3);
   });
-  it('skips missing and malformed manifests without touching files outside the fixture', () => {
-    const dir = writeOrigin('attractap/firmware', {});
-    fs.writeFileSync(path.join(dir, 'firmwares.json'), '{');
-    run();
-    expect(JSON.parse(fs.readFileSync(path.join(assets, 'firmwares.json'), 'utf8'))).toEqual({ firmwares: [] });
-    expect(failure).toHaveBeenCalled();
-    expect(warning).toHaveBeenCalled();
-  });
-  it('still copies extra artifacts when a manifest has no firmware list or is absent', () => {
-    const first = writeOrigin('attractap/firmware', {});
-    fs.writeFileSync(path.join(first, 'extra.bin'), 'extra');
-    const second = origin('attractap-touch-firmware');
-    fs.mkdirSync(second, { recursive: true });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+  const run = () => copyFirmwareAssets(assets, [{ path: source }]);
+  const catalog = (manifest: unknown) =>
+    fs.writeFileSync(path.join(source, 'firmwares.json'), JSON.stringify(manifest));
+
+  it('combines catalogs, copies listed images and sidecars, and replaces stale assets', () => {
+    fs.mkdirSync(path.join(assets, 'stale-directory'));
+    const firmware = {
+      filename: 'firmware.bin',
+      filenameOTA: 'ota.bin',
+      elfFilename: 'symbols.elf',
+      securityProfile: 'bridge',
+    };
+    catalog({ firmwares: [firmware] });
+    for (const name of ['firmware.bin', 'ota.bin', 'symbols.elf', 'unlisted.bin', 'ignored.json'])
+      fs.writeFileSync(path.join(source, name), name);
+    fs.mkdirSync(path.join(source, 'debug'));
+    fs.writeFileSync(path.join(source, 'debug/log.txt'), 'debug');
+    const second = path.join(root, 'second');
+    fs.mkdirSync(second);
+    fs.writeFileSync(path.join(second, 'firmwares.json'), JSON.stringify({ firmwares: [{ filename: 'touch.bin' }] }));
     fs.writeFileSync(path.join(second, 'touch.bin'), 'touch');
+    copyFirmwareAssets(assets, [{ path: source }, { path: second }]);
+    expect(fs.readdirSync(assets).sort()).toEqual([
+      'firmware.bin',
+      'firmwares.json',
+      'ota.bin',
+      'symbols.elf',
+      'touch.bin',
+    ]);
+    for (const name of ['firmware.bin', 'ota.bin', 'symbols.elf'])
+      expect(fs.readFileSync(path.join(assets, name), 'utf8')).toBe(name);
+    expect(JSON.parse(fs.readFileSync(path.join(assets, 'firmwares.json'), 'utf8')).firmwares).toEqual([
+      firmware,
+      { filename: 'touch.bin' },
+    ]);
+  });
+
+  it.each(['{', '{}', '{"firmwares":{}}'])('rejects malformed catalog %s and preserves existing assets', (text) => {
+    fs.writeFileSync(path.join(source, 'firmwares.json'), text);
+    expect(run).toThrow();
+    expect(fs.readFileSync(path.join(assets, 'stale.bin'), 'utf8')).toBe('old');
+    expect(fs.readdirSync(root).sort()).toEqual(['assets', 'source']);
+  });
+
+  it.each([
+    {},
+    null,
+    { filename: 'missing.bin' },
+    { filename: '../stale.bin' },
+    { filename: 'reader.bin', securityProfile: 'unknown' },
+    { filename: 'reader.bin', securityProfile: 'production' },
+    { filename: 'reader.bin', elfFilename: 'missing.elf' },
+  ])('rejects invalid or unqualified entries and preserves existing assets: %j', (firmware) => {
+    fs.writeFileSync(path.join(source, 'reader.bin'), 'bridge');
+    catalog({ firmwares: [firmware] });
+    expect(run).toThrow();
+    expect(fs.readFileSync(path.join(assets, 'stale.bin'), 'utf8')).toBe('old');
+    expect(fs.readdirSync(root).sort()).toEqual(['assets', 'source']);
+  });
+
+  it('copies no unlisted files when a catalog is absent', () => {
+    fs.writeFileSync(path.join(source, 'extra.bin'), 'extra');
     run();
-    expect(fs.readFileSync(path.join(assets, 'extra.bin'), 'utf8')).toBe('extra');
-    expect(fs.readFileSync(path.join(assets, 'touch.bin'), 'utf8')).toBe('touch');
+    expect(fs.readdirSync(assets)).toEqual(['firmwares.json']);
+    expect(JSON.parse(fs.readFileSync(path.join(assets, 'firmwares.json'), 'utf8'))).toEqual({ firmwares: [] });
+  });
+  it.each(['filename', 'filenameOTA', 'elfFilename', 'qualificationFile'])(
+    'rejects the generated catalog name in %s without replacing existing assets',
+    (field) => {
+      fs.writeFileSync(path.join(source, 'reader.bin'), 'bridge');
+      catalog({ firmwares: [{ filename: 'reader.bin', [field]: 'firmwares.json' }] });
+      expect(run).toThrow('Reserved firmware filename');
+      expect(fs.readdirSync(assets)).toEqual(['stale.bin']);
+      expect(fs.readFileSync(path.join(assets, 'stale.bin'), 'utf8')).toBe('old');
+    },
+  );
+
+  it('validates staged bytes if a source changes while copying', () => {
+    const originalCopy = fs.copyFileSync;
+    fs.writeFileSync(path.join(source, 'reader.bin'), Buffer.alloc(8192));
+    catalog({ firmwares: [{ filename: 'reader.bin', securityProfile: 'bridge' }] });
+    const copy = jest.spyOn(fs, 'copyFileSync').mockImplementation((from, to, ...args) => {
+      // Replace the source with a same-size signed image immediately before staging.
+      const changed = Buffer.alloc(8192);
+      changed.writeUInt32LE(0x000002e7, 4096);
+      fs.writeFileSync(from, changed);
+      originalCopy(from, to, ...args);
+    });
+    try {
+      expect(run).toThrow('Production firmware requires');
+      expect(fs.readdirSync(assets)).toEqual(['stale.bin']);
+    } finally {
+      copy.mockRestore();
+    }
   });
 });

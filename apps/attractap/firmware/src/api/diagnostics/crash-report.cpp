@@ -10,10 +10,12 @@
 #include <memory>
 #include <string>
 #include "esp_system.h"
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
 #include "esp_core_dump.h"
 #include "mbedtls/base64.h"
+#endif
 
 #include "crash-record.hpp"
 
@@ -128,16 +130,20 @@ void API::sendPendingCrashReport()
         return;
     }
 
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
     const char *coredumpKey = ",\"coredumpBase64\":\"";
     const char *tailWithCoredump = "\"}}}";
+#endif
     const char *tailPlain = "}}}";
 
     size_t total = (size_t)headLen + 1;
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
     if (coredump)
     {
         total += strlen(coredumpKey) + b64Len + strlen(tailWithCoredump);
     }
     else
+#endif
     {
         total += strlen(tailPlain);
     }
@@ -152,6 +158,7 @@ void API::sendPendingCrashReport()
     size_t pos = 0;
     memcpy(buf.get() + pos, head, headLen);
     pos += headLen;
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
     if (coredump)
     {
         memcpy(buf.get() + pos, coredumpKey, strlen(coredumpKey));
@@ -162,14 +169,17 @@ void API::sendPendingCrashReport()
         pos += strlen(tailWithCoredump);
     }
     else
+#endif
     {
         memcpy(buf.get() + pos, tailPlain, strlen(tailPlain));
         pos += strlen(tailPlain);
     }
     buf.get()[pos] = '\0';
 
-    this->transport.sendMessage(buf.get(), pos);
-    this->crashReportAwaitingAck = true;
+    if (this->transport.sendMessage(buf.get(), pos))
+    {
+        this->crashReportAwaitingAck = true;
+    }
 }
 #else
 void API::sendPendingCrashReport() {}
@@ -184,10 +194,12 @@ void API::sendPendingCrashReport() {}
 #include <memory>
 #include <string>
 #include "esp_system.h"
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
 #include "esp_core_dump.h"
 #include "mbedtls/base64.h"
+#endif
 
 #include "crash-record.hpp"
 
@@ -226,6 +238,7 @@ const char *crashResetReasonToString(uint8_t reason)
 std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len)
 {
     b64Len = 0;
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
     size_t addr = 0;
     size_t size = 0;
     if (esp_core_dump_image_get(&addr, &size) != ESP_OK || size == 0)
@@ -281,6 +294,10 @@ std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len)
     }
     b64Len = written;
     return encoded;
+#else
+    (void)logger;
+    return nullptr;
+#endif
 }
 #endif
 
@@ -293,10 +310,12 @@ std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len)
 #include <memory>
 #include <string>
 #include "esp_system.h"
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
 #include "esp_core_dump.h"
 #include "mbedtls/base64.h"
+#endif
 
 #include "crash-record.hpp"
 
@@ -319,6 +338,7 @@ void API::onCrashReportResponse(JsonObject data)
     prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);
     prefs.end();
 
+#if defined(CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH) && !defined(ATTRACTAP_PRODUCTION)
     if (this->crashReportSentCoredump)
     {
         esp_err_t err = esp_core_dump_image_erase();
@@ -328,6 +348,7 @@ void API::onCrashReportResponse(JsonObject data)
         }
     }
 
+#endif
     this->crashReportAwaitingAck = false;
 }
 #else

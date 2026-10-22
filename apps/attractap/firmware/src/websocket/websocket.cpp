@@ -87,63 +87,14 @@ void Websocket::unlockWsClient()
     }
 }
 
-void Websocket::loop()
-{
-    uint32_t nowMs = millis();
-    if (nowMs - this->lastHeapLogTime >= this->HEAP_LOG_INTERVAL_MS)
-    {
-        this->lastHeapLogTime = nowMs;
-        this->logHeapStats();
-    }
-
-    if (!connectionAttemptsEnabled)
-    {
-        this->connectWatchdogStartMs = 0;
-        return;
-    }
-
-    this->updateInfoFromAppState();
-    this->publishConnectionStatus();
-    this->publishNetworkQuality();
-
-    if (!network_is_connected)
-    {
-        this->connectWatchdogStartMs = 0;
-        return;
-    }
-
-    AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
-    this->checkConnectWatchdog(apiConfig);
-    bool apiConfigChanged = _lastApiConfig.hostname != apiConfig.hostname || _lastApiConfig.port != apiConfig.port || _lastApiConfig.useSSL != apiConfig.useSSL;
-    if (apiConfigChanged)
-    {
-        requestConnect();
-        return;
-    }
-
-    switch (_state)
-    {
-    case INIT:
-        requestConnect();
-        break;
-    case CONNECTING:
-        break;
-    case CONNECTED:
-        sendPongProbe(nowMs);
-        if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
-        {
-            logger.error("No inbound frames within liveness timeout, forcing reconnect");
-            recordNetworkQualityEvent(this->livenessTimeoutEventTimes, this->livenessTimeoutEventNextIndex);
-            setState(INIT);
-        }
-        break;
-    }
-}
-
 void Websocket::forceReconnect(const char *reason)
 {
     logger.errorf("Forcing websocket reconnect: %s", reason);
+#ifdef ATTRACTAP_PRODUCTION
+    reconnectRequested = true;
+#else
     setState(INIT); // loop() initiates a fresh connection from INIT
+#endif
 }
 
 // Deliberate-reboot reason handed to the crash reporter across the SW reset (see
@@ -196,6 +147,12 @@ void Websocket::enableConnectionAttempts()
 void Websocket::disableConnectionAttempts()
 {
     this->connectionAttemptsEnabled = false;
+#ifdef ATTRACTAP_PRODUCTION
+    secured.close();
+    securitySessionStarted = false;
+    if (disconnectCallback) disconnectCallback();
+    connectionGeneration++;
+#endif
 
     // Wait for any in-flight connect attempt on the ws_conn task to finish
     // before tearing the client down (it re-checks connectionAttemptsEnabled
@@ -315,7 +272,9 @@ void Websocket::checkConnectWatchdog(const AttraccessApiConfig &apiConfig)
 
 void Websocket::resetCertificateTrust()
 {
+#ifndef ATTRACTAP_PRODUCTION
     this->_certManager.reset();
+#endif
 }
 
 bool Websocket::shouldReconnect()
@@ -348,7 +307,6 @@ void Websocket::logHeapStats()
 
 bool Websocket::sendMessage(const std::string &message)
 {
-    this->logger.debug(("sendMessage: " + message).c_str());
     return enqueueMessage(message.c_str(), message.length());
 }
 
@@ -364,21 +322,46 @@ bool Websocket::sendHeartbeat(const char *message, size_t length)
 
 bool Websocket::enqueueMessage(const char *data, size_t length, bool isHeartbeat)
 {
+#ifdef ATTRACTAP_PRODUCTION
+    if (length > 8192 || !secured.ready()) { reconnectRequested = true; return false; }
+    size_t previous = queuedBytes.load();
+    do {
+        if (previous + length > 32768) { reconnectRequested = true; return false; }
+    } while (!queuedBytes.compare_exchange_weak(previous, previous + length));
+    const uint32_t generation = connectionGeneration.load();
+#endif
     if (!tx_queue)
     {
+#ifdef ATTRACTAP_PRODUCTION
+        queuedBytes -= length;
+#endif
         logger.error("enqueueMessage: tx_queue not initialized");
         return false;
     }
 
+#ifdef ATTRACTAP_PRODUCTION
+    char *copy = (char *)heap_caps_malloc(length, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+#else
     char *copy = (char *)malloc(length);
+#endif
     if (!copy)
     {
+#ifdef ATTRACTAP_PRODUCTION
+        queuedBytes -= length;
+        reconnectRequested = true;
+#endif
         logger.error("enqueueMessage: allocation failed");
         return false;
     }
     memcpy(copy, data, length);
 
-    TxMessage msg{copy, length, isHeartbeat};
+    TxMessage msg{};
+    msg.data = copy;
+    msg.length = length;
+    msg.isHeartbeat = isHeartbeat;
+#ifdef ATTRACTAP_PRODUCTION
+    msg.generation = generation;
+#endif
     if (xQueueSend(tx_queue, &msg, 0) != pdTRUE)
     {
         logger.error("enqueueMessage: tx queue full, dropping message");
@@ -387,7 +370,12 @@ bool Websocket::enqueueMessage(const char *data, size_t length, bool isHeartbeat
         {
             recordNetworkQualityEvent(this->missedHeartbeatEventTimes, this->missedHeartbeatEventNextIndex);
         }
+        memset(copy, 0, length);
         free(copy);
+#ifdef ATTRACTAP_PRODUCTION
+        queuedBytes -= length;
+        reconnectRequested = true;
+#endif
         return false;
     }
     return true;
@@ -407,6 +395,14 @@ void Websocket::txTaskLoop()
         {
             continue;
         }
+
+#ifdef ATTRACTAP_PRODUCTION
+        if (msg.generation == connectionGeneration.load() && !secured.send(msg.data, msg.length)) reconnectRequested = true;
+        memset(msg.data, 0, msg.length);
+        free(msg.data);
+        queuedBytes -= msg.length;
+        continue;
+#endif
 
         lockWsClient();
         if (!ws_client)
@@ -445,6 +441,10 @@ void Websocket::drainTxQueue()
     TxMessage msg;
     while (xQueueReceive(tx_queue, &msg, 0) == pdTRUE)
     {
+        memset(msg.data, 0, msg.length);
         free(msg.data);
+#ifdef ATTRACTAP_PRODUCTION
+        queuedBytes -= msg.length;
+#endif
     }
 }

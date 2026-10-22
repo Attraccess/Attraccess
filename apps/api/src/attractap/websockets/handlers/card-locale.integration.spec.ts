@@ -3,13 +3,11 @@ import { DataSource } from 'typeorm';
 import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';
 import { UsersService } from '../../../users-and-auth/users/users.service';
-import { getSupportedDeviceLanguage } from '@attraccess/shared';
-import { SettingsService } from '../../../settings/settings.service';
 import { AttractapService } from '../../attractap.service';
 import { AuthenticatedWebSocket, AttractapEventType } from '../websocket.types';
 import { AttractapCardHandler } from './card/card.handler';
 
-describe('persisted web UI locale at card authentication', () => {
+describe('persisted web UI locale at the card verification boundary', () => {
   let source: DataSource;
 
   beforeAll(async () => {
@@ -26,7 +24,7 @@ describe('persisted web UI locale at card authentication', () => {
     if (source?.isInitialized) await source.destroy();
   });
 
-  it('delivers each saved language on the next tap without updating the card or reconnecting', async () => {
+  it('retains saved languages without authorizing a card or exposing its keys', async () => {
     const userRepository = source.getRepository(User);
     const resourceRepository = source.getRepository(Resource);
     const cardRepository = source.getRepository(NFCCard);
@@ -54,20 +52,9 @@ describe('persisted web UI locale at card authentication', () => {
       nfcCardRepository: cardRepository,
       encryptionService: { decryptIfEncrypted: (value: string) => value },
     });
-    let defaultLanguage = 'de';
-    const settingsService: SettingsService = Object.assign(Object.create(SettingsService.prototype), {
-      getDefaultLanguage: async () => defaultLanguage,
-    });
-    const handler: AttractapCardHandler = Object.assign(new AttractapCardHandler(), {
-      attractapService,
-      settingsService,
-      resourceRepository,
-      metricsService: { attractapNfcTapsTotal: { inc: jest.fn() } },
-      resourceUsageService: { canControllResource: async () => true },
-      resourceIntroducersService: { isIntroducer: async () => false },
-      rbacService: { getEffectivePermissions: async () => new Set<string>() },
-      resourceListService: { sendResourceListToSocket: async () => undefined },
-    });
+    const handler = new AttractapCardHandler();
+    const lookup = jest.spyOn(attractapService, 'getNFCCardByUID');
+    Object.assign(handler, { attractapService });
     const sendMessage = jest.fn().mockResolvedValue(true);
     const socket = { readerId: 42, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;
     const tap = () =>
@@ -75,34 +62,29 @@ describe('persisted web UI locale at card authentication', () => {
         type: AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA,
         payload: { uid: card.uid, resourceId: resource.id },
       });
-    const expectLanguage = (language: string, languageFallback = false) =>
+    const expectDenied = () => {
       expect(sendMessage).toHaveBeenLastCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.CARD_AUTHENTICATION_DATA,
-            payload: expect.objectContaining({ username: user.username, language, languageFallback }),
+            payload: { error: 'CARD_VERIFICATION_UNAVAILABLE' },
           }),
         }),
       );
+      expect(socket.state.lastAuthenticatedUserId).toBeNull();
+      expect(lookup).not.toHaveBeenCalled();
+    };
 
     await tap();
-    expectLanguage('en');
-    for (const [locale, language] of [
-      ['de-DE', 'de'],
-      ['en-GB', 'en'],
-      ['fr-FR', 'de'],
-      ['en-!!!', 'de'],
-    ]) {
-      // The controller used by useLocaleSync receives the same, deliberately stale session user.
+    expectDenied();
+    for (const locale of ['de-DE', 'en-GB', 'fr-FR', 'en-!!!']) {
+      // Locale persistence remains independent of the deferred card gateway.
       const updated = await profile.updateMyLocale({ user } as never, { locale });
       expect(updated.locale).toBe(locale);
       expect((await userRepository.findOneByOrFail({ id: user.id })).locale).toBe(locale);
       await tap();
-      expectLanguage(language, !getSupportedDeviceLanguage(locale));
+      expectDenied();
     }
-    defaultLanguage = 'en';
-    await tap();
-    expectLanguage('en', true);
     expect(user.locale).toBe('en');
     expect((await userRepository.findOneByOrFail({ id: otherUser.id })).locale).toBe('en');
     expect(await cardRepository.count()).toBe(1);

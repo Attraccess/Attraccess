@@ -26,6 +26,7 @@ public:
     void begin(JsonObject firmwareMeta);
     void onChunk(esp_websocket_event_data_t data);
     void tick();
+    void cancel();
     bool inProgress() const { return this->ota.inProgress; }
 
 private:

@@ -422,3 +422,78 @@ describe('ResourceListService', () => {
     });
   });
 });
+
+describe('protected resource-list payload compatibility', () => {
+  const fixture = registerResourceListServiceFixture();
+
+  it.each<[string, number, string, boolean]>([
+    ['ten-descriptions', 10, 'x'.repeat(300), false],
+    ['empty', 0, '', false],
+    ['personalized', 10, 'x'.repeat(300), true],
+    ['multibyte', 10, '工具'.repeat(50), false],
+    ['escaped', 10, '"\\\n'.repeat(50), false],
+    ['flow-buttons', 10, '', true],
+  ])('preserves complete %s output through protected framing', async (name, count, description, personalized) => {
+    const { encodeReaderFrame, ReaderFrameDecoder, ReaderFrameType, READER_LIMITS } =
+      await import('../../reader-frame');
+    const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: personalized ? 1 : null } });
+    if (name === 'flow-buttons') {
+      fixture.resourceFlowsService.getNodesForResources.mockResolvedValue(
+        new Map(
+          Array.from({ length: count }, (_, index) => [
+            index + 10,
+            Array.from({ length: 7 }, (_, button) => ({
+              id: `00000000-0000-4000-8000-${String(index * 7 + button).padStart(12, '0')}`,
+              data: { label: String(button) },
+            })),
+          ]),
+        ),
+      );
+    }
+    fixture.attractapService.findReaderById.mockResolvedValue(
+      fixture.createReaderFixture({
+        resources: Array.from({ length: count }, (_, index) => ({
+          id: index + 10,
+          name: `Resource ${index}`,
+          type: 'machine',
+          separateUnlockAndUnlatch: false,
+          allowTakeOver: false,
+          description,
+        })),
+      }),
+    );
+    await fixture.service.sendResourceListToSocket(socket, { requestId: 17 });
+    const json = Buffer.from(JSON.stringify(socket.sendMessage.mock.calls[0][0]));
+    expect(json.length).toBeLessThanOrEqual(READER_LIMITS.json);
+    const received: Buffer[] = [];
+    const decoder = new ReaderFrameDecoder((_, body) => received.push(Buffer.from(body)));
+    const frame = encodeReaderFrame(ReaderFrameType.Json, json);
+    for (let offset = 0; offset < frame.length; offset += 127) decoder.push(frame.subarray(offset, offset + 127));
+    expect(received).toEqual([json]);
+    const result = JSON.parse(received[0].toString());
+    expect(result.data.payload.resources).toHaveLength(count);
+    expect(result.data.payload.requestId).toBe(17);
+    expect(result.data.payload.revision).toBe(1);
+    for (const resource of result.data.payload.resources) expect(resource.description).toBe(description);
+    // Optional temporary artifacts are consumed by the actual firmware parser test.
+    // No generated fixture is retained in the repository.
+    if (process.env.READER_PAYLOAD_FIXTURE_DIR) {
+      const { mkdirSync, writeFileSync } = await import('node:fs');
+      const { join } = await import('node:path');
+      mkdirSync(process.env.READER_PAYLOAD_FIXTURE_DIR, { recursive: true, mode: 0o700 });
+      writeFileSync(join(process.env.READER_PAYLOAD_FIXTURE_DIR, `${name}.json`), json, { mode: 0o600 });
+    }
+  });
+
+  it('rejects oversized database descriptions before emitting any envelope bytes', async () => {
+    const { encodeReaderFrame, ReaderFrameType } = await import('../../reader-frame');
+    const socket = fixture.createMockSocket();
+    fixture.attractapService.findReaderById.mockResolvedValue(
+      fixture.createReaderFixture({ resources: [{ id: 10, name: 'Machine', description: 'x'.repeat(8192) }] }),
+    );
+    await fixture.service.sendResourceListToSocket(socket);
+    expect(() =>
+      encodeReaderFrame(ReaderFrameType.Json, Buffer.from(JSON.stringify(socket.sendMessage.mock.calls[0][0]))),
+    ).toThrow('Reader frame exceeds limit');
+  });
+});

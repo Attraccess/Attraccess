@@ -7,13 +7,13 @@ import {
   AttractapFirmwareVersion,
 } from '@attraccess/database-entities';
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, FindManyOptions, In, DeleteResult } from 'typeorm';
+import { Repository, FindManyOptions, In, DeleteResult, QueryFailedError } from 'typeorm';
 
 import { AuditService } from '../audit/audit.service';
 
@@ -321,7 +321,18 @@ export class AttractapService {
   }
 
   public async deleteReader(id: number): Promise<boolean> {
-    const result = await this.readerRepository.delete(id);
+    let result: DeleteResult;
+    try {
+      result = await this.readerRepository.delete(id);
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError.message === 'SQLITE_CONSTRAINT: Enrolled readers must be revoked instead of deleted'
+      ) {
+        throw new ConflictException('Enrolled readers must be revoked instead of deleted');
+      }
+      throw error;
+    }
     if (!result.affected) return false;
 
     this.eventEmitter.emit(ReaderDeletedEvent.EVENT_NAME, new ReaderDeletedEvent(id));
@@ -349,8 +360,21 @@ export class AttractapService {
    * @param firmwareType The firmware type
    * @returns Promise<Attractap>
    */
-  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion) {
+  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion, legacyOnly = false) {
+    if (legacyOnly) {
+      // Check eligibility in the same database statement as the metadata write.
+      // A request admitted before enrollment must not overwrite secured state later.
+      const result = await this.readerRepository
+        .createQueryBuilder()
+        .update()
+        .set({ firmware })
+        .where('id = :id', { id })
+        .andWhere('NOT EXISTS (SELECT 1 FROM attractap_reader_identity identity WHERE identity.readerId = :id)', { id })
+        .execute();
+      return result.affected === 1;
+    }
     await this.updateReader(id, { firmware }, false);
+    return true;
   }
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {
@@ -441,24 +465,22 @@ export class AttractapService {
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
-    return this.decryptCardKey(card);
+    return card ?? undefined;
   }
 
   public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
     const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
-    cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
   public async getAllNFCCards(): Promise<NFCCard[]> {
     const cards = await this.nfcCardRepository.find();
-    cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
     const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
-    return this.decryptCardKey(card);
+    return card ?? undefined;
   }
 
   public async createNFCCard(
@@ -468,12 +490,14 @@ export class AttractapService {
     const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
       await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
 
-      return await transactionalEntityManager.save(NFCCard, {
+      const inserted = await transactionalEntityManager.save(NFCCard, {
         ...data,
-        key: this.encryptionService.encrypt(data.key),
+        key: '',
         user,
         isActive: true,
       });
+      inserted.key = this.encryptionService.encryptCardKey(inserted, data.key);
+      return await transactionalEntityManager.save(NFCCard, inserted);
     });
     this.notifyNfcCardChange(card, 'registered');
     return card;
@@ -536,17 +560,5 @@ export class AttractapService {
 
     await this.nfcCardRepository.update(card.id, { lastSeen: new Date() });
     return true;
-  }
-
-  /**
-   * Decrypts card key in place for use in the app. Assumes stored values are
-   * already encrypted (see migration EncryptSensitiveData).
-   */
-  protected decryptCardKey(card?: NFCCard | null): NFCCard | undefined {
-    if (!card?.key) {
-      return card ?? undefined;
-    }
-    card.key = this.encryptionService.decryptIfEncrypted(card.key) ?? card.key;
-    return card;
   }
 }

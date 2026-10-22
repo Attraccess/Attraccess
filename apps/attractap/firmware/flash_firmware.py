@@ -51,7 +51,17 @@ def main():
 
     bf.generate_certificates(bf.resolve_python_command())
 
-    idf_args = ["-B", os.path.join("build", args.variant), f"-DATTRACTAP_VARIANT={args.variant}"]
+    build_dir = os.path.join("build", "dev-flash-" + args.variant)
+    sdkconfig = os.path.abspath(os.path.join(build_dir, 'sdkconfig'))
+    idf_args = ["-B", build_dir, f"-DSDKCONFIG={sdkconfig}", "-DATTRACTAP_PRODUCTION=OFF", f"-DATTRACTAP_VARIANT={args.variant}"]
+    if bf.run_idf([*idf_args, 'build']) != 0:
+        return 1
+    with open(sdkconfig) as configuration:
+        resolved = configuration.read()
+    if any(setting in resolved for setting in ['CONFIG_SECURE_BOOT=y', 'CONFIG_SECURE_FLASH_ENC_ENABLED=y',
+                                               'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.production.csv"']):
+        print('Production transition requires qualified local provisioning; development flash is blocked.', file=sys.stderr)
+        return 1
     if args.port:
         idf_args += ["-p", args.port]
     if args.baud:

@@ -6,6 +6,18 @@
 #include "../../platform.hpp"
 #include <string>
 
+void OtaUpdater::cancel()
+{
+    if (ota.inProgress && ota.otaHandle) esp_ota_abort(ota.otaHandle);
+    ota = {};
+    readyForNextFirmwareChunk = false;
+    lastFirmwareChunkRequestTimeMs = 0;
+    currentChunkExpectedBytes = currentChunkReceivedBytes = 0;
+    consecutiveChunkFailures = 0;
+    lastChunkRequestSendFailed = false;
+    firmwareUpdateFailedTimeMs = 0;
+}
+
 void OtaUpdater::begin(JsonObject firmwareMeta)
 {
     std::string availableVersion = firmwareMeta["version"].as<std::string>();

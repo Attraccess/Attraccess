@@ -62,3 +62,21 @@ A reader is only ever offered the build matching the variant it reports, so a re
 - [Overview](attractap/overview.md) -- What is Attractap?
 - [Hardware](attractap/hardware.md) -- Hardware variants and components
 - [Setup](attractap/setup.md) -- Register and configure readers
+
+## Security migration
+
+Outdated and legacy readers retain firmware updates with update-only access. Their
+bearer credentials do not authorize card, resource, billing, project or BLE operations.
+A secured reader cannot fall back to legacy authentication. Firmware chunks are
+bounded to 4,096 bytes and tied to the requesting connection.
+
+Bridge updates never repartition flash, burn eFuses or lock a device. Production
+transition requires protected local reprovisioning and independent qualification
+of the exact inventory and images. Unqualified signed images are excluded from
+deployable catalogs. Production OTA travels inside the protected TLS channel and
+enforces image signatures and rollback policy. Previously unsigned readers cannot
+retroactively enforce signatures.
+
+After locks are applied, recovery requires qualified signed firmware and the
+approved protected process. Unrestricted browser or USB flashing is not promised.
+See [production security](production-security.md) and [lifecycle/recovery](security-lifecycle.md).

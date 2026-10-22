@@ -37,6 +37,7 @@ idf_component_register(
         esp_eth
         esp_timer
         esp_hw_support
+        esp_security
         esp_system
         esp_partition
         app_update

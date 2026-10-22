@@ -10,6 +10,9 @@ field set must stay stable; the flasher and OTA pipeline depend on it.
 """
 
 import glob
+import argparse
+import hashlib
+from pathlib import Path
 
 import os
 
@@ -167,6 +170,25 @@ def run_idf(args):
 import json
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    known_variants = ['attractap-touch', 'attractap-touch-v2', 'attractap-lite-ethernet',
+                      'attractap-touch-ethernet', 'attractap-touch-demo', 'attractap-touch-v2-demo']
+    parser.add_argument('--variants', nargs='+', choices=known_variants)
+    parser.add_argument('--production', action='store_true', help='build local unqualified overlays; no deployable catalog by default')
+    parser.add_argument('--signing-key-file', help='protected test or operator signing file; never key bytes')
+    parser.add_argument('--qualification-file')
+    parser.add_argument('--qualification-trust-file')
+    args = parser.parse_args()
+    for field in ['signing_key_file', 'qualification_file', 'qualification_trust_file']:
+        if getattr(args, field): setattr(args, field, os.path.abspath(getattr(args, field)))
+    if args.production and not args.signing_key_file:
+        parser.error('Production overlay requires a protected signing-key file')
+    if bool(args.qualification_file) != bool(args.qualification_trust_file):
+        parser.error('Qualification requires both receipt and independently installed trust')
+    if args.production:
+        sys.path.insert(0, os.path.join(FIRMWARE_DIR, 'tools'))
+        from provision_reader import protected_read
+        protected_read(os.path.abspath(args.signing_key_file))
     os.chdir(FIRMWARE_DIR)
 
     if not shutil.which("idf.py") and not find_idf_export():
@@ -184,14 +206,10 @@ def main():
 
     generate_certificates(python_cmd)
 
-    active_variants = [
-        "attractap-touch",
-        "attractap-touch-v2",
-        "attractap-touch-demo",
-        "attractap-touch-v2-demo",
-        # "attractap-lite-ethernet",
-        # "attractap-touch-ethernet",
-    ]
+    default_variants = known_variants
+    active_variants = args.variants or [name for name in default_variants if not (args.production and 'demo' in name)]
+    if args.production and any('demo' in name for name in active_variants):
+        parser.error('Demo variants cannot use the production profile')
     variants = [(name, os.path.join("variants", name + ".cmake")) for name in active_variants]
 
     if not variants:
@@ -199,7 +217,7 @@ def main():
         sys.exit(1)
     print(f"Found variants: {[v for v, _ in variants]}")
 
-    output_dir = os.path.abspath("firmware_output")
+    output_dir = os.path.abspath("build/unqualified-production-output" if args.production else "firmware_output")
     if os.path.exists(output_dir):
         print(f"Cleaning output directory: {output_dir}")
         shutil.rmtree(output_dir)
@@ -227,7 +245,7 @@ def main():
             print(f"Error: {variant_path} does not set: {', '.join(missing)}")
             sys.exit(1)
 
-        build_dir = os.path.join("build", variant)
+        build_dir = os.path.join("build", ("production-" if args.production else "") + variant)
         # CMake caches absolute paths to the source tree and ESP-IDF checkout.
         # Reusing a build directory from another worktree can therefore make
         # the compiler read a different checkout, or fail with a stale cache.
@@ -242,6 +260,12 @@ def main():
             "-DATTRACTAP_LOG_LEVEL=ERROR",  # production runtime log level
             "build",
         ]
+        if args.production:
+            build_args[0:0] = ["-DATTRACTAP_PRODUCTION=ON",
+                              f"-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.production"]
+            os.makedirs(build_dir, exist_ok=True)
+            with open(sdkconfig_path, 'w') as configuration:
+                configuration.write('CONFIG_SECURE_BOOT_SIGNING_KEY=' + json.dumps(os.path.abspath(args.signing_key_file)) + '\n')
         print(f"Running: idf.py {' '.join(build_args)}")
         if run_idf(build_args) != 0:
             print(f"Error: Build failed for variant '{variant}'")
@@ -259,6 +283,12 @@ def main():
             key=lambda item: int(item[0], 16),
         )
 
+        if args.production:
+            bootloader = os.path.join(build_dir, 'bootloader', 'bootloader.bin')
+            if not os.path.isfile(bootloader) or os.path.getsize(bootloader) > 0x8000:
+                raise ValueError('Signed bootloader does not fit before the unchanged partition table')
+            if not any(int(offset, 16) == 0 for offset, _ in flash_files):
+                flash_files.insert(0, ('0x0', bootloader))
         print(f"Flash layout for {variant}:")
         for offset, path in flash_files:
             print(f"  {offset}: {os.path.relpath(path, build_dir)}")
@@ -269,14 +299,17 @@ def main():
         app_bin = os.path.join(build_dir, flasher_args["app"]["file"])
         elf_path = os.path.join(build_dir, "attractap.elf")
 
-        firmware_filename = f"{firmware_name}_{firmware_variant}.bin"
+        if os.path.getsize(app_bin) > 0x640000:
+            raise ValueError('Application exceeds unchanged OTA slot')
+        profile_suffix = '_production' if args.production else ''
+        firmware_filename = f"{firmware_name}_{firmware_variant}{profile_suffix}.bin"
         merged_bin_path = os.path.join(output_dir, firmware_filename)
         print(f"Creating merged firmware for {variant}...")
         run_merge_bin(esptool_cmd, merged_bin_path, flash_files)
         print(f"Merged firmware created at: {merged_bin_path}")
 
         # Unstripped ELF so the server can symbolicate coredumps
-        elf_filename = f"{firmware_name}_{firmware_variant}.elf"
+        elf_filename = f"{firmware_name}_{firmware_variant}{profile_suffix}.elf"
         build_id = None
         if os.path.exists(elf_path):
             shutil.copyfile(elf_path, os.path.join(output_dir, elf_filename))
@@ -288,7 +321,7 @@ def main():
             print(f"Warning: ELF not found at {elf_path}; symbolication will be unavailable for {variant}")
 
         # App-only OTA image (no bootloader/partitions)
-        ota_filename = f"{firmware_name}_{firmware_variant}_ota.bin"
+        ota_filename = f"{firmware_name}_{firmware_variant}{profile_suffix}_ota.bin"
         shutil.copyfile(app_bin, os.path.join(output_dir, ota_filename))
         print(f"OTA app image copied to: {os.path.join(output_dir, ota_filename)}")
 
@@ -304,6 +337,7 @@ def main():
             "elfFilename": elf_filename,
             "buildId": build_id,
             "chip": CHIP,
+            "securityProfile": "production" if args.production else "bridge",
             # Keep the historically conservative flasher parameters — the
             # frontend esptool-js flasher behavior must not change.
             "flashMode": "dio",
@@ -311,8 +345,22 @@ def main():
             "flashSize": "16MB",
         })
 
-    with open(os.path.join(output_dir, "firmwares.json"), "w") as f:
-        json.dump({"firmwares": firmware_info}, f, indent=2)
+    catalog = {"firmwares": firmware_info}
+    catalog_name = 'unqualified-builds.json' if args.production else 'firmwares.json'
+    if args.production:
+        catalog['qualification'] = 'outstanding'
+        if args.qualification_file:
+            from check_security_qualification import verify_qualification
+            artifacts = {entry[field]: hashlib.sha256(Path(os.path.join(output_dir, entry[field])).read_bytes()).hexdigest()
+                         for entry in firmware_info for field in ['filename', 'filenameOTA']}
+            verify_qualification(args.qualification_file, args.qualification_trust_file, artifacts)
+            shutil.copyfile(args.qualification_file, os.path.join(output_dir, 'qualification.json'))
+            for entry in firmware_info:
+                entry['qualificationFile'] = 'qualification.json'
+            catalog['qualification'] = 'verified'
+            catalog_name = 'firmwares.json'
+    with open(os.path.join(output_dir, catalog_name), "w") as f:
+        json.dump(catalog, f, indent=2)
 
     print(f"\nBuild completed. Output in {output_dir}")
     print(f"Total variants built: {len(firmware_info)}")

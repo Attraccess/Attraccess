@@ -12,6 +12,10 @@
 #include "../logger/logger.hpp"
 #include "certManager/AdaptiveCertManager.hpp"
 #include "../api/reader_transport.hpp"
+#ifdef ATTRACTAP_PRODUCTION
+#include "../security/reader_session.hpp"
+#include <atomic>
+#endif
 
 class Websocket : public IReaderTransport
 {
@@ -30,6 +34,7 @@ public:
     bool sendMessage(const char *message, size_t length) override;
     bool sendHeartbeat(const char *message, size_t length) override;
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback) override;
+    void setDisconnectCallback(std::function<void()> callback) override { disconnectCallback = std::move(callback); }
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback) override;
 
     void enableConnectionAttempts() override;
@@ -44,7 +49,19 @@ public:
     void resetCertificateTrust() override;
 
 private:
+#ifdef ATTRACTAP_PRODUCTION
+    ReaderSecurity::ReaderSession secured;
+    std::atomic<bool> reconnectRequested{false};
+    std::atomic<bool> securitySessionStarted{false};
+    std::atomic<uint32_t> connectionGeneration{0};
+    std::atomic<size_t> queuedBytes{0};
+    size_t incomingMessageBytes = 0;
+    size_t incomingFrameOffset = 0;
+    bool incomingFragmented = false;
+#endif
+    std::function<void()> disconnectCallback;
     friend struct WebsocketPongProbeTest;
+    friend struct WebsocketBootstrapTest;
     std::function<void(const char *, size_t)> messageCallbackRaw;
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
 
@@ -175,6 +192,9 @@ private:
         char *data;
         size_t length;
         bool isHeartbeat;
+#ifdef ATTRACTAP_PRODUCTION
+        uint32_t generation;
+#endif
     };
     static constexpr size_t TX_QUEUE_DEPTH = 8;
     static constexpr uint32_t TX_TASK_STACK = 4096;

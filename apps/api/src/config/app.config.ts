@@ -35,6 +35,8 @@ export const AppEnvSchema = z
     LOG_LEVELS: logLevelsSchema,
     LOG_DESTINATIONS: logDestinationsSchema,
     LOG_FILE_PATH: z.string().optional(),
+    READER_SECURITY_DIRECTORY: z.string().min(1).optional(),
+    CARD_KEYRING_FILE: z.string().min(1).optional(),
     AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
     ATTRACCESS_URL: z.string().url().optional(),
     ATTRACCESS_FRONTEND_URL: z.string().url().optional(),

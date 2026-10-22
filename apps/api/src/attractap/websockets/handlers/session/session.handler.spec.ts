@@ -6,6 +6,7 @@ import { ResourceInUseError } from '../../../../resources/usage/errors/resource-
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { ResourceActionGuard } from '../resource-action.guard';
+import { VerifiedCardSessionService } from '../../../security/verified-card-session.service';
 import { AttractapSessionHandler } from './session.handler';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 import { createHandleStartResourceUsageSessionFixture } from './fixtures/start-session.test-fixture';
@@ -676,7 +677,9 @@ describe('AttractapSessionHandler – session + flow button', () => {
   });
   describe('live usage stats', () => {
     const liveUsageStatsScope = createLiveUsageStatsFixture(scope);
+    // Handler behavior below assumes authorization has already succeeded.
     beforeEach(() => {
+      liveUsageStatsScope.mockResourceActionGuard.validateResourceAction.mockResolvedValue(true);
       scope.mockResourceUsageService.getActiveSession.mockResolvedValue({
         id: 99,
         userId: 1,
@@ -852,70 +855,47 @@ describe('AttractapSessionHandler – session + flow button', () => {
     });
 
     describe('reader access with the actual resource guard', () => {
-      let reader: { id: number; resources: { id: number }[] };
-      const readerAccessWithTheActualResourceGuardScope = inheritTestScope(
-        {
-          get parentScope() {
-            return liveUsageStatsScope;
-          },
-          get reader() {
-            return reader;
-          },
-          set reader(value: typeof reader) {
-            reader = value;
-          },
-          get request() {
-            return liveUsageStatsScope.request;
-          },
-        },
-        liveUsageStatsScope,
-      );
+      let findReaderById: jest.Mock;
+
       beforeEach(() => {
-        reader = { id: 42, resources: [{ id: 10 }] };
+        findReaderById = jest.fn(async () => ({ id: 42, resources: [{ id: 10 }] }));
         (liveUsageStatsScope.handler as any).resourceActionGuard = Object.assign(new ResourceActionGuard(), {
-          attractapService: { findReaderById: jest.fn(async () => reader) },
+          proofs: new VerifiedCardSessionService(),
+          attractapService: { findReaderById },
           usersService: liveUsageStatsScope.mockUsersService,
         });
       });
 
-      it.each(['USER_NOT_AUTHENTICATED', 'RESOURCE_NOT_ASSOCIATED_WITH_READER'])(
-        'rejects %s without looking up or disclosing readings',
-        async (error) => {
-          if (error === 'USER_NOT_AUTHENTICATED')
-            (readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.state as any).lastAuthenticatedUserId =
-              null;
-          else readerAccessWithTheActualResourceGuardScope.reader.resources = [];
-          await readerAccessWithTheActualResourceGuardScope.parentScope.handler.handleResourceUsageStats(
-            readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket as any,
-            readerAccessWithTheActualResourceGuardScope.request,
-          );
-          expect(readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.sendMessage).toHaveBeenCalledWith(
-            new AttractapEvent(AttractapEventType.RESOURCE_USAGE_STATS, { requestId: 7, error }),
-          );
-          expect(
-            readerAccessWithTheActualResourceGuardScope.parentScope.mockResourceUsageService.getActiveSession,
-          ).not.toHaveBeenCalled();
-          expect(readerAccessWithTheActualResourceGuardScope.parentScope.metering.getLive).not.toHaveBeenCalled();
-          expect(
-            readerAccessWithTheActualResourceGuardScope.parentScope.operating.getForResource,
-          ).not.toHaveBeenCalled();
-        },
-      );
-
-      it('allows an authenticated session owner on a mapped resource', async () => {
-        await readerAccessWithTheActualResourceGuardScope.parentScope.handler.handleResourceUsageStats(
-          readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket as any,
-          readerAccessWithTheActualResourceGuardScope.request,
+      it.each([
+        ['missing identity', undefined, false],
+        ['null identity', null, false],
+        ['cached identity', 1, false],
+        ['fabricated proof', 1, true],
+      ])('denies %s before looking up readings, even on a mapped resource', async (_name, userId, fabricated) => {
+        const state = liveUsageStatsScope.mockSocket.state as any;
+        state.lastAuthenticatedUserId = userId;
+        if (fabricated) {
+          state.verifiedCardOperation = {
+            handle: 'reader-supplied-proof',
+            binding: { readerId: 42, resourceId: 10, operation: AttractapEventType.RESOURCE_USAGE_STATS },
+          };
+        }
+        await liveUsageStatsScope.handler.handleResourceUsageStats(
+          liveUsageStatsScope.mockSocket as any,
+          liveUsageStatsScope.request,
         );
-        expect(readerAccessWithTheActualResourceGuardScope.parentScope.metering.getLive).toHaveBeenCalledWith(10);
-        expect(
-          readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.sendMessage.mock.calls[0][0].data.payload
-            .usage,
-        ).toMatchObject({
-          id: 99,
-          meters: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 2, formattedRate: '0,02 EUR', value: '0.125' }],
-          operatingDurationMs: 120000,
-        });
+        expect(liveUsageStatsScope.mockSocket.sendMessage).toHaveBeenCalledTimes(1);
+        expect(liveUsageStatsScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+          new AttractapEvent(AttractapEventType.RESOURCE_USAGE_STATS, {
+            requestId: 7,
+            error: 'USER_NOT_AUTHENTICATED',
+          }),
+        );
+        expect(findReaderById).not.toHaveBeenCalled();
+        expect(liveUsageStatsScope.mockUsersService.findOne).not.toHaveBeenCalled();
+        expect(liveUsageStatsScope.mockResourceUsageService.getActiveSession).not.toHaveBeenCalled();
+        expect(liveUsageStatsScope.metering.getLive).not.toHaveBeenCalled();
+        expect(liveUsageStatsScope.operating.getForResource).not.toHaveBeenCalled();
       });
     });
 

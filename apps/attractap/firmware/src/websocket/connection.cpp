@@ -92,6 +92,13 @@ void Websocket::connectWebSocketLocked()
         _clientCertIndex == certIndex;
 
     _lastApiConfig = apiConfig;
+#ifdef ATTRACTAP_PRODUCTION
+    secured.close();
+    securitySessionStarted = false;
+    if (disconnectCallback) disconnectCallback();
+    connectionGeneration++;
+    drainTxQueue();
+#endif
     setState(CONNECTING);
 
     lockWsClient();
@@ -123,11 +130,17 @@ void Websocket::connectWebSocketLocked()
 
     std::string protocol = (apiConfig.useSSL) ? "wss" : "ws";
     std::string wsUrl = protocol + "://" + serverHostname + ":" + std::to_string(serverPort) + "/api/attractap/websocket";
+#ifdef ATTRACTAP_PRODUCTION
+    wsUrl += "/v1";
+#endif
     logger.info(("Connecting to WebSocket: " + wsUrl).c_str());
 
     esp_websocket_client_config_t websocket_cfg = {};
     websocket_cfg.uri = wsUrl.c_str();
     websocket_cfg.port = serverPort;
+#ifdef ATTRACTAP_PRODUCTION
+    websocket_cfg.subprotocol = "attraccess-reader-v1";
+#endif
 
     // Configure buffer sizes to prevent ENOBUFS errors
     // WebSocket event callbacks parse API payloads and invoke application
@@ -172,10 +185,19 @@ void Websocket::connectWebSocketLocked()
     // Register event handler
     esp_websocket_register_events(newClient, WEBSOCKET_EVENT_ANY, websocket_event_handler, this);
 
+    // Publish ownership before starting the higher-priority network task. A
+    // fast local connect can otherwise deliver CONNECTED before start returns.
+    lockWsClient();
+    ws_client = newClient;
+    unlockWsClient();
+
     // Start connection
     esp_err_t ret = esp_websocket_client_start(newClient);
     if (ret != ESP_OK)
     {
+        lockWsClient();
+        ws_client = nullptr;
+        unlockWsClient();
         esp_websocket_client_destroy(newClient);
         handleConnectFailure((std::string("esp_websocket_client_start: ") + esp_err_to_name(ret)).c_str());
         return;
@@ -202,12 +224,43 @@ void Websocket::websocket_event_handler(void *handler_args, esp_event_base_t bas
 void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, void *event_data)
 {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+#ifdef ATTRACTAP_PRODUCTION
+    // Ignore callbacks from a destroyed/replaced raw connection.
+    if (!data || data->client != ws_client) return;
+#endif
 
     AttraccessApiConfig apiConfig = Settings::getAttraccessApiConfig();
 
     switch (event_id)
     {
     case WEBSOCKET_EVENT_CONNECTED:
+#ifdef ATTRACTAP_PRODUCTION
+        incomingMessageBytes = 0;
+        incomingFrameOffset = 0;
+        incomingFragmented = false;
+        if (!secured.begin(
+            [this](const uint8_t *bytes, size_t length) {
+                lockWsClient();
+                const int sent = ws_client ? esp_websocket_client_send_bin(ws_client, reinterpret_cast<const char *>(bytes), length, SEND_TIMEOUT_TICKS) : -1;
+                unlockWsClient();
+                return sent == static_cast<int>(length);
+            },
+            [this](uint8_t type, const uint8_t *bytes, size_t length) {
+                if (type == 1 && messageCallbackRaw) messageCallbackRaw(reinterpret_cast<const char *>(bytes), length);
+                else if (type == 2 && binaryDataCallback) {
+                    esp_websocket_event_data_t packet{};
+                    packet.data_ptr = const_cast<char *>(reinterpret_cast<const char *>(bytes));
+                    packet.data_len = length;
+                    packet.payload_len = length;
+                    packet.op_code = 2;
+                    packet.fin = true;
+                    binaryDataCallback(packet);
+                }
+            })) reconnectRequested = true;
+        securitySessionStarted = true;
+        // Application connection state is published only after inner TLS.
+        break;
+#endif
         logger.info("WebSocket connected");
         this->lastInboundFrameTime = millis();
         this->consecutiveConnectFailures = 0;
@@ -222,6 +275,13 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         break;
 
     case WEBSOCKET_EVENT_CLOSED:
+#ifdef ATTRACTAP_PRODUCTION
+        secured.close();
+        securitySessionStarted = false;
+        if (disconnectCallback) disconnectCallback();
+        connectionGeneration++;
+        drainTxQueue();
+#endif
         logger.info("WebSocket closed");
         if (this->_state == CONNECTED || this->_state == CONNECTING)
         {
@@ -232,6 +292,13 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
+#ifdef ATTRACTAP_PRODUCTION
+        secured.close();
+        securitySessionStarted = false;
+        if (disconnectCallback) disconnectCallback();
+        connectionGeneration++;
+        drainTxQueue();
+#endif
         logger.info("WebSocket disconnected");
         if (this->_state == CONNECTED || this->_state == CONNECTING)
         {
@@ -256,6 +323,36 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_DATA:
     {
+#ifdef ATTRACTAP_PRODUCTION
+        if (data->op_code == 9 || data->op_code == 10) break;
+        if ((data->op_code != 2 && data->op_code != 0) || data->payload_len < 0 ||
+            data->payload_len > 4096 || data->payload_offset < 0 || data->data_len < 0 ||
+            data->payload_offset + data->data_len > data->payload_len) {
+            reconnectRequested = true;
+            break;
+        }
+        if (data->payload_offset == 0) {
+            if ((data->op_code == 2 && incomingFragmented) || (data->op_code == 0 && !incomingFragmented)) {
+                reconnectRequested = true;
+                break;
+            }
+            if (data->op_code == 2) incomingMessageBytes = 0;
+            incomingFrameOffset = 0;
+            incomingMessageBytes += data->payload_len;
+            incomingFragmented = !data->fin;
+        }
+        if (size_t(data->payload_offset) != incomingFrameOffset || incomingMessageBytes > 4096 || !secured.receive(reinterpret_cast<const uint8_t *>(data->data_ptr), data->data_len)) {
+            reconnectRequested = true;
+            break;
+        }
+        incomingFrameOffset += data->data_len;
+        if (secured.ready()) {
+            resetReconnectBackoff();
+            setState(CONNECTED);
+        }
+        if (data->fin && data->payload_offset + data->data_len == data->payload_len) incomingMessageBytes = 0;
+        break;
+#endif
         uint32_t nowMs = millis();
         if (data->op_code == WS_TRANSPORT_OPCODES_PONG && this->network_quality_mutex)
         {
@@ -297,6 +394,13 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     }
 
     case WEBSOCKET_EVENT_ERROR:
+#ifdef ATTRACTAP_PRODUCTION
+        secured.close();
+        securitySessionStarted = false;
+        if (disconnectCallback) disconnectCallback();
+        connectionGeneration++;
+        drainTxQueue();
+#endif
         logger.error("WebSocket error");
         if (data && data->error_handle.error_type == WEBSOCKET_ERROR_TYPE_PONG_TIMEOUT)
         {

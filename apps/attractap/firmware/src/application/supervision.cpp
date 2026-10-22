@@ -52,6 +52,12 @@ void SupervisionFlow::enter(const char *requester, const FirmwareI18n::Text &hin
 }
 
 void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_t id) {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST) && !defined(SUPERVISION_FLOW_TEST)
+    api.cancelSupervision();
+    onDisconnect();
+    return;
+#endif
+
     // Release a queued web transaction before the reader flow takes ownership.
     processEvents();
     if (pendingWebStart) {
@@ -69,6 +75,12 @@ void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_
 }
 
 void SupervisionFlow::armWebInitiated(const API::SupervisionStartCommand &command) {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST) && !defined(SUPERVISION_FLOW_TEST)
+    api.cancelSupervision();
+    onDisconnect();
+    return;
+#endif
+
     Event event = {};
     event.type = EventType::WebStart;
     event.resourceId = command.resourceId;
@@ -79,6 +91,12 @@ void SupervisionFlow::armWebInitiated(const API::SupervisionStartCommand &comman
 }
 
 void SupervisionFlow::beginWebInitiated(uint32_t id, const char *requester, uint32_t deadlineMs) {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST) && !defined(SUPERVISION_FLOW_TEST)
+    api.cancelSupervision();
+    onDisconnect();
+    return;
+#endif
+
     webInitiated = true;
     resourceId = id;
     enter(requester, FirmwareI18n::Message::TapSupervisorCard, millis(), deadlineMs);

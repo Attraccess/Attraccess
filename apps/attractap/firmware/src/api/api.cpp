@@ -28,6 +28,12 @@ void API::updateSateInfo()
 
 void API::setup()
 {
+#ifdef ATTRACTAP_PRODUCTION
+    this->transport.setDisconnectCallback([this]() {
+        this->firmware.cancel();
+        State::setApiState(false, "");
+    });
+#endif
     this->transport.setup();
     this->transport.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
@@ -101,6 +107,12 @@ bool API::sendMessage(const char *type, JsonObject payload)
     }
 
     const size_t requiredBytes = measureJson(event) + 1; // include terminator
+    if (event.overflowed() || requiredBytes > JSON_INBUF + 1)
+    {
+        this->logger.error("Outgoing reader JSON exceeds limit");
+        this->transport.forceReconnect("Outgoing JSON exceeds limit");
+        return false;
+    }
     if (requiredBytes <= JSON_OUTBUF_SMALL)
     {
         char json[JSON_OUTBUF_SMALL];
@@ -308,12 +320,33 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
 
 void API::processIncomingMessage(const char *buf, size_t len)
 {
+    // Always release parsed strings, including every early-return/error path.
+    struct ClearDocument {
+        JsonDocument &document;
+        ReaderJsonAllocator &allocator;
+        Logger &logger;
+        ~ClearDocument() {
+            document.clear();
+            logger.debugf("Reader JSON allocations: current=%u peak=%u",
+                static_cast<unsigned>(allocator.usedBytes()),
+                static_cast<unsigned>(allocator.peakBytes()));
+        }
+    } clear{inboundDoc, inboundAllocator, logger};
+    inboundAllocator.beginMessage();
+    if (!buf || len > JSON_INBUF)
+    {
+        inboundDoc.clear();
+        logger.error("Incoming reader JSON exceeds limit");
+        this->transport.forceReconnect("Incoming JSON exceeds limit");
+        return;
+    }
     // Parse into persistent inboundDoc to avoid deep stack usage in websocket task (no filter; server sends only needed fields)
     inboundDoc.clear();
     auto err = deserializeJson(inboundDoc, buf, len);
     if (err)
     {
         logger.error((std::string("JSON parse error: ") + err.c_str()).c_str());
+        this->transport.forceReconnect("Invalid reader JSON");
         return;
     }
 
@@ -327,7 +360,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {
-        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
+        logger.error("Missing reader event type");
         return;
     }
 
@@ -423,7 +456,7 @@ void API::sendHeartbeat()
         // Suppress heartbeats during OTA to avoid websocket contention
         return;
     }
-    if (this->heartbeat_sent_at != 0 && millis() - this->heartbeat_sent_at < (1000 * 5))
+    if (this->heartbeat_sent_at != 0 && millis() - this->heartbeat_sent_at < (1000 * 20))
     {
         return;
     }

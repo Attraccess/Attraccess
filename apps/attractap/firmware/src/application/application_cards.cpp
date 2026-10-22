@@ -5,6 +5,12 @@
 #include "../state/state.hpp"
 
 void Application::processCardAuthenticationData() {
+#if !defined(DEMO_MODE) && !defined(ATTRACTAP_HOST)
+  // A fabricated callback or cached key can never unlock a foundation reader.
+  this->unlocked = false;
+  memset(this->cardAuthenticationData.keyBytes, 0, sizeof(this->cardAuthenticationData.keyBytes));
+  this->cardAuthenticationData.keyLen = 0;
+#endif
   // A card that fails NFC verification must not inherit the language of the
   // previous cardholder while its error screen is shown.
   State::setUserLanguage(false);

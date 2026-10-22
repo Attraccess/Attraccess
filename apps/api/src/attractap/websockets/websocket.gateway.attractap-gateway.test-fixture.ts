@@ -1,4 +1,9 @@
-import { Resource } from '@attraccess/database-entities';
+import { AttractapReaderIdentity, Resource } from '@attraccess/database-entities';
+import { PassThrough } from 'node:stream';
+import { EventEmitter } from 'node:events';
+import { TLSSocket } from 'node:tls';
+import { WebSocket } from 'ws';
+import { ProtectedReaderSocket } from './reader-connection-transport';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditService } from '../../audit/audit.service';
@@ -40,6 +45,8 @@ import { AttractapSupervisionHandler } from './handlers/supervision/supervision.
 import { AttractapGateway } from './websocket.gateway';
 import { WebsocketService } from './websocket.service';
 import { AuthenticatedWebSocket } from './websocket.types';
+import { ReaderIdentityService } from '../security/reader-identity.service';
+import { VerifiedCardSessionService } from '../security/verified-card-session.service';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -75,6 +82,21 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     ...overrides,
   } as unknown as AuthenticatedWebSocket;
 }
+
+function createSecuredSocket(overrides: Partial<AuthenticatedWebSocket> = {}): AuthenticatedWebSocket {
+  const tls = new PassThrough();
+  const ws = Object.assign(new EventEmitter(), { terminate: jest.fn() });
+  const identity = Object.assign(new AttractapReaderIdentity(), {
+    readerId: overrides.readerId ?? 42,
+    generation: 1,
+    validFrom: new Date(0),
+    validUntil: new Date(Date.now() + 86400_000),
+    revokedAt: null,
+    retiredAt: null,
+  });
+  const socket = new ProtectedReaderSocket(identity, 'test-connection', tls as TLSSocket, ws as unknown as WebSocket);
+  return Object.assign(socket, createMockSocket(overrides)) as unknown as AuthenticatedWebSocket;
+}
 export function registerAttractapGatewayFixture() {
   let gateway: AttractapGateway;
 
@@ -97,6 +119,11 @@ export function registerAttractapGatewayFixture() {
       providers: [
         AttractapGateway,
         WebsocketService,
+        {
+          provide: ReaderIdentityService,
+          useValue: { isLegacy: jest.fn().mockResolvedValue(true), detachLegacy: jest.fn(), trackLegacy: jest.fn() },
+        },
+        VerifiedCardSessionService,
         { provide: AttractapService, useValue: attractapService },
         { provide: UsersService, useValue: {} },
         { provide: AttractapFirmwareService, useValue: {} },
@@ -145,6 +172,9 @@ export function registerAttractapGatewayFixture() {
     },
     get createMockSocket() {
       return createMockSocket;
+    },
+    get createSecuredSocket() {
+      return createSecuredSocket;
     },
     get gateway() {
       return gateway;

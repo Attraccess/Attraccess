@@ -53,16 +53,19 @@ extern "C" void app_main(void)
     // The erase path only triggers on a truly incompatible/corrupt partition —
     // same recovery the Arduino core performed.
     esp_err_t nvsErr = nvs_flash_init();
+#ifndef ATTRACTAP_PRODUCTION
     if (nvsErr == ESP_ERR_NVS_NO_FREE_PAGES || nvsErr == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
         nvsErr = nvs_flash_init();
     }
+#endif
     ESP_ERROR_CHECK(nvsErr);
 
     // Console input (serialCommandHandler) reads from the USB-Serial-JTAG
     // driver; log output goes through stdout, which the VFS console routes to
     // the same port (CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG).
+#ifndef ATTRACTAP_PRODUCTION
     usb_serial_jtag_driver_config_t usbConfig = {
         .tx_buffer_size = 1024,
         .rx_buffer_size = 512,
@@ -72,12 +75,15 @@ extern "C" void app_main(void)
     // Give the host time to enumerate USB before the first log lines
     // (parity with the old `Serial.begin(); delay(2000);` boot).
     delay(2000);
+#endif
 
     // log firmware info
     mainLogger.info("Welcome to Attractap");
     mainLogger.infof("Firmware: %s, Variant: %s, Version: %s", FIRMWARE_FRIENDLY_NAME, FIRMWARE_VARIANT_FRIENDLY_NAME, FIRMWARE_VERSION);
 
+#ifndef ATTRACTAP_PRODUCTION
     mainLogger.info("Console initialized");
+#endif
 
     mainLogger.infof("I2C init: SDA=%d, SCL=%d", PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
     recoverI2CBus(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);

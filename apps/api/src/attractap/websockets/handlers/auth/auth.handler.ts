@@ -1,10 +1,12 @@
+import { closeSync } from 'node:fs';
+import { ReaderIdentityService } from '../../../security/reader-identity.service';
+import { protectedReaderConnection } from '../../reader-connection-transport';
 import { SettingsService } from '../../../../settings/settings.service';
 import { WebSocket } from 'ws';
 import { WebsocketService } from '../../websocket.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../../attractap.service';
 import { verifyToken } from '../../websocket.utils';
-import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AuditService } from '../../../../audit/audit.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
@@ -17,11 +19,11 @@ export class AttractapAuthHandler {
   @Inject(AttractapService)
   private attractapService: AttractapService;
 
-  @Inject(ResourceListService)
-  private resourceListService: ResourceListService;
-
   @Inject(MetricsService)
   private metricsService: MetricsService;
+
+  @Inject(ReaderIdentityService)
+  private identities: ReaderIdentityService;
 
   @Inject(AuditService)
   private audit: AuditService;
@@ -33,6 +35,7 @@ export class AttractapAuthHandler {
   private websocketService: WebsocketService;
 
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    if (protectedReaderConnection(socket)) return;
     this.logger.debug('Received REGISTER event');
     const response = await this.attractapService.createNewReader(data.payload.firmware);
     await this.audit
@@ -45,10 +48,6 @@ export class AttractapAuthHandler {
       })
       .catch(() => undefined);
 
-    this.logger.debug(
-      `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`,
-    );
-
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.READER_REGISTER, {
         id: response.reader.id,
@@ -58,8 +57,7 @@ export class AttractapAuthHandler {
   }
 
   public async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    if (socket.readyState !== WebSocket.OPEN) return;
-    this.logger.debug('processing READER_AUTHENTICATE event', data);
+    if (protectedReaderConnection(socket) || socket.readyState !== WebSocket.OPEN) return;
 
     const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
       message: 'PLEASE_REREGISTER',
@@ -85,10 +83,33 @@ export class AttractapAuthHandler {
         0,
       );
     }
+    try {
+      this.identities.trackLegacy(socket, data.payload.id, async () => {
+        if (socket.cancelReaderConnection) return socket.cancelReaderConnection();
+        socket.state.readerAuthenticationAttempt = Symbol('reader-lifecycle-changed');
+        socket.readerId = null;
+        socket.readerName = null;
+        const ota = socket.state.ota;
+        socket.state.ota = null;
+        if (ota?.fd !== undefined) {
+          try {
+            closeSync(ota.fd);
+          } catch {
+            /* Already closed by disconnect cleanup. */
+          }
+        }
+        socket.close();
+      });
+    } catch {
+      socket.close();
+      return;
+    }
     this.logger.debug('Checking if reader exists');
     const reader = await this.attractapService.findReaderById(data.payload.id);
     if (!isCurrentAttempt()) return;
-    if (!reader) {
+    const isLegacy = reader && (await this.identities.isLegacy(reader.id));
+    if (!isCurrentAttempt()) return;
+    if (!reader || !isLegacy) {
       this.logger.error('No reader-config found for socket, sending UNAUTHORIZED response to client');
       return await socket.sendMessage(unauthorizedResponse);
     }
@@ -103,6 +124,7 @@ export class AttractapAuthHandler {
 
     const storedLanguage = await this.settingsService.getDefaultLanguage();
     if (!isCurrentAttempt()) return;
+    if (!(await this.identities.isLegacy(reader.id)) || !isCurrentAttempt()) return;
     // A broadcast during the read supersedes its snapshot, even before this
     // socket becomes eligible for language broadcasts.
     const language = this.websocketService.readerLanguage ?? storedLanguage;
@@ -116,7 +138,7 @@ export class AttractapAuthHandler {
       serverTime: readerServerTime(),
     });
     await socket.sendMessage(authenticatedResponse);
-    if (!isCurrentAttempt()) return;
-    await this.resourceListService.sendResourceListToSocket(socket);
+
+    // Bearer tokens authorize updates only; secured credentials never fall back here.
   }
 }

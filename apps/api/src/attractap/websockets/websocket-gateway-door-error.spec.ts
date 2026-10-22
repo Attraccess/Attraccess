@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
+import { VerifiedCardSessionService } from '../security/verified-card-session.service';
 import { AttractapEventType, AttractapEvent } from './websocket.types';
 import { FlowExecutionError } from '../../resources/flows/errors/flow-execution.error';
 import { BadRequestException } from '@nestjs/common';
@@ -53,12 +54,8 @@ describe('AttractapSessionHandler – door action error propagation', () => {
       getResourcesForReader: jest.fn().mockResolvedValue([{ id: 10 }]),
     };
 
-    // ResourceActionGuard runs the real validation logic against the mocks so the
-    // door handlers proceed exactly as they did when validateResourceAction lived
-    // on the gateway.
-    const guard: ResourceActionGuard = Object.create(ResourceActionGuard.prototype);
-    (guard as any).attractapService = mockAttractapService;
-    (guard as any).usersService = mockUsersService;
+    // These handler success/error tests assume authorization has already succeeded.
+    const guard = { validateResourceAction: jest.fn().mockResolvedValue(true) };
 
     (handler as any).resourceUsageService = mockResourceUsageService;
     (handler as any).usersService = mockUsersService;
@@ -236,6 +233,41 @@ describe('AttractapSessionHandler – door action error propagation', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('authorization with the actual resource guard and no card verifier', () => {
+    beforeEach(() => {
+      (handler as any).resourceActionGuard = Object.assign(new ResourceActionGuard(), {
+        proofs: new VerifiedCardSessionService(),
+        attractapService: mockAttractapService,
+        usersService: mockUsersService,
+      });
+    });
+
+    const actions = [
+      ['handleLockDoor', AttractapEventType.LOCK_DOOR],
+      ['handleUnlockDoor', AttractapEventType.UNLOCK_DOOR],
+      ['handleUnlatchDoor', AttractapEventType.UNLATCH_DOOR],
+    ] as const;
+    describe.each(actions)('%s', (method, eventType) => {
+      it.each([false, true])('denies cached identity with fabricated proof=%s', async (fabricated) => {
+        if (fabricated) {
+          (mockSocket.state as any).verifiedCardOperation = {
+            handle: 'reader-supplied-proof',
+            binding: { readerId: 42, resourceId: 10, operation: eventType },
+          };
+        }
+        await handler[method](mockSocket as any, new AttractapEvent(eventType, { resourceId: 10, requestId: 7 }).data);
+        expect(mockSocket.sendMessage).toHaveBeenCalledTimes(1);
+        expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+          new AttractapEvent(eventType, { requestId: 7, error: 'USER_NOT_AUTHENTICATED' }),
+        );
+        for (const action of Object.values(mockResourceUsageService)) expect(action).not.toHaveBeenCalled();
+        expect(mockAttractapService.findReaderById).not.toHaveBeenCalled();
+        expect(mockAttractapService.getResourcesForReader).not.toHaveBeenCalled();
+        expect(mockUsersService.findOne).not.toHaveBeenCalled();
+      });
     });
   });
 
