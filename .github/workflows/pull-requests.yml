@@ -238,7 +238,7 @@ jobs:
         run: ./scripts/grafana-managed-sync.spec.sh
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
       - name: Test legacy Pushover contact point cleanup
         run: node --test scripts/grafana-pushover-cleanup.test.mjs
 
