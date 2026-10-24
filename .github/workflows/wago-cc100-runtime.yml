@@ -54,11 +54,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Read Node.js version
+        id: node-version
+        run: echo "value=$(tr -d '[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         id: image
         with:
           context: .
           file: apps/plugins/wago/cc100-runtime/Dockerfile
+          build-args: NODE_VERSION=${{ steps.node-version.outputs.value }}
           platforms: linux/arm/v7
           push: ${{ github.event_name == 'push' }}
           tags: ghcr.io/attraccess/wago-cc100-runtime:${{ github.sha }}

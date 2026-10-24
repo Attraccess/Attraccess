@@ -5,8 +5,9 @@ module.exports = {
   appId: 'org.attraccess.companion',
   productName: 'Attraccess Companion',
   icon: path.join(__dirname, '../frontend/public/icon-512.png'),
-  // ponytail: resolved at build time so it stays in sync with the installed version
-  electronVersion: require('../../node_modules/electron/package.json').version,
+  // Electron bundles its own Node runtime; .nvmrc only selects the build toolchain.
+  // Electron 45 uses Node 24 and Chromium's Brotli decoder with the CVE-2026-111497 fix.
+  electronVersion: require('electron/package.json').version,
   directories: {
     output: 'dist',
   },

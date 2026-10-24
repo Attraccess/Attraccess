@@ -11,6 +11,7 @@ const buildId = process.env.CC100_BUILD_ID ?? execFileSync('git', ['rev-parse', 
 if (!/^[a-f0-9]{40}$/.test(buildId)) throw new Error('CC100_BUILD_ID must be a full commit SHA');
 const image = `ghcr.io/attraccess/wago-cc100-runtime:${buildId}`;
 if (process.argv.includes('--build')) {
+  const nodeVersion = (await readFile('.nvmrc', 'utf8')).trim();
   execFileSync(
     'docker',
     [
@@ -18,6 +19,8 @@ if (process.argv.includes('--build')) {
       'build',
       '--platform',
       'linux/arm/v7',
+      '--build-arg',
+      `NODE_VERSION=${nodeVersion}`,
       '--load',
       '-t',
       image,
