@@ -11,11 +11,14 @@ runs:
     - name: Identify checked-out build
       id: source
       shell: bash
-      run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        echo "node-version=$(tr -d '[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
     - uses: docker/build-push-action@v6
       with:
         context: .
         file: apps/plugins/wago/cc100-runtime/Dockerfile
+        build-args: NODE_VERSION=${{ steps.source.outputs.node-version }}
         platforms: linux/arm/v7
         load: true
         tags: ghcr.io/attraccess/wago-cc100-runtime:${{ steps.source.outputs.sha }}

@@ -1,7 +1,8 @@
 # Node 24 does not publish a linux/arm/v7 image; compile the TypeScript on the
 # Buildx host architecture and run the platform-neutral output on Node 22 ARMv7.
+ARG NODE_VERSION=24.22.1
 ARG BUILDPLATFORM
-FROM --platform=$BUILDPLATFORM node:24.22.1-bookworm-slim AS build
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-bookworm-slim AS build
 WORKDIR /workspace
 COPY . .
 RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx run plugin-wago:build-cc100-runtime
