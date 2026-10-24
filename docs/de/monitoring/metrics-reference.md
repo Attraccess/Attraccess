@@ -97,13 +97,18 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Anzahl verbundener Attractap-RFID-Leser |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Gesamtanzahl der RFID-Tap-Ereignisse |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Gesamtanzahl der Firmware-Update-Ereignisse |
-| `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Von Lesegeräten empfangene Crash-Berichte. `reset_reason` ist eine normalisierte Reset-Ursache (z. B. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
+| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Historischer Zähler aller gespeicherten Reset-Berichte, einschließlich POWERON und SW; beginnt nach API-Neustart bei null. Für bestehende Nutzer beibehalten, kein exakter stündlicher Alarmwert. |
+| `attraccess_attractap_reset_reports_last_hour` | Gauge | `reader_id`, `reset_reason` | Exakte Anzahl der in der letzten Stunde empfangenen Berichte, bei jedem Scrape aus der Datenbank ermittelt. |
 
 ### Beispiel-PromQL-Abfragen
 
+Reset-Ursachen sind auf `POWERON`, `EXT`, `SW`, `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`, `DEEPSLEEP`, `BROWNOUT`, `SDIO` und `UNKNOWN` begrenzt. Andere Rohwerte werden zu `UNKNOWN` zusammengefasst. Leser-IDs stammen aus gespeicherten Berichten. Das Empfangsfenster ist `(Scrape-Zeit − 1 Stunde, Scrape-Zeit]`; zukünftige Zeilen zählen nicht. Verzögerte Uploads zählen bei Empfang, nicht zum Zeitpunkt des tatsächlichen Resets. Abgelaufene und gelöschte Berichte verschwinden beim nächsten erfolgreichen Scrape. Leere Fenster liefern keine Beitragsserien. Ein Datenbankfehler lässt den Scrape fehlschlagen, statt alte Werte oder eine gesunde Null zu liefern. Nach Neustart werden die Werte beim ersten erfolgreichen Scrape wiederhergestellt.
+
+Crash-/Watchdog-Berichte (`PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`) und POWERON benötigen jeweils **vier Berichte über alle Leser**, durchgehend für **fünf Minuten**, bei minütlicher Auswertung. Drei Berichte je Kategorie lösen keine Warnung aus. SW und andere Ursachen zählen zu keiner Warnung. POWERON belegt weder einen Firmware-Absturz noch den Grund der Stromunterbrechung. Doppelte Scrape-Ziele derselben Datenbank werden mit `max by (reader_id, reset_reason)` zusammengefasst. Die Regeln gelten für eine Installation/Datenbank. Leser-IDs, Ursachen und ganzzahlige Anzahlen stehen in Beschreibungen, nicht in Identitätslabels der Warnung.
+
 ```promql
-# Lesegerät-Abstürze der letzten Stunde, nach Reset-Ursache
-sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
+# Exakte Crash-/Watchdog-Berichte, die in der letzten Stunde empfangen wurden
+sum(max by (reader_id, reset_reason) (attraccess_attractap_reset_reports_last_hour{job="attraccess",reset_reason=~"PANIC|INT_WDT|TASK_WDT|WDT"})) or vector(0)
 
 # Alarmsignal: alle Lesegeräte offline (waren aber kürzlich verbunden)
 sum(

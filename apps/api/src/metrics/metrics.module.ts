@@ -1,7 +1,16 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session } from '@attraccess/database-entities';
+import {
+  AttractapCrashReport,
+  User,
+  Resource,
+  Project,
+  ResourceGroup,
+  MqttServer,
+  ResourceUsage,
+  Session,
+} from '@attraccess/database-entities';
 import { MetricsService } from './metrics.service';
 import { MetricsController } from './metrics.controller';
 import { MetricsGuard } from './metrics.guard';
@@ -40,16 +49,33 @@ const definitionProviders = [
   { provide: WS_METRICS, useFactory: (m: MetricsService) => createWsMetrics(m.registry), inject: [MetricsService] },
   { provide: CRON_METRICS, useFactory: (m: MetricsService) => createCronMetrics(m.registry), inject: [MetricsService] },
   { provide: DB_METRICS, useFactory: (m: MetricsService) => createDbMetrics(m.registry), inject: [MetricsService] },
-  { provide: EXTERNAL_METRICS, useFactory: (m: MetricsService) => createExternalMetrics(m.registry), inject: [MetricsService] },
+  {
+    provide: EXTERNAL_METRICS,
+    useFactory: (m: MetricsService) => createExternalMetrics(m.registry),
+    inject: [MetricsService],
+  },
   { provide: SSE_METRICS, useFactory: (m: MetricsService) => createSseMetrics(m.registry), inject: [MetricsService] },
   { provide: FLOW_METRICS, useFactory: (m: MetricsService) => createFlowMetrics(m.registry), inject: [MetricsService] },
-  { provide: OPERATING_METRICS, useFactory: (m: MetricsService) => createOperatingMetrics(m.registry), inject: [MetricsService] },
+  {
+    provide: OPERATING_METRICS,
+    useFactory: (m: MetricsService) => createOperatingMetrics(m.registry),
+    inject: [MetricsService],
+  },
 ];
 
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session]),
+    TypeOrmModule.forFeature([
+      AttractapCrashReport,
+      User,
+      Resource,
+      Project,
+      ResourceGroup,
+      MqttServer,
+      ResourceUsage,
+      Session,
+    ]),
     SettingsModule,
   ],
   controllers: [MetricsController],

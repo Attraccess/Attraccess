@@ -1,7 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MetricsService } from './metrics.service';
-import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session } from '@attraccess/database-entities';
+import {
+  AttractapCrashReport,
+  User,
+  Resource,
+  Project,
+  ResourceGroup,
+  MqttServer,
+  ResourceUsage,
+  Session,
+} from '@attraccess/database-entities';
 
 describe('MetricsService', () => {
   let service: MetricsService;
@@ -23,10 +32,25 @@ describe('MetricsService', () => {
   const mockResourceUsageRepo = { count: jest.fn().mockResolvedValue(4) };
   const mockSessionRepo = { count: jest.fn().mockResolvedValue(7) };
 
+  const mockResetQuery = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    addGroupBy: jest.fn().mockReturnThis(),
+    getRawMany: jest.fn().mockResolvedValue([]),
+  };
+  const mockReportRepo = {
+    createQueryBuilder: jest.fn().mockReturnValue(mockResetQuery),
+    metadata: { findColumnWithPropertyName: jest.fn() },
+    manager: { connection: { driver: { preparePersistentValue: (value: Date) => value } } },
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MetricsService,
+        { provide: getRepositoryToken(AttractapCrashReport), useValue: mockReportRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(Resource), useValue: mockResourceRepo },
         { provide: getRepositoryToken(Project), useValue: mockProjectRepo },
@@ -46,6 +70,55 @@ describe('MetricsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('bounds a stuck query, rejects later scrapes without queueing, and discards late rows', async () => {
+    jest.useFakeTimers();
+    let release: (rows: { readerId: number; resetReason: string; count: number }[]) => void;
+    const delayed = new Promise<{ readerId: number; resetReason: string; count: number }[]>((resolve) => {
+      release = resolve;
+    });
+    mockResetQuery.getRawMany.mockReturnValueOnce(delayed);
+    try {
+      const first = service.getMetrics();
+      const firstFailure = expect(first).rejects.toThrow('Metrics collection timed out');
+      await jest.advanceTimersByTimeAsync(5_000);
+      await firstFailure;
+      for (let i = 0; i < 20; i++) {
+        await expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      }
+      expect(mockResetQuery.getRawMany).toHaveBeenCalledTimes(1);
+      release([{ readerId: 5, resetReason: 'PANIC', count: 99 }]);
+      await jest.advanceTimersByTimeAsync(0);
+      expect((await service.attractapResetReportsLastHour.get()).values).toEqual([]);
+      expect(await service.getMetrics()).not.toContain('reset_reason="PANIC"} 99');
+      expect(mockResetQuery.getRawMany).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('also bounds rendering and shares the deadline with overlapping scrapes', async () => {
+    jest.useFakeTimers();
+    let release: (text: string) => void;
+    const delayed = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const render = jest.spyOn(service.registry, 'metrics').mockReturnValueOnce(delayed);
+    try {
+      const first = expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      const second = expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      await jest.advanceTimersByTimeAsync(5_000);
+      await Promise.all([first, second]);
+      await expect(service.getMetrics()).rejects.toThrow('Metrics collection timed out');
+      expect(render).toHaveBeenCalledTimes(1);
+      release('late response');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(await service.getMetrics()).toContain('attraccess_');
+    } finally {
+      render.mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   describe('metric naming (issue #9: attraccess_ prefix)', () => {
@@ -136,7 +209,9 @@ describe('MetricsService', () => {
       service.authSsoLoginFailuresTotal.inc({ provider_type: 'oidc', reason: 'invalid_assertion' });
 
       const metrics = await service.getMetrics();
-      expect(metrics).toContain('attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1');
+      expect(metrics).toContain(
+        'attraccess_auth_sso_login_failures_total{provider_type="oidc",reason="invalid_assertion"} 1',
+      );
     });
 
     it('attractapFirmwareUpdatesTotal counter is defined', () => {
@@ -166,7 +241,9 @@ describe('MetricsService', () => {
 
       const metrics = await service.getMetrics();
       expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="success"} 1');
-      expect(metrics).toContain('attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1');
+      expect(metrics).toContain(
+        'attraccess_companion_downloads_total{platform="linux",arch="x64",status="not_found"} 1',
+      );
     });
 
     it('uses attraccess_ prefix (consistent with naming convention)', async () => {

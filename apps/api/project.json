@@ -6,6 +6,13 @@
   "tags": ["type:app", "scope:core"],
   "implicitDependencies": ["plugins-backend-sdk", "plugins-frontend-sdk"],
   "targets": {
+    "verify-attractap-reset-alerts": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node monitoring/tests/attractap-reset-alerts.mjs"
+      }
+    },
     "copy-attractap-firmware-into-assets": {
       "executor": "nx:run-commands",
       "dependsOn": [],
