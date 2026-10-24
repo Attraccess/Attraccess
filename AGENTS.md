@@ -5,6 +5,8 @@ RULES:
 - do not commit auto-generated code (e.g. react-query api client)
 - do not manually modify the CHANGELOG.md, it is auto generated
 - do not commit specs/plan files, repo is code/docs only.
+- For dependency PR triage, review, or merge decisions, follow the evidence and bot-description rules in
+  [SECURITY.md](SECURITY.md#dependency-pull-request-automation).
 
 ## Worktree Bootstrap
 
