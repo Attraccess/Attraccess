@@ -3,6 +3,7 @@ name: WAGO CC100 Runtime
 on:
   pull_request:
     paths:
+      - '.nvmrc'
       - 'apps/plugins/wago/**'
       - 'nx.json'
       - 'eslint.config.cjs'
@@ -16,6 +17,7 @@ on:
   push:
     branches: [main]
     paths:
+      - '.nvmrc'
       - 'apps/plugins/wago/**'
       - 'nx.json'
       - 'eslint.config.cjs'

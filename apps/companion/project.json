@@ -32,6 +32,8 @@
       "inputs": [
         "production",
         "^production",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
         {
           "runtime": "node -p \"process.platform + '-' + process.arch\""
         }
