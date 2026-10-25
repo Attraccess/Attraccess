@@ -7,6 +7,11 @@ let
   placesConfig = yaml.generate "attractap-places.yaml" { places = cfg.coordinator.places; };
   labgrid = pkgs.python3Packages.labgrid;
   tools = [ cfg.package labgrid pkgs.ser2net pkgs.esptool pkgs.ffmpeg pkgs.openssh pkgs.uhubctl pkgs.usbutils pkgs.v4l-utils ] ++ cfg.extraPackages;
+  waitForCoordinator = pkgs.writeShellScript "labgrid-wait-for-coordinator" ''
+    until ${labgrid}/bin/labgrid-client -x ${lib.escapeShellArg cfg.coordinator.syncAddress} places >/dev/null; do
+      ${pkgs.coreutils}/bin/sleep 1
+    done
+  '';
   syncPlaces = pkgs.writeShellScript "labgrid-sync-places" ''
     exec ${pkgs.python3.withPackages (ps: [ ps.labgrid ])}/bin/python \
       ${labgrid.src}/contrib/sync-places.py \
@@ -106,6 +111,11 @@ in {
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
       environment.PYTHONUNBUFFERED = "1";
+      # Type=simple starts ordering dependants before the gRPC server is ready.
+      # ExecStartPost keeps their start transaction waiting for a successful RPC.
+      postStart = ''
+        exec ${pkgs.coreutils}/bin/timeout 60 ${waitForCoordinator}
+      '';
       serviceConfig = {
         ExecStart = "${labgrid}/bin/labgrid-coordinator --listen ${lib.escapeShellArg cfg.coordinator.listenAddress}";
         DynamicUser = true;

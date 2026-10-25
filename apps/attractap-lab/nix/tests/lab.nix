@@ -2,7 +2,7 @@
 { pkgs, ... }:
 {
   name = "attractap-lab";
-  nodes.machine = { ... }: {
+  nodes.machine = { lib, ... }: {
     imports = [ self.nixosModules.attractap-lab ];
     services.attractap-lab = {
       enable = true;
@@ -26,10 +26,27 @@
       };
       cameras.overview = { device = "/dev/video-not-connected"; port = 8080; };
     };
+    # Start the lab explicitly so a failed initial activation cannot hide behind
+    # systemd's automatic retries. Delay the process itself, after Type=simple
+    # considers ExecStart launched, to reproduce slow coordinator initialization.
+    systemd.services = {
+      attractap-lab-coordinator = {
+        wantedBy = lib.mkForce [ ];
+        serviceConfig.ExecStart = lib.mkForce (pkgs.writeShellScript "delayed-labgrid-coordinator" ''
+          ${pkgs.coreutils}/bin/sleep 3
+          exec ${pkgs.python3Packages.labgrid}/bin/labgrid-coordinator --listen 127.0.0.1:20408
+        '');
+      };
+      attractap-lab-places.wantedBy = lib.mkForce [ ];
+      attractap-lab-exporter.wantedBy = lib.mkForce [ ];
+    };
     environment.systemPackages = [ pkgs.python3Packages.labgrid ];
   };
   testScript = ''
     machine.start()
+    machine.wait_for_unit("multi-user.target")
+    machine.succeed("systemctl start attractap-lab-places.service attractap-lab-exporter.service")
+    machine.succeed("test $(systemctl show attractap-lab-places --property=NRestarts --value) = 0")
     machine.wait_for_unit("attractap-lab-coordinator.service")
     machine.wait_for_unit("attractap-lab-exporter.service")
     machine.wait_for_unit("attractap-lab-places.service")
@@ -44,6 +61,7 @@
     machine.succeed("labgrid-client -p lock acquire")
     machine.succeed("systemctl restart attractap-lab-coordinator")
     machine.wait_for_unit("attractap-lab-places.service")
+    machine.succeed("test $(systemctl show attractap-lab-places --property=NRestarts --value) = 0")
     machine.wait_until_succeeds("labgrid-client places | grep reader-a")
     # Labgrid keeps places but deliberately releases acquisitions on restart.
     machine.succeed("env LG_USERNAME=fresh-client labgrid-client -p lock acquire")
