@@ -12,11 +12,15 @@
       packages = forSystems (system:
         let pkgs = import nixpkgs { inherit system; }; in rec {
           attractap-lab = pkgs.callPackage ./nix/package.nix { };
+          dashboard-api = (pkgs.callPackage ./nix/dashboard.nix { }).api;
+          dashboard-web = (pkgs.callPackage ./nix/dashboard.nix { }).web;
           default = attractap-lab;
         });
       checks = forSystems (system:
         let pkgs = import nixpkgs { inherit system; }; in {
           attractap-lab = self.packages.${system}.attractap-lab;
+          dashboard-api = self.packages.${system}.dashboard-api;
+          dashboard-web = self.packages.${system}.dashboard-web;
           lab-smoke = pkgs.testers.runNixOSTest (import ./nix/tests/lab.nix {
             inherit self;
           });

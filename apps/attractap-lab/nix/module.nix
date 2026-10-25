@@ -18,6 +18,7 @@ let
       --coordinator ${lib.escapeShellArg cfg.coordinator.syncAddress} sync ${placesConfig}
   '';
 in {
+  imports = [ ./dashboard-module.nix ];
   options.services.attractap-lab = {
     enable = mkEnableOption "the shared Attractap hardware lab";
     package = mkOption {

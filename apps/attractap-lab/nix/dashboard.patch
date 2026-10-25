@@ -1,0 +1,202 @@
+diff --git a/coordinator/api/app/main.py b/coordinator/api/app/main.py
+index 86b67e0..00c85f9 100644
+--- a/coordinator/api/app/main.py
++++ b/coordinator/api/app/main.py
+@@ -1,8 +1,9 @@
+ import asyncio
+ import logging
+ from contextlib import asynccontextmanager
++from socket import gethostname
+ 
+-from fastapi import FastAPI
++from fastapi import FastAPI, WebSocket
+ from fastapi.middleware.cors import CORSMiddleware
+ 
+ from .auth.store import AuthStore
+@@ -13,17 +14,14 @@ from .recorder import Recorder
+ from .routers import (
+     auth,
+     catalog,
+-    console,
+     deployments,
+     health,
+     history,
+     places,
+     power,
+     recordings,
+-    recovery,
+     reservations,
+     resources,
+-    sdmux,
+     users,
+ )
+ from .ws import router as ws_router
+@@ -127,9 +125,11 @@ async def lifespan(app: FastAPI):
+         try:
+             await place_acq_store.force_release(place)
+             try:
+-                # We (this gRPC connection) hold the labgrid lock — no
+-                # fromuser needed; identity is validated by session.
+-                await client.release_place(place)
++                # A grace timer may outlive an operator's force release and a
++                # new CI claim. Labgrid 26 does not validate release ownership.
++                await client.release_place(
++                    place, fromuser=f"{gethostname()}/{settings.api_name}"
++                )
+             except Exception as e:
+                 logger.warning("labgrid release on grace expired failed: %s", e)
+         except Exception as e:
+@@ -200,8 +200,17 @@ app.include_router(resources.router, prefix="/api")
+ app.include_router(reservations.router, prefix="/api")
+ app.include_router(ws_router, prefix="/api")
+ app.include_router(users.router, prefix="/api")
+-app.include_router(console.router, prefix="/api")
++
++# Upstream bridges plain TCP, bypassing RFC2217 negotiation and SSH isolation.
++# Keep browser consoles explicitly disabled until upstream supports our transport.
++@app.websocket("/api/places/{place_name}/resources/{resource_name}/console")
++async def unsupported_browser_console(websocket: WebSocket, place_name: str, resource_name: str):
++    await websocket.accept()
++    await websocket.close(
++        code=1008, reason="Use labgrid-client: browser console lacks RFC2217 and SSH proxy support"
++    )
++
++
+ app.include_router(recordings.router, prefix="/api")
+ app.include_router(power.router, prefix="/api")
+-app.include_router(recovery.router, prefix="/api")
+-app.include_router(sdmux.router, prefix="/api")
++# ADI FPGA/SD-card recovery and SD-mux controls are not exposed for Attractap.
+diff --git a/coordinator/api/app/routers/places.py b/coordinator/api/app/routers/places.py
+index 233a1e9..ebf12ee 100644
+--- a/coordinator/api/app/routers/places.py
++++ b/coordinator/api/app/routers/places.py
+@@ -1,9 +1,10 @@
+ import logging
++from socket import gethostname
+ 
+ from fastapi import APIRouter, Depends, HTTPException, Request
+ from fastapi.responses import Response
+ 
+-from ..auth.dependencies import current_user
++from ..auth.dependencies import current_user, require_admin
+ from ..auth.store import User
+ from ..config import settings
+ from ..env_gen import generate_env_yaml
+@@ -55,15 +56,19 @@ async def get_place(name: str, request: Request):
+ 
+ @router.post("/places", status_code=201)
+ async def create_place(
+-    body: CreatePlaceRequest, request: Request, _user: User = Depends(current_user)
++    body: CreatePlaceRequest, request: Request, _user: User = Depends(require_admin)
+ ):
+     await _get_client(request).add_place(body.name)
+     return {"name": body.name}
+ 
+ 
+ @router.delete("/places/{name}", status_code=204)
+-async def delete_place(name: str, request: Request, _user: User = Depends(current_user)):
+-    await _get_client(request).delete_place(name)
++async def delete_place(name: str, request: Request, _user: User = Depends(require_admin)):
++    client = _get_client(request)
++    place = client.get_place(name)
++    if place is not None and place.acquired:
++        raise HTTPException(status_code=409, detail="Cannot delete an acquired place")
++    await client.delete_place(name)
+ 
+ 
+ @router.post("/places/{name}/acquire")
+@@ -95,48 +100,36 @@ async def release_place(
+     place_store = _place_store(request)
+     client = _get_client(request)
+ 
+-    if force:
+-        if user.role != "admin":
+-            raise HTTPException(status_code=403, detail="force release requires admin")
+-        await place_store.force_release(name)
+-    else:
+-        try:
+-            await place_store.release(name, user_id=user.id)
+-        except PermissionError as e:
+-            raise HTTPException(status_code=403, detail="not the owner") from e
+-
+-    # Tell labgrid to release. If we (the API gRPC connection) hold the lock,
+-    # call release_place(name) without fromuser — labgrid validates the
+-    # caller's session identity. Pass fromuser only when force-releasing a
+-    # lock held by some other identity.
++    acq = await place_store.get(name)
++    if force and user.role != "admin":
++        raise HTTPException(status_code=403, detail="force release requires admin")
++    if not force and (acq is None or acq.user_id != user.id):
++        raise HTTPException(status_code=403, detail="not the dashboard owner")
++
+     lg_place = client.get_place(name)
+     holder = lg_place.acquired if lg_place else None
+-    fromuser: str | None = None
+-    if (
+-        force
+-        and holder
+-        and not holder.endswith("/" + settings.api_name)
+-        and holder != settings.api_name
+-    ):
+-        fromuser = holder
++    expected_holder = f"{gethostname()}/{settings.api_name}"
++    if holder != expected_holder:
++        raise HTTPException(
++            status_code=409,
++            detail="Place is not held by this dashboard; use labgrid-client for external claims",
++        )
++    # Labgrid 26's ReleasePlace RPC does not enforce caller ownership. Always
++    # compare the holder on the coordinator too, protecting a concurrent takeover.
++    fromuser = expected_holder
+ 
+     try:
+         await client.release_place(name, fromuser=fromuser)
+     except Exception as e:
+-        # Don't lie to the caller about success: surface the failure so they
+-        # can retry or escalate. The DB row is already gone, so this is a
+-        # divergence the user needs to know about.
+         logger.warning("labgrid release failed for %s: %s", name, e)
+-        raise HTTPException(
+-            status_code=502,
+-            detail=f"DB record cleared but labgrid release failed: {e}",
+-        ) from e
++        raise HTTPException(status_code=502, detail=f"labgrid release failed: {e}") from e
++    await place_store.force_release(name)
+     return {"released": name}
+ 
+ 
+ @router.put("/places/{name}/tags")
+ async def set_place_tags(
+-    name: str, body: SetTagsRequest, request: Request, _user: User = Depends(current_user)
++    name: str, body: SetTagsRequest, request: Request, _user: User = Depends(require_admin)
+ ):
+     await _get_client(request).set_place_tags(name, body.tags)
+ 
+@@ -175,7 +168,7 @@ async def set_place_tags(
+ 
+ @router.put("/places/{name}/comment")
+ async def set_place_comment(
+-    name: str, body: SetCommentRequest, request: Request, _user: User = Depends(current_user)
++    name: str, body: SetCommentRequest, request: Request, _user: User = Depends(require_admin)
+ ):
+     await _get_client(request).set_place_comment(name, body.comment)
+     return {"name": name, "comment": body.comment}
+@@ -183,7 +176,7 @@ async def set_place_comment(
+ 
+ @router.post("/places/{name}/matches")
+ async def add_place_match(
+-    name: str, body: AddMatchRequest, request: Request, _user: User = Depends(current_user)
++    name: str, body: AddMatchRequest, request: Request, _user: User = Depends(require_admin)
+ ):
+     await _get_client(request).add_place_match(name, body.pattern, body.rename)
+     return {"name": name, "pattern": body.pattern}
+@@ -191,7 +184,7 @@ async def add_place_match(
+ 
+ @router.delete("/places/{name}/matches")
+ async def delete_place_match(
+-    name: str, body: AddMatchRequest, request: Request, _user: User = Depends(current_user)
++    name: str, body: AddMatchRequest, request: Request, _user: User = Depends(require_admin)
+ ):
+     await _get_client(request).delete_place_match(name, body.pattern, body.rename)
+     return {"name": name, "pattern": body.pattern}

@@ -1,7 +1,7 @@
 # Attractap hardware lab
 
 A headless Linux app exposing USB-connected readers through labgrid. The app
-provides a reusable NixOS module, two small labgrid drivers and a shared agent/CI
+provides a reusable NixOS module, an optional web dashboard, two small labgrid drivers and a shared agent/CI
 workflow. Hostname, Tailscale, SSH policy, disks and OS updates belong to the
 consuming machine configuration.
 
@@ -102,6 +102,56 @@ For unattended power recovery, select a supported switch or per-port USB hub
 and add its native labgrid power resource/driver to the same reader group.
 `uhubctl` is installed; use `extraUdevRules` for narrowly scoped permissions
 required by the actual hub. No power hardware is assumed in the example.
+
+## Web dashboard
+
+Enable the pinned upstream [labgrid-plugins dashboard](https://tfcollins.github.io/labgrid-plugins/user-guide/web-dashboard.html)
+on the coordinator host:
+
+```nix
+services.attractap-lab.dashboard = {
+  enable = true;
+  # Defaults to loopback; use a trusted-network address to access it remotely.
+  listenAddress = "0.0.0.0";
+  port = 8081;
+};
+```
+
+The dashboard uses native nginx and a Python API service, with a prebuilt static
+frontend. It does not replace the coordinator or require Docker. The internal
+API binds only to loopback (port 8001). Restrict HTTP access to the tailnet in the
+host firewall; the module opens no ports. Use an HTTPS reverse proxy if serving
+outside an encrypted private network.
+
+Read-only pages show live exporters, resources, places, reservations and history.
+Sign in as `admin` to manage users and acquire/release places. The initial password
+is generated on first start; retrieve it through trusted SSH:
+
+```sh
+ssh root@lab-host 'cat /var/lib/attractap-lab-dashboard/initial-admin-password'
+```
+
+Change it in the dashboard's user management screen. Existing users/passwords
+are preserved across updates; the initial password file is not a password reset.
+The upstream known default account is never created. Back up the private
+`/var/lib/attractap-lab-dashboard` directory for accounts and history.
+
+The package carries a focused patch for labgrid 26 ownership checks: dashboard
+users cannot release external agent/CI claims, including with admin force-release.
+Use native `labgrid-client` for deliberate recovery. Only admins can edit place
+definitions, and acquired places cannot be deleted. With declarative
+`coordinator.places`, Nix remains authoritative and overwrites dashboard inventory
+edits on the next synchronization.
+
+Browser serial consoles are explicitly disabled: upstream's TCP bridge does not
+support our RFC2217/SSH transport. Use native labgrid console access instead.
+ADI-specific FPGA recovery and SD-mux routes are omitted. Power hardware is not
+assumed; dashboard power actions additionally require suitable native resources
+and outgoing SSH credentials for the API service user.
+
+The API follows coordinator restarts through systemd so its live state reconnects.
+`pnpm nx run attractap-lab:test` checks the complete nginx/API/coordinator path,
+authentication, claim exclusion and restart recovery in the NixOS VM.
 
 ## Agent and CI workflow
 
