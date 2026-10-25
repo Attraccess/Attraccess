@@ -78,11 +78,13 @@
     machine.succeed("env LG_USERNAME=fresh-client labgrid-client -p lock acquire")
     machine.succeed("env LG_USERNAME=fresh-client labgrid-client -p lock release")
     machine.succeed("test $(systemctl show attractap-lab-camera-overview --property=Restart --value) = always")
+    # Unlike the native claim above, dashboard claims also persist in SQLite.
+    machine.succeed("python /etc/dashboard-test.py claim")
     # A stop/start uses BindsTo + Wants, independently of PartOf's restart path.
     machine.succeed("systemctl stop attractap-lab-coordinator")
     machine.succeed("test $(systemctl show attractap-lab-dashboard --property=ActiveState --value) = inactive")
     machine.succeed("systemctl start attractap-lab-coordinator")
     machine.wait_for_unit("attractap-lab-dashboard.service")
-    machine.wait_until_succeeds("python /etc/dashboard-test.py health")
+    machine.succeed("python /etc/dashboard-test.py recovered")
   '';
 }

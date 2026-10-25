@@ -1,5 +1,5 @@
 diff --git a/coordinator/api/app/main.py b/coordinator/api/app/main.py
-index 86b67e0..00c85f9 100644
+index 86b67e0..c5edcb4 100644
 --- a/coordinator/api/app/main.py
 +++ b/coordinator/api/app/main.py
 @@ -1,8 +1,9 @@
@@ -31,7 +31,21 @@ index 86b67e0..00c85f9 100644
      users,
  )
  from .ws import router as ws_router
-@@ -127,9 +125,11 @@ async def lifespan(app: FastAPI):
+@@ -123,13 +121,25 @@ async def lifespan(app: FastAPI):
+     app.state.coordinator = client
+     await client.start()
+ 
++    # Native coordinator claims are cleared on coordinator restart, while this
++    # dashboard's SQLite ownership rows survive. Reconcile only after a complete
++    # snapshot, and never release a claim owned by an external agent or CI job.
++    expected_holder = f"{gethostname()}/{settings.api_name}"
++    if client.connected:
++        for acquisition in await place_acq_store.list_all():
++            native = client.get_place(acquisition.place_name)
++            if native is None or native.acquired != expected_holder:
++                await place_acq_store.force_release(acquisition.place_name)
++
+     async def _on_grace_expired(place: str, _resource: str) -> None:
          try:
              await place_acq_store.force_release(place)
              try:
@@ -46,7 +60,27 @@ index 86b67e0..00c85f9 100644
              except Exception as e:
                  logger.warning("labgrid release on grace expired failed: %s", e)
          except Exception as e:
-@@ -200,8 +200,17 @@ app.include_router(resources.router, prefix="/api")
+@@ -138,16 +148,10 @@ async def lifespan(app: FastAPI):
+     cmgr.on_session_dropped = make_on_session_dropped(rec_store)
+     cmgr.on_grace_expired = _on_grace_expired
+ 
+-    # Reconcile: any place labgrid thinks is acquired by an old instance of
+-    # this API (matches "<hostname>/<api_name>" or just "<api_name>") but
+-    # has no corresponding row in our DB is stale (orphaned by a previous
+-    # container restart) — force release on labgrid.
++    # Release only this instance's orphaned native claims. Other API hosts,
++    # agents and CI remain authoritative for their own claims.
+     def _is_our_acquisition(acquired: str | None) -> bool:
+-        if not acquired:
+-            return False
+-        # labgrid usually formats as "<hostname>/<client-name>"; some paths
+-        # store just the client-name. Match either.
+-        return acquired == settings.api_name or acquired.endswith("/" + settings.api_name)
++        return acquired == expected_holder
+ 
+     try:
+         for place in client.get_places():
+@@ -200,8 +204,17 @@ app.include_router(resources.router, prefix="/api")
  app.include_router(reservations.router, prefix="/api")
  app.include_router(ws_router, prefix="/api")
  app.include_router(users.router, prefix="/api")
@@ -68,10 +102,11 @@ index 86b67e0..00c85f9 100644
 -app.include_router(sdmux.router, prefix="/api")
 +# ADI FPGA/SD-card recovery and SD-mux controls are not exposed for Attractap.
 diff --git a/coordinator/api/app/routers/places.py b/coordinator/api/app/routers/places.py
-index 233a1e9..ebf12ee 100644
+index 233a1e9..f02b5fa 100644
 --- a/coordinator/api/app/routers/places.py
 +++ b/coordinator/api/app/routers/places.py
-@@ -1,9 +1,10 @@
+@@ -1,9 +1,11 @@
++import asyncio
  import logging
 +from socket import gethostname
  
@@ -83,7 +118,16 @@ index 233a1e9..ebf12ee 100644
  from ..auth.store import User
  from ..config import settings
  from ..env_gen import generate_env_yaml
-@@ -55,15 +56,19 @@ async def get_place(name: str, request: Request):
+@@ -19,6 +21,8 @@ from ..places.store import PlaceAcquisitionStore
+ logger = logging.getLogger(__name__)
+ 
+ router = APIRouter(tags=["places"])
++# Reconciliation must not clear another dashboard request's in-flight claim.
++_claim_lock = asyncio.Lock()
+ 
+ 
+ def _get_client(request: Request):
+@@ -55,15 +59,19 @@ async def get_place(name: str, request: Request):
  
  @router.post("/places", status_code=201)
  async def create_place(
@@ -106,13 +150,60 @@ index 233a1e9..ebf12ee 100644
  
  
  @router.post("/places/{name}/acquire")
-@@ -95,48 +100,36 @@ async def release_place(
-     place_store = _place_store(request)
-     client = _get_client(request)
+@@ -72,17 +80,27 @@ async def acquire_place(
+     request: Request,
+     user: User = Depends(current_user),
+ ):
+-    place_store = _place_store(request)
+-    try:
+-        await place_store.acquire(name, user.id)
+-    except ValueError as e:
+-        raise HTTPException(status_code=409, detail=str(e)) from e
+-    try:
+-        await _get_client(request).acquire_place(name)
+-    except Exception as e:
+-        await place_store.force_release(name)
+-        raise HTTPException(status_code=502, detail=f"labgrid acquire failed: {e}") from e
+-    return {"acquired": name, "user": user.username}
++    async with _claim_lock:
++        place_store = _place_store(request)
++        client = _get_client(request)
++        if not client.connected:
++            raise HTTPException(status_code=503, detail="Coordinator is disconnected")
++        native = client.get_place(name)
++        expected_holder = f"{gethostname()}/{settings.api_name}"
++        if native is None or native.acquired != expected_holder:
++            # A native operator may have kicked our claim while the API stayed up.
++            # Discard only the stale local row; native acquisition stays authoritative.
++            await place_store.force_release(name)
++        try:
++            await place_store.acquire(name, user.id)
++        except ValueError as e:
++            raise HTTPException(status_code=409, detail=str(e)) from e
++        try:
++            await _get_client(request).acquire_place(name)
++        except Exception as e:
++            await place_store.force_release(name)
++            raise HTTPException(status_code=502, detail=f"labgrid acquire failed: {e}") from e
++        return {"acquired": name, "user": user.username}
+ 
+ 
+ @router.post("/places/{name}/release")
+@@ -92,51 +110,40 @@ async def release_place(
+     user: User = Depends(current_user),
+     force: bool = False,
+ ):
+-    place_store = _place_store(request)
+-    client = _get_client(request)
++    async with _claim_lock:
++        place_store = _place_store(request)
++        client = _get_client(request)
  
 -    if force:
 -        if user.role != "admin":
--            raise HTTPException(status_code=403, detail="force release requires admin")
++        acq = await place_store.get(name)
++        if force and user.role != "admin":
+             raise HTTPException(status_code=403, detail="force release requires admin")
 -        await place_store.force_release(name)
 -    else:
 -        try:
@@ -124,14 +215,8 @@ index 233a1e9..ebf12ee 100644
 -    # call release_place(name) without fromuser — labgrid validates the
 -    # caller's session identity. Pass fromuser only when force-releasing a
 -    # lock held by some other identity.
-+    acq = await place_store.get(name)
-+    if force and user.role != "admin":
-+        raise HTTPException(status_code=403, detail="force release requires admin")
-+    if not force and (acq is None or acq.user_id != user.id):
-+        raise HTTPException(status_code=403, detail="not the dashboard owner")
-+
-     lg_place = client.get_place(name)
-     holder = lg_place.acquired if lg_place else None
+-    lg_place = client.get_place(name)
+-    holder = lg_place.acquired if lg_place else None
 -    fromuser: str | None = None
 -    if (
 -        force
@@ -140,30 +225,40 @@ index 233a1e9..ebf12ee 100644
 -        and holder != settings.api_name
 -    ):
 -        fromuser = holder
-+    expected_holder = f"{gethostname()}/{settings.api_name}"
-+    if holder != expected_holder:
-+        raise HTTPException(
-+            status_code=409,
-+            detail="Place is not held by this dashboard; use labgrid-client for external claims",
-+        )
-+    # Labgrid 26's ReleasePlace RPC does not enforce caller ownership. Always
-+    # compare the holder on the coordinator too, protecting a concurrent takeover.
-+    fromuser = expected_holder
++        if not force and (acq is None or acq.user_id != user.id):
++            raise HTTPException(status_code=403, detail="not the dashboard owner")
++
++        lg_place = client.get_place(name)
++        holder = lg_place.acquired if lg_place else None
++        expected_holder = f"{gethostname()}/{settings.api_name}"
++        if holder != expected_holder:
++            raise HTTPException(
++                status_code=409,
++                detail="Place is not held by this dashboard; use labgrid-client for external claims",
++            )
++        # Labgrid 26's ReleasePlace RPC does not enforce caller ownership. Always
++        # compare the holder on the coordinator too, protecting a concurrent takeover.
++        fromuser = expected_holder
  
-     try:
-         await client.release_place(name, fromuser=fromuser)
-     except Exception as e:
+-    try:
+-        await client.release_place(name, fromuser=fromuser)
+-    except Exception as e:
 -        # Don't lie to the caller about success: surface the failure so they
 -        # can retry or escalate. The DB row is already gone, so this is a
 -        # divergence the user needs to know about.
-         logger.warning("labgrid release failed for %s: %s", name, e)
+-        logger.warning("labgrid release failed for %s: %s", name, e)
 -        raise HTTPException(
 -            status_code=502,
 -            detail=f"DB record cleared but labgrid release failed: {e}",
 -        ) from e
-+        raise HTTPException(status_code=502, detail=f"labgrid release failed: {e}") from e
-+    await place_store.force_release(name)
-     return {"released": name}
+-    return {"released": name}
++        try:
++            await client.release_place(name, fromuser=fromuser)
++        except Exception as e:
++            logger.warning("labgrid release failed for %s: %s", name, e)
++            raise HTTPException(status_code=502, detail=f"labgrid release failed: {e}") from e
++        await place_store.force_release(name)
++        return {"released": name}
  
  
  @router.put("/places/{name}/tags")
@@ -173,7 +268,7 @@ index 233a1e9..ebf12ee 100644
  ):
      await _get_client(request).set_place_tags(name, body.tags)
  
-@@ -175,7 +168,7 @@ async def set_place_tags(
+@@ -175,7 +182,7 @@ async def set_place_tags(
  
  @router.put("/places/{name}/comment")
  async def set_place_comment(
@@ -182,7 +277,7 @@ index 233a1e9..ebf12ee 100644
  ):
      await _get_client(request).set_place_comment(name, body.comment)
      return {"name": name, "comment": body.comment}
-@@ -183,7 +176,7 @@ async def set_place_comment(
+@@ -183,7 +190,7 @@ async def set_place_comment(
  
  @router.post("/places/{name}/matches")
  async def add_place_match(
@@ -191,7 +286,7 @@ index 233a1e9..ebf12ee 100644
  ):
      await _get_client(request).add_place_match(name, body.pattern, body.rename)
      return {"name": name, "pattern": body.pattern}
-@@ -191,7 +184,7 @@ async def add_place_match(
+@@ -191,7 +198,7 @@ async def add_place_match(
  
  @router.delete("/places/{name}/matches")
  async def delete_place_match(
