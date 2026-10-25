@@ -13,6 +13,7 @@ from urllib.parse import urlsplit, urlunsplit
 import attr
 from labgrid.driver import Driver
 from labgrid.factory import target_factory
+from labgrid.protocol import ResetProtocol
 from labgrid.resource.common import NetworkResource
 from labgrid.util.managedfile import ManagedFile
 from labgrid.util.proxy import proxymanager
@@ -20,7 +21,7 @@ from labgrid.util.proxy import proxymanager
 
 @target_factory.reg_driver
 @attr.s(eq=False)
-class ESPToolDriver(Driver):
+class ESPToolDriver(Driver, ResetProtocol):
     bindings = {"device": {"USBFlashableDevice", "NetworkUSBFlashableDevice"}}
     esptool = attr.ib(default="esptool", validator=attr.validators.instance_of(str))
     baud = attr.ib(default=460800, validator=attr.validators.instance_of(int))
@@ -41,18 +42,28 @@ class ESPToolDriver(Driver):
             shutil.copyfile(image, staged)
             managed = ManagedFile(str(staged), self.device, detect_nfs=False)
             managed.sync_to_resource()
-            command = self.device.wrap_command([
-                    "timeout", "--signal=TERM", "--kill-after=10s", str(self.timeout),
-                    self.esptool, "--port", self.device.devnode,
-                    "--baud", str(self.baud), "--after", "hard-reset",
-                    "write-flash", "0x0", managed.get_remote_path(),
-                ])
-            if isinstance(self.device, NetworkResource):
-                # A PTY makes SSH channel teardown deliver SIGHUP to the
-                # foreground timeout/esptool group on cancellation as well.
-                command.insert(1, "-tt")
-            subprocess.run(command, check=True, stdin=subprocess.DEVNULL,
-                           timeout=self.timeout + 20)
+            self._run(["write-flash", "0x0", managed.get_remote_path()])
+
+    @Driver.check_active
+    def reset(self):
+        """Reboot existing firmware without flashing; SerialDriver must be inactive."""
+        self._run(["--no-stub", "run"])
+
+    def _run(self, arguments):
+        if not self.device.devnode:
+            raise RuntimeError("The flash resource has no serial device node")
+        command = self.device.wrap_command([
+            "timeout", "--signal=TERM", "--kill-after=10s", str(self.timeout),
+            self.esptool, "--port", self.device.devnode,
+            "--baud", str(self.baud), "--after", "hard-reset",
+            *arguments,
+        ])
+        if isinstance(self.device, NetworkResource):
+            # A PTY makes SSH channel teardown deliver SIGHUP to the
+            # foreground timeout/esptool group on cancellation as well.
+            command.insert(1, "-tt")
+        subprocess.run(command, check=True, stdin=subprocess.DEVNULL,
+                       timeout=self.timeout + 20)
 
 
 @target_factory.reg_driver

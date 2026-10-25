@@ -137,6 +137,11 @@ def test_reader(tmp_path):
         smoke(target, "firmware.bin", tmp_path, expect="connected")
 ```
 
+For a reboot without flashing, use `target.get_driver("ResetProtocol").reset()`
+inside a fresh claim. The driver uses esptool's native `run` and hard reset;
+close any active serial driver first. Native labgrid clients can also use this
+registered reset protocol with the same environment file.
+
 Inspect and recover abandoned claims with the native tools:
 
 ```sh

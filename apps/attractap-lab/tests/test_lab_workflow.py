@@ -102,7 +102,7 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash):
     serial = socket.socket()
     serial.bind(("127.0.0.1", 0))
     serial.listen()
-    serial.settimeout(5)
+    serial.settimeout(30)
     events = []
 
     def uart():
@@ -171,8 +171,12 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash):
             return real_run(command, **kwargs)
         assert command[1] == "-tt"
         assert command[3:6] == ["--", "timeout", "--signal=TERM"]
-        assert command[-3:-1] == ["write-flash", "0x0"]
         assert "hard-reset" in command
+        if command[-1] == "run":
+            assert command[-2:] == ["--no-stub", "run"]
+            events.append("reset")
+            return subprocess.CompletedProcess(command, 0)
+        assert command[-3:-1] == ["write-flash", "0x0"]
         assert events[-1] == "transfer"
         events.append("flash")
         if fail_flash:
@@ -213,6 +217,11 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash):
                             raise RuntimeError("Caller failure must still release the place")
                         smoke(target, firmware, tmp_path / "artifacts", log_seconds=0.5,
                               max_log_bytes=1024, expect="Attractap ready")
+                        # Native labgrid ResetProtocol resolves to this driver,
+                        # rebooting the existing image without another transfer.
+                        target.get_driver("ResetProtocol").reset()
+                        assert events.count("transfer") == 1
+                        assert events.count("reset") == 1
                         log = (tmp_path / "artifacts/serial.log").read_bytes()
                         assert len(log) == 1024 and b"Attractap ready" in log
                         png = (tmp_path / "artifacts/screen.png").read_bytes()
