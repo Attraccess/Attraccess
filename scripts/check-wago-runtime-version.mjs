@@ -47,15 +47,15 @@ export function isRuntimeSource(path) {
 export function checkRuntimeVersion(base = process.env.NX_AFFECTED_BASE ?? 'origin/main') {
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   const ancestor = git('merge-base', base, 'HEAD').trim();
-  let dependenciesChanged;
+  // Validate both committed graphs before classifying files or accepting a bump.
+  // Invalid unchanged records must also reject source-only and version-only edits.
+  const dependenciesChanged = !isDeepStrictEqual(
+    runtimeDependencies((file) => git('show', `${ancestor}:${file}`)),
+    runtimeDependencies((file) => git('show', `HEAD:${file}`)),
+  );
   const isSource = (path) => {
     if (!isRuntimeSource(path)) return false;
     if (!['package.json', 'pnpm-lock.yaml'].includes(path) && !path.startsWith('patches/')) return true;
-    // Read committed versions, never installed packages or a dirty working tree.
-    dependenciesChanged ??= !isDeepStrictEqual(
-      runtimeDependencies((file) => git('show', `${ancestor}:${file}`)),
-      runtimeDependencies((file) => git('show', `HEAD:${file}`)),
-    );
     return dependenciesChanged;
   };
   return checkReleaseVersion({

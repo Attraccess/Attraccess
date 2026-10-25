@@ -287,3 +287,61 @@ for (const kind of ['dependencies', 'optionalDependencies']) {
     assert.notDeepEqual(collect(), before);
   });
 }
+
+for (const invalid of ['unsupported', 'missing']) {
+  for (const location of ['baseline', 'head']) {
+    for (const editSource of [false, true]) {
+      test(`rejects ${invalid} dependency records in ${location} with ${editSource ? 'source and version' : 'version only'} changes`, () => {
+        const directory = mkdtempSync(join(tmpdir(), 'cc100-invalid-records-'));
+        const env = fixtureGitEnv();
+        const git = (...args) => execFileSync('git', args, { cwd: directory, env, encoding: 'utf8' }).trim();
+        const file = (path, content) => {
+          mkdirSync(join(directory, path, '..'), { recursive: true });
+          writeFileSync(join(directory, path), content);
+        };
+        const lock = dependencyFixture();
+        const invalidate = () => {
+          if (invalid === 'unsupported') lock.lockfileVersion = '10.0';
+          else delete lock.snapshots['transitive@1.0.0'];
+        };
+        try {
+          git('init', '--quiet');
+          git('config', 'user.email', 'test@example.com');
+          git('config', 'user.name', 'Test');
+          git('config', 'commit.gpgsign', 'false');
+          file(manifest, JSON.stringify({ runtimeVersion: '0.2.0' }));
+          file(source, 'baseline');
+          file('package.json', '{}');
+          if (location === 'baseline') invalidate();
+          file('pnpm-lock.yaml', stringify(lock));
+          git('add', '.');
+          git('commit', '--quiet', '-m', 'baseline');
+          const base = git('rev-parse', 'HEAD');
+          if (location === 'head') {
+            invalidate();
+            file('pnpm-lock.yaml', stringify(lock));
+          }
+          if (editSource) file(source, 'changed');
+          file(manifest, JSON.stringify({ runtimeVersion: '0.2.1' }));
+          git('add', '.');
+          git('commit', '--quiet', '-m', 'bump');
+          assert.throws(
+            () => execFileSync(process.execPath, [script, base], { cwd: directory, env, stdio: 'pipe' }),
+            (error) => {
+              assert.equal(error.status, 1);
+              assert.match(
+                error.stderr.toString(),
+                invalid === 'unsupported'
+                  ? /Unsupported CC100 dependency lockfile/
+                  : /Missing CC100 dependency: transitive@1\.0\.0/,
+              );
+              return true;
+            },
+          );
+        } finally {
+          rmSync(directory, { recursive: true, force: true });
+        }
+      });
+    }
+  }
+}

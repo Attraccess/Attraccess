@@ -254,10 +254,59 @@ async function main() {
     [5, 'SW', 50],
   ];
   await until('four in each category', () => totals([4, 4]));
-  const pending = await until('both categories pending', async () => {
+  const firstPending = await until('both categories initially pending', async () => {
     const rows = await states();
     return stateIs(rows, 'pending') && rows;
   });
+  observations.push({ at: new Date().toISOString(), state: 'initial-pending', rows: firstPending });
+  await save('initial-pending.json', firstPending);
+  fixture = [
+    [5, 'POWERON', 2],
+    [10, 'POWERON', 1],
+    [5, 'PANIC', 2],
+    [10, 'TASK_WDT', 1],
+  ];
+  await until('pending counts fall to three', () => totals([3, 3]));
+  const cancelled = await until('three cancels both pending warnings', async () => {
+    const rows = await states();
+    return (
+      stateIs(rows, 'inactive') &&
+      rows.every((row) => row.alerts?.[0]?.annotations.description.includes('3 total')) &&
+      rows
+    );
+  });
+  for (const row of cancelled) {
+    const initial = firstPending.find((r) => r.name === row.name);
+    assert.ok(
+      Date.parse(row.lastEvaluation) - Date.parse(initial.alerts[0].activeAt) < 300_000,
+      'cancellation must occur before the initial five-minute wait ends',
+    );
+  }
+  assert.equal(
+    notifications.some((n) => n.alerts?.some((a) => a.status === 'firing')),
+    false,
+    'cancelled pending warnings must not fire',
+  );
+  observations.push({ at: new Date().toISOString(), state: 'cancelled-pending', rows: cancelled });
+  await save('cancelled-pending.json', cancelled);
+  fixture = [
+    [5, 'POWERON', 3],
+    [10, 'POWERON', 1],
+    [5, 'PANIC', 2],
+    [10, 'TASK_WDT', 2],
+  ];
+  await until('four restored in both categories', () => totals([4, 4]));
+  const pending = await until('both categories start a fresh pending period', async () => {
+    const rows = await states();
+    return stateIs(rows, 'pending') && rows;
+  });
+  for (const row of pending) {
+    const initial = firstPending.find((r) => r.name === row.name);
+    assert.ok(
+      Date.parse(row.alerts[0].activeAt) > Date.parse(initial.alerts[0].activeAt),
+      're-entry must start a new pending timer',
+    );
+  }
   const activeAt = new Map(pending.map((r) => [r.name, r.alerts[0].activeAt]));
   observations.push({ at: new Date().toISOString(), state: 'pending', rows: pending });
   await save('pending.json', pending);
@@ -374,7 +423,7 @@ async function main() {
   await save('notifications.json', notifications);
   await save('observations.json', observations);
   process.stdout.write(
-    `PASS: exact thresholds, stable five-minute pending, contributor annotations, shared template preview and resolution. Evidence: ${evidence}\n`,
+    `PASS: exact thresholds, pending cancellation and fresh stable five-minute pending, contributor annotations, shared template preview and resolution. Evidence: ${evidence}\n`,
   );
 }
 try {

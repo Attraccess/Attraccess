@@ -100,11 +100,15 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Historischer Zähler aller gespeicherten Reset-Berichte, einschließlich POWERON und SW; beginnt nach API-Neustart bei null. Für bestehende Nutzer beibehalten, kein exakter stündlicher Alarmwert. |
 | `attraccess_attractap_reset_reports_last_hour` | Gauge | `reader_id`, `reset_reason` | Exakte Anzahl der in der letzten Stunde empfangenen Berichte, bei jedem Scrape aus der Datenbank ermittelt. |
 
-### Beispiel-PromQL-Abfragen
+Gezählt werden gespeicherte Berichtseingänge, nicht unterschiedliche physische Resets. Geht eine Bestätigung verloren und wird der Upload wiederholt, zählt jeder separat gespeicherte Wiederholungsversuch erneut. Der ausgewählte `attraccess`-Job und die Datenquelle dürfen nur eine Installation/Datenbank umfassen; doppelte Ziele müssen dieselbe Datenbank verwenden. Unabhängige Installationen nicht in diesem Monitoring-Bereich zusammenfassen.
 
 Reset-Ursachen sind auf `POWERON`, `EXT`, `SW`, `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`, `DEEPSLEEP`, `BROWNOUT`, `SDIO` und `UNKNOWN` begrenzt. Andere Rohwerte werden zu `UNKNOWN` zusammengefasst. Leser-IDs stammen aus gespeicherten Berichten. Das Empfangsfenster ist `(Scrape-Zeit − 1 Stunde, Scrape-Zeit]`; zukünftige Zeilen zählen nicht. Verzögerte Uploads zählen bei Empfang, nicht zum Zeitpunkt des tatsächlichen Resets. Abgelaufene und gelöschte Berichte verschwinden beim nächsten erfolgreichen Scrape. Leere Fenster liefern keine Beitragsserien. Ein Datenbankfehler lässt den Scrape fehlschlagen, statt alte Werte oder eine gesunde Null zu liefern. Nach Neustart werden die Werte beim ersten erfolgreichen Scrape wiederhergestellt.
 
+Überlappende Erfassungen teilen eine Frist von fünf Sekunden. Ein Datenbank- oder Erfassungsfehler lässt die gesamte Metrikantwort fehlschlagen. Die Frist kann SQLite-Arbeit nicht abbrechen; weitere Anfragen schlagen sofort fehl, bis die laufende Arbeit endet. Ein dauerhafter Stillstand erfordert die Wiederherstellung der Datenbank oder einen API-Neustart. API-Metrik und Empfangszeitindex vor oder gemeinsam mit den Regeln ausrollen. Siehe [Monitoring-Einrichtung und Grenzen der lokalen Prüfung](prometheus-grafana.md#attractap-reset-warnungen).
+
 Crash-/Watchdog-Berichte (`PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`) und POWERON benötigen jeweils **vier Berichte über alle Leser**, durchgehend für **fünf Minuten**, bei minütlicher Auswertung. Drei Berichte je Kategorie lösen keine Warnung aus. SW und andere Ursachen zählen zu keiner Warnung. POWERON belegt weder einen Firmware-Absturz noch den Grund der Stromunterbrechung. Doppelte Scrape-Ziele derselben Datenbank werden mit `max by (reader_id, reset_reason)` zusammengefasst. Die Regeln gelten für eine Installation/Datenbank. Leser-IDs, Ursachen und ganzzahlige Anzahlen stehen in Beschreibungen, nicht in Identitätslabels der Warnung.
+
+### Beispiel-PromQL-Abfragen
 
 ```promql
 # Exakte Crash-/Watchdog-Berichte, die in der letzten Stunde empfangen wurden
