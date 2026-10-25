@@ -1,0 +1,30 @@
+name: Attractap lab NixOS
+
+on:
+  pull_request:
+    paths:
+      - 'apps/attractap-lab/**'
+      - '.github/workflows/attractap-lab-nix.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/attractap-lab/**'
+      - '.github/workflows/attractap-lab-nix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            extra-system-features = nixos-test kvm
+      - name: Enable KVM for the NixOS integration test
+        run: sudo chmod a+rw /dev/kvm
+      - name: Build package and exercise coordinator/exporter in a NixOS VM
+        run: nix flake check path:./apps/attractap-lab --print-build-logs

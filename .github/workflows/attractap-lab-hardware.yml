@@ -1,0 +1,69 @@
+name: Attractap lab hardware smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_run_id:
+        description: Successful firmware build run containing the firmware artifact
+        type: string
+        required: true
+      firmware_file:
+        description: Merged firmware filename matching the connected reader variant
+        type: string
+        required: true
+      place:
+        description: Labgrid place
+        type: string
+        default: reader-1
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  hardware:
+    runs-on: ubuntu-latest
+    environment: attractap-lab
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: actions/download-artifact@v4
+        with:
+          name: attractap-firmware-${{ inputs.firmware_run_id }}
+          run-id: ${{ inputs.firmware_run_id }}
+          github-token: ${{ github.token }}
+          path: firmware
+      - uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: tag:ci
+          ping: ${{ vars.LAB_HOST }}
+      - name: Configure hardware SSH access
+        env:
+          LAB_SSH_PRIVATE_KEY: ${{ secrets.LAB_SSH_PRIVATE_KEY }}
+          LAB_SSH_KNOWN_HOSTS: ${{ secrets.LAB_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$LAB_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$LAB_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host *\n  User labgrid\n  BatchMode yes\n  StrictHostKeyChecking yes\n' > ~/.ssh/config
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts ~/.ssh/config
+      - name: Claim, flash, record serial and capture screen
+        env:
+          LG_COORDINATOR: ${{ vars.LAB_HOST }}:20408
+          LG_PLACE: ${{ inputs.place }}
+          FIRMWARE_FILE: ${{ inputs.firmware_file }}
+        run: |
+          nix run path:./apps/attractap-lab -- \
+            --config apps/attractap-lab/example-env.yaml \
+            --place "$LG_PLACE" --image "firmware/$FIRMWARE_FILE" \
+            --output lab-artifacts --log-seconds 15
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: attractap-lab-${{ github.run_id }}
+          path: lab-artifacts/
+          if-no-files-found: ignore

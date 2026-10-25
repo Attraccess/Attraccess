@@ -446,7 +446,11 @@ test('every JS/TS Nx project has a report target with an isolated output path', 
   const { execFileSync } = await import('node:child_process');
   const { readFileSync } = await import('node:fs');
   const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0');
-  const nativeProjects = new Set(['apps/attractap/firmware/project.json', 'apps/attractap/desktop/project.json']);
+  const nativeProjects = new Set([
+    'apps/attractap/firmware/project.json',
+    'apps/attractap/desktop/project.json',
+    'apps/attractap-lab/project.json',
+  ]);
   const outputs = new Set();
   for (const file of files.filter((file) => /(^|\/)project\.json$/.test(file))) {
     const project = JSON.parse(readFileSync(file, 'utf8'));

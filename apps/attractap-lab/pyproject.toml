@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "attraccess-attractap-lab"
+version = "0.1.0"
+description = "Labgrid drivers and hardware smoke workflow for Attractap"
+requires-python = ">=3.11"
+dependencies = ["labgrid>=26,<27", "attrs>=21.4", "pexpect>=4.8"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+attractap-lab = "attractap_lab.cli:main"
+attractap-lab-maintenance = "attractap_lab.maintenance:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

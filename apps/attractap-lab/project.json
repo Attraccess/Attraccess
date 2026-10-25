@@ -1,0 +1,37 @@
+{
+  "name": "attractap-lab",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/attractap-lab/src",
+  "projectType": "application",
+  "tags": ["scope:hardware"],
+  "targets": {
+    "check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nix flake check path:./apps/attractap-lab --all-systems --no-build --no-write-lock-file"
+      },
+      "cache": false
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nix build path:./apps/attractap-lab#attractap-lab --no-link --no-write-lock-file"
+      },
+      "cache": false
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nix flake check path:./apps/attractap-lab --print-build-logs --no-write-lock-file"
+      },
+      "cache": false
+    },
+    "smoke": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nix run path:./apps/attractap-lab --"
+      },
+      "cache": false
+    }
+  }
+}
