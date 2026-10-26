@@ -1,3 +1,5 @@
+import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+
 import {
   Resource,
   ResourceMaintenance,
@@ -148,7 +150,7 @@ export class MaintenanceScheduleEvaluatorService extends MaintenanceResourceEval
       const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
       const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
       try {
-        await this.scheduleRepository.manager.transaction(async (em) => {
+        await runSerializedTransaction(this.scheduleRepository.manager, async (em) => {
           for (const [index, { resourceId, schedule }] of batch.entries()) {
             const savepoint = `maintenance_schedule_${offset + index}`;
             await em.query(`SAVEPOINT ${savepoint}`);

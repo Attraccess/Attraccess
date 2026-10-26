@@ -1,3 +1,5 @@
+import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -145,7 +147,7 @@ export abstract class MaintenanceResourceEvaluation {
     // enabled schedule can produce maintenance. Re-read inside for correctness.
     if (!(await this.scheduleRepository.existsBy({ resourceId, enabled: true }))) return;
     let createdMaintenanceId: number | undefined;
-    await this.scheduleRepository.manager.transaction(async (transactionalEntityManager) => {
+    await runSerializedTransaction(this.scheduleRepository.manager, async (transactionalEntityManager) => {
       const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);
       const schedules = await scheduleRepo.find({
         where: { resourceId, enabled: true },
