@@ -103,10 +103,11 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
       { getDurationsForWindows: async () => new Map() } as never,
     );
     jest.spyOn(evaluator, 'shouldTrigger').mockResolvedValue(true);
+    jest.spyOn(evaluator, 'getBaselineDate').mockResolvedValue(new Date('2020-01-01'));
   });
 
   afterEach(async () => {
-    evaluator?.onModuleDestroy();
+    await evaluator?.onModuleDestroy();
     await closeResourceTransactionConnection(source);
     await source.destroy();
     jest.restoreAllMocks();
