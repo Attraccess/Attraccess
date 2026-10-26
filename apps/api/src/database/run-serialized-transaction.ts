@@ -56,7 +56,22 @@ export async function runSerializedTransaction<T>(
       const dedicated = await getResourceConnection(connection);
       // Refresh before each phase: Nest services may register commit observers after initialization.
       dedicated.subscribers.splice(0, dedicated.subscribers.length, ...connection.subscribers);
-      return dedicated.transaction(work);
+      // TypeORM 0.3.x exposes isolation levels but not SQLite BEGIN modes. Reserve
+      // the writer before reading: a deferred read-to-write upgrade can fail
+      // immediately with SQLITE_BUSY even when busyTimeout is configured.
+      // Keep TypeORM in charge of transaction depth, subscribers and rollback.
+      const runner = dedicated.createQueryRunner();
+      const originalQuery = runner.query;
+      const query = originalQuery.bind(runner);
+      runner.query = (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
+        const statement = sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql;
+        return useStructuredResult ? query(statement, parameters, true) : query(statement, parameters);
+      };
+      try {
+        return await dedicated.transaction(work);
+      } finally {
+        runner.query = originalQuery;
+      }
     });
   sqliteTransactions.set(connection, next);
   try {
