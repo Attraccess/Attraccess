@@ -1,3 +1,5 @@
+import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+
 import {
   Resource,
   ResourceMaintenance,
@@ -143,12 +145,27 @@ export class MaintenanceScheduleEvaluatorService extends MaintenanceResourceEval
   protected async persistTriggeredSchedules(
     toCreate: Array<{ resourceId: number; schedule: ResourceMaintenanceSchedule }>,
   ) {
+    if (this.scheduleRepository.manager.connection?.options.type === 'sqlite') {
+      // Revalidate bulk candidates through the independent snapshot reader. Each
+      // resource gets a short write transaction, letting usage proceed between them.
+      for (const { resourceId } of toCreate) {
+        try {
+          await this.evaluateResource(resourceId);
+        } catch (error) {
+          this.logger.error(
+            `Error creating scheduled maintenance for resource ${resourceId}: ${error}`,
+            (error as Error)?.stack,
+          );
+        }
+      }
+      return;
+    }
     // --- WRITE PHASE ---
     for (let offset = 0; offset < toCreate.length; offset += WRITE_TRANSACTION_BATCH_SIZE) {
       const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
       const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
       try {
-        await this.scheduleRepository.manager.transaction(async (em) => {
+        await runSerializedTransaction(this.scheduleRepository.manager, async (em) => {
           for (const [index, { resourceId, schedule }] of batch.entries()) {
             const savepoint = `maintenance_schedule_${offset + index}`;
             await em.query(`SAVEPOINT ${savepoint}`);

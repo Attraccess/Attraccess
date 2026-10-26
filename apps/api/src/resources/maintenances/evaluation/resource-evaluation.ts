@@ -1,3 +1,7 @@
+import { MaintenanceSnapshotReader, captureDurationState } from './snapshot-reader';
+
+import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -37,11 +41,17 @@ import { MetricsService } from '../../../metrics/metrics.service';
 import { ResourceMaintenanceService } from '../maintenance.service';
 
 export abstract class MaintenanceResourceEvaluation {
+  private snapshotReader?: MaintenanceSnapshotReader;
+  private readonly activeEvaluations = new Set<Promise<void>>();
+  private stopping = false;
   /** Drop pending debounce timers so shutdown isn't held up (and they don't fire against a closed DB). */
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
     for (const timer of this.pendingUsageEvals.values()) clearTimeout(timer);
     this.pendingUsageEvals.clear();
     this.usageEvalFirstEventAt.clear();
+    await Promise.allSettled(this.activeEvaluations);
+    await this.snapshotReader?.close();
   }
 
   /**
@@ -85,6 +95,7 @@ export abstract class MaintenanceResourceEvaluation {
   }
 
   protected queueEvaluation(resourceId: number): void {
+    if (this.stopping) return;
     const now = Date.now();
 
     // Record the timestamp of the first event in the current debounce window
@@ -141,11 +152,26 @@ export abstract class MaintenanceResourceEvaluation {
    * Evaluate all enabled schedules for a resource. If any triggers and there is no active maintenance, create one (first trigger wins).
    */
   async evaluateResource(resourceId: number): Promise<void> {
+    if (this.stopping) return;
+    const evaluation = this.evaluateResourceInternal(resourceId);
+    this.activeEvaluations.add(evaluation);
+    try {
+      await evaluation;
+    } finally {
+      this.activeEvaluations.delete(evaluation);
+    }
+  }
+
+  private async evaluateResourceInternal(resourceId: number): Promise<void> {
     // Avoid opening a SQLite transaction alongside session writes when no
     // enabled schedule can produce maintenance. Re-read inside for correctness.
     if (!(await this.scheduleRepository.existsBy({ resourceId, enabled: true }))) return;
+    if (this.scheduleRepository.manager.connection?.options.type === 'sqlite') {
+      await this.evaluateResourceSnapshot(resourceId);
+      return;
+    }
     let createdMaintenanceId: number | undefined;
-    await this.scheduleRepository.manager.transaction(async (transactionalEntityManager) => {
+    await runSerializedTransaction(this.scheduleRepository.manager, async (transactionalEntityManager) => {
       const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);
       const schedules = await scheduleRepo.find({
         where: { resourceId, enabled: true },
@@ -185,6 +211,68 @@ export abstract class MaintenanceResourceEvaluation {
     if (createdMaintenanceId !== undefined) {
       this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, createdMaintenanceId);
     }
+  }
+
+  /** Read history independently; only validate the resource's mutable state and write in the usage queue. */
+  private async evaluateResourceSnapshot(resourceId: number): Promise<void> {
+    this.snapshotReader ??= new MaintenanceSnapshotReader(this.scheduleRepository.manager.connection);
+    const reader = await this.snapshotReader.manager();
+    if (await this.maintenanceService.hasActiveMaintenance(resourceId, reader)) return;
+    const schedules = await reader.getRepository(ResourceMaintenanceSchedule).find({
+      where: { resourceId, enabled: true },
+      relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+    });
+    const candidates: Array<{
+      schedule: ResourceMaintenanceSchedule;
+      definition: string;
+      baseline: number;
+      durationState: string;
+    }> = [];
+    for (const schedule of schedules) {
+      const definition = JSON.stringify(schedule);
+      const baseline = (await this.getBaselineDate(resourceId, schedule.id, reader)).getTime();
+      const durationState =
+        schedule.triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL
+          ? ''
+          : await captureDurationState(resourceId, reader);
+      if (await this.shouldTrigger(schedule, resourceId, reader)) {
+        candidates.push({ schedule, definition, baseline, durationState });
+      }
+    }
+    if (candidates.length === 0) return;
+
+    let stale = false;
+    const created = await runSerializedTransaction(this.scheduleRepository.manager, async (manager) => {
+      // This read establishes the SQLite transaction snapshot before freshness checks.
+      if (await this.maintenanceService.hasActiveMaintenance(resourceId, manager)) return;
+      const currentSchedules = await manager.getRepository(ResourceMaintenanceSchedule).find({
+        where: { resourceId, enabled: true },
+        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+      });
+      for (const candidate of candidates) {
+        const current = currentSchedules.find((schedule) => schedule.id === candidate.schedule.id);
+        if (
+          !current ||
+          JSON.stringify(current) !== candidate.definition ||
+          (await this.getBaselineDate(resourceId, current.id, manager)).getTime() !== candidate.baseline ||
+          (candidate.durationState !== '' &&
+            (await captureDurationState(resourceId, manager)) !== candidate.durationState)
+        ) {
+          stale = true;
+          continue;
+        }
+        return this.maintenanceService.createMaintenanceFromSchedule(
+          resourceId,
+          current.id,
+          this.buildMaintenanceReasonFromScheduleDefinition(current),
+          manager,
+          false,
+        );
+      }
+    });
+    if (created) this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, created.id);
+    // Recompute changed resources outside the queue; unrelated resource writes never invalidate this work.
+    else if (stale) this.queueEvaluation(resourceId);
   }
 
   /**
