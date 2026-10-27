@@ -111,6 +111,30 @@ describe('AttractapProjectsHandler', () => {
       );
     });
 
+    it('echoes a valid request ID so readers can drop superseded responses', async () => {
+      await handler.handleProjectsOfUserRequest(
+        mockSocket as any,
+        {
+          payload: { page: 1, requestId: 12 },
+        } as AttractapEvent['data'],
+      );
+      expect(mockSocket.sendMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ payload: expect.objectContaining({ requestId: 12 }) }),
+        }),
+      );
+
+      for (const requestId of [0, -1, 1.5, 'x']) {
+        await handler.handleProjectsOfUserRequest(
+          mockSocket as any,
+          {
+            payload: { requestId },
+          } as unknown as AttractapEvent['data'],
+        );
+        expect(mockSocket.sendMessage.mock.lastCall[0].data.payload).not.toHaveProperty('requestId');
+      }
+    });
+
     it('ignores non-string search values and caps overly long queries', async () => {
       await handler.handleProjectsOfUserRequest(
         mockSocket as any,

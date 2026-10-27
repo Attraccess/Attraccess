@@ -27,6 +27,12 @@ void ResourceDetailsScreen::disposeProjectsModal()
 }
 void ResourceDetailsScreen::setProjects(const API::ProjectsOfUserResponse &projects)
 {
+   if (this->projectsRequestPending &&
+       (projects.page != this->projectsPendingPage || projects.search != this->projectsSearchQuery))
+   {
+      return;
+   }
+   this->projectsRequestPending = false;
    this->projectsCache = projects;
    this->projectsCurrentPage = projects.page;
    this->projectsTotalCount = projects.total;
@@ -41,7 +47,7 @@ void ResourceDetailsScreen::setProjects(const API::ProjectsOfUserResponse &proje
    }
    this->refreshProjectsButtonLabel();
 }
-void ResourceDetailsScreen::setProjectsPageRequestCallback(std::function<void(uint32_t, const std::string &)> callback)
+void ResourceDetailsScreen::setProjectsPageRequestCallback(std::function<bool(uint32_t, const std::string &)> callback)
 {
    this->projectsPageRequestCallback = callback;
 }
@@ -220,7 +226,12 @@ void ResourceDetailsScreen::ensureProjectsModal()
 void ResourceDetailsScreen::showProjectsModal()
 {
    this->ensureProjectsModal();
-   if (!this->projectsDataInitialized)
+   if (this->projectsRequestPending)
+   {
+      // The awaited reply may have been lost while the dialog was closed.
+      this->requestProjects(this->projectsPendingPage);
+   }
+   else if (!this->projectsDataInitialized)
    {
       this->requestProjects(this->projectsCurrentPage == 0 ? 1 : this->projectsCurrentPage);
    }
@@ -363,6 +374,11 @@ void ResourceDetailsScreen::rebuildProjectsList()
 {
    if (!this->projectsListContainer)
    {
+      return;
+   }
+   if (this->projectsRequestPending)
+   {
+      this->showProjectsLoading();
       return;
    }
 

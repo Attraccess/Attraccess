@@ -12,10 +12,31 @@ static constexpr uint32_t PROJECT_SEARCH_MAX_LENGTH = 64;
 void ResourceDetailsScreen::requestProjects(uint32_t page)
 {
    this->showProjectsLoading();
-   if (this->projectsPageRequestCallback)
+   this->projectsRequestPending = true;
+   this->projectsPendingPage = page;
+   if (!this->projectsPageRequestCallback || this->projectsPageRequestCallback(page, this->projectsSearchQuery))
    {
-      this->projectsPageRequestCallback(page, this->projectsSearchQuery);
+      return;
    }
+
+   // Nothing was sent: keep showing the last results under their own query.
+   this->projectsRequestPending = false;
+   this->projectsSearchQuery = this->projectsCache.search;
+   this->refreshProjectsSearchField();
+   this->rebuildProjectsList();
+}
+
+void ResourceDetailsScreen::refreshProjects()
+{
+   this->requestProjects(1);
+}
+
+void ResourceDetailsScreen::resetProjectsSearch()
+{
+   this->closeProjectsSearchEditor(false);
+   this->projectsSearchQuery.clear();
+   this->projectsRequestPending = false;
+   this->refreshProjectsSearchField();
 }
 
 void ResourceDetailsScreen::createProjectsSearchRow(lv_obj_t *panel)
@@ -207,7 +228,7 @@ void ResourceDetailsScreen::closeProjectsSearchEditor(bool commit)
 
 void ResourceDetailsScreen::applyProjectsSearch(const std::string &query)
 {
-   if (query == this->projectsSearchQuery && this->projectsDataInitialized)
+   if (query == this->projectsSearchQuery && this->projectsDataInitialized && !this->projectsRequestPending)
    {
       return;
    }

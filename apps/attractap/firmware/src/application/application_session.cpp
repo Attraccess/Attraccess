@@ -78,15 +78,18 @@ void Application::selectResource(const API::ResourceBrief &resource) {
   this->selectedResourceChanged = true;
 }
 
-void Application::requestProjectsPage(uint32_t page, const std::string &search) {
+bool Application::requestProjectsPage(uint32_t page, const std::string &search) {
   if (page == 0) {
     page = 1;
   }
-  this->api.requestProjectsOfUser(page, search);
+  return this->api.requestProjectsOfUser(page, search);
 }
 
 void Application::clearProjectSelection() {
   this->clearSelectedProject();
+  lv_lock();
+  Display::resourceDetailsScreen.resetProjectsSearch();
+  lv_unlock();
   this->projectsCurrentPage = 1;
   this->projectsTotalCount = 0;
   this->projectsHasMore = false;

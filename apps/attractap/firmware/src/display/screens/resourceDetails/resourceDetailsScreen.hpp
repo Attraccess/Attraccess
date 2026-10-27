@@ -40,7 +40,9 @@ public:
     void setUserDetails(UserDetails userDetails);
 
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
-    void setProjectsPageRequestCallback(std::function<void(uint32_t, const std::string &)> callback);
+    void setProjectsPageRequestCallback(std::function<bool(uint32_t, const std::string &)> callback);
+    void refreshProjects();
+    void resetProjectsSearch();
     void setProjectSelectionCallback(std::function<void(uint32_t, const std::string &)> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
     void showFormsModal(const API::ResourceUsageFormRequest &meta);
@@ -108,7 +110,7 @@ private:
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
-    std::function<void(uint32_t, const std::string &)> projectsPageRequestCallback;
+    std::function<bool(uint32_t, const std::string &)> projectsPageRequestCallback;
     std::function<void(uint32_t, const std::string &)> projectSelectionCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);

@@ -316,8 +316,10 @@ protected:
     std::function<void(std::string)> deviceNameCallback;
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
     // Written by the LVGL task's page requests, read when responses arrive.
-    std::mutex lastRequestedProjectsOfUserMutex;
+    // Recursive: the response callback may issue the next request.
+    std::recursive_mutex lastRequestedProjectsOfUserMutex;
     uint32_t lastRequestedProjectsOfUserPage = -1;
+    uint32_t lastRequestedProjectsOfUserId = 0;
     std::string lastRequestedProjectsOfUserSearch;
     std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;
     static constexpr size_t JSON_INBUF = 4608;
@@ -455,7 +457,7 @@ public:
     // Special-case callback for insufficient balance with server-provided SumUp flag
     void setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> callback);
 
-    void requestProjectsOfUser(uint32_t page, const std::string &search = "");
+    bool requestProjectsOfUser(uint32_t page, const std::string &search = "");
     void setProjectsOfUserResponseCallback(std::function<void(const ProjectsOfUserResponse &)> callback);
     void setResourceFormsRequestCallback(std::function<void(const ResourceUsageFormRequest &)> callback);
     void setResourceFormFieldsCallback(std::function<void(const ResourceUsageFormFieldsPage &)> callback);

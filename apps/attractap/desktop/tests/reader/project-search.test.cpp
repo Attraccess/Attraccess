@@ -59,8 +59,45 @@ void ReaderWorkflow::testProjectSearch()
     server.push("PROJECTS_OF_USER", R"({"page":1,"limit":4,"total":1,"search":"","projects":[{"id":42,"name":"Werkstattprojekt"}]})"); pump();
     assert(shown("Werkstattprojekt") && shown("Projekte suchen") && !shown("Zurücksetzen"));
 
-    search("Projekte suchen", "werk");
-    server.push("PROJECTS_OF_USER", R"({"page":1,"limit":4,"total":1,"search":"werk","projects":[{"id":42,"name":"Werkstattprojekt"}]})"); pump();
+    // A reply to an earlier request with the same page and query (e.g. for the previous
+    // user) must not be shown: only the echoed ID of the latest request is accepted.
+    const auto laserPage = [](uint32_t requestId) {
+        return R"({"page":1,"limit":4,"total":5,"search":"laser","requestId":)" + std::to_string(requestId) +
+               R"(,"projects":[{"id":1,"name":"Laser A"},{"id":2,"name":"Laser B"},{"id":3,"name":"Laser C"},{"id":4,"name":"Laser D"}]})";
+    };
+    search("Projekte suchen", "laser");
+    const auto supersededId = lastRequest()["requestId"].as<uint32_t>();
+    search("laser", "laser");
+    const auto latestId = lastRequest()["requestId"].as<uint32_t>();
+    assert(latestId > supersededId);
+    server.push("PROJECTS_OF_USER", laserPage(supersededId)); pump();
+    assert(shown("Lade Projekte ...") && !shown("Laser A"));
+    server.push("PROJECTS_OF_USER", laserPage(latestId)); pump();
+    assert(shown("Laser A") && shown("Seite 1 von 2"));
+
+    // A request that cannot be sent keeps the previous results instead of loading forever.
+    const auto requestsBeforeFailure = server.count("PROJECTS_OF_USER");
+    server.failSends = true;
+    click("Weiter", true);
+    search("laser", "werk");
+    server.failSends = false;
+    assert(server.count("PROJECTS_OF_USER") == requestsBeforeFailure);
+    assert(shown("Laser A") && shown("Seite 1 von 2") && shown("laser") && !shown("Lade Projekte ..."));
+    // A server answer to the restored request is still accepted.
+    server.push("PROJECTS_OF_USER", laserPage(latestId)); pump();
+    assert(shown("Laser A"));
+
+    // Reopening while a search is pending asks again instead of showing the old results.
+    search("laser", "werk");
+    click(LV_SYMBOL_CLOSE, true);
+    const auto requestsBeforeReopen = server.count("PROJECTS_OF_USER");
+    click("Projekt wählen");
+    assert(server.count("PROJECTS_OF_USER") == requestsBeforeReopen + 1);
+    assert(lastRequest()["search"] == "werk");
+    assert(shown("Lade Projekte ...") && !shown("Laser A"));
+    server.push("PROJECTS_OF_USER", R"({"page":1,"limit":4,"total":1,"search":"werk","requestId":)" +
+                                        std::to_string(lastRequest()["requestId"].as<uint32_t>()) +
+                                        R"(,"projects":[{"id":42,"name":"Werkstattprojekt"}]})"); pump();
     click("Werkstattprojekt", true);
     assert(label(lv_screen_active(), "Projekt: Werkstattprojekt"));
     assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), "Werkstattprojekt")));
