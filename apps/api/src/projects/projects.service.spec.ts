@@ -42,6 +42,31 @@ describe('ProjectsService', () => {
       expect(fixture.projectAccessService.addAccessMetadata).toHaveBeenCalledWith(5, [{ id: 1 }]);
       expect(result).toEqual([{ id: 1, access: { isOwner: true } }]);
     });
+
+    it('filters by a case-insensitive name search with LIKE wildcards escaped', async () => {
+      const qb = fixture.createMockQueryBuilder();
+      (fixture.projectRepository.createQueryBuilder as jest.Mock).mockReturnValueOnce(qb);
+      fixture.projectAccessService.addAccessMetadata.mockResolvedValueOnce([]);
+
+      await fixture.service.findMany(5, { page: 1, limit: 4, search: '  100%_a\\b ' } as FindManyProjectsQueryDto);
+
+      expect(qb.where).toHaveBeenCalledWith('(owner.id = :userId OR member.id IS NOT NULL)', { userId: 5 });
+      expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
+      expect(qb.andWhere).toHaveBeenCalledWith("LOWER(project.name) LIKE LOWER(:search) ESCAPE '\\'", {
+        search: '%100\\%\\_a\\\\b%',
+      });
+    });
+
+    it('does not filter by name for a blank search', async () => {
+      const qb = fixture.createMockQueryBuilder();
+      (fixture.projectRepository.createQueryBuilder as jest.Mock).mockReturnValueOnce(qb);
+      fixture.projectAccessService.addAccessMetadata.mockResolvedValueOnce([]);
+
+      await fixture.service.findMany(5, { page: 1, limit: 4, search: '   ' } as FindManyProjectsQueryDto);
+
+      expect(qb.andWhere).toHaveBeenCalledTimes(1);
+      expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
+    });
   });
 
   describe('getTotalCount', () => {
@@ -57,6 +82,20 @@ describe('ProjectsService', () => {
       expect(qb.leftJoin).toHaveBeenCalledWith('project.members', 'member', 'member.userId = :userId', { userId: 3 });
       expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
       expect(total).toBe(7);
+    });
+
+    it('counts only accessible projects matching the search', async () => {
+      const qb = fixture.createMockQueryBuilder();
+      qb.getCount.mockResolvedValueOnce(2);
+      (fixture.projectRepository.createQueryBuilder as jest.Mock).mockReturnValueOnce(qb);
+
+      const total = await fixture.service.getTotalCount(3, { search: 'Laser' });
+
+      expect(qb.andWhere).toHaveBeenCalledWith('project.archivedAt IS NULL');
+      expect(qb.andWhere).toHaveBeenCalledWith("LOWER(project.name) LIKE LOWER(:search) ESCAPE '\\'", {
+        search: '%Laser%',
+      });
+      expect(total).toBe(2);
     });
   });
 

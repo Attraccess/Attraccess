@@ -4,7 +4,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { IsNull, Not, Repository } from 'typeorm';
+import { IsNull, Not, Repository, SelectQueryBuilder } from 'typeorm';
 
 import { AuditService } from '../audit/audit.service';
 
@@ -54,18 +54,11 @@ export class ProjectsService extends ProjectInvitations {
   }
 
   public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
-    const { page, limit: take, includeArchived } = query;
+    const { page, limit: take } = query;
     const skip = (page - 1) * take;
 
-    const qb = this.projectRepository
-      .createQueryBuilder('project')
-      .leftJoinAndSelect('project.owner', 'owner')
-      .leftJoin('project.members', 'member', 'member.userId = :userId', { userId })
-      .where('(owner.id = :userId OR member.id IS NOT NULL)', { userId });
-
-    if (includeArchived !== true) {
-      qb.andWhere('project.archivedAt IS NULL');
-    }
+    const qb = this.projectRepository.createQueryBuilder('project').leftJoinAndSelect('project.owner', 'owner');
+    this.applyAccessibleProjectFilters(qb, userId, query);
 
     const projects = await qb
       .orderBy('project.name', 'ASC')
@@ -77,19 +70,36 @@ export class ProjectsService extends ProjectInvitations {
     return this.projectAccessService.addAccessMetadata(userId, projects);
   }
 
-  public async getTotalCount(userId: number, query: { includeArchived?: boolean } = {}): Promise<number> {
-    const includeArchived = query.includeArchived ?? false;
-    const qb = this.projectRepository
-      .createQueryBuilder('project')
-      .leftJoin('project.owner', 'owner')
-      .leftJoin('project.members', 'member', 'member.userId = :userId', { userId })
-      .where('(owner.id = :userId OR member.id IS NOT NULL)', { userId });
+  public async getTotalCount(
+    userId: number,
+    query: { includeArchived?: boolean; search?: string } = {},
+  ): Promise<number> {
+    const qb = this.projectRepository.createQueryBuilder('project').leftJoin('project.owner', 'owner');
+    this.applyAccessibleProjectFilters(qb, userId, query);
 
-    if (!includeArchived) {
+    return await qb.getCount();
+  }
+
+  /** Restricts to projects the user owns or is a member of, excluding archived and non-matching ones. */
+  private applyAccessibleProjectFilters(
+    qb: SelectQueryBuilder<Project>,
+    userId: number,
+    query: { includeArchived?: boolean; search?: string },
+  ): void {
+    qb.leftJoin('project.members', 'member', 'member.userId = :userId', { userId }).where(
+      '(owner.id = :userId OR member.id IS NOT NULL)',
+      { userId },
+    );
+
+    if (query.includeArchived !== true) {
       qb.andWhere('project.archivedAt IS NULL');
     }
 
-    return await qb.getCount();
+    const search = query.search?.trim();
+    if (search) {
+      const pattern = `%${search.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+      qb.andWhere("LOWER(project.name) LIKE LOWER(:search) ESCAPE '\\'", { search: pattern });
+    }
   }
 
   public async findOneById(userId: number, id: number): Promise<Project> {

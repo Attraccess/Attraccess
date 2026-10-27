@@ -108,7 +108,7 @@ private:
 
     void selectResource(const API::ResourceBrief &resource);
 
-    void requestProjectsPage(uint32_t page);
+    void requestProjectsPage(uint32_t page, const std::string &search = "");
     void clearProjectSelection();
     void clearSelectedProject();
     void handleProjectSelection(uint32_t projectId, const std::string &projectName);

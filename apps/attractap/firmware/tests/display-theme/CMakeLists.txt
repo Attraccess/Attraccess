@@ -65,6 +65,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsSession.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjects.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjectSearch.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/navigation.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsActionFeedback.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/layout.cpp"

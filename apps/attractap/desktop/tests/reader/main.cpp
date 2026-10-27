@@ -13,6 +13,7 @@ int main(int argc, char **argv)
     workflow.testListAndAuthentication();
     workflow.testSessionStart();
     workflow.testUsageStats();
+    workflow.testProjectSearch();
     workflow.testFormsAndLogout();
     workflow.testSupervisionAndCorrelation();
     workflow.testIdentityAndPendingAuthentication();

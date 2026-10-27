@@ -78,11 +78,11 @@ void Application::selectResource(const API::ResourceBrief &resource) {
   this->selectedResourceChanged = true;
 }
 
-void Application::requestProjectsPage(uint32_t page) {
+void Application::requestProjectsPage(uint32_t page, const std::string &search) {
   if (page == 0) {
     page = 1;
   }
-  this->api.requestProjectsOfUser(page);
+  this->api.requestProjectsOfUser(page, search);
 }
 
 void Application::clearProjectSelection() {
@@ -95,6 +95,7 @@ void Application::clearProjectSelection() {
   this->projectsOfUserResponse.total = 0;
   this->projectsOfUserResponse.limit = API::MAX_PROJECTS_PER_PAGE;
   this->projectsOfUserResponse.hasMore = false;
+  this->projectsOfUserResponse.search.clear();
   this->projectsOfUserResponseUpdated = true;
  }
 

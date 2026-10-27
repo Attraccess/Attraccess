@@ -66,13 +66,13 @@ describe('AttractapProjectsHandler', () => {
 
       await handler.handleProjectsOfUserRequest(mockSocket as any, data);
 
-      expect(mockProjectsService.findMany).toHaveBeenCalledWith(7, { page: 3, limit: 25 });
-      expect(mockProjectsService.getTotalCount).toHaveBeenCalledWith(7);
+      expect(mockProjectsService.findMany).toHaveBeenCalledWith(7, { page: 3, limit: 25, search: '' });
+      expect(mockProjectsService.getTotalCount).toHaveBeenCalledWith(7, { search: '' });
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.PROJECTS_OF_USER,
-            payload: { projects: mockProjects, page: 3, limit: 25, total: 2 },
+            payload: { projects: mockProjects, page: 3, limit: 25, total: 2, search: '' },
           }),
         }),
       );
@@ -83,16 +83,50 @@ describe('AttractapProjectsHandler', () => {
 
       await handler.handleProjectsOfUserRequest(mockSocket as any, data);
 
-      expect(mockProjectsService.findMany).toHaveBeenCalledWith(7, { page: 1, limit: 10 });
-      expect(mockProjectsService.getTotalCount).toHaveBeenCalledWith(7);
+      expect(mockProjectsService.findMany).toHaveBeenCalledWith(7, { page: 1, limit: 10, search: '' });
+      expect(mockProjectsService.getTotalCount).toHaveBeenCalledWith(7, { search: '' });
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.PROJECTS_OF_USER,
-            payload: { projects: mockProjects, page: 1, limit: 10, total: 2 },
+            payload: { projects: mockProjects, page: 1, limit: 10, total: 2, search: '' },
           }),
         }),
       );
+    });
+
+    it('filters projects and their total by the trimmed search query and echoes it back', async () => {
+      const data = { payload: { page: 2, limit: 4, search: '  Laser  ' } } as AttractapEvent['data'];
+
+      await handler.handleProjectsOfUserRequest(mockSocket as any, data);
+
+      expect(mockProjectsService.findMany).toHaveBeenCalledWith(7, { page: 2, limit: 4, search: 'Laser' });
+      expect(mockProjectsService.getTotalCount).toHaveBeenCalledWith(7, { search: 'Laser' });
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payload: { projects: mockProjects, page: 2, limit: 4, total: 2, search: 'Laser' },
+          }),
+        }),
+      );
+    });
+
+    it('ignores non-string search values and caps overly long queries', async () => {
+      await handler.handleProjectsOfUserRequest(
+        mockSocket as any,
+        {
+          payload: { search: 42 },
+        } as unknown as AttractapEvent['data'],
+      );
+      expect(mockProjectsService.findMany).toHaveBeenLastCalledWith(7, { page: 1, limit: 10, search: '' });
+
+      await handler.handleProjectsOfUserRequest(
+        mockSocket as any,
+        {
+          payload: { search: 'x'.repeat(150) },
+        } as AttractapEvent['data'],
+      );
+      expect(mockProjectsService.findMany).toHaveBeenLastCalledWith(7, { page: 1, limit: 10, search: 'x'.repeat(100) });
     });
   });
 });

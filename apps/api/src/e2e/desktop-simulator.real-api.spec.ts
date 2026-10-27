@@ -391,6 +391,46 @@ describe('desktop simulator against an isolated real API', () => {
     }
   }, 120_000);
 
+  it('searches the operator projects across pages with access and archive filters applied', async () => {
+    await start('project-search');
+    const operator = await user('searcher');
+    const stranger = await user('stranger', false);
+    const projects = db.getRepository(Project);
+    for (const index of [1, 2, 3, 4]) await projects.save({ name: `Laser ${reader.id} ${index}`, owner: operator });
+    const shared = await projects.save({ name: `Laser ${reader.id} Shared`, owner: stranger });
+    await db.getRepository(ProjectMember).save({ userId: operator.id, projectId: shared.id });
+    await projects.save({ name: `Laser ${reader.id} Archived`, owner: operator, archivedAt: new Date() });
+    await projects.save({ name: `Laser ${reader.id} Foreign`, owner: stranger });
+    await projects.save({ name: `Woodwork ${reader.id}`, owner: operator });
+    await enroll(operator);
+    await authenticate();
+    await desktop().click('Projekt wählen');
+    await desktop().click('Projekte suchen');
+    await desktop().command('edit', { text: ' LASER ' });
+    await desktop().text(`Laser ${reader.id} 4`);
+    await desktop().text('Seite 1 von 2');
+    await desktop().snapshot('project-search-results');
+    await desktop().click('Weiter');
+    await desktop().text(`Laser ${reader.id} Shared`);
+    await desktop().text('Seite 2 von 2');
+    const labels = (await desktop().command('inspect')).labels;
+    expect(labels.filter((label) => label.startsWith(`Laser ${reader.id}`))).toEqual([`Laser ${reader.id} Shared`]);
+
+    await desktop().click('LASER');
+    await desktop().command('edit', { text: 'no such project' });
+    await desktop().text('Keine passenden Projekte gefunden');
+    await desktop().snapshot('project-search-empty');
+    await desktop().click('Zurücksetzen');
+    await desktop().text('Projekte suchen');
+    await desktop().text(`Laser ${reader.id} 1`);
+    await desktop().text('Seite 1 von 2');
+
+    await desktop().click('Projekte suchen');
+    await desktop().command('edit', { text: 'wood' });
+    await desktop().click(`Woodwork ${reader.id}`);
+    await desktop().text(`Projekt: Woodwork ${reader.id}`);
+  }, 120_000);
+
   it.each(['approval', 'http-abort', 'reader-disconnect'] as const)(
     'handles web supervision %s',
     async (outcomeType) => {

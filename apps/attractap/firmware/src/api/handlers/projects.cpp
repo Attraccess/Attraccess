@@ -4,15 +4,24 @@
 #include "../api.hpp"
 #include <string>
 #include <functional>
+#include <mutex>
 
-void API::requestProjectsOfUser(uint32_t page)
+void API::requestProjectsOfUser(uint32_t page, const std::string &search)
 {
     this->logger.info("Requesting projects of user");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["page"] = page;
     payload["limit"] = MAX_PROJECTS_PER_PAGE;
-    this->lastRequestedProjectsOfUserPage = page;
+    if (!search.empty())
+    {
+        payload["search"] = search;
+    }
+    {
+        std::lock_guard<std::mutex> lock(this->lastRequestedProjectsOfUserMutex);
+        this->lastRequestedProjectsOfUserPage = page;
+        this->lastRequestedProjectsOfUserSearch = search;
+    }
     this->sendMessage("PROJECTS_OF_USER", payload);
 }
 
@@ -31,14 +40,28 @@ void API::onProjectsOfUserResponse(JsonObject data)
     }
 
     uint32_t receivedPage = data["payload"]["page"].is<uint32_t>() ? data["payload"]["page"].as<uint32_t>() : 0;
-
-    if (receivedPage != this->lastRequestedProjectsOfUserPage)
+    uint32_t requestedPage;
+    std::string requestedSearch;
     {
-        this->logger.infof("Received projects of user response for page %u, but last requested page was %u", receivedPage, this->lastRequestedProjectsOfUserPage);
+        std::lock_guard<std::mutex> lock(this->lastRequestedProjectsOfUserMutex);
+        requestedPage = this->lastRequestedProjectsOfUserPage;
+        requestedSearch = this->lastRequestedProjectsOfUserSearch;
+    }
+
+    if (receivedPage != requestedPage)
+    {
+        this->logger.infof("Received projects of user response for page %u, but last requested page was %u", receivedPage, requestedPage);
         return;
     }
 
     JsonObject payload = data["payload"].as<JsonObject>();
+    // Servers without search support do not echo the query; keep their results.
+    if (payload["search"].is<const char *>() && requestedSearch != payload["search"].as<const char *>())
+    {
+        this->logger.info("Received projects of user response for a superseded search");
+        return;
+    }
+
     JsonArray arr = payload["projects"].as<JsonArray>();
     if (arr.isNull())
     {
@@ -48,6 +71,7 @@ void API::onProjectsOfUserResponse(JsonObject data)
         result.limit = payload["limit"].is<uint32_t>() ? payload["limit"].as<uint32_t>() : MAX_PROJECTS_PER_PAGE;
         result.total = payload["total"].is<uint32_t>() ? payload["total"].as<uint32_t>() : 0;
         result.hasMore = (result.page * result.limit) < result.total;
+        result.search = requestedSearch;
         this->projectsOfUserResponseCallback(result);
         return;
     }
@@ -84,5 +108,6 @@ void API::onProjectsOfUserResponse(JsonObject data)
 
     result.count = count;
     result.hasMore = (result.page * result.limit) < result.total;
+    result.search = requestedSearch;
     this->projectsOfUserResponseCallback(result);
 }

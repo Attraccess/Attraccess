@@ -306,7 +306,7 @@ void Application::setupDisplayCallbacks()
       });
 
   Display::resourceDetailsScreen.setProjectsPageRequestCallback(
-      [this](uint32_t page) { this->requestProjectsPage(page); });
+      [this](uint32_t page, const std::string &search) { this->requestProjectsPage(page, search); });
   Display::resourceDetailsScreen.setProjectSelectionCallback(
       [this](uint32_t projectId, const std::string &projectName) {
         this->handleProjectSelection(projectId, projectName);
