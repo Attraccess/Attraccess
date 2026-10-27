@@ -48,16 +48,20 @@ services.attractap-lab = {
   coordinator = {
     enable = true;
     listenAddress = "0.0.0.0:20408";
-    places.reader-1 = {
-      matches = [ "lab-host/reader-1/*" ];
-      tags.board = "attractap";
+    # <firmware variant>-<n>, after apps/attractap/firmware/variants/.
+    places.attractap-touch-v2-1 = {
+      matches = [ "lab-host/attractap-touch-v2-1/*" ];
+      tags = {
+        board = "attractap";
+        variant = "attractap-touch-v2";
+      };
     };
   };
   exporter = {
     enable = true;
     name = "lab-host";
     hostname = "lab-host";
-    settings.reader-1 = {
+    settings.attractap-touch-v2-1 = {
       USBSerialPort.match.ID_SERIAL_SHORT = "REPLACE_WITH_READER_SERIAL";
       USBFlashableDevice.match = {
         SUBSYSTEM = "tty";
@@ -108,7 +112,9 @@ capture node, resolution and MJPEG support. Mount it rigidly.
 
 Each reader gets its own exporter group and place. Repeat the same
 `HTTPVideoStream` URL in multiple reader groups to share the camera without
-making different readers contend for one video resource. Screen capture uses
+making different readers contend for one video resource. Name each place
+`<firmware variant>-<n>` and tag its `variant`; the hardware workflow selects
+the place from the firmware image's variant. Screen capture uses
 the stream as served: either point each group at a view already cropped to its
 reader's screen, or add `crop: "width:height:x:y"` (camera pixels) to
 `ScreenCaptureDriver` in a copy of `example-env.yaml` per reader. A shared
@@ -183,8 +189,8 @@ On Linux, from the monorepo root:
 ```sh
 export LG_COORDINATOR=lab-host:20408
 pnpm nx run attractap-lab:smoke -- \
-  --config apps/attractap-lab/example-env.yaml --place reader-1 \
-  --image /path/to/merged-firmware.bin --output /tmp/reader-1
+  --config apps/attractap-lab/example-env.yaml --place attractap-touch-v2-1 \
+  --image /path/to/merged-firmware.bin --output /tmp/attractap-touch-v2-1
 ```
 
 Without Nx, use `nix run path:./apps/attractap-lab -- ...`. For an existing Python
@@ -207,7 +213,7 @@ Python and pytest use the same resource/driver lifecycle:
 from attractap_lab.workflow import claim, smoke
 
 def test_reader(tmp_path):
-    with claim("reader.yaml", "reader-1") as target:
+    with claim("reader.yaml", "attractap-touch-v2-1") as target:
         smoke(target, "firmware.bin", tmp_path, expect="connected")
 ```
 
@@ -220,8 +226,8 @@ Inspect and recover abandoned claims with the native tools:
 
 ```sh
 labgrid-client places
-labgrid-client -p reader-1 show
-labgrid-client -p reader-1 release --kick
+labgrid-client -p attractap-touch-v2-1 show
+labgrid-client -p attractap-touch-v2-1 release --kick
 ```
 
 Confirm the previous operation has stopped before forced takeover. Native

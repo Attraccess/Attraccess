@@ -12,9 +12,9 @@ on:
         type: string
         required: true
       place:
-        description: Labgrid place, named <firmware variant>-<n>
+        description: Labgrid place holding that variant (default <firmware variant>-1)
         type: string
-        default: attractap-touch-v2-1
+        required: false
 
 permissions:
   contents: read
@@ -35,6 +35,35 @@ jobs:
           run-id: ${{ inputs.firmware_run_id }}
           github-token: ${{ github.token }}
           path: firmware
+      - name: Select a place holding the firmware's variant
+        id: place
+        env:
+          FIRMWARE_FILE: ${{ inputs.firmware_file }}
+          PLACE: ${{ inputs.place }}
+        run: |
+          # Merged images are <FIRMWARE_NAME>_<FIRMWARE_VARIANT>.bin; places are
+          # named after the variant file, <variant>-<n>.
+          variant=
+          for file in apps/attractap/firmware/variants/*.cmake; do
+            name=$(sed -n 's/^set(ATTRACTAP_FIRMWARE_NAME "\(.*\)")$/\1/p' "$file")
+            flavor=$(sed -n 's/^set(ATTRACTAP_FIRMWARE_VARIANT "\(.*\)")$/\1/p' "$file")
+            if [ "${name}_${flavor}.bin" = "$FIRMWARE_FILE" ]; then
+              variant=$(basename "$file" .cmake)
+            fi
+          done
+          if [ -z "$variant" ]; then
+            echo "::error::$FIRMWARE_FILE is not the merged image of any firmware variant"
+            exit 1
+          fi
+          place=${PLACE:-$variant-1}
+          case "$place" in
+            "$variant"-[0-9]*) ;;
+            *)
+              echo "::error::Place $place does not hold $variant hardware"
+              exit 1
+              ;;
+          esac
+          echo "place=$place" >> "$GITHUB_OUTPUT"
       - uses: tailscale/github-action@v4
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
@@ -54,7 +83,7 @@ jobs:
       - name: Claim, flash, record serial and capture screen
         env:
           LG_COORDINATOR: ${{ vars.LAB_HOST }}:20408
-          LG_PLACE: ${{ inputs.place }}
+          LG_PLACE: ${{ steps.place.outputs.place }}
           FIRMWARE_FILE: ${{ inputs.firmware_file }}
         run: |
           nix run path:./apps/attractap-lab -- \
