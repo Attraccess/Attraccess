@@ -73,7 +73,7 @@ private:
     void respondCardAuth(const std::string &uidHex, uint32_t resourceId);
     void respondActionSuccess(const std::string &type);
 
-    void respondProjects(uint32_t page);
+    void respondProjects(uint32_t page, const std::string &search);
     void handleStartSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver);
     void handleStopSession(uint32_t resourceId);
     void respondFormRequest(uint32_t resourceId);

@@ -94,7 +94,10 @@ void Application::setupApiCallbacks()
           this->clearProjectSelection();
         }
         this->currentProjectsUser = response.username;
-        this->requestProjectsPage(1);
+        // Through the screen, so the refresh keeps the active search and stays the request it awaits.
+        lv_lock();
+        Display::resourceDetailsScreen.refreshProjects();
+        lv_unlock();
 #endif
 
         this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
@@ -306,7 +309,7 @@ void Application::setupDisplayCallbacks()
       });
 
   Display::resourceDetailsScreen.setProjectsPageRequestCallback(
-      [this](uint32_t page) { this->requestProjectsPage(page); });
+      [this](uint32_t page, const std::string &search) { return this->requestProjectsPage(page, search); });
   Display::resourceDetailsScreen.setProjectSelectionCallback(
       [this](uint32_t projectId, const std::string &projectName) {
         this->handleProjectSelection(projectId, projectName);
