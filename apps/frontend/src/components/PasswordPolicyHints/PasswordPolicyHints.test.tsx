@@ -53,7 +53,27 @@ it('marks unsatisfied composition rules and shows server rejection reasons', () 
     'data-satisfied',
     'true',
   );
+  expect(view.container.querySelector('[data-cy="password-policy-rule-strength"]')).toHaveAttribute(
+    'data-satisfied',
+    'false',
+  );
   expect(screen.getByText('serverErrors.PASSWORD_REUSED')).toBeTruthy();
+});
+it('lists the requirements as pending, without a meter, before anything is typed', () => {
+  const view = render(<PasswordPolicyHints password="" username="Ada" email="ada@example.test" policy={policy} />);
+  const rules = view.container.querySelectorAll('[data-cy^="password-policy-rule-"]');
+  expect(Array.from(rules, (rule) => rule.getAttribute('data-cy'))).toEqual([
+    'password-policy-rule-length',
+    'password-policy-rule-uppercase',
+    'password-policy-rule-lowercase',
+    'password-policy-rule-digit',
+    'password-policy-rule-special',
+    'password-policy-rule-similarity',
+    'password-policy-rule-strength',
+    'password-policy-rule-ascii',
+  ]);
+  rules.forEach((rule) => expect(rule).toHaveAttribute('data-satisfied', 'false'));
+  expect(screen.queryByRole('meter')).toBeNull();
 });
 it('marks a strong password as satisfying the rules and omits disabled composition rules', () => {
   state.score = 4;
@@ -71,6 +91,16 @@ it('marks a strong password as satisfying the rules and omits disabled compositi
   );
   expect(view.container.querySelector('[data-cy="password-policy-rule-uppercase"]')).toBeNull();
   expect(view.container.querySelector('[data-cy="password-policy-rule-ascii"]')).toBeNull();
+  expect(view.container.querySelector('[data-cy="password-policy-rule-strength"]')).toHaveAttribute(
+    'data-satisfied',
+    'true',
+  );
+});
+it('omits the strength rule when the policy sets no minimum score', () => {
+  const view = render(
+    <PasswordPolicyHints password="abc" username="" email="" policy={{ ...policy, minZxcvbnScore: 0 }} />,
+  );
+  expect(view.container.querySelector('[data-cy="password-policy-rule-strength"]')).toBeNull();
 });
 it.each([
   [0, 'danger'],

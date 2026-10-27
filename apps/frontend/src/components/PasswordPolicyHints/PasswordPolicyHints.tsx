@@ -1,13 +1,8 @@
 import React, { useMemo } from 'react';
 import { Meter } from '@heroui/react';
-import { Check, X, AlertCircle } from 'lucide-react';
+import { Check, Circle, X, AlertCircle } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  validatePassword,
-  PolicyError,
-  PolicyErrorCode,
-  PublicPasswordPolicy,
-} from '@attraccess/shared';
+import { validatePassword, PolicyError, PolicyErrorCode, PublicPasswordPolicy } from '@attraccess/shared';
 import { useZxcvbn } from './useZxcvbn';
 import en from './PasswordPolicyHints.en.json';
 import de from './PasswordPolicyHints.de.json';
@@ -50,6 +45,10 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
     [localResult.errors],
   );
 
+  const zxcvbn = useZxcvbn(password, [username, email]);
+  const score = zxcvbn.result?.score ?? 0;
+  const meetsScore = score >= policy.minZxcvbnScore;
+
   const rules: RuleSpec[] = useMemo(() => {
     const items: RuleSpec[] = [
       {
@@ -89,6 +88,12 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
         active: true,
       },
     ];
+    items.push({
+      id: 'strength',
+      label: t('rules.strength'),
+      satisfied: meetsScore,
+      active: policy.minZxcvbnScore > 0,
+    });
     if (!policy.allowAllUnicode) {
       items.push({
         id: 'ascii',
@@ -98,12 +103,11 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
       });
     }
     return items.filter((r) => r.active);
-  }, [t, password, policy, failingCodes]);
+  }, [t, password, policy, failingCodes, meetsScore]);
 
-  const zxcvbn = useZxcvbn(password, [username, email]);
-  const score = zxcvbn.result?.score ?? 0;
-  const strengthColor =
-    score >= policy.minZxcvbnScore ? 'success' : score === policy.minZxcvbnScore - 1 ? 'warning' : 'danger';
+  // Until something is typed, every rule is shown as pending rather than passed or failed.
+  const isEmpty = password.length === 0;
+  const strengthColor = meetsScore ? 'success' : score === policy.minZxcvbnScore - 1 ? 'warning' : 'danger';
 
   return (
     <div className="space-y-3" data-cy="password-policy-hints">
@@ -113,33 +117,37 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
             key={rule.id}
             className="flex items-center gap-2"
             data-cy={`password-policy-rule-${rule.id}`}
-            data-satisfied={rule.satisfied}
+            data-satisfied={!isEmpty && rule.satisfied}
           >
-            {rule.satisfied ? (
+            {isEmpty ? (
+              <Circle className="h-4 w-4 text-foreground-400" aria-hidden />
+            ) : rule.satisfied ? (
               <Check className="h-4 w-4 text-green-600" aria-hidden />
             ) : (
               <X className="h-4 w-4 text-red-500" aria-hidden />
             )}
-            <span className={rule.satisfied ? 'text-foreground' : 'text-foreground-500'}>{rule.label}</span>
+            <span className={!isEmpty && rule.satisfied ? 'text-foreground' : 'text-foreground-500'}>{rule.label}</span>
           </li>
         ))}
       </ul>
 
-      <Meter
-        aria-label={t('strength.label')}
-        value={score + 1}
-        minValue={0}
-        maxValue={5}
-        valueLabel={t(`strength.score.${score}` as const)}
-        color={strengthColor}
-        size="sm"
-        data-cy="password-strength-meter"
-        data-score={score}
-      >
-        <Meter.Track>
-          <Meter.Fill />
-        </Meter.Track>
-      </Meter>
+      {!isEmpty && (
+        <Meter
+          aria-label={t('strength.label')}
+          value={score + 1}
+          minValue={0}
+          maxValue={5}
+          valueLabel={t(`strength.score.${score}` as const)}
+          color={strengthColor}
+          size="sm"
+          data-cy="password-strength-meter"
+          data-score={score}
+        >
+          <Meter.Track>
+            <Meter.Fill />
+          </Meter.Track>
+        </Meter>
+      )}
 
       {serverErrors && serverErrors.length > 0 && (
         <ul className="space-y-1 text-sm text-danger" data-cy="password-policy-server-errors">
