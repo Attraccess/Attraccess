@@ -3,15 +3,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { PublicPasswordPolicy } from '@attraccess/shared';
 import { PasswordPolicyHints } from './PasswordPolicyHints';
 import { generateStrongPassword } from './generatePassword';
-const state = vi.hoisted(() => ({ score: 0, seconds: 0 }));
+const state = vi.hoisted(() => ({ score: 0 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({
-    t: (key: string, params?: { value?: number }) => (params?.value === undefined ? key : `${key}:${params.value}`),
+    t: (key: string) => key,
   }),
 }));
 vi.mock('./useZxcvbn', () => ({
   useZxcvbn: () => ({
-    result: { score: state.score, crackTimes: { offlineSlowHashingXPerSecond: { seconds: state.seconds } } },
+    result: { score: state.score },
   }),
 }));
 const policy: PublicPasswordPolicy = {
@@ -26,7 +26,6 @@ const policy: PublicPasswordPolicy = {
 };
 beforeEach(() => {
   state.score = 0;
-  state.seconds = 0;
 });
 afterEach(() => {
   cleanup();
@@ -54,7 +53,6 @@ it('marks unsatisfied composition rules and shows server rejection reasons', () 
     'data-satisfied',
     'true',
   );
-  expect(screen.getByText('strength.minRequired')).toBeTruthy();
   expect(screen.getByText('serverErrors.PASSWORD_REUSED')).toBeTruthy();
 });
 it('marks a strong password as satisfying the rules and omits disabled composition rules', () => {
@@ -73,22 +71,22 @@ it('marks a strong password as satisfying the rules and omits disabled compositi
   );
   expect(view.container.querySelector('[data-cy="password-policy-rule-uppercase"]')).toBeNull();
   expect(view.container.querySelector('[data-cy="password-policy-rule-ascii"]')).toBeNull();
-  expect(screen.queryByText('strength.minRequired')).toBeNull();
 });
 it.each([
-  [0, 'crack.instant'],
-  [30, 'crack.seconds:30'],
-  [120, 'crack.minutes:2'],
-  [7200, 'crack.hours:2'],
-  [172800, 'crack.days:2'],
-  [5184000, 'crack.months:2'],
-  [63072000, 'crack.years:2'],
-  [3153600000, 'crack.centuries'],
-  [Infinity, 'crack.centuries'],
-] as const)('formats the estimated crack duration %s', (seconds, text) => {
-  state.seconds = seconds;
-  render(<PasswordPolicyHints password="" username="" email="" policy={policy} />);
-  expect(screen.getByText(`strength.crackTime: ${text}`)).toBeTruthy();
+  [0, 'danger'],
+  [1, 'danger'],
+  [2, 'warning'],
+  [3, 'success'],
+  [4, 'success'],
+] as const)('shows strength score %s as a %s meter without crack-time details', (score, color) => {
+  state.score = score;
+  render(<PasswordPolicyHints password="x" username="" email="" policy={policy} />);
+  const meter = screen.getByRole('meter', { name: 'strength.label' });
+  expect(meter).toHaveAttribute('data-score', String(score));
+  expect(meter).toHaveAttribute('aria-valuenow', String(score + 1));
+  expect(meter).toHaveAttribute('aria-valuetext', `strength.score.${score}`);
+  expect(meter.className).toContain(`meter--${color}`);
+  expect(screen.queryByText(/crack/i)).toBeNull();
 });
 it('generates requested composition and length with a secure randomness source', () => {
   const password = generateStrongPassword({

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Meter } from '@heroui/react';
 import { Check, X, AlertCircle } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -24,34 +25,6 @@ interface RuleSpec {
   label: string;
   satisfied: boolean;
   active: boolean;
-}
-
-function formatSeconds(seconds: number, t: (k: string, p?: Record<string, string | number>) => string): string {
-  if (!Number.isFinite(seconds)) {
-    return t('crack.centuries');
-  }
-  if (seconds < 1) {
-    return t('crack.instant');
-  }
-  if (seconds < 60) {
-    return t('crack.seconds', { value: Math.round(seconds) });
-  }
-  if (seconds < 3600) {
-    return t('crack.minutes', { value: Math.round(seconds / 60) });
-  }
-  if (seconds < 86400) {
-    return t('crack.hours', { value: Math.round(seconds / 3600) });
-  }
-  if (seconds < 86400 * 30) {
-    return t('crack.days', { value: Math.round(seconds / 86400) });
-  }
-  if (seconds < 86400 * 365) {
-    return t('crack.months', { value: Math.round(seconds / (86400 * 30)) });
-  }
-  if (seconds < 86400 * 365 * 100) {
-    return t('crack.years', { value: Math.round(seconds / (86400 * 365)) });
-  }
-  return t('crack.centuries');
 }
 
 export function PasswordPolicyHints({ password, username, email, policy, serverErrors }: PasswordPolicyHintsProps) {
@@ -129,13 +102,8 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
 
   const zxcvbn = useZxcvbn(password, [username, email]);
   const score = zxcvbn.result?.score ?? 0;
-  const meetsScore = score >= policy.minZxcvbnScore;
-  const crackTime = useMemo(() => {
-    const seconds = zxcvbn.result?.crackTimes.offlineSlowHashingXPerSecond.seconds;
-    return formatSeconds(typeof seconds === 'number' ? seconds : Number(seconds ?? 0), t);
-  }, [zxcvbn.result, t]);
-
-  const strengthColor = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-lime-500', 'bg-green-500'][score];
+  const strengthColor =
+    score >= policy.minZxcvbnScore ? 'success' : score === policy.minZxcvbnScore - 1 ? 'warning' : 'danger';
 
   return (
     <div className="space-y-3" data-cy="password-policy-hints">
@@ -157,28 +125,21 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
         ))}
       </ul>
 
-      <div className="space-y-1" data-cy="password-strength-meter">
-        <div className="flex items-center justify-between text-xs">
-          <span>
-            {t('strength.label')}: {t(`strength.score.${score}` as const)}
-          </span>
-          <span data-cy="password-strength-crack-time">
-            {t('strength.crackTime')}: {crackTime}
-          </span>
-        </div>
-        <div className="h-2 w-full rounded bg-default-200">
-          <div
-            className={`h-2 rounded transition-all ${strengthColor}`}
-            style={{ width: `${((score + 1) / 5) * 100}%` }}
-            data-cy={`password-strength-bar-${score}`}
-          />
-        </div>
-        {!meetsScore && password.length > 0 && (
-          <p className="text-xs text-warning" data-cy="password-strength-required">
-            {t('strength.minRequired', { required: policy.minZxcvbnScore })}
-          </p>
-        )}
-      </div>
+      <Meter
+        aria-label={t('strength.label')}
+        value={score + 1}
+        minValue={0}
+        maxValue={5}
+        valueLabel={t(`strength.score.${score}` as const)}
+        color={strengthColor}
+        size="sm"
+        data-cy="password-strength-meter"
+        data-score={score}
+      >
+        <Meter.Track>
+          <Meter.Fill />
+        </Meter.Track>
+      </Meter>
 
       {serverErrors && serverErrors.length > 0 && (
         <ul className="space-y-1 text-sm text-danger" data-cy="password-policy-server-errors">
