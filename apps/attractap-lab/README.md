@@ -20,7 +20,7 @@ Import `inputs.attraccess.nixosModules.attractap-lab` into a Linux host. Use a
 supported stable nixpkgs; this app is checked against its pinned NixOS 26.05.
 Keep client and host labgrid versions aligned (currently 26.x).
 
-For concurrent agents, the [JappyJan/labgrid fork](https://github.com/JappyJan/labgrid/tree/feat/agent-sessions)
+For concurrent agents, the [JappyJan/labgrid fork](https://github.com/JappyJan/labgrid/tree/stable-26)
 adds a native `labgrid-client session` command, compatible with the existing
 26.x coordinator/exporter. Build firmware before reserving a reader:
 
@@ -39,7 +39,7 @@ sequence in that child; native labgrid commands share its identity. Ordinary
 failure, SIGINT and SIGTERM stop child processes and clean up reservations and
 claims. SIGKILL/machine failure require deliberate recovery. Never automatically
 force-release another claim. The fork includes a global agent skill under
-`contrib/skills/labgrid`.
+`skills/labgrid`.
 
 ```nix
 services.attractap-lab = {
