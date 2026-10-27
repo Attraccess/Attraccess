@@ -20,6 +20,13 @@ from .drivers import ESPToolDriver, ScreenCaptureDriver
 @contextmanager
 def claim(config, place, role="main"):
     """Claim with a unique native labgrid identity, including for concurrent CI."""
+    if os.environ.get("LG_SESSION_ID"):
+        if place != os.environ.get("LG_PLACE"):
+            raise ValueError("Inside a labgrid session, use its allocated LG_PLACE")
+        # The outer session owns acquisition/release; this context owns drivers.
+        with _claim(config, place, role, acquire=False) as target:
+            yield target
+        return
     previous = os.environ.get("LG_HOSTNAME")
     os.environ["LG_HOSTNAME"] = f"{previous or socket.gethostname()}-{uuid.uuid4().hex[:12]}"
     try:
@@ -33,7 +40,7 @@ def claim(config, place, role="main"):
 
 
 @contextmanager
-def _claim(config, place, role):
+def _claim(config, place, role, *, acquire=True):
     """Acquire an existing place and always deactivate drivers before release.
 
     Busy places fail immediately. This never silently shares or forcibly takes
@@ -58,8 +65,11 @@ def _claim(config, place, role):
     try:
         place = session.get_place(place).name
         resources["RemotePlace"]["name"] = place
-        attempted = True
-        session.loop.run_until_complete(session.acquire())
+        if acquire:
+            attempted = True
+            session.loop.run_until_complete(session.acquire())
+        elif session.get_acquired_place(place).acquired != owner:
+            raise RuntimeError("The reader is not owned by this labgrid session")
         # Reuse the session through labgrid's own client integration. Starting
         # another gRPC client on its shared channel is rejected by coordinator.
         session._prepare_manager()

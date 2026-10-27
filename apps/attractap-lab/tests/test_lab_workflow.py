@@ -242,6 +242,21 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_ca
                 # The previous context released even on a flash/caller exception.
                 real_run(client + ["acquire"], check=True)
                 real_run(client + ["release"], check=True)
+                # A session parent is another process. Reuse its identity and
+                # claim, cleaning drivers without releasing the parent claim.
+                real_run(client + ["acquire"], check=True)
+                try:
+                    with monkeypatch.context() as child:
+                        child.setenv("LG_SESSION_ID", "integration-session")
+                        child.setenv("LG_PLACE", "reader-1")
+                        with claim(tmp_path / "env.yaml", "reader-1") as attached:
+                            assert attached.get_driver("SerialDriver", activate=False)
+                        assert real_run(client + ["acquire"], capture_output=True).returncode != 0
+                        with pytest.raises(ValueError, match="LG_PLACE"):
+                            with claim(tmp_path / "env.yaml", "another-reader"):
+                                pytest.fail("Session attached to the wrong reader")
+                finally:
+                    real_run(client + ["release"], check=True)
                 maintenance_command = (
                     "import subprocess, sys; "
                     f"result = subprocess.run({client + ['acquire']!r}, capture_output=True); "
