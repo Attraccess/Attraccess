@@ -1,4 +1,4 @@
-# Copy this file and replace camera crop with the physical reader's screen.
+# --place (or LG_PLACE) overrides the place name below.
 # LG_COORDINATOR=lab-host:20408 selects the coordinator (default localhost).
 imports:
   - attractap_lab.drivers
@@ -10,5 +10,6 @@ targets:
     drivers:
       ESPToolDriver: {}
       SerialDriver: {}
-      ScreenCaptureDriver:
-        crop: "320:240:0:0"
+      # Captures the place's HTTPVideoStream as served. If that is the whole
+      # camera frame, add crop: "width:height:x:y" in camera pixels.
+      ScreenCaptureDriver: {}

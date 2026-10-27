@@ -104,14 +104,16 @@ numbers are not unique, use native labgrid udev matching with a stable USB path.
 Check the identity in both normal firmware and bootloader modes.
 
 Use `v4l2-ctl --list-devices` and `--list-formats-ext` to choose the webcam's
-capture node, resolution and MJPEG support. Mount it rigidly and set the
-reader's crop in a copy of `example-env.yaml`. The placeholder crop is
-`width:height:x:y`, in camera pixels; it must be calibrated before screen tests.
+capture node, resolution and MJPEG support. Mount it rigidly.
 
 Each reader gets its own exporter group and place. Repeat the same
 `HTTPVideoStream` URL in multiple reader groups to share the camera without
-making different readers contend for one video resource. Keep crop settings
-in the corresponding client environment.
+making different readers contend for one video resource. Screen capture uses
+the stream as served: either point each group at a view already cropped to its
+reader's screen, or add `crop: "width:height:x:y"` (camera pixels) to
+`ScreenCaptureDriver` in a copy of `example-env.yaml` per reader. A shared
+client environment needs per-place views, because the same crop applies to
+whichever place a session allocates.
 
 `exporter.settings` and `coordinator.places` use native labgrid schemas. Places
 are authoritative when configured: syncing removes places absent from that
@@ -191,7 +193,7 @@ The Nix host package targets Linux; macOS is not an exporter platform.
 
 The workflow claims the place exclusively, transfers the merged image using
 labgrid's `ManagedFile`, runs esptool on the exporter, resets into firmware,
-records bounded `serial.log`, captures a cropped `screen.png`, then releases.
+records bounded `serial.log`, captures `screen.png`, then releases.
 Both success and ordinary failure/cancellation clean up drivers and claims.
 A busy place fails immediately. `--expect TEXT` checks a literal serial marker.
 Serial reconnect follows reset, so the earliest boot messages may be missed;

@@ -12,9 +12,9 @@ on:
         type: string
         required: true
       place:
-        description: Labgrid place
+        description: Labgrid place, named <firmware variant>-<n>
         type: string
-        default: reader-1
+        default: attractap-touch-v2-1
 
 permissions:
   contents: read
