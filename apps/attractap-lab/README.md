@@ -175,7 +175,8 @@ Both success and ordinary failure/cancellation clean up drivers and claims.
 A busy place fails immediately. `--expect TEXT` checks a literal serial marker.
 Serial reconnect follows reset, so the earliest boot messages may be missed;
 use a marker emitted after reconnect. Screen capture provides evidence, not an
-automatic assertion that the UI is correct.
+automatic assertion that the UI is correct. Offline µStreamer placeholder frames
+are rejected; a missing webcam fails capture instead of producing false evidence.
 
 Python and pytest use the same resource/driver lifecycle:
 

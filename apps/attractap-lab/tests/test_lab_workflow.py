@@ -61,8 +61,9 @@ def eventually(check, process, seconds=10):
     pytest.fail("Labgrid did not become ready")
 
 
-@pytest.mark.parametrize("fail_flash", [False, True], ids=["success", "flash-failure"])
-def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash):
+@pytest.mark.parametrize("fail_flash,offline_camera", [(False, False), (True, False), (False, True)],
+                         ids=["success", "flash-failure", "camera-offline"])
+def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_camera):
     assert shutil.which("ffmpeg"), "Hardware workflow integration test requires FFmpeg"
     def executable(name):
         # Nix exposes dependencies on PATH, while a developer venv places them
@@ -89,6 +90,7 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash):
             assert self.path == "/snapshot"
             self.send_response(200)
             self.send_header("Content-Type", "image/png")
+            self.send_header("X-UStreamer-Online", "false" if offline_camera else "true")
             self.send_header("Content-Length", str(len(snapshot)))
             self.end_headers()
             self.wfile.write(snapshot)
@@ -215,6 +217,12 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash):
                             with pytest.raises(subprocess.CalledProcessError):
                                 smoke(target, firmware, tmp_path / "artifacts", log_seconds=0.5, max_log_bytes=1024)
                             raise RuntimeError("Caller failure must still release the place")
+                        if offline_camera:
+                            with pytest.raises(RuntimeError, match="offline"):
+                                smoke(target, firmware, tmp_path / "artifacts", log_seconds=0.5,
+                                      max_log_bytes=1024)
+                            assert not (tmp_path / "artifacts/screen.png").exists()
+                            raise RuntimeError("Caller failure must still release the place")
                         smoke(target, firmware, tmp_path / "artifacts", log_seconds=0.5,
                               max_log_bytes=1024, expect="Attractap ready")
                         # Native labgrid ResetProtocol resolves to this driver,
@@ -230,7 +238,7 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash):
                         assert int.from_bytes(png[20:24], "big") == 24
                         assert forwards, "Isolated camera/serial must use labgrid SSH forwarding"
                 except RuntimeError as error:
-                    assert fail_flash and str(error).startswith("Caller failure")
+                    assert (fail_flash or offline_camera) and str(error).startswith("Caller failure")
                 # The previous context released even on a flash/caller exception.
                 real_run(client + ["acquire"], check=True)
                 real_run(client + ["release"], check=True)

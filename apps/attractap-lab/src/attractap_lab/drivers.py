@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
+from urllib.request import ProxyHandler, build_opener
 
 import attr
 from labgrid.driver import Driver
@@ -95,11 +96,21 @@ class ScreenCaptureDriver(Driver):
         )
         netloc = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
         url = urlunsplit(parsed._replace(netloc=netloc))
+        # uStreamer serves a valid JPEG placeholder with HTTP 200 while the
+        # capture device is offline. Check the metadata on the exact frame we
+        # decode, so a missing webcam cannot masquerade as screen evidence.
+        # The endpoint already goes through labgrid's SSH tunnel; environment
+        # HTTP proxies must not redirect this private camera request.
+        with build_opener(ProxyHandler({})).open(url, timeout=self.timeout) as response:
+            if response.headers.get("X-UStreamer-Online", "").lower() == "false":
+                raise RuntimeError("Camera is offline; no physical screen frame is available")
+            snapshot = response.read(16 * 1024 * 1024 + 1)
+        if len(snapshot) > 16 * 1024 * 1024:
+            raise RuntimeError("Camera snapshot exceeds 16 MiB")
         command = [
             self.ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-rw_timeout", str(int(self.timeout * 1_000_000)),
-            "-i", url, "-frames:v", "1",
+            "-i", "pipe:0", "-frames:v", "1",
         ]
         if self.crop:
             command += ["-vf", f"crop={self.crop}"]
-        subprocess.run(command + [str(output)], check=True, timeout=self.timeout + 5)
+        subprocess.run(command + [str(output)], input=snapshot, check=True, timeout=self.timeout + 5)
