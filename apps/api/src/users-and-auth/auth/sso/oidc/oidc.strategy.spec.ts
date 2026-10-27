@@ -644,7 +644,7 @@ describe('OIDC Passport callback authentication context', () => {
         token === OidcTokenVerifier
           ? verifier
           : token === EncryptionService
-            ? { encrypt: () => 'encrypted-hint' }
+            ? { encrypt: (value: string) => `encrypted:${value}` }
             : undefined,
     } as unknown as ModuleRef;
     const config = {
@@ -662,13 +662,22 @@ describe('OIDC Passport callback authentication context', () => {
     jest.spyOn(strategy, 'validateProfile').mockResolvedValue(user);
     const req = {};
     const verify = (strategy as unknown as { _verify: (...args: unknown[]) => void })._verify;
-    expect(verify.length).toBe(6);
+    expect(verify.length).toBe(8);
     await new Promise<void>((resolve, reject) =>
-      verify(req, config.issuer, { id: 'subject' }, {}, 'signed-id-token', (error: Error | null, principal: User) => {
-        if (error) return reject(error);
-        expect(principal).toBe(user);
-        resolve();
-      }),
+      verify(
+        req,
+        config.issuer,
+        { id: 'subject' },
+        {},
+        'signed-id-token',
+        'access-token',
+        'refresh-token',
+        (error: Error | null, principal: User) => {
+          if (error) return reject(error);
+          expect(principal).toBe(user);
+          resolve();
+        },
+      ),
     );
     expect(verifier.verify).toHaveBeenCalledWith('signed-id-token', config);
     expect(req).toEqual({
@@ -679,7 +688,9 @@ describe('OIDC Passport callback authentication context', () => {
         subject: 'subject',
         providerIssuedAt: 1700000000000,
         sid: 'browser',
-        idTokenEncrypted: 'encrypted-hint',
+        idTokenEncrypted: 'encrypted:signed-id-token',
+        refreshTokenEncrypted: 'encrypted:refresh-token',
+        lastSsoSyncAt: expect.any(Number),
       },
     });
     expect(user).not.toHaveProperty('ssoSessionContext');

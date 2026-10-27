@@ -76,6 +76,8 @@
   "scopes": "Scopes (comma-separated)",
   "usernameClaimPaths": "Username claim paths (comma-separated)",
   "emailClaimPaths": "Email claim paths (comma-separated)",
+  "permissionSyncTtlMinutes": "Permission re-sync interval (minutes)",
+  "permissionSyncTtlMinutesHint": "Re-checks signed-in users' roles at the identity provider with their refresh token this often. Empty uses the server default (SSO_PERMISSION_SYNC_TTL_MINUTES), 0 turns re-sync off. If the provider rejects the refresh token, the session is ended.",
   "samlProvisioningSecret": "SAML provisioning secret",
   "samlProvisioningSecretHint": "Used to authorize SAML provisioning calls (logout, delete, permissions). Leave blank to keep existing secret.",
   "showSamlProvisioningSecret": "Show provisioning secret",

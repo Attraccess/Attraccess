@@ -76,6 +76,8 @@
   "scopes": "Scopes (durch Komma getrennt)",
   "usernameClaimPaths": "Benutzername-Claim-Pfade (durch Komma getrennt)",
   "emailClaimPaths": "E-Mail-Claim-Pfade (durch Komma getrennt)",
+  "permissionSyncTtlMinutes": "Intervall für Berechtigungsabgleich (Minuten)",
+  "permissionSyncTtlMinutesHint": "Prüft die Rollen angemeldeter Benutzer in diesem Abstand per Refresh-Token beim Identitätsanbieter. Leer verwendet den Server-Standard (SSO_PERMISSION_SYNC_TTL_MINUTES), 0 schaltet den Abgleich ab. Lehnt der Anbieter das Refresh-Token ab, wird die Sitzung beendet.",
   "samlProvisioningSecret": "SAML-Provisioning-Secret",
   "samlProvisioningSecretHint": "Wird für SAML-Provisioning-Aufrufe (Logout, Löschen, Berechtigungen) verwendet. Leer lassen, um das vorhandene Secret beizubehalten.",
   "showSamlProvisioningSecret": "Provisioning-Secret anzeigen",

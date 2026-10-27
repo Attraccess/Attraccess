@@ -351,6 +351,10 @@ describe('RbacService', () => {
         expect.objectContaining({ roleId: 3, source: UserRoleSource.SSO, externalValue: 'idp_manager' }),
       );
       expect(fixture.userRoleRepo.save).toHaveBeenCalled();
+      expect(fixture.eventEmitter.emit).toHaveBeenCalledWith(
+        UserPermissionsChangedEvent.EVENT_NAME,
+        expect.any(UserPermissionsChangedEvent),
+      );
     });
 
     it('refreshes externalValue on an existing SSO assignment when it changes', async () => {
@@ -368,12 +372,17 @@ describe('RbacService', () => {
 
     it('skips adding a role when already present in currentSsoRoles', async () => {
       const existingRole = fixture.makeRole({ key: 'manager' });
-      const currentSsoRoles = [fixture.makeUserRole({ source: UserRoleSource.SSO, role: existingRole })];
+      const currentSsoRoles = [
+        fixture.makeUserRole({ source: UserRoleSource.SSO, role: existingRole, externalValue: 'idp_manager' }),
+      ];
       fixture.userRoleRepo.find.mockResolvedValue(currentSsoRoles);
+      fixture.eventEmitter.emit.mockClear();
 
       await fixture.service.syncSsoRoles(10, [{ roleKey: 'manager', externalValue: 'idp_manager' }], SSO_TYPE, SSO_ID);
 
       expect(fixture.userRoleRepo.save).not.toHaveBeenCalled();
+      // No delta: no cache invalidation or permission-change fan-out.
+      expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('handles unique constraint violation (23505) gracefully when adding', async () => {

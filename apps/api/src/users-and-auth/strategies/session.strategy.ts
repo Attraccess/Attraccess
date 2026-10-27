@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-custom';
 import { Request } from 'express';
@@ -8,6 +8,7 @@ import { TwoFactorService } from '../auth/two-factor.service';
 import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { OidcSessionPermissionSyncService } from '../auth/sso/oidc/oidc-session-permission-sync.service';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -31,6 +32,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     private readonly rbacService: RbacService,
     private readonly apiTokenService: ApiTokenService,
     private readonly authAuditLogger: AuthAuditLogger,
+    @Optional() private readonly ssoPermissionSync?: OidcSessionPermissionSyncService,
   ) {
     super();
   }
@@ -79,6 +81,11 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
 
     const { user, session } = authenticated;
     req.authSession = session;
+
+    // Re-evaluate SSO roles before computing permissions once the provider's re-sync interval elapsed.
+    if ((await this.ssoPermissionSync?.syncIfDue(session, user.id)) === 'revoked') {
+      throw new UnauthorizedException('Session was ended by the identity provider');
+    }
 
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
     (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(

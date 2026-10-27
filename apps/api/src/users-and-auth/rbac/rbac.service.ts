@@ -157,8 +157,11 @@ export class RbacService {
         manager.getRepository(Role),
       ),
     );
-    this.permissionsCache.delete(userId);
-    await this.permissionsChanged(userId);
+    // Periodic session re-syncs usually find no delta; skip invalidation fan-out for those.
+    if (changes.added.length + changes.removed.length + changes.updated.length > 0) {
+      this.permissionsCache.delete(userId);
+      await this.permissionsChanged(userId);
+    }
     return changes;
   }
 

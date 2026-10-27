@@ -40,6 +40,7 @@ rate(attraccess_http_requests_total{status_code=~"5.."}[5m])
 | `attraccess_auth_active_sessions` | Gauge | -- | Anzahl aktiver authentifizierter Sitzungen |
 | `attraccess_auth_sso_login_total` | Counter | `provider_type` | Erfolgreiche SSO-Anmeldeversuche. `provider_type`: `oidc` oder `saml` |
 | `attraccess_auth_sso_login_failures_total` | Counter | `provider_type`, `reason` | Fehlgeschlagene SSO-Anmeldeversuche. `provider_type`: `oidc` oder `saml`; `reason`: `guard_rejected`, `invalid_assertion`, `linking_failed` oder `provider_error` |
+| `attraccess_auth_sso_permission_resync_total` | Counter | `provider_type`, `outcome` | Versuche des SSO-Berechtigungsabgleichs während der Sitzung. `provider_type`: `oidc`; `outcome`: `unchanged`, `updated`, `failed` oder `revoked` |
 | `attraccess_auth_2fa_usage_total` | Counter | `action` | Zwei-Faktor-Authentifizierungsaktionen |
 
 ### Beispiel-PromQL-Abfragen

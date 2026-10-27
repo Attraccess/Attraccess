@@ -73,6 +73,23 @@ Wenn Sie Keycloak-Gruppen für Rollenzuordnungen verwenden, konfigurieren Sie ei
 
 Keycloak lässt den `groups`-Claim bei Benutzern ohne Gruppenzugehörigkeit weg. Attraccess behält bestehende per SSO gewährte Rollen bei, wenn kein Rollen- oder Gruppen-Claim vorhanden ist. Das Entfernen der letzten zugeordneten Gruppe eines Benutzers entzieht diese Rolle daher nicht bei der nächsten Anmeldung. Weisen Sie jedem SSO-Benutzer eine Basisgruppe wie `attraccess_users` zu, damit der Claim vorhanden bleibt und das Entfernen einer zugeordneten Gruppe synchronisiert werden kann.
 
+### Berechtigungsabgleich während der Sitzung
+
+Standardmäßig werden SSO-Rollen nur bei der Anmeldung (oder über die Provisioning-API) aktualisiert. Damit langlebige Sitzungen mit dem Identitätsanbieter übereinstimmen, setzen Sie am Anbieter ein **Intervall für Berechtigungsabgleich (Minuten)**:
+
+- **Leer**: verwendet den Server-Standard aus `SSO_PERMISSION_SYNC_TTL_MINUTES` (`0`, aus, sofern nicht konfiguriert).
+- **`0`**: schaltet den Abgleich für diesen Anbieter ab.
+- **Jeder andere Wert**: Sind seit dem letzten Abgleich so viele Minuten vergangen, holt die nächste Anfrage mit dem Refresh-Token der Sitzung aktuelle Claims vom Token- und UserInfo-Endpunkt. Die Rollen werden dann genau wie bei der Anmeldung zugeordnet.
+
+Auch das Erneuern der Sitzung (`GET /api/auth/session/refresh`) löst einen Abgleich aus, höchstens einmal pro Minute, selbst wenn das Intervall noch nicht abgelaufen ist.
+
+Der Abgleich folgt denselben Regeln wie die Anmeldung. Rollen ändern sich nur, wenn sich die Rollen-/Gruppen-Claims geändert haben, und ein vollständig fehlender Claim entfernt nie Rollen. Jeder Versuch wird protokolliert und in der Metrik `attraccess_auth_sso_permission_resync_total` gezählt. Rollenänderungen werden im Audit-Log als **SSO-Berechtigungen synchronisiert** erfasst.
+
+Lehnt der Anbieter das Refresh-Token ab (`invalid_grant`, z. B. weil der Benutzer deaktiviert wurde oder seine Anbieter-Sitzung beendet ist) oder meldet er ein anderes Subject, wird die Attraccess-Sitzung beendet und als **SSO-Sitzungen widerrufen** erfasst. Bei Netzwerkfehlern oder Ausfällen des Anbieters bleiben die Sitzung und ihre aktuellen Rollen erhalten, und der nächste Versuch (periodisch oder beim Erneuern der Sitzung) wartet eine Minute.
+
+> [!IMPORTANT]
+> Der Abgleich benötigt ein Refresh-Token. Eine Sitzung erhält es nur, wenn der Anbieter es bei der Anmeldung ausgestellt hat, das ID-Token verifiziert werden konnte (JWKS konfiguriert oder per Discovery auffindbar) und sich der Benutzer nach dem Update auf eine Version mit dieser Funktion angemeldet hat. Refresh-Tokens werden bei jeder solchen Anmeldung verschlüsselt gespeichert, auch solange der Abgleich aus ist. Ein späteres Aktivieren erfordert daher keine neue Anmeldung. Bei Keycloak laufen Refresh-Tokens mit den SSO-Session-Idle-/Max-Timeouts ab. Setzen Sie diese mindestens so lang wie das Abgleichsintervall oder fordern Sie den Scope `offline_access` an, damit aktive Benutzer nicht abgemeldet werden. SAML-Anbieter werden während der Sitzung nicht abgeglichen. Verwenden Sie stattdessen die Provisioning-API.
+
 ## Callback-URL
 
 Tragen Sie folgende Callback-URL in Ihrem OIDC-Anbieter ein:

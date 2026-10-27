@@ -187,6 +187,7 @@ export class SSOController extends SsoUserProvisioning {
             'usernameClaimPaths',
             'emailClaimPaths',
             'roleMappings',
+            'permissionSyncTtlMinutes',
           ]
         : [
             'entryPoint',

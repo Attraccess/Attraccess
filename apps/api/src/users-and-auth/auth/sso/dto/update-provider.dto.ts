@@ -1,7 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsObject, IsOptional, IsString, ValidateNested, IsArray, IsBoolean, IsNotEmpty } from 'class-validator';
-import { IsStringArrayRecord } from './validators';
+import {
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsInt,
+  Max,
+  Min,
+} from 'class-validator';
+import { IsStringArrayRecord, MAX_PERMISSION_SYNC_TTL_MINUTES } from './validators';
 
 export class UpdateOIDCConfigurationDto {
   @ApiProperty({
@@ -31,6 +42,22 @@ export class UpdateOIDCConfigurationDto {
   @IsArray()
   @IsString({ each: true })
   signingAlgorithms?: string[] | null;
+
+  @ApiProperty({
+    description:
+      'Minutes between session-time permission re-syncs via the IdP refresh token. 0 disables re-sync; null or omitted uses the global SSO_PERMISSION_SYNC_TTL_MINUTES default.',
+    required: false,
+    nullable: true,
+    type: Number,
+    minimum: 0,
+    maximum: MAX_PERMISSION_SYNC_TTL_MINUTES,
+    example: 60,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(MAX_PERMISSION_SYNC_TTL_MINUTES)
+  permissionSyncTtlMinutes?: number | null;
 
   @ApiProperty({
     description: 'The issuer of the provider',

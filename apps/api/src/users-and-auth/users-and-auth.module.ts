@@ -1,6 +1,7 @@
 import { SsoLogoutService } from './auth/sso/sso-logout.service';
 import { SsoLogoutController } from './auth/sso/sso-logout.controller';
 import { OidcTokenVerifier } from './auth/sso/oidc/oidc-token-verifier.service';
+import { OidcSessionPermissionSyncService } from './auth/sso/oidc/oidc-session-permission-sync.service';
 import { Module } from '@nestjs/common';
 
 import { PassportModule } from '@nestjs/passport';
@@ -211,6 +212,7 @@ export const sessionStoreProvider = {
     SSOService,
     SsoLogoutService,
     OidcTokenVerifier,
+    OidcSessionPermissionSyncService,
     CookieConfigService,
     OidcCookieStateStore,
     SSOOIDCGuard,

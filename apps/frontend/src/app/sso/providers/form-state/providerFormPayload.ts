@@ -48,6 +48,8 @@ export function buildOidcPayload({
     userInfoURL: base.userInfoURL,
     clientId: base.clientId,
     clientSecret: base.clientSecret,
+    // null inherits the global SSO_PERMISSION_SYNC_TTL_MINUTES default
+    permissionSyncTtlMinutes: base.permissionSyncTtlMinutes ?? null,
   };
 
   if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);

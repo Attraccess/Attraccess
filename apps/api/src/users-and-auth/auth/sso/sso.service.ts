@@ -418,6 +418,10 @@ export class SSOService {
       // explicit null clears the column
       payload.roleMappings = updateConfig.roleMappings;
     }
+    if (typeof updateConfig.permissionSyncTtlMinutes !== 'undefined') {
+      // explicit null falls back to the global default
+      payload.permissionSyncTtlMinutes = updateConfig.permissionSyncTtlMinutes;
+    }
 
     await repository.update({ ssoProviderId: providerId }, payload);
     return repository.findOne({ where: { ssoProviderId: providerId } });

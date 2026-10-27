@@ -59,6 +59,13 @@ export const REVOKE_SESSION_SCRIPT = SESSION_SCRIPT_COMMON + 'return remove(ARGV
 // Existing sessions without a lineage index use their original token hash.
 export const REVOKE_LOGOUT_SESSION_SCRIPT =
   SESSION_SCRIPT_COMMON + "return remove(redis.call('GET', KEYS[1]) or ARGV[2])";
+// Existing sessions without a lineage index use their original token hash.
+export const COMPARE_AND_SET_SSO_CONTEXT_SCRIPT = `
+local key = 'session:' .. (redis.call('GET', KEYS[1]) or ARGV[1])
+if redis.call('HGET', key, 'ssoContext') ~= ARGV[2] then return 0 end
+redis.call('HSET', key, 'ssoContext', ARGV[3])
+return 1
+`;
 export const REVOKE_USER_SCRIPT =
   SESSION_SCRIPT_COMMON +
   `

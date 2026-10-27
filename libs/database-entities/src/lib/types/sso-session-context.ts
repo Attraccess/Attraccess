@@ -9,6 +9,12 @@ export type SsoSessionContext =
       subject: string;
       sid?: string;
       idTokenEncrypted?: string;
+      /** Encrypted IdP refresh token used for session-time permission re-sync. */
+      refreshTokenEncrypted?: string;
+      /** Last SSO permission sync (login or re-sync) in milliseconds, on the local clock. */
+      lastSsoSyncAt?: number;
+      /** After a failed re-sync, the next attempt waits until this time in milliseconds. */
+      ssoSyncRetryAt?: number;
     }
   | {
       /** Signed login assertion IssueInstant in milliseconds, on the provider clock. */

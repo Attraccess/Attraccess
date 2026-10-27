@@ -1,5 +1,8 @@
 import { registerDecorator, ValidationOptions } from 'class-validator';
 
+/** Sessions live at most 7 days, so a longer re-sync interval could never trigger. */
+export const MAX_PERMISSION_SYNC_TTL_MINUTES = 7 * 24 * 60;
+
 export function IsStringArrayRecord(options?: ValidationOptions) {
   return function (object: object, propertyName: string) {
     registerDecorator({

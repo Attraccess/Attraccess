@@ -65,6 +65,7 @@ describe('SSO provider form', () => {
         usernameClaimPaths: ['preferred_username'],
         emailClaimPaths: ['email'],
         roleMappings: { member: ['reader'] },
+        permissionSyncTtlMinutes: 45,
       },
     };
     const { result } = renderHook(() => useSSOProviderForm(7));
@@ -77,6 +78,7 @@ describe('SSO provider form', () => {
         endSessionURL: 'https://idp.example/logout',
         jwksURL: 'https://idp.example/jwks',
         signingAlgorithms: ['ES256'],
+        permissionSyncTtlMinutes: 45,
       },
     });
     expect(result.current.scopesInput).toBe('openid, email');
@@ -206,6 +208,19 @@ describe('SSO provider form', () => {
       signingAlgorithms: ['RS256'],
     });
   });
+  it('saves the permission re-sync interval and sends null to inherit the global default', async () => {
+    const { result } = renderHook(() => useSSOProviderForm(7));
+    act(() => result.current.setOidc('permissionSyncTtlMinutes', 0));
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[0][0].requestBody.oidcConfiguration).toMatchObject({ permissionSyncTtlMinutes: 0 });
+
+    act(() => result.current.setOidc('permissionSyncTtlMinutes', null));
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[1][0].requestBody.oidcConfiguration).toMatchObject({
+      permissionSyncTtlMinutes: null,
+    });
+  });
+
   it('requires signing material for SAML logout even when login signing is disabled', async () => {
     const { result } = renderHook(() => useSSOProviderForm());
     act(() => {

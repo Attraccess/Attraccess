@@ -29,6 +29,8 @@ import { RbacService } from '../../../rbac/rbac.service';
 
 import { resolveSsoRoleAssignments } from '../permission-mapping';
 
+import { getOidcPermissionClaimValues, resolveOidcRoleNames } from './oidc-permission-claims';
+
 import { ssoAuditSnapshot } from '../audit/provider-audit';
 
 import { SSOService } from '../sso.service';
@@ -44,7 +46,7 @@ export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
 export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
+export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
   constructor(
     protected moduleRef: ModuleRef,
     config: SSOProviderOIDCConfiguration,
@@ -112,13 +114,16 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
     }
   }
 
-  // Explicit six-argument Passport verify callback: req, issuer, profile, context, id_token, done.
+  // Explicit eight-argument Passport verify callback: req, issuer, profile, context, id_token, access_token,
+  // refresh_token, done. The refresh token enables session-time permission re-sync.
   async validate(
     req: SsoSessionRequest,
     issuer: string,
     profile: Profile,
     context: unknown,
     idToken: string,
+    _accessToken?: string,
+    refreshToken?: string,
   ): Promise<User> {
     const verifier = this.moduleRef.get(OidcTokenVerifier, { strict: false });
     let claims: Record<string, unknown> | undefined;
@@ -135,6 +140,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
         providerIssuedAt: Number(claims.iat) * 1000,
         ...(typeof claims.sid === 'string' && claims.sid ? { sid: claims.sid } : {}),
         idTokenEncrypted: encryption.encrypt(idToken),
+        ...(refreshToken ? { refreshTokenEncrypted: encryption.encrypt(refreshToken) } : {}),
+        lastSsoSyncAt: Date.now(),
       };
     } catch (error) {
       // Old providers without usable discovery/JWKS retain their existing OAuth login path,
@@ -351,50 +358,11 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
   }
 
   protected getPermissionClaimValues(claimSources: unknown[]): unknown[] {
-    const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
-    if (this.config.clientId) {
-      paths.push(`resource_access.${this.config.clientId}.roles`);
-    }
-
-    const values: unknown[] = [];
-    for (const path of paths) {
-      for (const source of claimSources) {
-        const value = get(source, path);
-        if (value !== undefined && value !== null) {
-          values.push(value);
-        }
-      }
-    }
-
-    return values;
+    return getOidcPermissionClaimValues(claimSources, this.config.clientId);
   }
 
   protected resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
-    const roleNames: string[] = [];
-
-    for (const value of claimValues) {
-      if (Array.isArray(value)) {
-        for (const entry of value) {
-          if (typeof entry === 'string') roleNames.push(entry);
-        }
-        continue;
-      }
-      if (typeof value === 'string') {
-        roleNames.push(value);
-        continue;
-      }
-      if (value && typeof value === 'object') {
-        for (const entry of Object.values(value)) {
-          if (typeof entry === 'string') roleNames.push(entry);
-          else if (Array.isArray(entry)) {
-            for (const item of entry) {
-              if (typeof item === 'string') roleNames.push(item);
-            }
-          }
-        }
-      }
-    }
-
+    const roleNames = resolveOidcRoleNames(claimValues);
     this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
     return roleNames;
   }

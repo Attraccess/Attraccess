@@ -124,6 +124,17 @@ export class SSOProviderOIDCConfiguration {
   })
   signingAlgorithms?: string[] | null;
 
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description:
+      'Minutes between session-time permission re-syncs using the IdP refresh token; 0 disables re-sync, null uses the global SSO_PERMISSION_SYNC_TTL_MINUTES default',
+    required: false,
+    nullable: true,
+    type: Number,
+    example: 60,
+  })
+  permissionSyncTtlMinutes?: number | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the user was created',

@@ -10,7 +10,11 @@ export const getDefaultOidcConfiguration = () => ({
   endSessionURL: '',
   jwksURL: '',
   signingAlgorithms: ['RS256'],
+  permissionSyncTtlMinutes: null as number | null,
 });
+
+/** Mirrors the API limit: sessions live at most 7 days. */
+export const MAX_PERMISSION_SYNC_TTL_MINUTES = 7 * 24 * 60;
 
 export const getDefaultSamlConfiguration = () => ({
   entryPoint: '',

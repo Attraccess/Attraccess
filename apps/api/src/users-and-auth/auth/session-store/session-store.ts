@@ -33,6 +33,8 @@ export interface SessionStore {
     expiresAt: Date,
   ): Promise<void>;
   getSsoContext(token: string): Promise<SsoSessionContext | null>;
+  /** Replaces a live session's SSO context only while it still equals `expected` (claims a re-sync). */
+  compareAndSetSsoContext(id: string, expected: SsoSessionContext, next: SsoSessionContext): Promise<boolean>;
   /** Unsigned notifications require a match to bound retained receipts by revoked active sessions. */
   revokeSsoSessionsOnce(
     selector: SsoSessionSelector,

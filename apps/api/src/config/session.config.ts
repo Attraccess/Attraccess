@@ -4,6 +4,13 @@ import { z } from 'zod';
 const SessionEnvSchema = z.object({
   AUTH_SESSION_SECRET: z.string().min(1, { message: 'AUTH_SESSION_SECRET is required' }),
   SESSION_COOKIE_MAX_AGE: z.coerce.number().default(7 * 24 * 60 * 60 * 1000), // 7 days in milliseconds
+  // Global default for OIDC providers without their own interval; 0 disables session-time permission re-sync
+  SSO_PERMISSION_SYNC_TTL_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(7 * 24 * 60)
+    .default(0),
 });
 
 export type SessionConfigType = z.infer<typeof SessionEnvSchema> & {};

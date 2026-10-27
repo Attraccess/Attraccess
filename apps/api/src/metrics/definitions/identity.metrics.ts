@@ -27,6 +27,13 @@ export function createIdentityMetrics(registry: Registry) {
     registers: [registry],
   });
 
+  const authSsoPermissionResyncTotal = new Counter({
+    name: 'attraccess_auth_sso_permission_resync_total',
+    help: 'Total number of session-time SSO permission re-sync attempts',
+    labelNames: ['provider_type', 'outcome'],
+    registers: [registry],
+  });
+
   const auth2faUsageTotal = new Counter({
     name: 'attraccess_auth_2fa_usage_total',
     help: 'Total number of 2FA actions',
@@ -64,6 +71,7 @@ export function createIdentityMetrics(registry: Registry) {
     authActiveSessions,
     authSsoLoginTotal,
     authSsoLoginFailuresTotal,
+    authSsoPermissionResyncTotal,
     auth2faUsageTotal,
     usersTotal,
     usersRegisteredTotal,
