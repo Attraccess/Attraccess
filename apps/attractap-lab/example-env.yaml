@@ -1,0 +1,14 @@
+# Copy this file and replace camera crop with the physical reader's screen.
+# LG_COORDINATOR=lab-host:20408 selects the coordinator (default localhost).
+imports:
+  - attractap_lab.drivers
+targets:
+  main:
+    resources:
+      RemotePlace:
+        name: reader-1
+    drivers:
+      ESPToolDriver: {}
+      SerialDriver: {}
+      ScreenCaptureDriver:
+        crop: "320:240:0:0"

@@ -30,8 +30,8 @@ Every current JavaScript/TypeScript app, library and tool has a `crap-score`
 target, including plugin frontends, the companion renderer and WAGO runtime.
 Files outside a nested Nx project, including standalone tools, root configuration,
 shared plugin scripts and examples, belong to the root target. The C/C++ Attractap
-firmware and desktop simulator cannot be analyzed by this JS/TS tool and retain
-their existing checks.
+firmware, desktop simulator and Python/Nix Attractap lab cannot be analyzed by
+this JS/TS tool and retain their native checks.
 
 Source discovery includes Git-tracked and unignored new JS/TS files. Tests,
 fixtures, declarations, generated clients and build output are excluded. Nested
