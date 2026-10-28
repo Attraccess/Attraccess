@@ -23,14 +23,16 @@ import {
 import { ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { Button } from '../../../../components/button/index';
-import { StandardModal } from '../../../../components/standardModal';
 import { SettingsRow } from '../../components/SettingsRow';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  AlertStatusIcon,
+  Button,
+  LabeledSwitch,
+  StandardModal,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   useSettingsServiceDeleteMetricsApiKey,
   useSettingsServiceGenerateMetricsApiKey,

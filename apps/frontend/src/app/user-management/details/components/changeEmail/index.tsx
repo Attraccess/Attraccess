@@ -17,17 +17,14 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useState } from 'react';
 
 import de from './de.json';
 import en from './en.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { ApiError } from '@attraccess/react-query-client';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
-import { StandardModal } from '../../../../../components/standardModal';
 
 interface Props {
   userId: number;

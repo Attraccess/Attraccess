@@ -1,5 +1,4 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
-import { Button } from '../../../components/button/index';
 import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { Select } from '../../../components/select/index';
 import { AddPersonDrawer } from './AddPersonDrawer';
@@ -11,7 +10,7 @@ import { FilterMode, PeopleManagementProps, AddMode } from './types';
 import { useOverlayState } from '@heroui/react';
 import { User } from '@attraccess/react-query-client';
 import type { UserIdentity } from '@attraccess/plugins-frontend-ui';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { usePeopleMutations } from './usePeopleMutations';
 import { usePeopleRows } from './usePeopleRows';
 import en from './en.json';

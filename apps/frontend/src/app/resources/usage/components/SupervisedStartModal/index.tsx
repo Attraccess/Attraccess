@@ -17,10 +17,15 @@ import {
   Spinner,
 } from '@heroui/react';
 import { X, Nfc } from 'lucide-react';
-import { Button } from '../../../../../components/button/index';
-import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
-import { useTranslations, AttraccessUser, TFunction } from '@attraccess/plugins-frontend-ui';
+import {
+  AlertStatusIcon,
+  AttraccessUser,
+  Button,
+  StandardDrawer,
+  TFunction,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   Attractap,
@@ -35,7 +40,6 @@ import {
 import { useAuth } from '../../../../../hooks/useAuth';
 import en from './translations/en.json';
 import de from './translations/de.json';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 
 export /** The 30s supervisor-approval window, mirrored from the backend. */
 const APPROVAL_TIMEOUT_SECONDS = 30;

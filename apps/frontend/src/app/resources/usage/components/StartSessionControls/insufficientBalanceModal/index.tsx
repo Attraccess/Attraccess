@@ -1,9 +1,8 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import en from './en.json';
 import de from './de.json';
 import { BillingDashboardTopupCard } from '../../../../../billing/dashboard/topup';
-import { StandardModal } from '../../../../../../components/standardModal';
 
 interface Props {
   isOpen: boolean;

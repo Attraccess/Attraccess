@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../components/pageHeader';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 

@@ -1,8 +1,7 @@
 import { Button, Card, Chip, Spinner } from '@heroui/react';
 import { PlusIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { EmptyState } from '../../../../components/emptyState';
+import { EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useResourceFormsServiceResourceFormsList } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';

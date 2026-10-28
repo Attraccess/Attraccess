@@ -1,6 +1,6 @@
 import { Button, TextField, InputGroup } from '@heroui/react';
 import { ListFilterIcon, ScanQrCodeIcon, SearchIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { CreateResourceButton } from '../createResourceButton';
 import en from './toolbar.en.json';
 import de from './toolbar.de.json';
@@ -8,7 +8,6 @@ import { ResourceScanner } from './scanner';
 import { ResourceFilter } from './filter';
 import { FilterProps } from '../filterProps';
 import { cn } from '@heroui/react';
-import { PageHeader } from '../../../components/pageHeader';
 
 interface ToolbarProps {
   onOpenCreate: () => void;

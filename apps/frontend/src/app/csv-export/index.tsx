@@ -1,9 +1,8 @@
 // CSV export page composition — date range picker, type cards, configure drawer
 // FEATURE: CSV export — top level page for /csv-export route
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { DateValue, DrawerHeader, DrawerHeading, RangeValue } from '@heroui/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { StandardDrawer } from '../../components/standardDrawer';
 import { DateRangeSection } from './date-range-section';
 import { computeRange, Preset, rangeToDateBounds } from './date-range-section/compute-range';
 import { SelectedRangePill } from './date-range-section/selected-range-pill';

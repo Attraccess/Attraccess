@@ -12,7 +12,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ResourceType,
   useResourcesServiceCreateOneResource,
@@ -23,7 +23,6 @@ import { DoorOpen, Shapes } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { recordUsefulAction } from '../../components/DonationPrompt/usefulAction';
 import { SplitActionButton } from '../../components/splitActionButton';
-import { StandardDrawer } from '../../components/standardDrawer';
 import { useToastMessage } from '../../components/toastProvider';
 import en from './createResourceDrawer.en.json';
 import de from './createResourceDrawer.de.json';

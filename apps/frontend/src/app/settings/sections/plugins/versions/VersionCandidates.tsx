@@ -1,4 +1,4 @@
-import { Button } from '../../../../../components/button/index';
+import { Button } from '@attraccess/plugins-frontend-ui';
 import type { usePluginsSectionState } from '../state/usePluginSettings';
 type Props = Pick<
   ReturnType<typeof usePluginsSectionState>,

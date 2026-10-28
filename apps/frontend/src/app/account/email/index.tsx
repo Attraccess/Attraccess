@@ -17,15 +17,12 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
-import { StandardModal } from '../../../components/standardModal';
 
 export function EmailForm() {
   const { t } = useTranslations({ en, de });

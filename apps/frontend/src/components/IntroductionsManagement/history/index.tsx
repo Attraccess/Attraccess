@@ -1,4 +1,4 @@
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, EmptyState, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   ModalBody,
@@ -15,8 +15,6 @@ import {
   TableRow,
 } from '@heroui/react';
 import { useMemo, useState } from 'react';
-import { EmptyState } from '../../../components/emptyState';
-import { StandardModal } from '../../standardModal';
 import { IntroductionStatusChip } from '../../IntroductionStatusChip';
 import { ResourceIntroductionHistoryItem } from '@attraccess/react-query-client';
 

@@ -1,9 +1,7 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Chip, DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { UsbIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '../../../components/button';
-import { StandardDrawer } from '../../../components/standardDrawer';
 import { ConnectionStateEvent, ESPTools } from '../../../utils/esp-tools';
 import { SetupTabs } from './SetupTabs';
 

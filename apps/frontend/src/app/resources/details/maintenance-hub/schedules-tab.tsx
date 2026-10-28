@@ -1,6 +1,5 @@
 import { Accordion, Skeleton } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, DeleteConfirmationModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PlusIcon, CalendarClockIcon } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -11,7 +10,6 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { ScheduleAccordionItem } from './schedule-accordion-item';
-import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
 import { SectionCard } from './section-card';
 import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness';
 import de from './de.json';

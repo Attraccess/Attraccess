@@ -1,6 +1,4 @@
-import { PageHeader } from '../../components/pageHeader';
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
-import { Button } from '../../components/button';
 import {
   BellIcon,
   CalendarClockIcon,
@@ -10,8 +8,7 @@ import {
   Trash2Icon,
   UserIcon,
 } from 'lucide-react';
-import { StandardDrawer } from '../../components/standardDrawer';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { UsernameForm } from './username';

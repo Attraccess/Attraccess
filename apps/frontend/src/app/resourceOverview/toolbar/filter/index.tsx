@@ -1,11 +1,9 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 
 import de from './de.json';
 import en from './en.json';
 import { FilterProps } from '../../filterProps';
-import { StandardDrawer } from '../../../../components/standardDrawer';
 
 interface Props {
   children: (props: { onOpen: () => void }) => React.ReactNode;

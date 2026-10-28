@@ -1,9 +1,5 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, TextField, cn } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
-import { PageHeader } from '../../../../../components/pageHeader/index';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, LabeledSwitch, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api/index';
 import { useAttractapSerialComm } from '../Auth/index';

@@ -3,8 +3,7 @@
 import { forwardRef, useCallback, useImperativeHandle } from 'react';
 import { DrawerBody, DrawerHeader, DrawerHeading, useOverlayState, Button, Spinner } from '@heroui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { StandardDrawer } from '../../../../../components/standardDrawer';
+import { StandardDrawer, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { CatalogContent } from './catalogContent';
 import { useNodeCatalog } from './useNodeCatalog';
 import { getDomainDef, getPluginDomainLabel } from './domains';

@@ -4,10 +4,9 @@ import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react
 import { KeyRound } from 'lucide-react';
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError, PasskeysService } from '@attraccess/react-query-client';
-import { Button } from '../../components/button';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import { getTranslationKeyForApiError } from '../../utils/apiError';

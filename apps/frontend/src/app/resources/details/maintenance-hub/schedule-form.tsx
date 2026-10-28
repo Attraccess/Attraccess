@@ -2,9 +2,7 @@
 // FEATURE: Maintenance Hub - schedule create/edit form without overlay state
 
 import { Alert, AlertContent, AlertTitle, Form, Input, Label, TextField } from '@heroui/react';
-import { Button } from '../../../../components/button/index';
 import { Select } from '../../../../components/select/index';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import {
   ResourceMaintenanceScheduleTriggerType,
   UsageDurationUnit,
@@ -14,7 +12,7 @@ import {
   useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule,
 } from '@attraccess/react-query-client';
 import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness/index';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import de from './de.json';

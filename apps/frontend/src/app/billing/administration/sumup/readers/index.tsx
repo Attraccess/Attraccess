@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -14,13 +14,11 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { SmartphoneNfcIcon, Trash2Icon } from 'lucide-react';
 import {
   useBillingServiceGetSumUpConfiguration,
   useBillingServiceGetSumUpReaders,
 } from '@attraccess/react-query-client';
-import { EmptyState } from '../../../../../components/emptyState';
 import { SumUpReadersPairing } from './pairing';
 import { SumUpReaderDeleteModal } from './remove';
 

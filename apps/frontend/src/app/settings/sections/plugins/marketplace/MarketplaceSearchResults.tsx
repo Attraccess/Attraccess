@@ -1,6 +1,6 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { Card, Input, TextField } from '@heroui/react';
 import { cardVariants } from '@heroui/styles';
-import { Button } from '../../../../../components/button/index';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import { usePluginsSectionState } from '../state/usePluginSettings';
 type Props = Pick<

@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   DrawerBody,
   DrawerFooter,
@@ -12,8 +12,6 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../../components/button';
-import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useState } from 'react';

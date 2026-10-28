@@ -1,12 +1,17 @@
 import { memo } from 'react';
 import { Alert, DrawerBody, DrawerHeader, DrawerHeading, Button, Spinner } from '@heroui/react';
 import { ResourceUsageAction, ResourceUsage, FormFieldType } from '@attraccess/react-query-client';
-import { AttraccessUser, useTranslations, DateTimeDisplay, DurationDisplay } from '@attraccess/plugins-frontend-ui';
+import {
+  AttraccessUser,
+  DateTimeDisplay,
+  DurationDisplay,
+  StandardDrawer,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
 import { X } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
-import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useAuth } from '../../../../../hooks/useAuth';
 
 export interface UsageNotesDrawerProps {

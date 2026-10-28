@@ -1,13 +1,12 @@
 import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger, useOverlayState } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId, NodeProps } from '@xyflow/react';
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
-import { DeleteConfirmationModal } from '../../../../../components/deleteConfirmationModal/index';
 import { NodeEditor } from './editor/index';
 import { ResourceFlowLogType, ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useFlowContext } from '../context/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';
-import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { DeleteConfirmationModal, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 export function useAttraccessNodeState(props: Props) {
   const { schema, previewMode, tNodeTranslations: t, tNodeExists, data, validationError } = props;

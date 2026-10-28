@@ -1,3 +1,4 @@
+import { Button, EmptyState } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -10,8 +11,6 @@ import {
   TableHeader,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button } from '../../../../components/button/index';
-import { EmptyState } from '../../../../components/emptyState';
 import { UploadPluginModal } from '../../../plugins/UploadPluginModal';
 import { SettingsSection } from '../../components/SettingsSection';
 import { MarketplaceBrowser } from './marketplace/MarketplaceBrowser';

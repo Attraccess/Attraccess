@@ -23,15 +23,12 @@ import {
 } from '@heroui/react';
 import { ArrowLeft, Braces, Languages, RotateCcw } from 'lucide-react';
 import { buttonVariants } from '@heroui/styles';
-import { Button } from '../../../components/button/index';
-import { StandardDrawer } from '../../../components/standardDrawer';
-import { StandardModal } from '../../../components/standardModal';
 import { MjmlVisualEditor } from './MjmlVisualEditor';
 import { TranslationsSection } from './TranslationsSection';
 import { CHROME_CLASS, extractTemplateFragment, splitHead, wrapInLayoutChrome } from './mjmlLayout';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';

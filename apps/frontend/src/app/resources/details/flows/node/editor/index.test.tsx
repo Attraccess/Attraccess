@@ -19,9 +19,12 @@ vi.mock('@attraccess/react-query-client', () => ({
 vi.mock('../../../../../../../components/mqttServerSelect', () => ({ MqttServerSelect: () => null }));
 vi.mock('../../../../../../../components/companionDeviceSelect', () => ({ CompanionDeviceSelect: () => null }));
 vi.mock('../../../../../../mqtt/servers/CreateMqttServerPage', () => ({ CreateMqttServerForm: () => null }));
-vi.mock('../../../../../../components/standardDrawer', () => ({
-  StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
-    isOpen ? <div>{children}</div> : null,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
+      isOpen ? <div>{children}</div> : null,
+  }))()),
 }));
 
 const baseProperties = {

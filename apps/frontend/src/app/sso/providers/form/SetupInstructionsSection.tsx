@@ -1,7 +1,6 @@
 import { Link, Tooltip, TooltipContent } from '@heroui/react';
 import { Copy } from 'lucide-react';
-import { Button } from '../../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SSOProviderSetupUrls } from '../useSSOProviderSetupUrls';
 import en from '../en.json';
 import de from '../de.json';

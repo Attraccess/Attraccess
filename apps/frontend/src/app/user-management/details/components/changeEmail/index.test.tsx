@@ -15,19 +15,47 @@ vi.mock('@attraccess/react-query-client', () => ({
   useUsersServiceFindManyKey: 'users',
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string) =>
-      ({
-        'email.label': 'Email',
-        'email.privacyHint': "The current email address is not shown to protect this user's privacy.",
-        'actions.save': 'Save',
-        'actions.cancel': 'Cancel',
-        'actions.confirm': 'Change email',
-        'modal.title': 'Confirm email change',
-        'modal.warning': 'Sign-in warning',
-      })[key] ?? key,
-  }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({
+      t: (key: string) =>
+        ({
+          'email.label': 'Email',
+          'email.privacyHint': "The current email address is not shown to protect this user's privacy.",
+          'actions.save': 'Save',
+          'actions.cancel': 'Cancel',
+          'actions.confirm': 'Change email',
+          'modal.title': 'Confirm email change',
+          'modal.warning': 'Sign-in warning',
+        })[key] ?? key,
+    }),
+  }))()),
+  ...(await (() => ({
+    Button: ({
+      children,
+      onPress,
+      isDisabled,
+    }: {
+      children: React.ReactNode;
+      onPress: () => void;
+      isDisabled?: boolean;
+    }) => (
+      <button type="button" onClick={onPress} disabled={isDisabled}>
+        {children}
+      </button>
+    ),
+  }))()),
+  ...(await (() => ({ AlertStatusIcon: () => null }))()),
+  ...(await (() => ({
+    StandardModal: ({
+      isOpen,
+      children,
+    }: {
+      isOpen: boolean;
+      children: (props: { close: () => void }) => React.ReactNode;
+    }) => (isOpen ? <div>{children({ close: vi.fn() })}</div> : null),
+  }))()),
 }));
 
 vi.mock('@heroui/react', () => ({
@@ -54,34 +82,6 @@ vi.mock('@heroui/react', () => ({
     const [isOpen, setIsOpen] = useState(false);
     return { isOpen, open: () => setIsOpen(true), close: () => setIsOpen(false) };
   },
-}));
-
-vi.mock('../../../../../components/button', () => ({
-  Button: ({
-    children,
-    onPress,
-    isDisabled,
-  }: {
-    children: React.ReactNode;
-    onPress: () => void;
-    isDisabled?: boolean;
-  }) => (
-    <button type="button" onClick={onPress} disabled={isDisabled}>
-      {children}
-    </button>
-  ),
-}));
-
-vi.mock('../../../../../components/AlertStatusIcon', () => ({ AlertStatusIcon: () => null }));
-
-vi.mock('../../../../../components/standardModal', () => ({
-  StandardModal: ({
-    isOpen,
-    children,
-  }: {
-    isOpen: boolean;
-    children: (props: { close: () => void }) => React.ReactNode;
-  }) => (isOpen ? <div>{children({ close: vi.fn() })}</div> : null),
 }));
 
 vi.mock('../../../../../components/toastProvider', () => ({

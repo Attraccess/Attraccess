@@ -3,7 +3,7 @@ import { cn, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrig
 import { buttonVariants } from '@heroui/styles';
 import { Button } from '../button';
 import { MoreVerticalIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '../../i18n';
 
 export type PageActionVariant = 'primary' | 'secondary' | 'destructive';
 

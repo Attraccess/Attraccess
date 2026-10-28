@@ -1,6 +1,5 @@
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { NotFound } from '../../not-found/index';
-import { PageHeader } from '../../../components/pageHeader/index';
 import { UserPermissionForm } from './components/permissionsForm/index';
 import { SetPasswordForm } from './components/setPasswordForm/index';
 import { ChangeUsernameForm } from './components/changeUsername/index';
@@ -16,8 +15,6 @@ import {
   CreditCardIcon,
 } from 'lucide-react';
 import { FlatSection } from '../../../components/flatSection';
-import { Button } from '../../../components/button/index';
-import { StandardModal } from '../../../components/standardModal';
 import {
   useRbacServiceListPermissions,
   useRbacServiceListRoles,
@@ -31,7 +28,7 @@ import {
   useUsersServiceDeleteUser,
   useUsersServiceGetOneUserById,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useMemo } from 'react';
 import en from './en.json';

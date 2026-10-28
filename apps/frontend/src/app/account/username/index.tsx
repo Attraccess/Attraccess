@@ -5,11 +5,10 @@ import {
   useUsersServiceGetCurrentKey,
 } from '@attraccess/react-query-client';
 import { TextField, Label, Input } from '@heroui/react';
-import { Button } from '../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 

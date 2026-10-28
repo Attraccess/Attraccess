@@ -17,7 +17,7 @@ import {
   AlertTitle,
 } from '@heroui/react';
 import { ChevronRightIcon, ShieldCheckIcon } from 'lucide-react';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, LabeledSwitch, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   AuditSettingsDto,
   useSettingsServiceSettingsControllerUpdateAuditSettings,
@@ -29,7 +29,6 @@ import {
   UseAuditServiceAuditControllerListKeyFn,
   UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn,
 } from '@attraccess/react-query-client';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { SettingsSaveBar } from '../../../components/SettingsSaveBar';
 import {
   coreAuditDomains,
@@ -48,7 +47,6 @@ import {
 } from '../audit-log-model';
 import en from '../en.json';
 import de from '../de.json';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../../hooks/useAuth';

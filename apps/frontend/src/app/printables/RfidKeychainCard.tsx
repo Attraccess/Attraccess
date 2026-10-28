@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Description, Input, Label, Spinner, TextField } from '@heroui/react';
-import { useTranslations, type TFunction } from '@attraccess/plugins-frontend-ui';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+  Description,
+  Input,
+  Label,
+  Spinner,
+  TextField,
+} from '@heroui/react';
+import { AlertStatusIcon, Button, type TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import scadSource from './rfid-keychain-card.scad?raw';
-import { Button } from '../../components/button';
 import { Select } from '../../components/select';
-import { AlertStatusIcon } from '../../components/AlertStatusIcon';
 import { Preview } from './Preview';
 import { downloadCard, scadWithLabel, toFileSlug, triggerDownload } from './download';
 import { useCardRender } from './useCardRender';
@@ -87,7 +95,6 @@ export function RfidKeychainCard() {
             <AlertDescription>{t('printTip')}</AlertDescription>
           </AlertContent>
         </Alert>
-
       </div>
 
       {/* Preview, with the download controls beneath it at the bottom right. */}
@@ -95,9 +102,7 @@ export function RfidKeychainCard() {
         {/* min-h matches Preview's own height so the first render — when there is no canvas
             yet — still has somewhere to show the spinner instead of collapsing to nothing. */}
         <div className="relative min-h-80 rounded-lg bg-default-100">
-          {result !== null && (
-            <Preview body={result.body} letters={result.letters} ariaLabel={t('previewAriaLabel')} />
-          )}
+          {result !== null && <Preview body={result.body} letters={result.letters} ariaLabel={t('previewAriaLabel')} />}
           {status === 'rendering' && (
             <div className="absolute inset-0 flex items-center justify-center gap-2">
               <Spinner size="sm" />

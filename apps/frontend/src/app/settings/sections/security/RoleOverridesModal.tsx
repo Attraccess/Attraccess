@@ -1,3 +1,4 @@
+import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
 import {
   ModalBody,
   ModalFooter,
@@ -19,9 +20,6 @@ import {
   PasswordPolicyRole,
 } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
-import { Button } from '../../../../components/button/index';
-import { StandardModal } from '../../../../components/standardModal';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { POLICY_BOOL_FIELDS, POLICY_NUMBER_FIELDS, POLICY_FIELD_KEYS } from './policy-fields';
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';

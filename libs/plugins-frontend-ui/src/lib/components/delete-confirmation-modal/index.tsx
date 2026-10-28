@@ -1,5 +1,6 @@
-import { useTranslations, I18nTransComponent } from '@attraccess/plugins-frontend-ui';
-import { StatusDialog } from '../statusDialog';
+import { useTranslations } from '../../i18n';
+import { I18nTransComponent } from '../Trans';
+import { StatusDialog } from '../status-dialog';
 import en from './en.json';
 import de from './de.json';
 

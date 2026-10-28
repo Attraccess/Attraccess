@@ -1,7 +1,6 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ProgressBar, ProgressBarFill, ProgressBarTrack } from "@heroui/react";
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ProgressBar, ProgressBarFill, ProgressBarTrack } from '@heroui/react';
 import { UnauthorizedLayout } from '../../app/unauthorized/unauthorized-layout/layout';
-import { PageHeader } from '../pageHeader';
 
 import de from './de.json';
 import en from './en.json';

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Description } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   MassIntroductionSessionDto,
@@ -13,7 +13,6 @@ import {
   useAccessControlServiceMassIntroductionRedeem,
 } from '@attraccess/react-query-client';
 import { OneTimeCodeInput } from '../../components/OneTimeCodeInput';
-import { StatusDialog } from '../../components/statusDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 import en from './en.json';
 import de from './de.json';

@@ -1,10 +1,26 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Alert, AlertContent, AlertTitle, ProgressBar, ProgressBarFill, ProgressBarTrack, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from '@heroui/react';
-import { Button } from '../../../../components/button';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionPanel,
+  AccordionBody,
+  Alert,
+  AlertContent,
+  AlertTitle,
+  ProgressBar,
+  ProgressBarFill,
+  ProgressBarTrack,
+  ProgressCircle,
+  ProgressCircleFillCircle,
+  ProgressCircleTrack,
+  ProgressCircleTrackCircle,
+} from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Terminal } from '../../../../components/Terminal';
 
 import de from './de.json';
@@ -134,13 +150,7 @@ export function FirmwareFlasher(props: Props) {
       )}
 
       {!flashError && (
-        <ProgressBar
-          isIndeterminate={flashProgress === 0}
-          value={flashProgress}
-          minValue={0}
-          maxValue={100}
-
-        >
+        <ProgressBar isIndeterminate={flashProgress === 0} value={flashProgress} minValue={0} maxValue={100}>
           <ProgressBarTrack>
             <ProgressBarFill />
           </ProgressBarTrack>
@@ -149,8 +159,14 @@ export function FirmwareFlasher(props: Props) {
 
       <Accordion>
         <AccordionItem key="terminal" id="terminal">
-          <AccordionHeading><AccordionTrigger>{t('terminal.title')}</AccordionTrigger></AccordionHeading>
-          <AccordionPanel><AccordionBody><Terminal logLines={logLines} maxHeight="30vh" /></AccordionBody></AccordionPanel>
+          <AccordionHeading>
+            <AccordionTrigger>{t('terminal.title')}</AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel>
+            <AccordionBody>
+              <Terminal logLines={logLines} maxHeight="30vh" />
+            </AccordionBody>
+          </AccordionPanel>
         </AccordionItem>
       </Accordion>
     </div>

@@ -16,8 +16,6 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { MeterNameEditor } from '../../meters/MeterNameEditor';
 import { MeterSetupNotice } from '../metering/MeterNotices';
 import { formatCredits, parseCredits, dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
@@ -32,7 +30,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useToastMessage } from '../../../../../components/toastProvider';

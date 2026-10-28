@@ -1,4 +1,4 @@
-import { StatusDialog } from '../../../../../components/statusDialog';
+import { StatusDialog } from '@attraccess/plugins-frontend-ui';
 import { usePluginsSectionState } from '../state/usePluginSettings';
 type Props = Pick<
   ReturnType<typeof usePluginsSectionState>,

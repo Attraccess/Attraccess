@@ -1,10 +1,9 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   useResourceFlowsServiceGetButtons,
   useResourceFlowsServicePressButton,
 } from '@attraccess/react-query-client';
-import { Button } from '../../../../../../components/button';
 import { useState } from 'react';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';

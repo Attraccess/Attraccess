@@ -1,5 +1,5 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { Chip } from '@heroui/react';
-import { Button } from '../../../../components/button/index';
 import { useAttractapDiagnosticsState } from './useDiagnostics';
 export function formatBytes(value: number | null | undefined, fallback: string): string {
   if (value === null || value === undefined) {

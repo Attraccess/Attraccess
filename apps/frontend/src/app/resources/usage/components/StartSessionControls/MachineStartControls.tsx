@@ -1,9 +1,8 @@
 import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { ChevronDownIcon, PlayIcon } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface MachineStartControlsProps {
   t: TFunction;
@@ -32,19 +31,19 @@ export function MachineStartControls({
         placeholder={t('machine.project.placeholder')}
       />
       <ButtonGroup className="w-full">
-        <Button isPending={isStarting} onPress={onStart}><PlayIcon className="w-4 h-4" />
+        <Button isPending={isStarting} onPress={onStart}>
+          <PlayIcon className="w-4 h-4" />
           {t('machine.startSession')}
         </Button>
         <Dropdown>
-          <DropdownTrigger className={`${buttonVariants({ isIconOnly: true })} inline-flex items-center justify-center`}>
+          <DropdownTrigger
+            className={`${buttonVariants({ isIconOnly: true })} inline-flex items-center justify-center`}
+          >
             <ChevronDownIcon />
           </DropdownTrigger>
           <DropdownPopover>
             <DropdownMenu aria-label={t('machine.alternativeStartSessionOptionsMenu.label')}>
-              <DropdownItem
-                key="startWithNotes" id="startWithNotes"
-                onPress={onStartWithNotes}
-              >
+              <DropdownItem key="startWithNotes" id="startWithNotes" onPress={onStartWithNotes}>
                 {t('machine.alternativeStartSessionOptionsMenu.startWithNotes.label')}
               </DropdownItem>
             </DropdownMenu>

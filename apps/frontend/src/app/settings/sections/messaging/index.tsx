@@ -20,13 +20,10 @@ import {
 import { ClipboardCopyIcon, RefreshCwIcon } from 'lucide-react';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { Button } from '../../../../components/button/index';
-import { StandardModal } from '../../../../components/standardModal';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
 import { SettingsRow } from '../../components/SettingsRow';
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   usePushServicePushGetVapidConfig,
   UsePushServicePushGetVapidConfigKeyFn,

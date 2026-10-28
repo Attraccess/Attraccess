@@ -11,14 +11,11 @@ import {
 } from '@heroui/react';
 import { ArrowLeft, Palette, RotateCcw } from 'lucide-react';
 import Editor from '@monaco-editor/react';
-import { Button } from '../../components/button/index';
-import { StandardDrawer } from '../../components/standardDrawer';
-import { StandardModal } from '../../components/standardModal';
 import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { OnMount } from '@monaco-editor/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAppTheme } from '@attraccess/ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';

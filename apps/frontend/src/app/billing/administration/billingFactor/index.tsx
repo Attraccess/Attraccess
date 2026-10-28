@@ -1,7 +1,12 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { PageHeader } from '../../../../components/pageHeader';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  cn,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+} from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { HandCoinsIcon } from 'lucide-react';
 import { HTMLAttributes, useCallback, useEffect, useState } from 'react';

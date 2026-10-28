@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TextFieldProps, TextField, Label, InputGroup, Description, FieldError } from '@heroui/react';
 import { Button, Tooltip } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '../../i18n';
 import en from './PasswordInput.en.json';
 import de from './PasswordInput.de.json';
 

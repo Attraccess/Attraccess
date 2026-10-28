@@ -1,13 +1,11 @@
 import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
-import { Button } from '../../components/button';
 import { Upload } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './UploadPluginModal.en.json';
 import de from './UploadPluginModal.de.json';
 import { useToastMessage } from '../../components/toastProvider';
-import { StandardDrawer } from '../../components/standardDrawer';
 
 interface UploadPluginModalProps {
   isOpen: boolean;

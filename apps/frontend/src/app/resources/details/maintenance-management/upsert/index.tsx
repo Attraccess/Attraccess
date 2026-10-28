@@ -1,6 +1,6 @@
 import { DateTimeLocaleProvider } from '../../../../../components/dateTimeLocaleProvider';
 import { DateFieldValidity } from '../../../../../components/localeDateField';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -18,12 +18,9 @@ import {
   TextArea,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import de from './de.json';
 import en from './en.json';
 import { MaintenanceReasonDisplay } from '../../../../../components/MaintenanceReasonDisplay';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
-import { StandardDrawer } from '../../../../../components/standardDrawer';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { parseAbsolute, type DateValue, type ZonedDateTime, toZoned } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-react';

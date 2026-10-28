@@ -20,10 +20,8 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { Plus, Trash } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Role } from '@attraccess/react-query-client';
-import { Button } from '../../../../components/button';
-import { StandardDrawer } from '../../../../components/standardDrawer';
 import { Select } from '../../../../components/select';
 import { useRbacCatalogTranslations } from '../../../../hooks/useRbacCatalogTranslations';
 import { RoleMappingEntry } from '../formDefaults';

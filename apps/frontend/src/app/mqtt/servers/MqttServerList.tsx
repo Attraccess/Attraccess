@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, EmptyState, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -19,8 +19,6 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { PencilIcon, Trash2Icon } from 'lucide-react';
-import { StandardModal } from '../../../components/standardModal';
-import { Button } from '../../../components/button';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
@@ -32,8 +30,6 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
-import { EmptyState } from '../../../components/emptyState';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 
@@ -110,10 +106,7 @@ export function MqttServerList() {
               <TableColumn>{t('columnAddress')}</TableColumn>
               <TableColumn>{t('columnActions')}</TableColumn>
             </TableHeader>
-            <TableBody
-              items={servers}
-              renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}
-            >
+            <TableBody items={servers} renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}>
               {(server) => (
                 <TableRow key={`mqtt-server-${server.id}`} id={server.id}>
                   <TableCell>{server.name}</TableCell>
@@ -168,11 +161,7 @@ export function MqttServerList() {
               <p>{t('deleteConfirmation')}</p>
             </ModalBody>
             <ModalFooter>
-              <Button
-                variant="secondary"
-                onPress={close}
-                data-cy="mqtt-server-list-delete-confirmation-cancel-button"
-              >
+              <Button variant="secondary" onPress={close} data-cy="mqtt-server-list-delete-confirmation-cancel-button">
                 {t('cancel')}
               </Button>
               <Button

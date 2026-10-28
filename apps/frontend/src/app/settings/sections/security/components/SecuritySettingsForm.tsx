@@ -13,7 +13,6 @@ import {
   AlertDescription,
 } from '@heroui/react';
 import { SettingsRow } from '../../../components/SettingsRow';
-import { Button } from '../../../../../components/button/index';
 import { POLICY_FIELD_KEYS, POLICY_NUMBER_FIELDS } from '../policy-fields';
 import {
   PasswordPolicyDto,
@@ -35,10 +34,9 @@ import {
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
   useUsersServiceGetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import en from '../en.json';
 import de from '../de.json';

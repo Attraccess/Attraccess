@@ -8,13 +8,10 @@ import {
   useSettingsServiceGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
-import { Button } from '../../../../components/button/index';
-import { PasswordInput } from '../../../../components/PasswordInput/index';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { Select } from '../../../../components/select/index';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';

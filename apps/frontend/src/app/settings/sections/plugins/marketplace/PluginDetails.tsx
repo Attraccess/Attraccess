@@ -1,6 +1,6 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { Card, Chip } from '@heroui/react';
 import { ExternalLink, ShieldCheck } from 'lucide-react';
-import { Button } from '../../../../../components/button/index';
 import { DependencyPlanDetails } from '../dependencies/DependencyPlan';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import type { InstalledNpmPlugin, MarketplacePlugin, PluginInstallPlan } from '../types';

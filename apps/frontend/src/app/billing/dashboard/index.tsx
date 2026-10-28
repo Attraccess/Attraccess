@@ -1,5 +1,4 @@
-import { PageHeader } from '../../../components/pageHeader';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ChartNoAxesCombinedIcon, Settings2Icon } from 'lucide-react';

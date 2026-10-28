@@ -1,5 +1,4 @@
-import { PageHeader } from '../../../components/pageHeader';
-import { UserIdentity, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, UserIdentity, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ManualTransactionsCard } from './manualTransactions';

@@ -1,5 +1,5 @@
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import { TextField, Label, Input } from '@heroui/react';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { EditorTabProps } from './props';
 
 export function RetrainingTab(props: EditorTabProps) {

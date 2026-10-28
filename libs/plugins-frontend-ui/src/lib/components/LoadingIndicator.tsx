@@ -1,4 +1,9 @@
-import { ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
+import {
+  ProgressCircle,
+  ProgressCircleFillCircle,
+  ProgressCircleTrack,
+  ProgressCircleTrackCircle,
+} from '@heroui/react';
 
 export const TableDataLoadingIndicator = () => {
   return (

@@ -1,5 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../components/pageHeader';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RfidKeychainCard } from './RfidKeychainCard';
 import de from './de.json';
 import en from './en.json';

@@ -23,17 +23,22 @@ vi.mock('@attraccess/react-query-client', () => ({
   useMqttServiceMqttServersGetOneById: () => ({ data: mocks.server, isLoading: false, isError: false }),
   useMqttServiceMqttServersGetAllKey: 'mqtt-servers',
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: ({ en }: { en: Record<string, unknown> }) => ({ t: (key: string) => en[key] ?? key }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: ({ en }: { en: Record<string, unknown> }) => ({ t: (key: string) => en[key] ?? key }),
+  }))()),
+  ...(await (() => ({ PageHeader: () => null }))()),
+  ...(await (() => ({ LabeledSwitch: () => null }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('react-router-dom', () => ({ useParams: () => ({ serverId: '7' }), useNavigate: () => vi.fn() }));
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
-vi.mock('../../../components/pageHeader', () => ({ PageHeader: () => null }));
+
 vi.mock('../../../components/select', () => ({ Select: () => null }));
-vi.mock('../../../components/labeledSwitch', () => ({ LabeledSwitch: () => null }));
+
 vi.mock('./TlsSection', () => ({ TlsSection: () => null }));
 vi.mock('../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 

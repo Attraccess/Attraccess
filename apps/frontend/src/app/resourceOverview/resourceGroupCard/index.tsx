@@ -4,12 +4,11 @@ import {
   useResourcesServiceResourceGroupsGetOne,
 } from '@attraccess/react-query-client';
 import { Button, Card, CardProps, Skeleton } from '@heroui/react';
-import { EmptyState } from '../../../components/emptyState';
 import { ResourceListItem } from '../../../components/ResourceListItem';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CogIcon } from 'lucide-react';
-import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { FilterProps } from '../filterProps';
 

@@ -3,9 +3,7 @@
 // so auto-subscription on mount is not permitted — this modal bridges the gap.
 import { useCallback, useEffect, useState } from 'react';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { Button } from '../../components/button';
-import { StandardModal } from '../../components/standardModal';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './permission.en.json';
 import de from './permission.de.json';
 import { useToastMessage } from '../../components/toastProvider';

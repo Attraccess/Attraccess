@@ -11,12 +11,11 @@ import {
   TextField,
 } from '@heroui/react';
 import { LockIcon } from 'lucide-react';
-import { StandardDrawer } from '../../../components/standardDrawer';
 import { PermissionPicker } from '../../../components/permissionPicker/index';
 import { useEffect, useMemo, useState } from 'react';
 import type { Key } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import type { SystemPermission } from '@attraccess/shared';
 import {
   ApiError,

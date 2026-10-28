@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
-import { StandardDrawer } from '../standardDrawer';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { HeartHandshake, Share2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import en from './en.json';

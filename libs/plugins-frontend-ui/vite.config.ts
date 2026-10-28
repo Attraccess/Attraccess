@@ -12,10 +12,12 @@ const sharedLibs = [
   'react-dom',
   'react/jsx-runtime',
   'react-pluggable',
+  'react-router-dom',
   '@heroui/react',
   '@tanstack/react-query',
   '@attraccess/react-query-client',
   '@attraccess/plugins-frontend-ui',
+  'lucide-react',
 ];
 
 export default defineConfig({

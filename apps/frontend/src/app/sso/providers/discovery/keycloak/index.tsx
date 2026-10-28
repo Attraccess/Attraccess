@@ -8,10 +8,8 @@ import {
   ModalHeading,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button';
-import { StandardModal } from '../../../../../components/standardModal';
 import { OpenIDConfiguration } from '../OpenIDC.data';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import de from './de.json';

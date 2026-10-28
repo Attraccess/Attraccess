@@ -13,12 +13,10 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../components/button/index';
-import { StandardModal } from '../../components/standardModal';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput/index';
 import { PasswordField } from '../../components/PasswordField/index';
 import React, { useCallback, useMemo, useState } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
 import {

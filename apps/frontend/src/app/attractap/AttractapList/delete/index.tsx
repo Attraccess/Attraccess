@@ -1,9 +1,8 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DeleteConfirmationModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import { useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
-import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
 import { useAttractapServiceDeleteReader, UseAttractapServiceGetReadersKeyFn } from '@attraccess/react-query-client';
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';

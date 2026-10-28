@@ -1,5 +1,6 @@
 // Preview table for CSV export drawer — first N rows with selected columns
 // FEATURE: CSV export — data sample shown before download
+import { EmptyState } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Spinner,
@@ -14,7 +15,6 @@ import {
 } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
 import { RotateCwIcon } from 'lucide-react';
-import { EmptyState } from '../../../components/emptyState';
 
 interface PreviewColumn {
   key: string;

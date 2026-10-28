@@ -1,13 +1,9 @@
 import { Checkbox, Description, Form, Input, Label, Spinner, TextField, FieldError } from '@heroui/react';
 import { TlsSection } from './TlsSection';
-import { Button } from '../../../components/button/index';
 import { Select } from '../../../components/select/index';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
-import { PageHeader } from '../../../components/pageHeader/index';
-import { PasswordInput } from '../../../components/PasswordInput/index';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_DETAIL_SLOT, MqttServerSlotContext } from '../mqtt.slots';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, PageHeader, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MqttManagementPort, parseManagementPort } from './managementPort';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';

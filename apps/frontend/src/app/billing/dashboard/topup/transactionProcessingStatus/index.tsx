@@ -1,10 +1,15 @@
-import { Card, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
-import { PageHeader } from '../../../../../components/pageHeader';
+import {
+  Card,
+  ProgressCircle,
+  ProgressCircleFillCircle,
+  ProgressCircleTrack,
+  ProgressCircleTrackCircle,
+} from '@heroui/react';
 import { CheckCircle2Icon, XCircleIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useLiveTransactionUpdates } from '../../summary/live-updates';
 import {
   BillingTransaction,
@@ -89,12 +94,7 @@ export function TransactionProcessingCard(props: Props) {
       </Card.Header>
       <Card.Content className="flex items-center justify-center">
         {status === BillingTransactionStatus.PENDING && (
-          <ProgressCircle
-            value={COUNTER_MAX_VALUE - counter}
-            minValue={0}
-            maxValue={COUNTER_MAX_VALUE}
-
-          >
+          <ProgressCircle value={COUNTER_MAX_VALUE - counter} minValue={0} maxValue={COUNTER_MAX_VALUE}>
             <ProgressCircleTrack>
               <ProgressCircleTrackCircle />
               <ProgressCircleFillCircle />

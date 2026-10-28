@@ -2,7 +2,7 @@ import { Select } from '../../../../components/select';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FieldError, Form, Input, Spinner, TextField } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   useSettingsServiceGetSystemSettings,
@@ -13,7 +13,6 @@ import {
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { PasswordInput } from '../../../../components/PasswordInput/index';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton/index';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';

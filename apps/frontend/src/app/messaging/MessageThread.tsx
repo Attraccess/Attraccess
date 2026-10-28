@@ -4,7 +4,6 @@
 import { Spinner, TextArea, cn } from '@heroui/react';
 import { Link } from 'react-router-dom';
 import { SendIcon, BoxIcon, XIcon } from 'lucide-react';
-import { Button } from '../../components/button/index';
 import {
   MessageReferenceType,
   useMessagingServiceMessagingListMessages,
@@ -13,7 +12,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { applyIncomingMessage } from './messageCache';

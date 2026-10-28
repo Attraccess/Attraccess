@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Form, TextField, Label, Input } from '@heroui/react';
-import { Button } from '../../../../components/button';
 import { UserPlusIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useUsersServiceCreateOneUser,
@@ -11,7 +10,6 @@ import {
   ApiError,
   AuthenticationType,
 } from '@attraccess/react-query-client';
-import { PageHeader } from '../../../../components/pageHeader';
 import { PasswordField } from '../../../../components/PasswordField';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../../../components/UsernameInput';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -113,12 +111,7 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        icon={<UserPlusIcon size={18} />}
-        noMargin
-      />
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<UserPlusIcon size={18} />} noMargin />
       <Form
         ref={formRef}
         onSubmit={(e) => {
@@ -162,11 +155,7 @@ export function CreateAdminStep({ onSuccess, isOverwrite }: CreateAdminStepProps
         />
         <input type="submit" hidden />
       </Form>
-      <Button variant="primary"
-        onPress={handleSubmit}
-        isPending={isPending}
-        isDisabled={!canSubmit}
-      >
+      <Button variant="primary" onPress={handleSubmit} isPending={isPending} isDisabled={!canSubmit}>
         {isPending ? t('creating') : t('actions.create')}
       </Button>
     </div>

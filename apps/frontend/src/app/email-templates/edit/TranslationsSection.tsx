@@ -18,11 +18,9 @@ import {
 } from '@heroui/react';
 import type { Key } from '@heroui/react';
 import { Languages, Trash2, Plus } from 'lucide-react';
-import { Button } from '../../../components/button/index';
-import { StandardModal } from '../../../components/standardModal';
 import { useEffect, useMemo, useState } from 'react';
 import { buttonVariants } from '@heroui/styles';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { extractTranslationKeys } from '@attraccess/shared';
 import { useTemplateTranslations } from './useTemplateTranslations';

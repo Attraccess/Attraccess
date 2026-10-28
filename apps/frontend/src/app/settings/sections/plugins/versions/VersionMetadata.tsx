@@ -1,5 +1,4 @@
-import { useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
+import { LabeledSwitch, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import type { usePluginsSectionState } from '../state/usePluginSettings';
 
 type Props = Pick<

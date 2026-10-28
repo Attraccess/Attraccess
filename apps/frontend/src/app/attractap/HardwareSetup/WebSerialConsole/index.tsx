@@ -8,11 +8,10 @@ import {
   ModalHeading,
   useOverlayState,
 } from '@heroui/react';
-import { StandardModal } from '../../../../components/standardModal';
 import { useCallback, useRef, useState } from 'react';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
 import { Terminal } from '../../../../components/Terminal';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';

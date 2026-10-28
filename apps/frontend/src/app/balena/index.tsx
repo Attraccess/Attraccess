@@ -1,4 +1,4 @@
-import { PageHeader } from '../../components/pageHeader';
+import { PageHeader } from '@attraccess/plugins-frontend-ui';
 import { ComputerIcon, PowerIcon, RefreshCcwIcon } from 'lucide-react';
 import { Button, Card } from '@heroui/react';
 import { BalenaIcon } from './balena-icon';
@@ -65,19 +65,13 @@ export function BalenaPage() {
           </Card.Header>
           <Card.Content className="flex flex-col gap-4">
             {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
-            <Button
-             
-              onPress={onClickReboot}
-              variant={rebootIsConfirmed ? 'primary' : 'outline'}
-            ><RefreshCcwIcon />
+            <Button onPress={onClickReboot} variant={rebootIsConfirmed ? 'primary' : 'outline'}>
+              <RefreshCcwIcon />
               {rebootIsConfirmed ? 'Confirm Reboot' : 'Reboot'}
             </Button>
             {/* TODO(heroui-v3): map dynamic color/variant to new variant prop */}
-            <Button
-             
-              onPress={onClickShutdown}
-              variant={shutdownIsConfirmed ? 'primary' : 'outline'}
-            ><PowerIcon />
+            <Button onPress={onClickShutdown} variant={shutdownIsConfirmed ? 'primary' : 'outline'}>
+              <PowerIcon />
               {shutdownIsConfirmed ? 'Confirm Shutdown' : 'Shutdown'}
             </Button>
           </Card.Content>

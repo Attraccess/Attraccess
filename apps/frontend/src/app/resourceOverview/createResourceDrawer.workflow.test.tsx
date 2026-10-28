@@ -14,17 +14,21 @@ const state = vi.hoisted(() => ({
   createOptions: {} as { onSuccess: (resource: Resource) => void; onError: (error: Error) => void },
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+  ...(await (() => ({
+    StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
+      isOpen ? <div>{children}</div> : null,
+  }))()),
+}));
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../components/DonationPrompt/usefulAction', () => ({ recordUsefulAction: state.useful }));
 vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
-vi.mock('../../components/standardDrawer', () => ({
-  StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: React.ReactNode }) =>
-    isOpen ? <div>{children}</div> : null,
-}));
+
 vi.mock('../../components/splitActionButton', () => ({
   SplitActionButton: ({
     label,
