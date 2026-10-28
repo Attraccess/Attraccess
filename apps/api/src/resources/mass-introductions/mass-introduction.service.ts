@@ -10,9 +10,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { randomBytes, randomUUID } from 'crypto';
-import { Attractap, Resource, ResourceGroup } from '@attraccess/database-entities';
+import { Resource, ResourceGroup } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -70,7 +70,6 @@ export class MassIntroductionService {
     protected readonly live: MassIntroductionLiveService,
     @InjectRepository(Resource) protected readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceGroup) protected readonly resourceGroupRepository: Repository<ResourceGroup>,
-    @InjectRepository(Attractap) protected readonly readerRepository: Repository<Attractap>,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link MassIntroductionReaderPort}. */
@@ -162,20 +161,6 @@ export class MassIntroductionService {
 
   public cancel(sessionId: string, userId: number): void {
     this.end(this.getOwned(sessionId, userId), MassIntroductionEndReason.CANCELLED);
-  }
-
-  /** Readers the introducer may show the scan screen on: those linked to the target. */
-  public async eligibleReaderIds(user: AuthenticatedUser, dto: StartMassIntroductionDto): Promise<number[]> {
-    const target = await this.authorizeTarget(user, dto);
-    const resourceIds = await this.linkedResourceIds(target.target);
-    if (resourceIds.length === 0) {
-      return [];
-    }
-    const readers = await this.readerRepository.find({
-      where: { resources: { id: In(resourceIds) } },
-      select: { id: true },
-    });
-    return [...new Set(readers.map((reader) => reader.id))];
   }
 
   /**

@@ -1,16 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseUUIDPipe,
-  Post,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
 import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { MassIntroductionService } from './mass-introduction.service';
@@ -18,7 +6,6 @@ import { StartMassIntroductionDto } from './dtos/startMassIntroduction.dto';
 import { MassIntroductionSessionDto } from './dtos/massIntroductionSession.dto';
 import { RedeemMassIntroductionDto, RedeemMassIntroductionResponseDto } from './dtos/redeemMassIntroduction.dto';
 import { MassIntroductionLiveEventDto } from './dtos/massIntroductionLiveEvent.dto';
-import { MassIntroductionReadersQueryDto } from './dtos/massIntroductionReaders.dto';
 
 @ApiTags('Access Control')
 // Delivered over the bundled live-updates stream, which is not in the OpenAPI document.
@@ -40,22 +27,6 @@ export class MassIntroductionController {
   @ApiResponse({ status: 409, description: 'The reader is busy' })
   start(@Body() dto: StartMassIntroductionDto, @Req() req: AuthenticatedRequest): Promise<MassIntroductionSessionDto> {
     return this.massIntroductionService.start(req.user, dto);
-  }
-
-  @Get('readers')
-  @Auth()
-  @ApiOperation({
-    summary: 'List the readers a mass introduction for this resource or group may use',
-    description: 'Only readers linked to the resource (or to a resource of the group) can show the scan screen.',
-    operationId: 'massIntroductionEligibleReaders',
-  })
-  @ApiResponse({ status: 200, type: [Number], description: 'Reader ids' })
-  @ApiResponse({ status: 403, description: 'The user is not an introducer for the target' })
-  eligibleReaders(
-    @Query() query: MassIntroductionReadersQueryDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<number[]> {
-    return this.massIntroductionService.eligibleReaderIds(req.user, query);
   }
 
   @Post('redeem')

@@ -43,10 +43,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     },
   }),
   useAccessControlServiceMassIntroductionCancel: () => ({ mutate: state.cancel }),
-  useAccessControlServiceMassIntroductionEligibleReaders: (query: unknown) => {
-    state.eligibleReadersQuery = query;
-    return { data: [4] };
-  },
+  useAttractapServiceGetResourceAttractaps: (query: unknown, _key: unknown, options: { enabled: boolean }) =>
+    options.enabled ? ((state.eligibleReadersQuery = query), { data: [{ id: 4 }] }) : { data: undefined },
+  useAttractapServiceGetResourceGroupAttractaps: (query: unknown, _key: unknown, options: { enabled: boolean }) =>
+    options.enabled ? ((state.eligibleReadersQuery = query), { data: [{ id: 4 }] }) : { data: undefined },
   AccessControlService: { massIntroductionGet: (data: unknown) => state.get(data) },
 }));
 vi.mock('./usePeopleMutations', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
@@ -191,7 +191,7 @@ describe('grant-introduction drawer', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: /tap their NFC card/ }));
     expect(state.readerCapabilities).toEqual({ cardEnrollment: true });
-    expect(state.eligibleReadersQuery).toEqual({ resourceGroupId: 3 });
+    expect(state.eligibleReadersQuery).toEqual({ groupId: 3 });
     expect(state.readerIds).toEqual([4]);
     expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
 

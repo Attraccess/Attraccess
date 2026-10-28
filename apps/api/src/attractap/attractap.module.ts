@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AttractapController } from './attractap.controller';
+import { ResourceAttractapsController } from './resource-attractaps.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
@@ -93,6 +94,11 @@ import { SettingsModule } from '../settings/settings.module';
     AttractapSupervisionHandler,
     AttractapMassIntroductionHandler,
   ],
-  controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],
+  controllers: [
+    AttractapController,
+    AttractapNfcCardsController,
+    AttractapFirmwareController,
+    ResourceAttractapsController,
+  ],
 })
 export class AttractapModule {}

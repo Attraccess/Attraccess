@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Attractap, Resource, ResourceGroup } from '@attraccess/database-entities';
+import { Resource, ResourceGroup } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -25,7 +25,6 @@ describe('MassIntroductionService', () => {
   let groupIntroducers: { isIntroducer: jest.Mock };
   let live: { emitToIntroducer: jest.Mock };
   let readerPort: { arm: jest.Mock; disarm: jest.Mock };
-  let readerRepository: { find: jest.Mock };
 
   const introducer = {
     id: 1,
@@ -67,7 +66,6 @@ describe('MassIntroductionService', () => {
     groupIntroducers = { isIntroducer: jest.fn().mockResolvedValue(true) };
     live = { emitToIntroducer: jest.fn() };
     readerPort = { arm: jest.fn().mockResolvedValue({ readerName: 'Entrance' }), disarm: jest.fn() };
-    readerRepository = { find: jest.fn().mockResolvedValue([{ id: 3 }, { id: 4 }, { id: 3 }]) };
 
     const module = await Test.createTestingModule({
       providers: [
@@ -89,7 +87,6 @@ describe('MassIntroductionService', () => {
           provide: getRepositoryToken(ResourceGroup),
           useValue: { findOne: jest.fn(({ where }) => Promise.resolve({ id: where.id, name: 'Wood shop' })) },
         },
-        { provide: getRepositoryToken(Attractap), useValue: readerRepository },
       ],
     }).compile();
 
@@ -341,13 +338,6 @@ describe('MassIntroductionService', () => {
       expect(readerPort.arm).toHaveBeenLastCalledWith(
         expect.objectContaining({ readerId: 4, allowedResourceIds: [5, 6] }),
       );
-    });
-
-    it('lists the readers linked to the target for introducers only', async () => {
-      await expect(service.eligibleReaderIds(introducer, { resourceGroupId: 3 })).resolves.toEqual([3, 4]);
-
-      resourceIntroducers.isIntroducer.mockResolvedValue(false);
-      await expect(service.eligibleReaderIds(introducer, { resourceId: 5 })).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });

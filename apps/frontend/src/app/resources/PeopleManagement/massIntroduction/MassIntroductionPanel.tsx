@@ -22,7 +22,8 @@ import {
   MassIntroductionReaderDto,
   MassIntroductionReaderState,
   MassIntroductionSessionDto,
-  useAccessControlServiceMassIntroductionEligibleReaders,
+  useAttractapServiceGetResourceAttractaps,
+  useAttractapServiceGetResourceGroupAttractaps,
 } from '@attraccess/react-query-client';
 import { Button } from '../../../../components/button';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
@@ -138,11 +139,14 @@ interface SetupStepProps {
 
 function SetupStep({ t, target, error, setup, onSetupChange }: Readonly<SetupStepProps>) {
   // Only readers linked to the resource (or a resource of the group) may show the scan screen.
-  const { data: eligibleReaderIds } = useAccessControlServiceMassIntroductionEligibleReaders(
-    target.type === 'resource' ? { resourceId: target.id } : { resourceGroupId: target.id },
-    undefined,
-    { enabled: setup.useReader },
-  );
+  const isResource = target.type === 'resource';
+  const resourceReaders = useAttractapServiceGetResourceAttractaps({ resourceId: target.id }, undefined, {
+    enabled: setup.useReader && isResource,
+  });
+  const groupReaders = useAttractapServiceGetResourceGroupAttractaps({ groupId: target.id }, undefined, {
+    enabled: setup.useReader && !isResource,
+  });
+  const linkedReaderIds = (isResource ? resourceReaders : groupReaders).data?.map((reader) => reader.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -162,7 +166,7 @@ function SetupStep({ t, target, error, setup, onSetupChange }: Readonly<SetupSte
             selection={setup.readerId}
             onSelectionChange={(readerId) => onSetupChange({ ...setup, readerId })}
             requiredCapabilities={REQUIRED_READER_CAPABILITIES}
-            readerIds={eligibleReaderIds ?? []}
+            readerIds={linkedReaderIds ?? []}
           />
           <Description>{t('setup.readerDescription')}</Description>
         </div>
@@ -226,7 +230,10 @@ function JoinCode({ t, code, refreshAt }: Readonly<{ t: TFunction; code: string;
   return (
     <div className="flex flex-col items-center" data-cy="mass-introduction-code">
       <Label>{t('active.codeLabel')}</Label>
-      <output className="text-4xl font-semibold tabular-nums tracking-widest text-foreground" aria-label={t('active.codeLabel')}>
+      <output
+        className="text-4xl font-semibold tabular-nums tracking-widest text-foreground"
+        aria-label={t('active.codeLabel')}
+      >
         {`${code.slice(0, 3)} ${code.slice(3)}`}
       </output>
       <Description className="tabular-nums">
