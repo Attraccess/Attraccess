@@ -9,7 +9,8 @@ module.exports = {
     '^.+\\.js$': '<rootDir>/src/test/jose-transformer.cjs',
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }],
   },
-  transformIgnorePatterns: ['node_modules/(?!jose/|\\.pnpm/jose@)'],
+  // ESM-only packages: JOSE, and otplib's @scure/@noble dependencies (mass-introduction QR codes).
+  transformIgnorePatterns: ['node_modules/(?!jose/|\\.pnpm/jose@|@scure/|\\.pnpm/@scure\\+|@noble/|\\.pnpm/@noble\\+)'],
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/apps/api',
   // SQLite integration tests and bcrypt exceed their per-test timeouts under the default worker count.

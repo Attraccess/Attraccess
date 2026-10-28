@@ -48,7 +48,11 @@
     "userLabel": "Benutzer",
     "commentLabel": "Kommentar (optional)",
     "submit": "Bestätigen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "tabs": {
+      "individual": "Einzeln",
+      "mass": "Sammeleinweisung (QR-Code)"
+    }
   },
   "commentModal": {
     "title": "Kommentar hinzufügen",

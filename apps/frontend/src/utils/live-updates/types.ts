@@ -1,5 +1,6 @@
 import type {
   BillingTransaction,
+  MassIntroductionLiveEventDto,
   Message,
   ResourceFlowLog,
   SupervisionRequestDto,
@@ -32,4 +33,5 @@ export interface LivePayloads {
   messaging: Message;
   notifications: SystemNotificationLiveEvent;
   supervision: SupervisionLiveEvent;
+  'mass-introduction': MassIntroductionLiveEventDto;
 }

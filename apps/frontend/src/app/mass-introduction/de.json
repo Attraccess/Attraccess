@@ -1,0 +1,21 @@
+{
+  "join": {
+    "title": "An der Sammeleinweisung teilnehmen",
+    "description": "Geben Sie den Code ein, der neben dem QR-Code angezeigt wird.",
+    "codeLabel": "Code",
+    "submit": "Teilnehmen",
+    "wrongCode": "Falscher oder abgelaufener Code. Geben Sie den aktuell angezeigten Code ein.",
+    "tooManyAttempts": "Zu viele falsche Codes. Warten Sie eine Minute und versuchen Sie es erneut."
+  },
+  "success": {
+    "title": "Einweisung abgeschlossen",
+    "introduced": "Sie wurden für {{{name}}} eingewiesen.",
+    "alreadyIntroduced": "Sie hatten bereits eine Einweisung für {{{name}}}."
+  },
+  "error": {
+    "title": "Einweisung fehlgeschlagen",
+    "ended": "Diese Sammeleinweisung ist beendet. Bitten Sie Ihren Einweiser, eine neue zu starten.",
+    "generic": "Etwas ist schiefgelaufen: {{{error}}}"
+  },
+  "close": "Fertig"
+}

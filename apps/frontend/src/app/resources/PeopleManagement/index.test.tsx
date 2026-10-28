@@ -75,6 +75,7 @@ vi.mock('./usePeopleMutations', () => ({
 }));
 vi.mock('./AddPersonDrawer', () => ({
   AddPersonDrawer: ({
+    target,
     isOpen,
     mode,
     comment,
@@ -85,6 +86,9 @@ vi.mock('./AddPersonDrawer', () => ({
     isOpen ? (
       <section aria-label="Add person">
         <span>{mode}</span>
+        <span>
+          for {target.type} {target.id}
+        </span>
         <input aria-label="Add comment" value={comment} onChange={(e) => onCommentChange(e.target.value)} />
         <button
           onClick={async () => {
@@ -360,4 +364,15 @@ it('keeps inherited access and navigation visible after direct revocation', () =
   } finally {
     state.rows = original;
   }
+});
+
+it.each([false, true])('offers individual and mass introductions behind one button (hideHeader=%s)', (hideHeader) => {
+  mount({ target: { type: 'group', id: 3 }, hideHeader, canManageIntroducers: false, canManageIntroductions: true });
+
+  expect(screen.queryByRole('button', { name: 'Mass introduction' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Grant introduction' }));
+
+  const drawer = screen.getByRole('region', { name: 'Add person' });
+  expect(drawer.textContent).toContain('introduction');
+  expect(drawer.textContent).toContain('for group 3');
 });

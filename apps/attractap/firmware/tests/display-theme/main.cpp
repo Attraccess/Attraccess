@@ -245,6 +245,7 @@ int main(int argc, char **argv)
         });
         test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte zurücksetzen...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });
+        test("screen/mass-introduction", [&] { testMassIntroduction(renderer); });
         test("screen/introducer-details", [&] { testIntroducerDetails(renderer); });
         test("screen/usage-stats-expiry", [&] { testUsageStatsExpiry(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });
@@ -254,7 +255,7 @@ int main(int argc, char **argv)
         test("screen/firmware-update-bilingual", [&] { testFirmwareUpdateLocales(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
                   << renderer.captures << " real LVGL frames\n";
-        std::cout << "COVERAGE: production theme, boot/init/enrollment/reset/supervision/PIN, lockscreen/resource list/no resources and image assets.\n"
+        std::cout << "COVERAGE: production theme, boot/init/enrollment/reset/supervision/mass-introduction/PIN, lockscreen/resource list/no resources and image assets.\n"
                      "NOT COVERED: devices, RTOS, transport, full router/overlays, remaining screens or pixel-golden approval.\n";
         if (!output.empty()) std::cout << "OUTPUT " << std::filesystem::absolute(output) << '\n';
         return failed || lvglErrors ? 1 : 0;

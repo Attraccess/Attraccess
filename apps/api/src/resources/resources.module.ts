@@ -19,6 +19,7 @@ import { ResourceGroupsModule } from './groups/resourceGroups.module';
 import { ResourcesService } from './resources.service';
 import { ResourceUsageModule } from './usage/resourceUsage.module';
 import { SupervisionModule } from './supervision/supervision.module';
+import { MassIntroductionModule } from './mass-introductions/mass-introduction.module';
 import { ResourceImageService } from './resourceImage.service';
 import { ResourceIntroductionsModule } from './introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from './introducers/resourceIntroducers.module';
@@ -53,6 +54,7 @@ import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
     ResourceIntroducersModule,
     ResourceUsageModule,
     SupervisionModule,
+    MassIntroductionModule,
     ResourceFlowsModule,
     ResourceMaintenanceModule,
     ResourceFormsModule,

@@ -9,10 +9,13 @@ export interface Props {
   fallbackKey?: string;
 }
 
+/** The server's error message (NestJS `body.message`), falling back to the transport error message. */
+export function getApiErrorMessage(error: ApiError | Error): string {
+  return String(((error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? error.message);
+}
+
 export function getTranslationKeyForApiError(props: Props) {
-  let errorMessage = String(
-    ((props.error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? props.error.message,
-  );
+  let errorMessage = getApiErrorMessage(props.error);
 
   // Initialization wraps setup errors; retain their actionable configuration guidance.
   errorMessage = errorMessage.replace(/^METER_INITIALIZATION_FAILED: (?=METER_NOT_CONFIGURED: )/, '');

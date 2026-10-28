@@ -353,7 +353,11 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     // make every reader that has been touched once permanently "busy".
     if (
       sockets.some(
-        (socket) => socket.state.supervisionFlow || socket.state.enrollNewCardData || socket.state.resetNfcCardData,
+        (socket) =>
+          socket.state.supervisionFlow ||
+          socket.state.enrollNewCardData ||
+          socket.state.resetNfcCardData ||
+          socket.state.massIntroductionFlow,
       )
     ) {
       throw new ConflictException('The selected reader is busy with another operation');

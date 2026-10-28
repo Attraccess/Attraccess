@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,11 +13,28 @@ vi.mock('@attraccess/react-query-client', () => ({
   useUsersServiceFindManyInfinite: mocks.useUsersServiceFindManyInfinite,
 }));
 
+// The tabs and the mass introduction are covered by IntroductionTabs.test.tsx; render the individual tab only.
+vi.mock('./IntroductionTabs', () => ({
+  IntroductionTabs: ({
+    individualFields,
+    individualActions,
+  }: {
+    individualFields: ReactNode;
+    individualActions: ReactNode;
+  }) => (
+    <>
+      {individualFields}
+      {individualActions}
+    </>
+  ),
+}));
+
 const t = ((key: string) => key) as TFunction;
 
 const renderDrawer = (overrides: Partial<Parameters<typeof AddPersonDrawer>[0]> = {}) => {
   const props = {
     t,
+    target: { type: 'resource' as const, id: 7 },
     isOpen: true,
     mode: 'introducer' as const,
     comment: '',
@@ -71,6 +89,18 @@ describe('AddPersonDrawer', () => {
     expect(confirm).toBeEnabled();
 
     await pointer.click(confirm);
+    expect(props.onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 1, username: 'alan' }));
+    expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it('grants an individual introduction from the introduction tab', async () => {
+    const pointer = userEvent.setup();
+    const props = renderDrawer({ mode: 'introduction' });
+
+    expect(screen.getByRole('textbox', { name: 'addModal.commentLabel' })).toBeInTheDocument();
+    await pickUser(pointer, /alan/i);
+    await pointer.click(screen.getByRole('button', { name: 'addModal.submit' }));
+
     expect(props.onAdd).toHaveBeenCalledWith(expect.objectContaining({ id: 1, username: 'alan' }));
     expect(props.onClose).toHaveBeenCalled();
   });

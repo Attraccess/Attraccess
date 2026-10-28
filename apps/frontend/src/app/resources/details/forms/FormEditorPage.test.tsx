@@ -8,6 +8,7 @@ import { FormEditorPage } from './FormEditorPage';
 
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+  I18nTransComponent: () => null,
 }));
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({

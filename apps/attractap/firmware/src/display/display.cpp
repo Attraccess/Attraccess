@@ -71,6 +71,7 @@ ResourceDetailsScreen Display::resourceDetailsScreen;
 EnrollmentScreen Display::enrollmentScreen;
 ResetScreen Display::resetScreen;
 SupervisionScreen Display::supervisionScreen;
+MassIntroductionScreen Display::massIntroductionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
 #ifdef DEMO_MODE
 DemoSettingsScreen Display::demoSettingsScreen;

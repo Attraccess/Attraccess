@@ -43,7 +43,7 @@ describe('bundled live client', () => {
     expect(fixture.streams).toHaveLength(1);
   });
 
-  it('uses one stream for all six types and ten resources; references duplicates and keeps unrelated topics alive', async () => {
+  it('uses one stream for all seven types and ten resources; references duplicates and keeps unrelated topics alive', async () => {
     const first = vi.fn(),
       second = vi.fn();
     const remove = fixture.client.subscribe({ topic: 'resource', resourceId: 1 }, first);
@@ -51,13 +51,13 @@ describe('bundled live client', () => {
     for (let resourceId = 2; resourceId <= 10; resourceId++)
       fixture.client.subscribe({ topic: 'resource', resourceId }, vi.fn());
     fixture.client.subscribe({ topic: 'flow-logs', resourceId: 1 }, vi.fn());
-    for (const topic of ['billing', 'messaging', 'notifications', 'supervision'] as const)
+    for (const topic of ['billing', 'messaging', 'notifications', 'supervision', 'mass-introduction'] as const)
       fixture.client.subscribe({ topic }, vi.fn());
     await flush();
     fixture.streams[0].send({ type: 'ready' });
     await flush();
     expect(fixture.streams).toHaveLength(1);
-    expect(fixture.controls.at(-1)?.subscriptions).toHaveLength(15);
+    expect(fixture.controls.at(-1)?.subscriptions).toHaveLength(16);
     const event: LivePacket = {
       type: 'event',
       event: { topic: 'resource', resourceId: 1, eventType: 'update', payload: { inUse: true } },

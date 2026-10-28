@@ -91,6 +91,28 @@ void Application::setupCardCallbacks()
         this->supervision.onResolved(result);
       });
 
+  // --- Mass introduction (ATT-1151) -----------------------------------------
+  // Server-armed like ATT-816: the flow queues every payload and the main loop
+  // decides whether this reader can show the scan screen.
+  Display::massIntroductionScreen.setOnCancelCallback(
+      [this]() { this->massIntroduction.requestCancel(); });
+  this->api.setMassIntroductionStartCallback(
+      [this](const API::MassIntroductionStartCommand &command) {
+        this->massIntroduction.onStart(command);
+      });
+  this->api.setMassIntroductionCardAuthenticationCallback(
+      [this](const API::MassIntroductionCardAuthenticationResponse &response) {
+        this->massIntroduction.onCardAuthentication(response);
+      });
+  this->api.setMassIntroductionResultCallback(
+      [this](const API::MassIntroductionResult &result) {
+        this->massIntroduction.onResult(result);
+      });
+  this->api.setMassIntroductionEndCallback(
+      [this](const API::MassIntroductionEnd &end) {
+        this->massIntroduction.onEnd(end);
+      });
+
   this->api.setProjectsOfUserResponseCallback(
       [this](const API::ProjectsOfUserResponse &projectsOfUserResponse) {
         this->projectsOfUserResponse = projectsOfUserResponse;
@@ -190,6 +212,11 @@ void Application::setupNfcCallbacks()
 
     if (this->state == APPLICATION_STATE_SUPERVISION) {
       this->supervision.onCardDetected(uid, uidLength);
+      return;
+    }
+
+    if (this->state == APPLICATION_STATE_MASS_INTRODUCTION) {
+      this->massIntroduction.onCardDetected(uid, uidLength);
       return;
     }
 #endif

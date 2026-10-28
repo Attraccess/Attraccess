@@ -1,7 +1,7 @@
 /** One logical subscription on the tab's bundled live-update stream. */
 export type LiveSubscription =
   | { topic: 'resource' | 'flow-logs'; resourceId: number }
-  | { topic: 'billing' | 'messaging' | 'notifications' | 'supervision'; resourceId?: never; identifier?: never }
+  | { topic: 'billing' | 'messaging' | 'notifications' | 'supervision' | 'mass-introduction'; resourceId?: never; identifier?: never }
   | { topic: `plugin:${string}:${string}`; identifier?: string; resourceId?: never };
 
 export type LiveTopic = LiveSubscription['topic'];

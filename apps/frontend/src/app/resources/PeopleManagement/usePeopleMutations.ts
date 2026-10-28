@@ -43,24 +43,11 @@ export interface PeopleMutations {
   isMutating: boolean;
 }
 
-export function usePeopleMutationsInputs({ target, t }: Params) {
-  const toast = useToastMessage();
+/** Refreshes the people table (and one user's history) after introductions changed for the target. */
+export function useInvalidatePeopleIntroductions(target: PeopleTarget) {
   const queryClient = useQueryClient();
   const isResource = target.type === 'resource';
-
-  const [pendingIntroducer, setPendingIntroducer] = useState<{ userId: number; type: ResourceIntroducerType } | null>(
-    null,
-  );
-  const [pendingIntroductionUserId, setPendingIntroductionUserId] = useState<number | null>(null);
-
-  const invalidateIntroducers = useCallback(() => {
-    const queryKey = isResource
-      ? UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId: target.id })
-      : UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId: target.id });
-    queryClient.invalidateQueries({ queryKey });
-  }, [queryClient, target.id, isResource]);
-
-  const invalidateIntroductions = useCallback(
+  return useCallback(
     (userId?: number) => {
       const listKey = isResource
         ? UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId: target.id })
@@ -80,6 +67,26 @@ export function usePeopleMutationsInputs({ target, t }: Params) {
     },
     [queryClient, target.id, isResource],
   );
+}
+
+export function usePeopleMutationsInputs({ target, t }: Params) {
+  const toast = useToastMessage();
+  const queryClient = useQueryClient();
+  const isResource = target.type === 'resource';
+
+  const [pendingIntroducer, setPendingIntroducer] = useState<{ userId: number; type: ResourceIntroducerType } | null>(
+    null,
+  );
+  const [pendingIntroductionUserId, setPendingIntroductionUserId] = useState<number | null>(null);
+
+  const invalidateIntroducers = useCallback(() => {
+    const queryKey = isResource
+      ? UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId: target.id })
+      : UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId: target.id });
+    queryClient.invalidateQueries({ queryKey });
+  }, [queryClient, target.id, isResource]);
+
+  const invalidateIntroductions = useInvalidatePeopleIntroductions(target);
 
   const grantIntroducerToasts = {
     onSuccess: (_data: unknown, variables: { requestBody?: { type?: ResourceIntroducerType } }) => {

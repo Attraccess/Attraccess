@@ -248,6 +248,17 @@ enum class Message {
     July, August, September, October, November, December,
     ClockDate, ClockDateWithYear, ClockDayDate, TapRfidCard,
     DemoDeviceName,
+    MassIntroduction,
+    TapYourCardToGetIntroduced,
+    MassIntroductionIntroducer,
+    MassIntroductionProgress,
+    MassIntroductionReady,
+    MassIntroductionIntroduced,
+    MassIntroductionAlreadyIntroduced,
+    MassIntroductionNoResponse,
+    ErrorCardMismatch,
+    ErrorNoMassIntroductionInProgress,
+    ErrorMassIntroductionFailed,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -518,6 +529,17 @@ inline constexpr Entry catalog[] = {
     {Message::ClockDayDate, "{0}, {1}", "{0}, {1}"},
     {Message::TapRfidCard, "RFID-Karte auflegen", "Tap RFID card"},
     {Message::DemoDeviceName, "Demo Gerät", "Demo Device"},
+    {Message::MassIntroduction, "Sammeleinweisung", "Mass introduction"},
+    {Message::TapYourCardToGetIntroduced, "Karte auflegen, um eingewiesen zu werden", "Tap your card to get introduced"},
+    {Message::MassIntroductionIntroducer, "Einweiser: {0}", "Introducer: {0}"},
+    {Message::MassIntroductionProgress, "{0} eingewiesen · noch {1}", "{0} introduced · {1} left"},
+    {Message::MassIntroductionReady, "Bereit für die nächste Karte", "Ready for the next card"},
+    {Message::MassIntroductionIntroduced, "{0} eingewiesen", "{0} introduced"},
+    {Message::MassIntroductionAlreadyIntroduced, "{0} war bereits eingewiesen", "{0} was already introduced"},
+    {Message::MassIntroductionNoResponse, "Keine Antwort vom Server,\nbitte Karte erneut auflegen", "No response from the server,\nplease tap the card again"},
+    {Message::ErrorCardMismatch, "Karte stimmt nicht überein", "Card does not match"},
+    {Message::ErrorNoMassIntroductionInProgress, "Keine Sammeleinweisung aktiv", "No mass introduction in progress"},
+    {Message::ErrorMassIntroductionFailed, "Einweisung fehlgeschlagen", "Introduction failed"},
 };
 
 } // namespace FirmwareI18n

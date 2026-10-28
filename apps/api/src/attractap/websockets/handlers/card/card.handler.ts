@@ -173,7 +173,7 @@ export class AttractapCardHandler {
     if (!nfcCard) {
       throw new Error(`NFC card not found: ${data.cardId}`);
     }
-    if (socket.state.enrollment || socket.state.resetNfcCardData) {
+    if (socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow) {
       throw new Error(`Reader already has an active card operation: ${data.readerId}`);
     }
 
@@ -287,7 +287,11 @@ export class AttractapCardHandler {
     if (sockets.length === 0) {
       throw new Error(`Reader not connected: ${data.readerId}`);
     }
-    if (sockets.some((socket) => socket.state.enrollment || socket.state.resetNfcCardData)) {
+    if (
+      sockets.some(
+        (socket) => socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow,
+      )
+    ) {
       throw new Error(`Reader already has an active card operation: ${data.readerId}`);
     }
 

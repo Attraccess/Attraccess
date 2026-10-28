@@ -37,6 +37,8 @@ import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
 import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
+import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
+import { MassIntroductionService } from '../../resources/mass-introductions/mass-introduction.service';
 import { AttractapGateway } from './websocket.gateway';
 import { WebsocketService } from './websocket.service';
 import { AuthenticatedWebSocket } from './websocket.types';
@@ -116,6 +118,7 @@ export function registerAttractapGatewayFixture() {
         { provide: WS_METRICS, useValue: mockWsMetrics },
         { provide: MetricsToggleService, useValue: mockMetricsToggle },
         { provide: SupervisionService, useValue: {} },
+        { provide: MassIntroductionService, useValue: { setReaderPort: jest.fn() } },
         { provide: RbacService, useValue: {} },
         { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
         { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
@@ -133,6 +136,7 @@ export function registerAttractapGatewayFixture() {
         AttractapBillingHandler,
         AttractapProjectsHandler,
         AttractapSupervisionHandler,
+        AttractapMassIntroductionHandler,
       ],
     }).compile();
 

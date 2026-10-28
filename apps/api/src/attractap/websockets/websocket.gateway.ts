@@ -1,6 +1,5 @@
 import { OnEvent } from '@nestjs/event-emitter';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
-
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -10,51 +9,30 @@ import {
   MessageBody,
   SubscribeMessage,
 } from '@nestjs/websockets';
-
 import { Mutex } from 'async-mutex';
-
 import { Server, WebSocket } from 'ws';
-
 import { LicenseService, LicenseModuleType } from '../../license/license.service';
-
 import { WS_METRICS } from '../../metrics/definitions/tokens';
-
 import { WsMetrics, ATTRACTAP_GATEWAY_LABEL } from '../../metrics/definitions/ws.metrics';
-
 import { WsMetricsInterceptor } from '../../metrics/instrumentation/ws/ws.interceptor';
-
 import { MetricsService } from '../../metrics/metrics.service';
-
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
-
 import { AttractapService } from '../attractap.service';
-
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
-
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
-
 import { AttractapCardHandler } from './handlers/card/card.handler';
-
 import { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
-
 import { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
-
 import { AttractapFormsHandler } from './handlers/forms/forms.handler';
-
 import { AttractapProjectsHandler } from './handlers/projects/projects.handler';
-
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
-
 import { AttractapSessionHandler } from './handlers/session/session.handler';
-
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
-
+import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { WebsocketService } from './websocket.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
-
 import { randomBytes } from 'crypto';
-
 import { closeSync } from 'fs';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
@@ -115,6 +93,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(AttractapSupervisionHandler)
   protected supervisionHandler: AttractapSupervisionHandler;
 
+  @Inject(AttractapMassIntroductionHandler)
+  protected massIntroductionHandler: AttractapMassIntroductionHandler;
+
   protected readonly connectedAt = new WeakMap<object, bigint>();
 
   protected clientResponseAwaiters: Array<{
@@ -146,6 +127,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     [AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
       this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData),
     [AttractapEventType.SUPERVISION_CANCEL]: (socket) => this.supervisionHandler.handleSupervisionCancel(socket),
+    [AttractapEventType.REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.massIntroductionHandler.handleCardAuthRequest(socket, eventData),
+    [AttractapEventType.MASS_INTRODUCTION_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
+      this.massIntroductionHandler.handleCardAuthConfirmed(socket, eventData),
+    [AttractapEventType.MASS_INTRODUCTION_CANCEL]: (socket, eventData) =>
+      this.massIntroductionHandler.handleCancel(socket, eventData),
     [AttractapEventType.START_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
       this.sessionHandler.handleStartResourceUsageSession(socket, eventData),
     [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
@@ -190,6 +177,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.rejectServerEvent(socket, eventData),
     [AttractapEventType.SUPERVISION_RESOLVED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.SUPERVISION_START]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.MASS_INTRODUCTION_START]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
+      this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.MASS_INTRODUCTION_RESULT]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.MASS_INTRODUCTION_END]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
     [AttractapEventType.RESOURCE_USAGE_FORM_REQUEST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
@@ -515,6 +507,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         resetNfcCardData: null,
         ota: null,
         supervisionFlow: null,
+        massIntroductionFlow: null,
       },
     });
 
@@ -578,6 +571,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // Tear down any in-progress two-card supervision so the supervisor's web popup doesn't linger.
     if (socket.state?.supervisionFlow) {
       this.supervisionHandler.cancelForSocket(socket);
+    }
+    if (socket.state?.massIntroductionFlow) {
+      this.massIntroductionHandler.cancelForSocket(socket, readerId);
     }
 
     // Clean up OTA file descriptor if present

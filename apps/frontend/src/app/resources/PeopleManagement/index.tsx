@@ -243,6 +243,7 @@ export function PeopleManagement(
     <>
       <AddPersonDrawer
         t={t}
+        target={target}
         isOpen={isAddOpen}
         mode={addMode}
         comment={addComment}

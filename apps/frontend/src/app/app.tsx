@@ -15,6 +15,7 @@ import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge/index';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
+import { MassIntroductionRedeemModal } from './mass-introduction/MassIntroductionRedeemModal';
 import { ThemeToggle } from '../components/themeToggle';
 import { SessionBillingSummary } from './billing/sessionSummary/index';
 import { Layout } from './layout/layout';
@@ -174,6 +175,8 @@ export function AppLayout(props: PropsWithChildren) {
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
               {props.children}
+              {/* Mass-introduction QR codes: claimed before sign-in, redeemed after (ATT-1151). */}
+              <MassIntroductionRedeemModal canRedeem={isAuthenticated && !needsTwoFactorSetup} />
               {isAuthenticated && <SupervisorApprovalListener />}
               {isAuthenticated && <SessionBillingSummary key={user?.id} />}
             </AttraccessUserActionsBridge>

@@ -54,13 +54,5 @@ export function PeopleHeader(props: Readonly<PeopleHeaderProps>) {
     );
   }
 
-  return (
-    <PageHeader
-      title={t('title')}
-      subtitle={subtitle}
-      icon={<ShieldCheckIcon />}
-      noMargin
-      actions={actions}
-    />
-  );
+  return <PageHeader title={t('title')} subtitle={subtitle} icon={<ShieldCheckIcon />} noMargin actions={actions} />;
 }

@@ -26,6 +26,7 @@
 #ifdef HAS_LVGL_DISPLAY
 #include "../display/display.hpp"
 #include "supervision.hpp"
+#include "mass_introduction.hpp"
 #else
 #define NFC_CARD_LONG_PRESENTATION_TIME_MS 1500
 #endif
