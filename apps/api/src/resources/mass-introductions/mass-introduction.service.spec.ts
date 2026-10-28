@@ -212,6 +212,30 @@ describe('MassIntroductionService', () => {
     await expect(service.start(introducer, { resourceId: 5, readerId: 3 })).resolves.toBeDefined();
   });
 
+  it('keeps the running session when its replacement cannot arm the reader', async () => {
+    const running = await service.start(introducer, { resourceId: 5 });
+    readerPort.arm.mockRejectedValueOnce(new ConflictException('busy'));
+
+    await expect(service.start(introducer, { resourceId: 5, readerId: 4 })).rejects.toBeInstanceOf(ConflictException);
+
+    expect(service.get(running.id, introducer.id).id).toBe(running.id);
+    expect(eventsOfType(MassIntroductionLiveEventType.ENDED)).toEqual([]);
+  });
+
+  it('frees the reader of the replaced session before arming it again', async () => {
+    const first = await service.start(introducer, { resourceId: 5, readerId: 3 });
+    readerPort.arm.mockImplementationOnce(async () => {
+      // By the time the reader is armed again, the old session has released it.
+      expect(readerPort.disarm).toHaveBeenCalledWith(expect.objectContaining({ readerId: 3, sessionId: first.id }));
+      return { readerName: 'Entrance' };
+    });
+
+    const second = await service.start(introducer, { resourceId: 5, readerId: 3 });
+
+    expect(second.reader?.state).toBe(MassIntroductionReaderState.ACTIVE);
+    expect(() => service.get(first.id, introducer.id)).toThrow(NotFoundException);
+  });
+
   it('replaces an earlier session of the same introducer for the same target', async () => {
     const first = await service.start(introducer, { resourceId: 5 });
     const second = await service.start(introducer, { resourceId: 5 });

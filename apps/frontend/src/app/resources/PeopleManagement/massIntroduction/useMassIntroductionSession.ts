@@ -59,8 +59,17 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     setEndReason(reason);
   }, []);
 
+  // Set while the drawer is closed: a start that finishes afterwards must not leave a QR code running.
+  const unmountedRef = useRef(false);
+
   const startMutation = useAccessControlServiceMassIntroductionStart({
     onSuccess: (started) => {
+      if (unmountedRef.current) {
+        // React Query still reports a start that finishes after the drawer closed; end it right away
+        // (with the plain service call, the mutation hook is gone).
+        void AccessControlService.massIntroductionCancel({ sessionId: started.id }).catch(() => undefined);
+        return;
+      }
       activeSessionIdRef.current = started.id;
       sessionRef.current = null;
       setEndReason(null);
@@ -107,7 +116,9 @@ export function useMassIntroductionSession(target: PeopleTarget) {
 
   // Closing the drawer or navigating away must not leave a QR code (and reader) running.
   useEffect(() => {
+    unmountedRef.current = false;
     return () => {
+      unmountedRef.current = true;
       const sessionId = activeSessionIdRef.current;
       if (sessionId) {
         activeSessionIdRef.current = null;

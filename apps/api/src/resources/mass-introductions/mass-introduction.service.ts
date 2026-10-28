@@ -80,13 +80,15 @@ export class MassIntroductionService {
   public async start(user: AuthenticatedUser, dto: StartMassIntroductionDto): Promise<MassIntroductionSessionDto> {
     const { target, viaPermission } = await this.authorizeTarget(user, dto);
 
-    // One session per introducer and target: reopening the dialog replaces the old QR code.
-    for (const existing of this.sessions.values()) {
-      if (
-        existing.introducer.id === user.id &&
-        existing.target.type === target.type &&
-        existing.target.id === target.id
-      ) {
+    // One session per introducer and target: starting again replaces the old QR code — but only once
+    // the replacement works, so a start that fails (offline or busy reader) keeps the running one.
+    const replaced = Array.from(this.sessions.values()).filter(
+      (existing) =>
+        existing.introducer.id === user.id && existing.target.type === target.type && existing.target.id === target.id,
+    );
+    // A session holding the requested reader has to let go of it first, or arming would find it busy.
+    for (const existing of replaced) {
+      if (existing.reader?.state === MassIntroductionReaderState.ACTIVE && existing.reader.id === dto.readerId) {
         this.end(existing, MassIntroductionEndReason.CANCELLED);
       }
     }
@@ -146,6 +148,10 @@ export class MassIntroductionService {
         throw new GoneException('The mass introduction was replaced while starting');
       }
       session.reader = { id: dto.readerId, name: readerName, state: MassIntroductionReaderState.ACTIVE };
+    }
+
+    for (const existing of replaced) {
+      this.end(existing, MassIntroductionEndReason.CANCELLED);
     }
 
     this.logger.log(

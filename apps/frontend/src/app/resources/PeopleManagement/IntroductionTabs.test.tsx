@@ -26,6 +26,9 @@ const state = vi.hoisted(() => ({
   },
   readerCapabilities: undefined as unknown,
   readerIds: undefined as unknown,
+  deferStart: false,
+  pendingStart: null as null | (() => void),
+  serviceCancel: vi.fn((_data: unknown) => Promise.resolve()),
   eligibleReadersQuery: undefined as unknown,
 }));
 
@@ -38,8 +41,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     isPending: false,
     mutate: (variables: unknown) => {
       state.start(variables);
-      if (state.startError) options.onError(state.startError);
-      else options.onSuccess(state.startResult);
+      const settle = () =>
+        state.startError ? options.onError(state.startError) : options.onSuccess(state.startResult);
+      if (state.deferStart) state.pendingStart = settle;
+      else settle();
     },
   }),
   useAccessControlServiceMassIntroductionCancel: () => ({ mutate: state.cancel }),
@@ -47,7 +52,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     options.enabled ? ((state.eligibleReadersQuery = query), { data: [{ id: 4 }] }) : { data: undefined },
   useAttractapServiceGetResourceGroupAttractaps: (query: unknown, _key: unknown, options: { enabled: boolean }) =>
     options.enabled ? ((state.eligibleReadersQuery = query), { data: [{ id: 4 }] }) : { data: undefined },
-  AccessControlService: { massIntroductionGet: (data: unknown) => state.get(data) },
+  AccessControlService: {
+    massIntroductionGet: (data: unknown) => state.get(data),
+    massIntroductionCancel: (data: unknown) => state.serviceCancel(data),
+  },
 }));
 vi.mock('./usePeopleMutations', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
 vi.mock('../../../utils/live-updates', () => ({
@@ -142,6 +150,8 @@ beforeEach(() => {
   state.live = null;
   state.readerCapabilities = undefined;
   state.readerIds = undefined;
+  state.deferStart = false;
+  state.pendingStart = null;
   state.eligibleReadersQuery = undefined;
 });
 afterEach(() => {
@@ -302,6 +312,17 @@ describe('grant-introduction drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
     expect(state.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends a session whose start only finishes after the drawer closed', () => {
+    state.deferStart = true;
+    const view = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    view.unmount();
+
+    act(() => state.pendingStart?.());
+
+    expect(state.serviceCancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
   });
 
   it('cancels a running session on unmount, but not one that never started', () => {
