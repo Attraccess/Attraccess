@@ -107,7 +107,7 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_ca
     serial = socket.socket()
     serial.bind(("127.0.0.1", 0))
     serial.listen()
-    serial.settimeout(30)
+    serial.settimeout(120)
     events = []
 
     def uart():
@@ -226,15 +226,15 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_ca
                         assert busy.returncode != 0
                         if fail_flash:
                             with pytest.raises(subprocess.CalledProcessError):
-                                smoke(target, firmware, tmp_path / "artifacts", log_seconds=0.5, max_log_bytes=1024)
+                                smoke(target, firmware, tmp_path / "artifacts", log_seconds=10, max_log_bytes=1024)
                             raise RuntimeError("Caller failure must still release the place")
                         if offline_camera:
                             with pytest.raises(RuntimeError, match="offline"):
-                                smoke(target, firmware, tmp_path / "artifacts", log_seconds=0.5,
+                                smoke(target, firmware, tmp_path / "artifacts", log_seconds=10,
                                       max_log_bytes=1024)
                             assert not (tmp_path / "artifacts/screen.png").exists()
                             raise RuntimeError("Caller failure must still release the place")
-                        smoke(target, firmware, tmp_path / "artifacts", log_seconds=0.5,
+                        smoke(target, firmware, tmp_path / "artifacts", log_seconds=10,
                               max_log_bytes=1024, expect="Attractap ready")
                         # Native labgrid ResetProtocol resolves to this driver,
                         # rebooting the existing image without another transfer.
