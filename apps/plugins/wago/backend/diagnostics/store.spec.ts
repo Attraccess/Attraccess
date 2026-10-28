@@ -128,3 +128,46 @@ describe('diagnostic payload admission', () => {
     expect(store.read(1)).toEqual(before);
   });
 });
+
+describe('canonical state admission', () => {
+  const now = Date.parse('2026-09-05T12:00:00Z');
+  const valid = { connected: true, revision: 1, contentHash: 'a'.repeat(64), outputs: { relay: true } };
+  const ingest = (fields: Record<string, unknown>) => {
+    const store = new WagoDiagnosticsStore(() => now);
+    const envelope = {
+      timestamp: new Date(now).toISOString(),
+      streamId: '00000000-0000-4000-8000-000000000001',
+      sequence: 1,
+    };
+    return { store, admitted: store.ingest(1, 'state', Buffer.from(JSON.stringify({ ...envelope, ...fields }))) };
+  };
+  it('admits readiness, null revisions and boolean inputs', () => {
+    const { store, admitted } = ingest({
+      ...valid,
+      revision: null,
+      contentHash: null,
+      readiness: { hardwareAvailable: false },
+      inputs: { door: false },
+      manualOutputChannelIds: ['relay'],
+    });
+    expect(admitted).toBe(true);
+    expect(store.read(1)).toMatchObject({ hardwareAvailable: false, manualOutputChannelIds: ['relay'] });
+    expect(store.read(1).inputs.door.value).toBe(false);
+  });
+  it.each([
+    ['manual output list', { manualOutputChannelIds: 'relay' }],
+    ['manual output identifier', { manualOutputChannelIds: [''] }],
+    ['readiness shape', { readiness: [] }],
+    ['readiness availability', { readiness: { hardwareAvailable: 'yes' } }],
+    ['content hash', { contentHash: 'invalid' }],
+    ['connection flag', { connected: 'true' }],
+    ['revision', { revision: -1 }],
+    ['outputs', { outputs: null }],
+    ['inputs shape', { inputs: [] }],
+    ['input value', { inputs: { door: 1 } }],
+  ])('rejects an invalid %s', (_name, fields) => {
+    const { store, admitted } = ingest({ ...valid, ...fields });
+    expect(admitted).toBe(false);
+    expect(store.read(1).outputs).toEqual({});
+  });
+});

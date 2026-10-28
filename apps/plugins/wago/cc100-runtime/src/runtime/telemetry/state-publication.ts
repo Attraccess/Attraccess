@@ -1,10 +1,14 @@
 import { RuntimeModbusOutputPolling } from './modbus-output-polling';
+import { type RuntimeState, type Snapshot, type ValidationError } from '../types';
+
+type AcceptedConfiguration = NonNullable<RuntimeState['accepted']>;
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling {
   protected async readAndPublishState(force: boolean): Promise<void> {
     const accepted = this.state.accepted;
-    for (const [id, sample] of this.modbusOutputSamples)
-      if (sample.revision !== accepted?.revision) this.modbusOutputSamples.delete(id);
+    this.pruneModbusOutputSamples(accepted);
     const inputs: Record<string, boolean> = Object.create(null);
     const outputs: Record<string, boolean> = Object.create(null);
     const commandedOutputs: Record<string, boolean> = Object.create(null);
@@ -16,7 +20,7 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
       errors.push({
         path: 'hardware',
         code: 'hardware_unavailable',
-        message: `Check firmware profile, DIN/DOUT mounts and runtime UID permissions: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Check firmware profile, DIN/DOUT mounts and runtime UID permissions: ${errorMessage(error)}`,
       });
     }
     if (accepted && supported && !this.runtimeUpdateRequired && !this.runtimeFailsafePending) {
@@ -28,18 +32,7 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
         const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
         if (!point) continue;
         if (point.modbus) {
-          const sample = this.modbusOutputSamples.get(channel.id);
-          const device = accepted.snapshot.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
-          const maxAge = (device?.pollIntervalMs ?? 5000) * 2;
-          if (sample?.revision === accepted.revision) {
-            if (sample.error) errors.push({ path: channel.id, code: 'modbus_read_failed', message: sample.error });
-            else if (
-              Date.now() - sample.acquiredAt <= maxAge &&
-              sample.commanded === this.state.outputs[channel.id] &&
-              typeof sample.value === 'boolean'
-            )
-              outputs[channel.id] = sample.value;
-          }
+          this.collectModbusOutputSample(accepted, channel, point, outputs, errors);
           continue;
         }
         try {
@@ -50,14 +43,57 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
           errors.push({
             path: channel.id,
             code: point.modbus ? 'modbus_read_failed' : 'digital_read_failed',
-            message: error instanceof Error ? error.message : String(error),
+            message: errorMessage(error),
           });
         }
       }
     }
     // A read started on an old configuration must never populate the new revision.
     if (accepted !== this.state.accepted) return;
-    const payload = {
+    const payload = this.statePayload(accepted, inputs, outputs, commandedOutputs, errors);
+    this.options.onReadiness?.({ connected: this.connected, ...payload.readiness });
+    const signature = JSON.stringify(payload);
+    if (!force && signature === this.lastPublishedState) return;
+    this.publishReadFaults(errors);
+    await this.publishOperational('state', payload, { retain: true }, () => accepted === this.state.accepted);
+    if (accepted === this.state.accepted) this.lastPublishedState = signature;
+  }
+
+  protected pruneModbusOutputSamples(accepted: AcceptedConfiguration | undefined): void {
+    for (const [id, sample] of this.modbusOutputSamples)
+      if (sample.revision !== accepted?.revision) this.modbusOutputSamples.delete(id);
+  }
+
+  /** Modbus outputs report the latest polled sample for this revision instead of reading the bus. */
+  protected collectModbusOutputSample(
+    accepted: AcceptedConfiguration,
+    channel: Snapshot['logicalChannels'][number],
+    point: Snapshot['physicalPoints'][number],
+    outputs: Record<string, boolean>,
+    errors: ValidationError[],
+  ): void {
+    const sample = this.modbusOutputSamples.get(channel.id);
+    const device = accepted.snapshot.modbus?.devices.find((item) => item.id === point.modbus?.deviceId);
+    const maxAge = (device?.pollIntervalMs ?? 5000) * 2;
+    if (sample?.revision === accepted.revision) {
+      if (sample.error) errors.push({ path: channel.id, code: 'modbus_read_failed', message: sample.error });
+      else if (
+        Date.now() - sample.acquiredAt <= maxAge &&
+        sample.commanded === this.state.outputs[channel.id] &&
+        typeof sample.value === 'boolean'
+      )
+        outputs[channel.id] = sample.value;
+    }
+  }
+
+  protected statePayload(
+    accepted: AcceptedConfiguration | undefined,
+    inputs: Record<string, boolean>,
+    outputs: Record<string, boolean>,
+    commandedOutputs: Record<string, boolean>,
+    errors: ValidationError[],
+  ) {
+    return {
       connected: this.connected,
       revision: accepted?.revision ?? null,
       contentHash: accepted?.contentHash ?? null,
@@ -84,15 +120,13 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
         errors,
       },
     };
-    this.options.onReadiness?.({ connected: this.connected, ...payload.readiness });
-    const signature = JSON.stringify(payload);
-    if (!force && signature === this.lastPublishedState) return;
+  }
+
+  protected publishReadFaults(errors: ValidationError[]): void {
     for (const error of errors) {
       if (error.code === 'digital_read_failed' || error.code === 'modbus_read_failed')
         void this.publishFault(error.path, { code: error.code, message: error.message }).catch(() => undefined);
     }
-    await this.publishOperational('state', payload, { retain: true }, () => accepted === this.state.accepted);
-    if (accepted === this.state.accepted) this.lastPublishedState = signature;
   }
 
   protected requestStatePublication(): void {

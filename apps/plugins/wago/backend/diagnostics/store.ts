@@ -118,41 +118,38 @@ export function validEventPayload(data: Record<string, unknown>, kind: string, c
 }
 
 export function validStatePayload(data: Record<string, unknown>, kind: string, canonical: boolean): boolean {
+  if (kind !== 'state') return true;
   if (
-    kind === 'state' &&
     data.manualOutputChannelIds !== undefined &&
     (!Array.isArray(data.manualOutputChannelIds) ||
       data.manualOutputChannelIds.length > MAX_CHANNELS ||
       !data.manualOutputChannelIds.every(identifier))
   )
     return false;
+  return !canonical || validCanonicalState(data);
+}
+
+function validCanonicalState(data: Record<string, unknown>): boolean {
   if (
-    canonical &&
-    kind === 'state' &&
     data.readiness !== undefined &&
     (!isObject(data.readiness) ||
       (data.readiness.hardwareAvailable !== undefined && typeof data.readiness.hardwareAvailable !== 'boolean'))
   )
     return false;
-  if (
-    canonical &&
-    kind === 'state' &&
-    !(data.contentHash === null || (typeof data.contentHash === 'string' && /^[0-9a-f]{64}$/i.test(data.contentHash)))
-  )
+  if (!(
+    data.contentHash === null ||
+    (typeof data.contentHash === 'string' && /^[0-9a-f]{64}$/i.test(data.contentHash))
+  ))
     return false;
-  if (
-    canonical &&
-    kind === 'state' &&
-    (typeof data.connected !== 'boolean' ||
-      !(data.revision === null || (Number.isSafeInteger(data.revision) && (data.revision as number) >= 0)) ||
-      !isObject(data.outputs) ||
-      (data.inputs !== undefined && !isObject(data.inputs)) ||
-      ![...Object.values(data.outputs), ...Object.values(isObject(data.inputs) ? data.inputs : {})].every(
-        (value) => typeof value === 'boolean',
-      ))
-  )
-    return false;
-  return true;
+  return (
+    typeof data.connected === 'boolean' &&
+    (data.revision === null || (Number.isSafeInteger(data.revision) && (data.revision as number) >= 0)) &&
+    isObject(data.outputs) &&
+    (data.inputs === undefined || isObject(data.inputs)) &&
+    [...Object.values(data.outputs), ...Object.values(isObject(data.inputs) ? data.inputs : {})].every(
+      (value) => typeof value === 'boolean',
+    )
+  );
 }
 
 export function freshness(timestamp: string | null | undefined, now = Date.now(), maxAge = 90_000): Freshness {

@@ -1,5 +1,4 @@
 import { SsoSessionRequest } from '../sso-session-request';
-import { DOMParser } from '@xmldom/xmldom';
 import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
@@ -17,6 +16,8 @@ import { AccountLinkingRequiredException } from '../oidc/exceptions/account-link
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
 
 import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
+
+import { buildSamlSessionContext } from './saml-session-context';
 
 import { randomUUID } from 'node:crypto';
 
@@ -79,61 +80,37 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     }
   }
 
+  /** Logs the cause, records the failure metric and rejects the login with the given error. */
+  protected rejectLogin(logMessage: string, error: Error): never {
+    this.logger.error(logMessage);
+    this.recordFailure(error);
+    throw error;
+  }
+
   async validate(req: SSOSamlRequest, profile: SamlProfile): Promise<User> {
     const requestOptions = req?.ssoSamlOptions;
-    if (!requestOptions?.samlConfiguration) {
-      this.logger.error('SAML configuration missing on request');
-      const error = new BadRequestException('Missing SAML configuration');
-      this.recordFailure(error);
-      throw error;
-    }
+    if (!requestOptions?.samlConfiguration)
+      this.rejectLogin('SAML configuration missing on request', new BadRequestException('Missing SAML configuration'));
 
     const config = requestOptions.samlConfiguration;
     const providerId = requestOptions.providerId ?? config.ssoProviderId;
     const samlUserId = typeof profile?.nameID === 'string' ? profile.nameID : undefined;
-    if (!samlUserId) {
-      this.logger.error('No NameID found in SAML assertion');
-      const error = new BadRequestException('No NameID found in SAML assertion');
-      this.recordFailure(error);
-      throw error;
-    }
+    if (!samlUserId)
+      this.rejectLogin(
+        'No NameID found in SAML assertion',
+        new BadRequestException('No NameID found in SAML assertion'),
+      );
 
-    const assertionXml =
-      typeof profile.getAssertionXml === 'function' ? (profile.getAssertionXml() as string) : undefined;
-    const assertion = assertionXml ? new DOMParser().parseFromString(assertionXml, 'text/xml') : undefined;
-    const providerIssuedAt = Date.parse(assertion?.documentElement.getAttribute('IssueInstant') ?? '');
-    const indexes = assertion
-      ? Array.from(assertion.getElementsByTagNameNS('urn:oasis:names:tc:SAML:2.0:assertion', 'AuthnStatement'))
-          .map((node) => node.getAttribute('SessionIndex'))
-          .filter((index): index is string => !!index)
-      : [];
-    (req as SsoSessionRequest).ssoSessionContext = {
-      protocol: 'SAML',
-      ...(Number.isFinite(providerIssuedAt) ? { providerIssuedAt } : {}),
-      providerId,
-      issuer: typeof profile.issuer === 'string' ? profile.issuer : undefined,
-      nameID: samlUserId,
-      ...(typeof profile.nameIDFormat === 'string' && profile.nameIDFormat
-        ? { nameIDFormat: profile.nameIDFormat }
-        : {}),
-      ...(typeof profile.nameQualifier === 'string' && profile.nameQualifier
-        ? { nameQualifier: profile.nameQualifier }
-        : {}),
-      ...(typeof profile.spNameQualifier === 'string' && profile.spNameQualifier
-        ? { spNameQualifier: profile.spNameQualifier }
-        : {}),
-      sessionIndexes: indexes.length ? indexes : typeof profile.sessionIndex === 'string' ? [profile.sessionIndex] : [],
-    };
+    (req as SsoSessionRequest).ssoSessionContext = buildSamlSessionContext(profile, providerId, samlUserId);
 
     const usersService = await this.moduleRef.get(UsersService);
     const email = this.resolveEmail(profile, config);
 
-    if (!email) {
-      this.logger.error('No email attribute could be resolved from the SAML assertion');
-      const error = new BadRequestException('No email found in SAML assertion');
-      this.recordFailure(error);
-      throw error;
-    }
+    if (!email)
+      this.rejectLogin(
+        'No email attribute could be resolved from the SAML assertion',
+        new BadRequestException('No email found in SAML assertion'),
+      );
 
     let user = await usersService.findOne({ externalIdentifier: samlUserId }).catch(() => null);
     if (user) {

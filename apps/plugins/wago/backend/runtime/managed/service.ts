@@ -8,6 +8,8 @@ import { WagoCommissioningReadiness } from '../../commissioning/readiness/readin
 
 import { WagoController } from '../../controllers/entity';
 
+import { WagoManagedAccess } from './access.entity';
+
 import { managedHostHelper } from './provisioning/helper';
 
 import { managedWatchdogScript } from './provisioning/provision';
@@ -31,6 +33,19 @@ import { MANAGED_HELPER_PROTOCOL, signInstaller } from './provisioning/installer
 
 import { WagoManagedRuntimeReconciliation } from './reconciliation';
 
+/** Mutable state of one leased enrolment attempt, read by failure handling and cleanup. */
+export interface EnrolmentAttempt {
+  readonly controller: WagoController;
+  readonly session: WagoCommissioningSession;
+  readonly owner: string;
+  readonly operation: AbortController;
+  readonly operationId: string;
+  timer: ReturnType<typeof setTimeout>;
+  stage: ManagedSetupStage;
+  principal: PluginAuditPrincipal | null;
+  attempted: boolean;
+}
+
 @Injectable()
 export class WagoManagedRuntimeService
   extends WagoManagedRuntimeReconciliation
@@ -46,14 +61,9 @@ export class WagoManagedRuntimeService
   }
 
   protected async completeEnrolment(controller: WagoController): Promise<boolean> {
-    if (!controller.mqttServerId) return false;
-    const bound = await this.access.findOne({ where: { controllerId: controller.id }, order: { sessionId: 'DESC' } });
-    if (!bound) return false;
-    const session = await this.sessions.findOneBy({ id: bound.sessionId });
-    if (!session || !['awaiting_verification', 'completed'].includes(session.state)) return false;
-    if (session.hardwareId !== controller.hardwareId || session.mqttServerId !== controller.mqttServerId) return false;
-    let access = await this.loadSession(session.id);
-    if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return false;
+    const candidate = await this.enrolmentCandidate(controller);
+    if (!candidate) return false;
+    const { bound, session, access } = candidate;
     try {
       if (this.credentials(access).hardwareId !== controller.hardwareId) throw new Error();
     } catch {
@@ -69,138 +79,185 @@ export class WagoManagedRuntimeService
     const owner = randomBytes(16).toString('hex');
     if (!(await this.operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 22 * 60_000))) return false;
     const operation = new AbortController();
-    // Key confirmation, acceptance and cutover can each wait 310s for a
-    // supervisor gate. The rollback window starts only once SSH actually changes.
-    let timer = setTimeout(() => operation.abort(), 18 * 60_000).unref();
-    let stage: ManagedSetupStage = 'status';
-    const operationId = randomUUID();
-    let principal: PluginAuditPrincipal | null = null;
-    let attempted = false;
+    const attempt: EnrolmentAttempt = {
+      controller,
+      session,
+      owner,
+      operation,
+      // Key confirmation, acceptance and cutover can each wait 310s for a
+      // supervisor gate. The rollback window starts only once SSH actually changes.
+      timer: setTimeout(() => operation.abort(), 18 * 60_000).unref(),
+      stage: 'status',
+      operationId: randomUUID(),
+      principal: null,
+      attempted: false,
+    };
     this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'preparation' });
     try {
-      await this.operations.assertOwned(access.fingerprint, owner);
-      access = await this.loadSession(session.id);
-      if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return false;
-      const remoteStatus = await this.connection(access, `access-status ${access.token}`, operation.signal);
-      if (remoteStatus === 'cutover\n' && access.state !== 'recovery_required') return false;
-      if (!['open\n', 'committed\n', 'cutover\n'].includes(remoteStatus)) throw new Error('Unknown management receipt');
-      const committed = remoteStatus === 'committed\n';
-      if (committed) {
-        clearTimeout(timer);
-        timer = setTimeout(() => operation.abort(), 180_000).unref();
-      }
-      stage = 'audit';
-      principal = JSON.parse(session.initiatingPrincipal ?? 'null') as PluginAuditPrincipal | null;
-      if (!principal) throw new Error('Management audit initiator unavailable');
-      await this.securityAudit(session.id, 'security_apply', principal, operationId, 'attempted');
-      attempted = true;
-      await this.sessions.update(session.id, { updatedAt: new Date().toISOString() });
-      await this.access.update(access.sessionId, { controllerId: controller.id });
-      if (remoteStatus === 'cutover\n') {
-        // A previous attempt already failed. Request the same safe rollback as
-        // the watchdog, without retiring the key or confirming an unknown policy.
-        stage = 'rollback';
-        clearTimeout(timer);
-        timer = setTimeout(() => operation.abort(), 50_000).unref();
-        await this.connection(access, `access-restore ${access.token}`, operation.signal);
-        await this.securityAudit(session.id, 'security_apply', principal, operationId, 'failed');
-        return false;
-      }
-      if (!committed) {
-        stage = 'ownership';
-        if (!session.deliveryToken || !session.dockerProvisionToken)
-          throw new Error('Commissioning ownership unavailable');
-        stage = 'proof';
-        await this.prove(access, operation.signal);
-        stage = 'recovery_login';
-        if (!(await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword)))
-          throw new Error('Root recovery path is unverified');
-        await this.setActiveState(access.sessionId, 'verified');
-        stage = 'key_commit';
-        await this.connection(access, `access-key-commit ${access.token}`, operation.signal);
-        stage = 'proof';
-        await this.prove(access, operation.signal);
-        stage = 'acceptance';
-        if (this.rootAcceptance) {
-          // Older initial helpers reject a busy supervisor lock immediately and
-          // cannot be replaced while their installation journals are outstanding.
-          // Finish only these owned journals through the still-verified bootstrap
-          // login; all runtime updates after cutover continue to use the scoped key.
-          await this.rootAcceptance(
-            access.host,
-            access.fingerprint,
-            this.credentials(access).recoveryPassword,
-            session.deliveryToken,
-            {
-              assertOwned: () => this.operations.assertOwned(access.fingerprint, owner),
-              signal: operation.signal,
-              deadline: Date.now() + 12 * 60_000,
-            },
-            { token: access.token, helper: managedHostHelper(await this.desired()), watchdog: managedWatchdogScript() },
-          );
-        } else await this.connection(access, `commissioning-accept ${session.deliveryToken}`, operation.signal);
-        stage = 'cutover';
-        this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'ssh_cutover' });
-        await this.connection(access, `access-cutover ${access.token}`, operation.signal);
-        clearTimeout(timer);
-        timer = setTimeout(() => operation.abort(), 180_000).unref();
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-      }
-      stage = 'policy';
-      await this.prove(access, operation.signal);
-      if ((await this.connection(access, `access-policy ${access.token}`, operation.signal)) !== 'OK\n')
-        throw new Error('Managed SSH policy is unverified');
-      stage = 'root_login';
-      if (await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword))
-        throw new Error('Root SSH remains enabled');
-      await this.prove(access, operation.signal);
-      if (!committed) {
-        this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'reboot' });
-        stage = 'boot';
-        const boot = await this.connection(access, `access-boot ${access.token}`, operation.signal);
-        if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\n$/.test(boot))
-          throw new Error('Controller boot identity unavailable');
-        stage = 'reboot';
-        await this.connection(access, `access-reboot ${access.token}`, operation.signal).catch(() => undefined);
-        let rebootVerified = false;
-        for (let attempt = 0; attempt < 60; attempt++) {
-          operation.signal.throwIfAborted();
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          try {
-            const next = await this.connection(access, `access-boot ${access.token}`, operation.signal);
-            if (next !== boot && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\n$/.test(next)) {
-              await this.prove(access, operation.signal);
-              if ((await this.connection(access, `access-policy ${access.token}`, operation.signal)) !== 'OK\n')
-                throw new Error('Post-reboot SSH policy unverified');
-              if (await this.rootProbe(access.host, access.fingerprint, this.credentials(access).recoveryPassword))
-                throw new Error('Root SSH enabled after reboot');
-              await this.prove(access, operation.signal);
-              rebootVerified = true;
-              break;
-            }
-          } catch {
-            // Reboot disconnects are expected. The deadline and host watchdog
-            // remain independent; no ambiguous result can commit the policy.
-          }
-        }
-        if (!rebootVerified) throw new Error('Managed reboot verification failed');
-      }
-      await this.operations.assertOwned(access.fingerprint, owner);
-      stage = 'confirmation';
-      this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'confirmation' });
-      if (!committed) await this.connection(access, `access-commit ${access.token}`, operation.signal);
-      await this.setActiveState(access.sessionId, 'managed');
-      await this.finishSession(session.id);
-      await this.securityAudit(session.id, 'security_apply', principal, operationId, 'succeeded');
-      return true;
+      return await this.runEnrolment(attempt, access.fingerprint);
     } catch (error) {
-      return await this.failEnrolment(session, error, stage, attempted, principal, operationId, operation);
+      return await this.failEnrolment(
+        session,
+        error,
+        attempt.stage,
+        attempt.attempted,
+        attempt.principal,
+        attempt.operationId,
+        operation,
+      );
     } finally {
       this.enrolmentProgress.delete(controller.id);
-      clearTimeout(timer);
+      clearTimeout(attempt.timer);
       operation.abort();
       await this.operations.release(bound.fingerprint, owner);
     }
+  }
+
+  /** Bound, unretired access whose commissioning session still matches this controller. */
+  protected async enrolmentCandidate(controller: WagoController) {
+    if (!controller.mqttServerId) return null;
+    const bound = await this.access.findOne({ where: { controllerId: controller.id }, order: { sessionId: 'DESC' } });
+    if (!bound) return null;
+    const session = await this.sessions.findOneBy({ id: bound.sessionId });
+    if (!session || !['awaiting_verification', 'completed'].includes(session.state)) return null;
+    if (session.hardwareId !== controller.hardwareId || session.mqttServerId !== controller.mqttServerId) return null;
+    const access = await this.loadSession(session.id);
+    if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return null;
+    return { bound, session, access };
+  }
+
+  /** Probes the pinned bootstrap root login with the encrypted recovery password. completeEnrolment
+   * only starts an attempt once a probe is registered; probes are never unregistered. */
+  protected async rootLoginAccepted(access: WagoManagedAccess): Promise<boolean> {
+    const probe = this.rootProbe;
+    if (!probe) throw new Error('Root recovery probe unavailable');
+    return probe(access.host, access.fingerprint, this.credentials(access).recoveryPassword);
+  }
+
+  /** Replaces the attempt's operation deadline; called whenever a new bounded phase starts. */
+  protected restartEnrolmentTimer(attempt: EnrolmentAttempt, ms: number): void {
+    clearTimeout(attempt.timer);
+    attempt.timer = setTimeout(() => attempt.operation.abort(), ms).unref();
+  }
+
+  /** Runs the leased enrolment attempt; `attempt` records the stage and audit state for failure handling. */
+  protected async runEnrolment(attempt: EnrolmentAttempt, fingerprint: string): Promise<boolean> {
+    const { controller, session, owner, operation, operationId } = attempt;
+    await this.operations.assertOwned(fingerprint, owner);
+    const access = await this.loadSession(session.id);
+    if (!access || ['retiring', 'retired', 'pending'].includes(access.state)) return false;
+    const remoteStatus = await this.connection(access, `access-status ${access.token}`, operation.signal);
+    if (remoteStatus === 'cutover\n' && access.state !== 'recovery_required') return false;
+    if (!['open\n', 'committed\n', 'cutover\n'].includes(remoteStatus)) throw new Error('Unknown management receipt');
+    const committed = remoteStatus === 'committed\n';
+    if (committed) this.restartEnrolmentTimer(attempt, 180_000);
+    attempt.stage = 'audit';
+    const principal = JSON.parse(session.initiatingPrincipal ?? 'null') as PluginAuditPrincipal | null;
+    attempt.principal = principal;
+    if (!principal) throw new Error('Management audit initiator unavailable');
+    await this.securityAudit(session.id, 'security_apply', principal, operationId, 'attempted');
+    attempt.attempted = true;
+    await this.sessions.update(session.id, { updatedAt: new Date().toISOString() });
+    await this.access.update(access.sessionId, { controllerId: controller.id });
+    if (remoteStatus === 'cutover\n') {
+      // A previous attempt already failed. Request the same safe rollback as
+      // the watchdog, without retiring the key or confirming an unknown policy.
+      attempt.stage = 'rollback';
+      this.restartEnrolmentTimer(attempt, 50_000);
+      await this.connection(access, `access-restore ${access.token}`, operation.signal);
+      await this.securityAudit(session.id, 'security_apply', principal, operationId, 'failed');
+      return false;
+    }
+    if (!committed) await this.cutOverEnrolment(attempt, access);
+    attempt.stage = 'policy';
+    await this.prove(access, operation.signal);
+    if ((await this.connection(access, `access-policy ${access.token}`, operation.signal)) !== 'OK\n')
+      throw new Error('Managed SSH policy is unverified');
+    attempt.stage = 'root_login';
+    if (await this.rootLoginAccepted(access)) throw new Error('Root SSH remains enabled');
+    await this.prove(access, operation.signal);
+    if (!committed) await this.verifyEnrolmentReboot(attempt, access);
+    await this.operations.assertOwned(access.fingerprint, owner);
+    attempt.stage = 'confirmation';
+    this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'confirmation' });
+    if (!committed) await this.connection(access, `access-commit ${access.token}`, operation.signal);
+    await this.setActiveState(access.sessionId, 'managed');
+    await this.finishSession(session.id);
+    await this.securityAudit(session.id, 'security_apply', principal, operationId, 'succeeded');
+    return true;
+  }
+
+  /** First attempt: prove recovery, commit the key, accept commissioning and switch SSH policy. */
+  protected async cutOverEnrolment(attempt: EnrolmentAttempt, access: WagoManagedAccess): Promise<void> {
+    const { controller, session, owner, operation } = attempt;
+    attempt.stage = 'ownership';
+    if (!session.deliveryToken || !session.dockerProvisionToken) throw new Error('Commissioning ownership unavailable');
+    attempt.stage = 'proof';
+    await this.prove(access, operation.signal);
+    attempt.stage = 'recovery_login';
+    if (!(await this.rootLoginAccepted(access))) throw new Error('Root recovery path is unverified');
+    await this.setActiveState(access.sessionId, 'verified');
+    attempt.stage = 'key_commit';
+    await this.connection(access, `access-key-commit ${access.token}`, operation.signal);
+    attempt.stage = 'proof';
+    await this.prove(access, operation.signal);
+    attempt.stage = 'acceptance';
+    if (this.rootAcceptance) {
+      // Older initial helpers reject a busy supervisor lock immediately and
+      // cannot be replaced while their installation journals are outstanding.
+      // Finish only these owned journals through the still-verified bootstrap
+      // login; all runtime updates after cutover continue to use the scoped key.
+      await this.rootAcceptance(
+        access.host,
+        access.fingerprint,
+        this.credentials(access).recoveryPassword,
+        session.deliveryToken,
+        {
+          assertOwned: () => this.operations.assertOwned(access.fingerprint, owner),
+          signal: operation.signal,
+          deadline: Date.now() + 12 * 60_000,
+        },
+        { token: access.token, helper: managedHostHelper(await this.desired()), watchdog: managedWatchdogScript() },
+      );
+    } else await this.connection(access, `commissioning-accept ${session.deliveryToken}`, operation.signal);
+    attempt.stage = 'cutover';
+    this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'ssh_cutover' });
+    await this.connection(access, `access-cutover ${access.token}`, operation.signal);
+    this.restartEnrolmentTimer(attempt, 180_000);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+
+  /** First attempt: reboot and require the new boot to keep the hardened policy. */
+  protected async verifyEnrolmentReboot(attempt: EnrolmentAttempt, access: WagoManagedAccess): Promise<void> {
+    const { controller, operation } = attempt;
+    this.enrolmentProgress.set(controller.id, { state: 'running', reason: 'reboot' });
+    attempt.stage = 'boot';
+    const boot = await this.connection(access, `access-boot ${access.token}`, operation.signal);
+    if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\n$/.test(boot))
+      throw new Error('Controller boot identity unavailable');
+    attempt.stage = 'reboot';
+    await this.connection(access, `access-reboot ${access.token}`, operation.signal).catch(() => undefined);
+    let rebootVerified = false;
+    for (let poll = 0; poll < 60; poll++) {
+      operation.signal.throwIfAborted();
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      try {
+        const next = await this.connection(access, `access-boot ${access.token}`, operation.signal);
+        if (next !== boot && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\n$/.test(next)) {
+          await this.prove(access, operation.signal);
+          if ((await this.connection(access, `access-policy ${access.token}`, operation.signal)) !== 'OK\n')
+            throw new Error('Post-reboot SSH policy unverified');
+          if (await this.rootLoginAccepted(access)) throw new Error('Root SSH enabled after reboot');
+          await this.prove(access, operation.signal);
+          rebootVerified = true;
+          break;
+        }
+      } catch {
+        // Reboot disconnects are expected. The deadline and host watchdog
+        // remain independent; no ambiguous result can commit the policy.
+      }
+    }
+    if (!rebootVerified) throw new Error('Managed reboot verification failed');
   }
 
   protected async failEnrolment(

@@ -280,6 +280,8 @@ it('edits SAML identity, signing and provisioning fields through the rendered co
   fireEvent.change(screen.getByLabelText('entryPoint'), { target: { value: 'https://idp.test/saml' } });
   fireEvent.change(screen.getByLabelText('issuer'), { target: { value: 'workshop' } });
   fireEvent.change(screen.getByLabelText('audience'), { target: { value: 'members' } });
+  fireEvent.change(screen.getByLabelText('idpIssuer'), { target: { value: 'https://idp.test/entity' } });
+  fireEvent.change(screen.getByLabelText('logoutURL'), { target: { value: 'https://idp.test/slo' } });
   fireEvent.change(screen.getByLabelText('emailAttributeKeys'), { target: { value: 'mail, email' } });
   fireEvent.change(screen.getByLabelText('samlProvisioningSecret'), { target: { value: 'new-secret' } });
   const toggle = container.querySelector('[data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"]');
@@ -295,7 +297,8 @@ it('edits SAML identity, signing and provisioning fields through the rendered co
     if (!input) throw new Error(`Missing ${field}`);
     fireEvent.change(input, { target: { value } });
   }
-  fireEvent.click(screen.getByRole('switch', { name: 'signRequest' }));
+  for (const name of ['signRequest', 'wantAssertionsSigned', 'wantAuthnResponseSigned', 'forceAuthn'])
+    fireEvent.click(screen.getByRole('switch', { name }));
   fireEvent.click(screen.getByRole('button', { name: 'Save fixture' }));
   await waitFor(() => expect(state.update).toHaveBeenCalledOnce());
   expect(state.update.mock.calls[0][0].requestBody.samlConfiguration).toMatchObject({
@@ -307,7 +310,12 @@ it('edits SAML identity, signing and provisioning fields through the rendered co
     provisioningSecret: 'new-secret',
     spSigningCertificate: 'signing-cert',
     spSigningPrivateKey: 'signing-key',
+    idpIssuer: 'https://idp.test/entity',
+    logoutURL: 'https://idp.test/slo',
     signRequest: true,
+    wantAssertionsSigned: true,
+    wantAuthnResponseSigned: false,
+    forceAuthn: true,
   });
 });
 function Setup({ saml, id }: { saml: boolean; id?: number }) {

@@ -61,7 +61,8 @@ for (const scenario of [
       await writeFile(stateFile, JSON.stringify({ scenario, calls: [] }));
       await assert.rejects(
         exec(process.execPath, [runner], {
-          timeout: 10_000,
+          // CRAP coverage loads an instrumenting hook into every child, so allow it time.
+          timeout: 30_000,
           env: {
             ...(process.env.CRAP_NODE_MANIFEST ? {
               CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,

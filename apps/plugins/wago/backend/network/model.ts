@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 export type NetworkInput = { targetHost: string; mqttServerId: number | null };
 
@@ -61,4 +61,17 @@ export function networkChangeInput(body: unknown): NetworkInput {
   if (input.mqttServerId !== null && (!Number.isSafeInteger(input.mqttServerId) || input.mqttServerId <= 0))
     throw new BadRequestException('Select a configured MQTT server or update only the address.');
   return { targetHost: input.targetHost, mqttServerId: input.mqttServerId };
+}
+
+type ManagedIdentity = { sessionId: number; fingerprint: string };
+
+/** A new change may only replace a completed change or a failed connection attempt. */
+export function assertNoUnfinishedChange(row: { phase: string; failure: string | null } | null): void {
+  if (row && row.phase !== 'completed' && !(row.phase === 'connecting' && row.failure))
+    throw new ConflictException('Retry the pending MQTT/address change before starting another.');
+}
+
+export function assertSameManagedIdentity(row: ManagedIdentity | null, access: ManagedIdentity): void {
+  if (!row || row.sessionId !== access.sessionId || row.fingerprint !== access.fingerprint)
+    throw new ConflictException('Pending change belongs to another managed identity.');
 }

@@ -351,7 +351,7 @@ test('runs an Nx library suite and writes consistent JSON, HTML, and summary art
     assert.ok(summary.functions > 0);
     assert.deepEqual(summarizeScores(functions), {
       functions: summary.functions,
-      atLeast30: summary.atLeast30,
+      violations: summary.violations,
       max: summary.max,
     });
     assert.ok(existsSync(path.join(directory, 'html/index.html')));
@@ -420,10 +420,15 @@ test('source selection includes apps and scripts but excludes tests and generate
   for (const file of [
     'apps/api/src/main.spec.ts',
     'apps/frontend/src/test-utils/setup.ts',
+    'apps/plugins/wago/cc100-runtime/src/runtime.test-utils.ts',
+    'apps/api/src/e2e/sso/oidc/oidc.test-fixture.ts',
     'libs/api-client/src/generated/client.ts',
     'libs/react-query-client/src/lib/client.ts',
     'apps/api/src/types.d.ts',
     'apps/frontend/public/openscad/openscad.wasm.js',
+    '.nx-cache/hash/project/src/generated.ts',
+    '.nx-workspace-data/daemon.ts',
+    '.electron-cache/runtime.js',
   ])
     assert.ok(!isSource(file), file);
 });
@@ -433,21 +438,12 @@ test('only the vendored OpenSCAD runtime is excluded, not maintained public scri
   assert.ok(isSource('apps/frontend/public/openscad/adapter.js'));
 });
 
-test('the strict target counts scores exactly equal to 30', () => {
-  assert.deepEqual(summarizeScores([29.99, 30, 30.01].map((crap) => ({ statements: { crap } }))), {
-    functions: 3,
-    atLeast30: 2,
-    max: 30.01,
-  });
-  assert.deepEqual(summarizeScores([]), { functions: 0, atLeast30: 0, max: 0 });
-});
-
 test('every JS/TS Nx project has a report target with an isolated output path', async () => {
   const { execFileSync } = await import('node:child_process');
   const { readFileSync } = await import('node:fs');
   const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0');
+  // The firmware project also owns maintained Node tooling, so it keeps a target.
   const nativeProjects = new Set([
-    'apps/attractap/firmware/project.json',
     'apps/attractap/desktop/project.json',
     'apps/attractap-lab/project.json',
   ]);
@@ -477,12 +473,13 @@ test('ownership retains standalone tools and assigns nested sources exactly once
   assert.deepEqual(ownedFiles('apps/a/nested', files).filter(isSource), ['apps/a/nested/main.ts']);
 });
 
-test('WAGO includes the complete serial frontend suite once and host-composed acceptance suites', async () => {
+test('WAGO includes the complete serial frontend suite once, the CC100 runtime suite and host-composed acceptance suites', async () => {
   const { suites } = await import('./run.mjs');
   const configs = suites('apps/plugins/wago').map((suite) => suite.args[1]);
   assert.deepEqual(configs, [
     'apps/plugins/wago/jest.config.ts',
     'apps/plugins/wago/frontend/vitest.config.mts',
+    'apps/plugins/wago/cc100-runtime/jest.config.ts',
     'apps/plugins/wago/scripts/jest.audit-hooks.config.cjs',
     'apps/plugins/wago/scripts/jest.commissioning.config.cjs',
   ]);

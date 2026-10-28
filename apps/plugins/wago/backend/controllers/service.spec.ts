@@ -2,6 +2,7 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoController } from './entity';
 import { WagoEnrollment } from './enrollment.entity';
 import { controller, createWagoServiceFixture } from '../wago-service.test-fixture';
+import { MqttSubscriptionError } from './model';
 import { WagoService } from './service';
 
 describe('WagoService connection monitoring', () => {
@@ -65,6 +66,64 @@ describe('WagoService connection monitoring', () => {
     expect(heartbeat).not.toHaveBeenCalled();
     await handlers.get(topic)?.({ serverId: 3, topic, payload });
     expect(heartbeat).toHaveBeenCalledWith('cc100-01', payload);
+  });
+
+  it('replays retained state after installing migrated subscriptions and routes live diagnostics', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
+    const { service, context } = createService([claimed], [], 2);
+    const root = 'attraccess/wago/v1/controllers/cc100-01';
+    type Handler = (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>;
+    const handlers = new Map<string, Handler>();
+    const ingest = jest.spyOn(service.diagnostics, 'ingest').mockReturnValue(true);
+    const internals = service as unknown as {
+      enqueueConfigurationReport(id: number, payload: Buffer): void;
+      onCommandAcknowledgement(id: number, payload: Buffer): void;
+    };
+    const report = jest.spyOn(internals, 'enqueueConfigurationReport').mockImplementation(() => undefined);
+    const acknowledge = jest.spyOn(internals, 'onCommandAcknowledgement').mockImplementation(() => undefined);
+    jest.mocked(context.mqtt.subscribe).mockImplementation(async (serverId, topic, handler) => {
+      handlers.set(topic, handler as Handler);
+      // Brokers replay retained messages before the full subscription set is installed.
+      if (topic === `${root}/state`) {
+        await (handler as Handler)({ serverId, topic, payload: Buffer.alloc(65_537) });
+        await (handler as Handler)({ serverId, topic, payload: Buffer.from('retained state') });
+      }
+      if (topic === `${root}/faults`) await (handler as Handler)({ serverId, topic, payload: Buffer.from('early') });
+      return { unsubscribe: jest.fn() };
+    });
+
+    await service.refreshNetworkConnection(1);
+    expect(ingest.mock.calls).toEqual([[1, 'state', Buffer.from('retained state')]]);
+
+    ingest.mockClear();
+    const send = (suffix: string, payload: string, topic = `${root}/${suffix}`) =>
+      handlers.get(`${root}/${suffix}`)?.({ serverId: 3, topic, payload: Buffer.from(payload) });
+    await send('measurements', 'ignored', `${root}/state`);
+    await send('measurements', 'meter');
+    await send('configuration/reported', 'report');
+    await send('acknowledgements', 'ack');
+    expect(ingest.mock.calls).toEqual([
+      [1, 'measurements', Buffer.from('meter')],
+      [1, 'configuration/reported', Buffer.from('report')],
+      [1, 'acknowledgements', Buffer.from('ack')],
+    ]);
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledWith(1, Buffer.from('report'));
+    expect(acknowledge).toHaveBeenCalledTimes(1);
+    expect(acknowledge).toHaveBeenCalledWith(1, Buffer.from('ack'));
+  });
+
+  it('releases partial migrated subscriptions when one subscription fails', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
+    const { service, context } = createService([claimed], [], 2);
+    const installed = { unsubscribe: jest.fn() };
+    jest
+      .mocked(context.mqtt.subscribe)
+      .mockResolvedValueOnce(installed)
+      .mockRejectedValueOnce(new Error('broker refused subscription'));
+
+    await expect(service.refreshNetworkConnection(1)).rejects.toBeInstanceOf(MqttSubscriptionError);
+    expect(installed.unsubscribe).toHaveBeenCalledTimes(1);
   });
 
   it('checks software after restarting runtime monitoring until the running image is confirmed', async () => {

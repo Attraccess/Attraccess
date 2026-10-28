@@ -268,6 +268,65 @@ describe('plugin version management', () => {
     );
   });
 
+  it('requires approval of newly installed dependencies before switching versions', async () => {
+    hoisted.plugins = [makePlugin()];
+    const installed = { name: 'Cool Plugin', version: '1.2.3', registryId: 'npm', updateOverride: 'inherit' };
+    const core = {
+      name: '@vendor/core',
+      displayName: '3D Printer Core',
+      version: '1.0.0',
+      action: 'install',
+      permissions: [],
+      dependencies: [],
+      classification: 'community',
+    };
+    const candidate = {
+      version: '1.3.0',
+      direction: 'newer',
+      compatible: true,
+      permissionAdditions: [],
+      permissionRemovals: [],
+      semverImpact: 'minor',
+      dependencies: [{ name: core.name, version: '^1', required: true }],
+    };
+    hoisted.dependencyPlan = {
+      root: 'Cool Plugin',
+      token: 'version-plan',
+      plugins: [core, { ...core, name: 'Cool Plugin', displayName: 'Cool Plugin', version: '1.3.0' }],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        const data = url.endsWith('/installed') ? [installed] : url.endsWith('/versions') ? [candidate] : [];
+        return Promise.resolve({ ok: true, json: async () => data });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    await user.click(await screen.findByRole('button', { name: '1.3.0 Newer' }));
+
+    expect(screen.getByText('3D Printer Core · 1.0.0')).toBeInTheDocument();
+    const update = screen.getByRole('button', { name: 'Update' });
+    expect(update).toBeDisabled();
+    const approval = screen.getByRole('switch', { name: /I approve installing these dependencies/ });
+    await user.click(approval);
+    expect(update).toBeEnabled();
+    await user.click(approval);
+    expect(update).toBeDisabled();
+    await user.click(approval);
+    await user.click(update);
+
+    await waitFor(() =>
+      expect(hoisted.replaceInstalledPackageMock).toHaveBeenCalledWith({
+        packageName: 'Cool Plugin',
+        version: '1.3.0',
+        requestBody: { approvedPermissionAdditions: [], approvedMajorVersion: false, planToken: 'version-plan' },
+      }),
+    );
+  });
+
   it('opens installed package details from the original registry', async () => {
     hoisted.plugins = [makePlugin()];
     const fetchMock = vi.fn((input: { url?: string } | string) => {

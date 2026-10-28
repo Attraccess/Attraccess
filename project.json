@@ -38,7 +38,7 @@
       "outputs": [],
       "options": {
         "commands": [
-          "node --test scripts/*.test.mjs scripts/crap-score/*.test.mjs",
+          "node --test scripts/*.test.mjs scripts/crap-score/*.test.mjs tools/eslint-rules/*.test.mjs",
           "vitest run --config scripts/vitest.config.mts"
         ],
         "parallel": false

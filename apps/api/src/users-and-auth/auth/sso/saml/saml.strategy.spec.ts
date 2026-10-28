@@ -10,6 +10,8 @@ import { EncryptionService } from './../../../../encryption/encryption.service';
 import { PassportSamlConfig } from '@node-saml/passport-saml';
 import { SSOSamlRequest } from './saml.types';
 import { AccountLinkingRequiredException } from './../oidc/exceptions/account-linking-required.exception';
+import { MetricsService } from './../../../../metrics/metrics.service';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 
 describe('SSOSamlStrategy', () => {
   const fixture = registerSsosamlStrategyFixture();
@@ -522,5 +524,91 @@ describe('SSOSamlStrategy', () => {
     await strategy.validate(request, profile);
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(45, [], SSOProviderType.SAML, 31);
+  });
+  describe('validation failures', () => {
+    const metricsFor = (usersService: unknown) => {
+      const inc = jest.fn();
+      const moduleRef = {
+        get: jest.fn((token: unknown) =>
+          token === MetricsService
+            ? { authSsoLoginFailuresTotal: { inc } }
+            : token === RbacService
+              ? null
+              : usersService,
+        ),
+      } as unknown as ModuleRef;
+      return { inc, strategy: new SSOSamlStrategy(moduleRef) };
+    };
+
+    it('rejects requests without SAML configuration and records an invalid assertion', async () => {
+      const { inc, strategy } = metricsFor({ findOne: jest.fn() });
+      await expect(strategy.validate({} as SSOSamlRequest, { nameID: 'subject' } as SamlProfile)).rejects.toThrow(
+        new BadRequestException('Missing SAML configuration'),
+      );
+      expect(inc).toHaveBeenCalledWith({ provider_type: 'saml', reason: 'invalid_assertion' });
+    });
+
+    it('rejects assertions without a NameID before storing session evidence', async () => {
+      const usersService = { findOne: jest.fn() };
+      const { inc, strategy } = metricsFor(usersService);
+      const request = fixture.buildRequest(10, 'email');
+      await expect(strategy.validate(request, { nameID: 42, email: 'a@example.com' } as SamlProfile)).rejects.toThrow(
+        new BadRequestException('No NameID found in SAML assertion'),
+      );
+      expect(request).not.toHaveProperty('ssoSessionContext');
+      expect(usersService.findOne).not.toHaveBeenCalled();
+      expect(inc).toHaveBeenCalledWith({ provider_type: 'saml', reason: 'invalid_assertion' });
+    });
+
+    it('rejects with Unauthorized when the new user cannot be created', async () => {
+      const usersService = {
+        findOne: jest.fn().mockRejectedValue(new Error('lookup failed')),
+        buildUsernameFromSSOClaim: jest.fn(() => 'user'),
+        createOne: jest.fn().mockRejectedValue(new Error('duplicate username')),
+      };
+      const { inc, strategy } = metricsFor(usersService);
+      await expect(
+        strategy.validate(fixture.buildRequest(10, 'email'), {
+          nameID: 'subject',
+          email: 'user@example.com',
+        } as SamlProfile),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(usersService.findOne).toHaveBeenCalledTimes(2);
+      expect(inc).toHaveBeenCalledWith({ provider_type: 'saml', reason: 'invalid_assertion' });
+    });
+
+    it('keeps rejecting when the failure metric cannot be resolved', async () => {
+      const strategy = new SSOSamlStrategy({
+        get: jest.fn(() => {
+          throw new Error('metrics unavailable');
+        }),
+      } as unknown as ModuleRef);
+      await expect(strategy.validate({} as SSOSamlRequest, { nameID: 'subject' } as SamlProfile)).rejects.toThrow(
+        'Missing SAML configuration',
+      );
+    });
+  });
+
+  it('links an existing email account that has no local credentials to the SAML NameID', async () => {
+    const existing = { id: 7, email: 'user@example.com', authenticationDetails: [] };
+    const linked = { id: 7, email: 'user@example.com', externalIdentifier: 'subject' };
+    const usersService = {
+      findOne: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(existing),
+      updateOne: jest.fn().mockResolvedValue(linked),
+      createOne: jest.fn(),
+    };
+    const moduleRef = {
+      get: jest.fn((token: unknown) => (token === RbacService ? null : usersService)),
+    } as unknown as ModuleRef;
+    const strategy = new SSOSamlStrategy(moduleRef);
+
+    await expect(
+      strategy.validate(fixture.buildRequest(10, 'email'), {
+        nameID: 'subject',
+        email: 'user@example.com',
+      } as SamlProfile),
+    ).resolves.toBe(linked);
+    expect(usersService.updateOne).toHaveBeenCalledWith(7, { externalIdentifier: 'subject' });
+    expect(usersService.createOne).not.toHaveBeenCalled();
   });
 });

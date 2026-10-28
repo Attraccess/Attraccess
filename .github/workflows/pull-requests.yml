@@ -169,7 +169,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Report change risk for affected JS/TS projects
+      - name: Enforce CRAP score limit for affected JS/TS projects
         run: pnpm crap-score:affected --base=${{ env.NX_AFFECTED_BASE }}
       - name: Upload CRAP reports
         if: always()

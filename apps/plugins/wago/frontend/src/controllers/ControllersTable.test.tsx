@@ -648,3 +648,42 @@ it('translates recognized saved failures on mounted controller rows while retain
     session.failureReason = null;
   }
 });
+
+function mountWithActions(controllers: WagoController[], sessions: CommissioningSession[]) {
+  const actions = { onResume: vi.fn(), onConfigure: vi.fn(), onClaim: vi.fn(), onRemove: vi.fn() };
+  render(
+    <QueryClientProvider client={client}>
+      <ControllersTable controllers={controllers} sessions={sessions} {...actions} />
+    </QueryClientProvider>,
+  );
+  return actions;
+}
+
+it('closes the details drawer before configuring a claimed controller', async () => {
+  const { onConfigure } = mountWithActions([controller], [session]);
+  const drawer = await openDetails();
+  fireEvent.click(within(drawer).getByRole('button', { name: 'Configure' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(onConfigure).toHaveBeenCalledWith(1);
+});
+
+it('closes the details drawer before removing a controller', async () => {
+  const { onRemove } = mountWithActions([controller], [session]);
+  const drawer = await openDetails();
+  fireEvent.click(within(drawer).getByRole('button', { name: 'Remove' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(onRemove).toHaveBeenCalledWith(controller);
+});
+
+it('resumes an unfinished enrolment from the details drawer', async () => {
+  const pending = { ...session, state: 'awaiting_delivery' } as CommissioningSession;
+  const { onResume, onConfigure, onRemove } = mountWithActions([], [pending]);
+  const drawer = await openDetails('fixture');
+  expect(within(drawer).queryByRole('button', { name: 'Configure' })).toBeNull();
+  expect(within(drawer).queryByRole('button', { name: 'Remove' })).toBeNull();
+  fireEvent.click(within(drawer).getByRole('button', { name: 'Setup progress' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(onResume).toHaveBeenCalledWith(pending);
+  expect(onConfigure).not.toHaveBeenCalled();
+  expect(onRemove).not.toHaveBeenCalled();
+});
