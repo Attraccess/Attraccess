@@ -187,6 +187,56 @@ The API follows coordinator restarts through systemd so its live state reconnect
 `pnpm nx run attractap-lab:test` checks the complete nginx/API/coordinator path,
 authentication, claim exclusion and restart recovery in the NixOS VM.
 
+## Reader parking (janitor)
+
+The optional janitor erases every reader as soon as it is released and flashes
+a lab-only parking image that turns off the screen, LEDs, beeper and NFC. The
+next session starts from an empty chip and can flash anything; idle readers
+stay dark. Enable it on the host running both coordinator and exporter:
+
+```nix
+services.attractap-lab.janitor = {
+  enable = true;
+  # Keyed by place `variant` tag; places without an image are left alone.
+  images.attractap-touch-v2 = ./attractap_touch_v2_park.bin;
+};
+```
+
+Build the images with `pnpm nx run attractap-firmware:build-lab`
+(`firmware_output_lab/`). They are never part of an Attraccess release.
+
+While anyone holds a reader, the janitor keeps a reservation for it at priority
+1000 (sessions use 0). Labgrid allocates a released reader inside the release
+itself, so the janitor always gets it before waiting sessions. It then claims
+the reader as `attractap-lab-janitor/janitor`, checks its eFuses, runs
+`esptool write-flash --erase-all` with the parking image and releases once the
+image prints `ATTRACTAP_PARKED` on the UART. Parking takes roughly 10–20 s. On
+startup and after coordinator restarts, every managed reader is parked once.
+
+Full erase also wipes NVS: each session must provision Wi-Fi/API settings
+again, and a previously paired reader registers as a new one.
+
+eFuses cannot be erased. Before erasing, the janitor requires factory values
+for secure boot, flash encryption, key purposes, download mode and USB/JTAG
+disables, and compares raw eFuse blocks with the first dump recorded for the
+chip (`/var/lib/attractap-lab-janitor/efuse-baselines`). A changed eFuse
+quarantines the reader immediately; other failures retry, then quarantine after
+`janitor.attempts`. Quarantined readers stay claimed by the janitor without a
+reservation, so sessions skip them and maintenance does not wait for them:
+
+```sh
+ssh root@lab-host attractap-lab-janitor status
+ssh root@lab-host attractap-lab-janitor clear attractap-touch-v2-1  # after repair: park, then release
+```
+
+Each attempt keeps `efuse.txt` and `serial.log` under
+`/var/lib/attractap-lab-janitor/runs/PLACE/`; `journalctl -u attractap-lab-janitor`
+shows decisions. The janitor reaches the local exporter over SSH like any
+client, with a host-local key authorized only for the `labgrid` account.
+
+The parking image never deep-sleeps: that would power down USB-Serial-JTAG and
+make the reader unreachable until someone presses reset.
+
 ## Agent and CI workflow
 
 On Linux, from the monorepo root:
@@ -261,7 +311,9 @@ state separately from Nix generations.
 
 `attractap-lab-maintenance -- COMMAND...` acquires all existing places before
 running a command and conditionally releases its own claims afterward. Busy
-labs defer maintenance. These locks do not survive coordinator restart: host
+labs (claims or allocated reservations, including active parking) defer
+maintenance; janitor-quarantined readers are skipped. The janitor parks the
+readers again after maintenance releases them. These locks do not survive coordinator restart: host
 deployment must also gate incoming coordinator access until activation and
 health checks finish. The personal Mac mini configuration implements that gate.
 

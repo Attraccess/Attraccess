@@ -7,7 +7,13 @@ Produces firmware_output/ with, per variant:
   - {name}_{variant}.elf      unstripped ELF for server-side coredump symbolication
 plus firmwares.json — the manifest consumed by the API/frontend. The manifest
 field set must stay stable; the flasher and OTA pipeline depend on it.
+
+Variants that set `set(ATTRACTAP_RELEASE OFF)` are lab-only (e.g. the
+hardware-lab parking images) and are never part of a release build. Build them
+with --lab, which writes only their merged images to firmware_output_lab/.
 """
+
+import argparse
 
 import glob
 
@@ -31,6 +37,10 @@ def extract_cmake_value(content, variable):
     """Extract `set(<variable> "<value>")` from a variant .cmake file."""
     match = re.search(rf'set\(\s*{re.escape(variable)}\s+"([^"]*)"\s*\)', content)
     return match.group(1) if match else None
+
+def is_release_variant(content):
+    """Lab-only variants opt out with `set(ATTRACTAP_RELEASE OFF)`."""
+    return not re.search(r'set\(\s*ATTRACTAP_RELEASE\s+"?OFF"?\s*\)', content, re.IGNORECASE)
 
 def extract_build_id(firmware_bin_path, esptool_cmd):
     """Best-effort: read app_elf_sha256 from the app image so the server can
@@ -166,7 +176,109 @@ def run_idf(args):
 
 import json
 
+RELEASE_VARIANTS = [
+    "attractap-touch",
+    "attractap-touch-v2",
+    "attractap-touch-demo",
+    "attractap-touch-v2-demo",
+    # "attractap-lite-ethernet",
+]
+
+def read_variant(variant):
+    variant_path = os.path.join("variants", variant + ".cmake")
+    if not os.path.exists(variant_path):
+        print(f"Error: unknown variant {variant} ({variant_path} does not exist)")
+        sys.exit(1)
+    with open(variant_path) as f:
+        return variant_path, f.read()
+
+def lab_variants():
+    names = sorted(os.path.splitext(os.path.basename(path))[0]
+                   for path in glob.glob(os.path.join("variants", "*.cmake")))
+    return [name for name in names if not is_release_variant(read_variant(name)[1])]
+
+def build_variant(variant, variant_path, log_level):
+    """Build one variant; returns (build_dir, flash_files, flasher_args)."""
+    build_dir = os.path.join("build", variant)
+    # CMake caches absolute paths to the source tree and ESP-IDF checkout.
+    # Reusing a build directory from another worktree can therefore make
+    # the compiler read a different checkout, or fail with a stale cache.
+    if os.path.exists(build_dir):
+        print(f"Cleaning CMake build directory: {os.path.abspath(build_dir)}")
+        shutil.rmtree(build_dir)
+    sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
+    build_args = [
+        "-B", build_dir,
+        f"-DSDKCONFIG={sdkconfig_path}",
+        f"-DATTRACTAP_VARIANT={variant}",
+        f"-DATTRACTAP_LOG_LEVEL={log_level}",
+        "build",
+    ]
+    print(f"Running: idf.py {' '.join(build_args)}")
+    if run_idf(build_args) != 0:
+        print(f"Error: Build failed for variant '{variant}'")
+        sys.exit(1)
+
+    # Flash layout from flasher_args.json (bootloader, partition table,
+    # otadata initial image, app). The otadata image MUST be part of the
+    # merged bin or freshly flashed devices boot-loop on garbage otadata.
+    flasher_args_path = os.path.join(build_dir, "flasher_args.json")
+    with open(flasher_args_path) as f:
+        flasher_args = json.load(f)
+    flash_files = sorted(
+        ((offset, os.path.join(build_dir, rel_path))
+         for offset, rel_path in flasher_args["flash_files"].items()),
+        key=lambda item: int(item[0], 16),
+    )
+
+    print(f"Flash layout for {variant}:")
+    for offset, path in flash_files:
+        print(f"  {offset}: {os.path.relpath(path, build_dir)}")
+        if not os.path.exists(path):
+            print(f"Error: missing flash image {path}")
+            sys.exit(1)
+    return build_dir, flash_files, flasher_args
+
+def prepare_output(name):
+    output_dir = os.path.abspath(name)
+    if os.path.exists(output_dir):
+        print(f"Cleaning output directory: {output_dir}")
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+def build_lab(variants, esptool_cmd):
+    """Lab-only images: merged binaries only, no release manifest."""
+    if not variants:
+        print("Error: No lab-only variants (set(ATTRACTAP_RELEASE OFF)) found in variants/")
+        sys.exit(1)
+    print(f"Lab variants: {variants}")
+    output_dir = prepare_output("firmware_output_lab")
+    for variant in variants:
+        print(f"\n=== Building lab variant: {variant} ===")
+        variant_path, content = read_variant(variant)
+        if is_release_variant(content):
+            print(f"Error: {variant_path} is a release variant; --lab builds only ATTRACTAP_RELEASE OFF variants")
+            sys.exit(1)
+        firmware_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_NAME")
+        if not firmware_name:
+            print(f"Error: {variant_path} does not set: ATTRACTAP_FIRMWARE_NAME")
+            sys.exit(1)
+        # INFO keeps the reader-side logs readable on lab serial consoles.
+        _, flash_files, _ = build_variant(variant, variant_path, "INFO")
+        merged_bin_path = os.path.join(output_dir, f"{firmware_name}.bin")
+        run_merge_bin(esptool_cmd, merged_bin_path, flash_files)
+        print(f"Merged lab image created at: {merged_bin_path}")
+    print(f"\nLab build completed. Output in {output_dir}")
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--lab", action="store_true",
+                        help="build only lab-only variants (ATTRACTAP_RELEASE OFF) into firmware_output_lab/")
+    parser.add_argument("--variant", action="append", dest="variants",
+                        help="restrict the build to this variant (repeatable)")
+    args = parser.parse_args()
+
     os.chdir(FIRMWARE_DIR)
 
     if not shutil.which("idf.py") and not find_idf_export():
@@ -178,38 +290,36 @@ def main():
     python_cmd = resolve_python_command()
     esptool_cmd = resolve_esptool_command()
 
+    if args.lab:
+        build_lab(args.variants or lab_variants(), esptool_cmd)
+        return
+
     with open("version.txt") as f:
         firmware_version = f.read().strip().splitlines()[0]
     print(f"Firmware version: {firmware_version}")
 
     generate_certificates(python_cmd)
 
-    active_variants = [
-        "attractap-touch",
-        "attractap-touch-v2",
-        "attractap-touch-demo",
-        "attractap-touch-v2-demo",
-        # "attractap-lite-ethernet",
-    ]
-    variants = [(name, os.path.join("variants", name + ".cmake")) for name in active_variants]
+    variants = []
+    for name in args.variants or RELEASE_VARIANTS:
+        variant_path, content = read_variant(name)
+        if not is_release_variant(content):
+            # Never bundle lab-only images, even if listed by mistake.
+            print(f"Skipping lab-only variant {name} (ATTRACTAP_RELEASE OFF)")
+            continue
+        variants.append((name, variant_path, content))
 
     if not variants:
-        print("Error: No variant files found in variants/")
+        print("Error: No release variants to build")
         sys.exit(1)
-    print(f"Found variants: {[v for v, _ in variants]}")
+    print(f"Found variants: {[v for v, _, _ in variants]}")
 
-    output_dir = os.path.abspath("firmware_output")
-    if os.path.exists(output_dir):
-        print(f"Cleaning output directory: {output_dir}")
-        shutil.rmtree(output_dir)
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir = prepare_output("firmware_output")
 
     firmware_info = []
 
-    for variant, variant_path in variants:
+    for variant, variant_path, content in variants:
         print(f"\n=== Building variant: {variant} ===")
-        with open(variant_path) as f:
-            content = f.read()
 
         firmware_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_NAME")
         friendly_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_FRIENDLY_NAME")
@@ -226,44 +336,8 @@ def main():
             print(f"Error: {variant_path} does not set: {', '.join(missing)}")
             sys.exit(1)
 
-        build_dir = os.path.join("build", variant)
-        # CMake caches absolute paths to the source tree and ESP-IDF checkout.
-        # Reusing a build directory from another worktree can therefore make
-        # the compiler read a different checkout, or fail with a stale cache.
-        if os.path.exists(build_dir):
-            print(f"Cleaning CMake build directory: {os.path.abspath(build_dir)}")
-            shutil.rmtree(build_dir)
-        sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
-        build_args = [
-            "-B", build_dir,
-            f"-DSDKCONFIG={sdkconfig_path}",
-            f"-DATTRACTAP_VARIANT={variant}",
-            "-DATTRACTAP_LOG_LEVEL=ERROR",  # production runtime log level
-            "build",
-        ]
-        print(f"Running: idf.py {' '.join(build_args)}")
-        if run_idf(build_args) != 0:
-            print(f"Error: Build failed for variant '{variant}'")
-            sys.exit(1)
-
-        # Flash layout from flasher_args.json (bootloader, partition table,
-        # otadata initial image, app). The otadata image MUST be part of the
-        # merged bin or freshly flashed devices boot-loop on garbage otadata.
-        flasher_args_path = os.path.join(build_dir, "flasher_args.json")
-        with open(flasher_args_path) as f:
-            flasher_args = json.load(f)
-        flash_files = sorted(
-            ((offset, os.path.join(build_dir, rel_path))
-             for offset, rel_path in flasher_args["flash_files"].items()),
-            key=lambda item: int(item[0], 16),
-        )
-
-        print(f"Flash layout for {variant}:")
-        for offset, path in flash_files:
-            print(f"  {offset}: {os.path.relpath(path, build_dir)}")
-            if not os.path.exists(path):
-                print(f"Error: missing flash image {path}")
-                sys.exit(1)
+        # ERROR is the production runtime log level.
+        build_dir, flash_files, flasher_args = build_variant(variant, variant_path, "ERROR")
 
         app_bin = os.path.join(build_dir, flasher_args["app"]["file"])
         elf_path = os.path.join(build_dir, "attractap.elf")

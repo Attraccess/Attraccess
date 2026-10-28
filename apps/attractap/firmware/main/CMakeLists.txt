@@ -7,18 +7,26 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
         message(FATAL_ERROR "ATTRACTAP_DEFINES not set — build via the top-level project so a variant file is loaded")
     endif()
 
-    file(GLOB_RECURSE ATTRACTAP_SRCS
-         "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
-         "${CMAKE_CURRENT_LIST_DIR}/../src/*.c")
+    if("${ATTRACTAP_APP}" STREQUAL "park")
+        # Lab parking image (variants/*-park.cmake): its own app_main, none of
+        # the reader app. Headers under ../src stay available for pin maps.
+        file(GLOB ATTRACTAP_SRCS "${CMAKE_CURRENT_LIST_DIR}/../park/*.cpp")
+        set(ATTRACTAP_UI OFF)
+    else()
+        file(GLOB_RECURSE ATTRACTAP_SRCS
+             "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
+             "${CMAKE_CURRENT_LIST_DIR}/../src/*.c")
 
-    if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
-        include("${CMAKE_CURRENT_LIST_DIR}/../tools/latin1_fonts.cmake")
-        attractap_latin1_fonts(ATTRACTAP_LATIN1_FONTS)
-        list(APPEND ATTRACTAP_SRCS ${ATTRACTAP_LATIN1_FONTS})
-    endif()
+        if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
+            set(ATTRACTAP_UI ON)
+            include("${CMAKE_CURRENT_LIST_DIR}/../tools/latin1_fonts.cmake")
+            attractap_latin1_fonts(ATTRACTAP_LATIN1_FONTS)
+            list(APPEND ATTRACTAP_SRCS ${ATTRACTAP_LATIN1_FONTS})
+        endif()
 
-    if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
-        list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "${ATTRACTAP_EXCLUDE_REGEX}")
+        if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
+            list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "${ATTRACTAP_EXCLUDE_REGEX}")
+        endif()
     endif()
 endif()
 
@@ -62,7 +70,7 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
 # (-Wno-enum-conversion in tools/cmake/build.cmake:193).
 target_compile_options(${COMPONENT_LIB} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>")
 
-if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
+if(ATTRACTAP_UI)
     # Generic binary embedding does not align the start symbol. LVGL's RGB565
     # pixel reads require aligned data, so use the same explicit wrapper as host tests.
     get_filename_component(ATTRACTAP_IMAGE_DIR "${CMAKE_CURRENT_LIST_DIR}/../src/display/images" ABSOLUTE)

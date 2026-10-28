@@ -4,6 +4,7 @@ import argparse
 from contextlib import contextmanager
 import os
 from pathlib import Path
+import re
 import time
 import socket
 import uuid
@@ -14,6 +15,7 @@ from labgrid.remote.generated import labgrid_coordinator_pb2 as messages
 from labgrid.resource.remote import RemotePlaceManager
 from pexpect import TIMEOUT
 
+from . import efuse
 from .drivers import ESPToolDriver, ScreenCaptureDriver
 
 
@@ -24,7 +26,7 @@ def claim(config, place, role="main"):
         if place != os.environ.get("LG_PLACE"):
             raise ValueError("Inside a labgrid session, use its allocated LG_PLACE")
         # The outer session owns acquisition/release; this context owns drivers.
-        with _claim(config, place, role, acquire=False) as target:
+        with attached(config, place, role) as target:
             yield target
         return
     previous = os.environ.get("LG_HOSTNAME")
@@ -37,6 +39,13 @@ def claim(config, place, role="main"):
             os.environ.pop("LG_HOSTNAME", None)
         else:
             os.environ["LG_HOSTNAME"] = previous
+
+
+@contextmanager
+def attached(config, place, role="main"):
+    """Use a place this process's labgrid identity already holds, never releasing it."""
+    with _claim(config, place, role, acquire=False) as target:
+        yield target
 
 
 @contextmanager
@@ -115,23 +124,69 @@ def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, e
     flash.flash(str(image))
     target.deactivate(flash)
     target.activate(console)
-    deadline = time.monotonic() + log_seconds
-    count = 0
-    with (output / "serial.log").open("wb") as log:
-        while count < max_log_bytes and time.monotonic() < deadline:
-            try:
-                data = console.read(
-                    timeout=min(0.25, max(0, deadline - time.monotonic())),
-                    max_size=min(4096, max_log_bytes - count),
-                )
-            except TIMEOUT:
-                continue
-            log.write(data)
-            log.flush()
-            count += len(data)
+    _record(console, output / "serial.log", log_seconds, max_log_bytes)
     target.deactivate(console)
     screen = target.get_driver(ScreenCaptureDriver)
     screen.capture(output / "screen.png")
     if expect is not None and expect.encode() not in (output / "serial.log").read_bytes():
         raise AssertionError(f"UART log did not contain expected marker: {expect!r}")
     return output
+
+
+PARKED_MARKER = b"ATTRACTAP_PARKED"
+PARK_FAILED_MARKER = b"ATTRACTAP_PARK_FAILED"
+# Complete marker lines only: the failure line names the hardware that failed.
+_PARK_REPORT = re.compile(rb"ATTRACTAP_PARK(?:ED|_FAILED)[^\n]*\n")
+
+
+def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resource_seconds=30.0):
+    """Check eFuses, erase the whole chip, flash a parking image and confirm it.
+
+    Raises efuse.EfuseViolation before erasing if security eFuses were burned;
+    such a reader must not be reused. Returns the chip MAC once the image
+    reports ATTRACTAP_PARKED on the UART. serial.log and efuse.txt stay in output.
+    """
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    console = target.get_driver("SerialDriver", activate=False)
+    target.deactivate(console)
+    flash = target.get_driver(ESPToolDriver, activate=False)
+    # Labgrid waits forever for an unavailable resource; a missing reader must fail.
+    target.await_resources([flash.device], timeout=resource_seconds)
+    target.activate(flash)
+    report = flash.read_efuses()
+    (output / "efuse.txt").write_text(report)
+    mac = efuse.check(report, baseline_dir)
+    flash.erase_and_flash(str(image))
+    target.deactivate(flash)
+    target.activate(console)
+    log = _record(console, output / "serial.log", marker_seconds, 1_048_576,
+                  until=_PARK_REPORT.search)
+    target.deactivate(console)
+    if PARK_FAILED_MARKER in log:
+        line = log[log.index(PARK_FAILED_MARKER):].split(b"\n", 1)[0]
+        raise RuntimeError(f"Parking image could not park the hardware: {line.decode(errors='replace')}")
+    if PARKED_MARKER not in log:
+        raise TimeoutError(f"Parking image did not report {PARKED_MARKER.decode()} within {marker_seconds}s")
+    return mac
+
+
+def _record(console, path, seconds, max_bytes, until=None):
+    """Write UART output to path for up to seconds/max_bytes, or until it matches."""
+    deadline = time.monotonic() + seconds
+    data = b""
+    with path.open("wb") as log:
+        while len(data) < max_bytes and time.monotonic() < deadline:
+            try:
+                chunk = console.read(
+                    timeout=min(0.25, max(0, deadline - time.monotonic())),
+                    max_size=min(4096, max_bytes - len(data)),
+                )
+            except TIMEOUT:
+                continue
+            log.write(chunk)
+            log.flush()
+            data += chunk
+            if until and until(data):
+                break
+    return data

@@ -29,7 +29,14 @@ sample leaves both UTC and the timezone offset unchanged, before and after
 SNTP synchronization. Trusted offline demo presets use their separate path.
 
 Each variant file sets the compile definitions (pins, feature flags, firmware
-name) and the source subtrees excluded for that hardware. The firmware version
+name) and the source subtrees excluded for that hardware.
+
+The `*-park` variants (`attractap-touch-park`, `attractap-touch-v2-park`,
+`attractap-lite-ethernet-park`) build `park/` instead of the reader app: the
+[hardware lab](../../attractap-lab/README.md) janitor flashes them between lab sessions to
+turn off the screen, LEDs, beeper and NFC while keeping USB-Serial-JTAG
+available. They set `set(ATTRACTAP_RELEASE OFF)`, so release builds skip
+them even if listed; any variant can use that tag to stay out of releases. The firmware version
 lives in `version.txt` — bump it whenever firmware source changes (CI enforces
 this).
 
@@ -98,6 +105,15 @@ into `build/<variant>/`, and writes `firmware_output/` containing per variant:
 - `<name>_<variant>_ota.bin` — app-only image for OTA updates via the server
 - `<name>_<variant>.elf` — unstripped ELF for server-side coredump symbolication
 - `firmwares.json` — manifest consumed by the Attraccess API/frontend
+
+Build the lab-only parking images (no manifest, not part of a release) into
+`firmware_output_lab/<name>.bin`, one merged image per hardware family:
+
+```bash
+python3 build_firmwares.py --lab  # or: pnpm nx run attractap-firmware:build-lab
+```
+
+`--variant NAME` restricts either mode to the given variants.
 
 Build a single variant during development:
 
