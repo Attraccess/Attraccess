@@ -107,7 +107,13 @@ export function PasswordPolicyHints({ password, username, email, policy, serverE
 
   // Until something is typed, every rule is shown as pending rather than passed or failed.
   const isEmpty = password.length === 0;
-  const strengthColor = meetsScore ? 'success' : score === policy.minZxcvbnScore - 1 ? 'warning' : 'danger';
+  // Green is reserved for a password that passes every client-side check, not just the strength score.
+  const passesAllRules = meetsScore && rules.every((rule) => rule.satisfied);
+  const strengthColor = passesAllRules
+    ? 'success'
+    : meetsScore || score === policy.minZxcvbnScore - 1
+      ? 'warning'
+      : 'danger';
 
   return (
     <div className="space-y-3" data-cy="password-policy-hints">

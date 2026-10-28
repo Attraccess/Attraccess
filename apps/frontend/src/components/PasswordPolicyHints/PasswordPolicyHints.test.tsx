@@ -110,13 +110,23 @@ it.each([
   [4, 'success'],
 ] as const)('shows strength score %s as a %s meter without crack-time details', (score, color) => {
   state.score = score;
-  render(<PasswordPolicyHints password="x" username="" email="" policy={policy} />);
+  render(<PasswordPolicyHints password="Strong-Passphrase-42!" username="" email="" policy={policy} />);
   const meter = screen.getByRole('meter', { name: 'strength.label' });
   expect(meter).toHaveAttribute('data-score', String(score));
   expect(meter).toHaveAttribute('aria-valuenow', String(score + 1));
   expect(meter).toHaveAttribute('aria-valuetext', `strength.score.${score}`);
   expect(meter.className).toContain(`meter--${color}`);
   expect(screen.queryByText(/crack/i)).toBeNull();
+});
+it('keeps the meter off green while another rule still fails', () => {
+  state.score = 4;
+  render(<PasswordPolicyHints password="weak" username="" email="" policy={policy} />);
+  expect(screen.getByRole('meter').className).toContain('meter--warning');
+});
+it('does not show a short password as green when the policy sets no minimum score', () => {
+  state.score = 0;
+  render(<PasswordPolicyHints password="x" username="" email="" policy={{ ...policy, minZxcvbnScore: 0 }} />);
+  expect(screen.getByRole('meter').className).not.toContain('meter--success');
 });
 it('generates requested composition and length with a secure randomness source', () => {
   const password = generateStrongPassword({
