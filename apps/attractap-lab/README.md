@@ -172,6 +172,11 @@ definitions, and acquired places cannot be deleted. With declarative
 `coordinator.places`, Nix remains authoritative and overwrites dashboard inventory
 edits on the next synchronization.
 
+Places with an `HTTPVideoStream` resource show a live camera view on their page
+to signed-in users, connected only while shown. The API relays the stream from
+the coordinator host, so the URL must be reachable there; a uStreamer-style
+`/snapshot` URL is watched as its sibling `/stream`.
+
 Browser serial consoles are explicitly disabled: upstream's TCP bridge does not
 support our RFC2217/SSH transport. Use native labgrid console access instead.
 ADI-specific FPGA recovery and SD-mux routes are omitted. Power hardware is not

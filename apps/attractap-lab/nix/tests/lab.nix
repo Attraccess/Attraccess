@@ -21,6 +21,7 @@
         # Missing USB devices should remain unavailable without crashing exporter.
         settings = {
           reader-a.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-A"; };
+          reader-a.HTTPVideoStream.url = "http://127.0.0.1:8080/snapshot";
           reader-b.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-B"; };
         };
       };

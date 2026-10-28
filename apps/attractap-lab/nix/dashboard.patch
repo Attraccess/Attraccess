@@ -1,5 +1,5 @@
 diff --git a/coordinator/api/app/main.py b/coordinator/api/app/main.py
-index 86b67e0..c5edcb4 100644
+index 86b67e0..5da9abc 100644
 --- a/coordinator/api/app/main.py
 +++ b/coordinator/api/app/main.py
 @@ -1,8 +1,9 @@
@@ -13,9 +13,11 @@ index 86b67e0..c5edcb4 100644
  from fastapi.middleware.cors import CORSMiddleware
  
  from .auth.store import AuthStore
-@@ -13,17 +14,14 @@ from .recorder import Recorder
+@@ -12,18 +13,16 @@ from .grpc_client import CoordinatorClient
+ from .recorder import Recorder
  from .routers import (
      auth,
++    cameras,
      catalog,
 -    console,
      deployments,
@@ -31,7 +33,7 @@ index 86b67e0..c5edcb4 100644
      users,
  )
  from .ws import router as ws_router
-@@ -123,13 +121,25 @@ async def lifespan(app: FastAPI):
+@@ -123,13 +122,25 @@ async def lifespan(app: FastAPI):
      app.state.coordinator = client
      await client.start()
  
@@ -60,7 +62,7 @@ index 86b67e0..c5edcb4 100644
              except Exception as e:
                  logger.warning("labgrid release on grace expired failed: %s", e)
          except Exception as e:
-@@ -138,16 +148,10 @@ async def lifespan(app: FastAPI):
+@@ -138,16 +149,10 @@ async def lifespan(app: FastAPI):
      cmgr.on_session_dropped = make_on_session_dropped(rec_store)
      cmgr.on_grace_expired = _on_grace_expired
  
@@ -80,7 +82,7 @@ index 86b67e0..c5edcb4 100644
  
      try:
          for place in client.get_places():
-@@ -200,8 +204,17 @@ app.include_router(resources.router, prefix="/api")
+@@ -200,8 +205,18 @@ app.include_router(resources.router, prefix="/api")
  app.include_router(reservations.router, prefix="/api")
  app.include_router(ws_router, prefix="/api")
  app.include_router(users.router, prefix="/api")
@@ -100,7 +102,76 @@ index 86b67e0..c5edcb4 100644
  app.include_router(power.router, prefix="/api")
 -app.include_router(recovery.router, prefix="/api")
 -app.include_router(sdmux.router, prefix="/api")
++app.include_router(cameras.router, prefix="/api")
 +# ADI FPGA/SD-card recovery and SD-mux controls are not exposed for Attractap.
+diff --git a/coordinator/api/app/routers/cameras.py b/coordinator/api/app/routers/cameras.py
+new file mode 100644
+index 0000000..b683d72
+--- /dev/null
++++ b/coordinator/api/app/routers/cameras.py
+@@ -0,0 +1,62 @@
++"""Relay a place's camera to signed-in dashboard users while they watch it."""
++
++from urllib.parse import urlsplit, urlunsplit
++
++import httpx
++from fastapi import APIRouter, Depends, HTTPException, Request
++from fastapi.responses import StreamingResponse
++
++from ..auth.dependencies import current_user
++from ..auth.store import User
++
++router = APIRouter(tags=["cameras"])
++
++
++def _stream_url(url: str) -> str:
++    # Lab cameras follow uStreamer's layout, exporting /snapshot beside /stream.
++    parts = urlsplit(url)
++    if parts.path.endswith("/snapshot"):
++        parts = parts._replace(path=parts.path.removesuffix("snapshot") + "stream")
++    return urlunsplit(parts)
++
++
++@router.get("/places/{name}/cameras/{resource}")
++async def camera_stream(
++    name: str,
++    resource: str,
++    request: Request,
++    user: User = Depends(current_user),
++):
++    camera = request.app.state.coordinator.get_resource(name, resource)
++    url = camera.params.get("url") if camera and camera.cls == "HTTPVideoStream" else None
++    if not isinstance(url, str) or urlsplit(url).scheme not in {"http", "https"}:
++        raise HTTPException(status_code=404, detail="place has no such HTTP camera")
++
++    # The URL is resolved from this host, as the exporter publishes it.
++    client = httpx.AsyncClient(timeout=httpx.Timeout(10, read=30), trust_env=False)
++    try:
++        upstream = await client.send(client.build_request("GET", _stream_url(url)), stream=True)
++    except httpx.HTTPError as e:
++        await client.aclose()
++        raise HTTPException(status_code=502, detail=f"camera unreachable: {e}")
++    if upstream.status_code != 200:
++        await upstream.aclose()
++        await client.aclose()
++        raise HTTPException(status_code=502, detail=f"camera returned {upstream.status_code}")
++
++    async def frames():
++        # Closing on disconnect stops the camera's encoder until the next viewer.
++        try:
++            async for chunk in upstream.aiter_raw():
++                yield chunk
++        except httpx.HTTPError:
++            pass
++        finally:
++            await upstream.aclose()
++            await client.aclose()
++
++    return StreamingResponse(
++        frames(),
++        media_type=upstream.headers.get("content-type", "multipart/x-mixed-replace"),
++        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
++    )
 diff --git a/coordinator/api/app/routers/places.py b/coordinator/api/app/routers/places.py
 index 233a1e9..f02b5fa 100644
 --- a/coordinator/api/app/routers/places.py
