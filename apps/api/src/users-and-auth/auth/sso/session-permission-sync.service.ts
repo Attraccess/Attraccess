@@ -1,7 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { SSOProvider, SsoSessionContext } from '@attraccess/database-entities';
-import { SessionConfigType } from '../../../config/session.config';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { SsoAuditService } from '../../../audit/sso-audit.service';
 import { SessionService } from '../session.service';
@@ -35,7 +33,6 @@ export class SsoSessionPermissionSyncService implements SessionPermissionSync {
 
   constructor(
     private readonly sessionService: SessionService,
-    private readonly configService: ConfigService,
     private readonly metricsService: MetricsService,
     @Inject(SESSION_PERMISSION_RESYNCERS) private readonly resyncers: SessionPermissionResyncer[],
     @Optional() private readonly ssoAudit?: SsoAuditService,
@@ -67,8 +64,7 @@ export class SsoSessionPermissionSyncService implements SessionPermissionSync {
     const resyncer = context && this.resyncers.find((candidate) => candidate.protocol === context.protocol);
     if (!context || !resyncer?.canResync(context)) return 'skipped';
     const loaded = await this.provider(resyncer, context.providerId);
-    const sessionConfig = this.configService.get<SessionConfigType>('session');
-    const intervalMs = loaded ? resolvePermissionSyncIntervalMinutes(loaded, sessionConfig) * 60_000 : 0;
+    const intervalMs = loaded ? resolvePermissionSyncIntervalMinutes(loaded) * 60_000 : 0;
     if (!loaded || intervalMs <= 0) return 'skipped';
     const { provider } = loaded;
     const providerType = context.protocol.toLowerCase();

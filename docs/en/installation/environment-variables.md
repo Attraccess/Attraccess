@@ -81,7 +81,6 @@ In containers, give the API write access to the file path and mount its director
 |----------|---------|-------------|
 | `AUTH_SESSION_SECRET` | – | **Required.** Secret key for session encryption |
 | `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days) |
-| `SSO_PERMISSION_SYNC_TTL_MINUTES` | `0` | Default interval in minutes for re-syncing OIDC users' roles during a session, for providers without their own interval. `0` disables it; the maximum is `525600` (365 days). See [OIDC Setup](user-management/sso-oidc.md#permission-re-sync-during-sessions) |
 | `VALKEY_URL` | – | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of SQLite — required for horizontal scaling. Falls back to SQLite when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
 
 > [!NOTE]

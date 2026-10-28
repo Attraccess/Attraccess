@@ -1,5 +1,4 @@
 import {
-  Description,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -8,11 +7,6 @@ import {
   Input,
   InputGroup,
   Label,
-  NumberField,
-  NumberFieldDecrementButton,
-  NumberFieldGroup,
-  NumberFieldIncrementButton,
-  NumberFieldInput,
   TextField,
   Tooltip,
   TooltipContent,
@@ -23,7 +17,7 @@ import { Button } from '../../../../components/button/index';
 import { AuthentikDiscoveryDialog } from '../discovery/authentik/index';
 import { KeycloakDiscoveryDialog } from '../discovery/keycloak/index';
 import { RoleMappingsSection } from './RoleMappingsSection';
-import { MAX_PERMISSION_SYNC_TTL_MINUTES } from '../formDefaults';
+import { PermissionSyncSection } from './PermissionSyncSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
@@ -252,20 +246,6 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
           <Label>{model.t('emailClaimPaths')}</Label>
           <Input placeholder="email, emails[0].value, upn" data-cy="sso-provider-form-oidc-email-claims-input" />
         </TextField>
-        <NumberField
-          minValue={0}
-          maxValue={MAX_PERMISSION_SYNC_TTL_MINUTES}
-          value={model.formValues.oidcConfiguration?.permissionSyncTtlMinutes ?? Number.NaN}
-          onChange={(value) => model.setOidc('permissionSyncTtlMinutes', Number.isNaN(value) ? null : value)}
-        >
-          <Label>{model.t('permissionSyncTtlMinutes')}</Label>
-          <NumberFieldGroup>
-            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-            <NumberFieldInput data-cy="sso-provider-form-oidc-permission-sync-ttl-input" />
-            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-          </NumberFieldGroup>
-          <Description>{model.t('permissionSyncTtlMinutesHint')}</Description>
-        </NumberField>
       </section>
 
       <RoleMappingsSection
@@ -274,6 +254,11 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
         isLoadingRoles={model.isLoadingRoles}
         entries={model.oidcRoleMappingEntries}
         onChange={model.setOidcRoleMappingEntries}
+      />
+
+      <PermissionSyncSection
+        value={model.formValues.oidcConfiguration?.permissionSyncTtlMinutes}
+        onChange={(value) => model.setOidc('permissionSyncTtlMinutes', value)}
       />
     </>
   );

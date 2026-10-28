@@ -75,11 +75,14 @@ Keycloak omits the `groups` claim for users with no group memberships. Attracces
 
 ### Permission Re-Sync During Sessions
 
-By default, SSO roles are only updated when a user signs in (or through the provisioning API). To keep long-lived sessions in line with the identity provider, set a **Permission re-sync interval (minutes)** on the provider:
+By default, SSO roles are only updated when a user signs in (or through the provisioning API). Re-sync is off for every provider until you turn it on. To keep long-lived sessions in line with the identity provider:
 
-- **Empty**: uses the server default from `SSO_PERMISSION_SYNC_TTL_MINUTES` (`0`, off, unless configured).
-- **`0`**: turns re-sync off for this provider.
-- **Any other value**: once that many minutes have passed since the last sync, the next request uses the session's refresh token to fetch fresh claims from the token and UserInfo endpoints. The roles are then mapped exactly as at login. The maximum is `525600` (365 days).
+1. Edit the OIDC provider and go to the **Permission re-sync during sessions** section.
+2. Read the identity provider requirements shown there (also listed below) and check your provider against them.
+3. Turn on **Re-sync permissions during sessions** and set the **Permission re-sync interval (minutes)**. It starts at `60`; the maximum is `525600` (365 days).
+4. Save the provider. The change applies within about 30 seconds, without a restart.
+
+Once the interval has passed since the last sync, the next request uses the session's refresh token to fetch fresh claims from the token and UserInfo endpoints. The roles are then mapped exactly as at login. Turning the switch off stops re-sync for this provider.
 
 Refreshing the session (`GET /api/auth/session/refresh`) also re-syncs, at most once per minute, even if the interval has not passed yet.
 
@@ -87,7 +90,7 @@ Re-sync follows the same rules as login. Roles are only changed when the role/gr
 
 If the provider rejects the refresh token (`invalid_grant`, for example because the user was disabled or their provider session ended) or returns a different subject, the Attraccess session is ended and recorded as **SSO sessions revoked**. Network errors and provider outages keep the session and its current roles, and the next attempt (periodic or on session refresh) waits one minute.
 
-> [!IMPORTANT]
+> [!WARNING]
 > Re-sync needs a refresh token. Sessions only get one when the provider issued it at login, the ID token could be verified (JWKS configured or discoverable), and the user signed in after upgrading to a version with this feature. Refresh tokens are stored encrypted for every such login, even while re-sync is off, so turning it on later needs no new sign-in. If re-sync is on but the provider issued no refresh token at login, Attraccess logs a warning and counts the login in `attraccess_auth_sso_refresh_token_missing_total`. With Keycloak, refresh tokens expire with the SSO session idle/max timeouts. Set those at least as long as the re-sync interval, or request the `offline_access` scope, so active users are not signed out. SAML providers are not re-synced during sessions. Use the provisioning API instead.
 
 ## Callback URL

@@ -130,7 +130,7 @@ export class SSOProviderOIDCConfiguration {
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({
     description:
-      'Minutes between session-time permission re-syncs using the IdP refresh token; 0 disables re-sync, null uses the global SSO_PERMISSION_SYNC_TTL_MINUTES default',
+      'Minutes between session-time permission re-syncs using the IdP refresh token; null or 0 disables re-sync',
     required: false,
     nullable: true,
     type: Number,

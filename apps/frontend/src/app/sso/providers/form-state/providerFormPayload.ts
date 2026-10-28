@@ -48,7 +48,7 @@ export function buildOidcPayload({
     userInfoURL: base.userInfoURL,
     clientId: base.clientId,
     clientSecret: base.clientSecret,
-    // null inherits the global SSO_PERMISSION_SYNC_TTL_MINUTES default
+    // null turns session-time permission re-sync off
     permissionSyncTtlMinutes: base.permissionSyncTtlMinutes ?? null,
   };
 

@@ -1,5 +1,4 @@
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { SSOProvider, SSOProviderType, SsoSessionContext } from '@attraccess/database-entities';
 import { SsoSessionPermissionSyncService } from './session-permission-sync.service';
 import { SessionPermissionResyncer, SessionRejectedError } from './session-permission-sync';
@@ -29,7 +28,6 @@ describe('SsoSessionPermissionSyncService', () => {
   let resyncer: jest.Mocked<SessionPermissionResyncer>;
   let audit: jest.Mocked<Pick<SsoAuditService, 'record'>>;
   let metrics: { authSsoPermissionResyncTotal: { inc: jest.Mock } };
-  let globalTtlMinutes: number;
   let providerTtl: number | null;
   let service: SsoSessionPermissionSyncService;
 
@@ -37,7 +35,6 @@ describe('SsoSessionPermissionSyncService', () => {
   const build = (resyncers: SessionPermissionResyncer[]) =>
     new SsoSessionPermissionSyncService(
       sessionService as unknown as SessionService,
-      { get: () => ({ SSO_PERMISSION_SYNC_TTL_MINUTES: globalTtlMinutes }) } as unknown as ConfigService,
       metrics as unknown as MetricsService,
       resyncers,
       audit as unknown as SsoAuditService,
@@ -46,7 +43,6 @@ describe('SsoSessionPermissionSyncService', () => {
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
-    globalTtlMinutes = 0;
     providerTtl = 60;
     sessionService = {
       compareAndSetSsoContext: jest.fn().mockResolvedValue(true),
@@ -107,13 +103,10 @@ describe('SsoSessionPermissionSyncService', () => {
     });
   });
 
-  it('treats a 0 interval as disabled and inherits the global default when the provider has none', async () => {
-    providerTtl = null;
+  it.each([null, 0])('treats a %s interval as disabled', async (ttl) => {
+    providerTtl = ttl;
     expect(await service.syncIfDue(session(), 7)).toBe('skipped');
-
-    globalTtlMinutes = 90;
-    expect(await service.syncIfDue(session(), 7)).toBe('unchanged');
-    expect(await service.syncIfDue(session(context(now - 60 * 60_000)), 7)).toBe('skipped');
+    expect(resyncer.resync).not.toHaveBeenCalled();
   });
 
   it('skips when the provider can no longer be loaded', async () => {

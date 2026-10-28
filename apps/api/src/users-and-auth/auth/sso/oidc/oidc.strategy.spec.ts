@@ -716,17 +716,15 @@ describe('OIDC Passport callback authentication context', () => {
 });
 
 describe('OIDC login without a refresh token', () => {
-  const setup = async (providerTtl: number | null, globalTtl: number) => {
+  const setup = async (providerTtl: number | null) => {
     const { OidcTokenVerifier } = await import('./oidc-token-verifier.service');
     const { EncryptionService } = await import('../../../../encryption/encryption.service');
-    const { ConfigService } = await import('@nestjs/config');
     const { MetricsService } = await import('../../../../metrics/metrics.service');
     const metrics = { authSsoRefreshTokenMissingTotal: { inc: jest.fn() } };
     const verifier = { verify: jest.fn().mockResolvedValue({ sub: 'subject', iat: 1700000000 }) };
     const services = new Map<unknown, unknown>([
       [OidcTokenVerifier, verifier],
       [EncryptionService, { encrypt: (value: string) => `encrypted:${value}` }],
-      [ConfigService, { get: () => ({ SSO_PERMISSION_SYNC_TTL_MINUTES: globalTtl }) }],
       [MetricsService, metrics],
     ]);
     const moduleRef = { get: (token: unknown) => services.get(token) } as unknown as ModuleRef;
@@ -757,32 +755,26 @@ describe('OIDC login without a refresh token', () => {
   };
 
   it('warns and counts a missing refresh token when re-sync is enabled for the provider', async () => {
-    const { login, metrics, warn } = await setup(60, 0);
+    const { login, metrics, warn } = await setup(60);
     await login(undefined);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('issued no refresh token'));
     expect(metrics.authSsoRefreshTokenMissingTotal.inc).toHaveBeenCalledWith({ provider_type: 'oidc' });
   });
 
   it('stays quiet when the login itself fails', async () => {
-    const { strategy, login, metrics, warn } = await setup(60, 0);
+    const { strategy, login, metrics, warn } = await setup(60);
     jest.spyOn(strategy, 'validateProfile').mockRejectedValue(new Error('account linking required'));
     await expect(login(undefined)).rejects.toThrow('account linking required');
     expect(warn).not.toHaveBeenCalled();
     expect(metrics.authSsoRefreshTokenMissingTotal.inc).not.toHaveBeenCalled();
   });
 
-  it('also signals when re-sync is only enabled through the global default', async () => {
-    const { login, metrics } = await setup(null, 30);
-    await login(undefined);
-    expect(metrics.authSsoRefreshTokenMissingTotal.inc).toHaveBeenCalledTimes(1);
-  });
-
   it.each([
-    ['re-sync is disabled for the provider', 0, 30, undefined],
-    ['re-sync is disabled globally', null, 0, undefined],
-    ['the IdP issued a refresh token', 60, 0, 'refresh-token'],
-  ])('stays quiet when %s', async (_label, providerTtl, globalTtl, refreshToken) => {
-    const { login, metrics, warn } = await setup(providerTtl, globalTtl);
+    ['re-sync is set to 0', 0, undefined],
+    ['re-sync is not configured', null, undefined],
+    ['the IdP issued a refresh token', 60, 'refresh-token'],
+  ])('stays quiet when %s', async (_label, providerTtl, refreshToken) => {
+    const { login, metrics, warn } = await setup(providerTtl);
     await login(refreshToken);
     expect(warn).not.toHaveBeenCalled();
     expect(metrics.authSsoRefreshTokenMissingTotal.inc).not.toHaveBeenCalled();

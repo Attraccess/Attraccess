@@ -1,5 +1,4 @@
 import type { SSOProvider, SsoSessionContext } from '@attraccess/database-entities';
-import type { SessionConfigType } from '../../../config/session.config';
 import { LogoutSession } from '../session-store/session-store';
 
 /** `skipped` means no IdP call was made; every other outcome is one logged re-sync attempt. */
@@ -44,10 +43,7 @@ export interface SessionPermissionResyncer {
 /** Multi-provider token: one resyncer per protocol that supports session-time re-sync. */
 export const SESSION_PERMISSION_RESYNCERS = Symbol('SESSION_PERMISSION_RESYNCERS');
 
-/** Per-provider interval, else the global SSO_PERMISSION_SYNC_TTL_MINUTES default; 0 disables re-sync. */
-export function resolvePermissionSyncIntervalMinutes(
-  config: { permissionSyncTtlMinutes?: number | null },
-  sessionConfig?: SessionConfigType,
-): number {
-  return config.permissionSyncTtlMinutes ?? sessionConfig?.SSO_PERMISSION_SYNC_TTL_MINUTES ?? 0;
+/** The provider's re-sync interval; null or 0 means re-sync is off. */
+export function resolvePermissionSyncIntervalMinutes(config: { permissionSyncTtlMinutes?: number | null }): number {
+  return config.permissionSyncTtlMinutes ?? 0;
 }

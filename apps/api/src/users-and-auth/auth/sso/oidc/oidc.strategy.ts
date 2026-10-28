@@ -31,10 +31,6 @@ import { recordSsoProvisioningAudit } from '../audit/provider-audit';
 
 import { resolvePermissionSyncIntervalMinutes } from '../session-permission-sync';
 
-import { ConfigService } from '@nestjs/config';
-
-import { SessionConfigType } from '../../../../config/session.config';
-
 import { SSOService } from '../sso.service';
 
 import { get } from 'lodash-es';
@@ -162,8 +158,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
   /** Re-sync is enabled for this provider but the IdP issued no refresh token, so the session can never be re-synced. */
   private reportMissingRefreshToken(): void {
     try {
-      const sessionConfig = this.moduleRef.get(ConfigService, { strict: false }).get<SessionConfigType>('session');
-      if (resolvePermissionSyncIntervalMinutes(this.config, sessionConfig) <= 0) return;
+      if (resolvePermissionSyncIntervalMinutes(this.config) <= 0) return;
       this.logger.warn(
         `OIDC provider ${this.config.ssoProviderId} has permission re-sync enabled but issued no refresh token; this session will not be re-synced (request the offline_access scope or enable refresh tokens at the IdP)`,
       );

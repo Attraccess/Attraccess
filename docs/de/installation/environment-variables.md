@@ -81,7 +81,6 @@ In Containern benötigt die API Schreibrechte für den Pfad. Mounten Sie das Ver
 |----------|----------|-------------|
 | `AUTH_SESSION_SECRET` | – | **Pflicht.** Geheimer Schlüssel für Sitzungsverschlüsselung |
 | `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximale Sitzungsdauer in Millisekunden (Standard: 7 Tage) |
-| `SSO_PERMISSION_SYNC_TTL_MINUTES` | `0` | Standardintervall in Minuten für den Rollenabgleich von OIDC-Benutzern während der Sitzung, für Anbieter ohne eigenes Intervall. `0` deaktiviert ihn; der Höchstwert ist `525600` (365 Tage). Siehe [OIDC-Einrichtung](user-management/sso-oidc.md#berechtigungsabgleich-während-der-sitzung) |
 | `VALKEY_URL` | – | Verbindungs-URL für einen Valkey/Redis-kompatiblen Sitzungsspeicher (z. B. `redis://valkey:6379`). Wenn gesetzt, werden Sitzungen in Valkey mit nativem TTL gespeichert statt in SQLite — erforderlich für horizontale Skalierung. Ohne Konfiguration wird SQLite verwendet. Unterstützt jede `ioredis`-kompatible URL inkl. `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache und Upstash. |
 
 > [!NOTE]
