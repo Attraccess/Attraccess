@@ -1,6 +1,6 @@
+import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
-  Button,
   Form,
   Input,
   Label,
@@ -81,7 +81,7 @@ export function ClaimControllerModal({ controllerId, onOpenChange }: ClaimContro
                 </TextField>
                 {claimMutation.isError && (
                   <Alert status="danger">
-                    <Alert.Indicator />
+                    <AlertStatusIcon status="danger" />
                     <Alert.Content>
                       <Alert.Description>
                         {claimMutation.error instanceof Error ? claimMutation.error.message : t('common.retry')}

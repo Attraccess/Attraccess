@@ -1,3 +1,4 @@
+import { AlertStatusIcon, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Alert, Button, Input, Key, Label, ListBox, Select, Spinner, TextField } from '@heroui/react';
 import { CommissioningSession } from '../../api/client';
 import { useMqttServersQuery } from '../../api/queries';
@@ -10,7 +11,7 @@ export function ErrorAlert({ error }: { error: unknown }) {
   const { t } = useWagoTranslations();
   return (
     <Alert status="danger">
-      <Alert.Indicator />
+      <AlertStatusIcon status="danger" />
       <Alert.Content>
         <Alert.Description>{error instanceof Error ? error.message : t('common.retry')}</Alert.Description>
       </Alert.Content>
@@ -36,13 +37,9 @@ export function ConnectionStep({
   const { t } = useWagoTranslations();
   return (
     <div className="wg:space-y-4">
-      <Alert status="accent">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>{t('commissioningUI.prepare')}</Alert.Title>
-          <Alert.Description>{t('commissioningUI.prepareDescription')}</Alert.Description>
-        </Alert.Content>
-      </Alert>
+      <StatusAlert status="accent" title={t('commissioningUI.prepare')}>
+        {t('commissioningUI.prepareDescription')}
+      </StatusAlert>
       <TextField isRequired name="controller-ip">
         <Label>{t('commissioningUI.ip')}</Label>
         <Input
@@ -176,15 +173,9 @@ export function DeliveryStep({
       <CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />
       {canInstall(session) && (
         <>
-          <Alert status="warning">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>{t('commissioningUI.destructive')}</Alert.Title>
-              <Alert.Description>
-                {t('commissioningUI.destructiveDescription', { host: session.targetHost })}
-              </Alert.Description>
-            </Alert.Content>
-          </Alert>
+          <StatusAlert status="warning" title={t('commissioningUI.destructive')}>
+            {t('commissioningUI.destructiveDescription', { host: session.targetHost })}
+          </StatusAlert>
           <CredentialFields
             isDisabled={isDelivering}
             username={sshUsername}
@@ -265,13 +256,9 @@ export function ProgressStep({ session }: { name: string; session: Commissioning
         <p className="wg:mt-1 wg:text-muted">{t('commissioningUI.savedDescription')}</p>
       </div>
       {session.failureReason && (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>{t('runtimeManagement.lastSetupFailure')}</Alert.Title>
-            <Alert.Description>{tBackendMessage(session.failureReason)}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <StatusAlert status="warning" title={t('runtimeManagement.lastSetupFailure')}>
+          {tBackendMessage(session.failureReason)}
+        </StatusAlert>
       )}
     </div>
   );

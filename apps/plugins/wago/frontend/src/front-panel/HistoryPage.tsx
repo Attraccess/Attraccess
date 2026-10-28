@@ -1,5 +1,6 @@
 // Keeps revision history and rollback accessible outside the live panel.
 // FEATURE: WAGO controller history retains existing revision and rollback protections.
+import { PageHeader } from '@attraccess/plugins-frontend-ui';
 import { Button } from '@heroui/react';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
@@ -33,7 +34,7 @@ function ControllerHistory({ controllerId }: { controllerId: number }) {
         <ArrowLeft className="wg:size-4" />
         {t('panel.title')}
       </Button>
-      <h1 className="wg:text-3xl wg:font-semibold">{t('panel.history')}</h1>
+      <PageHeader title={t('panel.history')} noMargin />
       <ConfigurationRevisions
         view="history"
         controllerId={controllerId}

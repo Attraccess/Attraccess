@@ -182,11 +182,11 @@ it('loads users and requires confirmation before deletion, then refreshes the li
   render(<RabbitmqUserPanel mqttServerId={104} />);
   expect(await screen.findByRole('row', { name: /sensor/ })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Delete user sensor' }));
-  const dialog = await screen.findByRole('dialog');
+  const dialog = await screen.findByRole('alertdialog');
   expect(request.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
   await waitFor(() => expect(request).toHaveBeenCalledWith('/api/rabbitmq/users/104/sensor', { method: 'DELETE' }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   expect(request.mock.calls.filter(([path]) => path === '/api/rabbitmq/users/104')).toHaveLength(2);
 });
 

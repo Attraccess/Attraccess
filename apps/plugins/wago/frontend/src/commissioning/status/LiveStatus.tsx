@@ -1,3 +1,4 @@
+import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
 import { Alert, Button } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { useWagoTranslations } from '../../i18n';
@@ -26,7 +27,7 @@ export function CommissioningLiveStatus({ model }: { model: CommissioningModel }
     <div className="wg:space-y-2">
       {query.isError || stale ? (
         <Alert status="warning">
-          <Alert.Indicator />
+          <AlertStatusIcon status="warning" />
           <Alert.Content>
             <Alert.Title>{t('commissioningUI.statusUnavailable')}</Alert.Title>
             <Alert.Description>

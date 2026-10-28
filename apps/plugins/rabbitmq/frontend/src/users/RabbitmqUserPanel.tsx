@@ -5,15 +5,11 @@
 // tags and per-vhost permissions, and offers create / edit / permission /
 // delete actions. All operations go through the plugin backend, which talks to
 // the RabbitMQ management HTTP API with the MQTT server's credentials.
+import { StatusAlert, StatusDialog, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import {
-  Alert,
-  AlertContent,
-  AlertDescription,
   Button,
   Card,
   Chip,
-  Modal,
-  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -30,7 +26,6 @@ import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
 import { useRabbitmqTranslations } from '../i18n';
 import { useRabbitmqUserPanelState } from './useRabbitmqUserPanelState';
 import { RabbitmqUserPanelCardHeader } from './RabbitmqUserPanelCardHeader';
-import { RabbitmqUserPanelModalBackdrop } from './RabbitmqUserPanelModalBackdrop';
 
 function PermissionChips({ user }: { user: RabbitmqUser }) {
   const { t } = useRabbitmqTranslations();
@@ -74,16 +69,14 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
       />
       <Card.Content className="rmq:flex rmq:flex-col rmq:gap-3">
         {model.loadError && (
-          <Alert status="danger" data-cy="rabbitmq-user-panel-error-alert">
-            <AlertContent>
-              <AlertDescription>{model.tMessage(model.loadError)}</AlertDescription>
-            </AlertContent>
-          </Alert>
+          <StatusAlert status="danger" title={model.t('users.loadError')} data-cy="rabbitmq-user-panel-error-alert">
+            {model.tMessage(model.loadError)}
+          </StatusAlert>
         )}
 
         {!model.data && !model.loadError && (
-          <div className="rmq:flex rmq:items-center rmq:justify-center rmq:p-4">
-            <Spinner data-cy="rabbitmq-user-panel-loading-spinner" />
+          <div data-cy="rabbitmq-user-panel-loading-spinner">
+            <TableDataLoadingIndicator />
           </div>
         )}
 
@@ -184,15 +177,34 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
         onSaved={() => void model.reload()}
       />
 
-      <Modal
+      <StatusDialog
         isOpen={model.userToDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) model.setUserToDelete(null);
+        onClose={() => model.setUserToDelete(null)}
+        status="error"
+        title={model.t('users.deleteTitle')}
+        action={{
+          label: model.t('common.delete'),
+          onPress: model.confirmDelete,
+          isPending: model.deleting,
+          'data-cy': 'rabbitmq-user-delete-confirm-button',
         }}
+        closeLabel={model.t('common.cancel')}
+        closeDataCy="rabbitmq-user-delete-cancel-button"
         data-cy={`rabbitmq-user-delete-modal-${mqttServerId}`}
       >
-        <RabbitmqUserPanelModalBackdrop {...model} />
-      </Modal>
+        <div className="rmq:flex rmq:flex-col rmq:gap-3">
+          <p>{model.t('users.deleteDescription', { name: model.userToDelete?.name })}</p>
+          {model.deleteError && (
+            <StatusAlert
+              status="danger"
+              title={model.t('users.deleteError')}
+              data-cy="rabbitmq-user-delete-error-alert"
+            >
+              {model.tMessage(model.deleteError)}
+            </StatusAlert>
+          )}
+        </div>
+      </StatusDialog>
     </Card>
   );
 }

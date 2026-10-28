@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PasswordFieldRow } from './drawer';
+import { PasswordInput } from '@attraccess/plugins-frontend-ui';
 
 // Vitest runs without globals here, so testing-library's auto-cleanup is off.
 afterEach(cleanup);
@@ -13,13 +13,13 @@ function Harness() {
   const [value, setValue] = useState('');
   return (
     <>
-      <PasswordFieldRow label="Current password" value={value} onChange={setValue} dataCy="pw" />
+      <PasswordInput label="Current password" value={value} onChange={setValue} autoComplete="off" data-cy="pw" />
       <output data-cy="stored">{value}</output>
     </>
   );
 }
 
-describe('PasswordFieldRow', () => {
+describe('PasswordInput in plugin forms', () => {
   // Regression: the field used to mask by rewriting its own controlled value,
   // so key-by-key typing accumulated bullet characters into the stored value
   // ('secret' became '•••••t'). A single fireEvent.change would not catch it.

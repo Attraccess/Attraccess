@@ -45,9 +45,7 @@
     "newDescription": "Schützt die lokale Weboberfläche und API des Geräts.",
     "error": "Passwort konnte nicht festgelegt werden",
     "required": "Ein neues Passwort ist erforderlich.",
-    "save": "Passwort speichern",
-    "show": "Passwort anzeigen",
-    "hide": "Passwort verbergen"
+    "save": "Passwort speichern"
   },
   "discovery": {
     "title": "Geräte suchen",

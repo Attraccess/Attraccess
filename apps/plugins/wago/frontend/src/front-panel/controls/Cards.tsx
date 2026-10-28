@@ -1,4 +1,5 @@
-import { Accordion, Button, Card, Switch } from '@heroui/react';
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { Accordion, Button, Card } from '@heroui/react';
 import { Cable, Settings2, Zap } from 'lucide-react';
 import { DIGITAL_TERMINALS } from '../../../../backend/configuration/digital';
 import { outputBehavior } from '../../../../channel-behavior';
@@ -47,18 +48,12 @@ export function OutputControl({ live, channel, label }: { live: LiveControls; ch
       {t('panel.pulse')}
     </Button>
   ) : (
-    <Switch
+    <LabeledSwitch
       aria-label={t('panel.switchOutput', { name: label })}
       isSelected={sample?.value === true}
       isDisabled={disabled || !sample}
       onChange={(value) => channel && live.command(channel, value)}
-    >
-      <Switch.Content aria-label={t('panel.switchOutput', { name: label })}>
-        <Switch.Control>
-          <Switch.Thumb />
-        </Switch.Control>
-      </Switch.Content>
-    </Switch>
+    />
   );
 }
 

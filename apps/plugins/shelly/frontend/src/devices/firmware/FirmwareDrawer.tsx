@@ -1,9 +1,15 @@
+import {
+  EmptyState,
+  PasswordInput,
+  StandardDrawer,
+  StatusAlert,
+  TableDataLoadingIndicator,
+  useDateTimeFormatter,
+} from '@attraccess/plugins-frontend-ui';
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner, Tooltip } from '@heroui/react';
 import { ArrowUpCircleIcon, CpuIcon, DownloadIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { type FirmwareOverviewEntry, type FirmwareStatus, type ShellyDevice } from '../../api';
-import { PasswordFieldRow, StandardDrawer } from '../../shared/drawer';
 import { useShellyTranslations } from '../../i18n';
-import { StatusAlert } from '../../shared/StatusAlert';
 import { useFirmwareDrawerState } from './useFirmwareDrawerState';
 
 export /**
@@ -96,13 +102,10 @@ export // A Shelly OTA takes ~30-90s including the reboot; past this we stop cla
 const UPDATE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function FirmwareDetails({ status }: { status: FirmwareStatus | null }) {
-  const { t, language } = useShellyTranslations();
+  const { t } = useShellyTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   if (!status) {
-    return (
-      <div className="sh:rounded-xl sh:border sh:border-dashed sh:border-default-300 sh:p-4 sh:text-sm sh:text-default-500">
-        {t('firmware.empty')}
-      </div>
-    );
+    return <EmptyState message={t('firmware.empty')} />;
   }
   return (
     <section
@@ -112,7 +115,7 @@ export function FirmwareDetails({ status }: { status: FirmwareStatus | null }) {
       <VersionRow label={t('firmware.installed')} value={status.currentVersion ?? t('devices.unknown')} />
       <VersionRow label={t('firmware.stable')} value={status.available.stable ?? t('firmware.upToDate')} />
       <VersionRow label={t('firmware.beta')} value={status.available.beta ?? t('firmware.nothingNewer')} />
-      <VersionRow label={t('firmware.checked')} value={new Date(status.fetchedAt).toLocaleString(language)} />
+      <VersionRow label={t('firmware.checked')} value={formatDateTime(status.fetchedAt)} />
     </section>
   );
 }
@@ -169,24 +172,24 @@ export function FirmwareDrawer({
       <DrawerBody>
         <div className="sh:flex sh:flex-col sh:gap-4">
           {device?.authState === 'required' && (
-            <PasswordFieldRow
+            <PasswordInput
               label={t('password.current')}
               value={currentPassword}
               onChange={setCurrentPassword}
               description={t('password.currentDescription')}
               autoComplete="current-password"
-              dataCy="shelly-firmware-current-password"
+              data-cy="shelly-firmware-current-password"
             />
           )}
 
           {error && (
-            <StatusAlert status="danger" title={t('firmware.error')} dataCy="shelly-firmware-error">
+            <StatusAlert status="danger" title={t('firmware.error')} data-cy="shelly-firmware-error">
               {tMessage(error)}
             </StatusAlert>
           )}
 
           {installing && (
-            <StatusAlert status="accent" title={t('firmware.running')} dataCy="shelly-firmware-progress">
+            <StatusAlert status="accent" title={t('firmware.running')} data-cy="shelly-firmware-progress">
               <span className="sh:flex sh:items-center sh:gap-2">
                 <Spinner size="sm" color="accent" />
                 {t('firmware.installing', {
@@ -198,18 +201,12 @@ export function FirmwareDrawer({
           )}
 
           {installedVersion && !installing && (
-            <StatusAlert status="success" title={t('firmware.finished')} dataCy="shelly-firmware-success">
+            <StatusAlert status="success" title={t('firmware.finished')} data-cy="shelly-firmware-success">
               {t('firmware.success', { version: installedVersion })}
             </StatusAlert>
           )}
 
-          {loading && !status ? (
-            <div className="sh:flex sh:items-center sh:justify-center sh:p-6">
-              <Spinner color="accent" />
-            </div>
-          ) : (
-            <FirmwareDetails status={status} />
-          )}
+          {loading && !status ? <TableDataLoadingIndicator /> : <FirmwareDetails status={status} />}
         </div>
       </DrawerBody>
       {/* Wraps because the install labels carry a version string — three buttons

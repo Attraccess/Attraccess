@@ -1,5 +1,5 @@
-import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Card, Chip, Modal } from '@heroui/react';
+import { AlertStatusIcon, Button, StatusDialog, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { Alert, Card, Chip } from '@heroui/react';
 import { Activity, ArrowLeft, ArrowRight, GitCompareArrows, History, Network, Settings2 } from 'lucide-react';
 import { ConfigurationErrors } from './ConfigurationChanges';
 import { ConfigurationSessionContent } from './ConfigurationSessionContent';
@@ -111,7 +111,7 @@ export function DraftFeedback({
       )}
       {draftConflict && (
         <Alert status="danger">
-          <Alert.Indicator />
+          <AlertStatusIcon status="danger" />
           <Alert.Content>
             <Alert.Title>{t('editor.draftChanged')}</Alert.Title>
             <Alert.Description>{t('editor.conflict')}</Alert.Description>
@@ -125,6 +125,7 @@ export function DraftFeedback({
       {notice && <p role="status">{tMessage(notice)}</p>}
       {validate.data && !validate.data.valid && (
         <Alert status="danger">
+          <AlertStatusIcon status="danger" />
           <Alert.Content>
             <Alert.Title>{t('editor.resolveFields')}</Alert.Title>
             <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
@@ -345,32 +346,22 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       <div hidden={model.section !== 'diagnostics'}>
         <ControllerDiagnostics controllerId={controllerId} />
       </div>
-      <Modal isOpen={model.discard} onOpenChange={model.setDiscard}>
-        <Modal.Backdrop>
-          <Modal.Container>
-            <Modal.Dialog>
-              <Modal.Header>
-                <Modal.Heading>{model.t('editor.discard')}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>{model.t('editor.draftRemains')}</Modal.Body>
-              <Modal.Footer>
-                <Button variant="secondary" onPress={() => model.setDiscard(false)}>
-                  {model.t('editor.keepEditing')}
-                </Button>
-                <Button
-                  variant="danger"
-                  onPress={() => {
-                    model.client.removeQueries({ queryKey: model.localKey, exact: true });
-                    onClose();
-                  }}
-                >
-                  {model.t('editor.discardAndClose')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <StatusDialog
+        isOpen={model.discard}
+        onClose={() => model.setDiscard(false)}
+        status="error"
+        title={model.t('editor.discard')}
+        closeLabel={model.t('editor.keepEditing')}
+        action={{
+          label: model.t('editor.discardAndClose'),
+          onPress: () => {
+            model.client.removeQueries({ queryKey: model.localKey, exact: true });
+            onClose();
+          },
+        }}
+      >
+        {model.t('editor.draftRemains')}
+      </StatusDialog>
     </main>
   );
 }

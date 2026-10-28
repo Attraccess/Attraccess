@@ -3,10 +3,9 @@ import { Button, DrawerBody, DrawerHeader, DrawerHeading, Form } from '@heroui/r
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { addDevice } from '../api';
-import { StandardDrawer, TextFieldRow } from '../shared/drawer';
-import { StatusAlert } from '../shared/StatusAlert';
+import { TextFieldRow } from '../shared/drawer';
 import { useShellyTranslations } from '../i18n';
-import { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, StatusAlert, TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 export function AddDeviceDrawer({
   isOpen,
@@ -84,7 +83,7 @@ export function AddDeviceDrawer({
             dataCy="shelly-add-name"
           />
           {error && (
-            <StatusAlert status="danger" title={t('add.error')} dataCy="shelly-add-error">
+            <StatusAlert status="danger" title={t('add.error')} data-cy="shelly-add-error">
               {tMessage(error)}
             </StatusAlert>
           )}

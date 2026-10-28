@@ -1,4 +1,11 @@
 import {
+  EmptyState,
+  PageHeader,
+  StatusAlert,
+  StatusDialog,
+  TableDataLoadingIndicator,
+} from '@attraccess/plugins-frontend-ui';
+import {
   Button,
   Chip,
   Dropdown,
@@ -6,15 +13,6 @@ import {
   DropdownMenu,
   DropdownPopover,
   DropdownTrigger,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Spinner,
   Table,
   TableBody,
   TableColumn,
@@ -27,7 +25,6 @@ import {
   CpuIcon,
   InfoIcon,
   KeyRoundIcon,
-  MehIcon,
   MoreVerticalIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -44,7 +41,6 @@ import { DiscoverDrawer } from '../DiscoverDrawer';
 import { FirmwareDrawer } from './firmware/FirmwareDrawer';
 import { useShellyTranslations } from '../i18n';
 import { renderDevicesPageDevicesRows } from '../renderDevicesPageDevicesRows';
-import { StatusAlert } from '../shared/StatusAlert';
 import { useDevicesPageState } from '../useDevicesPageState';
 
 export function AuthChip({ state }: { state: AuthState }) {
@@ -65,9 +61,8 @@ export function AuthChip({ state }: { state: AuthState }) {
 export function EmptyDevices({ onAdd }: { onAdd: () => void }) {
   const { t } = useShellyTranslations();
   return (
-    <div className="sh:flex sh:flex-col sh:items-center sh:justify-center sh:gap-3 sh:px-4 sh:py-12">
-      <MehIcon size={36} className="sh:text-default-300" />
-      <p className="sh:text-sm sh:text-default-500">{t('devices.empty')}</p>
+    <div className="sh:flex sh:flex-col sh:items-center sh:justify-center sh:gap-3 sh:pb-6">
+      <EmptyState message={t('devices.empty')} />
       <Button variant="secondary" size="sm" onPress={onAdd} data-cy="shelly-add-open-empty">
         <PlusIcon className="sh:h-4 sh:w-4" /> {t('devices.add')}
       </Button>
@@ -199,23 +194,30 @@ export function DevicesPage() {
 
   return (
     <div className="sh:mx-auto sh:flex sh:w-full sh:max-w-5xl sh:flex-col sh:gap-6 sh:p-4 sh:md:p-6">
-      <div className="sh:flex sh:w-full sh:flex-wrap sh:items-center sh:justify-between sh:gap-y-4">
-        <div className="sh:flex sh:items-center sh:gap-3">
-          <WifiIcon className="sh:h-6 sh:w-6 sh:text-accent-soft-foreground" />
-          <div>
-            <h1 className="sh:text-2xl sh:font-bold">{t('devices.title')}</h1>
-            <p className="sh:mt-1 sh:text-sm sh:text-muted">{t('devices.description')}</p>
-          </div>
-        </div>
-        <div className="sh:flex sh:flex-wrap sh:gap-2">
-          <Button variant="secondary" onPress={discoverDrawer.open} data-cy="shelly-discover-open">
-            <SearchIcon className="sh:h-4 sh:w-4" /> {t('devices.discover')}
-          </Button>
-          <Button variant="primary" onPress={addDrawer.open} data-cy="shelly-add-open">
-            <PlusIcon className="sh:h-4 sh:w-4" /> {t('devices.add')}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        noMargin
+        icon={<WifiIcon className="sh:h-6 sh:w-6 sh:text-accent-soft-foreground" />}
+        title={t('devices.title')}
+        subtitle={t('devices.description')}
+        actions={[
+          {
+            key: 'discover',
+            label: t('devices.discover'),
+            icon: <SearchIcon className="sh:h-4 sh:w-4" />,
+            variant: 'secondary',
+            onPress: discoverDrawer.open,
+            dataCy: 'shelly-discover-open',
+          },
+          {
+            key: 'add',
+            label: t('devices.add'),
+            icon: <PlusIcon className="sh:h-4 sh:w-4" />,
+            variant: 'primary',
+            onPress: addDrawer.open,
+            dataCy: 'shelly-add-open',
+          },
+        ]}
+      />
 
       {pageError && (
         <StatusAlert status="danger" title={t('devices.loadError')}>
@@ -224,9 +226,7 @@ export function DevicesPage() {
       )}
 
       {loading ? (
-        <div className="sh:flex sh:items-center sh:justify-center sh:p-6">
-          <Spinner color="accent" />
-        </div>
+        <TableDataLoadingIndicator />
       ) : (
         <Table data-cy="shelly-device-table">
           <TableScrollContainer>
@@ -281,34 +281,27 @@ export function DevicesPage() {
         onUpdated={() => void refreshFirmware(devices)}
       />
 
-      <Modal
+      <StatusDialog
         isOpen={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
+        onClose={() => setDeleteTarget(null)}
+        status="error"
+        title={t('devices.delete')}
+        action={{
+          label: (
+            <>
+              <Trash2Icon className="sh:h-4 sh:w-4" /> {t('common.delete')}
+            </>
+          ),
+          onPress: confirmDelete,
+          isPending: deleting,
+          'data-cy': 'shelly-delete-confirm',
         }}
+        closeLabel={t('common.cancel')}
+        closeDataCy="shelly-delete-cancel"
         data-cy="shelly-delete-confirmation-modal"
       >
-        <ModalBackdrop>
-          <ModalContainer size="sm">
-            <ModalDialog>
-              <ModalHeader>
-                <ModalHeading>{t('devices.delete')}</ModalHeading>
-              </ModalHeader>
-              <ModalBody>
-                <p>{t('devices.deleteDescription', { name: deleteTarget?.name, address: deleteTarget?.ipAddress })}</p>
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="secondary" onPress={() => setDeleteTarget(null)} data-cy="shelly-delete-cancel">
-                  {t('common.cancel')}
-                </Button>
-                <Button variant="danger" onPress={confirmDelete} isPending={deleting} data-cy="shelly-delete-confirm">
-                  <Trash2Icon className="sh:h-4 sh:w-4" /> {t('common.delete')}
-                </Button>
-              </ModalFooter>
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+        {t('devices.deleteDescription', { name: deleteTarget?.name, address: deleteTarget?.ipAddress })}
+      </StatusDialog>
     </div>
   );
 }

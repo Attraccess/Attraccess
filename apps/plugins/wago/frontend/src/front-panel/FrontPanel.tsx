@@ -1,6 +1,7 @@
 import { FrontPanelStatusAlerts } from './working-copy/StatusAlerts';
 // Combines controller configuration and live controls on one responsive page.
 // FEATURE: WAGO front panel exposes physical terminals and device settings.
+import { AlertStatusIcon, PageHeader, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { Alert, Button, Spinner } from '@heroui/react';
 import { ArrowLeft, History, Plus } from 'lucide-react';
 import { OnboardCard } from './controls/Cards';
@@ -44,16 +45,16 @@ export function FrontPanel({
             {model.t('panel.history')}
           </Button>
         </div>
-        <div>
-          <p className="wg:text-sm wg:text-muted">
-            WAGO / {model.panel.diagnostics.data?.name ?? model.t('editor.controller', { id: controllerId })}
-          </p>
-          <h1 className="wg:mt-1 wg:text-3xl wg:font-semibold">{model.t('panel.title')}</h1>
-        </div>
+        <PageHeader
+          title={model.t('panel.title')}
+          subtitle={`WAGO / ${model.panel.diagnostics.data?.name ?? model.t('editor.controller', { id: controllerId })}`}
+          noMargin
+        />
       </header>
       <FrontPanelStatusAlerts model={model} />
       {model.panel.ready && model.panel.dirty && (
         <Alert status="warning" className="wg:flex-col wg:items-stretch wg:sm:flex-row wg:sm:items-start">
+          <AlertStatusIcon status="warning" />
           <Alert.Content>
             <Alert.Title>{model.t('panel.unapplied')}</Alert.Title>
             <Alert.Description>{model.t('panel.unappliedHint')}</Alert.Description>
@@ -77,34 +78,21 @@ export function FrontPanel({
         </Alert>
       )}
       {model.panel.conflict && (
-        <Alert status="warning">
-          <Alert.Content>
-            <Alert.Title>{model.t('panel.conflict')}</Alert.Title>
-            <Alert.Description>{model.t('panel.conflictHint')}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <StatusAlert status="warning" title={model.t('panel.conflict')}>
+          {model.t('panel.conflictHint')}
+        </StatusAlert>
       )}
-      {model.panel.pending && (
-        <Alert status="accent">
-          <Alert.Content>
-            <Alert.Title>{model.t('panel.applying')}</Alert.Title>
-          </Alert.Content>
-        </Alert>
-      )}
+      {model.panel.pending && <StatusAlert status="accent" title={model.t('panel.applying')} />}
       {model.panel.diagnostics.data?.configuration.rejected && (
-        <Alert status="danger">
-          <Alert.Content>
-            <Alert.Title>{model.t('panel.rejected')}</Alert.Title>
-            <Alert.Description>
-              {model.panel.diagnostics.data.configuration.rejectionErrors
-                .map((error) => `${error.path}: ${model.tBackendMessage(error.code)}`)
-                .join(', ')}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <StatusAlert status="danger" title={model.t('panel.rejected')}>
+          {model.panel.diagnostics.data.configuration.rejectionErrors
+            .map((error) => `${error.path}: ${model.tBackendMessage(error.code)}`)
+            .join(', ')}
+        </StatusAlert>
       )}
       {model.manualCount > 0 && (
         <Alert status="warning" className="wg:flex-col wg:items-stretch wg:sm:flex-row wg:sm:items-start">
+          <AlertStatusIcon status="warning" />
           <Alert.Content>
             <Alert.Title>{model.t('panel.manualActive', { count: model.manualCount })}</Alert.Title>
             <Alert.Description>{model.t('panel.manualHint')}</Alert.Description>
@@ -123,7 +111,7 @@ export function FrontPanel({
           {model.t('panel.liveUnavailable')}
         </p>
       )}
-      {!model.panel.ready && !model.panel.loadError && <Spinner aria-label={model.t('panel.loading')} />}
+      {!model.panel.ready && !model.panel.loadError && <TableDataLoadingIndicator />}
       {model.panel.ready && model.panel.configuration && (
         <>
           <OnboardCard

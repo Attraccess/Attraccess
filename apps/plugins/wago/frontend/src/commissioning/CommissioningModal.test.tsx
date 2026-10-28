@@ -142,7 +142,8 @@ function mount() {
   return { ...render(view(true)), view, onOpenChange };
 }
 
-vi.mock('../shared/drawer', () => ({
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: ReactNode }) =>
     isOpen ? <div>{children}</div> : null,
 }));

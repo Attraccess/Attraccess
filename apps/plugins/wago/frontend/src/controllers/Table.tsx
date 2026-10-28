@@ -1,3 +1,4 @@
+import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
@@ -371,6 +372,7 @@ export function ControllerDetailsDrawer({
             )}
             {controller?.compatibilityError && (
               <Alert status="warning">
+                <AlertStatusIcon status="warning" />
                 <Alert.Content>
                   <Alert.Description>{tBackendMessage(controller.compatibilityError)}</Alert.Description>
                 </Alert.Content>

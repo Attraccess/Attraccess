@@ -1,4 +1,4 @@
-import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, StandardModal, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -6,11 +6,7 @@ import {
   Button,
   Input,
   Label,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalFooter,
   ModalHeader,
   ModalHeading,
@@ -202,72 +198,69 @@ export function RabbitmqPermissionsModal({
   const unusedVhosts = vhosts.filter((vhost) => !rows.some((row) => row.vhost === vhost));
 
   return (
-    <Modal
+    <StandardModal
+      size="lg"
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
       data-cy={`rabbitmq-permissions-modal-${mqttServerId}`}
     >
-      <ModalBackdrop>
-        <ModalContainer size="lg">
-          <ModalDialog>
-            <ModalHeader>
-              <ModalHeading>{t('permissions.title', { name: user.name })}</ModalHeading>
-            </ModalHeader>
-            <ModalBody className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
-              {rows.length === 0 && (
-                <p className="rmq:text-sm rmq:text-default-500" data-cy="rabbitmq-permissions-empty">
-                  {t('permissions.empty')}
-                </p>
-              )}
+      <>
+        <ModalHeader>
+          <ModalHeading>{t('permissions.title', { name: user.name })}</ModalHeading>
+        </ModalHeader>
+        <ModalBody className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
+          {rows.length === 0 && (
+            <div data-cy="rabbitmq-permissions-empty">
+              <EmptyState message={t('permissions.empty')} />
+            </div>
+          )}
 
-              {rows.map((row, index) => (
-                <PermissionEditor
-                  key={row.vhost}
-                  row={row}
-                  busy={busyVhost === row.vhost}
-                  onChange={(next) => updateRow(index, next)}
-                  onSave={() => saveRow(index)}
-                  onRemove={() => removeRow(index)}
-                />
-              ))}
+          {rows.map((row, index) => (
+            <PermissionEditor
+              key={row.vhost}
+              row={row}
+              busy={busyVhost === row.vhost}
+              onChange={(next) => updateRow(index, next)}
+              onSave={() => saveRow(index)}
+              onRemove={() => removeRow(index)}
+            />
+          ))}
 
-              <div className="rmq:flex rmq:items-end rmq:gap-2">
-                <TextField value={newVhost} onChange={setNewVhost} className="rmq:flex-1">
-                  <Label>
-                    {t('permissions.addVhost')}
-                    {unusedVhosts.length > 0 ? t('form.available', { vhosts: unusedVhosts.join(', ') }) : ''}
-                  </Label>
-                  <Input placeholder="/" autoComplete="off" data-cy="rabbitmq-permissions-add-vhost-input" />
-                </TextField>
-                <Button
-                  variant="secondary"
-                  onPress={addVhost}
-                  isDisabled={newVhost.trim().length === 0}
-                  data-cy="rabbitmq-permissions-add-vhost-button"
-                >
-                  <PlusIcon className="rmq:w-4 rmq:h-4" />
-                  {t('permissions.add')}
-                </Button>
-              </div>
+          <div className="rmq:flex rmq:items-end rmq:gap-2">
+            <TextField value={newVhost} onChange={setNewVhost} className="rmq:flex-1">
+              <Label>
+                {t('permissions.addVhost')}
+                {unusedVhosts.length > 0 ? t('form.available', { vhosts: unusedVhosts.join(', ') }) : ''}
+              </Label>
+              <Input placeholder="/" autoComplete="off" data-cy="rabbitmq-permissions-add-vhost-input" />
+            </TextField>
+            <Button
+              variant="secondary"
+              onPress={addVhost}
+              isDisabled={newVhost.trim().length === 0}
+              data-cy="rabbitmq-permissions-add-vhost-button"
+            >
+              <PlusIcon className="rmq:w-4 rmq:h-4" />
+              {t('permissions.add')}
+            </Button>
+          </div>
 
-              {error && (
-                <Alert status="danger" data-cy="rabbitmq-permissions-error-alert">
-                  <AlertContent>
-                    <AlertDescription>{tMessage(error)}</AlertDescription>
-                  </AlertContent>
-                </Alert>
-              )}
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="secondary" onPress={onClose} data-cy="rabbitmq-permissions-close-button">
-                {t('common.close')}
-              </Button>
-            </ModalFooter>
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+          {error && (
+            <Alert status="danger" data-cy="rabbitmq-permissions-error-alert">
+              <AlertContent>
+                <AlertDescription>{tMessage(error)}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onPress={onClose} data-cy="rabbitmq-permissions-close-button">
+            {t('common.close')}
+          </Button>
+        </ModalFooter>
+      </>
+    </StandardModal>
   );
 }

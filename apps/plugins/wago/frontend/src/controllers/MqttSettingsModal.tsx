@@ -1,6 +1,6 @@
+import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
-  Button,
   Form,
   Label,
   ListBox,
@@ -131,7 +131,7 @@ function ErrorAlert({ error }: { error: unknown }) {
   const { t } = useWagoTranslations();
   return (
     <Alert status="danger">
-      <Alert.Indicator />
+      <AlertStatusIcon status="danger" />
       <Alert.Content>
         <Alert.Description>{error instanceof Error ? error.message : t('common.retry')}</Alert.Description>
       </Alert.Content>

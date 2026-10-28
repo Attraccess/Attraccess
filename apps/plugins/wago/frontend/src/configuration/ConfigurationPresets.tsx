@@ -1,4 +1,5 @@
-import { Button } from '@heroui/react';
+import { Button } from '@attraccess/plugins-frontend-ui';
+
 import { useEffect, useRef, useState } from 'react';
 import type {
   ConfigurationEditorMetadata,
@@ -13,7 +14,6 @@ import { boundMeasurement, emptyModbus } from './modbus/modbus-editor';
 import { isEditableDigitalChannel } from '../../../backend/configuration/digital';
 import { useWagoTranslations } from '../i18n';
 import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
-
 export function ConfigurationPresets({
   controllerId,
   snapshot,

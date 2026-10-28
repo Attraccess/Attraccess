@@ -690,7 +690,7 @@ describe('configuration workspace', () => {
     rerender(view(1));
     expect(await screen.findByRole('textbox', { name: 'Channel name' })).toHaveValue('Retained local edit');
     await user.click(screen.getByRole('button', { name: 'WAGO controllers' }));
-    expect(await screen.findByRole('dialog', { name: 'Discard unsaved local edits?' })).toBeVisible();
+    expect(await screen.findByRole('alertdialog', { name: 'Discard unsaved local edits?' })).toBeVisible();
     expect(close).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Keep editing' }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));

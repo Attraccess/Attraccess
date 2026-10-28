@@ -1,3 +1,4 @@
+import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
 import { Alert, Link } from '@heroui/react';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import { useQuery } from '@tanstack/react-query';
@@ -53,7 +54,7 @@ function ResourceDiagnosticsContent({ resourceId }: { resourceId: number }) {
 
   return (
     <Alert status="warning" aria-label={t('diagnostics.resourceTitle')}>
-      <Alert.Indicator />
+      <AlertStatusIcon status="warning" />
       <Alert.Content className="wg:min-w-0 wg:break-words">
         <Alert.Title>{t('diagnostics.resourceAttention')}</Alert.Title>
         <Alert.Description>{t('diagnostics.resourceDescription')}</Alert.Description>

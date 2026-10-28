@@ -4,10 +4,8 @@ import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form } f
 import { KeyRoundIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { setAdminPassword, type ShellyDevice } from './api';
-import { PasswordFieldRow, StandardDrawer } from './shared/drawer';
-import { StatusAlert } from './shared/StatusAlert';
 import { useShellyTranslations } from './i18n';
-import { TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { PasswordInput, StandardDrawer, StatusAlert, TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 export function AdminPasswordDrawer({
   device,
@@ -85,26 +83,26 @@ export function AdminPasswordDrawer({
       <DrawerBody>
         <Form onSubmit={onSubmit} className="sh:flex sh:flex-col sh:gap-4">
           {device?.authState === 'required' && (
-            <PasswordFieldRow
+            <PasswordInput
               label={t('password.current')}
               value={currentPassword}
               onChange={setCurrentPassword}
               description={t('password.currentDescription')}
               autoComplete="current-password"
-              dataCy="shelly-auth-current-password"
+              data-cy="shelly-auth-current-password"
             />
           )}
-          <PasswordFieldRow
+          <PasswordInput
             label={t('password.new')}
             value={password}
             onChange={setPassword}
             description={t('password.newDescription')}
-            required
+            isRequired
             autoComplete="new-password"
-            dataCy="shelly-auth-password"
+            data-cy="shelly-auth-password"
           />
           {error && (
-            <StatusAlert status="danger" title={t('password.error')} dataCy="shelly-auth-error">
+            <StatusAlert status="danger" title={t('password.error')} data-cy="shelly-auth-error">
               {tMessage(error)}
             </StatusAlert>
           )}

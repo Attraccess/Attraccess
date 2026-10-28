@@ -1,5 +1,6 @@
+import { StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { RuntimeRecoveryControls } from './RuntimeRecoveryControls';
-import { Alert, Label, ProgressBar } from '@heroui/react';
+import { Label, ProgressBar } from '@heroui/react';
 import { type ManagedAccessTarget } from './useRuntimeStatus';
 import runtimeMessages from '../managed-runtime.en.json';
 import { useRuntimeUpdateDetailsState } from './useRuntimeUpdateDetailsState';
@@ -12,16 +13,11 @@ export function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }
     return (
       <>
         {model.summary}
-        <Alert status="warning">
-          <Alert.Content>
-            <Alert.Title>{model.t('runtimeManagement.unavailable')}</Alert.Title>
-            <Alert.Description>
-              {model.query.error instanceof Error
-                ? model.errorMessage(model.query.error.message)
-                : model.t('runtimeManagement.unavailableDescription')}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <StatusAlert status="warning" title={model.t('runtimeManagement.unavailable')}>
+          {model.query.error instanceof Error
+            ? model.errorMessage(model.query.error.message)
+            : model.t('runtimeManagement.unavailableDescription')}
+        </StatusAlert>
       </>
     );
   if (!model.status) return model.summary ?? <p role="status">{model.t('runtimeManagement.loading')}</p>;
@@ -29,13 +25,9 @@ export function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }
     return (
       <>
         {model.summary}
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>{model.t('runtimeManagement.reenrol')}</Alert.Title>
-            <Alert.Description>{model.t('runtimeManagement.reenrolDescription')}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <StatusAlert status="warning" title={model.t('runtimeManagement.reenrol')}>
+          {model.t('runtimeManagement.reenrolDescription')}
+        </StatusAlert>
       </>
     );
   return (
@@ -67,13 +59,9 @@ export function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }
           </p>
         ))}
       {model.status.managementFailure && (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>{model.t('runtimeManagement.lastSetupFailure')}</Alert.Title>
-            <Alert.Description>{model.tBackendMessage(model.status.managementFailure)}</Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <StatusAlert status="warning" title={model.t('runtimeManagement.lastSetupFailure')}>
+          {model.tBackendMessage(model.status.managementFailure)}
+        </StatusAlert>
       )}
       {model.status.blocker && <p role="alert">{model.failureMessage(model.status.blocker)}</p>}
       <p>
@@ -104,39 +92,33 @@ export function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }
             </p>
           )}
           {!!model.status.update.storageDiagnostics?.length && (
-            <Alert status="warning">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>{model.t('runtimeManagement.storageTitle')}</Alert.Title>
-                <Alert.Description>
-                  {model.status.update.storageDiagnostics.map((diagnostic) => (
-                    <p key={diagnostic.path}>
-                      {model.t('runtimeManagement.storageShortfall', {
-                        path: diagnostic.path,
-                        required: (diagnostic.requiredKiB / 1024).toLocaleString(model.language, {
-                          maximumFractionDigits: 1,
-                        }),
-                        available: (diagnostic.availableKiB / 1024).toLocaleString(model.language, {
-                          maximumFractionDigits: 1,
-                        }),
-                        shortfall: ((diagnostic.requiredKiB - diagnostic.availableKiB) / 1024).toLocaleString(
-                          model.language,
-                          { maximumFractionDigits: 1 },
-                        ),
-                      })}
-                    </p>
-                  ))}
-                  <p>{model.t('runtimeManagement.storageAction')}</p>
-                  <p>
-                    {model.t(
-                      model.status.update.phase === 'failed'
-                        ? 'runtimeManagement.previousRuntimeRunning'
-                        : 'runtimeManagement.recoveryPending',
-                    )}
-                  </p>
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
+            <StatusAlert status="warning" title={model.t('runtimeManagement.storageTitle')}>
+              {model.status.update.storageDiagnostics.map((diagnostic) => (
+                <p key={diagnostic.path}>
+                  {model.t('runtimeManagement.storageShortfall', {
+                    path: diagnostic.path,
+                    required: (diagnostic.requiredKiB / 1024).toLocaleString(model.language, {
+                      maximumFractionDigits: 1,
+                    }),
+                    available: (diagnostic.availableKiB / 1024).toLocaleString(model.language, {
+                      maximumFractionDigits: 1,
+                    }),
+                    shortfall: ((diagnostic.requiredKiB - diagnostic.availableKiB) / 1024).toLocaleString(
+                      model.language,
+                      { maximumFractionDigits: 1 },
+                    ),
+                  })}
+                </p>
+              ))}
+              <p>{model.t('runtimeManagement.storageAction')}</p>
+              <p>
+                {model.t(
+                  model.status.update.phase === 'failed'
+                    ? 'runtimeManagement.previousRuntimeRunning'
+                    : 'runtimeManagement.recoveryPending',
+                )}
+              </p>
+            </StatusAlert>
           )}
           {!!model.status.update.cleanupRetryAt && (
             <p role="status">
