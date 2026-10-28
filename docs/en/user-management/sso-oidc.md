@@ -79,12 +79,12 @@ By default, SSO roles are only updated when a user signs in (or through the prov
 
 1. Edit the OIDC provider and go to the **Permission re-sync during sessions** section.
 2. Read the identity provider requirements shown there (also listed below) and check your provider against them.
-3. Turn on **Re-sync permissions during sessions** and set the **Permission re-sync interval (minutes)**. It starts at `60`; the maximum is `525600` (365 days).
+3. Turn on **Re-sync permissions during sessions** and set the **Permission re-sync interval (minutes)**: how many minutes pass between two role checks of a signed-in user. It starts at `60`; the maximum is `525600` (365 days).
 4. Save the provider. The change applies within about 30 seconds, without a restart.
 
-Once the interval has passed since the last sync, the next request uses the session's refresh token to fetch fresh claims from the token and UserInfo endpoints. The roles are then mapped exactly as at login. Turning the switch off stops re-sync for this provider.
+Once the re-sync interval has passed since a session's last role check, its next request uses the session's refresh token to fetch fresh claims from the token and UserInfo endpoints. The roles are then mapped exactly as at login. Turning the switch off stops re-sync for this provider.
 
-Refreshing the session (`GET /api/auth/session/refresh`) also re-syncs, at most once per minute, even if the interval has not passed yet.
+Refreshing the session (`GET /api/auth/session/refresh`) also re-syncs, at most once per minute, even if the re-sync interval has not passed yet.
 
 Re-sync follows the same rules as login. Roles are only changed when the role/group claims changed, and a wholly missing claim never removes roles. Each attempt is logged and counted in the `attraccess_auth_sso_permission_resync_total` metric. Role changes are recorded in the audit log as **SSO permissions synchronized**.
 

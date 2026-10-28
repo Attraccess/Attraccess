@@ -80,12 +80,12 @@
   "permissionSyncTtlMinutes": "Permission re-sync interval (minutes)",
   "permissionSyncTtlMinutesHint": "Roles are re-checked once this many minutes have passed since the last check, and when the session is refreshed (at most once per minute). Maximum 525600 (365 days).",
   "permissionSync": {
-    "description": "By default, roles from this provider are only updated when a user signs in. Turn this on to re-check signed-in users' roles at the identity provider with their refresh token, so role changes take effect without a new sign-in.",
+    "description": "By default, roles from this provider are only updated when a user signs in. Turn this on to re-check each signed-in user's roles at the identity provider with their refresh token every few minutes, so role changes take effect without a new sign-in. How many minutes pass between two checks is set by the re-sync interval.",
     "enable": "Re-sync permissions during sessions",
     "requirements": {
       "title": "Check your identity provider before turning this on",
       "refreshToken": "The provider must issue refresh tokens for this client. Some providers only do so when the offline_access scope is requested. Logins without a refresh token are never re-synced; Attraccess logs a warning for them.",
-      "tokenLifetime": "Refresh tokens must stay valid for longer than the interval. With Keycloak, set the realm's SSO Session Idle (30 minutes by default) and SSO Session Max to at least the interval, or request offline_access. Otherwise every user is signed out at their first re-sync.",
+      "tokenLifetime": "Refresh tokens must stay valid for longer than the re-sync interval, the minutes between two role checks of a signed-in user. With Keycloak, set the realm's SSO Session Idle (30 minutes by default) and SSO Session Max to at least the re-sync interval, or request offline_access. Otherwise every user is signed out at their first re-sync.",
       "rejection": "If the provider rejects a refresh token, for example because the user was disabled or their provider session ended, that user's Attraccess session ends immediately.",
       "existingSessions": "Only sessions started on this Attraccess version or later can be re-synced. Users who signed in before the update must sign in once more."
     }
