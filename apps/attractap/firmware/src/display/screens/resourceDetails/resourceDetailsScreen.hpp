@@ -40,7 +40,9 @@ public:
     void setUserDetails(UserDetails userDetails);
 
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
-    void setProjectsPageRequestCallback(std::function<void(uint32_t)> callback);
+    void setProjectsPageRequestCallback(std::function<bool(uint32_t, const std::string &)> callback);
+    void refreshProjects();
+    void resetProjectsSearch();
     void setProjectSelectionCallback(std::function<void(uint32_t, const std::string &)> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
     void showFormsModal(const API::ResourceUsageFormRequest &meta);
@@ -108,7 +110,7 @@ private:
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
-    std::function<void(uint32_t)> projectsPageRequestCallback;
+    std::function<bool(uint32_t, const std::string &)> projectsPageRequestCallback;
     std::function<void(uint32_t, const std::string &)> projectSelectionCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);
@@ -120,6 +122,10 @@ private:
     static void onProjectListItemDelete(lv_event_t *e);
     static void onProjectsPrevPage(lv_event_t *e);
     static void onProjectsNextPage(lv_event_t *e);
+    static void onProjectsSearchFieldClick(lv_event_t *e);
+    static void onProjectsSearchClear(lv_event_t *e);
+    static void onProjectsSearchKeyboardEvent(lv_event_t *e);
+    static void onProjectsSearchEditorCancel(lv_event_t *e);
     static void onFormsNext(lv_event_t *e);
     static void onFormsBack(lv_event_t *e);
     static void onFormsCancel(lv_event_t *e);
@@ -157,6 +163,13 @@ private:
     void rebuildProjectsList();
     void showProjectsLoading();
     void updateProjectsPaginationControls();
+    void requestProjects(uint32_t page);
+    void createProjectsSearchRow(lv_obj_t *panel);
+    void createProjectsSearchEditor(lv_obj_t *overlay);
+    void refreshProjectsSearchField();
+    void openProjectsSearchEditor();
+    void closeProjectsSearchEditor(bool commit);
+    void applyProjectsSearch(const std::string &query);
     void ensureFormsModal();
     void buildCurrentFormField();
     bool collectCurrentField(API::FormPageSubmission &outPage);
