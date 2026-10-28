@@ -86,6 +86,36 @@ loading the cached default after an offline reboot.
 These checks use the production parser with a simulated server. Deployed-reader
 rollback, physical NFC and live networking remain unverified.
 
+## Mass introduction protocol (1.7.0)
+
+Firmware 1.7.0 adds the mass-introduction scan screen (ATT-1151). Touch variants
+report `capabilities.massIntroduction: true` in `READER_FIRMWARE_INFO`; demo
+builds report `false`. The server only arms readers that report it, so older
+firmware is never sent these events.
+
+| Direction | Event | Payload |
+| --- | --- | --- |
+| Server → reader | `MASS_INTRODUCTION_START` | `sessionId`, `targetName`, `introducerUsername`, `remainingMs` |
+| Reader → server | `REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` | `sessionId`, `uid` (lowercase hex) |
+| Server → reader | `MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` | `sessionId` plus `keyNo`, `key`, `username`, or `error` |
+| Reader → server | `MASS_INTRODUCTION_CARD_AUTH_CONFIRMED` | `sessionId`, `uid` |
+| Server → reader | `MASS_INTRODUCTION_RESULT` | `sessionId`, `success` plus `username`, `alreadyIntroduced`, `participantCount`, or `error` |
+| Reader → server | `MASS_INTRODUCTION_CANCEL` | `sessionId` |
+| Server → reader | `MASS_INTRODUCTION_END` | `sessionId`, `reason` (`expired`, `cancelled`, `revoked`) |
+
+Each tapped card is authenticated with its key like a supervisor card before it
+is confirmed. Errors stay on the scan screen instead of opening the generic error
+popup. After each result the screen waits for the next card. A card left on the
+reader is not read again. A reader that is busy (someone signed in, another flow
+active, a firmware update) replies to `START` with `MASS_INTRODUCTION_CANCEL`.
+The cancel button, the local countdown and an `END` for the shown session return
+the reader to its normal screens. A disconnect does too. Messages for any other
+`sessionId` are ignored. Serial logs mark the transitions:
+`MassIntroduction: started session=…`, `MassIntroduction: card uid=…`,
+`MassIntroduction: introduced user=… already=… count=…`,
+`MassIntroduction: refused session=… reason=…` and
+`MassIntroduction: ended reason=… session=…`.
+
 ## Building
 
 Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.

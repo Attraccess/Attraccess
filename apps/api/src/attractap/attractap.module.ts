@@ -39,6 +39,8 @@ import { BillingModule } from '../billing/billing.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { ResourceFormsModule } from '../resources/forms/forms.module';
 import { SupervisionModule } from '../resources/supervision/supervision.module';
+import { AttractapMassIntroductionHandler } from './websockets/handlers/mass-introduction/mass-introduction.handler';
+import { MassIntroductionModule } from '../resources/mass-introductions/mass-introduction.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
@@ -63,6 +65,7 @@ import { SettingsModule } from '../settings/settings.module';
     ProjectsModule,
     ResourceFormsModule,
     SupervisionModule,
+    MassIntroductionModule,
     NotificationsModule,
     AuditModule,
     SettingsModule,
@@ -88,6 +91,7 @@ import { SettingsModule } from '../settings/settings.module';
     AttractapBillingHandler,
     AttractapProjectsHandler,
     AttractapSupervisionHandler,
+    AttractapMassIntroductionHandler,
   ],
   controllers: [AttractapController, AttractapNfcCardsController, AttractapFirmwareController],
 })

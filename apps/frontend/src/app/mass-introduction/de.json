@@ -1,0 +1,17 @@
+{
+  "pending": "Sie treten der Sammeleinweisung bei…",
+  "success": {
+    "title": "Einweisung abgeschlossen",
+    "introduced": "Sie wurden für {{{name}}} eingewiesen.",
+    "alreadyIntroduced": "Sie hatten bereits eine Einweisung für {{{name}}}.",
+    "openResource": "Ressource öffnen",
+    "openResources": "Ressourcen anzeigen"
+  },
+  "error": {
+    "title": "Einweisung fehlgeschlagen",
+    "invalidOrExpired": "Dieser QR-Code ist ungültig oder abgelaufen. Bitten Sie Ihren Einweiser, einen neuen anzuzeigen.",
+    "missingToken": "Dieser Link enthält keinen Code für eine Sammeleinweisung.",
+    "generic": "Etwas ist schiefgelaufen: {{{error}}}",
+    "backToResources": "Zurück zu den Ressourcen"
+  }
+}

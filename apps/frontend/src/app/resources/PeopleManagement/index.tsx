@@ -1,12 +1,13 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import { Button } from '../../../components/button/index';
-import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
+import { AlertCircle, AwardIcon, QrCodeIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { Select } from '../../../components/select/index';
 import { AddPersonDrawer } from './AddPersonDrawer';
 import { HistoryModalLoader } from './HistoryModalLoader';
 import { IntroductionCommentModal } from './IntroductionCommentModal';
 import { PeopleHeader } from './PeopleHeader';
 import { PeopleTable } from './PeopleTable';
+import { MassIntroductionModal } from './massIntroduction/MassIntroductionModal';
 import { FilterMode, PeopleManagementProps, AddMode } from './types';
 import { useOverlayState } from '@heroui/react';
 import { User } from '@attraccess/react-query-client';
@@ -34,6 +35,11 @@ export function usePeopleManagementState(
 
   const [historyUserId, setHistoryUserId] = useState<number | null>(null);
   const { isOpen: isHistoryOpen, open: openHistory, close: closeHistory } = useOverlayState();
+  const {
+    isOpen: isMassIntroductionOpen,
+    open: openMassIntroduction,
+    close: closeMassIntroduction,
+  } = useOverlayState();
 
   const { rows, isLoading, hasError } = usePeopleRows({ target });
 
@@ -138,6 +144,9 @@ export function usePeopleManagementState(
     handleIntroductionToggle,
     handleRevokeSubmit,
     handleHistoryOpen,
+    isMassIntroductionOpen,
+    openMassIntroduction,
+    closeMassIntroduction,
   } as const;
 }
 
@@ -178,6 +187,9 @@ export function PeopleManagement(
     handleIntroductionToggle,
     handleRevokeSubmit,
     handleHistoryOpen,
+    isMassIntroductionOpen,
+    openMassIntroduction,
+    closeMassIntroduction,
   } = usePeopleManagementState(props);
 
   if (hasError) {
@@ -201,6 +213,7 @@ export function PeopleManagement(
       canManageIntroducers={canManageIntroducers}
       canManageIntroductions={canManageIntroductions}
       onAdd={handleAddOpen}
+      onMassIntroduction={openMassIntroduction}
     />
   );
 
@@ -280,6 +293,8 @@ export function PeopleManagement(
           }}
         />
       )}
+
+      {isMassIntroductionOpen && <MassIntroductionModal target={target} onClose={closeMassIntroduction} />}
     </>
   );
 
@@ -290,6 +305,12 @@ export function PeopleManagement(
           <Button variant="primary" onPress={() => handleAddOpen('introduction')} data-cy="people-add-introduction">
             <ShieldCheckIcon className="w-4 h-4" />
             {t('addOptions.introduction')}
+          </Button>
+        )}
+        {canManageIntroductions && (
+          <Button variant="primary" onPress={openMassIntroduction} data-cy="people-mass-introduction">
+            <QrCodeIcon className="w-4 h-4" />
+            {t('addOptions.massIntroduction')}
           </Button>
         )}
         {canManageIntroducers && (

@@ -33,6 +33,7 @@ private:
 
 #ifdef HAS_LVGL_DISPLAY
     SupervisionFlow supervision{api, nfc, beeper, logger, Display::supervisionScreen};
+    MassIntroductionFlow massIntroduction{api, nfc, beeper, logger, Display::massIntroductionScreen};
 #endif
 
 #ifdef HAS_WS2812_LED

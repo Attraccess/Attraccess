@@ -108,8 +108,16 @@ void API::sendFirmwareInfo()
 #else
         false;
 #endif
+    // Mass introduction needs the touch scan screen (ATT-1151). Demo builds have no real server.
+    event["data"]["payload"]["capabilities"]["massIntroduction"] =
+#if defined(HAS_LVGL_DISPLAY) && !defined(DEMO_MODE)
+        true;
+#else
+        false;
+#endif
 
-    char json[JSON_OUTBUF_SMALL];
+    // Long variant names plus every capability no longer fit the small buffer reliably.
+    char json[JSON_OUTBUF_AUTH];
     size_t n = serializeJson(event, json, sizeof(json));
     if (n == 0)
     {

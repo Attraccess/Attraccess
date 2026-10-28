@@ -52,6 +52,18 @@ class AttractapCapabilities {
     default: false,
   })
   hasLeds!: boolean;
+
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  @ApiProperty({
+    description: 'Whether the reader can show a mass-introduction scan screen',
+    example: false,
+    default: false,
+  })
+  massIntroduction!: boolean;
 }
 
 export class AttractapFirmwareVersion {

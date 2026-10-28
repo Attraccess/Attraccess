@@ -6,6 +6,7 @@ void Application::processState() {
   // Do not run sticky enrollment/reset workflows against suspended NFC.
   if (this->firmwareUpdateActive) {
 #ifdef HAS_LVGL_DISPLAY
+    this->massIntroduction.preempt(millis());
     if (this->state != APPLICATION_STATE_FIRMWARE_UPDATE)
       Display::transitionToScreen(&Display::firmwareUpdateScreen);
     Display::firmwareUpdateScreen.setProgress(this->firmwareUpdateProgressPct);
@@ -159,6 +160,7 @@ bool Application::processConnectionState()
       this->resetPhase = RESET_PHASE_NONE;
     }
     this->supervision.onDisconnect();
+    this->massIntroduction.onDisconnect();
 #endif
         if (this->state == APPLICATION_STATE_INIT)
         {
@@ -237,9 +239,22 @@ bool Application::processCardFlowState()
   // request is still live, and tell the server when we cannot serve it.
   if (this->supervision.takePendingWebStart(
           millis(), this->state == APPLICATION_STATE_SUPERVISION ||
+                         this->state == APPLICATION_STATE_MASS_INTRODUCTION ||
                          this->cardAuthenticationPending || this->unlocked ||
                          this->state == APPLICATION_STATE_AUTHENTICATE_CARD)) {
     this->state = APPLICATION_STATE_SUPERVISION;
+    this->externalState = EXTERNAL_STATE_NONE;
+    return true;
+  }
+
+  // Mass introduction is server-armed as well (ATT-1151). A signed-in user or another flow owns the
+  // reader, so refuse at once: the server then detaches this reader instead of listing it as armed.
+  if (this->state != APPLICATION_STATE_MASS_INTRODUCTION &&
+      this->massIntroduction.takePendingStart(
+          millis(), this->state == APPLICATION_STATE_SUPERVISION ||
+                         this->cardAuthenticationPending || this->unlocked ||
+                         this->state == APPLICATION_STATE_AUTHENTICATE_CARD)) {
+    this->state = APPLICATION_STATE_MASS_INTRODUCTION;
     this->externalState = EXTERNAL_STATE_NONE;
     return true;
   }
@@ -268,6 +283,16 @@ bool Application::processCardFlowState()
         this->finishReaderAction(outcome == SupervisionFlow::Outcome::Unlock);
       }
 
+    }
+    return true;
+  }
+
+  // The scan screen is sticky like supervision: it owns the reader until the session ends, the
+  // countdown runs out or someone presses cancel. Nobody is signed in, so routing starts fresh.
+  if (this->state == APPLICATION_STATE_MASS_INTRODUCTION) {
+    if (this->massIntroduction.tick(millis()) == MassIntroductionFlow::Outcome::ReturnToRouting) {
+      this->externalState = EXTERNAL_STATE_NONE;
+      this->state = APPLICATION_STATE_INIT;
     }
     return true;
   }

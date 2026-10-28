@@ -8,7 +8,8 @@
   "addOptions": {
     "introducer": "Als Einweiser ernennen",
     "maintainer": "Als Wartenden ernennen",
-    "introduction": "Einweisung gewähren"
+    "introduction": "Einweisung gewähren",
+    "massIntroduction": "Sammeleinweisung"
   },
   "filters": {
     "all": "Alle",

@@ -16,6 +16,7 @@
 #include "display/screens/enrollment/enrollmentScreen.hpp"
 #include "display/screens/reset/resetScreen.hpp"
 #include "display/screens/supervision/supervisionScreen.hpp"
+#include "display/screens/massIntroduction/massIntroductionScreen.hpp"
 #include "display/shared/pinInput/pinInputPage.hpp"
 #include "fixtures.hpp"
 #include "display/screens/resourceDetails/resourceDetailsScreen.hpp"
@@ -230,6 +231,7 @@ void testInit(Renderer &renderer);
 template <typename CardScreen>
 void testCard(Renderer &renderer, const std::string &name, const char *writing, const char *success);
 void testSupervision(Renderer &renderer);
+void testMassIntroduction(Renderer &renderer);
 void testPin(Renderer &renderer);
 void testBackgroundScreens(Renderer &renderer);
 void testWallClock(Renderer &renderer);

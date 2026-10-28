@@ -22,6 +22,7 @@
 #include "screens/enrollment/enrollmentScreen.hpp"
 #include "screens/reset/resetScreen.hpp"
 #include "screens/supervision/supervisionScreen.hpp"
+#include "screens/massIntroduction/massIntroductionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 #ifdef DEMO_MODE
 #include "screens/demoSettings/demoSettingsScreen.hpp"
@@ -59,6 +60,7 @@ public:
     static EnrollmentScreen enrollmentScreen;
     static ResetScreen resetScreen;
     static SupervisionScreen supervisionScreen;
+    static MassIntroductionScreen massIntroductionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
 #ifdef DEMO_MODE
     static DemoSettingsScreen demoSettingsScreen;

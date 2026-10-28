@@ -8,7 +8,8 @@
   "addOptions": {
     "introducer": "Appoint as introducer",
     "maintainer": "Appoint as maintainer",
-    "introduction": "Grant introduction"
+    "introduction": "Grant introduction",
+    "massIntroduction": "Mass introduction"
   },
   "filters": {
     "all": "All",

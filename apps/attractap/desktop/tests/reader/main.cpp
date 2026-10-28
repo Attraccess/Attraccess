@@ -16,6 +16,7 @@ int main(int argc, char **argv)
     workflow.testProjectSearch();
     workflow.testFormsAndLogout();
     workflow.testSupervisionAndCorrelation();
+    workflow.testMassIntroduction();
     workflow.testIdentityAndPendingAuthentication();
     workflow.testLocalization();
     workflow.testSessionSummary();

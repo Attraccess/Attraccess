@@ -60,6 +60,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/massIntroduction/massIntroductionScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/demoSettings/demoSettingsScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/firmwareUpdate/firmwareUpdateScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen.cpp"

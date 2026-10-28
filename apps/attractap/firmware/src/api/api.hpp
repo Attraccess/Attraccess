@@ -301,8 +301,9 @@ struct SupervisionStartCommand
 #include <atomic>
 #include <mutex>
 #include <ArduinoJson.h>
+#include "mass_introduction_types.hpp"
 
-struct ApiState : public ApiCards
+struct ApiState : public ApiCards, public ApiMassIntroduction
 {
 protected:
     bool loopIsEnabled = false;
@@ -313,6 +314,10 @@ protected:
     std::function<void(SupervisionRequestResult)> supervisionRequestResultCallback;
     std::function<void(SupervisorCardAuthenticationResponse)> supervisorCardAuthenticationResponseCallback;
     std::function<void(SupervisionResolvedResult)> supervisionResolvedCallback;
+    std::function<void(const MassIntroductionStartCommand &)> massIntroductionStartCallback;
+    std::function<void(const MassIntroductionCardAuthenticationResponse &)> massIntroductionCardAuthenticationCallback;
+    std::function<void(const MassIntroductionResult &)> massIntroductionResultCallback;
+    std::function<void(const MassIntroductionEnd &)> massIntroductionEndCallback;
     std::function<void(std::string)> deviceNameCallback;
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
     // Written by the LVGL task's page requests, read when responses arrive.
@@ -411,6 +416,17 @@ public:
     void setSupervisorCardAuthenticationResponseCallback(std::function<void(SupervisorCardAuthenticationResponse)> callback);
     void setSupervisionResolvedCallback(std::function<void(SupervisionResolvedResult)> callback);
 
+    // --- Mass introduction (ATT-1151) ----------------------------------------------------------
+    // Server-armed like ATT-816 supervision. Every message carries the sessionId so the flow can
+    // ignore replies for a session it has already left.
+    void requestMassIntroductionCardAuthenticationData(const char *sessionId, const uint8_t *uid, uint8_t uidLength);
+    void confirmMassIntroductionCardAuth(const char *sessionId, const uint8_t *uid, uint8_t uidLength);
+    void cancelMassIntroduction(const char *sessionId);
+    void setMassIntroductionStartCallback(std::function<void(const MassIntroductionStartCommand &)> callback);
+    void setMassIntroductionCardAuthenticationCallback(std::function<void(const MassIntroductionCardAuthenticationResponse &)> callback);
+    void setMassIntroductionResultCallback(std::function<void(const MassIntroductionResult &)> callback);
+    void setMassIntroductionEndCallback(std::function<void(const MassIntroductionEnd &)> callback);
+
     void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username)> callback);
     void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, std::string key)> callback);
     void setEnrollNewCardErrorCallback(std::function<void(std::string error)> callback);
@@ -481,6 +497,11 @@ private:
     void onSupervisionRequestResult(JsonObject data);
     void onSupervisorCardAuthenticationData(JsonObject data);
     void onSupervisionResolved(JsonObject data);
+
+    void onMassIntroductionStart(JsonObject data);
+    void onMassIntroductionCardAuthenticationData(JsonObject data);
+    void onMassIntroductionResult(JsonObject data);
+    void onMassIntroductionEnd(JsonObject data);
 
     uint32_t authenticationCount = 0;
 

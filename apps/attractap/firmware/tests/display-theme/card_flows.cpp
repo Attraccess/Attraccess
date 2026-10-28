@@ -111,6 +111,80 @@ void testSupervision(Renderer &renderer)
     expect(canceled == 1, "Supervision accepts a deliberate cancel press after guard");
 }
 
+void testMassIntroduction(Renderer &renderer)
+{
+    MassIntroductionScreen scan;
+    MassIntroductionScreen::View view;
+    view.deadlineMs = Fixtures::nowMs + 900000;
+    view.durationMs = 900000;
+    view.targetName = "Lasercutter";
+    view.introducerName = Fixtures::userName;
+    scan.render(view);
+    scan.init();
+    ScreenGuard screen(scan.getScreen(), &scan);
+    requireObject(screen.root, &lv_label_class, "Sammeleinweisung");
+    requireObject(screen.root, &lv_label_class, "Lasercutter");
+    requireObject(screen.root, &lv_label_class, "0 eingewiesen · noch 15:00");
+    requireObject(screen.root, &lv_label_class, "Karte auflegen, um eingewiesen zu werden\nEinweiser: Alex Example");
+    auto *bar = requireObject(screen.root, &lv_bar_class);
+    expect(lv_bar_get_max_value(bar) == 900 && lv_bar_get_value(bar) == 900, "Mass introduction bar spans the session");
+    auto *cancel = lv_obj_get_parent(requireObject(screen.root, &lv_label_class, "Abbrechen"));
+    const std::array<MassIntroductionScreen::Status, 5> states = {MassIntroductionScreen::STATUS_WAITING,
+        MassIntroductionScreen::STATUS_VERIFYING, MassIntroductionScreen::STATUS_INTRODUCED,
+        MassIntroductionScreen::STATUS_ALREADY_INTRODUCED, MassIntroductionScreen::STATUS_ERROR};
+    const char *suffix[] = {"waiting", "verifying", "introduced", "already-introduced", "error"};
+    const char *german[] = {"Bereit für die nächste Karte", "Karte gelesen...\nbitte nicht bewegen", "Ute Müller eingewiesen",
+        "Ute Müller war bereits eingewiesen", "Karte ist nicht aktiv"};
+    const char *english[] = {"Ready for the next card", "Card read...\nplease keep it still", "Ute Müller introduced",
+        "Ute Müller was already introduced", "Card is inactive"};
+    const lv_color_t colors[] = {DisplayTheme::text(), DisplayTheme::warning(), DisplayTheme::success(), DisplayTheme::primary(), DisplayTheme::danger()};
+    view.participantName = "Ute Müller";
+    view.participantCount = 3;
+    view.statusMessage = FirmwareI18n::readerError("CARD_NOT_ACTIVE");
+    for (size_t i = 0; i < states.size(); ++i) {
+        view.status = states[i];
+        scan.render(view);
+        auto *status = requireObject(screen.root, &lv_label_class, german[i]);
+        expectColor(lv_obj_get_style_text_color(status, LV_PART_MAIN), colors[i], "Mass introduction status color");
+        expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_28,
+               "Mass introduction status uses a Latin-1 font");
+        expect(!lv_obj_has_flag(cancel, LV_OBJ_FLAG_HIDDEN), "Mass introduction can always be cancelled");
+        requireObject(screen.root, &lv_label_class, "3 eingewiesen · noch 15:00");
+        renderer.capture(std::string("mass-introduction-") + suffix[i]);
+        FirmwareI18n::refreshTree(screen.root, "en");
+        requireObject(screen.root, &lv_label_class, english[i]);
+        requireObject(screen.root, &lv_label_class, "3 introduced · 15:00 left");
+        renderer.capture(std::string("mass-introduction-english-") + suffix[i]);
+        FirmwareI18n::refreshTree(screen.root, "de");
+    }
+    // Long German target and the longest status still leave the cancel button on the panel.
+    view.targetName = "Holzwerkstatt Formatkreissäge und Abrichthobel";
+    view.statusMessage = FirmwareI18n::Message::MassIntroductionNoResponse;
+    scan.render(view);
+    lv_obj_update_layout(screen.root);
+    lv_area_t bounds;
+    lv_obj_get_coords(cancel, &bounds);
+    expect(bounds.y2 < 480, "Mass introduction layout fits long names and messages");
+    renderer.capture("mass-introduction-long-error");
+    Fixtures::nowMs += 61500;
+    scan.loop();
+    requireObject(screen.root, &lv_label_class, "3 eingewiesen · noch 13:59");
+    expect(lv_bar_get_value(bar) == 839, "Mass introduction countdown advances with the clock");
+    Fixtures::nowMs += 900000;
+    scan.loop();
+    requireObject(screen.root, &lv_label_class, "3 eingewiesen · noch 0:00");
+    unsigned canceled = 0;
+    scan.setOnCancelCallback([&] { ++canceled; });
+    scan.armCancelGuard();
+    lv_obj_send_event(cancel, LV_EVENT_PRESSED, nullptr);
+    lv_obj_send_event(cancel, LV_EVENT_CLICKED, nullptr);
+    expect(canceled == 0, "Mass introduction rejects an early cancel press");
+    Fixtures::nowMs += 1001;
+    lv_obj_send_event(cancel, LV_EVENT_PRESSED, nullptr);
+    lv_obj_send_event(cancel, LV_EVENT_CLICKED, nullptr);
+    expect(canceled == 1, "Mass introduction accepts a deliberate cancel press after guard");
+}
+
 void testPin(Renderer &renderer)
 {
     PinInputPage pin;

@@ -114,6 +114,16 @@ vi.mock('./IntroductionCommentModal', () => ({
       </section>
     ) : null,
 }));
+vi.mock('./massIntroduction/MassIntroductionModal', () => ({
+  MassIntroductionModal: ({ target, onClose }: { target: { type: string; id: number }; onClose: () => void }) => (
+    <section aria-label="Mass introduction dialog">
+      <span>
+        Mass introduction for {target.type} {target.id}
+      </span>
+      <button onClick={onClose}>Close mass introduction</button>
+    </section>
+  ),
+}));
 vi.mock('./HistoryModalLoader', () => ({
   HistoryModalLoader: ({ userId, isOpen, onClose }: ComponentProps<typeof HistoryModalLoader>) =>
     isOpen ? (
@@ -360,4 +370,19 @@ it('keeps inherited access and navigation visible after direct revocation', () =
   } finally {
     state.rows = original;
   }
+});
+
+it.each([false, true])('opens and closes the mass introduction for introducers (hideHeader=%s)', (hideHeader) => {
+  mount({ target: { type: 'group', id: 3 }, hideHeader, canManageIntroducers: false, canManageIntroductions: true });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Mass introduction' }));
+  expect(screen.getByText('Mass introduction for group 3')).toBeTruthy();
+
+  fireEvent.click(screen.getByText('Close mass introduction'));
+  expect(screen.queryByText('Mass introduction for group 3')).toBeNull();
+});
+
+it('hides the mass introduction from people who cannot grant introductions', () => {
+  mount({ canManageIntroducers: true, canManageIntroductions: false });
+  expect(screen.queryByRole('button', { name: 'Mass introduction' })).toBeNull();
 });

@@ -1,0 +1,47 @@
+{
+  "title": "Mass introduction",
+  "subtitle": {
+    "setup": "Introduce many people at once with a temporary QR code",
+    "active": "Introducing people to {{{name}}}"
+  },
+  "setup": {
+    "description": "Start a QR code that stays valid for 15 minutes. Everyone who scans it and signs in is introduced immediately, with you recorded as their introducer.",
+    "useReader": "Also let people tap their NFC card on an Attractap reader",
+    "readerLabel": "Reader",
+    "readerPlaceholder": "Select a reader",
+    "readerDescription": "Only connected readers whose firmware supports mass introductions are listed.",
+    "startFailed": "Could not start the mass introduction",
+    "cancel": "Cancel",
+    "start": "Start"
+  },
+  "active": {
+    "qrLabel": "QR code for the mass introduction",
+    "scanHint": "Scan this code with a phone camera or the in-app scanner.",
+    "timeRemaining": "Time remaining",
+    "end": "End mass introduction"
+  },
+  "reader": {
+    "active": "{{{name}}} is waiting for NFC cards",
+    "detached": "{{{name}}} left the mass introduction. The QR code still works."
+  },
+  "ended": {
+    "title": "Mass introduction ended",
+    "reason": {
+      "expired": "The 15 minutes are up. The QR code no longer works.",
+      "cancelled": "The mass introduction was ended. The QR code no longer works.",
+      "revoked": "You can no longer introduce people to this target, so the mass introduction was ended.",
+      "unknown": "The QR code no longer works."
+    },
+    "close": "Close",
+    "restart": "New QR code"
+  },
+  "participants": {
+    "title": "Joined ({{count}})",
+    "empty": "Nobody has joined yet.",
+    "method": {
+      "qr": "QR code",
+      "nfc": "NFC card"
+    },
+    "alreadyIntroduced": "Already introduced"
+  }
+}

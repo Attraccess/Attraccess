@@ -210,6 +210,22 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     {
         this->onSupervisionResolved(inboundDoc["data"].as<JsonObject>());
     }
+    else if (strcmp(eventType, "MASS_INTRODUCTION_START") == 0)
+    {
+        this->onMassIntroductionStart(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA") == 0)
+    {
+        this->onMassIntroductionCardAuthenticationData(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "MASS_INTRODUCTION_RESULT") == 0)
+    {
+        this->onMassIntroductionResult(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "MASS_INTRODUCTION_END") == 0)
+    {
+        this->onMassIntroductionEnd(inboundDoc["data"].as<JsonObject>());
+    }
     else if (strcmp(eventType, "ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO") == 0)
     {
         this->onEnrollNewCardGetAvailableKeyNo(inboundDoc["data"].as<JsonObject>());
@@ -363,11 +379,18 @@ void API::processIncomingMessage(const char *buf, size_t len)
                               strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
                               strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
 
+    // Mass introduction errors (e.g. CARD_NOT_FOUND, CARD_MISMATCH) concern one tapped card; the
+    // scan screen shows them and keeps waiting for the next card (ATT-1151).
+    bool isMassIntroductionEvent = strcmp(eventType, "MASS_INTRODUCTION_START") == 0 ||
+                                   strcmp(eventType, "MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA") == 0 ||
+                                   strcmp(eventType, "MASS_INTRODUCTION_RESULT") == 0 ||
+                                   strcmp(eventType, "MASS_INTRODUCTION_END") == 0;
+
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
     // Background stats failures must not interrupt start/stop controls with a popup.
     const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
     if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
-        inboundDoc["data"]["payload"].is<JsonObject>())
+        !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
         if (payload["error"].is<const char *>())

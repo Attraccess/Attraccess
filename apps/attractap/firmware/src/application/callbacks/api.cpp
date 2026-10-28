@@ -360,7 +360,7 @@ void Application::setupDisplayCallbacks()
   Display::setDrawerAvailableCallback([this]() {
     return !this->sessionSummaryActive && !this->cardAuthenticationPending && this->pendingUiAction.empty() &&
            !this->waitingForResourceRefresh && !this->hasPendingFormRequest &&
-           this->state != APPLICATION_STATE_SUPERVISION;
+           this->state != APPLICATION_STATE_SUPERVISION && this->state != APPLICATION_STATE_MASS_INTRODUCTION;
   });
   Display::setOnOpenSettingsCallback([this]() {
 #ifdef DEMO_MODE

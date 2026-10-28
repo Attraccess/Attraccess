@@ -1,0 +1,47 @@
+{
+  "title": "Sammeleinweisung",
+  "subtitle": {
+    "setup": "Viele Personen gleichzeitig über einen befristeten QR-Code einweisen",
+    "active": "Einweisung für {{{name}}}"
+  },
+  "setup": {
+    "description": "Starten Sie einen QR-Code, der 15 Minuten lang gültig ist. Wer ihn scannt und sich anmeldet, wird sofort eingewiesen – mit Ihnen als Einweiser.",
+    "useReader": "Zusätzlich NFC-Karten an einem Attractap-Leser annehmen",
+    "readerLabel": "Leser",
+    "readerPlaceholder": "Leser auswählen",
+    "readerDescription": "Es werden nur verbundene Leser angezeigt, deren Firmware Sammeleinweisungen unterstützt.",
+    "startFailed": "Die Sammeleinweisung konnte nicht gestartet werden",
+    "cancel": "Abbrechen",
+    "start": "Starten"
+  },
+  "active": {
+    "qrLabel": "QR-Code für die Sammeleinweisung",
+    "scanHint": "Scannen Sie diesen Code mit der Handykamera oder dem Scanner in der App.",
+    "timeRemaining": "Verbleibende Zeit",
+    "end": "Sammeleinweisung beenden"
+  },
+  "reader": {
+    "active": "{{{name}}} wartet auf NFC-Karten",
+    "detached": "{{{name}}} hat die Sammeleinweisung verlassen. Der QR-Code funktioniert weiterhin."
+  },
+  "ended": {
+    "title": "Sammeleinweisung beendet",
+    "reason": {
+      "expired": "Die 15 Minuten sind abgelaufen. Der QR-Code ist nicht mehr gültig.",
+      "cancelled": "Die Sammeleinweisung wurde beendet. Der QR-Code ist nicht mehr gültig.",
+      "revoked": "Sie dürfen hierfür nicht mehr einweisen, daher wurde die Sammeleinweisung beendet.",
+      "unknown": "Der QR-Code ist nicht mehr gültig."
+    },
+    "close": "Schließen",
+    "restart": "Neuer QR-Code"
+  },
+  "participants": {
+    "title": "Beigetreten ({{count}})",
+    "empty": "Bisher ist noch niemand beigetreten.",
+    "method": {
+      "qr": "QR-Code",
+      "nfc": "NFC-Karte"
+    },
+    "alreadyIntroduced": "Bereits eingewiesen"
+  }
+}

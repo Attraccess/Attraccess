@@ -59,6 +59,17 @@ export enum AttractapEventType {
   RESOURCE_USAGE_FORM_SUBMIT_PAGE = 'RESOURCE_USAGE_FORM_SUBMIT_PAGE',
   RESOURCE_USAGE_FORM_PAGE_RESULT = 'RESOURCE_USAGE_FORM_PAGE_RESULT',
   RESOURCE_USAGE_FORM_CANCEL = 'RESOURCE_USAGE_FORM_CANCEL',
+  // Mass introduction (ATT-1151): the server shows a scan screen on a reader; every authenticated
+  // card tapped there introduces its owner on behalf of the introducer who started the session.
+  MASS_INTRODUCTION_START = 'MASS_INTRODUCTION_START',
+  REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA = 'REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA',
+  MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA = 'MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA',
+  MASS_INTRODUCTION_CARD_AUTH_CONFIRMED = 'MASS_INTRODUCTION_CARD_AUTH_CONFIRMED',
+  MASS_INTRODUCTION_RESULT = 'MASS_INTRODUCTION_RESULT',
+  /** Reader left the session (cancel button); the QR code keeps working. */
+  MASS_INTRODUCTION_CANCEL = 'MASS_INTRODUCTION_CANCEL',
+  /** Server ended the session (expired, cancelled by the introducer). */
+  MASS_INTRODUCTION_END = 'MASS_INTRODUCTION_END',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -202,6 +213,12 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
        * it confirms the card auth instead and the pending web request is approved server-side.
        */
       webInitiated?: boolean;
+    } | null;
+    /** Present while the reader shows a mass-introduction scan screen (ATT-1151). */
+    massIntroductionFlow?: {
+      sessionId: string;
+      /** The card whose key was handed out; only its confirmation may introduce someone. */
+      pendingCard: { uid: string; userId: number } | null;
     } | null;
     ota?: {
       path: string;

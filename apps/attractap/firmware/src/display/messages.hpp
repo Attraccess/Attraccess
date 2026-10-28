@@ -83,6 +83,9 @@ inline Text readerError(const std::string &code) {
     if (code == "INVALID_AMOUNT") return Message::ErrorInvalidAmount;
     if (code == "NO_SUMUP_TERMINALS_AVAILABLE") return Message::ErrorNoSumupTerminalsAvailable;
     if (code == "SUMUP_TOPUP_FAILED") return Message::ErrorSumupTopupFailed;
+    if (code == "CARD_MISMATCH") return Message::ErrorCardMismatch;
+    if (code == "NO_MASS_INTRODUCTION_IN_PROGRESS") return Message::ErrorNoMassIntroductionInProgress;
+    if (code == "MASS_INTRODUCTION_FAILED") return Message::ErrorMassIntroductionFailed;
     std::fprintf(stderr, "Unknown reader error: %s\n", code.c_str());
     // Unknown server errors have no reliable language; preserve English fallback.
     return Text::literal("Something went wrong. Please try again.");
