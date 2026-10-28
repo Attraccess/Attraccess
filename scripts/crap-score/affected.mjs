@@ -204,12 +204,18 @@ export async function selectProjects(args) {
     .map((node) => node.name);
   validateSupportedTargets(supportedProjects(nodes, trackedFiles()), targetProjects);
   const selection = affectedSelection(args);
-  if (selection === null || isSharedChange(changedFiles(selection))) return targetProjects.sort();
-  return JSON.parse(
-    exec(nx, ['show', 'projects', '--affected', ...selection, '--withTarget=crap-score', '--json'], {
-      encoding: 'utf8',
-    }),
-  ).sort();
+  const files = selection && changedFiles(selection);
+  if (selection === null || isSharedChange(files)) return targetProjects.sort();
+  const { args: nxArgs, input } = affectedProjectsQuery(selection, files);
+  return JSON.parse(exec(nx, nxArgs, { encoding: 'utf8', input })).sort();
+}
+
+// Nx's --uncommitted ignores untracked files and cannot be combined with
+// --untracked, so a working-tree selection passes the exact changed files.
+export function affectedProjectsQuery(selection, files) {
+  const query = ['show', 'projects', '--affected', '--withTarget=crap-score', '--json'];
+  if (selection[0] !== '--uncommitted') return { args: [...query, ...selection], input: undefined };
+  return { args: [...query, '--stdin'], input: files.map((file) => `${file}\n`).join('') };
 }
 
 export function enforceProjects(projects) {

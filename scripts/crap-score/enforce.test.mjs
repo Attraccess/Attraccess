@@ -6,6 +6,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { enforceScores, sourceFunctionCount, summarizeScores, workspace } from './run.mjs';
 import {
+  affectedProjectsQuery,
   affectedSelection,
   changedFiles,
   isSharedChange,
@@ -49,6 +50,18 @@ test('affected selection uses Nx base or worktree selectors', () => {
   assert.deepEqual(affectedSelection(['--base=origin/main', '--head=feature']), ['--base=origin/main', '--head=feature']);
   assert.deepEqual(affectedSelection(['--uncommitted']), ['--uncommitted']);
   assert.deepEqual(affectedSelection([]), ['--uncommitted']);
+});
+
+test('working-tree selections pass changed and untracked files to Nx', () => {
+  const query = ['show', 'projects', '--affected', '--withTarget=crap-score', '--json'];
+  assert.deepEqual(affectedProjectsQuery(['--uncommitted'], ['libs/a/src/changed.ts', 'libs/a/src/new.ts']), {
+    args: [...query, '--stdin'],
+    input: 'libs/a/src/changed.ts\nlibs/a/src/new.ts\n',
+  });
+  assert.deepEqual(affectedProjectsQuery(['--base=origin/main', '--head=HEAD'], ['ignored.ts']), {
+    args: [...query, '--base=origin/main', '--head=HEAD'],
+    input: undefined,
+  });
 });
 
 test('shared-change detection diffs the same snapshot Nx selects', () => {
