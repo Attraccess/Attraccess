@@ -1,18 +1,8 @@
-// Redeems a scanned mass-introduction QR code on the page it points to and reports the result in a modal
+// Redeems a scanned mass-introduction QR code on the page it points to and reports the result in a dialog
 // FEATURE: ATT-1151 Mass introduction
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Spinner,
-} from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -21,8 +11,7 @@ import {
   RedeemMassIntroductionResponseDto,
   useAccessControlServiceMassIntroductionRedeem,
 } from '@attraccess/react-query-client';
-import { Button } from '../../components/button';
-import { StandardModal } from '../../components/standardModal';
+import { StatusDialog } from '../../components/statusDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 import en from './en.json';
 import de from './de.json';
@@ -43,7 +32,6 @@ export function massIntroductionUrl(session: Pick<MassIntroductionSessionDto, 't
 }
 
 type RedeemState =
-  | { status: 'pending' }
   | { status: 'success'; result: RedeemMassIntroductionResponseDto }
   | { status: 'error'; isInvalidOrExpired: boolean; detail: string };
 
@@ -74,7 +62,6 @@ export function MassIntroductionRedeemModal() {
   useEffect(() => {
     if (!token || redeemedToken.current === token) return;
     redeemedToken.current = token;
-    setState({ status: 'pending' });
     redeem({ requestBody: { token } });
     // Reloading or sharing the page must not redeem again.
     setSearchParams(
@@ -86,54 +73,37 @@ export function MassIntroductionRedeemModal() {
     );
   }, [token, redeem, setSearchParams]);
 
+  // The redemption is quick; the dialog appears with its result.
   if (!state) return null;
 
   const close = () => setState(null);
-  let title = t('pending');
-  let message = '';
   if (state.status === 'success') {
-    title = t('success.title');
-    message = t(state.result.alreadyIntroduced ? 'success.alreadyIntroduced' : 'success.introduced', {
-      name: state.result.target.name,
-    });
-  } else if (state.status === 'error') {
-    title = t('error.title');
-    message = state.isInvalidOrExpired ? t('error.invalidOrExpired') : t('error.generic', { error: state.detail });
+    return (
+      <StatusDialog
+        isOpen
+        onClose={close}
+        status="success"
+        title={t('success.title')}
+        closeLabel={t('close')}
+        data-cy="mass-introduction-redeem-success"
+      >
+        {t(state.result.alreadyIntroduced ? 'success.alreadyIntroduced' : 'success.introduced', {
+          name: state.result.target.name,
+        })}
+      </StatusDialog>
+    );
   }
 
   return (
-    <StandardModal
+    <StatusDialog
       isOpen
-      onOpenChange={(isOpen) => !isOpen && state.status !== 'pending' && close()}
-      size="sm"
-      data-cy="mass-introduction-redeem-modal"
+      onClose={close}
+      status="error"
+      title={t('error.title')}
+      closeLabel={t('close')}
+      data-cy="mass-introduction-redeem-error"
     >
-      <ModalHeader>
-        <ModalHeading>{title}</ModalHeading>
-      </ModalHeader>
-      <ModalBody>
-        {state.status === 'pending' ? (
-          <div className="flex justify-center py-4">
-            <Spinner />
-          </div>
-        ) : (
-          <Alert
-            status={state.status === 'success' ? 'success' : 'danger'}
-            data-cy={`mass-introduction-redeem-${state.status}`}
-          >
-            <AlertContent>
-              <AlertDescription>{message}</AlertDescription>
-            </AlertContent>
-          </Alert>
-        )}
-      </ModalBody>
-      {state.status !== 'pending' && (
-        <ModalFooter>
-          <Button variant="primary" onPress={close} data-cy="mass-introduction-redeem-close">
-            {t('close')}
-          </Button>
-        </ModalFooter>
-      )}
-    </StandardModal>
+      {state.isInvalidOrExpired ? t('error.invalidOrExpired') : t('error.generic', { error: state.detail })}
+    </StatusDialog>
   );
 }

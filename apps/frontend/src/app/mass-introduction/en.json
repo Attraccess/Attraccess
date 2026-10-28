@@ -1,5 +1,4 @@
 {
-  "pending": "Joining the mass introduction…",
   "success": {
     "title": "Introduction complete",
     "introduced": "You've been introduced to {{{name}}}.",

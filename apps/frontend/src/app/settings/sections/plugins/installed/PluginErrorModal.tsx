@@ -1,6 +1,4 @@
-import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { StandardModal } from '../../../../../components/standardModal';
+import { StatusDialog } from '../../../../../components/statusDialog';
 import { usePluginsSectionState } from '../state/usePluginSettings';
 type Props = Pick<
   ReturnType<typeof usePluginsSectionState>,
@@ -8,38 +6,24 @@ type Props = Pick<
 >;
 export function PluginErrorModal({ failedPlugin, setFailedPlugin, t, retryPlugin, isRetryingPlugin }: Props) {
   return (
-    <StandardModal
+    <StatusDialog
       isOpen={failedPlugin !== null}
-      onOpenChange={(open) => !open && setFailedPlugin(null)}
+      onClose={() => setFailedPlugin(null)}
+      status="error"
+      title={t('status.errorTitle', { pluginName: failedPlugin?.name ?? '' })}
+      closeLabel={t('status.close')}
+      action={{
+        label: t('status.retry'),
+        onPress: retryPlugin,
+        isPending: isRetryingPlugin,
+        'data-cy': 'plugins-list-retry-load-button',
+      }}
       data-cy="plugins-list-load-error-modal"
-      size="md"
     >
-      {({ close }) => (
-        <>
-          <ModalHeader>
-            <ModalHeading>{t('status.errorTitle', { pluginName: failedPlugin?.name ?? '' })}</ModalHeading>
-          </ModalHeader>
-          <ModalBody>
-            <p className="text-sm text-muted">{t('status.errorDescription')}</p>
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-medium border border-divider p-3 text-sm text-danger">
-              {failedPlugin?.error}
-            </pre>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="secondary" onPress={close}>
-              {t('status.close')}
-            </Button>
-            <Button
-              variant="primary"
-              onPress={() => void retryPlugin()}
-              isPending={isRetryingPlugin}
-              data-cy="plugins-list-retry-load-button"
-            >
-              {t('status.retry')}
-            </Button>
-          </ModalFooter>
-        </>
-      )}
-    </StandardModal>
+      <p className="text-sm text-muted">{t('status.errorDescription')}</p>
+      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-medium border border-divider p-3 text-sm text-danger">
+        {failedPlugin?.error}
+      </pre>
+    </StatusDialog>
   );
 }

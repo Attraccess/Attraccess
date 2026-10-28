@@ -71,13 +71,13 @@ describe('MassIntroductionRedeemModal', () => {
 
     expect(state.redeem).toHaveBeenCalledTimes(1);
     expect(state.redeem).toHaveBeenCalledWith({ requestBody: { token: 'tok-1' } });
-    expect(await screen.findByRole('dialog', { name: 'Introduction complete' })).toBeInTheDocument();
+    expect(await screen.findByRole('alertdialog', { name: 'Introduction complete' })).toBeInTheDocument();
     expect(screen.getByText("You've been introduced to Laser Cutter.")).toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Current URL' })).toHaveTextContent('/resources/7?tab=people');
     expect(invalidate).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(state.redeem).toHaveBeenCalledTimes(1);
   });
 
@@ -92,7 +92,7 @@ describe('MassIntroductionRedeemModal', () => {
     state.error = { status: 404, message: 'Not Found', body: { message: 'expired' } };
     mount();
 
-    expect(await screen.findByRole('dialog', { name: 'Introduction failed' })).toBeInTheDocument();
+    expect(await screen.findByRole('alertdialog', { name: 'Introduction failed' })).toBeInTheDocument();
     expect(screen.getByText(/invalid or has expired/)).toBeInTheDocument();
   });
 
@@ -107,6 +107,6 @@ describe('MassIntroductionRedeemModal', () => {
     mount('/resources/7');
 
     expect(state.redeem).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 });

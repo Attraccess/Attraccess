@@ -1,7 +1,5 @@
-import { ModalHeader, ModalBody, ModalFooter, ModalHeading } from '@heroui/react';
-import { Button } from '@heroui/react';
-import { StandardModal } from '../standardModal';
 import { useTranslations, I18nTransComponent } from '@attraccess/plugins-frontend-ui';
+import { StatusDialog } from '../statusDialog';
 import en from './en.json';
 import de from './de.json';
 
@@ -11,6 +9,7 @@ interface DeleteConfirmationModalProps {
   onConfirm: () => unknown;
   itemName: string;
   isDeleting?: boolean;
+  'data-cy'?: string;
 }
 
 export function DeleteConfirmationModal({
@@ -19,6 +18,7 @@ export function DeleteConfirmationModal({
   onConfirm,
   itemName,
   isDeleting,
+  'data-cy': dataCy,
 }: Readonly<DeleteConfirmationModalProps>) {
   const { t } = useTranslations({
     en,
@@ -26,45 +26,28 @@ export function DeleteConfirmationModal({
   });
 
   return (
-    <StandardModal
+    <StatusDialog
       isOpen={isOpen}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      size="sm"
+      onClose={onClose}
+      status="error"
+      title={t('title')}
+      closeLabel={t('cancelButton')}
+      closeDataCy="cancel-button"
+      action={{ label: t('deleteButton'), onPress: onConfirm, isPending: isDeleting, 'data-cy': 'delete-button' }}
+      data-cy={dataCy}
     >
-      {({ close }) => (
-        <>
-          <ModalHeader>
-            <ModalHeading>{t('title')}</ModalHeading>
-          </ModalHeader>
-          <ModalBody>
-            <div className="text-lg">
-              <I18nTransComponent
-                t={t}
-                count={1}
-                i18nKey="message"
-                values={{ itemName }}
-                components={{
-                  br: <br />,
-                  bold: <span className="text-2xl font-bold block my-4" />,
-                  alert: (
-                    <div className="text-red-500 bg-red-100 p-2 rounded-md dark:bg-red-900 dark:text-red-100 mt-8" />
-                  ),
-                }}
-              />
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" onPress={close} data-cy="cancel-button">
-              {t('cancelButton')}
-            </Button>
-            <Button variant="danger" data-cy="delete-button" onPress={() => onConfirm()} isPending={isDeleting}>
-              {t('deleteButton')}
-            </Button>
-          </ModalFooter>
-        </>
-      )}
-    </StandardModal>
+      <p>
+        <I18nTransComponent
+          t={t}
+          count={1}
+          i18nKey="message"
+          values={{ itemName }}
+          components={{
+            bold: <strong />,
+            alert: <span className="block mt-2 text-danger" />,
+          }}
+        />
+      </p>
+    </StatusDialog>
   );
 }
