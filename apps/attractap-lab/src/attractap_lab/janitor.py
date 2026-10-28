@@ -70,6 +70,7 @@ class Janitor:
         self.poll_seconds = poll_seconds
         self.dirty = set()
         self.reservations = {}  # place -> [token, last poll]
+        self.reserving = set()
         self.jobs = {}
         self.failures = {}
         self.retry_after = {}
@@ -113,6 +114,8 @@ class Janitor:
                 await self._drop_reservation(name)
                 continue
             reservation = self.reservations.get(name)
+            if name in self.reserving:
+                continue
             if reservation is None:
                 await self._reserve(name)
             elif place.acquired is None and place.reservation == reservation[0]:
@@ -129,10 +132,18 @@ class Janitor:
 
         async def on_place_changed(place_pb2):
             await apply_update(place_pb2)
-            acquired = self.session.places[place_pb2.name].acquired
-            if acquired and acquired != OWNER:
-                self.dirty.add(place_pb2.name)
-            # Reserve right away instead of at the next poll.
+            name = place_pb2.name
+            place = self.session.places[name]
+            if place.acquired and place.acquired != OWNER:
+                self.dirty.add(name)
+                if place.tags.get("variant") in self.images:
+                    # Reserve inside the update itself: waiting for the next
+                    # tick would let a short claim end before the reservation
+                    # exists, and a queued session would get the dirty reader.
+                    try:
+                        await self._reserve(name)
+                    except grpc.aio.AioRpcError as error:
+                        log.warning("%s: could not reserve on claim: %s", name, error.details())
             self.wake.set()
 
         self.session.on_place_changed = on_place_changed
@@ -151,10 +162,17 @@ class Janitor:
                     messages.CancelReservationRequest(token=reservation.token), timeout=10)
 
     async def _reserve(self, name):
-        response = await self.session.stub.CreateReservation(messages.CreateReservationRequest(
-            filters={"main": messages.Reservation.Filter(filter={"name": name})},
-            prio=self.priority,
-        ), timeout=10)
+        # The update callback and tick() both reserve; never create two.
+        if name in self.reservations or name in self.reserving:
+            return
+        self.reserving.add(name)
+        try:
+            response = await self.session.stub.CreateReservation(messages.CreateReservationRequest(
+                filters={"main": messages.Reservation.Filter(filter={"name": name})},
+                prio=self.priority,
+            ), timeout=10)
+        finally:
+            self.reserving.discard(name)
         self.reservations[name] = [response.reservation.token, time.monotonic()]
         log.info("%s: reserved for parking after release", name)
 
