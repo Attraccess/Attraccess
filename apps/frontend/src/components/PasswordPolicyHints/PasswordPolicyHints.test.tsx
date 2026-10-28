@@ -3,15 +3,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { PublicPasswordPolicy } from '@attraccess/shared';
 import { PasswordPolicyHints } from './PasswordPolicyHints';
 import { generateStrongPassword } from './generatePassword';
-const state = vi.hoisted(() => ({ score: 0, seconds: 0 }));
+const state = vi.hoisted(() => ({ score: 0 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({
-    t: (key: string, params?: { value?: number }) => (params?.value === undefined ? key : `${key}:${params.value}`),
+    t: (key: string) => key,
   }),
 }));
 vi.mock('./useZxcvbn', () => ({
   useZxcvbn: () => ({
-    result: { score: state.score, crackTimes: { offlineSlowHashingXPerSecond: { seconds: state.seconds } } },
+    result: { score: state.score },
   }),
 }));
 const policy: PublicPasswordPolicy = {
@@ -26,7 +26,6 @@ const policy: PublicPasswordPolicy = {
 };
 beforeEach(() => {
   state.score = 0;
-  state.seconds = 0;
 });
 afterEach(() => {
   cleanup();
@@ -54,8 +53,27 @@ it('marks unsatisfied composition rules and shows server rejection reasons', () 
     'data-satisfied',
     'true',
   );
-  expect(screen.getByText('strength.minRequired')).toBeTruthy();
+  expect(view.container.querySelector('[data-cy="password-policy-rule-strength"]')).toHaveAttribute(
+    'data-satisfied',
+    'false',
+  );
   expect(screen.getByText('serverErrors.PASSWORD_REUSED')).toBeTruthy();
+});
+it('lists the requirements as pending, without a meter, before anything is typed', () => {
+  const view = render(<PasswordPolicyHints password="" username="Ada" email="ada@example.test" policy={policy} />);
+  const rules = view.container.querySelectorAll('[data-cy^="password-policy-rule-"]');
+  expect(Array.from(rules, (rule) => rule.getAttribute('data-cy'))).toEqual([
+    'password-policy-rule-length',
+    'password-policy-rule-uppercase',
+    'password-policy-rule-lowercase',
+    'password-policy-rule-digit',
+    'password-policy-rule-special',
+    'password-policy-rule-similarity',
+    'password-policy-rule-strength',
+    'password-policy-rule-ascii',
+  ]);
+  rules.forEach((rule) => expect(rule).toHaveAttribute('data-satisfied', 'false'));
+  expect(screen.queryByRole('meter')).toBeNull();
 });
 it('marks a strong password as satisfying the rules and omits disabled composition rules', () => {
   state.score = 4;
@@ -73,22 +91,42 @@ it('marks a strong password as satisfying the rules and omits disabled compositi
   );
   expect(view.container.querySelector('[data-cy="password-policy-rule-uppercase"]')).toBeNull();
   expect(view.container.querySelector('[data-cy="password-policy-rule-ascii"]')).toBeNull();
-  expect(screen.queryByText('strength.minRequired')).toBeNull();
+  expect(view.container.querySelector('[data-cy="password-policy-rule-strength"]')).toHaveAttribute(
+    'data-satisfied',
+    'true',
+  );
+});
+it('omits the strength rule when the policy sets no minimum score', () => {
+  const view = render(
+    <PasswordPolicyHints password="abc" username="" email="" policy={{ ...policy, minZxcvbnScore: 0 }} />,
+  );
+  expect(view.container.querySelector('[data-cy="password-policy-rule-strength"]')).toBeNull();
 });
 it.each([
-  [0, 'crack.instant'],
-  [30, 'crack.seconds:30'],
-  [120, 'crack.minutes:2'],
-  [7200, 'crack.hours:2'],
-  [172800, 'crack.days:2'],
-  [5184000, 'crack.months:2'],
-  [63072000, 'crack.years:2'],
-  [3153600000, 'crack.centuries'],
-  [Infinity, 'crack.centuries'],
-] as const)('formats the estimated crack duration %s', (seconds, text) => {
-  state.seconds = seconds;
-  render(<PasswordPolicyHints password="" username="" email="" policy={policy} />);
-  expect(screen.getByText(`strength.crackTime: ${text}`)).toBeTruthy();
+  [0, 'danger'],
+  [1, 'danger'],
+  [2, 'warning'],
+  [3, 'success'],
+  [4, 'success'],
+] as const)('shows strength score %s as a %s meter without crack-time details', (score, color) => {
+  state.score = score;
+  render(<PasswordPolicyHints password="Strong-Passphrase-42!" username="" email="" policy={policy} />);
+  const meter = screen.getByRole('meter', { name: 'strength.label' });
+  expect(meter).toHaveAttribute('data-score', String(score));
+  expect(meter).toHaveAttribute('aria-valuenow', String(score + 1));
+  expect(meter).toHaveAttribute('aria-valuetext', `strength.score.${score}`);
+  expect(meter.className).toContain(`meter--${color}`);
+  expect(screen.queryByText(/crack/i)).toBeNull();
+});
+it('keeps the meter off green while another rule still fails', () => {
+  state.score = 4;
+  render(<PasswordPolicyHints password="weak" username="" email="" policy={policy} />);
+  expect(screen.getByRole('meter').className).toContain('meter--warning');
+});
+it('does not show a short password as green when the policy sets no minimum score', () => {
+  state.score = 0;
+  render(<PasswordPolicyHints password="x" username="" email="" policy={{ ...policy, minZxcvbnScore: 0 }} />);
+  expect(screen.getByRole('meter').className).not.toContain('meter--success');
 });
 it('generates requested composition and length with a secure randomness source', () => {
   const password = generateStrongPassword({

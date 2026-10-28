@@ -142,7 +142,7 @@ export function PasswordField(props: PasswordFieldProps) {
         </Button>
       )}
 
-      {!hintsHidden && value.length > 0 && (
+      {!hintsHidden && (
         <PasswordPolicyHints
           password={value}
           username={username}

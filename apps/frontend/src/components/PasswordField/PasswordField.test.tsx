@@ -40,20 +40,16 @@ vi.mock('../PasswordPolicyHints', () => ({
 }));
 
 describe('PasswordField', () => {
-  it('only shows password strength hints after a password is entered', async () => {
-    const user = userEvent.setup();
-    const PasswordFieldHarness = () => {
-      const [password, setPassword] = useState('');
-      return <PasswordField value={password} onValueChange={setPassword} passwordLabel="New password" />;
-    };
-
-    render(<PasswordFieldHarness />);
-
-    expect(screen.queryByTestId('password-policy-hints')).not.toBeInTheDocument();
-
-    await user.type(screen.getByLabelText('New password'), 'password');
+  it('shows the password requirements before anything is typed', () => {
+    render(<PasswordField value="" onValueChange={vi.fn()} passwordLabel="New password" />);
 
     expect(screen.getByTestId('password-policy-hints')).toBeInTheDocument();
+  });
+
+  it('hides the password requirements when hints are disabled', () => {
+    render(<PasswordField value="secret" onValueChange={vi.fn()} hintsHidden />);
+
+    expect(screen.queryByTestId('password-policy-hints')).not.toBeInTheDocument();
   });
 });
 
