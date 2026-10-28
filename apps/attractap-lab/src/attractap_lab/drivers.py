@@ -1,4 +1,4 @@
-"""Only the missing labgrid operations: ESP flashing and screen snapshots.
+"""Only the missing labgrid operations: ESP flashing/eFuse reads and screen snapshots.
 
 Resources, USB discovery, SSH transport, locking and serial access use labgrid.
 """
@@ -25,6 +25,7 @@ from labgrid.util.proxy import proxymanager
 class ESPToolDriver(Driver, ResetProtocol):
     bindings = {"device": {"USBFlashableDevice", "NetworkUSBFlashableDevice"}}
     esptool = attr.ib(default="esptool", validator=attr.validators.instance_of(str))
+    espefuse = attr.ib(default="espefuse", validator=attr.validators.instance_of(str))
     baud = attr.ib(default=460800, validator=attr.validators.instance_of(int))
     timeout = attr.ib(default=180.0, converter=float)
 
@@ -36,6 +37,25 @@ class ESPToolDriver(Driver, ResetProtocol):
         Staging a fixed filename also avoids shell metacharacters in labgrid's
         remote cache paths when agents supply downloaded artifact filenames.
         """
+        self._write(image, ["write-flash", "0x0"])
+
+    @Driver.check_active
+    def erase_and_flash(self, image):
+        """Erase the whole chip (NVS included), then flash a merged image at zero."""
+        self._write(image, ["write-flash", "--erase-all", "0x0"])
+
+    @Driver.check_active
+    def reset(self):
+        """Reboot existing firmware without flashing; SerialDriver must be inactive."""
+        self._run([self.esptool, *self._connection(), "--after", "hard-reset", "--no-stub", "run"])
+
+    @Driver.check_active
+    def read_efuses(self):
+        """Return espefuse's raw dump and JSON summary from one connection."""
+        return self._run([self.espefuse, *self._connection(), "dump", "summary", "--format", "json"],
+                         capture=True)
+
+    def _write(self, image, arguments):
         if not self.device.devnode:
             raise RuntimeError("The flash resource has no serial device node")
         with tempfile.TemporaryDirectory(prefix="attractap-flash-") as directory:
@@ -43,28 +63,26 @@ class ESPToolDriver(Driver, ResetProtocol):
             shutil.copyfile(image, staged)
             managed = ManagedFile(str(staged), self.device, detect_nfs=False)
             managed.sync_to_resource()
-            self._run(["write-flash", "0x0", managed.get_remote_path()])
+            self._run([self.esptool, *self._connection(), "--after", "hard-reset",
+                       *arguments, managed.get_remote_path()])
 
-    @Driver.check_active
-    def reset(self):
-        """Reboot existing firmware without flashing; SerialDriver must be inactive."""
-        self._run(["--no-stub", "run"])
-
-    def _run(self, arguments):
+    def _connection(self):
         if not self.device.devnode:
             raise RuntimeError("The flash resource has no serial device node")
+        return ["--port", self.device.devnode, "--baud", str(self.baud)]
+
+    def _run(self, tool_command, *, capture=False):
         command = self.device.wrap_command([
-            "timeout", "--signal=TERM", "--kill-after=10s", str(self.timeout),
-            self.esptool, "--port", self.device.devnode,
-            "--baud", str(self.baud), "--after", "hard-reset",
-            *arguments,
+            "timeout", "--signal=TERM", "--kill-after=10s", str(self.timeout), *tool_command,
         ])
         if isinstance(self.device, NetworkResource):
             # A PTY makes SSH channel teardown deliver SIGHUP to the
             # foreground timeout/esptool group on cancellation as well.
             command.insert(1, "-tt")
-        subprocess.run(command, check=True, stdin=subprocess.DEVNULL,
-                       timeout=self.timeout + 20)
+        result = subprocess.run(command, check=True, stdin=subprocess.DEVNULL,
+                                capture_output=capture, timeout=self.timeout + 20)
+        # The PTY turns remote newlines into CRLF.
+        return result.stdout.decode(errors="replace").replace("\r\n", "\n") if capture else None
 
 
 @target_factory.reg_driver

@@ -16,11 +16,6 @@ dependencies:
   espressif/esp_lcd_st7701: "^2.0.0"
   espressif/esp_lcd_panel_io_additions: "^1.0.1"
 
-  # Qualia S3: XCA9554 IO expander (panel init SPI lines + backlight/reset).
-  # Touch (FocalTech protocol) is a small first-party reader on the shared
-  # i2c_master bus — see src/display/driver/qualia/.
-  espressif/esp_io_expander_tca9554: "^2.0.0"
-
   # Attractap Lite: WS2812 LED ring (RMT backend)
   espressif/led_strip: "^3.0.0"
 

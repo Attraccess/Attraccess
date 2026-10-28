@@ -1,0 +1,5 @@
+# Parking image overrides on top of ../sdkconfig.defaults: idle at the lowest
+# clock that keeps the PLL (and with it USB-Serial-JTAG) running.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80=y
+# CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240 is not set
+# CONFIG_SPIRAM is not set
