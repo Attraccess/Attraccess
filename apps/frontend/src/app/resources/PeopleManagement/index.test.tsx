@@ -75,6 +75,7 @@ vi.mock('./usePeopleMutations', () => ({
 }));
 vi.mock('./AddPersonDrawer', () => ({
   AddPersonDrawer: ({
+    target,
     isOpen,
     mode,
     comment,
@@ -85,6 +86,9 @@ vi.mock('./AddPersonDrawer', () => ({
     isOpen ? (
       <section aria-label="Add person">
         <span>{mode}</span>
+        <span>
+          for {target.type} {target.id}
+        </span>
         <input aria-label="Add comment" value={comment} onChange={(e) => onCommentChange(e.target.value)} />
         <button
           onClick={async () => {
@@ -113,16 +117,6 @@ vi.mock('./IntroductionCommentModal', () => ({
         <button onClick={onClose}>Cancel reason</button>
       </section>
     ) : null,
-}));
-vi.mock('./massIntroduction/MassIntroductionModal', () => ({
-  MassIntroductionModal: ({ target, onClose }: { target: { type: string; id: number }; onClose: () => void }) => (
-    <section aria-label="Mass introduction dialog">
-      <span>
-        Mass introduction for {target.type} {target.id}
-      </span>
-      <button onClick={onClose}>Close mass introduction</button>
-    </section>
-  ),
 }));
 vi.mock('./HistoryModalLoader', () => ({
   HistoryModalLoader: ({ userId, isOpen, onClose }: ComponentProps<typeof HistoryModalLoader>) =>
@@ -372,17 +366,13 @@ it('keeps inherited access and navigation visible after direct revocation', () =
   }
 });
 
-it.each([false, true])('opens and closes the mass introduction for introducers (hideHeader=%s)', (hideHeader) => {
+it.each([false, true])('offers individual and mass introductions behind one button (hideHeader=%s)', (hideHeader) => {
   mount({ target: { type: 'group', id: 3 }, hideHeader, canManageIntroducers: false, canManageIntroductions: true });
 
-  fireEvent.click(screen.getByRole('button', { name: 'Mass introduction' }));
-  expect(screen.getByText('Mass introduction for group 3')).toBeTruthy();
-
-  fireEvent.click(screen.getByText('Close mass introduction'));
-  expect(screen.queryByText('Mass introduction for group 3')).toBeNull();
-});
-
-it('hides the mass introduction from people who cannot grant introductions', () => {
-  mount({ canManageIntroducers: true, canManageIntroductions: false });
   expect(screen.queryByRole('button', { name: 'Mass introduction' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Grant introduction' }));
+
+  const drawer = screen.getByRole('region', { name: 'Add person' });
+  expect(drawer.textContent).toContain('introduction');
+  expect(drawer.textContent).toContain('for group 3');
 });

@@ -8,8 +8,7 @@
   "addOptions": {
     "introducer": "Als Einweiser ernennen",
     "maintainer": "Als Wartenden ernennen",
-    "introduction": "Einweisung gewähren",
-    "massIntroduction": "Sammeleinweisung"
+    "introduction": "Einweisung gewähren"
   },
   "filters": {
     "all": "Alle",
@@ -49,7 +48,11 @@
     "userLabel": "Benutzer",
     "commentLabel": "Kommentar (optional)",
     "submit": "Bestätigen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "tabs": {
+      "individual": "Einzeln",
+      "mass": "Sammeleinweisung (QR-Code)"
+    }
   },
   "commentModal": {
     "title": "Kommentar hinzufügen",

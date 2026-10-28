@@ -1,4 +1,4 @@
-import { AwardIcon, QrCodeIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
+import { AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { PageAction, PageHeader } from '../../../components/pageHeader';
 import { AddMode, PeopleTarget } from './types';
@@ -9,11 +9,10 @@ interface PeopleHeaderProps {
   canManageIntroducers: boolean;
   canManageIntroductions: boolean;
   onAdd: (mode: AddMode) => void;
-  onMassIntroduction: () => void;
 }
 
 export function PeopleHeader(props: Readonly<PeopleHeaderProps>) {
-  const { t, targetType, canManageIntroducers, canManageIntroductions, onAdd, onMassIntroduction } = props;
+  const { t, targetType, canManageIntroducers, canManageIntroductions, onAdd } = props;
   const subtitle = t(`subtitle.${targetType}`);
 
   const canAdd = canManageIntroducers || canManageIntroductions;
@@ -31,14 +30,6 @@ export function PeopleHeader(props: Readonly<PeopleHeaderProps>) {
       variant: 'primary',
       onPress: () => onAdd('introduction'),
       dataCy: 'people-add-introduction',
-    });
-    actions.push({
-      key: 'mass-introduction',
-      label: t('addOptions.massIntroduction'),
-      icon: <QrCodeIcon className="w-4 h-4" />,
-      variant: 'primary',
-      onPress: onMassIntroduction,
-      dataCy: 'people-mass-introduction',
     });
   }
 

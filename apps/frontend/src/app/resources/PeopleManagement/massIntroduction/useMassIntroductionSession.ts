@@ -1,4 +1,4 @@
-// State machine for one introducer-side mass-introduction dialog
+// State machine for the mass-introduction tab of the grant-introduction drawer
 // FEATURE: ATT-1151 Mass introduction
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -24,6 +24,8 @@ export function secondsUntil(timestamp: string): number {
   return Math.max(0, Math.ceil((new Date(timestamp).getTime() - Date.now()) / 1000));
 }
 
+export type MassIntroductionSessionState = ReturnType<typeof useMassIntroductionSession>;
+
 export function useMassIntroductionSession(target: PeopleTarget) {
   const invalidateIntroductions = useInvalidatePeopleIntroductions(target);
   const [session, setSession] = useState<MassIntroductionSessionDto | null>(null);
@@ -31,7 +33,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
   const [startError, setStartError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
 
-  // The id of the session that is still running server-side, as far as this dialog knows.
+  // The id of the session that is still running server-side, as far as this drawer knows.
   const activeSessionIdRef = useRef<string | null>(null);
   const sessionRef = useRef<MassIntroductionSessionDto | null>(null);
 
@@ -101,7 +103,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     setStartError(null);
   }, [cancel]);
 
-  // Closing the page or navigating away must not leave a QR code (and reader) running.
+  // Closing the drawer or navigating away must not leave a QR code (and reader) running.
   useEffect(() => {
     return () => {
       const sessionId = activeSessionIdRef.current;
@@ -155,7 +157,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     );
   }, [applySession, markEnded]);
 
-  // Subscribed for the whole dialog lifetime so no event right after starting is missed.
+  // Subscribed for as long as the drawer is open, so no event right after starting is missed.
   useLiveUpdates({ topic: 'mass-introduction', onUpdate: handleLiveEvent, onReconnect: resync });
 
   return {

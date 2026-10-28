@@ -1,7 +1,5 @@
 {
-  "title": "Mass introduction",
   "subtitle": {
-    "setup": "Introduce many people at once with a temporary QR code",
     "active": "Introducing people to {{{name}}}"
   },
   "setup": {

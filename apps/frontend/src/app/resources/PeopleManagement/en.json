@@ -8,8 +8,7 @@
   "addOptions": {
     "introducer": "Appoint as introducer",
     "maintainer": "Appoint as maintainer",
-    "introduction": "Grant introduction",
-    "massIntroduction": "Mass introduction"
+    "introduction": "Grant introduction"
   },
   "filters": {
     "all": "All",
@@ -49,7 +48,11 @@
     "userLabel": "User",
     "commentLabel": "Comment (optional)",
     "submit": "Confirm",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "tabs": {
+      "individual": "Individual",
+      "mass": "Mass introduction (QR code)"
+    }
   },
   "commentModal": {
     "title": "Add comment",

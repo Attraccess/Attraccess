@@ -1,7 +1,5 @@
 {
-  "title": "Sammeleinweisung",
   "subtitle": {
-    "setup": "Viele Personen gleichzeitig über einen befristeten QR-Code einweisen",
     "active": "Einweisung für {{{name}}}"
   },
   "setup": {

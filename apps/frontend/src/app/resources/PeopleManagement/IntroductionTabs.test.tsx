@@ -8,8 +8,9 @@ import {
   type MassIntroductionLiveEventDto,
   type MassIntroductionSessionDto,
 } from '@attraccess/react-query-client';
-import { MassIntroductionModal } from './MassIntroductionModal';
-import { PeopleTarget } from '../types';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { AddPersonDrawer } from './AddPersonDrawer';
+import { PeopleTarget } from './types';
 
 const state = vi.hoisted(() => ({
   start: vi.fn(),
@@ -42,13 +43,13 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useAccessControlServiceMassIntroductionCancel: () => ({ mutate: state.cancel }),
   AccessControlService: { massIntroductionGet: (data: unknown) => state.get(data) },
 }));
-vi.mock('../usePeopleMutations', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
-vi.mock('../../../../utils/live-updates', () => ({
+vi.mock('./usePeopleMutations', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
+vi.mock('../../../utils/live-updates', () => ({
   useLiveUpdates: (props: NonNullable<typeof state.live>) => {
     state.live = props;
   },
 }));
-vi.mock('../../../attractap/AttractapSelect', () => ({
+vi.mock('../../attractap/AttractapSelect', () => ({
   AttractapSelect: ({
     onSelectionChange,
     requiredCapabilities,
@@ -59,6 +60,11 @@ vi.mock('../../../attractap/AttractapSelect', () => ({
     state.readerCapabilities = requiredCapabilities;
     return <button onClick={() => onSelectionChange(4)}>Pick reader 4</button>;
   },
+}));
+// The individual tab's user picker is covered by AddPersonDrawer.test.tsx.
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  UserSearch: () => <p>User picker</p>,
 }));
 vi.mock('react-qrcode-logo', () => ({ QRCode: ({ value }: { value: string }) => <output>{value}</output> }));
 
@@ -86,10 +92,31 @@ const participant = (userId: number, username: string, extra: object = {}) =>
     ...extra,
   }) as MassIntroductionSessionDto['participants'][number];
 
-function mount(target: PeopleTarget = { type: 'resource', id: 7 }) {
+const t = ((key: string) => key) as TFunction;
+
+function renderDrawer(target: PeopleTarget = { type: 'resource', id: 7 }) {
   const onClose = vi.fn();
-  const view = render(<MassIntroductionModal target={target} onClose={onClose} />);
+  const view = render(
+    <AddPersonDrawer
+      t={t}
+      target={target}
+      isOpen
+      mode="introduction"
+      comment=""
+      isPending={false}
+      onCommentChange={vi.fn()}
+      onAdd={vi.fn()}
+      onClose={onClose}
+    />,
+  );
   return { onClose, ...view };
+}
+
+/** Opens the drawer on its mass-introduction tab. */
+function mount(target?: PeopleTarget) {
+  const view = renderDrawer(target);
+  fireEvent.click(screen.getByRole('tab', { name: 'addModal.tabs.mass' }));
+  return view;
 }
 
 function startSession(session = makeSession()) {
@@ -109,7 +136,27 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('MassIntroductionModal', () => {
+describe('grant-introduction drawer', () => {
+  it('opens on the individual tab and offers the mass introduction as a second tab', () => {
+    renderDrawer();
+
+    expect(screen.getByRole('tab', { name: 'addModal.tabs.individual' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('User picker')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'addModal.submit' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'addModal.tabs.mass' }));
+
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'addModal.submit' })).toBeNull();
+  });
+
+  it('locks the individual tab while a QR code is running', () => {
+    mount();
+    startSession();
+
+    expect(screen.getByRole('tab', { name: 'addModal.tabs.individual' })).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('starts without a reader and shows a QR code for the landing page', () => {
     mount();
     expect(state.live?.topic).toBe('mass-introduction');
@@ -223,7 +270,7 @@ describe('MassIntroductionModal', () => {
     expect(state.cancel).not.toHaveBeenCalled();
   });
 
-  it('cancels a running session when the introducer ends it', () => {
+  it('ends a running session and keeps its summary open until closed', () => {
     const { onClose } = mount();
     startSession();
 
@@ -231,7 +278,13 @@ describe('MassIntroductionModal', () => {
 
     expect(state.cancel).toHaveBeenCalledTimes(1);
     expect(state.cancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    expect(screen.getByText('The mass introduction was ended. The QR code no longer works.')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'addModal.tabs.individual' })).not.toHaveAttribute('aria-disabled');
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
+    expect(state.cancel).toHaveBeenCalledTimes(1);
   });
 
   it('cancels a running session on unmount, but not one that never started', () => {
