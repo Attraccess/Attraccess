@@ -1,6 +1,7 @@
 #pragma once
 class ResourceDetailsScreen;
 #include <cstdint>
+#include <string>
 #include "../../../api/api.hpp"
 
 struct ResourceDetailsProjectState
@@ -29,4 +30,14 @@ protected:
     lv_obj_t *projectsPaginationLabel = nullptr;
     lv_obj_t *projectsPrevButton = nullptr;
     lv_obj_t *projectsNextButton = nullptr;
+    // Committed name filter; pagination stays within its results.
+    std::string projectsSearchQuery;
+    // Results for any other page or query are stale while a request is pending.
+    bool projectsRequestPending = false;
+    uint32_t projectsPendingPage = 0;
+    lv_obj_t *projectsSearchLabel = nullptr;
+    lv_obj_t *projectsSearchClearButton = nullptr;
+    lv_obj_t *projectsSearchEditor = nullptr;
+    lv_obj_t *projectsSearchTextarea = nullptr;
+    lv_obj_t *projectsSearchKeyboard = nullptr;
 };

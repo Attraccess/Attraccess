@@ -19,22 +19,35 @@ void ResourceDetailsScreen::disposeProjectsModal()
    this->projectsPaginationLabel = nullptr;
    this->projectsPrevButton = nullptr;
    this->projectsNextButton = nullptr;
+   this->projectsSearchLabel = nullptr;
+   this->projectsSearchClearButton = nullptr;
+   this->projectsSearchEditor = nullptr;
+   this->projectsSearchTextarea = nullptr;
+   this->projectsSearchKeyboard = nullptr;
 }
 void ResourceDetailsScreen::setProjects(const API::ProjectsOfUserResponse &projects)
 {
+   if (this->projectsRequestPending &&
+       (projects.page != this->projectsPendingPage || projects.search != this->projectsSearchQuery))
+   {
+      return;
+   }
+   this->projectsRequestPending = false;
    this->projectsCache = projects;
    this->projectsCurrentPage = projects.page;
    this->projectsTotalCount = projects.total;
    this->projectsPageLimit = projects.limit;
    this->projectsHasMore = projects.hasMore;
+   this->projectsSearchQuery = projects.search;
    this->projectsDataInitialized = true;
+   this->refreshProjectsSearchField();
    if (this->projectsModal && !lv_obj_has_flag(this->projectsModal, LV_OBJ_FLAG_HIDDEN))
    {
       this->rebuildProjectsList();
    }
    this->refreshProjectsButtonLabel();
 }
-void ResourceDetailsScreen::setProjectsPageRequestCallback(std::function<void(uint32_t)> callback)
+void ResourceDetailsScreen::setProjectsPageRequestCallback(std::function<bool(uint32_t, const std::string &)> callback)
 {
    this->projectsPageRequestCallback = callback;
 }
@@ -128,7 +141,8 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_remove_style_all(panel);
    lv_obj_set_width(panel, lv_pct(90));
    lv_obj_set_style_max_width(panel, 400, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_min_height(panel, 370, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Fits header, search row, four projects and pagination on the 480 px display.
+   lv_obj_set_style_min_height(panel, 422, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::applySurface(panel);
    lv_obj_set_style_pad_left(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -143,7 +157,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_height(header, LV_SIZE_CONTENT);
    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_margin_bottom(header, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_margin_bottom(header, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *title = lv_label_create(header);
    FirmwareI18n::setLabel(title, FirmwareI18n::Message::SelectProject);
@@ -158,6 +172,8 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_t *closeLabel = lv_label_create(closeButton);
    FirmwareI18n::setLabel(closeLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE) /* i18n-data: Language-neutral LVGL icon glyph. */);
    lv_obj_center(closeLabel);
+
+   this->createProjectsSearchRow(panel);
 
    this->projectsListContainer = lv_obj_create(panel);
    lv_obj_remove_style_all(this->projectsListContainer);
@@ -204,18 +220,20 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_t *nextLabel = lv_label_create(this->projectsNextButton);
    FirmwareI18n::setLabel(nextLabel, FirmwareI18n::Message::Next);
    lv_obj_set_style_text_align(nextLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+   this->refreshProjectsSearchField();
 }
 void ResourceDetailsScreen::showProjectsModal()
 {
    this->ensureProjectsModal();
-   if (!this->projectsDataInitialized)
+   if (this->projectsRequestPending)
    {
-      this->showProjectsLoading();
-      if (this->projectsPageRequestCallback)
-      {
-         uint32_t page = this->projectsCurrentPage == 0 ? 1 : this->projectsCurrentPage;
-         this->projectsPageRequestCallback(page);
-      }
+      // The awaited reply may have been lost while the dialog was closed.
+      this->requestProjects(this->projectsPendingPage);
+   }
+   else if (!this->projectsDataInitialized)
+   {
+      this->requestProjects(this->projectsCurrentPage == 0 ? 1 : this->projectsCurrentPage);
    }
    else
    {
@@ -232,6 +250,7 @@ void ResourceDetailsScreen::hideProjectsModal()
    {
       return;
    }
+   this->closeProjectsSearchEditor(false);
    lv_obj_add_flag(this->projectsModal, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -309,11 +328,7 @@ void ResourceDetailsScreen::onProjectsPrevPage(lv_event_t *e)
       return;
    }
 
-   if (self->projectsPageRequestCallback)
-   {
-      self->showProjectsLoading();
-      self->projectsPageRequestCallback(self->projectsCurrentPage - 1);
-   }
+   self->requestProjects(self->projectsCurrentPage - 1);
 }
 void ResourceDetailsScreen::onProjectsNextPage(lv_event_t *e)
 {
@@ -328,11 +343,7 @@ void ResourceDetailsScreen::onProjectsNextPage(lv_event_t *e)
       return;
    }
 
-   if (self->projectsPageRequestCallback)
-   {
-      self->showProjectsLoading();
-      self->projectsPageRequestCallback(self->projectsCurrentPage + 1);
-   }
+   self->requestProjects(self->projectsCurrentPage + 1);
 }
 
 void ResourceDetailsScreen::showProjectsLoading()
@@ -365,13 +376,23 @@ void ResourceDetailsScreen::rebuildProjectsList()
    {
       return;
    }
+   if (this->projectsRequestPending)
+   {
+      this->showProjectsLoading();
+      return;
+   }
 
    lv_obj_clean(this->projectsListContainer);
 
    if (this->projectsCache.count == 0)
    {
       lv_obj_t *emptyLabel = lv_label_create(this->projectsListContainer);
-      FirmwareI18n::setLabel(emptyLabel, this->projectsDataInitialized ? FirmwareI18n::Message::NoProjectsAvailable : FirmwareI18n::Message::LoadingProjects);
+      const auto emptyMessage = !this->projectsDataInitialized ? FirmwareI18n::Message::LoadingProjects
+         : this->projectsSearchQuery.empty() ? FirmwareI18n::Message::NoProjectsAvailable
+                                             : FirmwareI18n::Message::NoMatchingProjects;
+      FirmwareI18n::setLabel(emptyLabel, emptyMessage);
+      lv_label_set_long_mode(emptyLabel, LV_LABEL_LONG_WRAP);
+      lv_obj_set_width(emptyLabel, lv_pct(100));
       lv_obj_set_style_text_font(emptyLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
       lv_obj_set_style_text_color(emptyLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
       this->updateProjectsPaginationControls();

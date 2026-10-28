@@ -1,0 +1,210 @@
+diff --git a/coordinator/web/src/components/CameraView.tsx b/coordinator/web/src/components/CameraView.tsx
+new file mode 100644
+index 0000000..2e472cf
+--- /dev/null
++++ b/coordinator/web/src/components/CameraView.tsx
+@@ -0,0 +1,54 @@
++import { useEffect, useRef, useState } from "react";
++import { Box, Button, HStack, Image, Text } from "@chakra-ui/react";
++
++interface Props {
++  place: string;
++  resource: string;
++}
++
++/** Live MJPEG view of a place's camera; connects only while shown. */
++export default function CameraView({ place, resource }: Props) {
++  const [shown, setShown] = useState(false);
++  const [failed, setFailed] = useState(false);
++  const image = useRef<HTMLImageElement>(null);
++  const src = `/api/places/${encodeURIComponent(place)}/cameras/${encodeURIComponent(resource)}`;
++
++  // Browsers may keep a detached MJPEG image downloading; drop it explicitly.
++  useEffect(() => {
++    const element = image.current;
++    return () => {
++      if (element) element.src = "";
++    };
++  }, [shown, failed]);
++
++  const toggle = () => {
++    setFailed(false);
++    setShown((s) => !s);
++  };
++
++  return (
++    <Box mb={4}>
++      <HStack mb={2}>
++        <Text fontSize="sm">{resource}</Text>
++        <Button ml="auto" size="xs" onClick={toggle}>
++          {shown ? "Hide live view" : "Show live view"}
++        </Button>
++      </HStack>
++      {shown && (failed ? (
++        <Text color="text.secondary" fontSize="sm">
++          Camera unavailable. Hide and show the live view to retry.
++        </Text>
++      ) : (
++        <Image
++          ref={image}
++          src={src}
++          alt={`Live view of ${place}`}
++          maxW="360px"
++          w="full"
++          borderRadius="md"
++          onError={() => setFailed(true)}
++        />
++      ))}
++    </Box>
++  );
++}
+diff --git a/coordinator/web/src/components/__tests__/CameraView.test.tsx b/coordinator/web/src/components/__tests__/CameraView.test.tsx
+new file mode 100644
+index 0000000..39b47dd
+--- /dev/null
++++ b/coordinator/web/src/components/__tests__/CameraView.test.tsx
+@@ -0,0 +1,34 @@
++import { describe, it, expect } from "vitest";
++import { render, screen, fireEvent } from "@testing-library/react";
++import { ChakraProvider } from "@chakra-ui/react";
++import CameraView from "../CameraView";
++
++describe("CameraView", () => {
++  it("connects to the camera only while shown", () => {
++    render(
++      <ChakraProvider>
++        <CameraView place="reader 1" resource="HTTPVideoStream" />
++      </ChakraProvider>
++    );
++    expect(screen.queryByRole("img")).toBeNull();
++
++    fireEvent.click(screen.getByRole("button", { name: "Show live view" }));
++    expect(screen.getByRole("img").getAttribute("src")).toBe(
++      "/api/places/reader%201/cameras/HTTPVideoStream"
++    );
++
++    fireEvent.click(screen.getByRole("button", { name: "Hide live view" }));
++    expect(screen.queryByRole("img")).toBeNull();
++  });
++
++  it("offers a retry when the camera fails", () => {
++    render(
++      <ChakraProvider>
++        <CameraView place="reader-1" resource="HTTPVideoStream" />
++      </ChakraProvider>
++    );
++    fireEvent.click(screen.getByRole("button", { name: "Show live view" }));
++    fireEvent.error(screen.getByRole("img"));
++    expect(screen.getByText(/Camera unavailable/)).toBeTruthy();
++  });
++});
+diff --git a/coordinator/web/src/pages/PlaceDetail.tsx b/coordinator/web/src/pages/PlaceDetail.tsx
+index 1035450..f77c890 100644
+--- a/coordinator/web/src/pages/PlaceDetail.tsx
++++ b/coordinator/web/src/pages/PlaceDetail.tsx
+@@ -15,6 +15,7 @@ import { isPowerResource } from "../api/power";
+ import { isSDMuxResource } from "../api/sdmux";
+ import PowerControls from "../components/PowerControls";
+ import SDMuxControls from "../components/SDMuxControls";
++import CameraView from "../components/CameraView";
+ import DownloadEnvModal from "../components/DownloadEnvModal";
+ import RelatedPanel from "../components/RelatedPanel";
+ import Term from "../components/Term";
+@@ -176,6 +177,11 @@ export default function PlaceDetail() {
+     [allResources, place]
+   );
+ 
++  const cameras = useMemo(
++    () => placeResources.filter((r) => r.cls === "HTTPVideoStream"),
++    [placeResources],
++  );
++
+   const resourceClasses = useMemo(
+     () => new Set(placeResources.map((r) => r.cls)),
+     [placeResources],
+@@ -232,6 +238,18 @@ export default function PlaceDetail() {
+ 
+         {place.comment && <Text mb={4} color="text.secondary">{place.comment}</Text>}
+ 
++        {cameras.length > 0 && (
++          <>
++            <Heading size="sm" mb={2}>Camera</Heading>
++            {user ? (
++              // Keyed by place too: navigating between places must not carry an open view.
++              cameras.map((r) => <CameraView key={`${name}/${r.name}`} place={name} resource={r.name} />)
++            ) : (
++              <Text color="text.secondary" fontSize="sm" mb={4}>Sign in to watch the camera.</Text>
++            )}
++          </>
++        )}
++
+         <HStack mb={2}>
+           <Heading size="sm">Tags</Heading>
+           {canEdit && (
+diff --git a/coordinator/web/src/pages/__tests__/PlaceDetailCamera.test.tsx b/coordinator/web/src/pages/__tests__/PlaceDetailCamera.test.tsx
+new file mode 100644
+index 0000000..e7cfe0e
+--- /dev/null
++++ b/coordinator/web/src/pages/__tests__/PlaceDetailCamera.test.tsx
+@@ -0,0 +1,61 @@
++import { describe, it, expect, vi } from "vitest";
++import { render, screen, fireEvent } from "@testing-library/react";
++import { MemoryRouter, Routes, Route, Link } from "react-router-dom";
++import { ChakraProvider } from "@chakra-ui/react";
++import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
++import PlaceDetail from "../PlaceDetail";
++
++// vi.mock is hoisted above imports; its fixtures must be too.
++const { place, camera } = vi.hoisted(() => {
++  const place = (name: string) => ({
++    name, aliases: [], comment: "", tags: {},
++    matches: [{ exporter: "lab", group: name, cls: "*" }],
++    acquired: null, acquired_resources: [], allowed: [], created: 0, changed: 0,
++    reservation: null, acquired_username: null,
++  });
++  const camera = (group: string) => ({
++    exporter: "lab", group, cls: "HTTPVideoStream", name: "HTTPVideoStream",
++    params: { url: `http://127.0.0.1:8082/${group}/snapshot` }, acquired: null, avail: true,
++  });
++  return { place, camera };
++});
++
++vi.mock("../../api/client", () => ({
++  api: {
++    getPlace: vi.fn((name: string) => Promise.resolve(place(name))),
++    getResources: vi.fn().mockResolvedValue([camera("reader-1"), camera("reader-2")]),
++  },
++}));
++vi.mock("../../auth/AuthContext", () => ({
++  useAuth: () => ({ user: { username: "alice", role: "user" }, loading: false }),
++}));
++
++describe("PlaceDetail camera", () => {
++  it("does not carry an open live view to another place", async () => {
++    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
++    // A previously visited place renders at once, reusing the mounted page.
++    qc.setQueryData(["place", "reader-2"], place("reader-2"));
++    render(
++      <ChakraProvider>
++        <QueryClientProvider client={qc}>
++          <MemoryRouter initialEntries={["/places/reader-1"]}>
++            <Link to="/places/reader-2">next place</Link>
++            <Routes>
++              <Route path="/places/:name" element={<PlaceDetail />} />
++            </Routes>
++          </MemoryRouter>
++        </QueryClientProvider>
++      </ChakraProvider>
++    );
++
++    fireEvent.click(await screen.findByRole("button", { name: "Show live view" }));
++    expect(screen.getByRole("img").getAttribute("src")).toBe(
++      "/api/places/reader-1/cameras/HTTPVideoStream"
++    );
++
++    fireEvent.click(screen.getByText("next place"));
++    expect(await screen.findByRole("heading", { name: "reader-2" })).toBeTruthy();
++    expect(screen.getByRole("button", { name: "Show live view" })).toBeTruthy();
++    expect(screen.queryByRole("img")).toBeNull();
++  });
++});

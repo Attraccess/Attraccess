@@ -20,9 +20,6 @@
 #if defined(DISPLAY_DRIVER_GT911)
 #include "driver/gt911/rgb_gt911_driver.hpp"
 #endif
-#if defined(DISPLAY_DRIVER_QUALIA)
-#include "driver/qualia/qualia_ft_cst_driver.hpp"
-#endif
 
 // display.cpp is the composition root: it owns the shared static state, brings
 // up the driver + LVGL, and drives the main loop. The behaviour-bearing
@@ -160,9 +157,6 @@ uint32_t Display::tick_cb()
 #if defined(DISPLAY_DRIVER_GT911)
 #include "driver/gt911/rgb_gt911_driver.hpp"
 #endif
-#if defined(DISPLAY_DRIVER_QUALIA)
-#include "driver/qualia/qualia_ft_cst_driver.hpp"
-#endif
 
 void Display::renderTask(void *parameter)
 {
@@ -251,9 +245,6 @@ void Display::loop()
 #if defined(DISPLAY_DRIVER_GT911)
 #include "driver/gt911/rgb_gt911_driver.hpp"
 #endif
-#if defined(DISPLAY_DRIVER_QUALIA)
-#include "driver/qualia/qualia_ft_cst_driver.hpp"
-#endif
 
 #ifdef ATTRACTAP_HOST
 void Display::setup(IDisplayDriver &hostDriver)
@@ -298,8 +289,6 @@ void Display::setup()
 #else
     Display::driver = new RgbGt911Driver(Display::logger);
 #endif
-#elif defined(DISPLAY_DRIVER_QUALIA)
-    Display::driver = new QualiaFtCstDriver(Display::logger);
 #else
     Display::driver = nullptr;
 #endif
@@ -370,9 +359,6 @@ void Display::setup()
 
 #if defined(DISPLAY_DRIVER_GT911)
 #include "driver/gt911/rgb_gt911_driver.hpp"
-#endif
-#if defined(DISPLAY_DRIVER_QUALIA)
-#include "driver/qualia/qualia_ft_cst_driver.hpp"
 #endif
 
 void Display::setupFramebuffer()

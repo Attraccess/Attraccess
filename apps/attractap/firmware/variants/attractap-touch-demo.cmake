@@ -33,5 +33,3 @@ set(ATTRACTAP_DEFINES
     DISPLAY_DRIVER_GT911=1
     HAS_IO_EXPANDER=1
 )
-
-set(ATTRACTAP_EXCLUDE_REGEX "src/display/driver/qualia/")

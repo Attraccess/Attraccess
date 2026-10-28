@@ -12,6 +12,7 @@
           lock.matches = [ ];
           reader-a = { matches = [ "smoke/reader-a/*" ]; tags.board = "attractap"; };
           reader-b.matches = [ "smoke/reader-b/*" ];
+          parking = { matches = [ "smoke/parking/*" ]; tags.variant = "parking-test"; };
         };
       };
       exporter = {
@@ -21,11 +22,20 @@
         # Missing USB devices should remain unavailable without crashing exporter.
         settings = {
           reader-a.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-A"; };
+          reader-a.HTTPVideoStream.url = "http://127.0.0.1:8080/snapshot";
           reader-b.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-B"; };
+          parking.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-P"; };
+          parking.USBFlashableDevice.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-P"; };
         };
       };
       cameras.overview = { device = "/dev/video-not-connected"; port = 8080; };
       dashboard.enable = true;
+      # The absent reader cannot be parked, so the janitor must quarantine it.
+      janitor = {
+        enable = true;
+        images.parking-test = pkgs.writeText "parking-test.bin" "not firmware";
+        attempts = 1;
+      };
     };
     # Start the lab explicitly so a failed initial activation cannot hide behind
     # systemd's automatic retries. Delay the process itself, after Type=simple
@@ -41,6 +51,7 @@
       attractap-lab-places.wantedBy = lib.mkForce [ ];
       attractap-lab-exporter.wantedBy = lib.mkForce [ ];
       attractap-lab-dashboard.wantedBy = lib.mkForce [ ];
+      attractap-lab-janitor.wantedBy = lib.mkForce [ ];
     };
     environment.etc."dashboard-test.py".source = ./dashboard.py;
     environment.systemPackages = [
@@ -63,7 +74,20 @@
     machine.succeed("labgrid-client -p lock acquire")
     machine.fail("env LG_USERNAME=competing-client labgrid-client -p lock acquire")
     machine.succeed("labgrid-client -p lock release")
-    machine.succeed("su -s /bin/sh labgrid -c 'command -v esptool; command -v ffmpeg; test -w /var/lib/labgrid'")
+    machine.succeed("su -s /bin/sh labgrid -c 'command -v esptool; command -v espefuse; command -v ffmpeg; test -w /var/lib/labgrid'")
+    machine.succeed("systemctl start attractap-lab-janitor.service")
+    machine.wait_for_unit("attractap-lab-janitor.service")
+    # The janitor key reaches this host's own exporter account over SSH.
+    machine.wait_until_succeeds("su -s /bin/sh labgrid -c 'ssh -o BatchMode=yes machine true'")
+    machine.fail("su -s /bin/sh labgrid -c 'ssh -o BatchMode=yes root@machine true'")
+    machine.wait_until_succeeds("test -e /var/lib/attractap-lab-janitor/quarantine/parking.json", timeout=180)
+    machine.succeed("labgrid-client -p parking show | grep 'acquired: attractap-lab-janitor/janitor'")
+    machine.fail("labgrid-client -p parking acquire")
+    machine.succeed("attractap-lab-janitor status | grep parking")
+    # Places without a parking image are left alone.
+    machine.succeed("labgrid-client -p reader-a acquire")
+    machine.succeed("labgrid-client -p reader-a release")
+    machine.fail("labgrid-client -p reader-a show | grep 'acquired: attractap-lab-janitor'")
     machine.succeed("systemctl start attractap-lab-dashboard.service")
     machine.wait_for_unit("nginx.service")
     machine.succeed("python /etc/dashboard-test.py")

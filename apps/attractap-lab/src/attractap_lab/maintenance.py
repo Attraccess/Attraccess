@@ -12,6 +12,8 @@ import uuid
 from labgrid.remote.client import start_session
 from labgrid.remote.generated import labgrid_coordinator_pb2 as messages
 
+from .janitor import is_quarantine_hold
+
 
 def connect(address):
     loop = asyncio.new_event_loop()
@@ -80,10 +82,14 @@ def main(argv=None):
 
     previous = signal.signal(signal.SIGTERM, interrupted)
     try:
-        busy = [place.name for place in session.places.values() if place.acquired]
+        # Readers the janitor holds in quarantine are out of service, not busy;
+        # allocated reservations (including the janitor's) are about to be.
+        held = {name for name, place in session.places.items() if is_quarantine_hold(place)}
+        busy = [place.name for place in session.places.values()
+                if place.name not in held and (place.acquired or place.reservation)]
         if busy:
             raise RuntimeError(f"Lab is busy; maintenance deferred: {', '.join(busy)}")
-        for place in sorted(session.places):
+        for place in sorted(set(session.places) - held):
             # Record before the RPC so a lost success response also gets cleaned up.
             attempted.append(place)
             session.loop.run_until_complete(

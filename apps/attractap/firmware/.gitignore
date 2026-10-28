@@ -4,6 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 firmware_output/*
+firmware_output_lab/
 /data/
 # Generated certificate files
 src/certs/

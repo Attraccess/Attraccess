@@ -1,0 +1,256 @@
+"""Janitor parking against a real coordinator; eFuse policy and park() offline.
+
+The park child is replaced by a script, so these tests cover reservation
+priority, claims, retries and quarantine without hardware or an exporter.
+"""
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import textwrap
+import time
+
+import pytest
+
+from attractap_lab import efuse
+from attractap_lab.janitor import OWNER
+from attractap_lab.workflow import park
+from test_lab_workflow import eventually, executable, free_port, running
+
+
+def espefuse_output(overrides=None, block0="00000000 00000000", mac="7c:df:a1:00:11:22 (OK)"):
+    summary = {name: {"value": value} for name, value in efuse.FACTORY_VALUES.items()}
+    summary["MAC"] = {"value": mac}
+    for name, value in (overrides or {}).items():
+        summary[name] = {"value": value}
+    return (
+        "espefuse v5.2.0\r\nConnecting....\n\n=== Run \"dump\" command ===\n"
+        f"BLOCK0          (                ) [0 ] dump: {block0}\n"
+        "BLOCK_KEY0      (BLOCK4          ) [4 ] dump: 00000000 00000000\n"
+        "\n=== Run \"summary\" command ===\n"
+        f"{json.dumps(summary, indent=4)}\n"
+    )
+
+
+def test_efuse_baseline_detects_later_burns(tmp_path):
+    assert efuse.check(espefuse_output(), tmp_path) == "7c:df:a1:00:11:22"
+    assert efuse.check(espefuse_output(), tmp_path) == "7c:df:a1:00:11:22"
+    # SPI_BOOT_CRYPT_CNT 0 -> 3 still reads "Disable"; the raw block changes.
+    with pytest.raises(efuse.EfuseViolation, match="BLOCK0"):
+        efuse.check(espefuse_output(block0="00000000 000c0000"), tmp_path)
+
+
+@pytest.mark.parametrize("overrides,message", [
+    ({"SECURE_BOOT_EN": True}, "SECURE_BOOT_EN"),
+    ({"SPI_BOOT_CRYPT_CNT": "Enable"}, "SPI_BOOT_CRYPT_CNT"),
+    ({"KEY_PURPOSE_2": "XTS_AES_128_KEY"}, "KEY_PURPOSE_2"),
+    ({"DIS_USB_SERIAL_JTAG": True}, "DIS_USB_SERIAL_JTAG"),
+    ({"MAC": "unreadable"}, "MAC"),
+])
+def test_efuse_security_fields_must_be_factory(tmp_path, overrides, message):
+    with pytest.raises(efuse.EfuseViolation, match=message):
+        efuse.check(espefuse_output(overrides), tmp_path)
+    assert not list(tmp_path.iterdir()), "A violating chip must not become a baseline"
+
+
+def test_efuse_missing_field_is_a_violation():
+    output = espefuse_output()
+    output = output.replace('"SECURE_BOOT_EN"', '"SOMETHING_ELSE"')
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN missing"):
+        efuse.check(output)
+
+
+class FakeConsole:
+    def __init__(self, chunks):
+        self.chunks = list(chunks)
+
+    def read(self, timeout, max_size):
+        if not self.chunks:
+            from pexpect import TIMEOUT
+            time.sleep(timeout)
+            raise TIMEOUT("idle")
+        return self.chunks.pop(0)[:max_size]
+
+
+class FakeFlash:
+    device = object()
+
+    def __init__(self, report, events):
+        self.report = report
+        self.events = events
+
+    def read_efuses(self):
+        self.events.append("efuse")
+        return self.report
+
+    def erase_and_flash(self, image):
+        self.events.append(("erase-and-flash", Path(image).name))
+
+
+class FakeTarget:
+    def __init__(self, console, flash):
+        self.console = console
+        self.flash = flash
+        self.events = flash.events
+
+    def get_driver(self, name, activate=True):
+        return self.console if name == "SerialDriver" else self.flash
+
+    def await_resources(self, resources, timeout):
+        assert resources == [self.flash.device] and timeout > 0
+
+    def activate(self, driver):
+        self.events.append(("activate", "serial" if driver is self.console else "flash"))
+
+    def deactivate(self, driver):
+        self.events.append(("deactivate", "serial" if driver is self.console else "flash"))
+
+
+def test_park_checks_efuses_before_erasing(tmp_path):
+    events = []
+    target = FakeTarget(FakeConsole([b"ESP-ROM boot\n", b"ATTRACTAP_PARK", b"ED hardware=x nfc=off\n"]),
+                        FakeFlash(espefuse_output(), events))
+    assert park(target, tmp_path / "park.bin", tmp_path / "run", baseline_dir=tmp_path / "base") == "7c:df:a1:00:11:22"
+    assert events.index("efuse") < events.index(("erase-and-flash", "park.bin"))
+    assert events[-1] == ("deactivate", "serial")
+    assert b"ATTRACTAP_PARKED" in (tmp_path / "run/serial.log").read_bytes()
+    assert "=== Run" in (tmp_path / "run/efuse.txt").read_text()
+
+    burned = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output({"SECURE_BOOT_EN": True}), []))
+    with pytest.raises(efuse.EfuseViolation):
+        park(burned, tmp_path / "park.bin", tmp_path / "burned")
+    assert all(event != "erase-and-flash" and event[0] != "erase-and-flash"
+               for event in burned.events if isinstance(event, tuple))
+
+    failing = FakeTarget(FakeConsole([b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander\n"]),
+                         FakeFlash(espefuse_output(), []))
+    with pytest.raises(RuntimeError, match="io-expander"):
+        park(failing, tmp_path / "park.bin", tmp_path / "failing")
+
+    silent = FakeTarget(FakeConsole([b"garbage\n"]), FakeFlash(espefuse_output(), []))
+    with pytest.raises(TimeoutError):
+        park(silent, tmp_path / "park.bin", tmp_path / "silent", marker_seconds=0.5)
+
+
+FAKE_PARK = textwrap.dedent("""
+    import json, os, sys, time
+    from pathlib import Path
+    args = sys.argv[1:]
+    value = lambda flag: args[args.index(flag) + 1]
+    place, output = value("--place"), Path(value("--output"))
+    root = Path(os.environ["FAKE_PARK_ROOT"])
+    with (root / "events.jsonl").open("a") as events:
+        events.write(json.dumps({"place": place, "host": os.environ.get("LG_HOSTNAME"),
+                                 "image": Path(value("--image")).name}) + "\\n")
+    time.sleep(float(os.environ.get("FAKE_PARK_SECONDS", "0")))
+    outcome = root / f"outcome-{place}"
+    code = int(outcome.read_text()) if outcome.exists() else 0
+    if code == 3:
+        (output / "reason.txt").write_text("eFuses burned: SECURE_BOOT_EN\\n")
+    sys.exit(code)
+""")
+
+
+def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
+    address = f"127.0.0.1:{free_port()}"
+    monkeypatch.setenv("LG_COORDINATOR", address)
+    (tmp_path / "fake_park.py").write_text(FAKE_PARK)
+    (tmp_path / "park.bin").write_bytes(b"park")
+    (tmp_path / "outcome-reader-b").write_text("3")
+    events = tmp_path / "events.jsonl"
+    events.touch()
+    state = tmp_path / "state"
+
+    def client(*arguments, user="agent", check=True):
+        return subprocess.run([executable("labgrid-client"), "-x", address, *arguments], check=check,
+                              capture_output=True, text=True,
+                              env={**os.environ, "LG_USERNAME": user, "LG_HOSTNAME": "test"})
+
+    def holder(place):
+        for line in client("-p", place, "show").stdout.splitlines():
+            if line.strip().startswith("acquired:"):
+                value = line.split(":", 1)[1].strip()
+                return None if value == "None" else value
+
+    def reservations():
+        states, token = {}, None
+        for line in client("reservations").stdout.splitlines():
+            line = line.strip()
+            if line.startswith("Reservation '"):
+                token = line.split("'")[1]
+            elif line.startswith(("owner:", "state:")):
+                key, value = line.split(":", 1)
+                states.setdefault(token, {})[key] = value.strip()
+        return states
+
+    def parked(place):
+        return [entry for entry in map(json.loads, events.read_text().splitlines()) if entry["place"] == place]
+
+    with running([executable("labgrid-coordinator"), "-l", address], tmp_path) as coordinator:
+        eventually(lambda: client("places", check=False).returncode == 0, coordinator)
+        for place, variant in [("reader-a", "touch-v2"), ("reader-b", "touch-v2"), ("other", None)]:
+            client("-p", place, "create")
+            if variant:
+                client("-p", place, "set-tags", f"variant={variant}")
+        janitor_command = [
+            sys.executable, "-m", "attractap_lab.janitor", "--state-dir", str(state), "run",
+            "--coordinator", address, "--config", str(tmp_path / "unused.yaml"),
+            "--image", f"touch-v2={tmp_path / 'park.bin'}", "--attempts", "2",
+            "--park-command", f"{sys.executable} {tmp_path / 'fake_park.py'}",
+        ]
+        monkeypatch.setenv("FAKE_PARK_ROOT", str(tmp_path))
+        monkeypatch.setenv("FAKE_PARK_SECONDS", "1")
+        with running(janitor_command, tmp_path) as janitor:
+            # Startup parks every managed reader once and leaves "other" alone.
+            eventually(lambda: parked("reader-a") and holder("reader-a") is None, janitor, 20)
+            eventually(lambda: (state / "quarantine/reader-b.json").exists(), janitor, 20)
+            assert holder("reader-b") == OWNER
+            assert len(parked("reader-b")) == 1, "eFuse quarantine must not retry"
+            assert parked("reader-a")[0] == {"place": "reader-a", "host": "attractap-lab-janitor",
+                                             "image": "park.bin"}
+            assert not parked("other") and holder("other") is None
+            assert client("-p", "reader-b", "acquire", check=False).returncode != 0
+
+            # A waiting priority-0 session must not get the reader before it is parked.
+            client("-p", "reader-a", "acquire")
+            eventually(lambda: any(r["owner"] == OWNER for r in reservations().values()), janitor)
+            waiter = client("reserve", "name=reader-a", user="waiter").stdout
+            token = next(line.split("'")[1] for line in waiter.splitlines() if "Reservation '" in line)
+            before = len(parked("reader-a"))
+            client("-p", "reader-a", "release")
+            # Allocation happens inside the release; the fake park takes 1 s.
+            assert reservations()[token]["state"] == "waiting"
+            assert client("-p", "reader-a", "acquire", user="sneaky", check=False).returncode != 0
+            eventually(lambda: len(parked("reader-a")) == before + 1, janitor, 20)
+            eventually(lambda: reservations()[token]["state"] == "allocated", janitor, 20)
+            client("cancel-reservation", token, user="waiter")
+            eventually(lambda: holder("reader-a") is None and not reservations(), janitor)
+
+            # Maintenance holds every reader except the quarantined one.
+            maintenance = subprocess.run([
+                sys.executable, "-m", "attractap_lab.maintenance", "--coordinator", address, "--",
+                sys.executable, "-c", "pass",
+            ], capture_output=True, text=True)
+            assert maintenance.returncode == 0, maintenance.stderr
+            assert holder("reader-b") == OWNER
+            # Maintenance claimed reader-a, so it is parked again afterwards.
+            eventually(lambda: len(parked("reader-a")) == before + 2 and holder("reader-a") is None,
+                       janitor, 20)
+
+            # After repair, clearing the quarantine parks and releases the reader.
+            (tmp_path / "outcome-reader-b").write_text("0")
+            subprocess.run([sys.executable, "-m", "attractap_lab.janitor", "--state-dir", str(state),
+                            "clear", "reader-b"], check=True)
+            eventually(lambda: holder("reader-b") is None, janitor, 20)
+
+            # Transient failures retry, then quarantine after --attempts.
+            (tmp_path / "outcome-reader-a").write_text("1")
+            client("-p", "reader-a", "acquire")
+            before = len(parked("reader-a"))
+            client("-p", "reader-a", "release")
+            eventually(lambda: (state / "quarantine/reader-a.json").exists(), janitor, 30)
+            assert len(parked("reader-a")) == before + 2
+            reason = json.loads((state / "quarantine/reader-a.json").read_text())["reason"]
+            assert "failed 2 times" in reason

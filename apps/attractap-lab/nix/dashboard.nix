@@ -36,6 +36,8 @@ in rec {
     version = api.version;
     inherit src;
     sourceRoot = "source/coordinator/web";
+    patches = [ ./dashboard-web.patch ];
+    patchFlags = [ "-p3" ];
     npmDepsHash = "sha256-2Vq3dQ1q0I993VFnu0D6k7864GVaOhMqyRp+YSsBFuM=";
     installPhase = ''
       runHook preInstall

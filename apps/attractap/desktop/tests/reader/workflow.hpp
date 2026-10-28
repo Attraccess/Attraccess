@@ -139,6 +139,7 @@ struct ReaderWorkflow
     void testListAndAuthentication();
     void testSessionStart();
     void testUsageStats();
+    void testProjectSearch();
     void testFormsAndLogout();
     void testSupervisionAndCorrelation();
     void testIdentityAndPendingAuthentication();

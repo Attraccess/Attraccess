@@ -21,6 +21,7 @@ from labgrid.util.ssh import sshmanager
 import pytest
 import yaml
 
+from attractap_lab.drivers import ESPToolDriver
 from attractap_lab.workflow import claim, smoke
 
 
@@ -48,6 +49,13 @@ def running(command, directory):
                 print(log.read())
 
 
+def executable(name):
+    # Nix exposes dependencies on PATH, while a developer venv places them
+    # beside its interpreter. Prefer the active environment's tools.
+    candidate = Path(sys.executable).parent / name
+    return str(candidate) if candidate.exists() else shutil.which(name)
+
+
 def eventually(check, process, seconds=10):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
@@ -65,11 +73,6 @@ def eventually(check, process, seconds=10):
                          ids=["success", "flash-failure", "camera-offline"])
 def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_camera):
     assert shutil.which("ffmpeg"), "Hardware workflow integration test requires FFmpeg"
-    def executable(name):
-        # Nix exposes dependencies on PATH, while a developer venv places them
-        # beside its interpreter. Prefer the active environment's tools.
-        candidate = Path(sys.executable).parent / name
-        return str(candidate) if candidate.exists() else shutil.which(name)
     address = f"127.0.0.1:{free_port()}"
     monkeypatch.setenv("LG_COORDINATOR", address)
     # Separate state per test; labgrid's native RemotePlaceManager is global.
@@ -173,10 +176,18 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_ca
             return real_run(command, **kwargs)
         assert command[1] == "-tt"
         assert command[3:6] == ["--", "timeout", "--signal=TERM"]
+        if command[8] == "espefuse":
+            assert command[-4:] == ["dump", "summary", "--format", "json"]
+            events.append("efuse")
+            return subprocess.CompletedProcess(command, 0, stdout=b"espefuse v5\r\nsummary\r\n")
         assert "hard-reset" in command
         if command[-1] == "run":
             assert command[-2:] == ["--no-stub", "run"]
             events.append("reset")
+            return subprocess.CompletedProcess(command, 0)
+        if "--erase-all" in command:
+            assert command[-4:-1] == ["write-flash", "--erase-all", "0x0"]
+            events.append("erase-and-flash")
             return subprocess.CompletedProcess(command, 0)
         assert command[-3:-1] == ["write-flash", "0x0"]
         assert events[-1] == "transfer"
@@ -230,6 +241,12 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_ca
                         target.get_driver("ResetProtocol").reset()
                         assert events.count("transfer") == 1
                         assert events.count("reset") == 1
+                        # The janitor's driver operations share the same transport.
+                        flash = target.get_driver(ESPToolDriver)
+                        assert flash.read_efuses() == "espefuse v5\nsummary\n"
+                        flash.erase_and_flash(firmware)
+                        assert events[-2:] == ["transfer", "erase-and-flash"]
+                        target.deactivate(flash)
                         log = (tmp_path / "artifacts/serial.log").read_bytes()
                         assert len(log) == 1024 and b"Attractap ready" in log
                         png = (tmp_path / "artifacts/screen.png").read_bytes()
