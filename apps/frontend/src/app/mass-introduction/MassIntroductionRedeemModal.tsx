@@ -1,43 +1,44 @@
-// Redeems a scanned mass-introduction QR code and reports the result in a dialog
+// Lets a participant who scanned a mass-introduction QR code join by typing the code shown next to it
 // FEATURE: ATT-1151 Mass introduction
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { Description } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   MassIntroductionSessionDto,
   MassIntroductionTargetType,
   RedeemMassIntroductionResponseDto,
-  useAccessControlServiceMassIntroductionClaim,
   useAccessControlServiceMassIntroductionRedeem,
 } from '@attraccess/react-query-client';
+import { OneTimeCodeInput } from '../../components/OneTimeCodeInput';
 import { StatusDialog } from '../../components/statusDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 import en from './en.json';
 import de from './de.json';
 
-/** Query parameter carrying the QR code's value; it changes every 15 seconds. */
+/** Query parameter naming the session in the QR code. Not a secret: joining needs the shown code. */
 export const MASS_INTRODUCTION_PARAM = 'massIntroduction';
 
-/** Query parameter carrying the ticket for a scanned code, so it survives signing in. */
-export const MASS_INTRODUCTION_TICKET_PARAM = 'massIntroductionTicket';
+const CODE_LENGTH = 6;
 
 /**
  * Where a session's QR code points: the resource's details page, or the resource overview for a
  * group (its page is an editor for managers). Signed-out participants log in there first.
  */
-export function massIntroductionUrl(session: Pick<MassIntroductionSessionDto, 'token' | 'target'>): string {
+export function massIntroductionUrl(session: Pick<MassIntroductionSessionDto, 'publicId' | 'target'>): string {
   const url = new URL(window.location.origin);
   url.pathname =
     session.target.type === MassIntroductionTargetType.RESOURCE ? `/resources/${session.target.id}` : '/resources';
-  url.searchParams.set(MASS_INTRODUCTION_PARAM, session.token);
+  url.searchParams.set(MASS_INTRODUCTION_PARAM, session.publicId);
   return url.toString();
 }
 
-type RedeemState =
+type DialogState =
+  | { status: 'code'; publicId: string; error: string | null }
   | { status: 'success'; result: RedeemMassIntroductionResponseDto }
-  | { status: 'error'; isInvalidOrExpired: boolean; detail: string };
+  | { status: 'ended' };
 
 interface Props {
   /** Signed in and past the two-factor gate. */
@@ -45,79 +46,103 @@ interface Props {
 }
 
 /**
- * Mount once, for signed-in and signed-out users alike. A scanned code is exchanged for a ticket
- * right away, because it would expire while a signed-out participant logs in; the ticket is
- * redeemed once they can. Renders nothing without a code or ticket in the URL.
+ * Mount once in the app shell. After scanning (and signing in, if needed), asks for the code shown
+ * next to the QR code and joins the session. Renders nothing without a session in the URL.
  */
 export function MassIntroductionRedeemModal({ canRedeem }: Readonly<Props>) {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [state, setState] = useState<RedeemState | null>(null);
-  // Codes and tickets are single-use; act on each once even under StrictMode/re-renders.
-  const claimedCode = useRef<string | null>(null);
-  const redeemedTicket = useRef<string | null>(null);
+  const [state, setState] = useState<DialogState | null>(null);
+  const [code, setCode] = useState('');
 
-  const showError = (error: unknown) =>
-    setState({
-      status: 'error',
-      isInvalidOrExpired: (error as ApiError)?.status === 404,
-      detail: getApiErrorMessage(error as ApiError),
-    });
-
-  // Reloading or sharing the page must not use a code or ticket again.
-  const replaceParams = useCallback(
-    (update: (params: URLSearchParams) => void) =>
-      setSearchParams(
-        (params) => {
-          update(params);
-          return params;
-        },
-        { replace: true },
-      ),
-    [setSearchParams],
-  );
-
-  const { mutate: claim } = useAccessControlServiceMassIntroductionClaim({
-    onSuccess: ({ ticket }) =>
-      replaceParams((params) => {
-        params.delete(MASS_INTRODUCTION_PARAM);
-        params.set(MASS_INTRODUCTION_TICKET_PARAM, ticket);
-      }),
-    onError: (error) => {
-      replaceParams((params) => params.delete(MASS_INTRODUCTION_PARAM));
-      showError(error);
-    },
-  });
-
-  const { mutate: redeem } = useAccessControlServiceMassIntroductionRedeem({
+  const { mutate: redeem, isPending } = useAccessControlServiceMassIntroductionRedeem({
     onSuccess: (result) => {
       setState({ status: 'success', result });
       // The page behind the dialog may change with the new introduction (usage controls, people).
       void queryClient.invalidateQueries();
     },
-    onError: showError,
+    onError: (error) => {
+      const status = (error as ApiError)?.status;
+      setCode('');
+      setState((current) => {
+        if (current?.status !== 'code') return current;
+        if (status === 404) return { status: 'ended' };
+        if (status === 400) return { ...current, error: t('join.wrongCode') };
+        if (status === 429) return { ...current, error: t('join.tooManyAttempts') };
+        return { ...current, error: t('error.generic', { error: getApiErrorMessage(error as ApiError) }) };
+      });
+    },
   });
 
-  const code = searchParams.get(MASS_INTRODUCTION_PARAM);
+  // Open the code dialog once the participant can join; drop the session from the URL so a reload
+  // or a shared link does not reopen it.
+  const publicId = searchParams.get(MASS_INTRODUCTION_PARAM);
   useEffect(() => {
-    if (!code || claimedCode.current === code) return;
-    claimedCode.current = code;
-    claim({ requestBody: { token: code } });
-  }, [code, claim]);
+    if (!publicId || !canRedeem) return;
+    setState({ status: 'code', publicId, error: null });
+    setCode('');
+    setSearchParams(
+      (params) => {
+        params.delete(MASS_INTRODUCTION_PARAM);
+        return params;
+      },
+      { replace: true },
+    );
+  }, [publicId, canRedeem, setSearchParams]);
 
-  const ticket = searchParams.get(MASS_INTRODUCTION_TICKET_PARAM);
-  useEffect(() => {
-    if (!ticket || !canRedeem || redeemedTicket.current === ticket) return;
-    redeemedTicket.current = ticket;
-    redeem({ requestBody: { ticket } });
-    replaceParams((params) => params.delete(MASS_INTRODUCTION_TICKET_PARAM));
-  }, [ticket, canRedeem, redeem, replaceParams]);
+  const submit = useCallback(
+    (value: string) => {
+      if (state?.status !== 'code' || value.length !== CODE_LENGTH || isPending) return;
+      redeem({ requestBody: { publicId: state.publicId, code: value } });
+    },
+    [state, isPending, redeem],
+  );
 
-  // The redemption is quick; the dialog appears with its result.
   if (!state) return null;
-
   const close = () => setState(null);
+
+  if (state.status === 'code') {
+    return (
+      <StatusDialog
+        isOpen
+        onClose={close}
+        status="info"
+        title={t('join.title')}
+        action={{
+          label: t('join.submit'),
+          onPress: () => submit(code),
+          isPending,
+          isDisabled: code.length !== CODE_LENGTH,
+          'data-cy': 'mass-introduction-join-submit',
+        }}
+        data-cy="mass-introduction-join"
+      >
+        <div className="flex flex-col items-center gap-3">
+          <Description>{t('join.description')}</Description>
+          <OneTimeCodeInput
+            label={t('join.codeLabel')}
+            value={code}
+            onChange={(value) => {
+              setCode(value);
+              // Joining right away saves a tap; the code is only valid for a few seconds.
+              submit(value);
+            }}
+            length={CODE_LENGTH}
+            autoFocus
+            isDisabled={isPending}
+            data-cy="mass-introduction-join-code"
+          />
+          {state.error && (
+            <Description className="text-danger" role="alert">
+              {state.error}
+            </Description>
+          )}
+        </div>
+      </StatusDialog>
+    );
+  }
+
   if (state.status === 'success') {
     return (
       <StatusDialog
@@ -144,7 +169,7 @@ export function MassIntroductionRedeemModal({ canRedeem }: Readonly<Props>) {
       closeLabel={t('close')}
       data-cy="mass-introduction-redeem-error"
     >
-      {state.isInvalidOrExpired ? t('error.invalidOrExpired') : t('error.generic', { error: state.detail })}
+      {t('error.ended')}
     </StatusDialog>
   );
 }

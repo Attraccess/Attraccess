@@ -32,7 +32,7 @@ export function useMassIntroductionSession(target: PeopleTarget) {
   const [endReason, setEndReason] = useState<MassIntroductionEndState | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
-  // Bumped when fetching the next QR code failed, to schedule another attempt.
+  // Bumped when fetching the next join code failed, to schedule another attempt.
   const [refreshRetry, setRefreshRetry] = useState(0);
 
   // The id of the session that is still running server-side, as far as this drawer knows.
@@ -161,15 +161,15 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     );
   }, [applySession, markEnded]);
 
-  // The QR code changes every 15 seconds so a photo of it cannot be passed on; fetch the next one
+  // The join code changes every 15 seconds so a photo of it cannot be passed on; fetch the next one
   // as soon as it rotates.
-  const tokenRefreshAt = phase === 'active' ? session?.tokenRefreshAt : undefined;
+  const codeRefreshAt = phase === 'active' ? session?.codeRefreshAt : undefined;
   useEffect(() => {
-    if (!tokenRefreshAt) return;
-    const dueInMs = new Date(tokenRefreshAt).getTime() - Date.now();
+    if (!codeRefreshAt) return;
+    const dueInMs = new Date(codeRefreshAt).getTime() - Date.now();
     const timeout = setTimeout(resync, dueInMs > 0 ? dueInMs + 250 : 2000);
     return () => clearTimeout(timeout);
-  }, [tokenRefreshAt, refreshRetry, resync]);
+  }, [codeRefreshAt, refreshRetry, resync]);
 
   // Subscribed for as long as the drawer is open, so no event right after starting is missed.
   useLiveUpdates({ topic: 'mass-introduction', onUpdate: handleLiveEvent, onReconnect: resync });

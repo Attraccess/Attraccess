@@ -9,6 +9,8 @@ interface Props {
   ariaLabel?: string;
   placeholder?: string;
   requiredCapabilities?: Partial<AttractapCapabilities>;
+  /** Only offer these readers (e.g. the ones linked to a resource). */
+  readerIds?: number[];
 }
 
 export function AttractapSelect(props: Props) {
@@ -26,6 +28,7 @@ export function AttractapSelect(props: Props) {
     // last connection within 30s
     return readers
       ?.filter((r) => r.lastConnection && new Date(r.lastConnection).getTime() > now - 30000)
+      .filter((r) => !props.readerIds || props.readerIds.includes(r.id))
       .filter((r) => {
         if (!props.requiredCapabilities) {
           return true;
@@ -34,7 +37,7 @@ export function AttractapSelect(props: Props) {
           ([key, value]) => r.firmware.capabilities[key as keyof AttractapCapabilities] === value,
         );
       });
-  }, [readers, now, props.requiredCapabilities]);
+  }, [readers, now, props.requiredCapabilities, props.readerIds]);
 
   return (
     <Select

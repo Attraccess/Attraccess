@@ -61,15 +61,19 @@ export class MassIntroductionSessionDto {
   @ApiProperty({ description: 'Identifies the session in the introducer-only endpoints' })
   id!: string;
 
+  @ApiProperty({ description: 'Names the session in the QR code; not a secret on its own' })
+  publicId!: string;
+
   @ApiProperty({
     description:
-      'The current QR code value. It changes every 15 seconds, so only people in the room can use it; ' +
-      'fetch the session again at tokenRefreshAt for the next one.',
+      'The code participants type after scanning. It changes every 15 seconds, so only people in the ' +
+      'room can join; fetch the session again at codeRefreshAt for the next one.',
+    example: '042917',
   })
-  token!: string;
+  code!: string;
 
-  @ApiProperty({ description: 'When the QR code value changes' })
-  tokenRefreshAt!: Date;
+  @ApiProperty({ description: 'When the code changes' })
+  codeRefreshAt!: Date;
 
   @ApiProperty({ type: () => MassIntroductionTargetDto })
   target!: MassIntroductionTargetDto;

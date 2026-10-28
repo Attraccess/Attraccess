@@ -25,6 +25,8 @@ const state = vi.hoisted(() => ({
     onReconnect?: () => void;
   },
   readerCapabilities: undefined as unknown,
+  readerIds: undefined as unknown,
+  eligibleReadersQuery: undefined as unknown,
 }));
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
@@ -41,6 +43,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     },
   }),
   useAccessControlServiceMassIntroductionCancel: () => ({ mutate: state.cancel }),
+  useAccessControlServiceMassIntroductionEligibleReaders: (query: unknown) => {
+    state.eligibleReadersQuery = query;
+    return { data: [4] };
+  },
   AccessControlService: { massIntroductionGet: (data: unknown) => state.get(data) },
 }));
 vi.mock('./usePeopleMutations', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
@@ -53,11 +59,14 @@ vi.mock('../../attractap/AttractapSelect', () => ({
   AttractapSelect: ({
     onSelectionChange,
     requiredCapabilities,
+    readerIds,
   }: {
     onSelectionChange: (id: number) => void;
     requiredCapabilities: unknown;
+    readerIds: unknown;
   }) => {
     state.readerCapabilities = requiredCapabilities;
+    state.readerIds = readerIds;
     return <button onClick={() => onSelectionChange(4)}>Pick reader 4</button>;
   },
 }));
@@ -72,13 +81,14 @@ function makeSession(overrides: Partial<MassIntroductionSessionDto> = {}): MassI
   const now = Date.now();
   return {
     id: 'session-1',
-    token: 'tok-1',
+    publicId: 'pub-1',
+    code: '042917',
     target: { type: 'resource', id: 7, name: 'Laser Cutter' } as MassIntroductionSessionDto['target'],
     reader: null,
     participants: [],
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + 15 * 60_000).toISOString(),
-    tokenRefreshAt: new Date(now + 15_000).toISOString(),
+    codeRefreshAt: new Date(now + 15_000).toISOString(),
     ...overrides,
   };
 }
@@ -131,6 +141,8 @@ beforeEach(() => {
   state.startError = null;
   state.live = null;
   state.readerCapabilities = undefined;
+  state.readerIds = undefined;
+  state.eligibleReadersQuery = undefined;
 });
 afterEach(() => {
   cleanup();
@@ -165,18 +177,22 @@ describe('grant-introduction drawer', () => {
     startSession();
 
     expect(state.start).toHaveBeenCalledWith({ requestBody: { resourceId: 7 } });
-    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=tok-1`)).toBeInTheDocument();
+    // The QR code only names the session; the code to type is shown next to it.
+    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub-1`)).toBeInTheDocument();
+    expect(screen.getByLabelText('Code', { selector: 'output' })).toHaveTextContent('042 917');
     expect(screen.getByText('Introducing people to Laser Cutter')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '15:00');
     expect(screen.getByText('Nobody has joined yet.')).toBeInTheDocument();
     expect(screen.queryByText(/waiting for NFC cards/)).toBeNull();
   });
 
-  it('requires a mass-introduction capable reader once the reader option is enabled', () => {
+  it('offers only capable readers linked to the target once the reader option is enabled', () => {
     mount({ type: 'group', id: 3 });
 
     fireEvent.click(screen.getByRole('switch', { name: /tap their NFC card/ }));
     expect(state.readerCapabilities).toEqual({ cardEnrollment: true });
+    expect(state.eligibleReadersQuery).toEqual({ resourceGroupId: 3 });
+    expect(state.readerIds).toEqual([4]);
     expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
 
     fireEvent.click(screen.getByText('Pick reader 4'));
@@ -299,28 +315,30 @@ describe('grant-introduction drawer', () => {
     expect(state.cancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
   });
 
-  it('shows the next QR code when the current one rotates', async () => {
+  it('shows the next code when the current one changes, while the QR code stays the same', async () => {
     vi.useFakeTimers();
     mount();
-    startSession(makeSession({ token: 'pub.11111111' }));
-    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub.11111111`)).toBeInTheDocument();
+    startSession(makeSession({ code: '111111' }));
+    const code = () => screen.getByLabelText('Code', { selector: 'output' });
+    expect(code()).toHaveTextContent('111 111');
     expect(screen.getByText(/changes every 15 seconds/)).toBeInTheDocument();
 
-    state.get.mockResolvedValueOnce(makeSession({ token: 'pub.22222222' }));
+    state.get.mockResolvedValueOnce(makeSession({ code: '222222' }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_500);
     });
 
     expect(state.get).toHaveBeenCalledWith({ sessionId: 'session-1' });
-    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub.22222222`)).toBeInTheDocument();
+    expect(code()).toHaveTextContent('222 222');
+    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub-1`)).toBeInTheDocument();
   });
 
-  it('retries fetching the next QR code after a network error', async () => {
+  it('retries fetching the next code after a network error', async () => {
     vi.useFakeTimers();
     mount();
     startSession();
 
-    state.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(makeSession({ token: 'pub.33333333' }));
+    state.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(makeSession({ code: '333333' }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_500);
     });
@@ -329,7 +347,7 @@ describe('grant-introduction drawer', () => {
     });
 
     expect(state.get).toHaveBeenCalledTimes(2);
-    expect(screen.getByText(/massIntroduction=pub\.33333333/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Code', { selector: 'output' })).toHaveTextContent('333 333');
   });
 
   it('resyncs from the server after the live stream reconnects', async () => {

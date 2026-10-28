@@ -7,15 +7,17 @@
     "useReader": "Zusätzlich NFC-Karten an einem Attractap-Leser annehmen",
     "readerLabel": "Leser",
     "readerPlaceholder": "Leser auswählen",
-    "readerDescription": "Es werden nur verbundene Leser angezeigt, die RFID-Karten registrieren können.",
+    "readerDescription": "Es werden nur verbundene Leser angezeigt, die mit dieser Ressource (oder einer Ressource dieser Gruppe) verknüpft sind.",
     "startFailed": "Die Sammeleinweisung konnte nicht gestartet werden",
     "cancel": "Abbrechen",
     "start": "Starten"
   },
   "active": {
     "qrLabel": "QR-Code für die Sammeleinweisung",
-    "scanHint": "Scannen Sie diesen Code mit der Handykamera oder dem Scanner in der App.",
-    "rotationHint": "Der Code ändert sich alle 15 Sekunden und funktioniert daher nur für Anwesende.",
+    "scanHint": "QR-Code scannen und dann diesen Code eingeben:",
+    "codeLabel": "Code",
+    "codeChangesIn": "Ändert sich in {{seconds}} s",
+    "rotationHint": "Der Code ändert sich alle 15 Sekunden, daher können nur Anwesende teilnehmen.",
     "timeRemaining": "Verbleibende Zeit",
     "end": "Sammeleinweisung beenden"
   },

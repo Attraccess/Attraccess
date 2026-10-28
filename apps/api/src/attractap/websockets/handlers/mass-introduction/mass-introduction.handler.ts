@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -122,8 +123,16 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     }
   }
 
-  /** Reader cancel button: the reader leaves, the QR code keeps working. */
-  public async handleCancel(socket: AuthenticatedWebSocket) {
+  /**
+   * Reader cancel button, or the reader refusing a start: the reader leaves, the QR code keeps
+   * working. Only the session the reader names is left — a refusal of an older start must not detach
+   * the session the reader shows now.
+   */
+  public async handleCancel(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const { sessionId } = (data?.payload ?? {}) as { sessionId?: string };
+    if (sessionId !== socket.state.massIntroductionFlow?.sessionId) {
+      return;
+    }
     this.cancelForSocket(socket);
   }
 
@@ -147,6 +156,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
 
   protected async armReader(params: {
     readerId: number;
+    allowedResourceIds: number[];
     sessionId: string;
     targetName: string;
     introducerUsername: string;
@@ -162,6 +172,10 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     // show its progress.
     if (!reader.firmware?.capabilities?.cardEnrollment) {
       throw new BadRequestException('This reader does not support mass introductions');
+    }
+    // A mass introduction must not take over readers elsewhere (e.g. a door) for 15 minutes.
+    if (!(reader.resources ?? []).some((resource) => params.allowedResourceIds.includes(resource.id))) {
+      throw new ForbiddenException('The selected reader is not linked to this resource');
     }
 
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);

@@ -65,7 +65,13 @@ export function IntroductionTabs(props: Readonly<IntroductionTabsProps>) {
             {individualFields}
           </TabPanel>
           <TabPanel id="mass" className="pt-4">
-            <MassIntroductionContent t={tMass} state={massIntroduction} setup={setup} onSetupChange={setSetup} />
+            <MassIntroductionContent
+              t={tMass}
+              target={target}
+              state={massIntroduction}
+              setup={setup}
+              onSetupChange={setSetup}
+            />
           </TabPanel>
         </Tabs>
       </DrawerBody>

@@ -1,12 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, Length } from 'class-validator';
+import { IsString, Length, Matches } from 'class-validator';
 import { MassIntroductionTargetDto } from './massIntroductionSession.dto';
 
 export class RedeemMassIntroductionDto {
-  @ApiProperty({ description: 'The ticket from POST /mass-introductions/claim' })
+  @ApiProperty({ description: 'The session id from the scanned QR code' })
   @IsString()
-  @Length(16, 128)
-  ticket!: string;
+  @Length(8, 64)
+  publicId!: string;
+
+  @ApiProperty({ description: 'The code shown next to the QR code', example: '042917' })
+  @IsString()
+  @Matches(/^\d{6}$/)
+  code!: string;
 }
 
 export class RedeemMassIntroductionResponseDto {

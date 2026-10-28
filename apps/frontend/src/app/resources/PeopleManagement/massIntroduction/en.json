@@ -7,15 +7,17 @@
     "useReader": "Also let people tap their NFC card on an Attractap reader",
     "readerLabel": "Reader",
     "readerPlaceholder": "Select a reader",
-    "readerDescription": "Only connected readers that can enroll RFID cards are listed.",
+    "readerDescription": "Only connected readers linked to this resource (or a resource of this group) are listed.",
     "startFailed": "Could not start the mass introduction",
     "cancel": "Cancel",
     "start": "Start"
   },
   "active": {
     "qrLabel": "QR code for the mass introduction",
-    "scanHint": "Scan this code with a phone camera or the in-app scanner.",
-    "rotationHint": "The code changes every 15 seconds, so it only works for people in the room.",
+    "scanHint": "Scan the QR code, then enter this code:",
+    "codeLabel": "Code",
+    "codeChangesIn": "Changes in {{seconds}} s",
+    "rotationHint": "The code changes every 15 seconds, so only people in the room can join.",
     "timeRemaining": "Time remaining",
     "end": "End mass introduction"
   },

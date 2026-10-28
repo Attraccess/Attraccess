@@ -10,9 +10,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { randomBytes, randomUUID } from 'crypto';
-import { Resource, ResourceGroup } from '@attraccess/database-entities';
+import { Attractap, Resource, ResourceGroup } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -34,7 +34,6 @@ import {
 import { MassIntroductionEndReason, MassIntroductionLiveEventType } from './dtos/massIntroductionLiveEvent.dto';
 import { StartMassIntroductionDto } from './dtos/startMassIntroduction.dto';
 import { RedeemMassIntroductionResponseDto } from './dtos/redeemMassIntroduction.dto';
-import { MassIntroductionTicketDto } from './dtos/claimMassIntroduction.dto';
 import {
   currentMassIntroductionCode,
   isValidMassIntroductionCode,
@@ -52,10 +51,8 @@ import {
 export class MassIntroductionService {
   public static readonly TTL_MS = 15 * 60_000;
 
-  /** Long enough to sign in (including SSO) after scanning. */
-  public static readonly TICKET_TTL_MS = 10 * 60_000;
-
-  public static readonly MAX_FAILED_CLAIMS_PER_MINUTE = 20;
+  /** Per participant and session, so nobody can lock others out by guessing. */
+  public static readonly MAX_WRONG_CODES_PER_MINUTE = 5;
 
   protected readonly logger = new Logger(MassIntroductionService.name);
 
@@ -73,6 +70,7 @@ export class MassIntroductionService {
     protected readonly live: MassIntroductionLiveService,
     @InjectRepository(Resource) protected readonly resourceRepository: Repository<Resource>,
     @InjectRepository(ResourceGroup) protected readonly resourceGroupRepository: Repository<ResourceGroup>,
+    @InjectRepository(Attractap) protected readonly readerRepository: Repository<Attractap>,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link MassIntroductionReaderPort}. */
@@ -81,15 +79,7 @@ export class MassIntroductionService {
   }
 
   public async start(user: AuthenticatedUser, dto: StartMassIntroductionDto): Promise<MassIntroductionSessionDto> {
-    if ((dto.resourceId == null) === (dto.resourceGroupId == null)) {
-      throw new BadRequestException('Provide exactly one of resourceId and resourceGroupId');
-    }
-
-    const target = await this.loadTarget(dto);
-    const viaPermission = user.effectivePermissions?.has('resources.access.manage') === true;
-    if (!viaPermission && !(await this.isIntroducer(target, user.id))) {
-      throw new ForbiddenException('You are not an introducer for this target');
-    }
+    const { target, viaPermission } = await this.authorizeTarget(user, dto);
 
     // One session per introducer and target: reopening the dialog replaces the old QR code.
     for (const existing of this.sessions.values()) {
@@ -107,8 +97,7 @@ export class MassIntroductionService {
       id: randomUUID(),
       publicId: randomBytes(12).toString('base64url'),
       codeSecret: newMassIntroductionCodeSecret(),
-      tickets: new Map(),
-      failedClaims: { windowStart: now.getTime(), count: 0 },
+      wrongCodes: new Map(),
       target,
       introducer: {
         id: user.id,
@@ -137,6 +126,7 @@ export class MassIntroductionService {
       try {
         ({ readerName } = await this.readerPort.arm({
           readerId: dto.readerId,
+          allowedResourceIds: await this.linkedResourceIds(target),
           sessionId: session.id,
           targetName: target.name,
           introducerUsername: user.username,
@@ -174,57 +164,55 @@ export class MassIntroductionService {
     this.end(this.getOwned(sessionId, userId), MassIntroductionEndReason.CANCELLED);
   }
 
-  /**
-   * A participant scanned the QR code: exchange its short-lived code for a single-use ticket. Needs
-   * no sign-in, because the code would expire while a signed-out participant logs in.
-   */
-  public claim(token: string, nowMs = Date.now()): MassIntroductionTicketDto {
-    const [publicId, code] = token.split('.');
-    const session = this.sessions.get(this.sessionIdsByPublicId.get(publicId ?? '') ?? '');
-    if (!session || !code) {
-      throw new NotFoundException('This mass introduction QR code is invalid or has expired');
+  /** Readers the introducer may show the scan screen on: those linked to the target. */
+  public async eligibleReaderIds(user: AuthenticatedUser, dto: StartMassIntroductionDto): Promise<number[]> {
+    const target = await this.authorizeTarget(user, dto);
+    const resourceIds = await this.linkedResourceIds(target.target);
+    if (resourceIds.length === 0) {
+      return [];
     }
-
-    const attempts = session.failedClaims;
-    if (nowMs - attempts.windowStart >= 60_000) {
-      attempts.windowStart = nowMs;
-      attempts.count = 0;
-    }
-    if (attempts.count >= MassIntroductionService.MAX_FAILED_CLAIMS_PER_MINUTE) {
-      throw new HttpException('Too many invalid codes, try again in a minute', HttpStatus.TOO_MANY_REQUESTS);
-    }
-    if (!isValidMassIntroductionCode(session.codeSecret, code, nowMs)) {
-      attempts.count += 1;
-      throw new NotFoundException('This mass introduction QR code is invalid or has expired');
-    }
-
-    for (const [ticket, { expiresAt }] of session.tickets) {
-      if (expiresAt <= nowMs) session.tickets.delete(ticket);
-    }
-    const ticket = randomBytes(24).toString('base64url');
-    const expiresAt = nowMs + MassIntroductionService.TICKET_TTL_MS;
-    session.tickets.set(ticket, { expiresAt });
-    return { ticket: `${session.publicId}.${ticket}`, expiresAt: new Date(expiresAt) };
+    const readers = await this.readerRepository.find({
+      where: { resources: { id: In(resourceIds) } },
+      select: { id: true },
+    });
+    return [...new Set(readers.map((reader) => reader.id))];
   }
 
-  /** The signed-in participant redeems the ticket from their scan. */
-  public async redeemTicket(
-    ticket: string,
+  /**
+   * A participant scanned the QR code (which only names the session) and typed the code shown next
+   * to it. The code changes every 15 seconds, so only people in the room can join.
+   */
+  public async redeem(
+    publicId: string,
+    code: string,
     user: { id: number; username: string },
     nowMs = Date.now(),
   ): Promise<RedeemMassIntroductionResponseDto> {
-    const [publicId, secret] = ticket.split('.');
-    const session = this.sessions.get(this.sessionIdsByPublicId.get(publicId ?? '') ?? '');
-    const entry = secret ? session?.tickets.get(secret) : undefined;
-    if (!session || !entry || entry.expiresAt <= nowMs) {
-      throw new NotFoundException('This mass introduction QR code is invalid or has expired');
+    const session = this.sessions.get(this.sessionIdsByPublicId.get(publicId) ?? '');
+    if (!session) {
+      throw new NotFoundException('This mass introduction has ended');
     }
+    const existing = session.participants.get(user.id);
+    if (existing) {
+      return { target: { ...session.target }, alreadyIntroduced: existing.alreadyIntroduced };
+    }
+
+    const attempts = session.wrongCodes.get(user.id);
+    if (attempts && nowMs - attempts.windowStart < 60_000) {
+      if (attempts.count >= MassIntroductionService.MAX_WRONG_CODES_PER_MINUTE) {
+        throw new HttpException('Too many wrong codes, try again in a minute', HttpStatus.TOO_MANY_REQUESTS);
+      }
+    } else {
+      session.wrongCodes.set(user.id, { windowStart: nowMs, count: 0 });
+    }
+    if (!isValidMassIntroductionCode(session.codeSecret, code, nowMs)) {
+      session.wrongCodes.get(user.id).count += 1;
+      throw new BadRequestException('Wrong or expired code');
+    }
+    session.wrongCodes.delete(user.id);
+
     const participant = await this.join(session, user, MassIntroductionMethod.QR);
-    session.tickets.delete(secret);
-    return {
-      target: { ...session.target },
-      alreadyIntroduced: participant.alreadyIntroduced,
-    };
+    return { target: { ...session.target }, alreadyIntroduced: participant.alreadyIntroduced };
   }
 
   /** A participant tapped an authenticated card at the session's reader. */
@@ -322,7 +310,36 @@ export class MassIntroductionService {
     return { userId: user.id, username: user.username, method, alreadyIntroduced, joinedAt: new Date() };
   }
 
-  protected async loadTarget(dto: StartMassIntroductionDto): Promise<MassIntroductionTarget> {
+  protected async authorizeTarget(
+    user: AuthenticatedUser,
+    dto: Pick<StartMassIntroductionDto, 'resourceId' | 'resourceGroupId'>,
+  ): Promise<{ target: MassIntroductionTarget; viaPermission: boolean }> {
+    if ((dto.resourceId == null) === (dto.resourceGroupId == null)) {
+      throw new BadRequestException('Provide exactly one of resourceId and resourceGroupId');
+    }
+    const target = await this.loadTarget(dto);
+    const viaPermission = user.effectivePermissions?.has('resources.access.manage') === true;
+    if (!viaPermission && !(await this.isIntroducer(target, user.id))) {
+      throw new ForbiddenException('You are not an introducer for this target');
+    }
+    return { target, viaPermission };
+  }
+
+  /** The target resource, or every resource of the target group. */
+  protected async linkedResourceIds(target: MassIntroductionTarget): Promise<number[]> {
+    if (target.type === MassIntroductionTargetType.RESOURCE) {
+      return [target.id];
+    }
+    const resources = await this.resourceRepository.find({
+      where: { groups: { id: target.id } },
+      select: { id: true },
+    });
+    return resources.map((resource) => resource.id);
+  }
+
+  protected async loadTarget(
+    dto: Pick<StartMassIntroductionDto, 'resourceId' | 'resourceGroupId'>,
+  ): Promise<MassIntroductionTarget> {
     if (dto.resourceId != null) {
       const resource = await this.resourceRepository.findOne({ where: { id: dto.resourceId } });
       if (!resource) {
@@ -397,8 +414,9 @@ export class MassIntroductionService {
     const code = currentMassIntroductionCode(session.codeSecret);
     return {
       id: session.id,
-      token: `${session.publicId}.${code.code}`,
-      tokenRefreshAt: code.refreshAt,
+      publicId: session.publicId,
+      code: code.code,
+      codeRefreshAt: code.refreshAt,
       target: { ...session.target },
       reader: session.reader ? { ...session.reader } : null,
       participants: Array.from(session.participants.values(), (participant) => ({ ...participant })),

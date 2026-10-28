@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { MassIntroductionService } from './mass-introduction.service';
@@ -6,7 +18,7 @@ import { StartMassIntroductionDto } from './dtos/startMassIntroduction.dto';
 import { MassIntroductionSessionDto } from './dtos/massIntroductionSession.dto';
 import { RedeemMassIntroductionDto, RedeemMassIntroductionResponseDto } from './dtos/redeemMassIntroduction.dto';
 import { MassIntroductionLiveEventDto } from './dtos/massIntroductionLiveEvent.dto';
-import { ClaimMassIntroductionDto, MassIntroductionTicketDto } from './dtos/claimMassIntroduction.dto';
+import { MassIntroductionReadersQueryDto } from './dtos/massIntroductionReaders.dto';
 
 @ApiTags('Access Control')
 // Delivered over the bundled live-updates stream, which is not in the OpenAPI document.
@@ -30,36 +42,38 @@ export class MassIntroductionController {
     return this.massIntroductionService.start(req.user, dto);
   }
 
-  @Post('claim')
-  @HttpCode(HttpStatus.OK)
+  @Get('readers')
+  @Auth()
   @ApiOperation({
-    summary: 'Exchange a scanned mass-introduction QR code for a ticket (no sign-in required)',
-    description:
-      'QR codes change every 15 seconds. Claiming one right after the scan yields a single-use ticket ' +
-      'that survives signing in, which usually takes longer than a code is valid.',
-    operationId: 'massIntroductionClaim',
+    summary: 'List the readers a mass introduction for this resource or group may use',
+    description: 'Only readers linked to the resource (or to a resource of the group) can show the scan screen.',
+    operationId: 'massIntroductionEligibleReaders',
   })
-  @ApiResponse({ status: 200, type: MassIntroductionTicketDto })
-  @ApiResponse({ status: 404, description: 'The QR code is invalid or has expired' })
-  @ApiResponse({ status: 429, description: 'Too many invalid codes for this mass introduction' })
-  claim(@Body() dto: ClaimMassIntroductionDto): MassIntroductionTicketDto {
-    return this.massIntroductionService.claim(dto.token);
+  @ApiResponse({ status: 200, type: [Number], description: 'Reader ids' })
+  @ApiResponse({ status: 403, description: 'The user is not an introducer for the target' })
+  eligibleReaders(
+    @Query() query: MassIntroductionReadersQueryDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<number[]> {
+    return this.massIntroductionService.eligibleReaderIds(req.user, query);
   }
 
   @Post('redeem')
   @Auth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Get introduced with a ticket from a scanned mass-introduction QR code',
+    summary: 'Join a mass introduction with the code shown next to its QR code',
     operationId: 'massIntroductionRedeem',
   })
   @ApiResponse({ status: 200, type: RedeemMassIntroductionResponseDto })
-  @ApiResponse({ status: 404, description: 'The ticket is invalid, used or expired' })
+  @ApiResponse({ status: 400, description: 'Wrong or expired code' })
+  @ApiResponse({ status: 404, description: 'The mass introduction has ended' })
+  @ApiResponse({ status: 429, description: 'Too many wrong codes from this user in the last minute' })
   redeem(
     @Body() dto: RedeemMassIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<RedeemMassIntroductionResponseDto> {
-    return this.massIntroductionService.redeemTicket(dto.ticket, req.user);
+    return this.massIntroductionService.redeem(dto.publicId, dto.code, req.user);
   }
 
   @Get(':sessionId')

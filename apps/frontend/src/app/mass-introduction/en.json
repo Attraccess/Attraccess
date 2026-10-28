@@ -1,4 +1,12 @@
 {
+  "join": {
+    "title": "Join the mass introduction",
+    "description": "Enter the code shown next to the QR code.",
+    "codeLabel": "Code",
+    "submit": "Join",
+    "wrongCode": "Wrong or expired code. Enter the code that is shown right now.",
+    "tooManyAttempts": "Too many wrong codes. Wait a minute and try again."
+  },
   "success": {
     "title": "Introduction complete",
     "introduced": "You've been introduced to {{{name}}}.",
@@ -6,7 +14,7 @@
   },
   "error": {
     "title": "Introduction failed",
-    "invalidOrExpired": "This QR code is invalid or has expired. Ask your introducer to show a new one.",
+    "ended": "This mass introduction has ended. Ask your introducer to start a new one.",
     "generic": "Something went wrong: {{{error}}}"
   },
   "close": "Done"

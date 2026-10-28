@@ -131,7 +131,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.massIntroductionHandler.handleCardAuthRequest(socket, eventData),
     [AttractapEventType.MASS_INTRODUCTION_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
       this.massIntroductionHandler.handleCardAuthConfirmed(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_CANCEL]: (socket) => this.massIntroductionHandler.handleCancel(socket),
+    [AttractapEventType.MASS_INTRODUCTION_CANCEL]: (socket, eventData) =>
+      this.massIntroductionHandler.handleCancel(socket, eventData),
     [AttractapEventType.START_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
       this.sessionHandler.handleStartResourceUsageSession(socket, eventData),
     [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>

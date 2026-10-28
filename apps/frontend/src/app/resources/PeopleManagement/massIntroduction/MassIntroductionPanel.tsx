@@ -22,12 +22,14 @@ import {
   MassIntroductionReaderDto,
   MassIntroductionReaderState,
   MassIntroductionSessionDto,
+  useAccessControlServiceMassIntroductionEligibleReaders,
 } from '@attraccess/react-query-client';
 import { Button } from '../../../../components/button';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { AttractapSelect } from '../../../attractap/AttractapSelect';
 import { massIntroductionUrl } from '../../../mass-introduction/MassIntroductionRedeemModal';
-import { MassIntroductionEndState, MassIntroductionSessionState } from './useMassIntroductionSession';
+import { PeopleTarget } from '../types';
+import { MassIntroductionEndState, MassIntroductionSessionState, secondsUntil } from './useMassIntroductionSession';
 
 const REQUIRED_READER_CAPABILITIES = { cardEnrollment: true };
 
@@ -46,16 +48,18 @@ function formatCountdown(seconds: number): string {
 
 interface MassIntroductionContentProps {
   t: TFunction;
+  target: PeopleTarget;
   state: MassIntroductionSessionState;
   setup: MassIntroductionSetup;
   onSetupChange: (setup: MassIntroductionSetup) => void;
 }
 
-export function MassIntroductionContent({ t, state, setup, onSetupChange }: Readonly<MassIntroductionContentProps>) {
+export function MassIntroductionContent(props: Readonly<MassIntroductionContentProps>) {
+  const { t, target, state, setup, onSetupChange } = props;
   const { phase, session, endReason } = state;
 
   if (phase === 'setup') {
-    return <SetupStep t={t} error={state.startError} setup={setup} onSetupChange={onSetupChange} />;
+    return <SetupStep t={t} target={target} error={state.startError} setup={setup} onSetupChange={onSetupChange} />;
   }
 
   if (phase === 'active' && session) {
@@ -126,12 +130,20 @@ export function MassIntroductionActions({ t, state, setup, onClose }: Readonly<M
 
 interface SetupStepProps {
   t: TFunction;
+  target: PeopleTarget;
   error: string | null;
   setup: MassIntroductionSetup;
   onSetupChange: (setup: MassIntroductionSetup) => void;
 }
 
-function SetupStep({ t, error, setup, onSetupChange }: Readonly<SetupStepProps>) {
+function SetupStep({ t, target, error, setup, onSetupChange }: Readonly<SetupStepProps>) {
+  // Only readers linked to the resource (or a resource of the group) may show the scan screen.
+  const { data: eligibleReaderIds } = useAccessControlServiceMassIntroductionEligibleReaders(
+    target.type === 'resource' ? { resourceId: target.id } : { resourceGroupId: target.id },
+    undefined,
+    { enabled: setup.useReader },
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <Description>{t('setup.description')}</Description>
@@ -150,6 +162,7 @@ function SetupStep({ t, error, setup, onSetupChange }: Readonly<SetupStepProps>)
             selection={setup.readerId}
             onSelectionChange={(readerId) => onSetupChange({ ...setup, readerId })}
             requiredCapabilities={REQUIRED_READER_CAPABILITIES}
+            readerIds={eligibleReaderIds ?? []}
           />
           <Description>{t('setup.readerDescription')}</Description>
         </div>
@@ -184,6 +197,7 @@ function ActiveSession({ t, session, secondsLeft }: Readonly<ActiveSessionProps>
       <figure className="flex flex-col items-center gap-2" aria-label={t('active.qrLabel')}>
         <QRCode value={url} size={256} qrStyle="fluid" quietZone={8} />
         <Description className="text-center">{t('active.scanHint')}</Description>
+        <JoinCode t={t} code={session.code} refreshAt={session.codeRefreshAt} />
         <Description className="text-center">{t('active.rotationHint')}</Description>
       </figure>
 
@@ -204,6 +218,21 @@ function ActiveSession({ t, session, secondsLeft }: Readonly<ActiveSessionProps>
 
       {session.reader && <ReaderStatus t={t} reader={session.reader} />}
     </>
+  );
+}
+
+/** Rerenders every second with the session countdown, so the "changes in" hint stays current. */
+function JoinCode({ t, code, refreshAt }: Readonly<{ t: TFunction; code: string; refreshAt: string }>) {
+  return (
+    <div className="flex flex-col items-center" data-cy="mass-introduction-code">
+      <Label>{t('active.codeLabel')}</Label>
+      <output className="text-4xl font-semibold tabular-nums tracking-widest text-foreground" aria-label={t('active.codeLabel')}>
+        {`${code.slice(0, 3)} ${code.slice(3)}`}
+      </output>
+      <Description className="tabular-nums">
+        {t('active.codeChangesIn', { seconds: secondsUntil(refreshAt) })}
+      </Description>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, ResourceGroup } from '@attraccess/database-entities';
+import { Attractap, Resource, ResourceGroup } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -25,6 +25,7 @@ describe('MassIntroductionService', () => {
   let groupIntroducers: { isIntroducer: jest.Mock };
   let live: { emitToIntroducer: jest.Mock };
   let readerPort: { arm: jest.Mock; disarm: jest.Mock };
+  let readerRepository: { find: jest.Mock };
 
   const introducer = {
     id: 1,
@@ -41,9 +42,9 @@ describe('MassIntroductionService', () => {
   const alice = { id: 7, username: 'alice' };
   const bob = { id: 8, username: 'bob' };
 
-  /** Scan the QR code shown right now, then redeem the ticket as the signed-in participant. */
-  const scan = (session: { token: string }, user: { id: number; username: string }) =>
-    Promise.resolve().then(() => service.redeemTicket(service.claim(session.token).ticket, user));
+  /** Scan the QR code and type the code shown next to it, as the signed-in participant. */
+  const scan = (session: { publicId: string; code: string }, user: { id: number; username: string }) =>
+    service.redeem(session.publicId, session.code, user);
 
   const eventsOfType = (type: MassIntroductionLiveEventType) =>
     live.emitToIntroducer.mock.calls
@@ -66,6 +67,7 @@ describe('MassIntroductionService', () => {
     groupIntroducers = { isIntroducer: jest.fn().mockResolvedValue(true) };
     live = { emitToIntroducer: jest.fn() };
     readerPort = { arm: jest.fn().mockResolvedValue({ readerName: 'Entrance' }), disarm: jest.fn() };
+    readerRepository = { find: jest.fn().mockResolvedValue([{ id: 3 }, { id: 4 }, { id: 3 }]) };
 
     const module = await Test.createTestingModule({
       providers: [
@@ -77,12 +79,17 @@ describe('MassIntroductionService', () => {
         { provide: MassIntroductionLiveService, useValue: live },
         {
           provide: getRepositoryToken(Resource),
-          useValue: { findOne: jest.fn(({ where }) => Promise.resolve({ id: where.id, name: 'Laser' })) },
+          useValue: {
+            findOne: jest.fn(({ where }) => Promise.resolve({ id: where.id, name: 'Laser' })),
+            // Resources of a group (group 3 holds resources 5 and 6).
+            find: jest.fn(() => Promise.resolve([{ id: 5 }, { id: 6 }])),
+          },
         },
         {
           provide: getRepositoryToken(ResourceGroup),
           useValue: { findOne: jest.fn(({ where }) => Promise.resolve({ id: where.id, name: 'Wood shop' })) },
         },
+        { provide: getRepositoryToken(Attractap), useValue: readerRepository },
       ],
     }).compile();
 
@@ -162,9 +169,8 @@ describe('MassIntroductionService', () => {
     expect(resourceIntroductions.grant).not.toHaveBeenCalled();
   });
 
-  it('rejects unknown codes and tickets', async () => {
-    expect(() => service.claim('not-a-token')).toThrow(NotFoundException);
-    await expect(service.redeemTicket('not.a-ticket', alice)).rejects.toBeInstanceOf(NotFoundException);
+  it('rejects unknown sessions', async () => {
+    await expect(service.redeem('not-a-session', '123456', alice)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('expires after 15 minutes: the token stops working and the reader is released', async () => {
@@ -252,68 +258,96 @@ describe('MassIntroductionService', () => {
     expect(readerPort.disarm).not.toHaveBeenCalled();
   });
 
-  describe('rotating QR codes', () => {
+  describe('join codes', () => {
     const PERIOD_MS = 15_000;
 
-    it('changes the code every 15 seconds and accepts it until the next change', async () => {
-      const session = await service.start(introducer, { resourceId: 5 });
-      const shownAt = Date.now();
-
-      expect(new Date(session.tokenRefreshAt).getTime() - shownAt).toBeLessThanOrEqual(PERIOD_MS);
-      const later = service.get(session.id, introducer.id);
-      expect(later.token.split('.')[0]).toBe(session.token.split('.')[0]);
-
-      // Still valid one period later (a scan just before the change), no longer two periods later.
-      expect(() => service.claim(session.token, shownAt + PERIOD_MS)).not.toThrow();
-      expect(() => service.claim(session.token, shownAt + 2 * PERIOD_MS + 1000)).toThrow(NotFoundException);
-    });
-
-    it('rejects a code with a wrong number', async () => {
-      const session = await service.start(introducer, { resourceId: 5 });
-      const [publicId, code] = session.token.split('.');
-      const wrong = String((Number(code) + 1) % 100_000_000).padStart(8, '0');
-
-      expect(() => service.claim(`${publicId}.${wrong}`)).toThrow(NotFoundException);
-      expect(() => service.claim(publicId)).toThrow(NotFoundException);
-    });
-
-    it('stops accepting guesses after too many invalid codes in a minute', async () => {
+    it('keeps the QR code fixed and changes the 6-digit code every 15 seconds', async () => {
       jest.useFakeTimers();
       const session = await service.start(introducer, { resourceId: 5 });
-      const [publicId] = session.token.split('.');
-      for (let i = 0; i < MassIntroductionService.MAX_FAILED_CLAIMS_PER_MINUTE; i++) {
-        expect(() => service.claim(`${publicId}.00000000`)).toThrow(NotFoundException);
-      }
+      const startedAt = Date.now();
 
-      expect(() => service.claim(session.token)).toThrow(expect.objectContaining({ status: 429 }));
+      expect(session.code).toMatch(/^\d{6}$/);
+      expect(new Date(session.codeRefreshAt).getTime() - startedAt).toBeLessThanOrEqual(PERIOD_MS);
+      const later = service.get(session.id, introducer.id);
+      expect(later.publicId).toBe(session.publicId);
 
-      jest.setSystemTime(Date.now() + 60_000);
-      expect(() => service.claim(service.get(session.id, introducer.id).token)).not.toThrow();
+      // Still accepted one period later (typed just before it changed), no longer two periods later.
+      await expect(service.redeem(session.publicId, session.code, alice, startedAt + PERIOD_MS)).resolves.toBeDefined();
+      await expect(
+        service.redeem(session.publicId, session.code, bob, startedAt + 2 * PERIOD_MS + 1000),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('lets a ticket outlive the code for a sign-in, but only once and not forever', async () => {
+    it('rejects wrong codes', async () => {
       const session = await service.start(introducer, { resourceId: 5 });
-      const scannedAt = Date.now();
-      const { ticket } = service.claim(session.token, scannedAt);
+      const wrong = String((Number(session.code) + 1) % 1_000_000).padStart(6, '0');
 
-      // Signing in took five minutes; the code itself expired long ago.
-      await expect(service.redeemTicket(ticket, alice, scannedAt + 5 * 60_000)).resolves.toBeDefined();
-      await expect(service.redeemTicket(ticket, bob, scannedAt + 5 * 60_000)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.redeem(session.publicId, wrong, alice)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.redeem(session.publicId, '12345', alice)).rejects.toBeInstanceOf(BadRequestException);
+      expect(resourceIntroductions.grant).not.toHaveBeenCalled();
+    });
 
-      const { ticket: stale } = service.claim(service.get(session.id, introducer.id).token);
+    it('limits wrong codes per participant, so one person cannot lock out the others', async () => {
+      jest.useFakeTimers();
+      const session = await service.start(introducer, { resourceId: 5 });
+      const wrong = String((Number(session.code) + 1) % 1_000_000).padStart(6, '0');
+      for (let i = 0; i < MassIntroductionService.MAX_WRONG_CODES_PER_MINUTE; i++) {
+        await expect(service.redeem(session.publicId, wrong, alice)).rejects.toBeInstanceOf(BadRequestException);
+      }
+
+      await expect(service.redeem(session.publicId, session.code, alice)).rejects.toEqual(
+        expect.objectContaining({ status: 429 }),
+      );
+      await expect(service.redeem(session.publicId, session.code, bob)).resolves.toBeDefined();
+
+      jest.setSystemTime(Date.now() + 60_000);
       await expect(
-        service.redeemTicket(stale, bob, Date.now() + MassIntroductionService.TICKET_TTL_MS + 1),
-      ).rejects.toBeInstanceOf(NotFoundException);
+        service.redeem(session.publicId, service.get(session.id, introducer.id).code, alice),
+      ).resolves.toBeDefined();
+    });
+
+    it('introduces each participant once, even for concurrent submissions', async () => {
+      const session = await service.start(introducer, { resourceId: 5 });
+
+      await Promise.all([scan(session, alice), scan(session, alice), scan(session, alice)]);
+
       expect(resourceIntroductions.grant).toHaveBeenCalledTimes(1);
     });
 
-    it('invalidates tickets when the session ends', async () => {
+    it('reports a participant who already joined without checking the code again', async () => {
       const session = await service.start(introducer, { resourceId: 5 });
-      const { ticket } = service.claim(session.token);
+      await scan(session, alice);
+
+      await expect(service.redeem(session.publicId, '000000', alice)).resolves.toEqual(
+        expect.objectContaining({ alreadyIntroduced: false }),
+      );
+    });
+
+    it('stops accepting codes when the session ends', async () => {
+      const session = await service.start(introducer, { resourceId: 5 });
 
       service.cancel(session.id, introducer.id);
 
-      await expect(service.redeemTicket(ticket, alice)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(scan(session, alice)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('readers', () => {
+    it('only arms readers linked to the target', async () => {
+      await service.start(introducer, { resourceId: 5, readerId: 3 });
+      expect(readerPort.arm).toHaveBeenCalledWith(expect.objectContaining({ readerId: 3, allowedResourceIds: [5] }));
+
+      await service.start(introducer, { resourceGroupId: 3, readerId: 4 });
+      expect(readerPort.arm).toHaveBeenLastCalledWith(
+        expect.objectContaining({ readerId: 4, allowedResourceIds: [5, 6] }),
+      );
+    });
+
+    it('lists the readers linked to the target for introducers only', async () => {
+      await expect(service.eligibleReaderIds(introducer, { resourceGroupId: 3 })).resolves.toEqual([3, 4]);
+
+      resourceIntroducers.isIntroducer.mockResolvedValue(false);
+      await expect(service.eligibleReaderIds(introducer, { resourceId: 5 })).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });

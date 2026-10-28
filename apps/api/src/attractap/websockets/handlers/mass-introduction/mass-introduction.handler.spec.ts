@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { MassIntroductionEndReason } from '../../../../resources/mass-introductions/dtos/massIntroductionLiveEvent.dto';
 import { AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapMassIntroductionHandler } from './mass-introduction.handler';
@@ -42,6 +42,7 @@ describe('AttractapMassIntroductionHandler', () => {
   const arm = () =>
     port().arm({
       readerId: READER_ID,
+      allowedResourceIds: [42],
       sessionId: SESSION_ID,
       targetName: 'Laser',
       introducerUsername: 'tutor',
@@ -96,6 +97,20 @@ describe('AttractapMassIntroductionHandler', () => {
       expect(start.payload.remainingMs).toBeGreaterThan(0);
     });
 
+    it('refuses readers that are not linked to the target', async () => {
+      attractapService.findReaderById.mockResolvedValue({
+        id: READER_ID,
+        name: 'Front door',
+        firmware: { capabilities: { cardEnrollment: true } },
+        resources: [{ id: 99 }],
+      });
+      const socket = makeSocket();
+      websocketService.sockets.set('a', socket);
+
+      await expect(arm()).rejects.toBeInstanceOf(ForbiddenException);
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('rejects readers whose firmware lacks the capability', async () => {
       attractapService.findReaderById.mockResolvedValue({ id: READER_ID, firmware: { capabilities: {} } });
       websocketService.sockets.set('a', makeSocket());
@@ -144,7 +159,7 @@ describe('AttractapMassIntroductionHandler', () => {
     it('reports a reader that refused the start while it was being acknowledged', async () => {
       const socket = makeSocket();
       (socket.sendMessage as jest.Mock).mockImplementation(async () => {
-        await handler.handleCancel(socket);
+        await handler.handleCancel(socket, event({ sessionId: SESSION_ID }));
         return true;
       });
       websocketService.sockets.set('a', socket);
@@ -247,10 +262,20 @@ describe('AttractapMassIntroductionHandler', () => {
   });
 
   describe('leaving', () => {
+    it('ignores a cancel for a session the reader is not showing', async () => {
+      const socket = makeSocket({ massIntroductionFlow: { sessionId: SESSION_ID, pendingCard: null } });
+
+      // E.g. the reader refusing an older start after it was re-armed for this session.
+      await handler.handleCancel(socket, event({ sessionId: 'older-session' }));
+
+      expect(socket.state.massIntroductionFlow).toEqual({ sessionId: SESSION_ID, pendingCard: null });
+      expect(massIntroductionService.detachReader).not.toHaveBeenCalled();
+    });
+
     it('detaches the reader from the session when it cancels', async () => {
       const socket = makeSocket({ massIntroductionFlow: { sessionId: SESSION_ID, pendingCard: null } });
 
-      await handler.handleCancel(socket);
+      await handler.handleCancel(socket, event({ sessionId: SESSION_ID }));
 
       expect(socket.state.massIntroductionFlow).toBeNull();
       expect(massIntroductionService.detachReader).toHaveBeenCalledWith(SESSION_ID, READER_ID);

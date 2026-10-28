@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Resource, ResourceGroup } from '@attraccess/database-entities';
+import { Attractap, Resource, ResourceGroup } from '@attraccess/database-entities';
 import { ResourceIntroductionsModule } from '../introductions/resourceIntroductions.module';
 import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.module';
 import { ResourceGroupsModule } from '../groups/resourceGroups.module';
@@ -16,7 +16,7 @@ import { MassIntroductionLiveTopicsProvider } from './mass-introduction-live-top
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Resource, ResourceGroup]),
+    TypeOrmModule.forFeature([Resource, ResourceGroup, Attractap]),
     ResourceIntroductionsModule,
     ResourceIntroducersModule,
     ResourceGroupsModule,

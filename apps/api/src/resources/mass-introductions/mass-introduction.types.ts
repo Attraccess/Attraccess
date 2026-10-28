@@ -21,17 +21,12 @@ export interface MassIntroductionParticipant {
 
 export interface ActiveMassIntroduction {
   id: string;
-  /** Identifies the session inside QR codes; the rotating code next to it proves a recent scan. */
+  /** Identifies the session in the QR code. Not a secret: joining also needs the rotating code. */
   publicId: string;
-  /** TOTP secret behind the rotating QR code. Never leaves the server. */
+  /** TOTP secret behind the rotating code shown next to the QR code. Never leaves the server. */
   codeSecret: string;
-  /**
-   * Single-use tickets handed out for scanned codes, keyed by ticket. Logging in after scanning
-   * takes longer than a code is valid, so the ticket carries the scan across the login.
-   */
-  tickets: Map<string, { expiresAt: number }>;
-  /** Failed claims in the current minute; caps guessing of the 8-digit code. */
-  failedClaims: { windowStart: number; count: number };
+  /** Wrong codes per participant in the current minute; caps guessing per person. */
+  wrongCodes: Map<number, { windowStart: number; count: number }>;
   target: MassIntroductionTarget;
   introducer: {
     id: number;
@@ -68,6 +63,8 @@ export interface MassIntroductionReaderPort {
    */
   arm(params: {
     readerId: number;
+    /** Only readers linked to one of these resources may be armed. */
+    allowedResourceIds: number[];
     sessionId: string;
     targetName: string;
     introducerUsername: string;
