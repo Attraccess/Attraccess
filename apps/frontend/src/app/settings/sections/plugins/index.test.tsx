@@ -229,6 +229,32 @@ describe('PluginsSection', () => {
     ).toBeInTheDocument();
   });
 
+  it.each(['Cancel button', 'Escape key'])(
+    'discards the install acknowledgement when the confirmation is dismissed with the %s',
+    async (dismissal) => {
+      const user = userEvent.setup();
+      render(<PluginsSection />);
+      await openMarketplace(user);
+      await user.click(await screen.findByText('Example'));
+
+      await user.click(screen.getByRole('button', { name: 'Install' }));
+      const dialog = screen.getByRole('heading', { name: 'Install Example?' }).closest('[role="dialog"]') as HTMLElement;
+      await user.click(within(dialog).getByRole('checkbox'));
+      expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
+      if (dismissal === 'Cancel button') await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      else await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Install Example?' })).not.toBeInTheDocument());
+
+      await user.click(screen.getByRole('button', { name: 'Install' }));
+      const reopened = (await screen.findByRole('heading', { name: 'Install Example?' })).closest(
+        '[role="dialog"]',
+      ) as HTMLElement;
+      expect(within(reopened).getByRole('checkbox')).not.toBeChecked();
+      expect(within(reopened).getByRole('button', { name: 'Install plugin' })).toBeDisabled();
+      expect(hoisted.installPackageMock).not.toHaveBeenCalled();
+    },
+  );
+
   it('installs an exact private package version from its selected registry', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: { url?: string } | string) => {

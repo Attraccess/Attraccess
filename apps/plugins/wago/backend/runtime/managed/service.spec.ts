@@ -12,6 +12,7 @@ import { resetTestFixture } from './setup.test-fixture';
 import { managedSsh } from './transport/ssh';
 import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
 import { WagoService } from '../../controllers/service';
+import { WagoNetworkChange } from '../../network/entity';
 
 const artifact: BuildRuntimeArtifact = {
   imageId: `sha256:${'1'.repeat(64)}`,
@@ -509,4 +510,95 @@ describe('managed enrolment and durable credential lifecycle', () => {
       expect(jest.mocked(managedSsh)).not.toHaveBeenCalled();
     },
   );
+
+  describe('managed access retry', () => {
+    const headers = () => jest.mocked(managedSsh).mock.calls.map(([, , header]) => header.split(' ')[0]);
+
+    const leaseOwner = async () =>
+      (await db.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: session().hostKeyFingerprint }))?.owner;
+
+    const answer = (replies: Record<string, string>) =>
+      jest.mocked(managedSsh).mockImplementation(async (_access, _key, header) => {
+        const [command, argument] = header.split(' ');
+        return replies[command] ?? (command === 'proof' ? `OK ${argument}\n` : 'OK\n');
+      });
+
+    beforeEach(async () => {
+      await service.enrol(session(), async () => 'OK\n', new AbortController().signal);
+      await db.getRepository(WagoManagedAccess).update(1, { state: 'recovery_required' });
+      jest.mocked(managedSsh).mockClear();
+      rootProbe.mockClear();
+    });
+
+    it('restores managed state only after a committed receipt reports the hardened policy', async () => {
+      answer({ 'access-status': 'committed\n' });
+      await service.retryAccess(1);
+      expect(headers()).toEqual(['proof', 'access-status', 'access-policy']);
+      expect((await service.sessionStatus(1)).management).toBe('managed');
+      expect(rootProbe).not.toHaveBeenCalled();
+      expect(await leaseOwner()).toBeNull();
+    });
+
+    it('keeps recovery state when a committed receipt cannot prove the hardened policy', async () => {
+      answer({ 'access-status': 'committed\n', 'access-policy': 'FAILED\n' });
+      await expect(service.retryAccess(1)).rejects.toThrow('Managed SSH policy is unverified');
+      expect((await service.sessionStatus(1)).management).toBe('recovery_required');
+      expect(await leaseOwner()).toBeNull();
+    });
+
+    it('recommits the managed key through the proven root login while the receipt is open', async () => {
+      answer({ 'access-status': 'open\n' });
+      await service.retryAccess(1);
+      const row = (await db.query('SELECT encrypted_credentials FROM plugin_wago_managed_access'))[0];
+      expect(rootProbe).toHaveBeenCalledWith(
+        session().targetHost,
+        session().hostKeyFingerprint,
+        JSON.parse(decrypt(row.encrypted_credentials)).recoveryPassword,
+      );
+      expect(headers()).toEqual(['proof', 'access-status', 'access-key-commit', 'proof']);
+      expect((await service.sessionStatus(1)).management).toBe('verified');
+      expect(await leaseOwner()).toBeNull();
+    });
+
+    it.each([
+      ['an open receipt without a working root login', 'open\n', false],
+      ['a cutover receipt', 'cutover\n', true],
+    ])('waits for the SSH-policy watchdog on %s', async (_case, status, rootLogin) => {
+      answer({ 'access-status': status });
+      rootProbe.mockResolvedValue(rootLogin);
+      await expect(service.retryAccess(1)).rejects.toThrow('Wait for the SSH-policy watchdog');
+      expect(headers()).toEqual(['proof', 'access-status']);
+      expect((await service.sessionStatus(1)).management).toBe('recovery_required');
+      expect(await leaseOwner()).toBeNull();
+    });
+
+    it('refuses to contact the controller while another operation owns it', async () => {
+      const fingerprint = session().hostKeyFingerprint;
+      expect(await service['operations'].acquire(fingerprint, 'other', Date.now(), Date.now() + 60_000)).toBe(true);
+      await expect(service.retryAccess(1)).rejects.toThrow('Controller is busy');
+      expect(managedSsh).not.toHaveBeenCalled();
+      expect(await leaseOwner()).toBe('other');
+    });
+
+    it('refuses unknown sessions and pending address changes before contacting the controller', async () => {
+      await expect(service.retryAccess(2)).rejects.toThrow('cannot be retried');
+      await db.getRepository(WagoManagedAccess).update(1, { controllerId: 1 });
+      await db.getRepository(WagoNetworkChange).save(
+        Object.assign(new WagoNetworkChange(), {
+          controllerId: 1,
+          sessionId: 1,
+          fingerprint: session().hostKeyFingerprint,
+          targetHost: '10.77.0.8',
+          mqttServerId: null,
+          phase: 'applying',
+          failure: null,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+      await expect(service.retryAccess(1)).rejects.toThrow('pending MQTT/address change');
+      expect(managedSsh).not.toHaveBeenCalled();
+      expect((await service.sessionStatus(1)).management).toBe('recovery_required');
+      expect(await leaseOwner()).toBeNull();
+    });
+  });
 });

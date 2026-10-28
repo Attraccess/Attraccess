@@ -176,6 +176,31 @@ describe('Flow-defined metering', () => {
       await expect(operationsScope.run(session)).rejects.toThrow(/already answered/);
     });
 
+    it('accepts an identical duplicate ready reply and rejects a conflicting baseline or source', async () => {
+      const outcomes: string[] = [];
+      scope.onStart = async ({ complete }) => {
+        await complete({ kind: 'ready', baseline: { value: '5' }, source: 'plug' });
+        for (const report of [
+          { kind: 'ready', baseline: { value: '5.0' }, source: 'plug' },
+          { kind: 'ready', baseline: { value: '6' }, source: 'plug' },
+          { kind: 'ready', baseline: { value: '5' } },
+        ] as const)
+          outcomes.push(
+            await complete(report).then(
+              () => 'accepted',
+              (error: Error) => error.message,
+            ),
+          );
+      };
+      const session = await operationsScope.activeSession();
+      expect(outcomes).toEqual([
+        'accepted',
+        'The start request was already answered or has expired',
+        'The start request was already answered or has expired',
+      ]);
+      expect(session).toEqual(expect.objectContaining({ baselineValue: '5000000000', source: 'plug' }));
+    });
+
     it('rejects a reply of the wrong kind and a report for an unknown resource', async () => {
       const session = await operationsScope.activeSession();
       operationsScope.onCollect = ({ complete }) => complete({ kind: 'ready' });

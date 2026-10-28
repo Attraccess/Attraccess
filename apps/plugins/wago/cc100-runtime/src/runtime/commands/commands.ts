@@ -2,70 +2,85 @@ import { supportsOutputAction } from '../../../../channel-behavior';
 import { RuntimeConfiguration } from '../configuration/configuration';
 import { WriteAdmissionError } from '../types';
 
+type OutputCommand = {
+  id: string;
+  expiresAt?: unknown;
+  channelId: string;
+  action: 'set' | 'pulse' | 'release';
+  source?: 'manual';
+  value?: boolean;
+  expectedConfigurationRevision?: unknown;
+};
+
+type CommandFailure = { error: string; code: string };
+
+/** Unparseable or unaddressable payloads cannot be acknowledged and are dropped. */
+function parseCommand(payload: Buffer): OutputCommand | undefined {
+  let command: OutputCommand;
+  try {
+    command = JSON.parse(payload.toString('utf8'));
+  } catch {
+    return undefined;
+  }
+  if (
+    typeof command?.id !== 'string' ||
+    !command.id ||
+    !command.channelId ||
+    !['set', 'pulse', 'release'].includes(command.action)
+  )
+    return undefined;
+  return command;
+}
+
+function commandFormatFailure(command: OutputCommand): CommandFailure | undefined {
+  if (
+    (command.source !== undefined && command.source !== 'manual') ||
+    (command.action === 'release' && command.source !== 'manual')
+  )
+    return { error: 'invalid command source', code: 'invalid_command' };
+  if (command.action === 'set' && typeof command.value !== 'boolean')
+    return { error: 'set commands require a boolean value', code: 'invalid_command' };
+  return undefined;
+}
+
+function isUnexpired(expiresAt: unknown): expiresAt is string {
+  return typeof expiresAt === 'string' && Number.isFinite(Date.parse(expiresAt)) && Date.parse(expiresAt) > Date.now();
+}
+
+function isConfigurationRevision(revision: unknown): revision is number {
+  return typeof revision === 'number' && Number.isSafeInteger(revision) && revision > 0;
+}
+
+/** Only admission rejections and a full channel queue are reported; anything else propagates. */
+function interruptedCommandFailure(error: unknown): CommandFailure {
+  if (error instanceof WriteAdmissionError) return { error: error.message, code: error.code };
+  if (!(error instanceof Error) || error.message !== 'channel write queue is full') throw error;
+  return { error: error.message, code: 'queue_full' };
+}
+
 export abstract class RuntimeCommands extends RuntimeConfiguration {
   async receiveCommand(payload: Buffer): Promise<void> {
-    let command: {
-      id: string;
-      expiresAt?: unknown;
-      channelId: string;
-      action: 'set' | 'pulse' | 'release';
-      source?: 'manual';
-      value?: boolean;
-      expectedConfigurationRevision?: unknown;
-    };
-    try {
-      command = JSON.parse(payload.toString('utf8'));
-    } catch {
-      return;
-    }
-    if (
-      typeof command?.id !== 'string' ||
-      !command.id ||
-      !command.channelId ||
-      !['set', 'pulse', 'release'].includes(command.action)
-    )
-      return;
-    if (
-      (command.source !== undefined && command.source !== 'manual') ||
-      (command.action === 'release' && command.source !== 'manual')
-    )
-      return this.acknowledge(command.id, 'rejected', 'invalid command source', 'invalid_command');
-    if (command.action === 'set' && typeof command.value !== 'boolean')
-      return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value', 'invalid_command');
+    const command = parseCommand(payload);
+    if (!command) return;
+    const formatFailure = commandFormatFailure(command);
+    if (formatFailure) return this.acknowledge(command.id, 'rejected', formatFailure.error, formatFailure.code);
     const expiresAt = command.expiresAt;
-    if (typeof expiresAt !== 'string' || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now())
-      return this.acknowledge(command.id, 'rejected', 'command has expired', 'expired');
+    if (!isUnexpired(expiresAt)) return this.acknowledge(command.id, 'rejected', 'command has expired', 'expired');
     const expectedConfigurationRevision = command.expectedConfigurationRevision;
-    if (
-      typeof expectedConfigurationRevision !== 'number' ||
-      !Number.isSafeInteger(expectedConfigurationRevision) ||
-      expectedConfigurationRevision <= 0
-    )
+    if (!isConfigurationRevision(expectedConfigurationRevision))
       return this.acknowledge(command.id, 'rejected', 'command requires a configuration revision', 'invalid_command');
-    if (this.configurationPending)
-      return this.acknowledge(command.id, 'rejected', 'configuration persistence is in progress', 'configuration_busy');
-    if (this.runtimeUpdateRequired || this.runtimeFailsafePending)
-      return this.acknowledge(
-        command.id,
-        'rejected',
-        'Runtime update required; outputs are held in failsafe',
-        'runtime_update',
-      );
+    const availabilityFailure = this.commandAvailabilityFailure();
+    if (availabilityFailure)
+      return this.acknowledge(command.id, 'rejected', availabilityFailure.error, availabilityFailure.code);
     this.pruneCommandExpiries();
     if (this.state.commandIds.includes(command.id) || this.state.commandExpiries?.[command.id])
       return this.acknowledge(command.id, 'duplicate');
     if (this.inFlightCommandIds.has(command.id)) return this.acknowledge(command.id, 'duplicate');
     this.inFlightCommandIds.add(command.id);
     try {
-      if (this.state.accepted?.revision !== expectedConfigurationRevision)
-        return this.acknowledge(command.id, 'rejected', 'controller configuration revision is stale', 'stale_revision');
-      if (this.state.accepted && this.options.device.validate?.(this.state.accepted.snapshot).length)
-        return this.acknowledge(
-          command.id,
-          'rejected',
-          'stored configuration is unsupported by this hardware profile; publish a corrected configuration',
-          'unsupported_point',
-        );
+      const configurationFailure = this.acceptedConfigurationFailure(expectedConfigurationRevision);
+      if (configurationFailure)
+        return this.acknowledge(command.id, 'rejected', configurationFailure.error, configurationFailure.code);
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
       if (!channel || !channel.capabilities.includes('output'))
         return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
@@ -157,16 +172,30 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
       // Release the physical channel/configuration barrier before waiting on MQTT.
       await this.acknowledge(command.id, failure ? 'rejected' : 'accepted', failure?.error, failure?.code);
     } catch (error) {
-      if (error instanceof WriteAdmissionError) {
-        await this.releaseCommand(command.id);
-        await this.acknowledge(command.id, 'rejected', error.message, error.code);
-        return;
-      }
-      if (!(error instanceof Error) || error.message !== 'channel write queue is full') throw error;
+      const failure = interruptedCommandFailure(error);
       await this.releaseCommand(command.id);
-      await this.acknowledge(command.id, 'rejected', error.message, 'queue_full');
+      await this.acknowledge(command.id, 'rejected', failure.error, failure.code);
     } finally {
       this.inFlightCommandIds.delete(command.id);
     }
+  }
+
+  protected commandAvailabilityFailure(): CommandFailure | undefined {
+    if (this.configurationPending)
+      return { error: 'configuration persistence is in progress', code: 'configuration_busy' };
+    if (this.runtimeUpdateRequired || this.runtimeFailsafePending)
+      return { error: 'Runtime update required; outputs are held in failsafe', code: 'runtime_update' };
+    return undefined;
+  }
+
+  protected acceptedConfigurationFailure(expectedConfigurationRevision: number): CommandFailure | undefined {
+    if (this.state.accepted?.revision !== expectedConfigurationRevision)
+      return { error: 'controller configuration revision is stale', code: 'stale_revision' };
+    if (this.state.accepted && this.options.device.validate?.(this.state.accepted.snapshot).length)
+      return {
+        error: 'stored configuration is unsupported by this hardware profile; publish a corrected configuration',
+        code: 'unsupported_point',
+      };
+    return undefined;
   }
 }

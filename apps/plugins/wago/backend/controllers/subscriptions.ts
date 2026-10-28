@@ -18,6 +18,8 @@ import { canonicalEnvelope, sourceTime, validEnvelope } from '../diagnostics/env
 
 import { hash, isValidHardwareId } from './model';
 
+import { WagoController } from './entity';
+
 import { type PluginContext, type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 
 import { MqttSubscriptionError } from './model';
@@ -26,22 +28,9 @@ import { WagoControllerEnrollment } from './enrollment';
 
 export abstract class WagoSubscriptions extends WagoControllerEnrollment {
   protected async onHeartbeat(hardwareId: string, payload: Buffer): Promise<void> {
-    let heartbeat: WagoHeartbeat;
-    try {
-      heartbeat = parseHeartbeat(payload);
-    } catch (error) {
-      this.context.logger.warn(
-        `Ignoring invalid WAGO heartbeat: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return;
-    }
-    if (heartbeat.hardwareId !== hardwareId) return;
-    let rawHeartbeat: Record<string, unknown>;
-    try {
-      rawHeartbeat = JSON.parse(payload.toString('utf8'));
-    } catch {
-      return;
-    }
+    const parsed = this.parseHeartbeatPayload(hardwareId, payload);
+    if (!parsed) return;
+    const { heartbeat, rawHeartbeat } = parsed;
     const canonical = canonicalEnvelope(rawHeartbeat, 'heartbeat');
     const controller = await this.controllers.findOneBy({ hardwareId });
     if (
@@ -60,45 +49,69 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       : typeof rawHeartbeat.timestamp === 'string'
         ? rawHeartbeat.timestamp
         : undefined;
-    const persistedHeartbeatAt = sourceTime(controller.lastHeartbeatAt);
-    // A full bounded diagnostic cache must not disable permanent heartbeat checkpoints.
-    // Other canonical rejections remain invalid and never use receipt time as liveness.
-    if (
-      canonical &&
-      (!validEnvelope(rawHeartbeat, Date.now()) ||
-        !heartbeatAt ||
-        (persistedHeartbeatAt !== null && sourceTime(heartbeatAt) < persistedHeartbeatAt))
-    )
-      return;
+    if (canonical && !acceptedCanonicalHeartbeat(rawHeartbeat, heartbeatAt, controller.lastHeartbeatAt)) return;
     // Connectivity is process-local between bounded persistence checkpoints.
-    if (
-      canonical &&
-      (admitted || !canTrackDiagnostics) &&
-      typeof rawHeartbeat.streamId === 'string' &&
-      typeof rawHeartbeat.timestamp === 'string'
-    ) {
-      this.runtimeStatusHandler?.(controller.id, {
-        imageId: heartbeat.runtimeImageId ?? '',
-        runtimeVersion: heartbeat.runtimeVersion,
-        streamId: rawHeartbeat.streamId,
-        timestamp: Date.parse(rawHeartbeat.timestamp),
-        receivedAt: Date.now(),
-        sequence: rawHeartbeat.sequence as number,
-        ...(heartbeat.runtimePolicyToken ? { runtimePolicyToken: heartbeat.runtimePolicyToken } : {}),
-      });
-    }
+    if (canonical && (admitted || !canTrackDiagnostics))
+      this.reportRuntimeStatus(controller.id, heartbeat, rawHeartbeat);
     // Avoid a database write for every permanent heartbeat.
-    const metadataChanged =
-      controller.protocolVersion !== heartbeat.protocolVersion ||
-      controller.runtimeVersion !== heartbeat.runtimeVersion ||
-      controller.capabilities !== JSON.stringify(heartbeat.capabilities) ||
-      controller.compatibilityError !== compatibilityError(heartbeat);
     if (
       controller.lastHeartbeatAt &&
       freshness(controller.lastSeenAt, Date.now(), 30_000) === 'fresh' &&
-      !metadataChanged
+      !heartbeatMetadataChanged(controller, heartbeat)
     )
       return;
+    await this.checkpointHeartbeat(controller, heartbeat, canonical, heartbeatAt, now);
+  }
+
+  /** Parse a heartbeat for the expected controller; malformed packets are ignored. */
+  protected parseHeartbeatPayload(
+    hardwareId: string,
+    payload: Buffer,
+  ): { heartbeat: WagoHeartbeat; rawHeartbeat: Record<string, unknown> } | undefined {
+    let heartbeat: WagoHeartbeat;
+    try {
+      heartbeat = parseHeartbeat(payload);
+    } catch (error) {
+      this.context.logger.warn(
+        `Ignoring invalid WAGO heartbeat: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return undefined;
+    }
+    if (heartbeat.hardwareId !== hardwareId) return undefined;
+    try {
+      return { heartbeat, rawHeartbeat: JSON.parse(payload.toString('utf8')) };
+    } catch {
+      return undefined;
+    }
+  }
+
+  protected reportRuntimeStatus(
+    controllerId: number,
+    heartbeat: WagoHeartbeat,
+    rawHeartbeat: Record<string, unknown>,
+  ): void {
+    if (typeof rawHeartbeat.streamId !== 'string' || typeof rawHeartbeat.timestamp !== 'string') return;
+    this.runtimeStatusHandler?.(controllerId, {
+      imageId: heartbeat.runtimeImageId ?? '',
+      runtimeVersion: heartbeat.runtimeVersion,
+      streamId: rawHeartbeat.streamId,
+      timestamp: Date.parse(rawHeartbeat.timestamp),
+      receivedAt: Date.now(),
+      sequence: rawHeartbeat.sequence as number,
+      ...(heartbeat.runtimePolicyToken ? { runtimePolicyToken: heartbeat.runtimePolicyToken } : {}),
+    });
+  }
+
+  /** Persist a heartbeat checkpoint. Canonical heartbeats record their source
+   * time; legacy heartbeats advance the sequence and use receipt time.
+   */
+  protected async checkpointHeartbeat(
+    controller: WagoController,
+    heartbeat: WagoHeartbeat,
+    canonical: boolean,
+    heartbeatAt: string | undefined,
+    now: string,
+  ): Promise<void> {
     controller.protocolVersion = heartbeat.protocolVersion;
     controller.runtimeVersion = heartbeat.runtimeVersion;
     controller.capabilities = JSON.stringify(heartbeat.capabilities);
@@ -360,4 +373,26 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     this.subscriptionRebuild = rebuild.catch(() => undefined);
     return rebuild;
   }
+}
+
+/** A full bounded diagnostic cache must not disable permanent heartbeat checkpoints.
+ * Other canonical rejections remain invalid and never use receipt time as liveness.
+ */
+function acceptedCanonicalHeartbeat(
+  rawHeartbeat: Record<string, unknown>,
+  heartbeatAt: string | undefined,
+  lastHeartbeatAt: string | null | undefined,
+): boolean {
+  if (!validEnvelope(rawHeartbeat, Date.now()) || !heartbeatAt) return false;
+  const persistedHeartbeatAt = sourceTime(lastHeartbeatAt);
+  return persistedHeartbeatAt === null || (sourceTime(heartbeatAt) ?? 0) >= persistedHeartbeatAt;
+}
+
+function heartbeatMetadataChanged(controller: WagoController, heartbeat: WagoHeartbeat): boolean {
+  return (
+    controller.protocolVersion !== heartbeat.protocolVersion ||
+    controller.runtimeVersion !== heartbeat.runtimeVersion ||
+    controller.capabilities !== JSON.stringify(heartbeat.capabilities) ||
+    controller.compatibilityError !== compatibilityError(heartbeat)
+  );
 }

@@ -395,6 +395,29 @@ describe('SsoService', () => {
       await expect(update(1, {})).rejects.toThrow('SAML configuration not found');
     });
 
+    it('rejects SAML logout updates that would leave the provider without an IdP issuer', async () => {
+      jest.mocked(fixture.samlConfigRepository.findOne).mockResolvedValue({
+        ...baseSamlConfig,
+        idpIssuer: 'https://idp.example.com',
+        logoutURL: 'https://idp.example.com/logout',
+        spSigningCertificate: 'SPCERT',
+        spSigningKeyEncrypted: 'enc:key',
+      } as SSOProviderSAMLConfiguration);
+      const update = (
+        fixture.service as unknown as { updateSAMLConfiguration: (id: number, config: object) => Promise<unknown> }
+      ).updateSAMLConfiguration.bind(fixture.service);
+
+      await expect(update(1, { idpIssuer: ' ' })).rejects.toThrow('SAML logout requires an IdP issuer');
+      await expect(update(1, { idpIssuer: null, logoutURL: null })).resolves.toMatchObject({
+        issuer: baseSamlConfig.issuer,
+      });
+      expect(fixture.samlConfigRepository.update).toHaveBeenCalledTimes(1);
+      expect(fixture.samlConfigRepository.update).toHaveBeenCalledWith(
+        { ssoProviderId: 1 },
+        { idpIssuer: null, logoutURL: null },
+      );
+    });
+
     it('does not re-encrypt a canonical-equivalent signing key', async () => {
       jest.mocked(fixture.samlConfigRepository.findOne).mockResolvedValue({
         ...baseSamlConfig,

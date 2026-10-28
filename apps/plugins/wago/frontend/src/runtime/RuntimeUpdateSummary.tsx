@@ -4,18 +4,8 @@ import { useWagoTranslations } from '../i18n';
 
 const activePhases = new Set(['preparing', 'staging', 'activating', 'verifying', 'accepting', 'recovering']);
 
-export function RuntimeUpdateSummary({
-  controller,
-  status,
-  unavailable = false,
-  compact = false,
-}: {
-  controller: WagoController;
-  status?: RuntimeUpdateStatus;
-  unavailable?: boolean;
-  compact?: boolean;
-}) {
-  const { t } = useWagoTranslations();
+/** The versions and image ids shown before and after the arrow. */
+function runtimeVersions(controller: WagoController, status: RuntimeUpdateStatus | undefined) {
   const update = status?.update;
   const after = status?.runtime?.desiredVersion ?? update?.desiredRuntimeVersion;
   const afterImage = status?.runtime?.desiredImageId ?? update?.desiredImageId;
@@ -30,6 +20,14 @@ export function RuntimeUpdateSummary({
   const beforeImage = matchesTarget
     ? (update?.previousImageId ?? status?.runtime?.runningImageId)
     : status?.runtime?.runningImageId;
+  return { before, beforeImage, after, afterImage, matchesTarget };
+}
+
+function runtimeTransition(
+  controller: WagoController,
+  status: RuntimeUpdateStatus | undefined,
+  { before, beforeImage, after, afterImage, matchesTarget }: ReturnType<typeof runtimeVersions>,
+) {
   const runningMismatch = Boolean(
     status?.runtime?.runningImageId && afterImage && status.runtime.runningImageId !== afterImage,
   );
@@ -38,13 +36,47 @@ export function RuntimeUpdateSummary({
   const changedImage = Boolean(beforeImage && afterImage && beforeImage !== afterImage);
   const transition =
     changedImage || (required && !waitingForController) || Boolean(before && after && before !== after);
-  const completed = matchesTarget && transition && update?.phase === 'current' && !required && !status?.blocker;
-  const active =
+  const completed = matchesTarget && transition && status?.update?.phase === 'current' && !required && !status?.blocker;
+  return { required, waitingForController, changedImage, transition, completed };
+}
+
+function runtimeUpdateActive(
+  status: RuntimeUpdateStatus | undefined,
+  unavailable: boolean,
+  { required, waitingForController }: ReturnType<typeof runtimeTransition>,
+) {
+  const update = status?.update;
+  return (
     !unavailable &&
     (!status || status.management === 'managed') &&
     !status?.blocker &&
     (activePhases.has(update?.phase ?? '') ||
-      (required && !waitingForController && (!update || update.phase === 'current')));
+      (required && !waitingForController && (!update || update.phase === 'current')))
+  );
+}
+
+function setupShortKey(setup: NonNullable<RuntimeUpdateStatus['managementSetup']>) {
+  return setup.state === 'running' ? 'running' : setup.reason === 'configuration' ? 'configuration' : 'waiting';
+}
+
+export function RuntimeUpdateSummary({
+  controller,
+  status,
+  unavailable = false,
+  compact = false,
+}: {
+  controller: WagoController;
+  status?: RuntimeUpdateStatus;
+  unavailable?: boolean;
+  compact?: boolean;
+}) {
+  const { t } = useWagoTranslations();
+  const update = status?.update;
+  const versions = runtimeVersions(controller, status);
+  const { before, beforeImage, after, afterImage } = versions;
+  const state = runtimeTransition(controller, status, versions);
+  const { changedImage, transition, completed } = state;
+  const active = runtimeUpdateActive(status, unavailable, state);
   const phase = activePhases.has(update?.phase ?? '') ? update?.phase : 'waiting';
   const label = (version: string | null | undefined, image: string | null | undefined) => {
     const text = version ? `v${version}` : t('runtimeManagement.unknownVersion');
@@ -101,9 +133,7 @@ export function RuntimeUpdateSummary({
       )}
       {compact && status?.management === 'verified' && status.managementSetup && !update && (
         <p role="status" className="wg:truncate wg:text-xs wg:text-muted">
-          {t(
-            `runtimeManagement.setupShort.${status.managementSetup.state === 'running' ? 'running' : status.managementSetup.reason === 'configuration' ? 'configuration' : 'waiting'}`,
-          )}
+          {t(`runtimeManagement.setupShort.${setupShortKey(status.managementSetup)}`)}
         </p>
       )}
       {!active && !completed && update && update.phase !== 'current' && (

@@ -28,6 +28,7 @@ import { hasRequiredSamlSigningMaterial } from '../signingMaterial';
 import en from '../en.json';
 import de from '../de.json';
 import { buildOidcPayload, buildSamlPayload } from './providerFormPayload';
+import { listInputValue, oidcFormValues, samlFormValues } from './providerFormValues';
 
 /**
  * Where the provider list lives — the Single sign-on settings section, and the target for cancel,
@@ -184,40 +185,14 @@ export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProvide
       samlConfiguration: getDefaultSamlConfiguration(),
     };
 
-    if (extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration) {
-      updatedFormValues.oidcConfiguration = {
-        issuer: extendedProvider.oidcConfiguration.issuer ?? '',
-        endSessionURL: extendedProvider.oidcConfiguration.endSessionURL ?? '',
-        jwksURL: extendedProvider.oidcConfiguration.jwksURL ?? '',
-        signingAlgorithms: extendedProvider.oidcConfiguration.signingAlgorithms?.length
-          ? extendedProvider.oidcConfiguration.signingAlgorithms
-          : ['RS256'],
-        authorizationURL: extendedProvider.oidcConfiguration.authorizationURL ?? '',
-        tokenURL: extendedProvider.oidcConfiguration.tokenURL ?? '',
-        userInfoURL: extendedProvider.oidcConfiguration.userInfoURL ?? '',
-        clientId: extendedProvider.oidcConfiguration.clientId ?? '',
-        clientSecret: extendedProvider.oidcConfiguration.clientSecret ?? '',
-      };
-
-      setScopesInput(
-        Array.isArray(extendedProvider.oidcConfiguration.scopes)
-          ? extendedProvider.oidcConfiguration.scopes.join(', ')
-          : '',
-      );
-      setUsernameClaimPathsInput(
-        Array.isArray(extendedProvider.oidcConfiguration.usernameClaimPaths)
-          ? extendedProvider.oidcConfiguration.usernameClaimPaths.join(', ')
-          : '',
-      );
-      setEmailClaimPathsInput(
-        Array.isArray(extendedProvider.oidcConfiguration.emailClaimPaths)
-          ? extendedProvider.oidcConfiguration.emailClaimPaths.join(', ')
-          : '',
-      );
+    const oidcConfiguration = extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration;
+    if (oidcConfiguration) {
+      updatedFormValues.oidcConfiguration = oidcFormValues(oidcConfiguration);
+      setScopesInput(listInputValue(oidcConfiguration.scopes));
+      setUsernameClaimPathsInput(listInputValue(oidcConfiguration.usernameClaimPaths));
+      setEmailClaimPathsInput(listInputValue(oidcConfiguration.emailClaimPaths));
       setOidcRoleMappingEntries(
-        buildRoleMappingEntries(
-          (extendedProvider.oidcConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined,
-        ),
+        buildRoleMappingEntries((oidcConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined),
       );
     } else {
       setScopesInput('');
@@ -226,31 +201,12 @@ export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProvide
       setOidcRoleMappingEntries([]);
     }
 
-    if (extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration) {
-      updatedFormValues.samlConfiguration = {
-        entryPoint: extendedProvider.samlConfiguration.entryPoint ?? '',
-        idpIssuer: extendedProvider.samlConfiguration.idpIssuer ?? '',
-        logoutURL: extendedProvider.samlConfiguration.logoutURL ?? '',
-        issuer: extendedProvider.samlConfiguration.issuer ?? '',
-        certificate: extendedProvider.samlConfiguration.certificate ?? '',
-        audience: extendedProvider.samlConfiguration.audience ?? '',
-        signRequest: extendedProvider.samlConfiguration.signRequest ?? false,
-        wantAssertionsSigned: extendedProvider.samlConfiguration.wantAssertionsSigned ?? false,
-        wantAuthnResponseSigned: extendedProvider.samlConfiguration.wantAuthnResponseSigned ?? true,
-        forceAuthn: extendedProvider.samlConfiguration.forceAuthn ?? false,
-        provisioningSecret: '',
-        spSigningCertificate: extendedProvider.samlConfiguration.spSigningCertificate ?? '',
-        spSigningPrivateKey: '',
-      };
-      setEmailAttributeKeysInput(
-        Array.isArray(extendedProvider.samlConfiguration.emailAttributeKeys)
-          ? extendedProvider.samlConfiguration.emailAttributeKeys.join(', ')
-          : '',
-      );
+    const samlConfiguration = extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration;
+    if (samlConfiguration) {
+      updatedFormValues.samlConfiguration = samlFormValues(samlConfiguration);
+      setEmailAttributeKeysInput(listInputValue(samlConfiguration.emailAttributeKeys));
       setSamlRoleMappingEntries(
-        buildRoleMappingEntries(
-          (extendedProvider.samlConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined,
-        ),
+        buildRoleMappingEntries((samlConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined),
       );
     } else {
       setEmailAttributeKeysInput('');

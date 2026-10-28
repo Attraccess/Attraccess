@@ -78,6 +78,12 @@
       "options": {
         "command": "node apps/attractap/firmware/tools/check-version.mjs"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/attractap/firmware"
+      }
     }
   }
 }

@@ -32,11 +32,15 @@ import { WagoManagedProvisioningError, type ManagedProvisioningStage } from './p
 
 import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 
-import { Credentials, RootProbe, RootAcceptance } from './contracts';
+import { Credentials, RootProbe, RootAcceptance, type ManagementSetup } from './contracts';
 
 import { WagoDeviceOperations } from '../device-operations';
 
 import { WagoController } from '../../controllers/entity';
+
+import { type RuntimeArtifactMetadata } from '../artifacts/catalog';
+
+import { type BuildRuntimeArtifact } from '../artifacts/build';
 
 import { admitEnvelope, emptyStream } from '../../diagnostics/envelope';
 
@@ -158,32 +162,13 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
   }
 
   protected async publicStatus(access: WagoManagedAccess | null, requestedControllerId?: number) {
-    if (access && !['retiring', 'retired'].includes(access.state)) {
-      try {
-        const stored = await this.loadSession(access.sessionId);
-        if (!stored) throw new Error();
-        this.credentials(stored);
-      } catch {
-        await this.setActiveState(access.sessionId, 'recovery_required').catch(() => undefined);
-        access = await this.access.findOneBy({ sessionId: access.sessionId });
-      }
-    }
+    access = await this.revalidatedAccess(access);
     const row = access?.controllerId ? await this.updates.findOneBy({ controllerId: access.controllerId }) : null;
     const controllerId = requestedControllerId ?? access?.controllerId;
     const controller = controllerId ? await this.controllers.findOneBy({ id: controllerId }) : null;
     const desired = controller ? await this.artifacts.current().catch(() => null) : null;
     const managementSetup =
-      access?.state === 'verified'
-        ? (this.enrolmentProgress.get(controllerId ?? 0) ?? {
-            state: 'waiting' as const,
-            reason: controller
-              ? ((await this.enrolmentWaitReason(
-                  controller,
-                  await this.sessions.findOneBy({ id: access.sessionId }),
-                )) ?? 'scheduled')
-              : 'connection',
-          })
-        : undefined;
+      access?.state === 'verified' ? await this.managementSetup(access, controller, controllerId) : undefined;
     const managementFailure =
       access && ['verified', 'recovery_required'].includes(access.state)
         ? (await this.sessions.findOneBy({ id: access.sessionId }))?.failureReason
@@ -195,29 +180,69 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
       keyFingerprint: access?.keyFingerprint ?? null,
       update: row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null,
       ...(managementSetup ? { managementSetup } : {}),
-      ...(controller
-        ? {
-            runtime: {
-              runningVersion: controller.runtimeVersion,
-              runningImageId: this.heartbeats.get(controller.id)?.imageId || null,
-              desiredVersion: desired?.manifest.runtimeVersion ?? null,
-              desiredImageId:
-                desired && 'imageId' in desired
-                  ? runtimeTargetImageId(desired, {
-                      imageId: this.heartbeats.get(controller.id)?.imageId ?? '',
-                      runtimeVersion: this.heartbeats.get(controller.id)?.runtimeVersion ?? controller.runtimeVersion,
-                    })
-                  : null,
-            },
-          }
-        : {}),
-      ...(access?.controllerId && this.wago.isRuntimeUpdateRequired
-        ? { runtimeUpdateRequired: this.wago.isRuntimeUpdateRequired(access.controllerId) }
-        : {}),
-      ...(access?.controllerId && this.reconciliationFailures.has(access.controllerId)
-        ? { blocker: this.reconciliationFailures.get(access.controllerId) }
-        : {}),
+      ...(controller ? { runtime: this.runtimeStatus(controller, desired) } : {}),
+      ...this.runtimeAttention(access?.controllerId),
       physicalQualification: 'unverified' as const,
+    };
+  }
+
+  /** Marks active access whose stored envelope no longer verifies as needing recovery. */
+  protected async revalidatedAccess(access: WagoManagedAccess | null): Promise<WagoManagedAccess | null> {
+    if (!access || ['retiring', 'retired'].includes(access.state)) return access;
+    try {
+      const stored = await this.loadSession(access.sessionId);
+      if (!stored) throw new Error();
+      this.credentials(stored);
+      return access;
+    } catch {
+      await this.setActiveState(access.sessionId, 'recovery_required').catch(() => undefined);
+      return this.access.findOneBy({ sessionId: access.sessionId });
+    }
+  }
+
+  /** Live automatic SSH-completion progress, or the prerequisite it is still waiting for. */
+  protected async managementSetup(
+    access: WagoManagedAccess,
+    controller: WagoController | null,
+    controllerId: number | null | undefined,
+  ): Promise<ManagementSetup> {
+    return (
+      this.enrolmentProgress.get(controllerId ?? 0) ?? {
+        state: 'waiting' as const,
+        reason: controller
+          ? ((await this.enrolmentWaitReason(controller, await this.sessions.findOneBy({ id: access.sessionId }))) ??
+            'scheduled')
+          : 'connection',
+      }
+    );
+  }
+
+  /** Running versus desired runtime image for the controller's latest heartbeat. */
+  protected runtimeStatus(controller: WagoController, desired: RuntimeArtifactMetadata | null) {
+    const heartbeat = this.heartbeats.get(controller.id);
+    return {
+      runningVersion: controller.runtimeVersion,
+      runningImageId: heartbeat?.imageId || null,
+      desiredVersion: desired?.manifest.runtimeVersion ?? null,
+      desiredImageId:
+        desired && 'imageId' in desired
+          ? runtimeTargetImageId(desired as BuildRuntimeArtifact, {
+              imageId: heartbeat?.imageId ?? '',
+              runtimeVersion: heartbeat?.runtimeVersion ?? controller.runtimeVersion,
+            })
+          : null,
+    };
+  }
+
+  /** Runtime update demand and the last reconciliation blocker for a bound controller. */
+  protected runtimeAttention(controllerId: number | null | undefined) {
+    return {
+      ...(controllerId && this.wago.isRuntimeUpdateRequired
+        ? { runtimeUpdateRequired: this.wago.isRuntimeUpdateRequired(controllerId) }
+        : {}),
+      ...(controllerId && this.reconciliationFailures.has(controllerId)
+        ? { blocker: this.reconciliationFailures.get(controllerId) }
+        : {}),
     };
   }
 

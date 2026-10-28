@@ -1,7 +1,7 @@
 // ===== i18n: language detected from localStorage or browser =====
 var currentLang = (function () {
   var stored = localStorage.getItem('attraccess-docs-lang');
-  if (stored === 'de' || stored === 'en') return stored;
+  if (['de', 'en'].includes(stored)) return stored;
   var browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
   return browserLang.startsWith('de') ? 'de' : 'en';
 })();
