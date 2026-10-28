@@ -158,8 +158,10 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     if (!reader) {
       throw new NotFoundException(`Reader not found: ${readerId}`);
     }
-    if (!reader.firmware?.capabilities?.massIntroduction) {
-      throw new BadRequestException('This reader does not support mass introductions; update its firmware');
+    // Every reader that can enroll cards can run the scan flow; readers without a screen just cannot
+    // show its progress.
+    if (!reader.firmware?.capabilities?.cardEnrollment) {
+      throw new BadRequestException('This reader does not support mass introductions');
     }
 
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);

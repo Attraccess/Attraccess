@@ -54,7 +54,7 @@ describe('AttractapMassIntroductionHandler', () => {
       findReaderById: jest.fn().mockResolvedValue({
         id: READER_ID,
         name: 'Entrance',
-        firmware: { capabilities: { massIntroduction: true } },
+        firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: 42 }],
       }),
       getNFCCardByUID: jest.fn().mockResolvedValue({

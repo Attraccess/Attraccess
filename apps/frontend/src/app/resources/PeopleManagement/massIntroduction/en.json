@@ -7,7 +7,7 @@
     "useReader": "Also let people tap their NFC card on an Attractap reader",
     "readerLabel": "Reader",
     "readerPlaceholder": "Select a reader",
-    "readerDescription": "Only connected readers whose firmware supports mass introductions are listed.",
+    "readerDescription": "Only connected readers that can enroll RFID cards are listed.",
     "startFailed": "Could not start the mass introduction",
     "cancel": "Cancel",
     "start": "Start"

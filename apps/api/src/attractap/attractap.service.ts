@@ -350,12 +350,7 @@ export class AttractapService {
    * @returns Promise<Attractap>
    */
   public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion) {
-    // Older firmware omits newer capabilities; store them as absent instead of keeping a stale value
-    // from a since-downgraded reader.
-    const capabilities = firmware?.capabilities
-      ? { ...firmware.capabilities, massIntroduction: firmware.capabilities.massIntroduction === true }
-      : firmware?.capabilities;
-    await this.updateReader(id, { firmware: { ...firmware, capabilities } }, false);
+    await this.updateReader(id, { firmware }, false);
   }
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {

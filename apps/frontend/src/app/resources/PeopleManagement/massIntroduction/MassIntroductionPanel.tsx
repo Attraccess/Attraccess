@@ -29,7 +29,7 @@ import { AttractapSelect } from '../../../attractap/AttractapSelect';
 import { massIntroductionUrl } from '../../../mass-introduction/MassIntroductionRedeemModal';
 import { MassIntroductionEndState, MassIntroductionSessionState } from './useMassIntroductionSession';
 
-const REQUIRED_READER_CAPABILITIES = { massIntroduction: true };
+const REQUIRED_READER_CAPABILITIES = { cardEnrollment: true };
 
 /** Choices made before starting; owned by the drawer so the footer's Start button can read them. */
 export interface MassIntroductionSetup {

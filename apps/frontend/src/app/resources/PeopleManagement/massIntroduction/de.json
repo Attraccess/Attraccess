@@ -7,7 +7,7 @@
     "useReader": "Zusätzlich NFC-Karten an einem Attractap-Leser annehmen",
     "readerLabel": "Leser",
     "readerPlaceholder": "Leser auswählen",
-    "readerDescription": "Es werden nur verbundene Leser angezeigt, deren Firmware Sammeleinweisungen unterstützt.",
+    "readerDescription": "Es werden nur verbundene Leser angezeigt, die RFID-Karten registrieren können.",
     "startFailed": "Die Sammeleinweisung konnte nicht gestartet werden",
     "cancel": "Abbrechen",
     "start": "Starten"

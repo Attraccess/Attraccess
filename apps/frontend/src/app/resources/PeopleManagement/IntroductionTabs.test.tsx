@@ -175,7 +175,7 @@ describe('grant-introduction drawer', () => {
     mount({ type: 'group', id: 3 });
 
     fireEvent.click(screen.getByRole('switch', { name: /tap their NFC card/ }));
-    expect(state.readerCapabilities).toEqual({ massIntroduction: true });
+    expect(state.readerCapabilities).toEqual({ cardEnrollment: true });
     expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
 
     fireEvent.click(screen.getByText('Pick reader 4'));

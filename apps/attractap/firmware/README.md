@@ -88,10 +88,10 @@ rollback, physical NFC and live networking remain unverified.
 
 ## Mass introduction protocol (1.7.0)
 
-Firmware 1.7.0 adds the mass-introduction scan screen (ATT-1151). Touch variants
-report `capabilities.massIntroduction: true` in `READER_FIRMWARE_INFO`; demo
-builds report `false`. The server only arms readers that report it, so older
-firmware is never sent these events.
+Firmware 1.7.0 adds the mass-introduction scan screen (ATT-1151). The server
+arms any reader that reports `capabilities.cardEnrollment`. Firmware older than
+1.7.0 acknowledges and ignores these events, so readers must be updated before
+they can take part in mass introductions.
 
 | Direction | Event | Payload |
 | --- | --- | --- |
