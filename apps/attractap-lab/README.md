@@ -48,16 +48,20 @@ services.attractap-lab = {
   coordinator = {
     enable = true;
     listenAddress = "0.0.0.0:20408";
-    places.reader-1 = {
-      matches = [ "lab-host/reader-1/*" ];
-      tags.board = "attractap";
+    # <firmware variant>-<n>, after apps/attractap/firmware/variants/.
+    places.attractap-touch-v2-1 = {
+      matches = [ "lab-host/attractap-touch-v2-1/*" ];
+      tags = {
+        board = "attractap";
+        variant = "attractap-touch-v2";
+      };
     };
   };
   exporter = {
     enable = true;
     name = "lab-host";
     hostname = "lab-host";
-    settings.reader-1 = {
+    settings.attractap-touch-v2-1 = {
       USBSerialPort.match.ID_SERIAL_SHORT = "REPLACE_WITH_READER_SERIAL";
       USBFlashableDevice.match = {
         SUBSYSTEM = "tty";
@@ -104,14 +108,18 @@ numbers are not unique, use native labgrid udev matching with a stable USB path.
 Check the identity in both normal firmware and bootloader modes.
 
 Use `v4l2-ctl --list-devices` and `--list-formats-ext` to choose the webcam's
-capture node, resolution and MJPEG support. Mount it rigidly and set the
-reader's crop in a copy of `example-env.yaml`. The placeholder crop is
-`width:height:x:y`, in camera pixels; it must be calibrated before screen tests.
+capture node, resolution and MJPEG support. Mount it rigidly.
 
 Each reader gets its own exporter group and place. Repeat the same
 `HTTPVideoStream` URL in multiple reader groups to share the camera without
-making different readers contend for one video resource. Keep crop settings
-in the corresponding client environment.
+making different readers contend for one video resource. Name each place
+`<firmware variant>-<n>` and tag its `variant`; the hardware workflow selects
+the place from the firmware image's variant. Screen capture uses
+the stream as served: either point each group at a view already cropped to its
+reader's screen, or add `crop: "width:height:x:y"` (camera pixels) to
+`ScreenCaptureDriver` in a copy of `example-env.yaml` per reader. A shared
+client environment needs per-place views, because the same crop applies to
+whichever place a session allocates.
 
 `exporter.settings` and `coordinator.places` use native labgrid schemas. Places
 are authoritative when configured: syncing removes places absent from that
@@ -164,6 +172,11 @@ definitions, and acquired places cannot be deleted. With declarative
 `coordinator.places`, Nix remains authoritative and overwrites dashboard inventory
 edits on the next synchronization.
 
+Places with an `HTTPVideoStream` resource show a live camera view on their page
+to signed-in users, connected only while shown. The API relays the stream from
+the coordinator host, so the URL must be reachable there; a uStreamer-style
+`/snapshot` URL is watched as its sibling `/stream`.
+
 Browser serial consoles are explicitly disabled: upstream's TCP bridge does not
 support our RFC2217/SSH transport. Use native labgrid console access instead.
 ADI-specific FPGA recovery and SD-mux routes are omitted. Power hardware is not
@@ -181,8 +194,8 @@ On Linux, from the monorepo root:
 ```sh
 export LG_COORDINATOR=lab-host:20408
 pnpm nx run attractap-lab:smoke -- \
-  --config apps/attractap-lab/example-env.yaml --place reader-1 \
-  --image /path/to/merged-firmware.bin --output /tmp/reader-1
+  --config apps/attractap-lab/example-env.yaml --place attractap-touch-v2-1 \
+  --image /path/to/merged-firmware.bin --output /tmp/attractap-touch-v2-1
 ```
 
 Without Nx, use `nix run path:./apps/attractap-lab -- ...`. For an existing Python
@@ -191,7 +204,7 @@ The Nix host package targets Linux; macOS is not an exporter platform.
 
 The workflow claims the place exclusively, transfers the merged image using
 labgrid's `ManagedFile`, runs esptool on the exporter, resets into firmware,
-records bounded `serial.log`, captures a cropped `screen.png`, then releases.
+records bounded `serial.log`, captures `screen.png`, then releases.
 Both success and ordinary failure/cancellation clean up drivers and claims.
 A busy place fails immediately. `--expect TEXT` checks a literal serial marker.
 Serial reconnect follows reset, so the earliest boot messages may be missed;
@@ -205,7 +218,7 @@ Python and pytest use the same resource/driver lifecycle:
 from attractap_lab.workflow import claim, smoke
 
 def test_reader(tmp_path):
-    with claim("reader.yaml", "reader-1") as target:
+    with claim("reader.yaml", "attractap-touch-v2-1") as target:
         smoke(target, "firmware.bin", tmp_path, expect="connected")
 ```
 
@@ -218,8 +231,8 @@ Inspect and recover abandoned claims with the native tools:
 
 ```sh
 labgrid-client places
-labgrid-client -p reader-1 show
-labgrid-client -p reader-1 release --kick
+labgrid-client -p attractap-touch-v2-1 show
+labgrid-client -p attractap-touch-v2-1 release --kick
 ```
 
 Confirm the previous operation has stopped before forced takeover. Native

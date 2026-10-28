@@ -47,6 +47,16 @@ def wait_for_holder(client, expected):
     raise AssertionError(f"Coordinator holder did not converge to {expected!r}: {holder!r}")
 
 
+def check_camera(client):
+    camera = "/api/places/reader-a/cameras/HTTPVideoStream"
+    # uStreamer answers without a webcam; the relay ends with this viewer.
+    with client.stream("GET", camera) as response:
+        expect(response, 200)
+        assert response.headers["content-type"].startswith("multipart/x-mixed-replace")
+    expect(client.get("/api/places/reader-a/cameras/USBSerialPort"), 404)
+    expect(client.get("/api/places/reader-b/cameras/HTTPVideoStream"), 404)
+
+
 def check_health(client):
     assert expect(client.get("/api/health"), 200).json()["coordinator_connected"]
     assert "reader-a" in {
@@ -70,6 +80,7 @@ def main():
             javascript = expect(client.get(asset.group(1)), 200)
             assert "javascript" in javascript.headers["content-type"]
             expect(client.post("/api/places/lock/acquire"), 401)
+            expect(client.get("/api/places/reader-a/cameras/HTTPVideoStream"), 401)
             expect(
                 client.post(
                     "/api/auth/login", json={"username": "analog", "password": "analog"}
@@ -111,6 +122,7 @@ def main():
             return
         assert mode == "full", mode
         expect(client.post("/api/users", json={**RECOVERY_USER, "role": "user"}), 201)
+        check_camera(client)
 
         # This connection must traverse nginx's real WebSocket upgrade path.
         with connect("ws://127.0.0.1:8081/api/ws", open_timeout=10) as websocket:
@@ -150,7 +162,7 @@ def main():
         assert expect(client.get("/api/places/lock"), 200).json()["acquired_username"] == RECOVERY_USER["username"]
         expect(client.post("/api/places/lock/release"), 200)
         wait_for_holder(client, None)
-        print("Dashboard SPA, HTTP/WebSocket proxy, authentication, native claim safety and kick recovery passed")
+        print("Dashboard SPA, HTTP/WebSocket proxy, camera relay, authentication, native claim safety and kick recovery passed")
 
 
 if __name__ == "__main__":

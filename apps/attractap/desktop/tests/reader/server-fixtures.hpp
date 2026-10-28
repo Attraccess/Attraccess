@@ -19,6 +19,7 @@ public:
     std::vector<std::string> sent;
     std::queue<std::string> incoming;
     std::function<void(const char *, size_t)> receive;
+    bool failSends = false; // Simulates a dropped connection for outgoing messages.
     void setup() override {}
     void loop() override {
         while (!incoming.empty()) {
@@ -26,7 +27,10 @@ public:
             receive(message.c_str(), message.size());
         }
     }
-    bool sendMessage(const char *data, size_t size) override { sent.emplace_back(data, size); return true; }
+    bool sendMessage(const char *data, size_t size) override {
+        if (failSends) return false;
+        sent.emplace_back(data, size); return true;
+    }
     bool sendHeartbeat(const char *, size_t) override { return true; }
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> value) override { receive = std::move(value); }
     void enableConnectionAttempts() override {}

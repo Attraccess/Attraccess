@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsPositive, IsInt, IsNumber, Min, Max } from 'class-validator';
+import { IsOptional, IsPositive, IsInt, IsNumber, IsString, Min, Max, MaxLength } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ToBoolean } from '../../common/request-transformers';
 
@@ -44,4 +44,15 @@ export class FindManyProjectsQueryDto {
   @ToBoolean()
   @Type(() => Boolean)
   includeArchived?: boolean = false;
+
+  @ApiProperty({
+    description: 'Only return projects whose name contains this text (case-insensitive)',
+    example: 'laser',
+    required: false,
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
 }
