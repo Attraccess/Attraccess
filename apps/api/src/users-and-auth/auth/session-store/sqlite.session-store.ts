@@ -106,6 +106,21 @@ export class SqliteSessionStore implements SessionStore {
     return (await this.getLogoutSession(token))?.ssoContext ?? null;
   }
 
+  async compareAndSetSsoContext(id: string, expected: SsoSessionContext, next: SsoSessionContext): Promise<boolean> {
+    // simple-json stores JSON.stringify output, so the serialized context is a stable compare token.
+    const result = await this.sessionRepository
+      .createQueryBuilder()
+      .update(Session)
+      .set({ ssoContext: next })
+      .where('id = :id AND ssoContext = :expected AND expiresAt > :now', {
+        id: Number(id),
+        expected: JSON.stringify(expected),
+        now: new Date(),
+      })
+      .execute();
+    return (result.affected ?? 0) > 0;
+  }
+
   async revokeSsoSessions(selector: SsoSessionSelector): Promise<number> {
     const query = this.sessionRepository
       .createQueryBuilder('session')

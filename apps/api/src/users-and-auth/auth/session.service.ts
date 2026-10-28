@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Session, User } from '@attraccess/database-entities';
+import { Session, SsoSessionContext, User } from '@attraccess/database-entities';
 import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
@@ -95,6 +95,10 @@ export class SessionService implements OnModuleInit {
 
   async getSsoContext(token: string) {
     return token ? this.store.getSsoContext(token) : null;
+  }
+
+  async compareAndSetSsoContext(id: string, expected: SsoSessionContext, next: SsoSessionContext): Promise<boolean> {
+    return this.store.compareAndSetSsoContext(id, expected, next);
   }
 
   async revokeSsoSessionsOnce(

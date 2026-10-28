@@ -11,6 +11,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { SSOProvider } from './ssoProvider.entity';
 
+/** Sanity bound (365 days) for the re-sync interval; deliberately not tied to the configurable session length. */
+export const MAX_PERMISSION_SYNC_TTL_MINUTES = 365 * 24 * 60;
+
 @Entity()
 export class SSOProviderOIDCConfiguration {
   @PrimaryGeneratedColumn()
@@ -123,6 +126,17 @@ export class SSOProviderOIDCConfiguration {
     type: [String],
   })
   signingAlgorithms?: string[] | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description:
+      'Minutes between session-time permission re-syncs using the IdP refresh token; null or 0 disables re-sync',
+    required: false,
+    nullable: true,
+    type: Number,
+    example: 60,
+  })
+  permissionSyncTtlMinutes?: number | null;
 
   @CreateDateColumn()
   @ApiProperty({

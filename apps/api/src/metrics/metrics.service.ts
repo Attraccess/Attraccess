@@ -27,6 +27,8 @@ export class MetricsService implements OnModuleInit {
   public readonly authActiveSessions: Gauge;
   public readonly authSsoLoginTotal: Counter;
   public readonly authSsoLoginFailuresTotal: Counter;
+  public readonly authSsoPermissionResyncTotal: Counter;
+  public readonly authSsoRefreshTokenMissingTotal: Counter;
   public readonly auth2faUsageTotal: Counter;
 
   public readonly usersTotal: Gauge;
@@ -90,6 +92,8 @@ export class MetricsService implements OnModuleInit {
     this.authActiveSessions = identity.authActiveSessions;
     this.authSsoLoginTotal = identity.authSsoLoginTotal;
     this.authSsoLoginFailuresTotal = identity.authSsoLoginFailuresTotal;
+    this.authSsoPermissionResyncTotal = identity.authSsoPermissionResyncTotal;
+    this.authSsoRefreshTokenMissingTotal = identity.authSsoRefreshTokenMissingTotal;
     this.auth2faUsageTotal = identity.auth2faUsageTotal;
     this.usersTotal = identity.usersTotal;
     this.usersRegisteredTotal = identity.usersRegisteredTotal;

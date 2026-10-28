@@ -228,9 +228,9 @@ export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProvide
   ]);
 
   const setOidc = useCallback(
-    (field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string | string[]) => {
+    (field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string | string[] | number | null) => {
       if (field === 'signingAlgorithms') {
-        setSigningAlgorithmsInput(Array.isArray(value) ? value.join(', ') : value);
+        setSigningAlgorithmsInput(Array.isArray(value) ? value.join(', ') : String(value ?? ''));
       }
       setFormValues((prev) => ({
         ...prev,

@@ -13,6 +13,7 @@ import {
   REVOKE_LOGOUT_SESSION_SCRIPT,
   REVOKE_USER_SCRIPT,
   REVOKE_SSO_SCRIPT,
+  COMPARE_AND_SET_SSO_CONTEXT_SCRIPT,
 } from './valkey-session-scripts';
 
 const SESSION_PREFIX = 'session:';
@@ -146,6 +147,21 @@ export class ValkeySessionStore implements SessionStore {
 
   async getSsoContext(token: string): Promise<SsoSessionContext | null> {
     return (await this.getLogoutSession(token))?.ssoContext ?? null;
+  }
+
+  async compareAndSetSsoContext(id: string, expected: SsoSessionContext, next: SsoSessionContext): Promise<boolean> {
+    return (
+      Number(
+        await this.client.eval(
+          COMPARE_AND_SET_SSO_CONTEXT_SCRIPT,
+          1,
+          `session_lineage:${id}`,
+          id,
+          JSON.stringify(expected),
+          JSON.stringify(next),
+        ),
+      ) === 1
+    );
   }
 
   async revokeSsoSessions(selector: SsoSessionSelector): Promise<number> {

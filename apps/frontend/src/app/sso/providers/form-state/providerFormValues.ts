@@ -20,6 +20,7 @@ export function oidcFormValues(
     userInfoURL: config.userInfoURL ?? '',
     clientId: config.clientId ?? '',
     clientSecret: config.clientSecret ?? '',
+    permissionSyncTtlMinutes: config.permissionSyncTtlMinutes ?? null,
   };
 }
 

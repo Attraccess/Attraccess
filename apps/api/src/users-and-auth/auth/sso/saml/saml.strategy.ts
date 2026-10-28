@@ -19,15 +19,13 @@ import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 
 import { buildSamlSessionContext } from './saml-session-context';
 
-import { randomUUID } from 'node:crypto';
-
 import { SsoAuditService } from '../../../../audit/sso-audit.service';
 
 import { RbacService } from '../../../rbac/rbac.service';
 
 import { resolveSsoRoleAssignments } from '../permission-mapping';
 
-import { ssoAuditSnapshot } from '../audit/provider-audit';
+import { recordSsoProvisioningAudit } from '../audit/provider-audit';
 
 import { SSOService } from '../sso.service';
 
@@ -245,15 +243,13 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       const audit = this.moduleRef.get(SsoAuditService, { strict: false });
       const provider = await ssoService?.getProviderByTypeAndIdWithConfiguration(SSOProviderType.SAML, providerId);
       if (!audit || !provider) return;
-      const details = { provider: ssoAuditSnapshot(provider) };
-      await audit.record({
-        action: `sso.provisioning.${action}`,
-        operationId: randomUUID(),
-        actorId: null,
-        authenticationMethod: null,
-        subject: { type: 'user', id: userId },
-        details: { ...details, changes: JSON.stringify(action === 'user_created' ? { userCreated: true } : changes) },
-      });
+      await recordSsoProvisioningAudit(
+        audit,
+        action,
+        userId,
+        provider,
+        action === 'user_created' ? { userCreated: true } : changes,
+      );
     } catch (error) {
       this.logger.warn(
         `Failed to record committed SAML provisioning audit: ${error instanceof Error ? error.message : String(error)}`,

@@ -25,6 +25,7 @@ import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nes
 import { CookieConfigService } from '../../common/services/cookie-config.service';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { randomUUID } from 'node:crypto';
+import { SessionPermissionSync } from './sso/session-permission-sync';
 
 @ApiTags('Authentication')
 @Controller('/auth')
@@ -35,6 +36,7 @@ export class AuthController {
     @Optional() private readonly identityAudit?: IdentityAuditService,
     @Optional() private readonly ssoLogout?: SsoLogoutService,
     @Optional() private readonly settings?: SettingsService,
+    @Optional() private readonly ssoPermissionSync?: SessionPermissionSync,
   ) {}
 
   @Post('/session/local')
@@ -105,6 +107,15 @@ export class AuthController {
     const currentToken = this.sessionToken(request);
 
     if (!currentToken) throw new UnauthorizedException('An active session is required');
+
+    // Session refresh re-evaluates SSO roles even before the re-sync interval elapses.
+    const authSession = (request as SessionAuthenticatedRequest).authSession;
+    if (
+      authSession &&
+      (await this.ssoPermissionSync?.syncIfDue(authSession, request.user.id, { force: true })) === 'revoked'
+    ) {
+      throw new UnauthorizedException('Session was ended by the identity provider');
+    }
 
     // Refresh the session token
     const newToken = await this.sessionService.refreshSession(currentToken);

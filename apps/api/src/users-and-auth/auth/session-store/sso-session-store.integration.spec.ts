@@ -138,6 +138,21 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       ).toBe(0);
     });
 
+    it('compare-and-sets the SSO context of a live session lineage across refreshes', async () => {
+      await create('syncing', oidc);
+      const handle = await store.getLogoutSession('syncing');
+      const claimed: SsoSessionContext = { ...oidc, lastSsoSyncAt: 1 };
+      expect(await store.compareAndSetSsoContext(handle.id, oidc, claimed)).toBe(true);
+      // A concurrent claimer holding the stale context loses.
+      expect(await store.compareAndSetSsoContext(handle.id, oidc, { ...oidc, lastSsoSyncAt: 2 })).toBe(false);
+      expect(await store.rotateSession('syncing', hash.hashToken('synced'), new Date(Date.now() + 60000))).toBe(true);
+      const next: SsoSessionContext = { ...claimed, refreshTokenEncrypted: 'rotated-refresh' };
+      expect(await store.compareAndSetSsoContext(handle.id, claimed, next)).toBe(true);
+      expect(await store.getSsoContext('synced')).toEqual(next);
+      expect(await store.revokeLogoutSession(handle.id)).toBe(true);
+      expect(await store.compareAndSetSsoContext(handle.id, next, claimed)).toBe(false);
+    });
+
     it('matches the complete SAML identity and any supplied SessionIndex', async () => {
       await create('matched', saml);
       await create('other-index', { ...saml, sessionIndexes: ['third'] });

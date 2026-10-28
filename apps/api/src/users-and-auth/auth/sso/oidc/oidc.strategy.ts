@@ -21,15 +21,15 @@ import { AccountLinkingRequiredException } from './exceptions/account-linking-re
 
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 
-import { randomUUID } from 'node:crypto';
-
 import { SsoAuditService } from '../../../../audit/sso-audit.service';
 
 import { RbacService } from '../../../rbac/rbac.service';
 
-import { resolveSsoRoleAssignments } from '../permission-mapping';
+import { syncOidcRolesFromClaims } from './oidc-permission-claims';
 
-import { ssoAuditSnapshot } from '../audit/provider-audit';
+import { recordSsoProvisioningAudit } from '../audit/provider-audit';
+
+import { resolvePermissionSyncIntervalMinutes } from '../session-permission-sync';
 
 import { SSOService } from '../sso.service';
 
@@ -44,7 +44,7 @@ export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
 export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
+export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
   constructor(
     protected moduleRef: ModuleRef,
     config: SSOProviderOIDCConfiguration,
@@ -112,13 +112,16 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
     }
   }
 
-  // Explicit six-argument Passport verify callback: req, issuer, profile, context, id_token, done.
+  // Explicit eight-argument Passport verify callback: req, issuer, profile, context, id_token, access_token,
+  // refresh_token, done. The refresh token enables session-time permission re-sync.
   async validate(
     req: SsoSessionRequest,
     issuer: string,
     profile: Profile,
     context: unknown,
     idToken: string,
+    _accessToken?: string,
+    refreshToken?: string,
   ): Promise<User> {
     const verifier = this.moduleRef.get(OidcTokenVerifier, { strict: false });
     let claims: Record<string, unknown> | undefined;
@@ -135,6 +138,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
         providerIssuedAt: Number(claims.iat) * 1000,
         ...(typeof claims.sid === 'string' && claims.sid ? { sid: claims.sid } : {}),
         idTokenEncrypted: encryption.encrypt(idToken),
+        ...(refreshToken ? { refreshTokenEncrypted: encryption.encrypt(refreshToken) } : {}),
+        lastSsoSyncAt: Date.now(),
       };
     } catch (error) {
       // Old providers without usable discovery/JWKS retain their existing OAuth login path,
@@ -145,7 +150,26 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
       delete req.ssoSessionContext;
       claims = undefined;
     }
-    return this.validateProfile(issuer, profile, context, claims);
+    const user = await this.validateProfile(issuer, profile, context, claims);
+    if (req.ssoSessionContext && !refreshToken) this.reportMissingRefreshToken();
+    return user;
+  }
+
+  /** Re-sync is enabled for this provider but the IdP issued no refresh token, so the session can never be re-synced. */
+  private reportMissingRefreshToken(): void {
+    try {
+      if (resolvePermissionSyncIntervalMinutes(this.config) <= 0) return;
+      this.logger.warn(
+        `OIDC provider ${this.config.ssoProviderId} has permission re-sync enabled but issued no refresh token; this session will not be re-synced (request the offline_access scope or enable refresh tokens at the IdP)`,
+      );
+      this.moduleRef
+        .get(MetricsService, { strict: false })
+        .authSsoRefreshTokenMissingTotal.inc({ provider_type: 'oidc' });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to report missing OIDC refresh token: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async validateProfile(
@@ -262,28 +286,12 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
   }
 
   protected async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {
-    const claimValues = this.getPermissionClaimValues(claimSources);
-    this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
-    const roleNames = this.resolveRoleNamesFromClaims(claimValues);
-    const roleAssignments = resolveSsoRoleAssignments(roleNames, this.config.roleMappings);
-    this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify(roleAssignments.map((r) => r.roleKey))}`);
-
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
     let changes: { added: string[]; removed: string[]; updated: string[] } | undefined;
     if (!rbacService) {
       this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
-    } else if (claimValues.length > 0) {
-      // Only sync when the token contained at least one role/group claim key. A present-but-empty
-      // claim (e.g. groups: []) is authoritative and revokes this provider's SSO-managed roles; a
-      // wholly absent claim (missing scope, transient IdP omission) must not silently revoke
-      // anything. Intentionally not gated on a configured mapping: a cleared mapping must still
-      // sync (with zero assignments) so roles granted under the old mapping get revoked.
-      changes = await rbacService.syncSsoRoles(
-        user.id,
-        roleAssignments,
-        SSOProviderType.OIDC,
-        this.config.ssoProviderId,
-      );
+    } else {
+      changes = await syncOidcRolesFromClaims(rbacService, user.id, this.config, claimSources);
     }
     await this.recordProvisioningAudit(user.id, userCreated, changes);
     return user;
@@ -302,27 +310,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
         this.config.ssoProviderId,
       );
       if (!audit || !provider) return;
-      const details = { provider: ssoAuditSnapshot(provider) };
-      if (userCreated) {
-        await audit.record({
-          action: 'sso.provisioning.user_created',
-          operationId: randomUUID(),
-          actorId: null,
-          authenticationMethod: null,
-          subject: { type: 'user', id: userId },
-          details: { ...details, changes: JSON.stringify({ userCreated: true }) },
-        });
-      }
-      if (changes) {
-        await audit.record({
-          action: 'sso.provisioning.permissions_synced',
-          operationId: randomUUID(),
-          actorId: null,
-          authenticationMethod: null,
-          subject: { type: 'user', id: userId },
-          details: { ...details, changes: JSON.stringify(changes) },
-        });
-      }
+      if (userCreated) await recordSsoProvisioningAudit(audit, 'user_created', userId, provider, { userCreated: true });
+      if (changes) await recordSsoProvisioningAudit(audit, 'permissions_synced', userId, provider, changes);
     } catch (error) {
       this.logger.warn(
         `Failed to record committed OIDC provisioning audit: ${error instanceof Error ? error.message : String(error)}`,
@@ -348,54 +337,5 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 6) {
       }
     }
     return undefined;
-  }
-
-  protected getPermissionClaimValues(claimSources: unknown[]): unknown[] {
-    const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
-    if (this.config.clientId) {
-      paths.push(`resource_access.${this.config.clientId}.roles`);
-    }
-
-    const values: unknown[] = [];
-    for (const path of paths) {
-      for (const source of claimSources) {
-        const value = get(source, path);
-        if (value !== undefined && value !== null) {
-          values.push(value);
-        }
-      }
-    }
-
-    return values;
-  }
-
-  protected resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
-    const roleNames: string[] = [];
-
-    for (const value of claimValues) {
-      if (Array.isArray(value)) {
-        for (const entry of value) {
-          if (typeof entry === 'string') roleNames.push(entry);
-        }
-        continue;
-      }
-      if (typeof value === 'string') {
-        roleNames.push(value);
-        continue;
-      }
-      if (value && typeof value === 'object') {
-        for (const entry of Object.values(value)) {
-          if (typeof entry === 'string') roleNames.push(entry);
-          else if (Array.isArray(entry)) {
-            for (const item of entry) {
-              if (typeof item === 'string') roleNames.push(item);
-            }
-          }
-        }
-      }
-    }
-
-    this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
-    return roleNames;
   }
 }

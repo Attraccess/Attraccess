@@ -644,7 +644,7 @@ describe('OIDC Passport callback authentication context', () => {
         token === OidcTokenVerifier
           ? verifier
           : token === EncryptionService
-            ? { encrypt: () => 'encrypted-hint' }
+            ? { encrypt: (value: string) => `encrypted:${value}` }
             : undefined,
     } as unknown as ModuleRef;
     const config = {
@@ -662,13 +662,22 @@ describe('OIDC Passport callback authentication context', () => {
     jest.spyOn(strategy, 'validateProfile').mockResolvedValue(user);
     const req = {};
     const verify = (strategy as unknown as { _verify: (...args: unknown[]) => void })._verify;
-    expect(verify.length).toBe(6);
+    expect(verify.length).toBe(8);
     await new Promise<void>((resolve, reject) =>
-      verify(req, config.issuer, { id: 'subject' }, {}, 'signed-id-token', (error: Error | null, principal: User) => {
-        if (error) return reject(error);
-        expect(principal).toBe(user);
-        resolve();
-      }),
+      verify(
+        req,
+        config.issuer,
+        { id: 'subject' },
+        {},
+        'signed-id-token',
+        'access-token',
+        'refresh-token',
+        (error: Error | null, principal: User) => {
+          if (error) return reject(error);
+          expect(principal).toBe(user);
+          resolve();
+        },
+      ),
     );
     expect(verifier.verify).toHaveBeenCalledWith('signed-id-token', config);
     expect(req).toEqual({
@@ -679,7 +688,9 @@ describe('OIDC Passport callback authentication context', () => {
         subject: 'subject',
         providerIssuedAt: 1700000000000,
         sid: 'browser',
-        idTokenEncrypted: 'encrypted-hint',
+        idTokenEncrypted: 'encrypted:signed-id-token',
+        refreshTokenEncrypted: 'encrypted:refresh-token',
+        lastSsoSyncAt: expect.any(Number),
       },
     });
     expect(user).not.toHaveProperty('ssoSessionContext');
@@ -701,5 +712,71 @@ describe('OIDC Passport callback authentication context', () => {
     ).resolves.toBe(user);
     expect(legacyRequest).not.toHaveProperty('ssoSessionContext');
     expect(strategy.validateProfile).toHaveBeenLastCalledWith(config.issuer, { id: 'subject' }, {}, undefined);
+  });
+});
+
+describe('OIDC login without a refresh token', () => {
+  const setup = async (providerTtl: number | null) => {
+    const { OidcTokenVerifier } = await import('./oidc-token-verifier.service');
+    const { EncryptionService } = await import('../../../../encryption/encryption.service');
+    const { MetricsService } = await import('../../../../metrics/metrics.service');
+    const metrics = { authSsoRefreshTokenMissingTotal: { inc: jest.fn() } };
+    const verifier = { verify: jest.fn().mockResolvedValue({ sub: 'subject', iat: 1700000000 }) };
+    const services = new Map<unknown, unknown>([
+      [OidcTokenVerifier, verifier],
+      [EncryptionService, { encrypt: (value: string) => `encrypted:${value}` }],
+      [MetricsService, metrics],
+    ]);
+    const moduleRef = { get: (token: unknown) => services.get(token) } as unknown as ModuleRef;
+    const config = {
+      ssoProviderId: 4,
+      issuer: 'https://issuer',
+      authorizationURL: 'https://issuer/auth',
+      tokenURL: 'https://issuer/token',
+      userInfoURL: 'https://issuer/me',
+      clientId: 'client',
+      clientSecret: 'secret',
+      permissionSyncTtlMinutes: providerTtl,
+    } as SSOProviderOIDCConfiguration;
+    const strategy = new SSOOIDCStrategy(moduleRef, config, 'https://app.example/callback', {} as OidcCookieStateStore);
+    jest.spyOn(strategy, 'validateProfile').mockResolvedValue({ id: 7 } as User);
+    const warn = jest.spyOn(strategy['logger'], 'warn').mockImplementation();
+    const login = (refreshToken?: string) =>
+      strategy.validate(
+        {} as never,
+        config.issuer,
+        { id: 'subject' } as Profile,
+        {},
+        'id-token',
+        'access',
+        refreshToken,
+      );
+    return { strategy, login, metrics, warn };
+  };
+
+  it('warns and counts a missing refresh token when re-sync is enabled for the provider', async () => {
+    const { login, metrics, warn } = await setup(60);
+    await login(undefined);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('issued no refresh token'));
+    expect(metrics.authSsoRefreshTokenMissingTotal.inc).toHaveBeenCalledWith({ provider_type: 'oidc' });
+  });
+
+  it('stays quiet when the login itself fails', async () => {
+    const { strategy, login, metrics, warn } = await setup(60);
+    jest.spyOn(strategy, 'validateProfile').mockRejectedValue(new Error('account linking required'));
+    await expect(login(undefined)).rejects.toThrow('account linking required');
+    expect(warn).not.toHaveBeenCalled();
+    expect(metrics.authSsoRefreshTokenMissingTotal.inc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['re-sync is set to 0', 0, undefined],
+    ['re-sync is not configured', null, undefined],
+    ['the IdP issued a refresh token', 60, 'refresh-token'],
+  ])('stays quiet when %s', async (_label, providerTtl, refreshToken) => {
+    const { login, metrics, warn } = await setup(providerTtl);
+    await login(refreshToken);
+    expect(warn).not.toHaveBeenCalled();
+    expect(metrics.authSsoRefreshTokenMissingTotal.inc).not.toHaveBeenCalled();
   });
 });

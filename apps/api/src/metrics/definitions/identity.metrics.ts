@@ -27,6 +27,20 @@ export function createIdentityMetrics(registry: Registry) {
     registers: [registry],
   });
 
+  const authSsoPermissionResyncTotal = new Counter({
+    name: 'attraccess_auth_sso_permission_resync_total',
+    help: 'Total number of session-time SSO permission re-sync attempts (claim_lost: a concurrent request claimed it)',
+    labelNames: ['provider_type', 'outcome'],
+    registers: [registry],
+  });
+
+  const authSsoRefreshTokenMissingTotal = new Counter({
+    name: 'attraccess_auth_sso_refresh_token_missing_total',
+    help: 'Total number of SSO logins with permission re-sync enabled where the IdP issued no refresh token',
+    labelNames: ['provider_type'],
+    registers: [registry],
+  });
+
   const auth2faUsageTotal = new Counter({
     name: 'attraccess_auth_2fa_usage_total',
     help: 'Total number of 2FA actions',
@@ -64,6 +78,8 @@ export function createIdentityMetrics(registry: Registry) {
     authActiveSessions,
     authSsoLoginTotal,
     authSsoLoginFailuresTotal,
+    authSsoPermissionResyncTotal,
+    authSsoRefreshTokenMissingTotal,
     auth2faUsageTotal,
     usersTotal,
     usersRegisteredTotal,

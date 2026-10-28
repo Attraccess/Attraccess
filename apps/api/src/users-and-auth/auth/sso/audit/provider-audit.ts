@@ -1,4 +1,6 @@
 import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { randomUUID } from 'node:crypto';
+import { SsoAuditService } from '../../../../audit/sso-audit.service';
 
 const MAX_INLINE_ROLE_MAPPINGS_BYTES = 180;
 const MAX_INLINE_FIELD_BYTES = 96;
@@ -135,4 +137,22 @@ export function ssoAuditSnapshot(provider: SSOProvider): string {
     }
   }
   return JSON.stringify(snapshot);
+}
+
+/** Records a committed `sso.provisioning.*` change for a user; callers decide how to handle failures. */
+export async function recordSsoProvisioningAudit(
+  audit: SsoAuditService,
+  action: 'user_created' | 'permissions_synced' | 'sessions_revoked',
+  userId: number,
+  provider: SSOProvider,
+  changes: unknown,
+): Promise<void> {
+  await audit.record({
+    action: `sso.provisioning.${action}`,
+    operationId: randomUUID(),
+    actorId: null,
+    authenticationMethod: null,
+    subject: { type: 'user', id: userId },
+    details: { provider: ssoAuditSnapshot(provider), changes: JSON.stringify(changes) },
+  });
 }

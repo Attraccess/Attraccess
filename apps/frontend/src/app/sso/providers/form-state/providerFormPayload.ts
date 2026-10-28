@@ -48,6 +48,8 @@ export function buildOidcPayload({
     userInfoURL: base.userInfoURL,
     clientId: base.clientId,
     clientSecret: base.clientSecret,
+    // null turns session-time permission re-sync off
+    permissionSyncTtlMinutes: base.permissionSyncTtlMinutes ?? null,
   };
 
   if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);

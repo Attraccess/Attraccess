@@ -1,6 +1,9 @@
 import { SsoLogoutService } from './auth/sso/sso-logout.service';
 import { SsoLogoutController } from './auth/sso/sso-logout.controller';
 import { OidcTokenVerifier } from './auth/sso/oidc/oidc-token-verifier.service';
+import { OidcSessionResyncer } from './auth/sso/oidc/oidc-session-resyncer';
+import { SsoSessionPermissionSyncService } from './auth/sso/session-permission-sync.service';
+import { SESSION_PERMISSION_RESYNCERS, SessionPermissionSync } from './auth/sso/session-permission-sync';
 import { Module } from '@nestjs/common';
 
 import { PassportModule } from '@nestjs/passport';
@@ -211,6 +214,15 @@ export const sessionStoreProvider = {
     SSOService,
     SsoLogoutService,
     OidcTokenVerifier,
+    OidcSessionResyncer,
+    // Add further protocols' resyncers (e.g. SAML) to the factory to enable their session-time re-sync.
+    {
+      provide: SESSION_PERMISSION_RESYNCERS,
+      useFactory: (oidc: OidcSessionResyncer) => [oidc],
+      inject: [OidcSessionResyncer],
+    },
+    SsoSessionPermissionSyncService,
+    { provide: SessionPermissionSync, useExisting: SsoSessionPermissionSyncService },
     CookieConfigService,
     OidcCookieStateStore,
     SSOOIDCGuard,

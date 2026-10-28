@@ -1,6 +1,18 @@
+import { MAX_PERMISSION_SYNC_TTL_MINUTES } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsObject, IsOptional, IsString, ValidateNested, IsArray, IsBoolean, IsNotEmpty } from 'class-validator';
+import {
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsInt,
+  Max,
+  Min,
+} from 'class-validator';
 import { IsStringArrayRecord } from './validators';
 
 export class UpdateOIDCConfigurationDto {
@@ -31,6 +43,22 @@ export class UpdateOIDCConfigurationDto {
   @IsArray()
   @IsString({ each: true })
   signingAlgorithms?: string[] | null;
+
+  @ApiProperty({
+    description:
+      'Minutes between session-time permission re-syncs via the IdP refresh token. null or 0 disables re-sync.',
+    required: false,
+    nullable: true,
+    type: Number,
+    minimum: 0,
+    maximum: MAX_PERMISSION_SYNC_TTL_MINUTES,
+    example: 60,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(MAX_PERMISSION_SYNC_TTL_MINUTES)
+  permissionSyncTtlMinutes?: number | null;
 
   @ApiProperty({
     description: 'The issuer of the provider',

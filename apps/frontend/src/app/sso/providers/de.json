@@ -30,7 +30,8 @@
     "samlIdentityProvider": "Identity Provider",
     "samlAttributes": "Attribut-Zuordnung",
     "samlProvisioning": "Provisioning",
-    "samlSigning": "Service-Provider-Signierung"
+    "samlSigning": "Service-Provider-Signierung",
+    "oidcPermissionSync": "Berechtigungsabgleich während der Sitzung"
   },
   "issuer": "Aussteller",
   "entryPoint": "Entry Point",
@@ -76,6 +77,19 @@
   "scopes": "Scopes (durch Komma getrennt)",
   "usernameClaimPaths": "Benutzername-Claim-Pfade (durch Komma getrennt)",
   "emailClaimPaths": "E-Mail-Claim-Pfade (durch Komma getrennt)",
+  "permissionSyncTtlMinutes": "Abgleichsintervall (Minuten)",
+  "permissionSyncTtlMinutesHint": "Die Rollen werden erneut geprüft, sobald seit der letzten Prüfung so viele Minuten vergangen sind, und beim Erneuern der Sitzung (höchstens einmal pro Minute). Höchstwert 525600 (365 Tage).",
+  "permissionSync": {
+    "description": "Standardmäßig werden Rollen dieses Anbieters nur bei der Anmeldung aktualisiert. Schalten Sie dies ein, um die Rollen jedes angemeldeten Benutzers alle paar Minuten per Refresh-Token beim Identitätsanbieter erneut zu prüfen, damit Rollenänderungen ohne neue Anmeldung wirksam werden. Wie viele Minuten zwischen zwei Prüfungen liegen, legt das Abgleichsintervall fest.",
+    "enable": "Berechtigungen während der Sitzung abgleichen",
+    "requirements": {
+      "title": "Prüfen Sie Ihren Identitätsanbieter, bevor Sie dies einschalten",
+      "refreshToken": "Der Anbieter muss für diesen Client Refresh-Tokens ausstellen. Manche Anbieter tun das nur, wenn der Scope offline_access angefordert wird. Anmeldungen ohne Refresh-Token werden nie abgeglichen; Attraccess protokolliert dafür eine Warnung.",
+      "tokenLifetime": "Refresh-Tokens müssen länger als das Abgleichsintervall gültig bleiben, also die Minuten zwischen zwei Rollenprüfungen eines angemeldeten Benutzers. Setzen Sie bei Keycloak im Realm SSO Session Idle (standardmäßig 30 Minuten) und SSO Session Max mindestens auf das Abgleichsintervall oder fordern Sie offline_access an. Andernfalls wird jeder Benutzer beim ersten Abgleich abgemeldet.",
+      "rejection": "Lehnt der Anbieter ein Refresh-Token ab, etwa weil der Benutzer deaktiviert wurde oder seine Anbieter-Sitzung beendet ist, endet die Attraccess-Sitzung dieses Benutzers sofort.",
+      "existingSessions": "Nur Sitzungen, die mit dieser Attraccess-Version oder später begonnen wurden, können abgeglichen werden. Benutzer, die sich vor dem Update angemeldet haben, müssen sich noch einmal anmelden."
+    }
+  },
   "samlProvisioningSecret": "SAML-Provisioning-Secret",
   "samlProvisioningSecretHint": "Wird für SAML-Provisioning-Aufrufe (Logout, Löschen, Berechtigungen) verwendet. Leer lassen, um das vorhandene Secret beizubehalten.",
   "showSamlProvisioningSecret": "Provisioning-Secret anzeigen",

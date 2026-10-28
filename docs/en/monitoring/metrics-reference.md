@@ -40,6 +40,8 @@ rate(attraccess_http_requests_total{status_code=~"5.."}[5m])
 | `attraccess_auth_active_sessions` | Gauge | -- | Number of active authenticated sessions |
 | `attraccess_auth_sso_login_total` | Counter | `provider_type` | Successful SSO login attempts. `provider_type`: `oidc` or `saml` |
 | `attraccess_auth_sso_login_failures_total` | Counter | `provider_type`, `reason` | Failed SSO login attempts. `provider_type`: `oidc` or `saml`; `reason`: `guard_rejected`, `invalid_assertion`, `linking_failed`, or `provider_error` |
+| `attraccess_auth_sso_permission_resync_total` | Counter | `provider_type`, `outcome` | Session-time SSO permission re-sync attempts. `provider_type`: `oidc`; `outcome`: `unchanged`, `updated`, `failed`, `revoked`, or `claim_lost` (not an attempt: a concurrent request claimed it first) |
+| `attraccess_auth_sso_refresh_token_missing_total` | Counter | `provider_type` | Successful SSO logins with permission re-sync enabled where the IdP issued no refresh token, so the session can never be re-synced |
 | `attraccess_auth_2fa_usage_total` | Counter | `action` | Two-factor authentication actions |
 
 ### Example PromQL Queries

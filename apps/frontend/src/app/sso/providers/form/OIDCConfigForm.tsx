@@ -17,6 +17,7 @@ import { Button } from '../../../../components/button/index';
 import { AuthentikDiscoveryDialog } from '../discovery/authentik/index';
 import { KeycloakDiscoveryDialog } from '../discovery/keycloak/index';
 import { RoleMappingsSection } from './RoleMappingsSection';
+import { PermissionSyncSection } from './PermissionSyncSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
@@ -253,6 +254,11 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
         isLoadingRoles={model.isLoadingRoles}
         entries={model.oidcRoleMappingEntries}
         onChange={model.setOidcRoleMappingEntries}
+      />
+
+      <PermissionSyncSection
+        value={model.formValues.oidcConfiguration?.permissionSyncTtlMinutes}
+        onChange={(value) => model.setOidc('permissionSyncTtlMinutes', value)}
       />
     </>
   );
