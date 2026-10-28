@@ -18,14 +18,12 @@ import { LogoutSession } from '../../session-store/session-store';
 import { ssoAuditSnapshot } from '../audit/provider-audit';
 import { resolveSsoRoleAssignments } from '../permission-mapping';
 import { SSOService } from '../sso.service';
+import { SessionPermissionSync, SessionPermissionSyncOutcome } from '../session-permission-sync';
 import { OidcTokenVerifier } from './oidc-token-verifier.service';
 import { getOidcPermissionClaimValues, resolveOidcRoleNames } from './oidc-permission-claims';
 
 type OidcSessionContext = Extract<SsoSessionContext, { protocol: 'OIDC' }>;
 type RoleDelta = { added: string[]; removed: string[]; updated: string[] };
-
-/** `skipped` means no IdP call was made; every other outcome is one logged re-sync attempt. */
-export type OidcPermissionSyncOutcome = 'skipped' | 'unchanged' | 'updated' | 'failed' | 'revoked';
 
 const PROVIDER_CACHE_MS = 30_000;
 const RETRY_AFTER_FAILURE_MS = 60_000;
@@ -47,7 +45,7 @@ class OidcSessionRejectedError extends Error {}
  * re-sync interval has elapsed, using the same claim → role mapping as login.
  */
 @Injectable()
-export class OidcSessionPermissionSyncService {
+export class OidcSessionPermissionSyncService implements SessionPermissionSync {
   private readonly logger = new Logger(OidcSessionPermissionSyncService.name);
   private readonly providers = new Map<number, { expires: number; provider: SSOProvider | null }>();
 
@@ -70,7 +68,7 @@ export class OidcSessionPermissionSyncService {
     session: LogoutSession,
     userId: number,
     options: { force?: boolean } = {},
-  ): Promise<OidcPermissionSyncOutcome> {
+  ): Promise<SessionPermissionSyncOutcome> {
     try {
       return await this.attempt(session, userId, options);
     } catch (error) {
@@ -83,7 +81,7 @@ export class OidcSessionPermissionSyncService {
     session: LogoutSession,
     userId: number,
     options: { force?: boolean },
-  ): Promise<OidcPermissionSyncOutcome> {
+  ): Promise<SessionPermissionSyncOutcome> {
     const context = session.ssoContext;
     if (context?.protocol !== 'OIDC' || !context.refreshTokenEncrypted) return 'skipped';
     const provider = await this.provider(context.providerId);
@@ -103,7 +101,7 @@ export class OidcSessionPermissionSyncService {
     if (!(await this.sessionService.compareAndSetSsoContext(session.id, context, claimed))) return 'skipped';
     session.ssoContext = claimed;
 
-    let outcome: OidcPermissionSyncOutcome;
+    let outcome: SessionPermissionSyncOutcome;
     let changes: RoleDelta | undefined;
     try {
       changes = await this.resync(session, claimed, userId, provider, config);

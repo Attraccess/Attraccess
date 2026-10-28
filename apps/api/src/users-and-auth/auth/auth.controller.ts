@@ -25,7 +25,7 @@ import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nes
 import { CookieConfigService } from '../../common/services/cookie-config.service';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { randomUUID } from 'node:crypto';
-import { OidcSessionPermissionSyncService } from './sso/oidc/oidc-session-permission-sync.service';
+import { SessionPermissionSync } from './sso/session-permission-sync';
 
 @ApiTags('Authentication')
 @Controller('/auth')
@@ -36,7 +36,7 @@ export class AuthController {
     @Optional() private readonly identityAudit?: IdentityAuditService,
     @Optional() private readonly ssoLogout?: SsoLogoutService,
     @Optional() private readonly settings?: SettingsService,
-    @Optional() private readonly ssoPermissionSync?: OidcSessionPermissionSyncService,
+    @Optional() private readonly ssoPermissionSync?: SessionPermissionSync,
   ) {}
 
   @Post('/session/local')

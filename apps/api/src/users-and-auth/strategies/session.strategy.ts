@@ -8,7 +8,7 @@ import { TwoFactorService } from '../auth/two-factor.service';
 import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
-import { OidcSessionPermissionSyncService } from '../auth/sso/oidc/oidc-session-permission-sync.service';
+import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -32,7 +32,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     private readonly rbacService: RbacService,
     private readonly apiTokenService: ApiTokenService,
     private readonly authAuditLogger: AuthAuditLogger,
-    @Optional() private readonly ssoPermissionSync?: OidcSessionPermissionSyncService,
+    @Optional() private readonly ssoPermissionSync?: SessionPermissionSync,
   ) {
     super();
   }
