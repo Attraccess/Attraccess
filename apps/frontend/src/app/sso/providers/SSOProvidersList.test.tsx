@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  browserConfirm: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
@@ -29,7 +30,7 @@ vi.mock('./SSOProvidersTable', () => ({
 describe('SSOProvidersList', () => {
   beforeEach(() => {
     mocks.mutateAsync.mockReset().mockResolvedValue(undefined);
-    vi.stubGlobal('confirm', vi.fn());
+    vi.stubGlobal('confirm', mocks.browserConfirm);
   });
   afterEach(() => {
     cleanup();
@@ -42,7 +43,7 @@ describe('SSOProvidersList', () => {
     await userEvent.click(screen.getByText('Delete row'));
     expect(await screen.findByRole('alertdialog', { name: 'Delete Provider' })).toBeInTheDocument();
     expect(mocks.mutateAsync).not.toHaveBeenCalled();
-    expect(window.confirm).not.toHaveBeenCalled();
+    expect(mocks.browserConfirm).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());

@@ -10,6 +10,7 @@ export * from './EmptyState';
 export * from './LabeledSwitch';
 export * from './LoadingIndicator';
 export * from './StandardDrawer';
+export * from './StatusAlert';
 export * from './StandardModal';
 export * from './button';
 export * from './delete-confirmation-modal';
