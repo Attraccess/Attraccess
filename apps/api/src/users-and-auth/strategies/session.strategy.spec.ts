@@ -10,6 +10,7 @@ import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 
 describe('SessionStrategy', () => {
   let strategy: SessionStrategy;
@@ -17,6 +18,7 @@ describe('SessionStrategy', () => {
   let twoFactorService: jest.Mocked<TwoFactorService>;
   let apiTokenService: jest.Mocked<ApiTokenService>;
   let rbacService: jest.Mocked<RbacService>;
+  let ssoPermissionSync: { syncIfDue: jest.Mock };
 
   const mockUser: User = {
     id: 1,
@@ -24,7 +26,7 @@ describe('SessionStrategy', () => {
     email: 'test@example.com',
   } as User;
 
-  beforeEach(async () => {
+  const buildModule = async (withSync: boolean) => {
     const mockSessionService = {
       authenticateSession: jest.fn(),
     };
@@ -55,6 +57,7 @@ describe('SessionStrategy', () => {
           provide: AuthAuditLogger,
           useValue: { log: jest.fn() },
         },
+        ...(withSync ? [{ provide: SessionPermissionSync, useValue: ssoPermissionSync }] : []),
       ],
     }).compile();
 
@@ -68,6 +71,11 @@ describe('SessionStrategy', () => {
       required: false,
       policy: TwoFactorPolicy.OPTIONAL,
     });
+  };
+
+  beforeEach(async () => {
+    ssoPermissionSync = { syncIfDue: jest.fn().mockResolvedValue('skipped') };
+    await buildModule(true);
   });
 
   describe('validate', () => {
@@ -269,6 +277,56 @@ describe('SessionStrategy', () => {
       });
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(new ForbiddenException('TwoFactorSetupRequired'));
+    });
+
+    describe('SSO permission re-sync', () => {
+      const session = { id: 'stable-session', ssoContext: null };
+      const sessionRequest = () =>
+        ({
+          headers: { authorization: 'Bearer valid-session-token' },
+          cookies: {},
+          path: '/api/users/me',
+        }) as Request;
+
+      beforeEach(() => {
+        sessionService.authenticateSession.mockResolvedValue({ user: mockUser, session } as never);
+      });
+
+      it('calls syncIfDue with the session and user id without force', async () => {
+        await strategy.validate(sessionRequest());
+
+        expect(ssoPermissionSync.syncIfDue).toHaveBeenCalledTimes(1);
+        expect(ssoPermissionSync.syncIfDue).toHaveBeenCalledWith(session, mockUser.id);
+      });
+
+      it('rejects revoked sessions before computing effective permissions', async () => {
+        ssoPermissionSync.syncIfDue.mockResolvedValue('revoked');
+
+        await expect(strategy.validate(sessionRequest())).rejects.toThrow(UnauthorizedException);
+        expect(rbacService.getEffectivePermissions).not.toHaveBeenCalled();
+        expect(twoFactorService.getStatus).not.toHaveBeenCalled();
+      });
+
+      it.each(['updated', 'unchanged', 'skipped', 'failed'])(
+        'passes through when the outcome is %s',
+        async (outcome) => {
+          ssoPermissionSync.syncIfDue.mockResolvedValue(outcome);
+
+          const result = await strategy.validate(sessionRequest());
+
+          expect(result).toEqual(mockUser);
+          expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(mockUser.id);
+        },
+      );
+
+      it('still validates when no SessionPermissionSync is provided', async () => {
+        await buildModule(false);
+        sessionService.authenticateSession.mockResolvedValue({ user: mockUser, session } as never);
+
+        const result = await strategy.validate(sessionRequest());
+
+        expect(result).toEqual(mockUser);
+      });
     });
   });
 });

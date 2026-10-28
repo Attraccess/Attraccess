@@ -4,6 +4,7 @@ import { SettingsService } from '../../settings/settings.service';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { AuthController } from './auth.controller';
 import { Response } from 'express';
+import { UnauthorizedException } from '@nestjs/common';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { User } from '@attraccess/database-entities';
 
@@ -331,5 +332,48 @@ describe('AuthController', () => {
       'ended or expired',
     );
     expect(fixture.sessionService.createSession).not.toHaveBeenCalled();
+  });
+
+  describe('refreshSession SSO permission re-sync', () => {
+    const authSession = { id: 'stable-session', ssoContext: null };
+    let syncIfDue: jest.Mock;
+    const refreshRequest = () =>
+      ({
+        user: { id: 7 },
+        authSession,
+        headers: { authorization: 'Bearer current-session-token' },
+        cookies: {},
+      }) as unknown as AuthenticatedRequest;
+
+    beforeEach(() => {
+      syncIfDue = fixture.ssoPermissionSync.syncIfDue;
+    });
+
+    it('forces a re-sync with the session and user id', async () => {
+      await fixture.authController.refreshSession(refreshRequest(), {} as Response, 'body');
+
+      expect(syncIfDue).toHaveBeenCalledWith(authSession, 7, { force: true });
+    });
+
+    it('rejects revoked sessions without rotating them', async () => {
+      syncIfDue.mockResolvedValue('revoked');
+
+      await expect(fixture.authController.refreshSession(refreshRequest(), {} as Response, 'body')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(fixture.sessionService.refreshSession).not.toHaveBeenCalled();
+    });
+
+    it.each(['updated', 'unchanged', 'skipped', 'failed'])(
+      'rotates the session when the outcome is %s',
+      async (outcome) => {
+        syncIfDue.mockResolvedValue(outcome);
+
+        const result = await fixture.authController.refreshSession(refreshRequest(), {} as Response, 'body');
+
+        expect(result.authToken).toBe('new-session-token');
+        expect(fixture.sessionService.refreshSession).toHaveBeenCalledWith('current-session-token');
+      },
+    );
   });
 });

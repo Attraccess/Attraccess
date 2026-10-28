@@ -146,6 +146,13 @@ describe('MetricsService', () => {
       expect(metrics).toContain('attraccess_auth_sso_permission_resync_total{provider_type="oidc",outcome="revoked"} 1');
     });
 
+    it('authSsoRefreshTokenMissingTotal counter is defined with a provider type label', async () => {
+      service.authSsoRefreshTokenMissingTotal.inc({ provider_type: 'oidc' });
+
+      const metrics = await service.getMetrics();
+      expect(metrics).toContain('attraccess_auth_sso_refresh_token_missing_total{provider_type="oidc"} 1');
+    });
+
     it('attractapFirmwareUpdatesTotal counter is defined', () => {
       expect(service.attractapFirmwareUpdatesTotal).toBeDefined();
     });

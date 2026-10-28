@@ -21,17 +21,19 @@ import { AccountLinkingRequiredException } from './exceptions/account-linking-re
 
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 
-import { randomUUID } from 'node:crypto';
-
 import { SsoAuditService } from '../../../../audit/sso-audit.service';
 
 import { RbacService } from '../../../rbac/rbac.service';
 
-import { resolveSsoRoleAssignments } from '../permission-mapping';
+import { syncOidcRolesFromClaims } from './oidc-permission-claims';
 
-import { getOidcPermissionClaimValues, resolveOidcRoleNames } from './oidc-permission-claims';
+import { recordSsoProvisioningAudit } from '../audit/provider-audit';
 
-import { ssoAuditSnapshot } from '../audit/provider-audit';
+import { resolvePermissionSyncIntervalMinutes } from '../session-permission-sync';
+
+import { ConfigService } from '@nestjs/config';
+
+import { SessionConfigType } from '../../../../config/session.config';
 
 import { SSOService } from '../sso.service';
 
@@ -152,7 +154,27 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       delete req.ssoSessionContext;
       claims = undefined;
     }
-    return this.validateProfile(issuer, profile, context, claims);
+    const user = await this.validateProfile(issuer, profile, context, claims);
+    if (req.ssoSessionContext && !refreshToken) this.reportMissingRefreshToken();
+    return user;
+  }
+
+  /** Re-sync is enabled for this provider but the IdP issued no refresh token, so the session can never be re-synced. */
+  private reportMissingRefreshToken(): void {
+    try {
+      const sessionConfig = this.moduleRef.get(ConfigService, { strict: false }).get<SessionConfigType>('session');
+      if (resolvePermissionSyncIntervalMinutes(this.config, sessionConfig) <= 0) return;
+      this.logger.warn(
+        `OIDC provider ${this.config.ssoProviderId} has permission re-sync enabled but issued no refresh token; this session will not be re-synced (request the offline_access scope or enable refresh tokens at the IdP)`,
+      );
+      this.moduleRef
+        .get(MetricsService, { strict: false })
+        .authSsoRefreshTokenMissingTotal.inc({ provider_type: 'oidc' });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to report missing OIDC refresh token: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async validateProfile(
@@ -269,28 +291,12 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
   }
 
   protected async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {
-    const claimValues = this.getPermissionClaimValues(claimSources);
-    this.logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
-    const roleNames = this.resolveRoleNamesFromClaims(claimValues);
-    const roleAssignments = resolveSsoRoleAssignments(roleNames, this.config.roleMappings);
-    this.logger.debug(`RBAC role keys from SSO: ${JSON.stringify(roleAssignments.map((r) => r.roleKey))}`);
-
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
     let changes: { added: string[]; removed: string[]; updated: string[] } | undefined;
     if (!rbacService) {
       this.logger.warn('RbacService not available via ModuleRef — SSO role sync skipped; existing roles preserved');
-    } else if (claimValues.length > 0) {
-      // Only sync when the token contained at least one role/group claim key. A present-but-empty
-      // claim (e.g. groups: []) is authoritative and revokes this provider's SSO-managed roles; a
-      // wholly absent claim (missing scope, transient IdP omission) must not silently revoke
-      // anything. Intentionally not gated on a configured mapping: a cleared mapping must still
-      // sync (with zero assignments) so roles granted under the old mapping get revoked.
-      changes = await rbacService.syncSsoRoles(
-        user.id,
-        roleAssignments,
-        SSOProviderType.OIDC,
-        this.config.ssoProviderId,
-      );
+    } else {
+      changes = await syncOidcRolesFromClaims(rbacService, user.id, this.config, claimSources);
     }
     await this.recordProvisioningAudit(user.id, userCreated, changes);
     return user;
@@ -309,27 +315,8 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
         this.config.ssoProviderId,
       );
       if (!audit || !provider) return;
-      const details = { provider: ssoAuditSnapshot(provider) };
-      if (userCreated) {
-        await audit.record({
-          action: 'sso.provisioning.user_created',
-          operationId: randomUUID(),
-          actorId: null,
-          authenticationMethod: null,
-          subject: { type: 'user', id: userId },
-          details: { ...details, changes: JSON.stringify({ userCreated: true }) },
-        });
-      }
-      if (changes) {
-        await audit.record({
-          action: 'sso.provisioning.permissions_synced',
-          operationId: randomUUID(),
-          actorId: null,
-          authenticationMethod: null,
-          subject: { type: 'user', id: userId },
-          details: { ...details, changes: JSON.stringify(changes) },
-        });
-      }
+      if (userCreated) await recordSsoProvisioningAudit(audit, 'user_created', userId, provider, { userCreated: true });
+      if (changes) await recordSsoProvisioningAudit(audit, 'permissions_synced', userId, provider, changes);
     } catch (error) {
       this.logger.warn(
         `Failed to record committed OIDC provisioning audit: ${error instanceof Error ? error.message : String(error)}`,
@@ -355,15 +342,5 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       }
     }
     return undefined;
-  }
-
-  protected getPermissionClaimValues(claimSources: unknown[]): unknown[] {
-    return getOidcPermissionClaimValues(claimSources, this.config.clientId);
-  }
-
-  protected resolveRoleNamesFromClaims(claimValues: unknown[]): string[] {
-    const roleNames = resolveOidcRoleNames(claimValues);
-    this.logger.debug(`Resolved SSO role names: ${JSON.stringify(roleNames)}`);
-    return roleNames;
   }
 }

@@ -10,6 +10,7 @@ import { UsersService } from '../users/users.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
+import { SessionPermissionSync } from './sso/session-permission-sync';
 
 const passportRequest = require('passport/lib/http/request') as {
   logout(this: object, callback: (error?: Error) => void): void;
@@ -22,6 +23,8 @@ export function registerAuthControllerFixture() {
   let cookieConfigService: CookieConfigService;
 
   let identityAudit: { record: jest.Mock };
+
+  let ssoPermissionSync: { syncIfDue: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -77,6 +80,7 @@ export function registerAuthControllerFixture() {
         { provide: SettingsService, useValue: { getUrl: async () => 'https://app.example' } },
         { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },
+        { provide: SessionPermissionSync, useValue: { syncIfDue: jest.fn().mockResolvedValue('skipped') } },
       ],
     }).compile();
 
@@ -84,6 +88,7 @@ export function registerAuthControllerFixture() {
     sessionService = module.get<SessionService>(SessionService);
     cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
     identityAudit = module.get(IdentityAuditService);
+    ssoPermissionSync = module.get(SessionPermissionSync);
   });
   return {
     get passportRequest() {
@@ -100,6 +105,9 @@ export function registerAuthControllerFixture() {
     },
     get identityAudit() {
       return identityAudit;
+    },
+    get ssoPermissionSync() {
+      return ssoPermissionSync;
     },
   };
 }

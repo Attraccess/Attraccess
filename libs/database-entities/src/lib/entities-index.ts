@@ -114,7 +114,7 @@ export { Role } from './entities/role.entity';
 export { Session } from './entities/session.entity';
 export { Setting } from './entities/setting.entity';
 export { SSOProvider, SSOProviderType } from './entities/ssoProvider.entity';
-export { SSOProviderOIDCConfiguration } from './entities/ssoProvider.oidc';
+export { SSOProviderOIDCConfiguration, MAX_PERMISSION_SYNC_TTL_MINUTES } from './entities/ssoProvider.oidc';
 export { SSOProviderSAMLConfiguration } from './entities/ssoProvider.saml';
 export { UserRole, UserRoleSource } from './entities/user-role.entity';
 export { User } from './entities/user.entity';

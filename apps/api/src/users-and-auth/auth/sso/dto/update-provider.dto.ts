@@ -1,3 +1,4 @@
+import { MAX_PERMISSION_SYNC_TTL_MINUTES } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -12,7 +13,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { IsStringArrayRecord, MAX_PERMISSION_SYNC_TTL_MINUTES } from './validators';
+import { IsStringArrayRecord } from './validators';
 
 export class UpdateOIDCConfigurationDto {
   @ApiProperty({

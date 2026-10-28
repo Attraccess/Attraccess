@@ -13,8 +13,8 @@ export const getDefaultOidcConfiguration = () => ({
   permissionSyncTtlMinutes: null as number | null,
 });
 
-/** Mirrors the API limit: sessions live at most 7 days. */
-export const MAX_PERMISSION_SYNC_TTL_MINUTES = 7 * 24 * 60;
+/** Mirrors MAX_PERMISSION_SYNC_TTL_MINUTES in database-entities; importing it would pull the entity barrel into the browser bundle. */
+export const MAX_PERMISSION_SYNC_TTL_MINUTES = 365 * 24 * 60;
 
 export const getDefaultSamlConfiguration = () => ({
   entryPoint: '',
