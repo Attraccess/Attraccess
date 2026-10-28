@@ -190,7 +190,6 @@ def main():
         "attractap-touch-demo",
         "attractap-touch-v2-demo",
         # "attractap-lite-ethernet",
-        # "attractap-touch-ethernet",
     ]
     variants = [(name, os.path.join("variants", name + ".cmake")) for name in active_variants]
 

@@ -10,7 +10,6 @@ One firmware per hardware flavor, defined by a file in `variants/`:
 | -------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
 | `attractap-touch`          | ESP32-S3 DevKitC (V3 hardware) | ST7701 480x480 RGB panel, GT911 touch, TCA9554 IO expander, PN532 NFC, WiFi |
 | `attractap-touch-v2`       | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64             |
-| `attractap-touch-ethernet` | Adafruit Qualia S3 RGB666      | TL040WVS03 panel via XCA9554 expander, FocalTech touch, W5500 ethernet      |
 | `attractap-lite-ethernet`  | Adafruit Qualia S3             | headless, WS2812 24-LED ring, W5500 ethernet                                |
 | `attractap-touch-demo`     | V3 display hardware            | Offline demo API and demo settings                                          |
 | `attractap-touch-v2-demo`  | V4 display hardware            | Offline demo API, demo settings and power button                            |
