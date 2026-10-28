@@ -15,6 +15,7 @@ test = ["pytest>=8"]
 [project.scripts]
 attractap-lab = "attractap_lab.cli:main"
 attractap-lab-maintenance = "attractap_lab.maintenance:main"
+attractap-lab-janitor = "attractap_lab.janitor:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -17,6 +17,38 @@ let
       ${labgrid.src}/contrib/sync-places.py \
       --coordinator ${lib.escapeShellArg cfg.coordinator.syncAddress} sync ${placesConfig}
   '';
+  janitor = cfg.janitor;
+  janitorState = "/var/lib/attractap-lab-janitor";
+  janitorEnvironment = yaml.generate "attractap-janitor-env.yaml" {
+    imports = [ "attractap_lab.drivers" ];
+    targets.main = {
+      resources.RemotePlace.name = "set-per-place-by-the-janitor";
+      drivers = { ESPToolDriver = { }; SerialDriver = { }; };
+    };
+  };
+  # The janitor reaches this host's exporter like any client: labgrid always
+  # uses SSH for isolated resources. It gets a host-local key that never leaves
+  # the machine, authorized only for the labgrid account (see authorizedKeysFiles).
+  janitorSsh = pkgs.writeShellScript "attractap-lab-janitor-ssh" ''
+    set -eu
+    install -d -m 0700 "$HOME/.ssh" ${janitorState}/ssh
+    if [ ! -e "$HOME/.ssh/id_janitor" ]; then
+      ${pkgs.openssh}/bin/ssh-keygen -q -t ed25519 -N "" -C attractap-lab-janitor -f "$HOME/.ssh/id_janitor"
+    fi
+    install -m 0600 "$HOME/.ssh/id_janitor.pub" ${janitorState}/ssh/labgrid.authorized_keys
+    names="localhost,127.0.0.1,::1,${cfg.exporter.hostname},${config.networking.hostName},$(${pkgs.python3}/bin/python3 -c 'import socket; print(socket.getfqdn())')"
+    : > "$HOME/.ssh/known_hosts_janitor"
+    for key in /etc/ssh/ssh_host_*_key.pub; do
+      printf '%s %s\n' "$names" "$(cut -d' ' -f1,2 "$key")" >> "$HOME/.ssh/known_hosts_janitor"
+    done
+    cat > "$HOME/.ssh/config" <<'CONFIG'
+    Host *
+      IdentityFile ~/.ssh/id_janitor
+      IdentitiesOnly yes
+      UserKnownHostsFile ~/.ssh/known_hosts_janitor
+      StrictHostKeyChecking yes
+    CONFIG
+  '';
 in {
   imports = [ ./dashboard-module.nix ];
   options.services.attractap-lab = {
@@ -58,6 +90,23 @@ in {
       coordinatorAddress = mkOption { type = types.str; default = "127.0.0.1:20408"; description = "Coordinator HOST:PORT (labgrid gRPC address)."; };
       settings = mkOption { type = yaml.type; default = { }; description = "Native labgrid exporter YAML: one resource group per reader. Use stable USB properties in match expressions."; };
     };
+    janitor = {
+      enable = mkEnableOption "erasing and parking every reader as soon as it is released";
+      images = mkOption {
+        type = types.attrsOf types.path;
+        default = { };
+        example = lib.literalExpression ''{ "attractap-touch-v2" = ./attractap_touch_v2_park.bin; }'';
+        description = "Parking images keyed by place `variant` tag, built with `pnpm nx run attractap-firmware:build-lab`. Places whose variant has no image are not managed.";
+      };
+      priority = mkOption {
+        type = types.ints.positive;
+        default = 1000;
+        description = "Reservation priority; must exceed every client's (labgrid sessions use 0) so released readers are parked before anyone else gets them.";
+      };
+      maxParallel = mkOption { type = types.ints.positive; default = 2; description = "Readers parked at the same time."; };
+      attempts = mkOption { type = types.ints.positive; default = 3; description = "Failed parking attempts before a reader is quarantined."; };
+      markerSeconds = mkOption { type = types.ints.positive; default = 30; description = "Time for the parking image to report ATTRACTAP_PARKED after flashing."; };
+    };
     cameras = mkOption {
       default = { };
       description = "uStreamer camera services; use stable /dev/v4l/by-id device paths.";
@@ -76,6 +125,9 @@ in {
     assertions = [ {
       assertion = cfg.coordinator.enable || cfg.exporter.enable || cfg.cameras != { };
       message = "Enable an Attractap lab coordinator, exporter or camera.";
+    } {
+      assertion = !janitor.enable || (cfg.coordinator.enable && cfg.exporter.enable && janitor.images != { });
+      message = "The Attractap lab janitor needs the local coordinator and exporter, and at least one parking image.";
     } {
       assertion = cfg.coordinator.places == null || cfg.coordinator.enable;
       message = "Declarative Attractap lab places require the local coordinator.";
@@ -96,9 +148,11 @@ in {
     };
     # SSH sessions must find esptool without relying on interactive shell setup.
     environment.systemPackages = tools;
-    services.openssh = mkIf (cfg.ssh.authorizedKeys != [ ]) {
+    services.openssh = mkIf (cfg.ssh.authorizedKeys != [ ] || janitor.enable) {
       enable = true;
       openFirewall = lib.mkDefault false;
+      # %u: the janitor key authorizes only the labgrid account.
+      authorizedKeysFiles = lib.optional janitor.enable "${janitorState}/ssh/%u.authorized_keys";
     };
     services.udev.extraRules = cfg.extraUdevRules;
     systemd.tmpfiles.rules = [
@@ -158,6 +212,38 @@ in {
         Group = "labgrid";
         WorkingDirectory = "/var/lib/labgrid";
         ExecStart = lib.escapeShellArgs [ "${labgrid}/bin/labgrid-exporter" "--isolated" "--name" cfg.exporter.name "--hostname" cfg.exporter.hostname "--coordinator" cfg.exporter.coordinatorAddress exporterConfig ];
+        Restart = "always";
+        RestartSec = 5;
+      };
+    };
+  })
+  (mkIf janitor.enable {
+    systemd.services.attractap-lab-janitor = {
+      description = "Erase and park released Attractap lab readers";
+      wantedBy = [ "multi-user.target" ];
+      requires = [ "attractap-lab-coordinator.service" ];
+      after = [ "attractap-lab-coordinator.service" "attractap-lab-exporter.service" "attractap-lab-places.service" "sshd.service" ];
+      # Coordinator restarts drop all claims; restart to park every reader again.
+      partOf = [ "attractap-lab-coordinator.service" ];
+      path = tools;
+      environment = { PYTHONUNBUFFERED = "1"; HOME = "/var/lib/labgrid"; LG_COORDINATOR = cfg.coordinator.syncAddress; };
+      startLimitIntervalSec = 0;
+      serviceConfig = {
+        User = "labgrid";
+        Group = "labgrid";
+        StateDirectory = "attractap-lab-janitor";
+        StateDirectoryMode = "0750";
+        WorkingDirectory = janitorState;
+        ExecStartPre = janitorSsh;
+        ExecStart = lib.escapeShellArgs ([
+          "${cfg.package}/bin/attractap-lab-janitor" "--state-dir" janitorState "run"
+          "--config" janitorEnvironment
+          "--priority" (toString janitor.priority)
+          "--max-parallel" (toString janitor.maxParallel)
+          "--attempts" (toString janitor.attempts)
+          "--marker-seconds" (toString janitor.markerSeconds)
+          "--park-command" "${cfg.package}/bin/attractap-lab-janitor"
+        ] ++ lib.concatMap (variant: [ "--image" "${variant}=${janitor.images.${variant}}" ]) (lib.attrNames janitor.images));
         Restart = "always";
         RestartSec = 5;
       };

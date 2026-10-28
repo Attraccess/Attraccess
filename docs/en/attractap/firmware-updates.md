@@ -42,7 +42,6 @@ Each hardware variant requires its own firmware build:
 |-----------------|-----------------|
 | Attractap Lite Ethernet | `lite-ethernet` |
 | Attractap Touch WiFi | `touch-wifi` |
-| Attractap Touch Ethernet | `touch-ethernet` |
 
 A reader is only ever offered the build matching the variant it reports, so a reader cannot be updated with the wrong image.
 

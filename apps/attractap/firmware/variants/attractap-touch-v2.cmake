@@ -44,5 +44,3 @@ set(ATTRACTAP_DEFINES
     # V4 uses a 16-bit IO expander (PCA9555-compatible) at 0x24
     IO_EXPANDER_16BIT=1
 )
-
-set(ATTRACTAP_EXCLUDE_REGEX "src/display/driver/qualia/")

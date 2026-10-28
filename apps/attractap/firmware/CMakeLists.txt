@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.16)
 # Firmware variant to build — one .cmake file per shipped firmware under variants/.
 # Each variant file sets ATTRACTAP_DEFINES (compile definitions, the successor of
 # the per-env build_flags in the old platformio.ini) and ATTRACTAP_EXCLUDE_REGEX
-# (source subtrees not compiled for that hardware).
+# (source subtrees not compiled for that hardware). Lab-only variants set
+# ATTRACTAP_RELEASE OFF (build_firmwares.py never ships them); the *-park
+# variants also set ATTRACTAP_APP "park" to build park/ instead of src/.
 set(ATTRACTAP_VARIANT "attractap-touch" CACHE STRING "Attractap firmware variant to build")
 
 # Runtime log level compiled into the firmware banner/filter (bare token, stringified

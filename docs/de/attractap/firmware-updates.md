@@ -42,7 +42,6 @@ Jede Hardware-Variante erfordert ihren eigenen Firmware-Build:
 |-------------------|------------------|
 | Attractap Lite Ethernet | `lite-ethernet` |
 | Attractap Touch WiFi | `touch-wifi` |
-| Attractap Touch Ethernet | `touch-ethernet` |
 
 Einem Leser wird immer nur der Build zu der Variante angeboten, die er meldet -- ein Leser kann also nicht mit dem falschen Image aktualisiert werden.
 

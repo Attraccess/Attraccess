@@ -31,6 +31,31 @@
       ],
       "cache": true
     },
+    "build-lab": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cd apps/attractap/firmware && python3 build_firmwares.py --lab",
+        "cwd": "."
+      },
+      "outputs": [
+        "{projectRoot}/firmware_output_lab"
+      ],
+      "inputs": [
+        "{projectRoot}/CMakeLists.txt",
+        "{projectRoot}/main/**/*",
+        "{projectRoot}/variants/**/*",
+        "{projectRoot}/sdkconfig.defaults",
+        "{projectRoot}/version.txt",
+        "{projectRoot}/partitions.csv",
+        "{projectRoot}/include/**/*",
+        "{projectRoot}/*.py",
+        "{projectRoot}/tools/**/*",
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/esp-idf-version.txt",
+        "{projectRoot}/park/**/*"
+      ],
+      "cache": true
+    },
     "test": {
       "executor": "nx:run-commands",
       "options": {
