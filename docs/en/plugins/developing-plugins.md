@@ -611,6 +611,37 @@ Declare `@attraccess/plugins-frontend-ui` as a peer dependency and require
 Attraccess 1.11.0 or later in both the npm `attraccess.host` range and the ZIP
 manifest's `attraccessVersion.min`, since older hosts do not share this module.
 
+### Shared UI components
+
+`@attraccess/plugins-frontend-ui` also ships the host's UI building blocks, so
+plugins look and behave like core instead of carrying their own copies:
+
+| Component                                               | Use it for                                                        |
+| ------------------------------------------------------- | ----------------------------------------------------------------- |
+| `StatusDialog`                                          | Notices and confirmations (`info`, `success`, `warning`, `error`) |
+| `DeleteConfirmationModal`                               | Confirming a deletion of a named item                             |
+| `StandardModal`, `StandardDrawer`                       | Richer modals and drawers (forms, lists)                          |
+| `Button`                                                | Buttons with a pending spinner                                    |
+| `AlertStatusIcon`, `StatusAlert`                        | Alerts with a status icon                                         |
+| `LabeledSwitch`, `PasswordInput`                        | Switch with label, password field with show/hide                  |
+| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Empty lists, centred loading indicator, page title with actions   |
+| `DateTimeDisplay`, `useDateTimeFormatter`               | Dates and times that follow the user's date/time preferences      |
+
+Use `StatusDialog` for short notices and confirmations. Only `error` renders a
+red (danger) action button; every other status renders a primary one. Escape
+calls `onClose`, a click on the backdrop does nothing. Reach for
+`StandardModal` only when the dialog needs richer content.
+
+The `StandardModal` and `StandardDrawer` exports of
+`@attraccess/plugins-frontend-sdk` are **deprecated** re-exports of the
+components above; import them from `@attraccess/plugins-frontend-ui` instead.
+
+These components need a host and `@attraccess/plugins-frontend-ui` that already
+contain them (**1.11.0 or later**, see the release that introduces them). A
+plugin that uses them fails at runtime on an older host, so raise
+`attraccess.host`, `attraccessVersion.min` and the peer dependency range
+accordingly.
+
 ### Packaging the frontend
 
 Build the frontend as a module federation remote exposing `./plugin`. Its
