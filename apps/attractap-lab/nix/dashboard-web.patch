@@ -1,0 +1,142 @@
+diff --git a/coordinator/web/src/components/CameraView.tsx b/coordinator/web/src/components/CameraView.tsx
+new file mode 100644
+index 0000000..2e472cf
+--- /dev/null
++++ b/coordinator/web/src/components/CameraView.tsx
+@@ -0,0 +1,54 @@
++import { useEffect, useRef, useState } from "react";
++import { Box, Button, HStack, Image, Text } from "@chakra-ui/react";
++
++interface Props {
++  place: string;
++  resource: string;
++}
++
++/** Live MJPEG view of a place's camera; connects only while shown. */
++export default function CameraView({ place, resource }: Props) {
++  const [shown, setShown] = useState(false);
++  const [failed, setFailed] = useState(false);
++  const image = useRef<HTMLImageElement>(null);
++  const src = `/api/places/${encodeURIComponent(place)}/cameras/${encodeURIComponent(resource)}`;
++
++  // Browsers may keep a detached MJPEG image downloading; drop it explicitly.
++  useEffect(() => {
++    const element = image.current;
++    return () => {
++      if (element) element.src = "";
++    };
++  }, [shown, failed]);
++
++  const toggle = () => {
++    setFailed(false);
++    setShown((s) => !s);
++  };
++
++  return (
++    <Box mb={4}>
++      <HStack mb={2}>
++        <Text fontSize="sm">{resource}</Text>
++        <Button ml="auto" size="xs" onClick={toggle}>
++          {shown ? "Hide live view" : "Show live view"}
++        </Button>
++      </HStack>
++      {shown && (failed ? (
++        <Text color="text.secondary" fontSize="sm">
++          Camera unavailable. Hide and show the live view to retry.
++        </Text>
++      ) : (
++        <Image
++          ref={image}
++          src={src}
++          alt={`Live view of ${place}`}
++          maxW="360px"
++          w="full"
++          borderRadius="md"
++          onError={() => setFailed(true)}
++        />
++      ))}
++    </Box>
++  );
++}
+diff --git a/coordinator/web/src/components/__tests__/CameraView.test.tsx b/coordinator/web/src/components/__tests__/CameraView.test.tsx
+new file mode 100644
+index 0000000..39b47dd
+--- /dev/null
++++ b/coordinator/web/src/components/__tests__/CameraView.test.tsx
+@@ -0,0 +1,34 @@
++import { describe, it, expect } from "vitest";
++import { render, screen, fireEvent } from "@testing-library/react";
++import { ChakraProvider } from "@chakra-ui/react";
++import CameraView from "../CameraView";
++
++describe("CameraView", () => {
++  it("connects to the camera only while shown", () => {
++    render(
++      <ChakraProvider>
++        <CameraView place="reader 1" resource="HTTPVideoStream" />
++      </ChakraProvider>
++    );
++    expect(screen.queryByRole("img")).toBeNull();
++
++    fireEvent.click(screen.getByRole("button", { name: "Show live view" }));
++    expect(screen.getByRole("img").getAttribute("src")).toBe(
++      "/api/places/reader%201/cameras/HTTPVideoStream"
++    );
++
++    fireEvent.click(screen.getByRole("button", { name: "Hide live view" }));
++    expect(screen.queryByRole("img")).toBeNull();
++  });
++
++  it("offers a retry when the camera fails", () => {
++    render(
++      <ChakraProvider>
++        <CameraView place="reader-1" resource="HTTPVideoStream" />
++      </ChakraProvider>
++    );
++    fireEvent.click(screen.getByRole("button", { name: "Show live view" }));
++    fireEvent.error(screen.getByRole("img"));
++    expect(screen.getByText(/Camera unavailable/)).toBeTruthy();
++  });
++});
+diff --git a/coordinator/web/src/pages/PlaceDetail.tsx b/coordinator/web/src/pages/PlaceDetail.tsx
+index 1035450..9966d2c 100644
+--- a/coordinator/web/src/pages/PlaceDetail.tsx
++++ b/coordinator/web/src/pages/PlaceDetail.tsx
+@@ -15,6 +15,7 @@ import { isPowerResource } from "../api/power";
+ import { isSDMuxResource } from "../api/sdmux";
+ import PowerControls from "../components/PowerControls";
+ import SDMuxControls from "../components/SDMuxControls";
++import CameraView from "../components/CameraView";
+ import DownloadEnvModal from "../components/DownloadEnvModal";
+ import RelatedPanel from "../components/RelatedPanel";
+ import Term from "../components/Term";
+@@ -176,6 +177,11 @@ export default function PlaceDetail() {
+     [allResources, place]
+   );
+ 
++  const cameras = useMemo(
++    () => placeResources.filter((r) => r.cls === "HTTPVideoStream"),
++    [placeResources],
++  );
++
+   const resourceClasses = useMemo(
+     () => new Set(placeResources.map((r) => r.cls)),
+     [placeResources],
+@@ -232,6 +238,17 @@ export default function PlaceDetail() {
+ 
+         {place.comment && <Text mb={4} color="text.secondary">{place.comment}</Text>}
+ 
++        {cameras.length > 0 && (
++          <>
++            <Heading size="sm" mb={2}>Camera</Heading>
++            {user ? (
++              cameras.map((r) => <CameraView key={r.name} place={name} resource={r.name} />)
++            ) : (
++              <Text color="text.secondary" fontSize="sm" mb={4}>Sign in to watch the camera.</Text>
++            )}
++          </>
++        )}
++
+         <HStack mb={2}>
+           <Heading size="sm">Tags</Heading>
+           {canEdit && (
