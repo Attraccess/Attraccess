@@ -7,6 +7,8 @@ import { createProjectGraphAsync } from '@nx/devkit';
 import { CRAP_SCORE_LIMIT, enforceScores, isSource, ownedFiles, validateFunctionCompleteness, workspace } from './run.mjs';
 
 const exec = (command, args, options = {}) => execFileSync(command, args, { cwd: workspace, ...options });
+// Call Nx directly: `pnpm exec` can print engine warnings to stdout ahead of Nx's JSON.
+const nx = path.join(workspace, 'node_modules/.bin/nx');
 const lines = (output, separator = '\n') => output.split(separator).filter(Boolean);
 // Match run.mjs: deleted worktree files are still listed by Git but have no source to score.
 export const trackedFiles = (root = workspace) =>
@@ -204,7 +206,7 @@ export async function selectProjects(args) {
   const selection = affectedSelection(args);
   if (selection === null || isSharedChange(changedFiles(selection))) return targetProjects.sort();
   return JSON.parse(
-    exec('pnpm', ['exec', 'nx', 'show', 'projects', '--affected', ...selection, '--withTarget=crap-score', '--json'], {
+    exec(nx, ['show', 'projects', '--affected', ...selection, '--withTarget=crap-score', '--json'], {
       encoding: 'utf8',
     }),
   ).sort();
@@ -222,7 +224,7 @@ export function enforceProjects(projects) {
     rmSync(path.join(workspace, 'coverage/crap', project.replaceAll('/', '__')), { recursive: true, force: true });
   }
   try {
-    exec('pnpm', ['exec', 'nx', 'run-many', '--target=crap-score', `--projects=${projects.join(',')}`, '--parallel=2'], {
+    exec(nx, ['run-many', '--target=crap-score', `--projects=${projects.join(',')}`, '--parallel=2'], {
       stdio: 'inherit',
     });
   } catch (error) {
