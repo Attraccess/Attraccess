@@ -271,13 +271,13 @@ def build_lab(variants, esptool_cmd):
         print(f"Merged lab image created at: {merged_bin_path}")
     print(f"\nLab build completed. Output in {output_dir}")
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--lab", action="store_true",
                         help="build only lab-only variants (ATTRACTAP_RELEASE OFF) into firmware_output_lab/")
     parser.add_argument("--variant", action="append", dest="variants",
                         help="restrict the build to this variant (repeatable)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     os.chdir(FIRMWARE_DIR)
 
