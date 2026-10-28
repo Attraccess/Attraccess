@@ -315,6 +315,33 @@ describe('plugin sidebar placement', () => {
   });
 });
 
+describe('user menu preferences', () => {
+  it('switches the interface language and back from the user menu', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Deutsch' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Benutzermenü' }));
+    expect(screen.getByRole('menuitem', { name: 'Abmelden' })).toBeVisible();
+    await user.click(screen.getByRole('menuitem', { name: 'Englisch' }));
+
+    await user.click(await screen.findByRole('button', { name: 'User menu' }));
+    expect(screen.getByRole('menuitem', { name: 'Logout' })).toBeVisible();
+  });
+
+  it('opens the account page from the user menu', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Account' }));
+
+    expect(screen.getByLabelText('Current path')).toHaveTextContent('/account');
+  });
+});
+
 describe('account logout actions', () => {
   it('explains disabled central logout and keeps local logout separate', async () => {
     const user = userEvent.setup();

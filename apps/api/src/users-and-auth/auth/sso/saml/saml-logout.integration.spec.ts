@@ -317,6 +317,72 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
     expect(await service.consumeResult(returned.searchParams.get('ssoLogout'))).toEqual({ result: 'returned' });
   });
 
+  it('rejects malformed envelopes, validity windows, identifiers and statuses at the adapter boundary', async () => {
+    const mutate = (xml: string, change: (root: Element) => void) => {
+      const document = new DOMParser().parseFromString(xml, 'text/xml');
+      change(document.documentElement);
+      return new XMLSerializer().serializeToString(document);
+    };
+    const post = (kind: 'SAMLRequest' | 'SAMLResponse', xml: string) =>
+      adapter.validateMessage({ [kind]: signedPost(xml) }, null, destination);
+    await expect(adapter.validateMessage({}, null, destination)).rejects.toThrow('Expected one SAML logout message');
+    await expect(adapter.validateMessage({ SAMLRequest: 'a', SAMLResponse: 'b' }, null, destination)).rejects.toThrow(
+      'Expected one SAML logout message',
+    );
+    await expect(adapter.validateMessage({ SAMLRequest: 'a'.repeat(350001) }, null, destination)).rejects.toThrow(
+      'SAML message too large',
+    );
+    const doctype = Buffer.from('<!DOCTYPE x [<!ENTITY y "z">]><x/>').toString('base64');
+    await expect(adapter.validateMessage({ SAMLRequest: doctype }, null, destination)).rejects.toThrow(
+      'Invalid SAML XML',
+    );
+
+    // node-saml checks request windows itself, so exercise the adapter's own check on responses.
+    const response = provider._generateLogoutResponse({ ID: 'request-id' } as Profile, true);
+    const past = new Date(Date.now() - 60000).toISOString();
+    const future = new Date(Date.now() + 60000).toISOString();
+    for (const [attribute, value] of [
+      ['NotOnOrAfter', past],
+      ['NotBefore', future],
+      ['NotBefore', 'not-a-date'],
+    ])
+      await expect(
+        post(
+          'SAMLResponse',
+          mutate(response, (root) => root.setAttribute(attribute, value)),
+        ),
+      ).rejects.toThrow('Expired SAML logout message');
+    await expect(
+      post(
+        'SAMLResponse',
+        mutate(response, (root) => {
+          root.setAttribute('NotBefore', past);
+          root.setAttribute('NotOnOrAfter', future);
+        }),
+      ),
+    ).resolves.toMatchObject({ kind: 'response', inResponseTo: 'request-id' });
+    // node-saml rejects these POST requests first; signed Redirects reach the adapter's own checks.
+    const redirect = async (overrides: Partial<typeof context>) => {
+      const { values, query } = decodeRedirect(await provider.request({ ...context, ...overrides }, 'state'));
+      return adapter.validateMessage(values, query, destination);
+    };
+    await expect(redirect({ nameID: '' })).rejects.toThrow('SAML LogoutRequest requires NameID');
+    await expect(redirect({ sessionIndexes: ['first', ''] })).rejects.toThrow('Invalid SAML SessionIndex');
+
+    await expect(
+      post(
+        'SAMLResponse',
+        mutate(response, (root) => root.removeAttribute('InResponseTo')),
+      ),
+    ).rejects.toThrow('SAML LogoutResponse requires correlation and status');
+    const denied = response.replace(
+      `<samlp:StatusCode Value="${success}"/>`,
+      `<samlp:StatusCode Value="${success}"><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:RequestDenied"/></samlp:StatusCode>`,
+    );
+    expect(denied).not.toBe(response);
+    await expect(post('SAMLResponse', denied)).rejects.toThrow('Contradictory SAML logout status');
+  });
+
   it('does not send incomplete logout requests without correlation or signing material', async () => {
     expect(await service.prepare({ ...context, sessionIndexes: [] })).toEqual({
       kind: 'local_only',

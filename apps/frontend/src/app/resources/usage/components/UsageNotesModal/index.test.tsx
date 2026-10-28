@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { UsageNotesDrawer } from './drawer';
 
@@ -44,5 +45,16 @@ describe('UsageNotesDrawer', () => {
     expect(screen.getByText('Started with supervised NFC flow')).toBeInTheDocument();
     expect(screen.getByText('Completed supervised session')).toBeInTheDocument();
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+  });
+
+  it('closes the drawer when it is dismissed with Escape', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<UsageNotesDrawer isOpen={true} onClose={onClose} session={supervisedSession} />);
+
+    expect(screen.getByRole('dialog', { name: 'sessionNotes' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

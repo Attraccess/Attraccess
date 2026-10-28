@@ -287,6 +287,80 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
     expect(violations[0].detail).toContain('<Form>');
   });
 
+  it('follows aliased local export lists to the declaration they name', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Fields.tsx'),
+      `import { TextField } from '@heroui/react';
+       function LocalForm() { return <TextField />; }
+       const Plain = () => <div />;
+       export { Plain as Avatar, LocalForm as Form };`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Avatar, Form } from './Fields';
+       export const Page = () => <Card><Card.Content><Avatar /><Form /></Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    const formRendersField = rendersField(path.join(dir, 'Fields.tsx'), 'Form');
+    const avatarRendersField = rendersField(path.join(dir, 'Fields.tsx'), 'Avatar');
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<Form>');
+    expect(formRendersField).toBe(true);
+    expect(avatarRendersField).toBe(false);
+  });
+
+  it('finds no declaration for names a module only re-exports or never declares', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { TextField } from '@heroui/react';
+       export const Form = () => <TextField />;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'barrel.ts'),
+      `import { Form } from './Form';
+       export { Form };`,
+    );
+
+    // The re-exporting module has nothing to walk; resolution to `Form.tsx` happens upstream.
+    const barrelRendersField = rendersField(path.join(dir, 'barrel.ts'), 'Form');
+    const missingRendersField = rendersField(path.join(dir, 'Form.tsx'), 'Missing');
+    const missingWrapsChildren = wrapsChildrenInCard(path.join(dir, 'barrel.ts'), 'Form');
+    const leafRendersField = rendersField(path.join(dir, 'Form.tsx'), 'Form');
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(barrelRendersField).toBe(false);
+    expect(missingRendersField).toBe(false);
+    expect(missingWrapsChildren).toBe(false);
+    expect(leafRendersField).toBe(true);
+  });
+
+  it('resolves default exports declared as functions, classes, or inline expressions', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    const files = {
+      'FunctionForm.tsx': `import { TextField } from '@heroui/react';
+         export default function FunctionForm() { return <TextField />; }`,
+      'ClassForm.tsx': `import { Component } from 'react';
+         import { TextField } from '@heroui/react';
+         export default class ClassForm extends Component { render() { return <TextField />; } }`,
+      'InlineForm.tsx': `import { TextField } from '@heroui/react';
+         export default () => <TextField />;`,
+      'Plain.tsx': `const Plain = () => <div />;
+         export default Plain;`,
+    };
+    for (const [name, content] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), content);
+
+    const results = Object.keys(files).map((name) => rendersField(path.join(dir, name), 'default'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(results).toEqual([true, true, true, false]);
+  });
+
   it('follows helpers and JSX variables used in non-identifier expression slots', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
     fs.writeFileSync(

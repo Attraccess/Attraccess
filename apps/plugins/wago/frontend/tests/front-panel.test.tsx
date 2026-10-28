@@ -393,3 +393,69 @@ describe('front panel', () => {
     expect(result.current.live.enabled).toBe(false);
   });
 });
+
+describe('front panel page actions', () => {
+  const dirtyDraft = { ...draft, snapshot: JSON.stringify({ ...snapshot, logicalChannels: [] }) };
+
+  it('leaves for the controller list or revision history directly when nothing is unapplied', async () => {
+    const onClose = vi.fn();
+    const onHistory = vi.fn();
+    render(<FrontPanel controllerId={1} onClose={onClose} onHistory={onHistory} />, { wrapper });
+    await screen.findByText('CC100 onboard I/O');
+    expect(screen.getByText('WAGO / Workshop CC100')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'WAGO controllers' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Revision history' }));
+    expect(onHistory).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('asks before leaving with unapplied changes and only leaves once confirmed', async () => {
+    api.getDraft.mockResolvedValue(dirtyDraft);
+    const onClose = vi.fn();
+    const onHistory = vi.fn();
+    render(<FrontPanel controllerId={1} onClose={onClose} onHistory={onHistory} />, { wrapper });
+    await screen.findByText('Unapplied changes');
+    fireEvent.click(screen.getByRole('button', { name: 'Revision history' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Leave with unapplied changes?' });
+    expect(onHistory).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Leave page' }));
+    expect(onHistory).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('discards unapplied changes from the warning back to the applied configuration', async () => {
+    api.getDraft.mockResolvedValue(dirtyDraft);
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    await screen.findByText('Unapplied changes');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(screen.queryByText('Unapplied changes')).toBeNull());
+    expect(api.save).toHaveBeenCalledWith(1, snapshot, expect.anything(), expect.anything());
+    expect(api.publish).not.toHaveBeenCalled();
+  });
+
+  it('lists every reason the controller rejected the applied configuration', async () => {
+    const diagnostics = api.diagnostics();
+    api.diagnostics.mockReturnValue({
+      ...diagnostics,
+      data: {
+        ...diagnostics.data,
+        configuration: {
+          ...diagnostics.data.configuration,
+          rejected: true,
+          rejectionErrors: [
+            { path: '$.logicalChannels[0]', code: 'unsupported_capability' },
+            { path: '$.physicalPoints[0]', code: 'unknown_terminal' },
+          ],
+        },
+      },
+    });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    expect(
+      await screen.findByText('The controller rejected this configuration. Correct the settings and apply again.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('$.logicalChannels[0]: unsupported_capability, $.physicalPoints[0]: unknown_terminal'),
+    ).toBeTruthy();
+  });
+});

@@ -31,7 +31,7 @@ import { WagoNetworkChange, WagoMqttCredentialRetirement } from './entity';
 
 import { NetworkChangeError } from './model';
 
-import { networkChangeInput } from './model';
+import { assertNoUnfinishedChange, assertSameManagedIdentity, networkChangeInput } from './model';
 
 import { OPERATION_MS } from './model';
 
@@ -99,31 +99,10 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
         .where('change.controllerId = :controllerId', { controllerId })
         .getOne();
       if (retry && (!row || row.phase === 'completed')) return this.status(controllerId);
-      if (!retry && row && row.phase !== 'completed' && !(row.phase === 'connecting' && row.failure))
-        throw new ConflictException('Retry the pending MQTT/address change before starting another.');
-      const rotation = await this.context.getRepository(WagoCredentialRotationEntity).findOneBy({ controllerId });
-      const update = await this.context.getRepository(WagoRuntimeUpdateEntity).findOneBy({ controllerId });
-      if ((rotation && rotation.phase !== 'completed') || (update?.metadata && JSON.parse(update.metadata).token))
-        throw new ConflictException(
-          'Finish credential rotation or runtime update recovery before changing MQTT/address settings.',
-        );
-      if (!retry) {
-        if (!input) throw new BadRequestException('Invalid MQTT/address change');
-        row = this.repository.create({
-          controllerId,
-          sessionId: access.sessionId,
-          fingerprint: access.fingerprint,
-          ...input,
-          phase: 'connecting',
-          failure: null,
-          encryptedPayload: null,
-          updatedAt: new Date().toISOString(),
-        });
-        await assertOwned();
-        await this.repository.save(row);
-      }
-      if (!row || row.sessionId !== access.sessionId || row.fingerprint !== access.fingerprint)
-        throw new ConflictException('Pending change belongs to another managed identity.');
+      if (!retry) assertNoUnfinishedChange(row);
+      await this.assertNoPendingRecovery(controllerId);
+      if (!retry) row = await this.savePendingChange(controllerId, access, input, assertOwned);
+      assertSameManagedIdentity(row, access);
       await lifecycle.attempt();
       audited = true;
       await assertOwned();
@@ -138,10 +117,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
       if (row.mqttServerId !== null) {
         await this.applyBrokerChange(controllerId, row, controller, host, abort, assertOwned, retry);
       } else {
-        if ((await host.command(`mqtt-address ${host.managementToken}`)) !== 'OK\n')
-          throw new RuntimeUpdateError('recovery');
-        await this.phase(row, 'saving', assertOwned);
-        await this.saveBindings(row, host.encryptedCredentials, null, assertOwned);
+        await this.applyAddressChange(row, host, assertOwned);
       }
       row.encryptedPayload = null;
       await this.phase(row, 'completed', assertOwned);
@@ -152,13 +128,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     } catch (error) {
       // Neither provider errors, SSH output nor decrypted envelopes cross this
       // boundary. The durable intent stays available to an explicit retry.
-      if (row && row.phase !== 'completed') {
-        row.failure =
-          error instanceof RuntimeUpdateError || error instanceof NetworkChangeError ? error.failure : 'interrupted';
-        await assertOwned()
-          .then(() => this.repository.save(row))
-          .catch(() => undefined);
-      }
+      if (row && row.phase !== 'completed') await this.recordFailure(row, error, assertOwned);
       if (audited) await lifecycle.finish('failed');
       throw new ConflictException('MQTT/address change is incomplete. Check its status and retry the saved operation.');
     } finally {
@@ -167,6 +137,64 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
       this.active.delete(abort);
       await operations.release(access.fingerprint, owner);
     }
+  }
+
+  /** Network changes must not race credential rotation or runtime update recovery. */
+  protected async assertNoPendingRecovery(controllerId: number): Promise<void> {
+    const rotation = await this.context.getRepository(WagoCredentialRotationEntity).findOneBy({ controllerId });
+    const update = await this.context.getRepository(WagoRuntimeUpdateEntity).findOneBy({ controllerId });
+    if ((rotation && rotation.phase !== 'completed') || (update?.metadata && JSON.parse(update.metadata).token))
+      throw new ConflictException(
+        'Finish credential rotation or runtime update recovery before changing MQTT/address settings.',
+      );
+  }
+
+  /** Durably record a new change intent before contacting the controller. */
+  protected async savePendingChange(
+    controllerId: number,
+    access: WagoManagedAccess,
+    input: ReturnType<typeof networkChangeInput> | null,
+    assertOwned: () => Promise<void>,
+  ): Promise<WagoNetworkChange> {
+    if (!input) throw new BadRequestException('Invalid MQTT/address change');
+    const row = this.repository.create({
+      controllerId,
+      sessionId: access.sessionId,
+      fingerprint: access.fingerprint,
+      ...input,
+      phase: 'connecting',
+      failure: null,
+      encryptedPayload: null,
+      updatedAt: new Date().toISOString(),
+    });
+    await assertOwned();
+    await this.repository.save(row);
+    return row;
+  }
+
+  /** Apply an address-only change; the broker binding stays unchanged. */
+  protected async applyAddressChange(
+    row: WagoNetworkChange,
+    host: Awaited<ReturnType<WagoManagedRuntimeService['networkManagement']>>,
+    assertOwned: () => Promise<void>,
+  ): Promise<void> {
+    if ((await host.command(`mqtt-address ${host.managementToken}`)) !== 'OK\n')
+      throw new RuntimeUpdateError('recovery');
+    await this.phase(row, 'saving', assertOwned);
+    await this.saveBindings(row, host.encryptedCredentials, null, assertOwned);
+  }
+
+  /** Keep the durable intent for an explicit retry, recording only a safe failure code. */
+  protected async recordFailure(
+    row: WagoNetworkChange,
+    error: unknown,
+    assertOwned: () => Promise<void>,
+  ): Promise<void> {
+    row.failure =
+      error instanceof RuntimeUpdateError || error instanceof NetworkChangeError ? error.failure : 'interrupted';
+    await assertOwned()
+      .then(() => this.repository.save(row))
+      .catch(() => undefined);
   }
 
   protected async applyBrokerChange(

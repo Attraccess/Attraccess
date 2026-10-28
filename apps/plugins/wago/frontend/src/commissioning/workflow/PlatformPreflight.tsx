@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import type { CommissioningSession } from '../../api/client';
-import type { WagoCommissioningPreflightReport } from '../../../../shared/commissioning';
+import type { WagoCommissioningClockReport, WagoCommissioningPreflightReport } from '../../../../shared/commissioning';
 import { useWagoTranslations } from '../../i18n';
 
 const api = createPluginApiClient('/api/wago/commissioning/sessions');
@@ -81,69 +81,8 @@ export function CommissioningPlatformPreflight({
       <h3>{t('security.check')}</h3>
       <p>{t('security.description')}</p>
       {codesysDisabled && <p role="status">{t('security.codesysDisabled')}</p>}
-      {report?.clock && (
-        <dl>
-          <dt>{t('security.clockResult')}</dt>
-          <dd>{tBackendMessage(report.clock.result)}</dd>
-          <dt>{t('security.utcReference')}</dt>
-          <dd>{formatUtc(report.clock.hostUtc)}</dd>
-          <dt>{t('security.controllerUtc')}</dt>
-          <dd>{formatUtc(report.clock.controllerUtc)}</dd>
-          <dt>{t('security.clockObservation')}</dt>
-          <dd>
-            {t('security.observation', {
-              observation: tBackendMessage(report.clock.observation),
-              seconds: report.clock.uncertaintySeconds,
-            })}
-          </dd>
-          <dt>{t('security.skew')}</dt>
-          <dd>{t('security.seconds', { seconds: report.clock.skewSeconds })}</dd>
-          {report.clock.previousSkewSeconds !== undefined && (
-            <>
-              <dt>{t('security.beforeCorrection')}</dt>
-              <dd>{t('security.seconds', { seconds: report.clock.previousSkewSeconds })}</dd>
-            </>
-          )}
-          <dt>{t('security.clockAction')}</dt>
-          <dd>
-            {tBackendMessage(report.clock.tool)} / {tBackendMessage(report.clock.action)}
-          </dd>
-        </dl>
-      )}
-      {report?.clock?.result === 'correction-required' && <p>{t('security.clockCorrection')}</p>}
-      {report?.platform && (
-        <dl>
-          <dt>{t('security.reportSource')}</dt>
-          <dd>{t('security.savedSnapshot')}</dd>
-          <dt>{t('security.platform')}</dt>
-          <dd>{tBackendMessage(report.platform)}</dd>
-          <dt>{t('security.hardware')}</dt>
-          <dd>{tBackendMessage(report.hardware)}</dd>
-          <dt>{t('security.exclusivity')}</dt>
-          <dd>{tBackendMessage(report.exclusivity)}</dd>
-          <dt>Docker</dt>
-          <dd>{tBackendMessage(report.docker)}</dd>
-          <dt>{t('security.provision')}</dt>
-          <dd>{tBackendMessage(report.provision)}</dd>
-        </dl>
-      )}
-      {report?.platform === 'unsupported-firmware' && <p>{t('security.unsupportedFirmware')}</p>}
-      {report && <p>{t('security.preparationHint')}</p>}
-      {report?.hardware === 'uid10001-access-denied' && <p>{t('security.accessDenied')}</p>}
-      {report?.hardware === 'permission-tool-unavailable' && <p>{t('security.permissionTool')}</p>}
-      {report?.hardware === 'missing-register' && <p>{t('security.missingRegister')}</p>}
-      {!codesysDisabled && report?.exclusivity === 'codesys-active' && <p>{t('security.codesysActive')}</p>}
-      {!codesysDisabled && report?.exclusivity === 'codesys-boot-enabled' && <p>{t('security.codesysBoot')}</p>}
-      {report?.exclusivity === 'output-container-conflict' && <p>{t('security.containerConflict')}</p>}
-      {report?.provision === 'unsupported-fw31-package-activation' && (
-        <Alert status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>{t('security.packageActivation')}</Alert.Description>
-          </Alert.Content>
-        </Alert>
-      )}
-      {report?.provision === 'unsupported-lifecycle-dependencies' && <p>{t('security.lifecycle')}</p>}
+      {report?.clock && <PreflightClockReport clock={report.clock} formatUtc={formatUtc} />}
+      {report && <PreflightReportFindings report={report} codesysDisabled={codesysDisabled} />}
       {current.dockerProvisionState && (
         <p role="status">{t('security.savedPreparation', { state: tBackendMessage(current.dockerProvisionState) })}</p>
       )}
@@ -182,5 +121,94 @@ export function CommissioningPlatformPreflight({
       </form>
       {error && <p role="alert">{t(error)}</p>}
     </section>
+  );
+}
+
+function PreflightClockReport({
+  clock,
+  formatUtc,
+}: {
+  clock: WagoCommissioningClockReport;
+  formatUtc: (value: string) => string;
+}) {
+  const { t, tBackendMessage } = useWagoTranslations();
+  return (
+    <>
+      <dl>
+        <dt>{t('security.clockResult')}</dt>
+        <dd>{tBackendMessage(clock.result)}</dd>
+        <dt>{t('security.utcReference')}</dt>
+        <dd>{formatUtc(clock.hostUtc)}</dd>
+        <dt>{t('security.controllerUtc')}</dt>
+        <dd>{formatUtc(clock.controllerUtc)}</dd>
+        <dt>{t('security.clockObservation')}</dt>
+        <dd>
+          {t('security.observation', {
+            observation: tBackendMessage(clock.observation),
+            seconds: clock.uncertaintySeconds,
+          })}
+        </dd>
+        <dt>{t('security.skew')}</dt>
+        <dd>{t('security.seconds', { seconds: clock.skewSeconds })}</dd>
+        {clock.previousSkewSeconds !== undefined && (
+          <>
+            <dt>{t('security.beforeCorrection')}</dt>
+            <dd>{t('security.seconds', { seconds: clock.previousSkewSeconds })}</dd>
+          </>
+        )}
+        <dt>{t('security.clockAction')}</dt>
+        <dd>
+          {tBackendMessage(clock.tool)} / {tBackendMessage(clock.action)}
+        </dd>
+      </dl>
+      {clock.result === 'correction-required' && <p>{t('security.clockCorrection')}</p>}
+    </>
+  );
+}
+
+function PreflightReportFindings({
+  report,
+  codesysDisabled,
+}: {
+  report: WagoCommissioningPreflightReport;
+  codesysDisabled: boolean;
+}) {
+  const { t, tBackendMessage } = useWagoTranslations();
+  return (
+    <>
+      {report.platform && (
+        <dl>
+          <dt>{t('security.reportSource')}</dt>
+          <dd>{t('security.savedSnapshot')}</dd>
+          <dt>{t('security.platform')}</dt>
+          <dd>{tBackendMessage(report.platform)}</dd>
+          <dt>{t('security.hardware')}</dt>
+          <dd>{tBackendMessage(report.hardware)}</dd>
+          <dt>{t('security.exclusivity')}</dt>
+          <dd>{tBackendMessage(report.exclusivity)}</dd>
+          <dt>Docker</dt>
+          <dd>{tBackendMessage(report.docker)}</dd>
+          <dt>{t('security.provision')}</dt>
+          <dd>{tBackendMessage(report.provision)}</dd>
+        </dl>
+      )}
+      {report.platform === 'unsupported-firmware' && <p>{t('security.unsupportedFirmware')}</p>}
+      <p>{t('security.preparationHint')}</p>
+      {report.hardware === 'uid10001-access-denied' && <p>{t('security.accessDenied')}</p>}
+      {report.hardware === 'permission-tool-unavailable' && <p>{t('security.permissionTool')}</p>}
+      {report.hardware === 'missing-register' && <p>{t('security.missingRegister')}</p>}
+      {!codesysDisabled && report.exclusivity === 'codesys-active' && <p>{t('security.codesysActive')}</p>}
+      {!codesysDisabled && report.exclusivity === 'codesys-boot-enabled' && <p>{t('security.codesysBoot')}</p>}
+      {report.exclusivity === 'output-container-conflict' && <p>{t('security.containerConflict')}</p>}
+      {report.provision === 'unsupported-fw31-package-activation' && (
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{t('security.packageActivation')}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+      {report.provision === 'unsupported-lifecycle-dependencies' && <p>{t('security.lifecycle')}</p>}
+    </>
   );
 }

@@ -151,3 +151,101 @@ describe('Modbus persisted configuration', () => {
     expect(validateSnapshot(snapshot).some((e) => e.message.includes('named action'))).toBe(true);
   });
 });
+describe('Modbus custom profile validation', () => {
+  const measurement = {
+    id: 'energy',
+    name: 'Energy',
+    address: 0,
+    addressBase: 0,
+    dataType: 'uint32',
+    byteOrder: 'big',
+    wordOrder: 'big',
+    scale: 1,
+    offset: 0,
+    functionCode: 3,
+    unit: 'watt-hour',
+    kind: 'cumulative',
+    pollIntervalMs: 1000,
+  };
+  const action = {
+    id: 'relay',
+    name: 'Relay',
+    address: 0,
+    addressBase: 0,
+    dataType: 'uint16',
+    byteOrder: 'big',
+    wordOrder: 'big',
+    scale: 1,
+    offset: 0,
+    functionCode: 5,
+    onValue: 1,
+    offValue: 0,
+  };
+  const messages = (profile: Record<string, unknown>) =>
+    validateModbus({
+      ...configuration(),
+      profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [], ...profile }],
+    } as unknown as ModbusConfiguration).map((error) => error.message);
+  const measurementMessages = (overrides: Record<string, unknown>) =>
+    messages({ measurements: [{ ...measurement, ...overrides }] });
+  const actionMessages = (overrides: Record<string, unknown>) => messages({ actions: [{ ...action, ...overrides }] });
+
+  it('accepts fully described cumulative measurements and coil actions', () => {
+    expect(
+      measurementMessages({
+        rollover: 4294967296,
+        encoding: 'bcd',
+        section: 'active-energy',
+        display: 'hex',
+        decimalPlaces: 3,
+        valueLabels: { '-1': 'Fault', '0': 'Idle' },
+      }),
+    ).toEqual([]);
+    expect(actionMessages({})).toEqual([]);
+  });
+
+  it.each([
+    [{ kind: 'live', rollover: 100 }, 'rollover must be an explicit positive raw modulus on cumulative measurements'],
+    [{ rollover: 0 }, 'rollover must be an explicit positive raw modulus on cumulative measurements'],
+    [{ rollover: Infinity }, 'rollover must be an explicit positive raw modulus on cumulative measurements'],
+    [{ scale: -1 }, 'cumulative measurements require a positive scale'],
+    [{ encoding: 'bcd', dataType: 'float32' }, 'BCD encoding requires an unsigned integer measurement'],
+    [{ encoding: 'bcd', dataType: 'int16' }, 'BCD encoding requires an unsigned integer measurement'],
+    [{ encoding: 'ascii' }, 'BCD encoding requires an unsigned integer measurement'],
+    [{ section: 'bogus' }, 'unsupported measurement section'],
+    [{ display: 'binary' }, 'unsupported measurement display'],
+    [{ valueLabels: ['On'] }, 'measurement value labels require at most 64 named integer values'],
+    [{ valueLabels: { on: 'On' } }, 'measurement value labels require at most 64 named integer values'],
+    [{ valueLabels: { 1: ' ' } }, 'measurement value labels require at most 64 named integer values'],
+    [
+      { valueLabels: Object.fromEntries(Array.from({ length: 65 }, (_, value) => [value, `Value ${value}`])) },
+      'measurement value labels require at most 64 named integer values',
+    ],
+    [{ functionCode: 6 }, 'measurement requires FC03/04, physical unit, kind, poll interval 100..3600000ms'],
+    [{ decimalPlaces: 4 }, 'measurement requires FC03/04, physical unit, kind, poll interval 100..3600000ms'],
+  ])('rejects measurement %p', (overrides, message) => expect(measurementMessages(overrides)).toEqual([message]));
+
+  it.each([
+    [{ functionCode: 3 }, 'action requires FC05/06/16 and finite on/off values'],
+    [{ onValue: Number.NaN }, 'action requires FC05/06/16 and finite on/off values'],
+    [{ onValue: 2 }, 'coil action requires identity uint16 and values 0 or 1'],
+    [{ offValue: -1, dataType: 'int16' }, 'coil action requires identity uint16 and values 0 or 1'],
+    [{ dataType: 'uint32' }, 'coil action requires identity uint16 and values 0 or 1'],
+    [{ functionCode: 16, scale: 2 }, 'action on/off value cannot be represented by dtype and transform'],
+  ])('rejects action %p', (overrides, message) => expect(actionMessages(overrides)).toEqual([message]));
+
+  it('requires custom identity and bounded measurement/action arrays', () => {
+    const identity = 'custom ID, name and positive version required; built-ins are immutable';
+    const arrays = 'measurements/actions arrays required, maximum 256 entries';
+    expect(messages({ name: ' ' })).toEqual([identity]);
+    expect(messages({ version: 0 })).toEqual([identity]);
+    expect(messages({ id: BUILTIN_MODBUS_PROFILES[0].id })).toContain(identity);
+    expect(messages({ measurements: null })).toEqual([arrays]);
+    expect(messages({ actions: 'relay' })).toEqual([arrays]);
+    expect(
+      messages({
+        measurements: Array.from({ length: 257 }, (_, index) => ({ ...measurement, id: `m${index}` })),
+      }),
+    ).toEqual([arrays]);
+  });
+});

@@ -43,7 +43,8 @@ async function runCompilerFixture({ stdout = sample, stderr = '', status = 1 } =
     return spawnSync(process.execPath, [script], {
       cwd: directory,
       encoding: 'utf8',
-      timeout: 10_000,
+      // CRAP coverage loads an instrumenting hook into every child, so allow it time.
+      timeout: 30_000,
       env: {
         ...(process.env.CRAP_NODE_MANIFEST ? {
           CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,

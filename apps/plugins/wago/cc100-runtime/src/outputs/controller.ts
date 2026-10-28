@@ -212,39 +212,102 @@ export class OutputController {
     const key = route && routeKey(route);
     const pendingRoutes = state.pendingPulseRoutes;
     const hadPulse = state.pendingPulseChannelIds?.includes(channel.id);
-    if (pulseDuration && route)
-      state.pendingPulseRoutes = [...(pendingRoutes ?? []).filter((item) => routeKey(item) !== key), route];
-    if (pulseDuration)
-      state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channel.id])];
-    if (this.options.device.prepareConfiguration) {
-      this.options.getState().uncertainOutputChannelIds = [
-        ...new Set([...(this.options.getState().uncertainOutputChannelIds ?? []), channel.id]),
-      ];
-    }
+    if (pulseDuration) this.reservePulseRoute(state, channel.id, route, key, pendingRoutes);
+    this.markWriteUncertain(channel.id);
     if (value && (this.options.device.prepareConfiguration || pulseDuration)) await this.options.saveState();
     try {
       admit?.();
       await this.options.device.write(point, value, admit);
     } catch (error) {
       if (error instanceof WriteAdmissionError) {
-        if (!wasUncertain)
-          state.uncertainOutputChannelIds = (state.uncertainOutputChannelIds ?? []).filter((id) => id !== channel.id);
-        this.restorePulseRoute(key, pendingRoutes);
-        if (!hadPulse)
-          state.pendingPulseChannelIds = (state.pendingPulseChannelIds ?? []).filter((id) => id !== channel.id);
+        this.rollBackRejectedWrite(state, channel.id, key, pendingRoutes, wasUncertain, hadPulse);
         await this.options.saveState();
         throw error;
       }
-      if (this.options.device.writeMayHaveBeenTransmitted?.(error)) {
-        this.uncertainWrites.add(channel.id);
-        // An ambiguous ON may still have energized the relay: arrange pulse shutdown.
-        onWritten?.();
-      }
-      // Neither a fault ack nor an offline broker may delay retrying a failed shutoff.
-      void this.options.publishFault(channel.id, error).catch(() => undefined);
+      this.reportFailedWrite(channel.id, error, onWritten);
       return false;
     }
     onWritten?.();
+    this.commitWrittenOutput(state, channel, value, configurationGeneration, ownership);
+    const pendingPulses = state.pendingPulseChannelIds;
+    if (!pulseDuration) this.releasePulseRoute(state, key);
+    try {
+      await this.options.saveState();
+    } catch {
+      this.restoreUncommittedWrite(state, channel.id, key, pendingRoutes, pendingPulses, pulseDuration);
+      // Do not acknowledge an operation whose durable output state is stale.
+      throw new Error('failed to persist channel state');
+    }
+    onCommitted?.();
+    // Telemetry must not hold the physical channel queue: a pending MQTT ack
+    // could otherwise prevent the pulse timer or disconnect policy from writing off.
+    this.options.publishState();
+    return true;
+  }
+
+  /** A pulse persists its shutdown obligation before the ON write can energize the relay. */
+  protected reservePulseRoute(
+    state: RuntimeState,
+    channelId: string,
+    route: PulseRoute | undefined,
+    key: string | undefined,
+    pendingRoutes: PulseRoute[] | undefined,
+  ): void {
+    if (route) state.pendingPulseRoutes = [...(pendingRoutes ?? []).filter((item) => routeKey(item) !== key), route];
+    state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channelId])];
+  }
+
+  protected releasePulseRoute(state: RuntimeState, key: string | undefined): void {
+    state.pendingPulseRoutes = state.pendingPulseRoutes?.filter((item) => routeKey(item) !== key);
+    state.pendingPulseChannelIds = [...new Set(state.pendingPulseRoutes?.map((route) => route.channel.id) ?? [])];
+  }
+
+  protected markWriteUncertain(channelId: string): void {
+    if (this.options.device.prepareConfiguration)
+      this.options.getState().uncertainOutputChannelIds = [
+        ...new Set([...(this.options.getState().uncertainOutputChannelIds ?? []), channelId]),
+      ];
+  }
+
+  protected clearWriteUncertain(channelId: string): void {
+    if (this.options.device.prepareConfiguration)
+      this.options.getState().uncertainOutputChannelIds = (
+        this.options.getState().uncertainOutputChannelIds ?? []
+      ).filter((id) => id !== channelId);
+  }
+
+  /** An admission rejection never reached the device: undo this write's reservations. */
+  protected rollBackRejectedWrite(
+    state: RuntimeState,
+    channelId: string,
+    key: string | undefined,
+    pendingRoutes: PulseRoute[] | undefined,
+    wasUncertain: boolean | undefined,
+    hadPulse: boolean | undefined,
+  ): void {
+    if (!wasUncertain)
+      state.uncertainOutputChannelIds = (state.uncertainOutputChannelIds ?? []).filter((id) => id !== channelId);
+    this.restorePulseRoute(key, pendingRoutes);
+    if (!hadPulse) state.pendingPulseChannelIds = (state.pendingPulseChannelIds ?? []).filter((id) => id !== channelId);
+  }
+
+  protected reportFailedWrite(channelId: string, error: unknown, onWritten?: () => void): void {
+    if (this.options.device.writeMayHaveBeenTransmitted?.(error)) {
+      this.uncertainWrites.add(channelId);
+      // An ambiguous ON may still have energized the relay: arrange pulse shutdown.
+      onWritten?.();
+    }
+    // Neither a fault ack nor an offline broker may delay retrying a failed shutoff.
+    void this.options.publishFault(channelId, error).catch(() => undefined);
+  }
+
+  protected commitWrittenOutput(
+    state: RuntimeState,
+    channel: LogicalChannel,
+    value: boolean,
+    configurationGeneration: number,
+    ownership: 'manual' | 'flow' | undefined,
+  ): void {
     this.options.getState().outputs = { ...this.options.getState().outputs, [channel.id]: value };
     // Output value and its command owner must share the same durable commit.
     // Safety shutoffs omit ownership so they do not pretend a flow took over.
@@ -256,33 +319,22 @@ export class OutputController {
     // Feedback follows confirmed hardware state. Disk persistence may stall while a
     // pulse shuts off; the old ON check must not survive that physical transition.
     if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);
-    if (this.options.device.prepareConfiguration)
-      this.options.getState().uncertainOutputChannelIds = (
-        this.options.getState().uncertainOutputChannelIds ?? []
-      ).filter((id) => id !== channel.id);
-    const pendingPulses = state.pendingPulseChannelIds;
-    if (!pulseDuration) {
-      state.pendingPulseRoutes = state.pendingPulseRoutes?.filter((item) => routeKey(item) !== key);
-      state.pendingPulseChannelIds = [...new Set(state.pendingPulseRoutes?.map((route) => route.channel.id) ?? [])];
-    }
-    try {
-      await this.options.saveState();
-    } catch {
-      if (!pulseDuration) this.restorePulseRoute(key, pendingRoutes);
-      if (pendingPulses?.includes(channel.id))
-        state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channel.id])];
-      if (this.options.device.prepareConfiguration)
-        this.options.getState().uncertainOutputChannelIds = [
-          ...new Set([...(this.options.getState().uncertainOutputChannelIds ?? []), channel.id]),
-        ];
-      // Do not acknowledge an operation whose durable output state is stale.
-      throw new Error('failed to persist channel state');
-    }
-    onCommitted?.();
-    // Telemetry must not hold the physical channel queue: a pending MQTT ack
-    // could otherwise prevent the pulse timer or disconnect policy from writing off.
-    this.options.publishState();
-    return true;
+    this.clearWriteUncertain(channel.id);
+  }
+
+  /** Persistence failed after the device write: keep every shutdown obligation durable-pending. */
+  protected restoreUncommittedWrite(
+    state: RuntimeState,
+    channelId: string,
+    key: string | undefined,
+    pendingRoutes: PulseRoute[] | undefined,
+    pendingPulses: string[] | undefined,
+    pulseDuration: number | undefined,
+  ): void {
+    if (!pulseDuration) this.restorePulseRoute(key, pendingRoutes);
+    if (pendingPulses?.includes(channelId))
+      state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channelId])];
+    this.markWriteUncertain(channelId);
   }
 
   schedulePulse(channel: LogicalChannel, duration: number, captured?: PulseRoute): void {

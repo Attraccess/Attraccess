@@ -42,6 +42,22 @@ export * from './contracts';
 
 export { runtimeTargetImageId } from '../target-image';
 
+/** One owned reconciliation: its lease owner, deadline-bound abort signal and fenced persistence. */
+export interface RuntimeUpdateLease {
+  owner: string;
+  operation: AbortController;
+  timer: ReturnType<typeof setTimeout>;
+  assertOwned: () => void;
+  persist: (record: RuntimeUpdateRecord) => Promise<void>;
+  acknowledge: (record: RuntimeUpdateRecord) => Promise<boolean>;
+}
+
+function inspectionBlocker(inspection: RuntimeUpdateInspection): RuntimeUpdateFailure | null {
+  if (!inspection.claimed || !inspection.managed) return 'management_required';
+  if (!inspection.online) return 'offline';
+  return inspection.compatible ? null : 'incompatible';
+}
+
 export class WagoRuntimeUpdateCoordinator {
   public constructor(
     protected readonly store: RuntimeUpdateStore,
@@ -74,152 +90,12 @@ export class WagoRuntimeUpdateCoordinator {
     if (this.stopped || this.running.has(controllerId) || this.running.size >= this.concurrency) return 'busy';
     this.running.add(controllerId);
     let acquired = false;
-    const { owner, operation, timer, assertOwned, persist, acknowledge } = this.createLease(controllerId);
+    const lease = this.createLease(controllerId);
+    const { owner, operation, timer } = lease;
     try {
       acquired = await this.store.acquire(controllerId, owner, this.now(), this.now() + LEASE_MS);
       if (!acquired) return 'busy';
-      let record = await this.store.load(controllerId);
-      await advanceRuntimeRetry(record, retry, persist);
-      if (record && ['current', 'failed'].includes(record.phase) && record.token) {
-        if (!(await acknowledge(record))) return 'deferred';
-      }
-      if (record && active.has(record.phase)) {
-        if (record.phase === 'recovery_required' && record.retryAt > this.now()) return 'deferred';
-        // Do not guess whether an interrupted accept succeeded. The host's
-        // idempotent receipt/journal decides whether rollback is still available.
-        if (!record.token || !record.previousImageId) throw new RuntimeUpdateError('recovery');
-        record.phase = 'recovering';
-        await persist(record);
-        try {
-          await this.host.recover(controllerId, record.token, record.previousImageId, operation.signal);
-          assertOwned();
-        } catch {
-          record.phase = 'recovery_required';
-          record.failure = 'recovery';
-          record.retryAt = this.now() + 60_000;
-          await persist(record);
-          return 'settled';
-        }
-        record.phase = 'failed';
-        record.failure = 'interrupted';
-        record.retryAt = this.now();
-        await persist(record);
-        if (!(await acknowledge(record))) return 'deferred';
-        // Recovery and supervisor handoff can consume most of an operation's
-        // deadline. Release the lease here; the next automatic scan starts the
-        // new rollout with its own full budget and the acknowledged journal gone.
-        return 'settled';
-      }
-      const desired = await this.desired();
-      assertOwned();
-      const contradictedCurrent =
-        record?.phase === 'current' &&
-        observedImageId !== undefined &&
-        observedImageId !== (record.currentImageId ?? record.desiredImageId);
-      if (record && !contradictedCurrent && record.desiredImageId === desired.imageId && record.retryAt > this.now())
-        return 'deferred';
-      const attempt = (record?.desiredImageId === desired.imageId ? record.attempt : 0) + 1;
-      let inspection: RuntimeUpdateInspection;
-      try {
-        inspection = await this.host.inspect(controllerId, operation.signal);
-        assertOwned();
-      } catch (error) {
-        await persist({
-          controllerId,
-          phase: 'blocked',
-          token: null,
-          desiredImageId: desired.imageId,
-          desiredRuntimeVersion: desired.manifest.runtimeVersion,
-          previousRuntimeVersion:
-            record?.desiredImageId === desired.imageId ? (record.previousRuntimeVersion ?? null) : null,
-          desiredDigest: desired.digest,
-          buildId: desired.buildId,
-          previousImageId: record?.desiredImageId === desired.imageId ? record.previousImageId : null,
-          attempt,
-          startedAt: this.now(),
-          updatedAt: this.now(),
-          retryAt: this.retryAt(attempt),
-          failure: error instanceof RuntimeUpdateError ? error.failure : 'offline',
-        });
-        return 'settled';
-      }
-      const previous = record;
-      const retainPrevious = previous?.desiredImageId === desired.imageId && inspection.imageId === desired.imageId;
-      record = {
-        controllerId,
-        phase: 'blocked',
-        token: null,
-        desiredImageId: desired.imageId,
-        desiredRuntimeVersion: desired.manifest.runtimeVersion,
-        previousRuntimeVersion: retainPrevious
-          ? (previous.previousRuntimeVersion ?? inspection.runtimeVersion ?? null)
-          : (inspection.runtimeVersion ?? null),
-        desiredDigest: desired.digest,
-        buildId: desired.buildId,
-        ...(desired.installerSha256 ? { installerSha256: desired.installerSha256 } : {}),
-        previousImageId: retainPrevious ? (previous.previousImageId ?? inspection.imageId) : inspection.imageId,
-        attempt,
-        startedAt: this.now(),
-        updatedAt: this.now(),
-        retryAt: 0,
-        failure: null,
-        cleanupAttempt: 0,
-        cleanupRetryAt: 0,
-      };
-      // A claimed identity is mandatory even when the Docker image is already current.
-      const blocker: RuntimeUpdateFailure | null =
-        !inspection.claimed || !inspection.managed
-          ? 'management_required'
-          : !inspection.online
-            ? 'offline'
-            : !inspection.compatible
-              ? 'incompatible'
-              : null;
-      if (blocker) {
-        record.failure = blocker;
-        record.retryAt = this.retryAt(attempt);
-        await persist(record);
-        return 'settled';
-      }
-      if (this.host.prepare) {
-        record.phase = 'preparing';
-        await persist(record);
-        try {
-          await this.host.prepare(controllerId, desired, operation.signal);
-          await this.assertCurrent(desired.imageId);
-          assertOwned();
-        } catch (error) {
-          assertOwned();
-          record.phase = 'blocked';
-          record.failure = error instanceof RuntimeUpdateError ? error.failure : 'incompatible';
-          record.retryAt = this.retryAt(attempt);
-          await persist(record);
-          return 'settled';
-        }
-      }
-      const targetImageId = runtimeTargetImageId(desired, inspection);
-      if (inspection.imageId === targetImageId)
-        return await this.verifyExisting(
-          controllerId,
-          desired,
-          record,
-          operation,
-          assertOwned,
-          persist,
-          attempt,
-          targetImageId,
-        );
-      return await this.applyRollout(
-        controllerId,
-        desired,
-        record,
-        inspection,
-        operation,
-        assertOwned,
-        persist,
-        acknowledge,
-        attempt,
-      );
+      return await this.reconcileOwned(controllerId, retry, observedImageId, lease);
     } finally {
       clearTimeout(timer);
       operation.abort();
@@ -231,6 +107,189 @@ export class WagoRuntimeUpdateCoordinator {
         this.shutdownWaiters.clear();
       }
     }
+  }
+
+  protected async reconcileOwned(
+    controllerId: number,
+    retry: boolean,
+    observedImageId: string | undefined,
+    lease: RuntimeUpdateLease,
+  ): Promise<'deferred' | 'settled'> {
+    const { operation, assertOwned, persist, acknowledge } = lease;
+    let record = await this.store.load(controllerId);
+    await advanceRuntimeRetry(record, retry, persist);
+    if (record && ['current', 'failed'].includes(record.phase) && record.token) {
+      if (!(await acknowledge(record))) return 'deferred';
+    }
+    if (record && active.has(record.phase)) return await this.recoverInterrupted(controllerId, record, lease);
+    const desired = await this.desired();
+    assertOwned();
+    const contradictedCurrent =
+      record?.phase === 'current' &&
+      observedImageId !== undefined &&
+      observedImageId !== (record.currentImageId ?? record.desiredImageId);
+    if (record && !contradictedCurrent && record.desiredImageId === desired.imageId && record.retryAt > this.now())
+      return 'deferred';
+    const attempt = (record?.desiredImageId === desired.imageId ? record.attempt : 0) + 1;
+    let inspection: RuntimeUpdateInspection;
+    try {
+      inspection = await this.host.inspect(controllerId, operation.signal);
+      assertOwned();
+    } catch (error) {
+      await persist(this.uninspectedRecord(controllerId, desired, record, attempt, error));
+      return 'settled';
+    }
+    record = this.plannedRecord(controllerId, desired, record, inspection, attempt);
+    // A claimed identity is mandatory even when the Docker image is already current.
+    const blocker = inspectionBlocker(inspection);
+    if (blocker) {
+      record.failure = blocker;
+      record.retryAt = this.retryAt(attempt);
+      await persist(record);
+      return 'settled';
+    }
+    if (!(await this.prepareHost(controllerId, desired, record, lease, attempt))) return 'settled';
+    const targetImageId = runtimeTargetImageId(desired, inspection);
+    if (inspection.imageId === targetImageId)
+      return await this.verifyExisting(
+        controllerId,
+        desired,
+        record,
+        operation,
+        assertOwned,
+        persist,
+        attempt,
+        targetImageId,
+      );
+    return await this.applyRollout(
+      controllerId,
+      desired,
+      record,
+      inspection,
+      operation,
+      assertOwned,
+      persist,
+      acknowledge,
+      attempt,
+    );
+  }
+
+  /** Resumes an interrupted rollout found in an active phase by asking the host to recover. */
+  protected async recoverInterrupted(
+    controllerId: number,
+    record: RuntimeUpdateRecord,
+    { operation, assertOwned, persist, acknowledge }: RuntimeUpdateLease,
+  ): Promise<'deferred' | 'settled'> {
+    if (record.phase === 'recovery_required' && record.retryAt > this.now()) return 'deferred';
+    // Do not guess whether an interrupted accept succeeded. The host's
+    // idempotent receipt/journal decides whether rollback is still available.
+    if (!record.token || !record.previousImageId) throw new RuntimeUpdateError('recovery');
+    record.phase = 'recovering';
+    await persist(record);
+    try {
+      await this.host.recover(controllerId, record.token, record.previousImageId, operation.signal);
+      assertOwned();
+    } catch {
+      record.phase = 'recovery_required';
+      record.failure = 'recovery';
+      record.retryAt = this.now() + 60_000;
+      await persist(record);
+      return 'settled';
+    }
+    record.phase = 'failed';
+    record.failure = 'interrupted';
+    record.retryAt = this.now();
+    await persist(record);
+    if (!(await acknowledge(record))) return 'deferred';
+    // Recovery and supervisor handoff can consume most of an operation's
+    // deadline. Release the lease here; the next automatic scan starts the
+    // new rollout with its own full budget and the acknowledged journal gone.
+    return 'settled';
+  }
+
+  /** Blocked record for a controller whose host inspection failed. */
+  protected uninspectedRecord(
+    controllerId: number,
+    desired: BuildRuntimeArtifact,
+    record: RuntimeUpdateRecord | null,
+    attempt: number,
+    error: unknown,
+  ): RuntimeUpdateRecord {
+    const sameTarget = record?.desiredImageId === desired.imageId;
+    return {
+      controllerId,
+      phase: 'blocked',
+      token: null,
+      desiredImageId: desired.imageId,
+      desiredRuntimeVersion: desired.manifest.runtimeVersion,
+      previousRuntimeVersion: sameTarget ? (record.previousRuntimeVersion ?? null) : null,
+      desiredDigest: desired.digest,
+      buildId: desired.buildId,
+      previousImageId: sameTarget ? record.previousImageId : null,
+      attempt,
+      startedAt: this.now(),
+      updatedAt: this.now(),
+      retryAt: this.retryAt(attempt),
+      failure: error instanceof RuntimeUpdateError ? error.failure : 'offline',
+    };
+  }
+
+  /** Fresh blocked record for a new attempt, retaining the rollback target of a repeated one. */
+  protected plannedRecord(
+    controllerId: number,
+    desired: BuildRuntimeArtifact,
+    previous: RuntimeUpdateRecord | null,
+    inspection: RuntimeUpdateInspection,
+    attempt: number,
+  ): RuntimeUpdateRecord {
+    const retainPrevious = previous?.desiredImageId === desired.imageId && inspection.imageId === desired.imageId;
+    return {
+      controllerId,
+      phase: 'blocked',
+      token: null,
+      desiredImageId: desired.imageId,
+      desiredRuntimeVersion: desired.manifest.runtimeVersion,
+      previousRuntimeVersion: retainPrevious
+        ? (previous.previousRuntimeVersion ?? inspection.runtimeVersion ?? null)
+        : (inspection.runtimeVersion ?? null),
+      desiredDigest: desired.digest,
+      buildId: desired.buildId,
+      ...(desired.installerSha256 ? { installerSha256: desired.installerSha256 } : {}),
+      previousImageId: retainPrevious ? (previous.previousImageId ?? inspection.imageId) : inspection.imageId,
+      attempt,
+      startedAt: this.now(),
+      updatedAt: this.now(),
+      retryAt: 0,
+      failure: null,
+      cleanupAttempt: 0,
+      cleanupRetryAt: 0,
+    };
+  }
+
+  /** Runs the optional host preparation; false once a blocked record has been persisted. */
+  protected async prepareHost(
+    controllerId: number,
+    desired: BuildRuntimeArtifact,
+    record: RuntimeUpdateRecord,
+    { operation, assertOwned, persist }: RuntimeUpdateLease,
+    attempt: number,
+  ): Promise<boolean> {
+    if (!this.host.prepare) return true;
+    record.phase = 'preparing';
+    await persist(record);
+    try {
+      await this.host.prepare(controllerId, desired, operation.signal);
+      await this.assertCurrent(desired.imageId);
+      assertOwned();
+    } catch (error) {
+      assertOwned();
+      record.phase = 'blocked';
+      record.failure = error instanceof RuntimeUpdateError ? error.failure : 'incompatible';
+      record.retryAt = this.retryAt(attempt);
+      await persist(record);
+      return false;
+    }
+    return true;
   }
 
   protected async verifyExisting(
@@ -353,7 +412,7 @@ export class WagoRuntimeUpdateCoordinator {
     return 'settled';
   }
 
-  protected createLease(controllerId: number) {
+  protected createLease(controllerId: number): RuntimeUpdateLease {
     const owner = randomBytes(16).toString('hex');
     const operation = new AbortController();
     this.operations.add(operation);

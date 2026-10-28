@@ -31,6 +31,23 @@ import { SSOProviderNotFoundException } from './errors';
 
 import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from './logout-endpoints';
 
+type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
+
+/** SAML update fields stored as given; an explicit null (e.g. roleMappings) clears the column. */
+const SAML_UPDATE_PASSTHROUGH_FIELDS = [
+  'idpIssuer',
+  'logoutURL',
+  'entryPoint',
+  'issuer',
+  'audience',
+  'signRequest',
+  'wantAssertionsSigned',
+  'wantAuthnResponseSigned',
+  'forceAuthn',
+  'emailAttributeKeys',
+  'roleMappings',
+] as const;
+
 @Injectable()
 export class SSOService {
   public constructor(
@@ -196,8 +213,6 @@ export class SSOService {
     void unusedSpCert;
     void unusedSpKey;
 
-    type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
-
     const newConfig = repository.create({
       ...persistableConfig,
       certificate: normalizedCertificate,
@@ -222,46 +237,28 @@ export class SSOService {
       throw new BadRequestException('SAML configuration not found for provider');
     }
 
-    type SAMLConfigEntity = SSOProviderSAMLConfiguration & { provisioningSecret?: string | null };
-    const payload: Partial<SAMLConfigEntity> = {};
-    for (const key of ['idpIssuer', 'logoutURL'] as const) {
-      if (config[key] !== undefined) Object.assign(payload, { [key]: config[key] });
-    }
+    const payload = this.buildSAMLConfigurationUpdate(config, existing);
+    this.assertSAMLConfigurationUsable(config, payload, existing);
 
-    if (typeof config.entryPoint !== 'undefined') {
-      payload.entryPoint = config.entryPoint;
-    }
-    if (typeof config.issuer !== 'undefined') {
-      payload.issuer = config.issuer;
+    await repository.update({ ssoProviderId: providerId }, payload);
+    return repository.findOne({ where: { ssoProviderId: providerId } });
+  }
+
+  /** Copies provided fields; normalizes and encrypts the sensitive ones. Explicit null clears a column. */
+  protected buildSAMLConfigurationUpdate(
+    config: UpdateSAMLConfigurationDto,
+    existing: SSOProviderSAMLConfiguration,
+  ): Partial<SAMLConfigEntity> {
+    const payload: Partial<SAMLConfigEntity> = {};
+    for (const key of SAML_UPDATE_PASSTHROUGH_FIELDS) {
+      if (config[key] !== undefined) Object.assign(payload, { [key]: config[key] });
     }
     if (typeof config.certificate !== 'undefined') {
       payload.certificate = this.normalizeCertificate(config.certificate);
     }
-    if (typeof config.audience !== 'undefined') {
-      payload.audience = config.audience;
-    }
-    if (typeof config.signRequest !== 'undefined') {
-      payload.signRequest = config.signRequest;
-    }
-    if (typeof config.wantAssertionsSigned !== 'undefined') {
-      payload.wantAssertionsSigned = config.wantAssertionsSigned;
-    }
-    if (typeof config.wantAuthnResponseSigned !== 'undefined') {
-      payload.wantAuthnResponseSigned = config.wantAuthnResponseSigned;
-    }
-    if (typeof config.forceAuthn !== 'undefined') {
-      payload.forceAuthn = config.forceAuthn;
-    }
-    if (typeof config.emailAttributeKeys !== 'undefined') {
-      payload.emailAttributeKeys = config.emailAttributeKeys;
-    }
     if (typeof config.provisioningSecret !== 'undefined') {
       const trimmed = config.provisioningSecret?.trim();
       payload.provisioningSecret = trimmed ? this.encryptionService.encrypt(trimmed) : null;
-    }
-    if (typeof config.roleMappings !== 'undefined') {
-      // explicit null clears the column
-      payload.roleMappings = config.roleMappings;
     }
     if (typeof config.spSigningCertificate !== 'undefined') {
       payload.spSigningCertificate = config.spSigningCertificate
@@ -269,21 +266,35 @@ export class SSOService {
         : null;
     }
     if (typeof config.spSigningPrivateKey !== 'undefined') {
-      if (config.spSigningPrivateKey) {
-        const canonicalPrivateKey = this.canonicalizePrivateKey(config.spSigningPrivateKey);
-        const existingPrivateKey = existing.spSigningKeyEncrypted
-          ? this.encryptionService.decryptIfEncrypted(existing.spSigningKeyEncrypted)
-          : null;
-        if (canonicalPrivateKey !== (existingPrivateKey ? this.canonicalizePrivateKey(existingPrivateKey) : null)) {
-          payload.spSigningKeyEncrypted = this.encryptionService.encrypt(canonicalPrivateKey);
-          payload.spSigningKeyEncryptionKeyId = this.getEncryptionKeyId();
-        }
-      } else {
-        payload.spSigningKeyEncrypted = null;
-        payload.spSigningKeyEncryptionKeyId = null;
-      }
+      Object.assign(payload, this.buildSigningKeyUpdate(config.spSigningPrivateKey, existing));
     }
+    return payload;
+  }
 
+  /** An empty key clears the stored key; a canonical-equivalent key is not re-encrypted. */
+  protected buildSigningKeyUpdate(
+    privateKey: string | null,
+    existing: SSOProviderSAMLConfiguration,
+  ): Partial<SAMLConfigEntity> {
+    if (!privateKey) return { spSigningKeyEncrypted: null, spSigningKeyEncryptionKeyId: null };
+    const canonicalPrivateKey = this.canonicalizePrivateKey(privateKey);
+    const existingPrivateKey = existing.spSigningKeyEncrypted
+      ? this.encryptionService.decryptIfEncrypted(existing.spSigningKeyEncrypted)
+      : null;
+    if (canonicalPrivateKey === (existingPrivateKey ? this.canonicalizePrivateKey(existingPrivateKey) : null))
+      return {};
+    return {
+      spSigningKeyEncrypted: this.encryptionService.encrypt(canonicalPrivateKey),
+      spSigningKeyEncryptionKeyId: this.getEncryptionKeyId(),
+    };
+  }
+
+  /** Validates the configuration that results from applying the update to the stored one. */
+  protected assertSAMLConfigurationUsable(
+    config: UpdateSAMLConfigurationDto,
+    payload: Partial<SAMLConfigEntity>,
+    existing: SSOProviderSAMLConfiguration,
+  ): void {
     const nextSignRequest =
       typeof payload.signRequest !== 'undefined' ? payload.signRequest : (existing.signRequest ?? false);
     const nextSigningCert =
@@ -299,9 +310,6 @@ export class SSOService {
     const nextIdpIssuer = config.idpIssuer === undefined ? existing.idpIssuer : config.idpIssuer;
     if (nextLogoutURL && !nextIdpIssuer?.trim()) throw new BadRequestException('SAML logout requires an IdP issuer');
     this.ensureSigningMaterialAvailability(Boolean(nextSignRequest || nextLogoutURL), nextSigningCert, nextSigningKey);
-
-    await repository.update({ ssoProviderId: providerId }, payload);
-    return repository.findOne({ where: { ssoProviderId: providerId } });
   }
 
   protected normalizeCertificate(cert: string): string {
