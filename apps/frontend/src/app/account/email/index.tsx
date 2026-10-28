@@ -4,23 +4,11 @@ import {
   useUsersServiceGetCurrent,
   useUsersServiceGetCurrentKey,
 } from '@attraccess/react-query-client';
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  Input,
-  Label,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  TextField,
-  useOverlayState,
-} from '@heroui/react';
+import { Input, Label, TextField, useOverlayState } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
-import { AlertStatusIcon, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
@@ -86,37 +74,16 @@ export function EmailForm() {
           {t('actions.save')}
         </Button>
       </div>
-      <StandardModal
+      <StatusDialog
         isOpen={isOpen}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) close();
-        }}
-        size="md"
+        onClose={close}
+        status="warning"
+        title={t('modal.title')}
+        closeLabel={t('actions.cancel')}
+        action={{ label: t('actions.confirm'), onPress: confirmEmailChange, isPending }}
       >
-        {({ close: modalClose }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('modal.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <Alert status="warning">
-                <AlertStatusIcon status="warning" />
-                <AlertContent>
-                  <AlertDescription>{t('modal.warning')}</AlertDescription>
-                </AlertContent>
-              </Alert>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={modalClose}>
-                {t('actions.cancel')}
-              </Button>
-              <Button variant="primary" onPress={confirmEmailChange} isPending={isPending}>
-                {t('actions.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+        {t('modal.warning')}
+      </StatusDialog>
     </>
   );
 }

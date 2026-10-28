@@ -14,24 +14,31 @@ const locale = vi.hoisted(() => ({ current: 'en' }));
 const pending = vi.hoisted(() => ({ createAccount: false }));
 const labels = { en, de };
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: (locales: Record<string, Record<string, unknown>>) => {
-    const translations = locales[locale.current];
-    const lookup = (key: string) => key.split('.').reduce<unknown>(
-      (value, part) => value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
-      translations,
-    );
-    const t = (key: string, vars?: Record<string, unknown>) => {
-      const value = lookup(key);
-      if (typeof value !== 'string') return key;
-      return Object.entries(vars ?? {}).reduce(
-        (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, String(replacement)),
-        value,
-      );
-    };
-    const tExists = (key: string) => lookup(key) !== undefined;
-    return { t, tExists };
-  },
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+      const translations = locales[locale.current];
+      const lookup = (key: string) =>
+        key
+          .split('.')
+          .reduce<unknown>(
+            (value, part) =>
+              value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+            translations,
+          );
+      const t = (key: string, vars?: Record<string, unknown>) => {
+        const value = lookup(key);
+        if (typeof value !== 'string') return key;
+        return Object.entries(vars ?? {}).reduce(
+          (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, String(replacement)),
+          value,
+        );
+      };
+      const tExists = (key: string) => lookup(key) !== undefined;
+      return { t, tExists };
+    },
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

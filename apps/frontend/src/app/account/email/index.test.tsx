@@ -46,28 +46,39 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
       </button>
     ),
   }))()),
-  ...(await (() => ({ AlertStatusIcon: () => null }))()),
   ...(await (() => ({
-    StandardModal: ({
+    StatusDialog: ({
       isOpen,
+      title,
       children,
+      closeLabel,
+      onClose,
+      action,
     }: {
       isOpen: boolean;
-      children: (props: { close: () => void }) => React.ReactNode;
-    }) => (isOpen ? <div>{children({ close: vi.fn() })}</div> : null),
+      title: React.ReactNode;
+      children?: React.ReactNode;
+      closeLabel?: React.ReactNode;
+      onClose: () => void;
+      action?: { label: React.ReactNode; onPress: () => void };
+    }) =>
+      isOpen ? (
+        <div role="alertdialog" aria-label={String(title)}>
+          <div>{children}</div>
+          <button type="button" onClick={onClose}>
+            {closeLabel}
+          </button>
+          <button type="button" onClick={action?.onPress}>
+            {action?.label}
+          </button>
+        </div>
+      ) : null,
   }))()),
 }));
 
 vi.mock('@heroui/react', () => ({
-  Alert: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
   Label: ({ children }: { children: React.ReactNode }) => <label>{children}</label>,
-  ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ModalHeading: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
   TextField: ({
     children,
     value,

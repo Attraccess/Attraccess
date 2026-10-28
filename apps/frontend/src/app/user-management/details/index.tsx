@@ -4,7 +4,7 @@ import { UserPermissionForm } from './components/permissionsForm/index';
 import { SetPasswordForm } from './components/setPasswordForm/index';
 import { ChangeUsernameForm } from './components/changeUsername/index';
 import { ChangeEmailForm } from './components/changeEmail/index';
-import { Chip, ModalBody, ModalFooter, ModalHeader, ModalHeading, Separator, useOverlayState } from '@heroui/react';
+import { Chip, Separator, useOverlayState } from '@heroui/react';
 import {
   AlertTriangleIcon,
   KeyRoundIcon,
@@ -28,7 +28,7 @@ import {
   useUsersServiceDeleteUser,
   useUsersServiceGetOneUserById,
 } from '@attraccess/react-query-client';
-import { Button, PageHeader, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useMemo } from 'react';
 import en from './en.json';
@@ -390,31 +390,21 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
         </div>
       )}
 
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="sm">
-        {({ close: modalClose }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('delete.modal.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p className="text-sm text-default-500">{t('delete.modal.description')}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={modalClose} isDisabled={isDeleting}>
-                {t('delete.actions.cancel')}
-              </Button>
-              <Button
-                variant="danger"
-                onPress={() => user && deleteUser({ id: user.id })}
-                isPending={isDeleting}
-                data-cy="admin-delete-user-confirm-button"
-              >
-                {t('delete.actions.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+      <StatusDialog
+        isOpen={isOpen}
+        onClose={() => setOpen(false)}
+        status="error"
+        title={t('delete.modal.title')}
+        closeLabel={t('delete.actions.cancel')}
+        action={{
+          label: t('delete.actions.confirm'),
+          onPress: () => user && deleteUser({ id: user.id }),
+          isPending: isDeleting,
+          'data-cy': 'admin-delete-user-confirm-button',
+        }}
+      >
+        {t('delete.modal.description')}
+      </StatusDialog>
     </div>
   );
 }

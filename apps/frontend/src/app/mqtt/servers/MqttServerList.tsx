@@ -1,12 +1,8 @@
-import { AlertStatusIcon, Button, EmptyState, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, EmptyState, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
   AlertDescription,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Spinner,
   Table,
   TableBody,
@@ -144,38 +140,23 @@ export function MqttServerList() {
         </TableScrollContainer>
       </Table>
 
-      <StandardModal
+      <StatusDialog
         isOpen={isOpen}
-        onOpenChange={(o) => {
-          if (!o) closeDeleteModal();
+        onClose={closeDeleteModal}
+        status="error"
+        title={t('deleteServer')}
+        closeLabel={t('cancel')}
+        closeDataCy="mqtt-server-list-delete-confirmation-cancel-button"
+        action={{
+          label: t('deleteServer'),
+          onPress: confirmDelete,
+          isPending: deleteServer.isPending,
+          'data-cy': 'mqtt-server-list-delete-confirmation-delete-button',
         }}
         data-cy="mqtt-server-list-delete-confirmation-modal"
-        size="sm"
       >
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('deleteServer')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('deleteConfirmation')}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="secondary" onPress={close} data-cy="mqtt-server-list-delete-confirmation-cancel-button">
-                {t('cancel')}
-              </Button>
-              <Button
-                variant="danger"
-                onPress={confirmDelete}
-                isPending={deleteServer.isPending}
-                data-cy="mqtt-server-list-delete-confirmation-delete-button"
-              >
-                {t('deleteServer')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+        {t('deleteConfirmation')}
+      </StatusDialog>
     </>
   );
 }

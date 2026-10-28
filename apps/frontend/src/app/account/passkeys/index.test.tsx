@@ -12,11 +12,14 @@ const state = vi.hoisted(() => ({
   refetch: vi.fn(),
   toast: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string, params?: { name?: string }) => (params?.name ? `${key}:${params.name}` : key),
-  }),
-  DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({
+      t: (key: string, params?: { name?: string }) => (params?.name ? `${key}:${params.name}` : key),
+    }),
+    DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
+  }))()),
 }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ showToast: state.toast }) }));
 vi.mock('@simplewebauthn/browser', () => ({

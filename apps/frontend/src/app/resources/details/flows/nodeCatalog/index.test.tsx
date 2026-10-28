@@ -9,27 +9,30 @@ import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import { NodeCatalogHandle, NodeCatalogPanel } from './index';
 import { TestWrapper } from '../../../../../test-utils/wrappers';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => {
-    const dict: Record<string, string> = {
-      title: 'Node catalog',
-      empty: 'No nodes available.',
-      'domains.flow-control': 'Flow control',
-      'domains.access-doors': 'Access & doors',
-      'nodes.input.button.title': 'Button',
-      'nodes.input.button.description': 'User-triggered start',
-      'nodes.input.resource.door.locked.title': 'Door locked',
-      'nodes.input.resource.door.locked.description': 'Fires on lock',
-      loading: 'Loading nodes…',
-      toggleOpen: 'Open catalog',
-      toggleClose: 'Close catalog',
-      collapse: 'Collapse',
-      expand: 'Expand',
-    };
-    const t = (key: string) => dict[key] ?? key;
-    const tExists = (key: string) => key in dict;
-    return { t, tExists };
-  },
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => {
+      const dict: Record<string, string> = {
+        title: 'Node catalog',
+        empty: 'No nodes available.',
+        'domains.flow-control': 'Flow control',
+        'domains.access-doors': 'Access & doors',
+        'nodes.input.button.title': 'Button',
+        'nodes.input.button.description': 'User-triggered start',
+        'nodes.input.resource.door.locked.title': 'Door locked',
+        'nodes.input.resource.door.locked.description': 'Fires on lock',
+        loading: 'Loading nodes…',
+        toggleOpen: 'Open catalog',
+        toggleClose: 'Close catalog',
+        collapse: 'Collapse',
+        expand: 'Expand',
+      };
+      const t = (key: string) => dict[key] ?? key;
+      const tExists = (key: string) => key in dict;
+      return { t, tExists };
+    },
+  }))()),
 }));
 
 let mockIsLoading = false;

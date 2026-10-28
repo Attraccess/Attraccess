@@ -18,27 +18,31 @@ let loginError: Error | null = null;
 let resendOnSuccess: (() => void) | undefined;
 let resendOnError: ((error: unknown) => void) | undefined;
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: (locales: Record<string, Record<string, unknown>>) => {
-    const translations = locales[locale.current];
-    const lookup = (key: string) =>
-      key
-        .split('.')
-        .reduce<unknown>(
-          (value, part) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined),
-          translations,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+      const translations = locales[locale.current];
+      const lookup = (key: string) =>
+        key
+          .split('.')
+          .reduce<unknown>(
+            (value, part) =>
+              value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+            translations,
+          );
+      const t = (key: string, vars?: Record<string, unknown>) => {
+        const value = lookup(key);
+        if (typeof value !== 'string') return key;
+        return Object.entries(vars ?? {}).reduce(
+          (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, String(replacement)),
+          value,
         );
-    const t = (key: string, vars?: Record<string, unknown>) => {
-      const value = lookup(key);
-      if (typeof value !== 'string') return key;
-      return Object.entries(vars ?? {}).reduce(
-        (result, [name, replacement]) => result.replaceAll(`{{${name}}}`, String(replacement)),
-        value,
-      );
-    };
-    const tExists = (key: string) => lookup(key) !== undefined;
-    return { t, tExists };
-  },
+      };
+      const tExists = (key: string) => lookup(key) !== undefined;
+      return { t, tExists };
+    },
+  }))()),
 }));
 
 vi.mock('../../utils/live-updates', () => ({ resumeLiveUpdates: vi.fn(), stopLiveUpdates: vi.fn() }));
@@ -393,7 +397,11 @@ describe('LoginForm credential and authenticator steps', () => {
     (identifier as HTMLInputElement).value = 'alice@example.com';
     (password as HTMLInputElement).value = ' password ';
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(loginMock).toHaveBeenCalledWith({ username: 'alice@example.com', password: ' password ', tokenLocation: 'cookie' });
+    expect(loginMock).toHaveBeenCalledWith({
+      username: 'alice@example.com',
+      password: ' password ',
+      tokenLocation: 'cookie',
+    });
     expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
   });
 
@@ -414,17 +422,27 @@ describe('LoginForm credential and authenticator steps', () => {
     expect(password).toHaveAttribute('type', 'password');
   });
 
-  it.each(['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'TwoFactorInvalidCode', 'TwoFactorRequiredExtra'])('does not challenge on %s', async (message) => {
+  it.each([
+    'UnkownUserOrPasswordException',
+    'UserEmailNotVerifiedException',
+    'TwoFactorInvalidCode',
+    'TwoFactorRequiredExtra',
+  ])('does not challenge on %s', async (message) => {
     loginMock.mockRejectedValue(apiFailure(message));
     const user = userEvent.setup();
     renderLogin();
     await submitCredentials(user);
     expect(screen.queryByLabelText('Authenticator code')).not.toBeInTheDocument();
-    expect(screen.getByText(message === 'UserEmailNotVerifiedException' ? 'Email not verified' : 'Server Error')).toBeInTheDocument();
+    expect(
+      screen.getByText(message === 'UserEmailNotVerifiedException' ? 'Email not verified' : 'Server Error'),
+    ).toBeInTheDocument();
   });
 
   it('focuses one named code control, preserves credentials, pastes leading zeroes and retries invalid codes', async () => {
-    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockRejectedValueOnce(apiFailure('TwoFactorInvalidCode')).mockResolvedValueOnce({});
+    loginMock
+      .mockRejectedValueOnce(apiFailure('TwoFactorRequired'))
+      .mockRejectedValueOnce(apiFailure('TwoFactorInvalidCode'))
+      .mockResolvedValueOnce({});
     const user = userEvent.setup();
     renderLogin();
     const identifier = screen.getByLabelText('Email or username');
@@ -442,7 +460,12 @@ describe('LoginForm credential and authenticator steps', () => {
     expect(password).toHaveValue(' password ');
     await user.paste('012345');
     await user.click(screen.getByRole('button', { name: 'Verify code' }));
-    expect(loginMock).toHaveBeenLastCalledWith({ username: 'alice@example.com', password: ' password ', twoFactorCode: '012345', tokenLocation: 'cookie' });
+    expect(loginMock).toHaveBeenLastCalledWith({
+      username: 'alice@example.com',
+      password: ' password ',
+      twoFactorCode: '012345',
+      tokenLocation: 'cookie',
+    });
     expect(code).toBeInTheDocument();
     expect(screen.getByText('Server Error')).toBeInTheDocument();
     await user.click(code);
@@ -453,7 +476,8 @@ describe('LoginForm credential and authenticator steps', () => {
   });
 
   it('clears the previous code and error when credentials change', async () => {
-    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired'))
+    loginMock
+      .mockRejectedValueOnce(apiFailure('TwoFactorRequired'))
       .mockRejectedValueOnce(apiFailure('TwoFactorInvalidCode'))
       .mockRejectedValueOnce(apiFailure('TwoFactorRequired'));
     const user = userEvent.setup();
@@ -475,20 +499,34 @@ describe('LoginForm credential and authenticator steps', () => {
     expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toHaveValue('');
   });
 
-  it.each(['TooManyAuthAttemptsException', 'network failure', 'UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'])('handles %s during the code step', async (message) => {
+  it.each([
+    'TooManyAuthAttemptsException',
+    'network failure',
+    'UnkownUserOrPasswordException',
+    'UserEmailNotVerifiedException',
+    'LOCAL_LOGIN_FOR_SSO_FORBIDDEN',
+  ])('handles %s during the code step', async (message) => {
     loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockRejectedValueOnce(apiFailure(message));
     const user = userEvent.setup();
     renderLogin();
     await submitCredentials(user);
     await user.paste('012345');
     await user.click(screen.getByRole('button', { name: 'Verify code' }));
-    if (['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'].includes(message)) {
+    if (
+      ['UnkownUserOrPasswordException', 'UserEmailNotVerifiedException', 'LOCAL_LOGIN_FOR_SSO_FORBIDDEN'].includes(
+        message,
+      )
+    ) {
       expect(screen.queryByRole('textbox', { name: 'Authenticator code' })).not.toBeInTheDocument();
       expect(screen.getByLabelText('Email or username')).not.toHaveAttribute('readonly');
       expect(screen.getByLabelText('Password')).not.toHaveAttribute('readonly');
       loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired'));
       await user.click(screen.getByRole('button', { name: 'Sign in' }));
-      expect(loginMock).toHaveBeenLastCalledWith({ username: 'alice@example.com', password: ' password ', tokenLocation: 'cookie' });
+      expect(loginMock).toHaveBeenLastCalledWith({
+        username: 'alice@example.com',
+        password: ' password ',
+        tokenLocation: 'cookie',
+      });
       expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toHaveValue('');
     } else expect(screen.getByRole('textbox', { name: 'Authenticator code' })).toBeInTheDocument();
   });
@@ -496,30 +534,41 @@ describe('LoginForm credential and authenticator steps', () => {
   it.each([
     ['en', 'Sign in', 'Verify code', 'Authenticator code'],
     ['de', 'Anmelden', 'Code bestätigen', 'Authenticator-Code'],
-  ] as const)('keeps the authenticator action visibly named while pending in %s', async (language, signIn, verifyCode, codeLabel) => {
-    locale.current = language;
-    let finish: (() => void) | undefined;
-    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockImplementationOnce(
-      () => new Promise<void>((resolve) => { finish = resolve; }),
-    );
-    const user = userEvent.setup();
-    renderLogin();
-    await user.type(screen.getByLabelText(labels[language].username), 'alice@example.com');
-    await user.type(screen.getByLabelText(labels[language].password), 'password');
-    await user.click(screen.getByRole('button', { name: signIn }));
-    await screen.findByRole('textbox', { name: codeLabel });
-    await user.paste('012345');
-    await user.click(screen.getByRole('button', { name: verifyCode }));
-    await waitFor(() => expect(loginMock).toHaveBeenCalledTimes(2));
-    const button = screen.getByRole('button', { name: verifyCode });
-    expect(button).toBeDisabled();
-    expect(button).toHaveTextContent(verifyCode);
-    await act(async () => finish?.());
-  });
+  ] as const)(
+    'keeps the authenticator action visibly named while pending in %s',
+    async (language, signIn, verifyCode, codeLabel) => {
+      locale.current = language;
+      let finish: (() => void) | undefined;
+      loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const user = userEvent.setup();
+      renderLogin();
+      await user.type(screen.getByLabelText(labels[language].username), 'alice@example.com');
+      await user.type(screen.getByLabelText(labels[language].password), 'password');
+      await user.click(screen.getByRole('button', { name: signIn }));
+      await screen.findByRole('textbox', { name: codeLabel });
+      await user.paste('012345');
+      await user.click(screen.getByRole('button', { name: verifyCode }));
+      await waitFor(() => expect(loginMock).toHaveBeenCalledTimes(2));
+      const button = screen.getByRole('button', { name: verifyCode });
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent(verifyCode);
+      await act(async () => finish?.());
+    },
+  );
 
   it('blocks incomplete-code Enter and duplicate requests, including switching while pending', async () => {
     let finish: (() => void) | undefined;
-    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    loginMock.mockRejectedValueOnce(apiFailure('TwoFactorRequired')).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     const user = userEvent.setup();
     const { container } = renderLogin();
     await submitCredentials(user);

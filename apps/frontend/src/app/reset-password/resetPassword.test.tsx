@@ -11,17 +11,21 @@ const navigateMock = vi.fn();
 
 const state = vi.hoisted(() => ({ locale: 'en' as 'en' | 'de', pending: false, success: true }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useUrlQuery: () => new URLSearchParams('token=test&userId=1'),
-  useTranslations: () => ({
-    t: (key: string) =>
-      key
-        .split('.')
-        .reduce<unknown>(
-          (value, part) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined),
-          state.locale === 'en' ? en : de,
-        ) as string,
-  }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useUrlQuery: () => new URLSearchParams('token=test&userId=1'),
+    useTranslations: () => ({
+      t: (key: string) =>
+        key
+          .split('.')
+          .reduce<unknown>(
+            (value, part) =>
+              value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+            state.locale === 'en' ? en : de,
+          ) as string,
+    }),
+  }))()),
 }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
 vi.mock('@attraccess/react-query-client', () => ({

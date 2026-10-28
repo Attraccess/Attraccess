@@ -15,10 +15,13 @@ const state = vi.hoisted(() => ({
   lineData: [] as unknown[],
   barData: [] as unknown[],
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
-  useNumberFormatter: () => (n: number) => n.toFixed(2),
-  useDateTimeFormatter: () => (date: Date) => date.toISOString().slice(0, 10),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+    useNumberFormatter: () => (n: number) => n.toFixed(2),
+    useDateTimeFormatter: () => (date: Date) => date.toISOString().slice(0, 10),
+  }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useProjectsServiceGetProjectUsageStats: () => ({ data: state.data, isLoading: state.loading }),

@@ -17,8 +17,11 @@ vi.mock('@attraccess/react-query-client', () => ({
   useSettingsServiceDeleteMetricsApiKey: vi.fn(),
   useSettingsServiceUpdateMetricsSettings: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+  }))()),
 }));
 const { setQueryData, invalidateQueries, success, error } = vi.hoisted(() => ({
   setQueryData: vi.fn(),

@@ -10,9 +10,12 @@ const state = vi.hoisted(() => ({
   options: {} as { onSuccess: () => void; onError: (error: Error) => void },
 }));
 const t = (key: string) => key;
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t, tExists: () => false }),
-  useUrlQuery: () => state.query,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t, tExists: () => false }),
+    useUrlQuery: () => state.query,
+  }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', () => ({

@@ -7,25 +7,28 @@ import { TestWrapper } from '../../../../test-utils/wrappers';
 
 let inviteFromCsvOptions: { onError?: (error: unknown) => void } | undefined;
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string) =>
-      ({
-        'inputs.file': 'Select file',
-        'inputs.fieldMapping.email': 'Email',
-        'inputs.fieldMapping.username': 'Username',
-        'preview.columns.index': 'Index',
-        'preview.columns.username': 'Username',
-        'preview.columns.email': 'Email',
-        'errors.title': 'Import errors',
-        'errors.columns.row': 'Row',
-        'errors.columns.field': 'Field',
-        'errors.columns.message': 'Reason',
-        'errors.columns.value': 'Value',
-        'actions.invite': 'Invite',
-        'actions.inviteIgnore': 'Invite skipping failed rows',
-      })[key] ?? key,
-  }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({
+      t: (key: string) =>
+        ({
+          'inputs.file': 'Select file',
+          'inputs.fieldMapping.email': 'Email',
+          'inputs.fieldMapping.username': 'Username',
+          'preview.columns.index': 'Index',
+          'preview.columns.username': 'Username',
+          'preview.columns.email': 'Email',
+          'errors.title': 'Import errors',
+          'errors.columns.row': 'Row',
+          'errors.columns.field': 'Field',
+          'errors.columns.message': 'Reason',
+          'errors.columns.value': 'Value',
+          'actions.invite': 'Invite',
+          'actions.inviteIgnore': 'Invite skipping failed rows',
+        })[key] ?? key,
+    }),
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

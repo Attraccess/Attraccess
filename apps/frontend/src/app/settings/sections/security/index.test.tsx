@@ -45,8 +45,11 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn: () => ['two-factor'],
   UseUsersServiceGetLocalSignupDomainWhitelistKeyFn: () => ['domains'],
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
+  }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: feedback.invalidate, setQueryData: feedback.cache }),

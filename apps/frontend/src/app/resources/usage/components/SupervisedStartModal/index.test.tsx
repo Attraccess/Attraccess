@@ -29,9 +29,12 @@ vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, username: 'me' } }),
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
-  AttraccessUser: ({ user }: { user: { username: string } }) => <div>{user.username}</div>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+    AttraccessUser: ({ user }: { user: { username: string } }) => <div>{user.username}</div>,
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

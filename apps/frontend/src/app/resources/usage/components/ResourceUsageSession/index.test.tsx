@@ -16,8 +16,11 @@ vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, username: 'me' }, hasPermission: () => hasPermission.value }),
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+  }))()),
 }));
 
 vi.mock('../../../../../utils/live-updates', () => ({ useLiveUpdates: () => undefined }));

@@ -35,7 +35,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     resourceGroupsResourcesExist: () => state.getExistence(),
   },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useDebounce: (value: unknown) => value }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useDebounce: (value: unknown) => value }))()),
+}));
 vi.mock('./toolbar/toolbar', () => ({ Toolbar: () => null }));
 vi.mock('./resourceGroupCard', () => ({ ResourceGroupCard: () => null }));
 vi.mock('./activeUsageSessionsBanner', () => ({ ActiveUsageSessionsBanner: () => null }));

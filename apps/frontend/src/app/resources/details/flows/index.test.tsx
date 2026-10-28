@@ -42,8 +42,11 @@ const state = vi.hoisted(() => ({
   },
   live: undefined as undefined | ((log: { type: string }) => void),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+  }))()),
 }));
 vi.mock('@attraccess/ui', () => ({ useAppTheme: () => ({ resolvedTheme: 'light' }) }));
 vi.mock('../../../../stores/ptr.store', () => ({ usePtrStore: () => ({ setPullToRefreshIsEnabled: state.refresh }) }));

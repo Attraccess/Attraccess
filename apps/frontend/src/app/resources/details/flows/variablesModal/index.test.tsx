@@ -12,9 +12,12 @@ const state = vi.hoisted(() => ({
   upsertOptions: {} as { onSuccess: () => void; onError: (error: unknown) => void },
   removeOptions: {} as { onSuccess: () => void; onError: (error: unknown) => void },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
-  useDateTimeFormatter: () => (date: string) => date,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+    useDateTimeFormatter: () => (date: string) => date,
+  }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../../../components/toastProvider', () => ({

@@ -4,23 +4,25 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { UserSelectionList } from './index';
-vi.mock('@attraccess/plugins-frontend-ui', async (original) => ({
-  ...(await original<Record<string, unknown>>()),
-  UserSearch: ({
-    onSelectionChange,
-    afterSelection,
-    resetSignal,
-  }: {
-    onSelectionChange: (user: { id: number; username: string }) => void;
-    afterSelection: ReactNode;
-    resetSignal: number;
-  }) => (
-    <>
-      <button onClick={() => onSelectionChange({ id: 99, username: 'New user' })}>Choose user</button>
-      <output aria-label="Picker reset">{resetSignal}</output>
-      <div data-testid="add-user">{afterSelection}</div>
-    </>
-  ),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...{
+    UserSearch: ({
+      onSelectionChange,
+      afterSelection,
+      resetSignal,
+    }: {
+      onSelectionChange: (user: { id: number; username: string }) => void;
+      afterSelection: ReactNode;
+      resetSignal: number;
+    }) => (
+      <>
+        <button onClick={() => onSelectionChange({ id: 99, username: 'New user' })}>Choose user</button>
+        <output aria-label="Picker reset">{resetSignal}</output>
+        <div data-testid="add-user">{afterSelection}</div>
+      </>
+    ),
+  },
 }));
 afterEach(cleanup);
 it('adds the chosen user once and clears the picker', () => {

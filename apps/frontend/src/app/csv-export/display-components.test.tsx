@@ -4,8 +4,11 @@ import { FileIcon } from 'lucide-react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { SelectedRangePill } from './date-range-section/selected-range-pill';
 import { ExportTypeCard } from './export-type-section/export-type-card';
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useDateTimeFormatter: () => (date: Date) => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useDateTimeFormatter: () => (date: Date) => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`,
+  }))()),
 }));
 afterEach(cleanup);
 it('summarizes a selected inclusive date range and an absent range', () => {

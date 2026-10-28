@@ -12,16 +12,19 @@ const createSessionWithPasskey = vi.fn();
 
 // Resolves dotted keys against the translations the component actually passes in, so the test
 // runs the real getTranslationKeyForApiError against the real api-errors JSON.
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: ({ en }: { en: Record<string, unknown> }) => {
-    const lookup = (key: string) =>
-      key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], en);
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: ({ en }: { en: Record<string, unknown> }) => {
+      const lookup = (key: string) =>
+        key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], en);
 
-    return {
-      t: (key: string) => (typeof lookup(key) === 'string' ? (lookup(key) as string) : key),
-      tExists: (key: string) => lookup(key) !== undefined,
-    };
-  },
+      return {
+        t: (key: string) => (typeof lookup(key) === 'string' ? (lookup(key) as string) : key),
+        tExists: (key: string) => lookup(key) !== undefined,
+      };
+    },
+  }))()),
 }));
 
 vi.mock('@simplewebauthn/browser', () => ({

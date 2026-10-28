@@ -21,21 +21,24 @@ const state = vi.hoisted(() => ({
   balanceQuery: vi.fn(),
   transactionsQuery: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslationState: () => ({ language: 'en' }),
-  useTranslations: () => ({
-    t: (
-      key: string,
-      params?: { balance?: string; currency?: string; originalId?: number; originalDetails?: string },
-    ) =>
-      key === 'balance'
-        ? `${params?.currency} ${params?.balance}`
-        : params?.originalId
-          ? `${key} #${params.originalId} ${params.originalDetails}`
-          : key,
-  }),
-  useNumberFormatter: () => (value: number) => value.toFixed(2),
-  DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslationState: () => ({ language: 'en' }),
+    useTranslations: () => ({
+      t: (
+        key: string,
+        params?: { balance?: string; currency?: string; originalId?: number; originalDetails?: string },
+      ) =>
+        key === 'balance'
+          ? `${params?.currency} ${params?.balance}`
+          : params?.originalId
+            ? `${key} #${params.originalId} ${params.originalDetails}`
+            : key,
+    }),
+    useNumberFormatter: () => (value: number) => value.toFixed(2),
+    DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
+  }))()),
 }));
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: state.userId ? { id: state.userId } : undefined }),
