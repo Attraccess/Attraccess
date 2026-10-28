@@ -39,6 +39,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({ useDebounce: (value: unknown
 vi.mock('./toolbar/toolbar', () => ({ Toolbar: () => null }));
 vi.mock('./resourceGroupCard', () => ({ ResourceGroupCard: () => null }));
 vi.mock('./activeUsageSessionsBanner', () => ({ ActiveUsageSessionsBanner: () => null }));
+vi.mock('../mass-introduction/MassIntroductionRedeemModal', () => ({ MassIntroductionRedeemModal: () => null }));
 vi.mock('./createResourceDrawer', () => ({
   CreateResourceDrawer: ({ isOpen }: { isOpen: boolean }) =>
     isOpen && <div role="dialog" aria-label="Create another" />,

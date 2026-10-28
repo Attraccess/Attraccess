@@ -26,6 +26,7 @@ import {
 import { Button } from '../../../../components/button';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { AttractapSelect } from '../../../attractap/AttractapSelect';
+import { massIntroductionUrl } from '../../../mass-introduction/MassIntroductionRedeemModal';
 import { MassIntroductionEndState, MassIntroductionSessionState } from './useMassIntroductionSession';
 
 const REQUIRED_READER_CAPABILITIES = { massIntroduction: true };
@@ -37,13 +38,6 @@ export interface MassIntroductionSetup {
 }
 
 export const INITIAL_MASS_INTRODUCTION_SETUP: MassIntroductionSetup = { useReader: false, readerId: null };
-
-export function massIntroductionUrl(token: string): string {
-  const url = new URL(window.location.origin);
-  url.pathname = '/mass-introduction';
-  url.searchParams.set('token', token);
-  return url.toString();
-}
 
 function formatCountdown(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -179,7 +173,7 @@ interface ActiveSessionProps {
 }
 
 function ActiveSession({ t, session, secondsLeft }: Readonly<ActiveSessionProps>) {
-  const url = useMemo(() => massIntroductionUrl(session.token), [session.token]);
+  const url = useMemo(() => massIntroductionUrl(session), [session]);
   const totalSeconds = Math.max(
     1,
     Math.round((new Date(session.expiresAt).getTime() - new Date(session.createdAt).getTime()) / 1000),

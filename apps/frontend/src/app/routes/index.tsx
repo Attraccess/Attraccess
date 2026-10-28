@@ -20,7 +20,6 @@ import FirstTimeSetupPage from '../first-time-setup/index';
 import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { KioskLayout } from '../kiosk/layout/KioskLayout';
 import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
-import { MassIntroductionLandingPage } from '../mass-introduction/index';
 import { MessagesPage } from '../messaging/index';
 import { EditMqttServerPage, MqttServersPage } from '../mqtt/index';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
@@ -248,12 +247,6 @@ const coreRoutes: RouteConfig[] = [
         <MaintenanceHubPage />
       </ResourceTabsLayout>
     ),
-    authRequired: true,
-  },
-  {
-    // Target of the QR code shown during a mass introduction; signed-out users log in first and return here.
-    path: '/mass-introduction',
-    element: <MassIntroductionLandingPage />,
     authRequired: true,
   },
   {

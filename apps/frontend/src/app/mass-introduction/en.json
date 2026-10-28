@@ -3,15 +3,12 @@
   "success": {
     "title": "Introduction complete",
     "introduced": "You've been introduced to {{{name}}}.",
-    "alreadyIntroduced": "You already had an introduction to {{{name}}}.",
-    "openResource": "Open resource",
-    "openResources": "Show resources"
+    "alreadyIntroduced": "You already had an introduction to {{{name}}}."
   },
   "error": {
     "title": "Introduction failed",
     "invalidOrExpired": "This QR code is invalid or has expired. Ask your introducer to show a new one.",
-    "missingToken": "This link does not contain a mass-introduction code.",
-    "generic": "Something went wrong: {{{error}}}",
-    "backToResources": "Back to resources"
-  }
+    "generic": "Something went wrong: {{{error}}}"
+  },
+  "close": "Done"
 }

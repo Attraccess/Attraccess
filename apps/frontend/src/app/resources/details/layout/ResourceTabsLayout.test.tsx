@@ -37,6 +37,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useResourceMaintenancesServiceCanManageMaintenance: () => ({ data: { canManage: state.update } }),
 }));
 vi.mock('../useQrCodeAction', () => ({ useQrCodeAction: vi.fn() }));
+vi.mock('../../../mass-introduction/MassIntroductionRedeemModal', () => ({ MassIntroductionRedeemModal: () => null }));
 vi.mock('../health-state', () => ({ ResourceHealthWarning: () => null }));
 vi.mock('../qrcode', () => ({
   ResourceQrCode: ({ renderTrigger }: ComponentProps<typeof ResourceQrCode>) => renderTrigger?.(state.qr),

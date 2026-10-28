@@ -164,7 +164,7 @@ describe('grant-introduction drawer', () => {
     startSession();
 
     expect(state.start).toHaveBeenCalledWith({ requestBody: { resourceId: 7 } });
-    expect(screen.getByText(`${window.location.origin}/mass-introduction?token=tok-1`)).toBeInTheDocument();
+    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=tok-1`)).toBeInTheDocument();
     expect(screen.getByText('Introducing people to Laser Cutter')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '15:00');
     expect(screen.getByText('Nobody has joined yet.')).toBeInTheDocument();
@@ -245,7 +245,7 @@ describe('grant-introduction drawer', () => {
 
     expect(screen.getByText('Mass introduction ended')).toBeInTheDocument();
     expect(screen.getByText(/can no longer introduce people/)).toBeInTheDocument();
-    expect(screen.queryByText(/mass-introduction\?token=/)).toBeNull();
+    expect(screen.queryByText(/massIntroduction=/)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
@@ -266,7 +266,7 @@ describe('grant-introduction drawer', () => {
     });
 
     expect(screen.getByText('The 15 minutes are up. The QR code no longer works.')).toBeInTheDocument();
-    expect(screen.queryByText(/mass-introduction\?token=/)).toBeNull();
+    expect(screen.queryByText(/massIntroduction=/)).toBeNull();
     expect(state.cancel).not.toHaveBeenCalled();
   });
 

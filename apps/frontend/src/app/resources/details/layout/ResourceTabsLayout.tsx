@@ -32,6 +32,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQrCodeAction } from '../useQrCodeAction';
+import { MassIntroductionRedeemModal } from '../../../mass-introduction/MassIntroductionRedeemModal';
 import de from '../resourceDetails.de.json';
 import en from '../resourceDetails.en.json';
 
@@ -130,7 +131,13 @@ function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
     return <Navigate to="/resources" replace />;
   }
 
-  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
+  return (
+    <>
+      {/* Mass-introduction QR codes for a resource point here (ATT-1151). */}
+      <MassIntroductionRedeemModal />
+      <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>
+    </>
+  );
 }
 
 function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
