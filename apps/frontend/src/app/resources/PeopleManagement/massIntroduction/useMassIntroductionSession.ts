@@ -32,6 +32,8 @@ export function useMassIntroductionSession(target: PeopleTarget) {
   const [endReason, setEndReason] = useState<MassIntroductionEndState | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  // Bumped when fetching the next QR code failed, to schedule another attempt.
+  const [refreshRetry, setRefreshRetry] = useState(0);
 
   // The id of the session that is still running server-side, as far as this drawer knows.
   const activeSessionIdRef = useRef<string | null>(null);
@@ -152,10 +154,22 @@ export function useMassIntroductionSession(target: PeopleTarget) {
         if (activeSessionIdRef.current === sessionId) applySession(current);
       },
       (error) => {
-        if (activeSessionIdRef.current === sessionId && (error as ApiError)?.status === 404) markEnded('unknown');
+        if (activeSessionIdRef.current !== sessionId) return;
+        if ((error as ApiError)?.status === 404) markEnded('unknown');
+        else setRefreshRetry((attempt) => attempt + 1);
       },
     );
   }, [applySession, markEnded]);
+
+  // The QR code changes every 15 seconds so a photo of it cannot be passed on; fetch the next one
+  // as soon as it rotates.
+  const tokenRefreshAt = phase === 'active' ? session?.tokenRefreshAt : undefined;
+  useEffect(() => {
+    if (!tokenRefreshAt) return;
+    const dueInMs = new Date(tokenRefreshAt).getTime() - Date.now();
+    const timeout = setTimeout(resync, dueInMs > 0 ? dueInMs + 250 : 2000);
+    return () => clearTimeout(timeout);
+  }, [tokenRefreshAt, refreshRetry, resync]);
 
   // Subscribed for as long as the drawer is open, so no event right after starting is missed.
   useLiveUpdates({ topic: 'mass-introduction', onUpdate: handleLiveEvent, onReconnect: resync });

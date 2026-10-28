@@ -184,6 +184,7 @@ function ActiveSession({ t, session, secondsLeft }: Readonly<ActiveSessionProps>
       <figure className="flex flex-col items-center gap-2" aria-label={t('active.qrLabel')}>
         <QRCode value={url} size={256} qrStyle="fluid" quietZone={8} />
         <Description className="text-center">{t('active.scanHint')}</Description>
+        <Description className="text-center">{t('active.rotationHint')}</Description>
       </figure>
 
       <ProgressBar

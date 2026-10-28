@@ -48,6 +48,7 @@ vi.mock('../components/supervisorApproval/SupervisorApprovalListener', () => ({
 vi.mock('./billing/sessionSummary', () => ({
   SessionBillingSummary: () => <p>Session billing listener</p>,
 }));
+vi.mock('./mass-introduction/MassIntroductionRedeemModal', () => ({ MassIntroductionRedeemModal: () => null }));
 vi.mock('../components/themeToggle', () => ({ ThemeToggle: () => <button>Theme</button> }));
 vi.mock('../components/bootScreen', () => ({ BootScreen: () => <p>Starting app</p> }));
 vi.mock('./unauthorized/unauthorized', () => ({ Unauthorized: () => <p>Sign in</p> }));

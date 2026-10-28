@@ -1,6 +1,6 @@
-// Redeems a scanned mass-introduction QR code on the page it points to and reports the result in a dialog
+// Redeems a scanned mass-introduction QR code and reports the result in a dialog
 // FEATURE: ATT-1151 Mass introduction
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -9,6 +9,7 @@ import {
   MassIntroductionSessionDto,
   MassIntroductionTargetType,
   RedeemMassIntroductionResponseDto,
+  useAccessControlServiceMassIntroductionClaim,
   useAccessControlServiceMassIntroductionRedeem,
 } from '@attraccess/react-query-client';
 import { StatusDialog } from '../../components/statusDialog';
@@ -16,8 +17,11 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import en from './en.json';
 import de from './de.json';
 
-/** Query parameter carrying the QR code's token. */
+/** Query parameter carrying the QR code's value; it changes every 15 seconds. */
 export const MASS_INTRODUCTION_PARAM = 'massIntroduction';
+
+/** Query parameter carrying the ticket for a scanned code, so it survives signing in. */
+export const MASS_INTRODUCTION_TICKET_PARAM = 'massIntroductionTicket';
 
 /**
  * Where a session's QR code points: the resource's details page, or the resource overview for a
@@ -35,43 +39,80 @@ type RedeemState =
   | { status: 'success'; result: RedeemMassIntroductionResponseDto }
   | { status: 'error'; isInvalidOrExpired: boolean; detail: string };
 
-/** Mount on every page a QR code can point to; renders nothing without a token in the URL. */
-export function MassIntroductionRedeemModal() {
+interface Props {
+  /** Signed in and past the two-factor gate. */
+  canRedeem: boolean;
+}
+
+/**
+ * Mount once, for signed-in and signed-out users alike. A scanned code is exchanged for a ticket
+ * right away, because it would expire while a signed-out participant logs in; the ticket is
+ * redeemed once they can. Renders nothing without a code or ticket in the URL.
+ */
+export function MassIntroductionRedeemModal({ canRedeem }: Readonly<Props>) {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<RedeemState | null>(null);
-  // A token grants an introduction; redeem it once even under StrictMode/re-renders.
-  const redeemedToken = useRef<string | null>(null);
+  // Codes and tickets are single-use; act on each once even under StrictMode/re-renders.
+  const claimedCode = useRef<string | null>(null);
+  const redeemedTicket = useRef<string | null>(null);
+
+  const showError = (error: unknown) =>
+    setState({
+      status: 'error',
+      isInvalidOrExpired: (error as ApiError)?.status === 404,
+      detail: getApiErrorMessage(error as ApiError),
+    });
+
+  // Reloading or sharing the page must not use a code or ticket again.
+  const replaceParams = useCallback(
+    (update: (params: URLSearchParams) => void) =>
+      setSearchParams(
+        (params) => {
+          update(params);
+          return params;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
+
+  const { mutate: claim } = useAccessControlServiceMassIntroductionClaim({
+    onSuccess: ({ ticket }) =>
+      replaceParams((params) => {
+        params.delete(MASS_INTRODUCTION_PARAM);
+        params.set(MASS_INTRODUCTION_TICKET_PARAM, ticket);
+      }),
+    onError: (error) => {
+      replaceParams((params) => params.delete(MASS_INTRODUCTION_PARAM));
+      showError(error);
+    },
+  });
 
   const { mutate: redeem } = useAccessControlServiceMassIntroductionRedeem({
     onSuccess: (result) => {
       setState({ status: 'success', result });
-      // The page behind the modal may change with the new introduction (usage controls, people).
+      // The page behind the dialog may change with the new introduction (usage controls, people).
       void queryClient.invalidateQueries();
     },
-    onError: (error) =>
-      setState({
-        status: 'error',
-        isInvalidOrExpired: (error as ApiError)?.status === 404,
-        detail: getApiErrorMessage(error as ApiError),
-      }),
+    onError: showError,
   });
 
-  const token = searchParams.get(MASS_INTRODUCTION_PARAM);
+  const code = searchParams.get(MASS_INTRODUCTION_PARAM);
   useEffect(() => {
-    if (!token || redeemedToken.current === token) return;
-    redeemedToken.current = token;
-    redeem({ requestBody: { token } });
-    // Reloading or sharing the page must not redeem again.
-    setSearchParams(
-      (params) => {
-        params.delete(MASS_INTRODUCTION_PARAM);
-        return params;
-      },
-      { replace: true },
-    );
-  }, [token, redeem, setSearchParams]);
+    if (!code || claimedCode.current === code) return;
+    claimedCode.current = code;
+    claim({ requestBody: { token: code } });
+  }, [code, claim]);
+
+  const ticket = searchParams.get(MASS_INTRODUCTION_TICKET_PARAM);
+  useEffect(() => {
+    if (!ticket || !canRedeem || redeemedTicket.current === ticket) return;
+    redeemedTicket.current = ticket;
+    redeem({ requestBody: { ticket } });
+    replaceParams((params) => params.delete(MASS_INTRODUCTION_TICKET_PARAM));
+  }, [ticket, canRedeem, redeem, replaceParams]);
 
   // The redemption is quick; the dialog appears with its result.
   if (!state) return null;

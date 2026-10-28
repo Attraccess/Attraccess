@@ -11,7 +11,6 @@ import { useDebounce } from '@attraccess/plugins-frontend-ui';
 import { NoResourcesFound } from './noResourcesFound';
 import { ActiveUsageSessionsBanner } from './activeUsageSessionsBanner';
 import { CreateResourceDrawer } from './createResourceDrawer';
-import { MassIntroductionRedeemModal } from '../mass-introduction/MassIntroductionRedeemModal';
 
 enum PersistedFilterProps {
   onlyInUseByMe = 'onlyInUseByMe',
@@ -113,8 +112,6 @@ export function ResourceOverview() {
 
   return (
     <div>
-      {/* Mass-introduction QR codes for a resource group point here (ATT-1151). */}
-      <MassIntroductionRedeemModal />
       <Toolbar
         onOpenCreate={() => setCreateOpen(true)}
         search={searchValue}

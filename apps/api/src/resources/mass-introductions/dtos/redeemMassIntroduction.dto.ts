@@ -3,10 +3,10 @@ import { IsString, Length } from 'class-validator';
 import { MassIntroductionTargetDto } from './massIntroductionSession.dto';
 
 export class RedeemMassIntroductionDto {
-  @ApiProperty({ description: 'The token from the scanned mass-introduction QR code' })
+  @ApiProperty({ description: 'The ticket from POST /mass-introductions/claim' })
   @IsString()
   @Length(16, 128)
-  token!: string;
+  ticket!: string;
 }
 
 export class RedeemMassIntroductionResponseDto {

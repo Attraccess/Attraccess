@@ -41,6 +41,10 @@ describe('MassIntroductionService', () => {
   const alice = { id: 7, username: 'alice' };
   const bob = { id: 8, username: 'bob' };
 
+  /** Scan the QR code shown right now, then redeem the ticket as the signed-in participant. */
+  const scan = (session: { token: string }, user: { id: number; username: string }) =>
+    Promise.resolve().then(() => service.redeemTicket(service.claim(session.token).ticket, user));
+
   const eventsOfType = (type: MassIntroductionLiveEventType) =>
     live.emitToIntroducer.mock.calls
       .filter(([, event]) => event.type === type)
@@ -108,7 +112,7 @@ describe('MassIntroductionService', () => {
   it('introduces QR participants on behalf of the introducer and reports them live', async () => {
     const session = await service.start(introducer, { resourceId: 5 });
 
-    const result = await service.redeemToken(session.token, alice);
+    const result = await scan(session, alice);
 
     expect(result).toEqual({
       target: { type: MassIntroductionTargetType.RESOURCE, id: 5, name: 'Laser' },
@@ -131,8 +135,8 @@ describe('MassIntroductionService', () => {
   it('grants once per participant, even for concurrent scans', async () => {
     const session = await service.start(introducer, { resourceId: 5 });
 
-    await Promise.all([service.redeemToken(session.token, alice), service.redeemToken(session.token, alice)]);
-    await service.redeemToken(session.token, alice);
+    await Promise.all([scan(session, alice), scan(session, alice)]);
+    await scan(session, alice);
 
     expect(resourceIntroductions.grant).toHaveBeenCalledTimes(1);
     expect(eventsOfType(MassIntroductionLiveEventType.UPDATED)).toHaveLength(1);
@@ -142,7 +146,7 @@ describe('MassIntroductionService', () => {
     resourceIntroductions.hasValidIntroduction.mockResolvedValue(true);
     const session = await service.start(introducer, { resourceId: 5 });
 
-    const result = await service.redeemToken(session.token, alice);
+    const result = await scan(session, alice);
 
     expect(result.alreadyIntroduced).toBe(true);
     expect(resourceIntroductions.grant).not.toHaveBeenCalled();
@@ -151,15 +155,16 @@ describe('MassIntroductionService', () => {
 
   it('uses the group services for resource-group sessions', async () => {
     const session = await service.start(introducer, { resourceGroupId: 3 });
-    await service.redeemToken(session.token, alice);
+    await scan(session, alice);
 
     expect(groupIntroducers.isIntroducer).toHaveBeenCalledWith({ groupId: 3, userId: introducer.id });
     expect(groupIntroductions.grant).toHaveBeenCalledWith(3, alice.id, undefined, expect.any(Object));
     expect(resourceIntroductions.grant).not.toHaveBeenCalled();
   });
 
-  it('rejects unknown tokens', async () => {
-    await expect(service.redeemToken('not-a-token', alice)).rejects.toBeInstanceOf(NotFoundException);
+  it('rejects unknown codes and tickets', async () => {
+    expect(() => service.claim('not-a-token')).toThrow(NotFoundException);
+    await expect(service.redeemTicket('not.a-ticket', alice)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('expires after 15 minutes: the token stops working and the reader is released', async () => {
@@ -168,7 +173,7 @@ describe('MassIntroductionService', () => {
 
     jest.advanceTimersByTime(MassIntroductionService.TTL_MS);
 
-    await expect(service.redeemToken(session.token, alice)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(scan(session, alice)).rejects.toBeInstanceOf(NotFoundException);
     expect(readerPort.disarm).toHaveBeenCalledWith({
       readerId: 3,
       sessionId: session.id,
@@ -190,7 +195,7 @@ describe('MassIntroductionService', () => {
     expect(readerPort.disarm).toHaveBeenCalledWith(
       expect.objectContaining({ readerId: 3, reason: MassIntroductionEndReason.CANCELLED }),
     );
-    await expect(service.redeemToken(session.token, alice)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(scan(session, alice)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('fails fast and leaves no session behind when the reader cannot be armed', async () => {
@@ -208,15 +213,15 @@ describe('MassIntroductionService', () => {
     const first = await service.start(introducer, { resourceId: 5 });
     const second = await service.start(introducer, { resourceId: 5 });
 
-    await expect(service.redeemToken(first.token, alice)).rejects.toBeInstanceOf(NotFoundException);
-    await expect(service.redeemToken(second.token, alice)).resolves.toBeDefined();
+    await expect(scan(first, alice)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(scan(second, alice)).resolves.toBeDefined();
   });
 
   it('ends the session when the introducer has lost the introducer role', async () => {
     const session = await service.start(introducer, { resourceId: 5 });
     resourceIntroducers.isIntroducer.mockResolvedValue(false);
 
-    await expect(service.redeemToken(session.token, alice)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(scan(session, alice)).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(resourceIntroductions.grant).not.toHaveBeenCalled();
     expect(eventsOfType(MassIntroductionLiveEventType.ENDED)[0].reason).toBe(MassIntroductionEndReason.REVOKED);
@@ -227,7 +232,7 @@ describe('MassIntroductionService', () => {
 
     await expect(service.redeemCard(session.id, 4, alice)).rejects.toBeInstanceOf(NotFoundException);
     const { participant, participantCount } = await service.redeemCard(session.id, 3, alice);
-    await service.redeemToken(session.token, bob);
+    await scan(session, bob);
 
     expect(participant.method).toBe(MassIntroductionMethod.NFC);
     expect(participantCount).toBe(1);
@@ -241,9 +246,74 @@ describe('MassIntroductionService', () => {
 
     expect(service.get(session.id, introducer.id).reader?.state).toBe(MassIntroductionReaderState.DETACHED);
     await expect(service.redeemCard(session.id, 3, alice)).rejects.toBeInstanceOf(NotFoundException);
-    await expect(service.redeemToken(session.token, alice)).resolves.toBeDefined();
+    await expect(scan(session, alice)).resolves.toBeDefined();
 
     service.cancel(session.id, introducer.id);
     expect(readerPort.disarm).not.toHaveBeenCalled();
+  });
+
+  describe('rotating QR codes', () => {
+    const PERIOD_MS = 15_000;
+
+    it('changes the code every 15 seconds and accepts it until the next change', async () => {
+      const session = await service.start(introducer, { resourceId: 5 });
+      const shownAt = Date.now();
+
+      expect(new Date(session.tokenRefreshAt).getTime() - shownAt).toBeLessThanOrEqual(PERIOD_MS);
+      const later = service.get(session.id, introducer.id);
+      expect(later.token.split('.')[0]).toBe(session.token.split('.')[0]);
+
+      // Still valid one period later (a scan just before the change), no longer two periods later.
+      expect(() => service.claim(session.token, shownAt + PERIOD_MS)).not.toThrow();
+      expect(() => service.claim(session.token, shownAt + 2 * PERIOD_MS + 1000)).toThrow(NotFoundException);
+    });
+
+    it('rejects a code with a wrong number', async () => {
+      const session = await service.start(introducer, { resourceId: 5 });
+      const [publicId, code] = session.token.split('.');
+      const wrong = String((Number(code) + 1) % 100_000_000).padStart(8, '0');
+
+      expect(() => service.claim(`${publicId}.${wrong}`)).toThrow(NotFoundException);
+      expect(() => service.claim(publicId)).toThrow(NotFoundException);
+    });
+
+    it('stops accepting guesses after too many invalid codes in a minute', async () => {
+      jest.useFakeTimers();
+      const session = await service.start(introducer, { resourceId: 5 });
+      const [publicId] = session.token.split('.');
+      for (let i = 0; i < MassIntroductionService.MAX_FAILED_CLAIMS_PER_MINUTE; i++) {
+        expect(() => service.claim(`${publicId}.00000000`)).toThrow(NotFoundException);
+      }
+
+      expect(() => service.claim(session.token)).toThrow(expect.objectContaining({ status: 429 }));
+
+      jest.setSystemTime(Date.now() + 60_000);
+      expect(() => service.claim(service.get(session.id, introducer.id).token)).not.toThrow();
+    });
+
+    it('lets a ticket outlive the code for a sign-in, but only once and not forever', async () => {
+      const session = await service.start(introducer, { resourceId: 5 });
+      const scannedAt = Date.now();
+      const { ticket } = service.claim(session.token, scannedAt);
+
+      // Signing in took five minutes; the code itself expired long ago.
+      await expect(service.redeemTicket(ticket, alice, scannedAt + 5 * 60_000)).resolves.toBeDefined();
+      await expect(service.redeemTicket(ticket, bob, scannedAt + 5 * 60_000)).rejects.toBeInstanceOf(NotFoundException);
+
+      const { ticket: stale } = service.claim(service.get(session.id, introducer.id).token);
+      await expect(
+        service.redeemTicket(stale, bob, Date.now() + MassIntroductionService.TICKET_TTL_MS + 1),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(resourceIntroductions.grant).toHaveBeenCalledTimes(1);
+    });
+
+    it('invalidates tickets when the session ends', async () => {
+      const session = await service.start(introducer, { resourceId: 5 });
+      const { ticket } = service.claim(session.token);
+
+      service.cancel(session.id, introducer.id);
+
+      await expect(service.redeemTicket(ticket, alice)).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 });

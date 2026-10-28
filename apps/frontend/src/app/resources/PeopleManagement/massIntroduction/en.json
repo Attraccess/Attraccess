@@ -15,6 +15,7 @@
   "active": {
     "qrLabel": "QR code for the mass introduction",
     "scanHint": "Scan this code with a phone camera or the in-app scanner.",
+    "rotationHint": "The code changes every 15 seconds, so it only works for people in the room.",
     "timeRemaining": "Time remaining",
     "end": "End mass introduction"
   },

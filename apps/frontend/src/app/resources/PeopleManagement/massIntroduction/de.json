@@ -15,6 +15,7 @@
   "active": {
     "qrLabel": "QR-Code für die Sammeleinweisung",
     "scanHint": "Scannen Sie diesen Code mit der Handykamera oder dem Scanner in der App.",
+    "rotationHint": "Der Code ändert sich alle 15 Sekunden und funktioniert daher nur für Anwesende.",
     "timeRemaining": "Verbleibende Zeit",
     "end": "Sammeleinweisung beenden"
   },

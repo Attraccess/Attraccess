@@ -6,6 +6,7 @@ import { StartMassIntroductionDto } from './dtos/startMassIntroduction.dto';
 import { MassIntroductionSessionDto } from './dtos/massIntroductionSession.dto';
 import { RedeemMassIntroductionDto, RedeemMassIntroductionResponseDto } from './dtos/redeemMassIntroduction.dto';
 import { MassIntroductionLiveEventDto } from './dtos/massIntroductionLiveEvent.dto';
+import { ClaimMassIntroductionDto, MassIntroductionTicketDto } from './dtos/claimMassIntroduction.dto';
 
 @ApiTags('Access Control')
 // Delivered over the bundled live-updates stream, which is not in the OpenAPI document.
@@ -29,20 +30,36 @@ export class MassIntroductionController {
     return this.massIntroductionService.start(req.user, dto);
   }
 
+  @Post('claim')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Exchange a scanned mass-introduction QR code for a ticket (no sign-in required)',
+    description:
+      'QR codes change every 15 seconds. Claiming one right after the scan yields a single-use ticket ' +
+      'that survives signing in, which usually takes longer than a code is valid.',
+    operationId: 'massIntroductionClaim',
+  })
+  @ApiResponse({ status: 200, type: MassIntroductionTicketDto })
+  @ApiResponse({ status: 404, description: 'The QR code is invalid or has expired' })
+  @ApiResponse({ status: 429, description: 'Too many invalid codes for this mass introduction' })
+  claim(@Body() dto: ClaimMassIntroductionDto): MassIntroductionTicketDto {
+    return this.massIntroductionService.claim(dto.token);
+  }
+
   @Post('redeem')
   @Auth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Get introduced through a scanned mass-introduction QR code',
+    summary: 'Get introduced with a ticket from a scanned mass-introduction QR code',
     operationId: 'massIntroductionRedeem',
   })
   @ApiResponse({ status: 200, type: RedeemMassIntroductionResponseDto })
-  @ApiResponse({ status: 404, description: 'The QR code is invalid or has expired' })
+  @ApiResponse({ status: 404, description: 'The ticket is invalid, used or expired' })
   redeem(
     @Body() dto: RedeemMassIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<RedeemMassIntroductionResponseDto> {
-    return this.massIntroductionService.redeemToken(dto.token, req.user);
+    return this.massIntroductionService.redeemTicket(dto.ticket, req.user);
   }
 
   @Get(':sessionId')

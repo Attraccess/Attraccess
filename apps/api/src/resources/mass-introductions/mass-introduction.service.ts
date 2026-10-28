@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ForbiddenException,
   GoneException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -32,6 +34,12 @@ import {
 import { MassIntroductionEndReason, MassIntroductionLiveEventType } from './dtos/massIntroductionLiveEvent.dto';
 import { StartMassIntroductionDto } from './dtos/startMassIntroduction.dto';
 import { RedeemMassIntroductionResponseDto } from './dtos/redeemMassIntroduction.dto';
+import { MassIntroductionTicketDto } from './dtos/claimMassIntroduction.dto';
+import {
+  currentMassIntroductionCode,
+  isValidMassIntroductionCode,
+  newMassIntroductionCodeSecret,
+} from './mass-introduction-codes';
 
 /**
  * Short-lived sessions in which an introducer introduces everyone who scans a QR code, or taps a
@@ -44,11 +52,16 @@ import { RedeemMassIntroductionResponseDto } from './dtos/redeemMassIntroduction
 export class MassIntroductionService {
   public static readonly TTL_MS = 15 * 60_000;
 
+  /** Long enough to sign in (including SSO) after scanning. */
+  public static readonly TICKET_TTL_MS = 10 * 60_000;
+
+  public static readonly MAX_FAILED_CLAIMS_PER_MINUTE = 20;
+
   protected readonly logger = new Logger(MassIntroductionService.name);
 
   protected readonly sessions = new Map<string, ActiveMassIntroduction>();
 
-  protected readonly sessionIdsByToken = new Map<string, string>();
+  protected readonly sessionIdsByPublicId = new Map<string, string>();
 
   protected readerPort: MassIntroductionReaderPort | null = null;
 
@@ -92,7 +105,10 @@ export class MassIntroductionService {
     const now = new Date();
     const session: ActiveMassIntroduction = {
       id: randomUUID(),
-      token: randomBytes(24).toString('base64url'),
+      publicId: randomBytes(12).toString('base64url'),
+      codeSecret: newMassIntroductionCodeSecret(),
+      tickets: new Map(),
+      failedClaims: { windowStart: now.getTime(), count: 0 },
       target,
       introducer: {
         id: user.id,
@@ -110,7 +126,7 @@ export class MassIntroductionService {
       timeout: setTimeout(() => this.expire(session.id), MassIntroductionService.TTL_MS).unref(),
     };
     this.sessions.set(session.id, session);
-    this.sessionIdsByToken.set(session.token, session.id);
+    this.sessionIdsByPublicId.set(session.publicId, session.id);
 
     if (dto.readerId != null) {
       if (!this.readerPort) {
@@ -158,16 +174,53 @@ export class MassIntroductionService {
     this.end(this.getOwned(sessionId, userId), MassIntroductionEndReason.CANCELLED);
   }
 
-  /** A participant scanned the QR code. */
-  public async redeemToken(
-    token: string,
+  /**
+   * A participant scanned the QR code: exchange its short-lived code for a single-use ticket. Needs
+   * no sign-in, because the code would expire while a signed-out participant logs in.
+   */
+  public claim(token: string, nowMs = Date.now()): MassIntroductionTicketDto {
+    const [publicId, code] = token.split('.');
+    const session = this.sessions.get(this.sessionIdsByPublicId.get(publicId ?? '') ?? '');
+    if (!session || !code) {
+      throw new NotFoundException('This mass introduction QR code is invalid or has expired');
+    }
+
+    const attempts = session.failedClaims;
+    if (nowMs - attempts.windowStart >= 60_000) {
+      attempts.windowStart = nowMs;
+      attempts.count = 0;
+    }
+    if (attempts.count >= MassIntroductionService.MAX_FAILED_CLAIMS_PER_MINUTE) {
+      throw new HttpException('Too many invalid codes, try again in a minute', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    if (!isValidMassIntroductionCode(session.codeSecret, code, nowMs)) {
+      attempts.count += 1;
+      throw new NotFoundException('This mass introduction QR code is invalid or has expired');
+    }
+
+    for (const [ticket, { expiresAt }] of session.tickets) {
+      if (expiresAt <= nowMs) session.tickets.delete(ticket);
+    }
+    const ticket = randomBytes(24).toString('base64url');
+    const expiresAt = nowMs + MassIntroductionService.TICKET_TTL_MS;
+    session.tickets.set(ticket, { expiresAt });
+    return { ticket: `${session.publicId}.${ticket}`, expiresAt: new Date(expiresAt) };
+  }
+
+  /** The signed-in participant redeems the ticket from their scan. */
+  public async redeemTicket(
+    ticket: string,
     user: { id: number; username: string },
+    nowMs = Date.now(),
   ): Promise<RedeemMassIntroductionResponseDto> {
-    const session = this.sessions.get(this.sessionIdsByToken.get(token) ?? '');
-    if (!session) {
+    const [publicId, secret] = ticket.split('.');
+    const session = this.sessions.get(this.sessionIdsByPublicId.get(publicId ?? '') ?? '');
+    const entry = secret ? session?.tickets.get(secret) : undefined;
+    if (!session || !entry || entry.expiresAt <= nowMs) {
       throw new NotFoundException('This mass introduction QR code is invalid or has expired');
     }
     const participant = await this.join(session, user, MassIntroductionMethod.QR);
+    session.tickets.delete(secret);
     return {
       target: { ...session.target },
       alreadyIntroduced: participant.alreadyIntroduced,
@@ -316,7 +369,7 @@ export class MassIntroductionService {
     }
     clearTimeout(session.timeout);
     this.sessions.delete(session.id);
-    this.sessionIdsByToken.delete(session.token);
+    this.sessionIdsByPublicId.delete(session.publicId);
 
     if (session.reader?.state === MassIntroductionReaderState.ACTIVE) {
       this.readerPort?.disarm({ readerId: session.reader.id, sessionId: session.id, reason });
@@ -341,9 +394,11 @@ export class MassIntroductionService {
   }
 
   protected toDto(session: ActiveMassIntroduction): MassIntroductionSessionDto {
+    const code = currentMassIntroductionCode(session.codeSecret);
     return {
       id: session.id,
-      token: session.token,
+      token: `${session.publicId}.${code.code}`,
+      tokenRefreshAt: code.refreshAt,
       target: { ...session.target },
       reader: session.reader ? { ...session.reader } : null,
       participants: Array.from(session.participants.values(), (participant) => ({ ...participant })),

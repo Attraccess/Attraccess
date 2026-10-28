@@ -78,6 +78,7 @@ function makeSession(overrides: Partial<MassIntroductionSessionDto> = {}): MassI
     participants: [],
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + 15 * 60_000).toISOString(),
+    tokenRefreshAt: new Date(now + 15_000).toISOString(),
     ...overrides,
   };
 }
@@ -296,6 +297,39 @@ describe('grant-introduction drawer', () => {
     startSession();
     second.unmount();
     expect(state.cancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
+  });
+
+  it('shows the next QR code when the current one rotates', async () => {
+    vi.useFakeTimers();
+    mount();
+    startSession(makeSession({ token: 'pub.11111111' }));
+    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub.11111111`)).toBeInTheDocument();
+    expect(screen.getByText(/changes every 15 seconds/)).toBeInTheDocument();
+
+    state.get.mockResolvedValueOnce(makeSession({ token: 'pub.22222222' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_500);
+    });
+
+    expect(state.get).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub.22222222`)).toBeInTheDocument();
+  });
+
+  it('retries fetching the next QR code after a network error', async () => {
+    vi.useFakeTimers();
+    mount();
+    startSession();
+
+    state.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(makeSession({ token: 'pub.33333333' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_500);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(state.get).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/massIntroduction=pub\.33333333/)).toBeInTheDocument();
   });
 
   it('resyncs from the server after the live stream reconnects', async () => {
