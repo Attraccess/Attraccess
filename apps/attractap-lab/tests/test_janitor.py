@@ -329,6 +329,8 @@ def test_janitor_releases_a_claim_without_resources(tmp_path):
         "full": {"Flash": ResourceEntry({"cls": "NetworkUSBFlashableDevice"}),
                  "Serial": ResourceEntry({"cls": "NetworkSerialPort"})},
         "serial-only": {"Serial": ResourceEntry({"cls": "NetworkSerialPort"})},
+        # What labgrid keeps for resources of a disconnected exporter.
+        "gone": {"Flash": ResourceEntry({}), "Serial": ResourceEntry({})},
     }}, places={"empty": place("empty", []),
                 "full": place("full", [("test", "full", "NetworkUSBFlashableDevice", "Flash")])})
     janitor = Janitor(session, config=None, images={"touch-v2": "park.bin"}, state_dir=tmp_path,
@@ -350,3 +352,4 @@ def test_janitor_releases_a_claim_without_resources(tmp_path):
     assert janitor._hardware_registered(session.places["full"])
     assert not janitor._hardware_registered(place("serial-only", []))
     assert not janitor._hardware_registered(place("missing", []))
+    assert not janitor._hardware_registered(place("gone", []))

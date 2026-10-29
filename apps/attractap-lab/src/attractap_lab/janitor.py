@@ -217,11 +217,12 @@ class Janitor:
 
     def _hardware_registered(self, place):
         """Whether the exporter has registered the reader's flash and serial devices."""
-        classes = {entry.cls
+        # A disconnecting exporter leaves deleted entries behind without a class.
+        classes = {entry.data["cls"]
                    for exporter, groups in self.session.resources.items()
                    for group, entries in groups.items()
                    for resource, entry in entries.items()
-                   if place.hasmatch((exporter, group, entry.cls, resource))}
+                   if "cls" in entry.data and place.hasmatch((exporter, group, entry.data["cls"], resource))}
         return bool(classes & FLASH_RESOURCES and classes & SERIAL_RESOURCES)
 
     async def _release_empty_claim(self, name):
