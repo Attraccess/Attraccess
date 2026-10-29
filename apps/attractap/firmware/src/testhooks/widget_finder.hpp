@@ -33,7 +33,7 @@ namespace WidgetFinder
 
     enum class Match
     {
-        Exact,    // one label text or the joined text equals the query
+        Exact,    // one label text or the joined text equals the query, with or without symbol icons
         Contains, // the joined text contains the query
     };
 

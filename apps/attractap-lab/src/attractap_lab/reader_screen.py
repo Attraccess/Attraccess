@@ -132,9 +132,14 @@ def normalize(text):
     return " ".join(str(text).split())
 
 
+# LVGL symbol icons live in the Unicode private use area.
+_SYMBOLS = re.compile("[\ue000-\uf8ff]")
+
+
 def matches(widget, text, match="exact"):
     """Firmware's ui.widgets.tap rule: ``exact`` equals one label text or the
-    joined text, ``contains`` finds the text inside the joined text."""
+    joined text, with or without symbol icons; ``contains`` finds the text
+    inside the joined text."""
     wanted = normalize(text)
     if not wanted:
         return False
@@ -142,7 +147,8 @@ def matches(widget, text, match="exact"):
         return wanted in widget["text"]
     if match != "exact":
         raise ValueError("match must be 'exact' or 'contains'")
-    return wanted == widget["text"] or wanted in widget["texts"]
+    return any(wanted in (candidate, normalize(_SYMBOLS.sub("", candidate)))
+               for candidate in [widget["text"], *widget["texts"]])
 
 
 def find(listing, text, match="exact"):

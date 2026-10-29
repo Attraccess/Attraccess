@@ -100,6 +100,8 @@ WIDGETS = {"screen": "ResourceList", "width": 480, "height": 480, "widgets": [
     {"type": "lv_button", "text": "Lathe Available", "texts": ["Lathe", "Available"], "cx": 10, "cy": 20,
      "hittable": True},
     {"type": "lv_button", "text": "Lathe 2", "texts": ["Lathe 2"], "cx": 10, "cy": 90, "hittable": False},
+    {"type": "lv_button", "text": "\uf011 Reboot", "texts": ["\uf011 Reboot"], "cx": 347, "cy": 105, "hittable": True},
+    {"type": "key", "key": 11, "text": "\uf55a", "texts": ["\uf55a"], "cx": 446, "cy": 280, "hittable": True},
 ]}
 
 
@@ -108,6 +110,8 @@ def test_matching_follows_the_firmware_rules():
     assert [w["cy"] for w in reader_screen.find(WIDGETS, " Lathe\n Available ")] == [20]
     assert [w["cy"] for w in reader_screen.find(WIDGETS, "athe", "contains")] == [20]
     assert reader_screen.find(WIDGETS, "Lathe 2") == []  # covered
+    assert [w["cy"] for w in reader_screen.find(WIDGETS, "Reboot")] == [105]  # icon ignored
+    assert [w["key"] for w in reader_screen.find(WIDGETS, "\uf55a")] == [11]  # icon-only key
     assert reader_screen.find(WIDGETS, "") == []
     with pytest.raises(ValueError):
         reader_screen.find(WIDGETS, "OK", "regex")

@@ -330,6 +330,30 @@ namespace WidgetFinder
         return false;
     }
 
+    // Drops LVGL symbol glyphs (Unicode private use area U+E000-U+F8FF,
+    // e.g. the gear in LV_SYMBOL_SETTINGS " Settings").
+    static std::string withoutSymbols(const std::string &text)
+    {
+        std::string out;
+        for (size_t i = 0; i < text.size(); i++)
+        {
+            unsigned char lead = static_cast<unsigned char>(text[i]);
+            unsigned char next = i + 1 < text.size() ? static_cast<unsigned char>(text[i + 1]) : 0;
+            if (i + 2 < text.size() && (lead == 0xEE || (lead == 0xEF && next >= 0x80 && next <= 0xA3)))
+            {
+                i += 2;
+                continue;
+            }
+            out += text[i];
+        }
+        return normalize(out.c_str());
+    }
+
+    static bool sameText(const std::string &wanted, const std::string &text)
+    {
+        return wanted == text || wanted == withoutSymbols(text);
+    }
+
     bool matches(const Widget &widget, const std::string &query, Match mode)
     {
         std::string wanted = normalize(query.c_str());
@@ -342,13 +366,13 @@ namespace WidgetFinder
         {
             return joined.find(wanted) != std::string::npos;
         }
-        if (joined == wanted)
+        if (sameText(wanted, joined))
         {
             return true;
         }
         for (const std::string &part : widget.texts)
         {
-            if (part == wanted)
+            if (sameText(wanted, part))
             {
                 return true;
             }

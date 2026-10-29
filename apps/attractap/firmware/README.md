@@ -295,7 +295,9 @@ part not clipped by scrolling parents or the screen edge. `hittable` is true
 when a touch at `cx`/`cy` reaches the widget, false when something such as a
 popup covers it. `ui.widgets.tap` taps `cx`/`cy` of the `index`-th hittable
 widget whose text matches: `exact` (default) means one label text or the joined
-text equals `text`; `contains` searches the joined text.
+text equals `text`, also after removing LVGL symbol icons (Unicode private-use
+glyphs, so `Reboot` matches `"\uf011 Reboot"`; icon-only keys such as backspace
+`"\uf55a"` match their glyph); `contains` searches the joined text.
 
 ```text
 CMND ui.widgets.tap {"authCode":"4711","text":"Start"}

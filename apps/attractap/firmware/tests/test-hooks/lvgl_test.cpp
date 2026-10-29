@@ -135,6 +135,8 @@ int main()
     lv_obj_t *second = lv_label_create(end);
     lv_label_set_text(second, "\nsession");
     lv_obj_align(second, LV_ALIGN_RIGHT_MID, 0, 0);
+    Counter settings;
+    button(screen, LV_SYMBOL_SETTINGS " Settings", 340, 400, 120, 40, &settings);
     lv_obj_add_flag(button(screen, "Ghost", 340, 20, 100, 50, &start), LV_OBJ_FLAG_HIDDEN);
     lv_obj_t *passive = lv_label_create(screen);
     lv_label_set_text(passive, "Title");
@@ -195,6 +197,9 @@ int main()
     CHECK(find(widgets, "session")); // one of its labels
     CHECK(!find(widgets, "Sess") && find(widgets, "nd sess", WidgetFinder::Match::Contains));
     CHECK(!anyWithText(widgets, "Ghost"));
+    // Under the keyboard, so not hittable; matching alone ignores the icon.
+    CHECK(anyWithText(widgets, "Settings") && anyWithText(widgets, LV_SYMBOL_SETTINGS " Settings"));
+    CHECK(!anyWithText(widgets, "Setting"));
     CHECK(find(widgets, "Page A") && find(widgets, "Page A")->text() == "Page A");
     CHECK(!anyWithText(widgets, "Title"));
     const auto *cardWidget = find(widgets, "Lathe");
