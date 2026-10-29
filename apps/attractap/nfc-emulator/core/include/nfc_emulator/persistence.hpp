@@ -27,15 +27,6 @@ class MemoryBlobStore final : public BlobStore {
 Bytes encode_profile(const CardProfile &profile);
 bool decode_profile(const Bytes &bytes, CardProfile &profile);
 
-struct ProvisioningConfig {
-  std::string ssid;
-  std::string password;
-  std::string token;
-};
-
-Bytes encode_provisioning(const ProvisioningConfig &config);
-bool decode_provisioning(const Bytes &bytes, ProvisioningConfig &config);
-
 class ProfileRepository {
  public:
   explicit ProfileRepository(BlobStore &store) : store_(store) {}

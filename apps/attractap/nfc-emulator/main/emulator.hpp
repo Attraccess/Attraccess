@@ -25,7 +25,6 @@ struct EmulatorState {
   bool target_armed = false;
   bool rf_active = false;
   uint64_t presentation_started_ms = 0;
-  std::string token;
 };
 
 }  // namespace nfc_emulator

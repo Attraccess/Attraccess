@@ -10,8 +10,6 @@ class NvsStore final : public BlobStore {
   bool put(const std::string &key, const Bytes &value) override;
   bool get(const std::string &key, Bytes &value) const override;
   bool erase(const std::string &key) override;
-  bool save_provisioning(const ProvisioningConfig &config);
-  bool load_provisioning(ProvisioningConfig &config) const;
   bool list_profiles(std::vector<CardProfile> &profiles) const;
 
  private:

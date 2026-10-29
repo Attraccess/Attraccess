@@ -4,5 +4,5 @@
 #include "nvs_store.hpp"
 
 namespace nfc_emulator {
-bool start_control_api(EmulatorState &state, NvsStore &store);
+bool start_serial_console(EmulatorState &state, NvsStore &store);
 }

@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""Send one command to the Attractap NFC emulator over USB serial.
+
+Usage: nfcemu.py --port /dev/cu.usbmodemXXXX <command> [json-object]
+
+Prints the result as JSON and exits non-zero when the emulator reports an
+error. Requires pyserial (included in the ESP-IDF Python environment).
+"""
+
+import argparse
+import json
+import sys
+import time
+
+import serial
+
+PREFIX = "@nfc "
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--port", required=True)
+    parser.add_argument("--timeout", type=float, default=10.0)
+    parser.add_argument("command")
+    parser.add_argument("arguments", nargs="?", help="JSON object")
+    options = parser.parse_args()
+    if options.arguments is not None:
+        json.loads(options.arguments)
+
+    connection = serial.Serial()
+    connection.port = options.port
+    connection.baudrate = 115200
+    connection.timeout = 0.2
+    # Keep DTR/RTS released so opening the port does not reset the ESP32-S3.
+    connection.dtr = False
+    connection.rts = False
+    connection.open()
+    connection.reset_input_buffer()
+
+    line = options.command
+    if options.arguments is not None:
+        line += " " + options.arguments
+    connection.write((line + "\n").encode())
+
+    deadline = time.monotonic() + options.timeout
+    buffer = b""
+    while time.monotonic() < deadline:
+        buffer += connection.read(4096)
+        while b"\n" in buffer:
+            raw, buffer = buffer.split(b"\n", 1)
+            text = raw.decode(errors="replace").strip()
+            if not text.startswith(PREFIX):
+                continue
+            reply = json.loads(text[len(PREFIX):])
+            if "ok" not in reply:
+                continue
+            if reply["ok"]:
+                print(json.dumps(reply["result"], indent=2))
+                return 0
+            print(f"{reply['error']}: {reply['message']}", file=sys.stderr)
+            return 1
+    print("no reply from emulator", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

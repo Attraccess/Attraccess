@@ -4,7 +4,6 @@
 
 #include <array>
 #include <cstdio>
-#include <cstring>
 
 namespace nfc_emulator {
 
@@ -13,7 +12,6 @@ NvsStore::NvsStore(const char *name_space) : namespace_(name_space) {}
 std::string NvsStore::nvs_key(const std::string &key) {
   // NVS keys are limited to 15 characters; the profile ID remains inside the
   // checksummed blob, so a stable hash is safe and collisions are detected.
-  if (key == "provisioning") return "provisioning";
   uint32_t hash = 2166136261U;
   for (uint8_t byte : key) hash = (hash ^ byte) * 16777619U;
   char result[16];
@@ -70,15 +68,6 @@ bool NvsStore::erase(const std::string &key) {
   return result == ESP_OK;
 }
 
-bool NvsStore::save_provisioning(const ProvisioningConfig &config) {
-  return put("provisioning", encode_provisioning(config));
-}
-
-bool NvsStore::load_provisioning(ProvisioningConfig &config) const {
-  Bytes bytes;
-  return get("provisioning", bytes) && decode_provisioning(bytes, config);
-}
-
 bool NvsStore::list_profiles(std::vector<CardProfile> &profiles) const {
   profiles.clear();
   nvs_iterator_t iterator = nullptr;
@@ -101,12 +90,12 @@ bool NvsStore::list_profiles(std::vector<CardProfile> &profiles) const {
         nvs_close(handle); nvs_release_iterator(iterator); return false;
       }
       CardProfile profile;
-      if (decode_profile(bytes, profile)) profiles.push_back(std::move(profile));
-      else if (strcmp(info.key, "provisioning") != 0) {
+      if (!decode_profile(bytes, profile)) {
         nvs_close(handle);
         nvs_release_iterator(iterator);
         return false;
       }
+      profiles.push_back(std::move(profile));
     } else {
       nvs_close(handle);
       nvs_release_iterator(iterator);

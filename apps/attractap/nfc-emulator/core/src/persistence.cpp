@@ -91,39 +91,6 @@ bool decode_profile(const Bytes &bytes, CardProfile &profile) {
          validate(profile).empty();
 }
 
-Bytes encode_provisioning(const ProvisioningConfig &config) {
-  Bytes out{'N', 'F', 'C', 'W', 1, static_cast<uint8_t>(config.ssid.size()),
-            static_cast<uint8_t>(config.password.size()),
-            static_cast<uint8_t>(config.token.size())};
-  append(out, config.ssid.data(), config.ssid.size());
-  append(out, config.password.data(), config.password.size());
-  append(out, config.token.data(), config.token.size());
-  uint32_t checksum = crypto::jamcrc(out);
-  append(out, &checksum, sizeof(checksum));
-  return out;
-}
-
-bool decode_provisioning(const Bytes &bytes, ProvisioningConfig &config) {
-  if (bytes.size() < 12 || Bytes(bytes.begin(), bytes.begin() + 4) != Bytes{'N','F','C','W'} ||
-      bytes[4] != 1) return false;
-  uint32_t stored = 0;
-  std::memcpy(&stored, bytes.data() + bytes.size() - 4, 4);
-  Bytes payload(bytes.begin(), bytes.end() - 4);
-  if (crypto::jamcrc(payload) != stored) return false;
-  size_t ssid_size = bytes[5], password_size = bytes[6], token_size = bytes[7];
-  if (ssid_size == 0 || ssid_size > 32 ||
-      (password_size > 0 && password_size < 8) || password_size > 63 || token_size < 16 ||
-      token_size > 128 || 8 + ssid_size + password_size + token_size != payload.size())
-    return false;
-  size_t offset = 8;
-  config.ssid.assign(reinterpret_cast<const char *>(bytes.data() + offset), ssid_size);
-  offset += ssid_size;
-  config.password.assign(reinterpret_cast<const char *>(bytes.data() + offset), password_size);
-  offset += password_size;
-  config.token.assign(reinterpret_cast<const char *>(bytes.data() + offset), token_size);
-  return true;
-}
-
 bool ProfileRepository::save(const CardProfile &profile) {
   return validate(profile).empty() && store_.put("profile_" + profile.id, encode_profile(profile));
 }

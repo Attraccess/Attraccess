@@ -87,14 +87,6 @@ void model_and_persistence() {
   Bytes corrupt = encode_profile(profile);
   corrupt[10] ^= 1;
   CHECK(!decode_profile(corrupt, loaded));
-
-  ProvisioningConfig provisioning{"Lab", "secretpass", "0123456789abcdef"};
-  Bytes encoded_provisioning = encode_provisioning(provisioning);
-  ProvisioningConfig decoded_provisioning;
-  CHECK(decode_provisioning(encoded_provisioning, decoded_provisioning));
-  CHECK(decoded_provisioning.ssid == "Lab" && decoded_provisioning.token == provisioning.token);
-  encoded_provisioning[8] ^= 1;
-  CHECK(!decode_provisioning(encoded_provisioning, decoded_provisioning));
 }
 
 class FailingBlobStore final : public BlobStore {
@@ -115,15 +107,22 @@ void persistence_rollback() {
 }
 
 void api_validation() {
-  CHECK(validate_provisioning("Lab", "", "0123456789abcdef").valid);
-  CHECK(!validate_provisioning("", "", "0123456789abcdef").valid);
-  CHECK(!validate_provisioning("Lab", "", "short").valid);
-  CHECK(!validate_provisioning("Lab", "short", "0123456789abcdef").valid);
   CHECK(validate_removal(-1, 2, -1).valid);
   CHECK(!validate_removal(0, -1, -1).valid);
   CHECK(!validate_removal(-1, -1, -1).valid);
   CHECK(!validate_removal(-1, 0, -1).valid);
   CHECK(!validate_removal(-1, -1, 256).valid);
+}
+
+void command_lines() {
+  std::string command, arguments;
+  CHECK(parse_command_line("present\r", command, arguments));
+  CHECK(command == "present" && arguments.empty());
+  CHECK(parse_command_line("  profiles.select  {\"id\": \"a b\"} \r\n", command, arguments));
+  CHECK(command == "profiles.select" && arguments == "{\"id\": \"a b\"}");
+  CHECK(!parse_command_line(" \r\n", command, arguments));
+  CHECK(!parse_command_line("Present", command, arguments));
+  CHECK(!parse_command_line("{\"id\":1}", command, arguments));
 }
 
 void get_version_and_selection() {
@@ -282,6 +281,7 @@ int main() {
   model_and_persistence();
   persistence_rollback();
   api_validation();
+  command_lines();
   get_version_and_selection();
   ndef_files_and_limits();
   authentication_state();

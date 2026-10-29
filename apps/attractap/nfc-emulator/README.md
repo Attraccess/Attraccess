@@ -2,9 +2,10 @@
 
 Dedicated ESP-IDF firmware for an ESP32-S3 Supermini and a PN532 in ISO/IEC
 14443-4 target mode. It presents host-configured NTAG424 DNA, MIFARE DESFire
-EV2, and MIFARE DESFire EV3 profiles to an Attractap reader. This application
-does not share configuration, partitions, PSRAM, display, OTA, or runtime code
-with the production reader firmware.
+EV2, and MIFARE DESFire EV3 profiles to an Attractap reader. It is controlled
+entirely over USB serial; there is no Wi-Fi or network interface. This
+application does not share configuration, partitions, PSRAM, display, OTA, or
+runtime code with the production reader firmware.
 
 ## Hardware and wiring
 
@@ -12,18 +13,18 @@ Put the PN532 board in I2C mode before applying power. The common red Elechouse
 V3 board uses switch positions `1=ON, 2=OFF`; verify the table printed on other
 boards.
 
-| ESP32-S3 Supermini | PN532 | Purpose |
-| --- | --- | --- |
-| `3V3` | `VCC` | 3.3 V power |
-| `GND` | `GND` | Common ground |
-| `GPIO8` | `SDA` | I2C data |
-| `GPIO9` | `SCL` | I2C clock |
-| `GPIO7` | `RSTPD_N` | Deterministic target-mode reset |
+| ESP32-S3 Supermini | PN532     | Purpose                         |
+| ------------------ | --------- | ------------------------------- |
+| `3V3`              | `VCC`     | 3.3 V power                     |
+| `GND`              | `GND`     | Common ground                   |
+| `GPIO8`            | `SDA`     | I2C data                        |
+| `GPIO9`            | `SCL`     | I2C clock                       |
+| `GPIO7`            | `RSTPD_N` | Deterministic target-mode reset |
 
 The firmware uses PN532 I2C address `0x24` (the unshifted 7-bit address), 100
 kHz, and the ESP32-S3 internal pull-ups. Add external 4.7 kohm pull-ups to 3.3 V
 if the module does not include them. IRQ is not required. `RSTPD_N` is required
-so a pending target command can be canceled synchronously on `/remove` without
+so a pending target command can be canceled synchronously on `remove` without
 waiting for a reader. GPIO7/8/9 match the tested Supermini layout but are not
 standardized across all boards; change the arguments to `Pn532Target::begin`
 for a different pinout. Do not connect GPIO7 to a module pin labeled `RSTO`;
@@ -53,102 +54,89 @@ pnpm nx monitor attractap-nfc-emulator -- --port /dev/cu.usbmodemXXXX
 directly. `build`, `flash`, and `monitor` fail with a clear message when
 `idf.py` is not in `PATH`.
 
-## Provisioning
+## Serial control
 
-Provisioning persists the station SSID, password, and bearer token as one
-versioned, checksummed NVS blob. A failed write cannot leave mixed credentials.
-The token must be 16 to 128 characters. Tokens are never included in HTTP
-responses, logs, NFC exchange traces, or card profile blobs.
+The emulator has no network interface. It is configured and controlled
+entirely over the Supermini's USB-C port (USB Serial/JTAG), the same port used
+for flashing and logs. No provisioning is needed: flash it, plug it in, and send
+commands.
 
-### USB serial
-
-Open the USB Serial/JTAG console at 115200 baud and send one line. `|` is the
-field separator and therefore cannot occur in these values.
+Each request is one line: a command name, optionally followed by one JSON
+object with its arguments.
 
 ```text
-PROVISION Lab WiFi|secret password|replace-with-a-random-32-byte-token
+profiles.select {"id":"supervisor"}
 ```
 
-The device prints `OK provisioned; restarting` and restarts. This path is
-intended for CI and bench setup.
+Each request produces exactly one reply line. Requests are handled one at a
+time, in order. Reply lines start with `@nfc ` so they can be told apart from
+ESP-IDF log output on the same port:
 
-### Setup access point
+```text
+@nfc {"ok":true,"result":{"state":"armed"}}
+@nfc {"ok":false,"error":"profile_presented","message":"remove the current profile before selecting another"}
+```
 
-An unprovisioned device creates the open temporary network
-`Attractap-NFC-XXXX`. Connect to it and provision through `192.168.4.1`:
+After boot the firmware prints `@nfc {"event":"ready","protocol":1}`. Event
+lines have an `event` field instead of `ok`. Lines are limited to 8192 bytes,
+and both `\n` and `\r\n` endings work.
+
+`scripts/nfcemu.py` sends one command and prints the result. It needs pyserial,
+which the ESP-IDF Python environment already has. It opens the port without
+toggling DTR/RTS, so it does not reset the board.
 
 ```sh
-curl -X POST http://192.168.4.1/provision \
-  -H 'content-type: application/json' \
-  -d '{"ssid":"Lab WiFi","password":"secret password","token":"replace-with-a-random-32-byte-token"}'
+alias nfcemu="python apps/attractap/nfc-emulator/scripts/nfcemu.py --port /dev/cu.usbmodemXXXX"
+nfcemu profiles.create '{"id":"supervisor","type":"desfire-ev3","uid":"08010203"}'
+nfcemu profiles.select '{"id":"supervisor"}'
+nfcemu present
+nfcemu trace.get
+nfcemu remove
+nfcemu reset
 ```
 
-After restart the device joins the station network, reconnects after a dropped
-connection, and advertises `_http._tcp` as
-`attractap-nfc-emulator.local`. Provisioning is unauthenticated only before a
-token exists. HTTP reprovisioning then requires that token; use serial if the
-token is lost. The setup AP shuts down after ten minutes; restart the device to
-open another setup window.
+You can also type commands directly into `pnpm nx monitor attractap-nfc-emulator`.
 
-The ESP32 has no display or preinstalled per-device secret, so the setup AP
-cannot provide meaningful proof of physical possession without making
-standalone setup impossible. It is intentionally limited to the initial
-ten-minute, physically local setup window. Both setup and control APIs use
-plain HTTP, not HTTPS: provisioning and HIL control must run on an isolated
-bench network or trusted test VLAN. Do not expose the AP or station service to
-an untrusted network; bearer tokens and Wi-Fi credentials are otherwise
-observable to an on-path attacker. USB serial provisioning is preferred in CI.
+## Commands
 
-## API
+Mutating commands reply only after the requested control state is visible.
+`present` replies `{"state":"armed"}` after the PN532 acknowledges
+`TgInitAsTarget`; it does not report RF activation before a reader is present.
+`status` exposes `presentRequested`, `targetArmed`, and `rfActive`.
 
-Send `Authorization: Bearer TOKEN` on every endpoint except initial
-`/provision`. JSON mutations return after the requested control state is
-visible. `/present` returns `{"state":"armed"}` after PN532 acknowledges
-`TgInitAsTarget`; it does not falsely report RF activation before a reader is
-present. `/status` exposes `presentRequested`, `targetArmed`, and `rfActive`.
+| Command                            | Arguments   | Purpose                                         |
+| ---------------------------------- | ----------- | ----------------------------------------------- |
+| `help`                             |             | List commands                                   |
+| `health`                           |             | Liveness                                        |
+| `status`                           |             | Presentation and complete active card/key state |
+| `profiles.list`                    |             | Enumerate persisted profiles                    |
+| `profiles.create`                  | profile     | Create a profile and its factory snapshot       |
+| `profiles.get`                     | `{"id"}`    | Read a persisted profile                        |
+| `profiles.update`                  | profile     | Replace a persisted profile                     |
+| `profiles.delete`                  | `{"id"}`    | Delete a persisted profile                      |
+| `profiles.select`                  | `{"id"}`    | Select the active profile                       |
+| `scenario`                         | `{"name"}`  | Select a named scenario                         |
+| `fault.set`, `fault.clear`         | fault       | Configure or clear one fault                    |
+| `overrides.set`, `overrides.clear` | `{"rules"}` | Replace or clear raw APDU rules                 |
+| `removal.set`                      | removal     | Configure removal timing/command/count          |
+| `present`, `remove`                |             | Enter or leave PN532 target mode                |
+| `reset`                            |             | Restore and persist the active factory snapshot |
+| `trace.get`, `trace.clear`         |             | Read or clear the bounded 128-exchange trace    |
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Authenticated liveness |
-| `GET` | `/status`, `/state` | Presentation and complete active card/key state |
-| `POST` | `/profiles` | Create a profile and its factory snapshot |
-| `GET` | `/profiles` | Enumerate persisted profiles |
-| `GET`, `PUT`, `DELETE` | `/profiles/{id}` | Read, replace, or delete a persisted profile |
-| `POST` | `/profiles/select` | Select `{ "id": "card-a" }` |
-| `POST` | `/scenario` | Select `{ "name": "valid" }` |
-| `POST`, `DELETE` | `/fault` | Configure or clear one fault |
-| `POST`, `DELETE` | `/overrides` | Replace or clear raw APDU rules |
-| `POST` | `/removal` | Configure removal timing/command/count |
-| `POST` | `/present`, `/remove` | Enter or leave PN532 target mode |
-| `POST` | `/reset` | Restore and persist the active factory snapshot |
-| `GET`, `DELETE` | `/trace` | Read or clear the bounded 128-exchange trace |
-
-Creating an existing profile returns `409`; replacing or deleting a missing
-profile returns `404`; storage failures return `500` and leave runtime state
-unchanged. Active profiles must be removed before selection, replacement,
-deletion, or factory reset. Card-side mutations are staged, persisted, and only
-then committed to runtime state; persistence failure produces no NFC success
-response and resets the secure session.
-
-Example lifecycle:
-
-```sh
-BASE=http://attractap-nfc-emulator.local
-AUTH="Authorization: Bearer $NFC_EMULATOR_TOKEN"
-
-curl -X POST "$BASE/profiles" -H "$AUTH" -H 'content-type: application/json' \
-  -d '{"id":"supervisor","type":"desfire-ev3","uid":"08010203"}'
-curl -X POST "$BASE/profiles/select" -H "$AUTH" -H 'content-type: application/json' \
-  -d '{"id":"supervisor"}'
-curl -X POST "$BASE/present" -H "$AUTH"
-curl "$BASE/trace" -H "$AUTH"
-curl -X POST "$BASE/remove" -H "$AUTH"
-curl -X POST "$BASE/reset" -H "$AUTH"
-```
+Errors carry a stable `error` code, for example `invalid_json`,
+`invalid_profile`, `not_found`, `profile_exists`, `profile_presented`,
+`no_profile`, `persist_failed`, `pn532_not_ready`, or `unknown_command`.
+Creating an existing profile returns `profile_exists`. Replacing or deleting a
+missing profile returns `not_found`. Storage failures return `persist_failed`
+and leave runtime state unchanged. You must `remove` an active profile before
+selecting another profile, replacing or deleting it, or resetting it. Card-side
+mutations are staged, persisted, and only then committed to runtime state. A
+persistence failure produces no NFC success response and resets the secure
+session.
 
 ### Profile schema
 
-Profile creation/replacement accepts:
+`profiles.create` and `profiles.update` accept:
 
 ```json
 {
@@ -168,9 +156,9 @@ Profile creation/replacement accepts:
 `id` is 1 to 31 alphanumeric, `_`, or `-` characters. `type` is `ntag424`,
 `desfire-ev2`, or `desfire-ev3`. Omitted key slots are zero AES keys with
 version zero. NDEF data is hexadecimal and limited to 1024 bytes. The complete
-initial mutable state becomes the immutable factory snapshot. `PUT` deliberately
-creates a new snapshot; card-side enrollment and reset mutations update only
-the mutable state. `/reset` copies the snapshot back atomically.
+initial mutable state becomes the immutable factory snapshot. `profiles.update`
+deliberately creates a new snapshot; card-side enrollment and reset mutations update only
+the mutable state. `reset` copies the snapshot back atomically.
 
 DESFire factory profiles normally omit `attraccessApp` (false). Attractap's
 enrollment path selects PICC `000000`, creates `ACCE55` using key settings
@@ -244,8 +232,7 @@ bytes but reads are further capped to the 248-byte response payload that fits a
 normal frame. Extended PN532 frames are not implemented.
 
 Trace entries contain timestamp, duration, command APDU, response APDU,
-outcome, and behavior source. Wi-Fi credentials and bearer tokens cannot enter
-the trace.
+outcome, and behavior source.
 
 ## Hardware assumptions and HIL scope
 

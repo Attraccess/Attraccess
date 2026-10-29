@@ -1,8 +1,7 @@
-#include "control_api.hpp"
 #include "emulator.hpp"
-#include "network.hpp"
 #include "nvs_store.hpp"
 #include "pn532_target.hpp"
+#include "serial_console.hpp"
 
 #include "esp_log.h"
 #include "esp_random.h"
@@ -193,11 +192,7 @@ extern "C" void app_main() {
   ESP_ERROR_CHECK(nvs);
   static NvsStore store;
   static EmulatorState state(store);
-  ProvisioningConfig provisioning;
-  if (store.load_provisioning(provisioning)) state.token = provisioning.token;
   state.engine = ProtocolEngine([](uint8_t *output, size_t size) { esp_fill_random(output, size); });
-  start_serial_provisioning(store);
-  ESP_ERROR_CHECK(start_network(store) ? ESP_OK : ESP_FAIL);
-  ESP_ERROR_CHECK(start_control_api(state, store) ? ESP_OK : ESP_FAIL);
+  ESP_ERROR_CHECK(start_serial_console(state, store) ? ESP_OK : ESP_FAIL);
   xTaskCreate(emulator_task, "nfc-emulator", 8192, &state, 8, nullptr);
 }
