@@ -14,6 +14,8 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import ProxyHandler, build_opener
 
+from collections import deque
+
 import attr
 import serial
 from labgrid.driver import Driver, SerialDriver
@@ -165,6 +167,25 @@ class NfcEmulatorDriver(SerialDriver):
     def __attrs_post_init__(self):
         super().__attrs_post_init__()
         self._buffer = b""
+        self._log = deque(maxlen=5000)
+
+    @Driver.check_active
+    def read_log(self, seconds=0.0):
+        """Return and clear the emulator's log lines (ESP-IDF output), reading for ``seconds`` first."""
+        deadline = time.monotonic() + seconds
+        while True:
+            try:
+                self._buffer += self._read(timeout=0.1, max_size=4096)
+            except TIMEOUT:
+                if time.monotonic() >= deadline:
+                    break
+            while b"\n" in self._buffer:
+                raw, self._buffer = self._buffer.split(b"\n", 1)
+                if self._parse(raw) is None:
+                    self._log.append(raw.decode(errors="replace").rstrip("\r"))
+        lines = list(self._log)
+        self._log.clear()
+        return lines
 
     def on_activate(self):
         deadline = time.monotonic() + self.ready_timeout
@@ -179,10 +200,7 @@ class NfcEmulatorDriver(SerialDriver):
                     raise
                 time.sleep(1)
         self._buffer = b""
-        # Opening the port can reset the ESP32-S3, and input arriving before the
-        # exporter configures the tty can leave a partial line. End it, then
-        # wait until the emulator answers.
-        self._write(b"\n")
+        # Opening the port can reset the ESP32-S3. Wait until it answers.
         while True:
             try:
                 self._exchange("health", None, 1.0)
@@ -200,10 +218,16 @@ class NfcEmulatorDriver(SerialDriver):
         return self._exchange(name, arguments, self.command_timeout if timeout is None else timeout)
 
     def _exchange(self, name, arguments, timeout):
-        line = name.encode()
+        # The leading newline ends any stray partial line the emulator buffered.
+        line = b"\n" + name.encode()
         if arguments is not None:
             line += b" " + json.dumps(arguments, separators=(",", ":")).encode()
-        # A reply that arrived after an earlier timeout must not answer this command.
+        # A reply that arrived after an earlier timeout must not answer this
+        # command; complete log lines are kept.
+        while b"\n" in self._buffer:
+            raw, self._buffer = self._buffer.split(b"\n", 1)
+            if self._parse(raw) is None:
+                self._log.append(raw.decode(errors="replace").rstrip("\r"))
         self._buffer = b""
         # The raw transport also works from on_activate, before the driver is active.
         self._write(line + b"\n")
@@ -213,6 +237,10 @@ class NfcEmulatorDriver(SerialDriver):
                 raw, self._buffer = self._buffer.split(b"\n", 1)
                 reply = self._parse(raw)
                 if reply is None:
+                    self._log.append(raw.decode(errors="replace").rstrip("\r"))
+                    continue
+                # Replies name their command; skip ones answering stray input.
+                if reply.get("command") != name:
                     continue
                 if reply["ok"]:
                     return reply["result"]

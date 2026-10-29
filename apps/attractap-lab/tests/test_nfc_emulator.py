@@ -36,6 +36,9 @@ def fake_emulator(listener, received):
                     continue
                 command, _, arguments = line.decode().partition(" ")
                 received.append((command, json.loads(arguments) if arguments else None))
+                if command == "status":
+                    # A reply to input the host never sent must be ignored.
+                    connection.sendall(b'@nfc {"ok":false,"error":"invalid_command","message":"x"}\r\n')
                 if command == "profiles.select":
                     reply = {"ok": True, "result": {"id": json.loads(arguments)["id"]}}
                 elif command == "present":
@@ -44,6 +47,7 @@ def fake_emulator(listener, received):
                     continue
                 else:
                     reply = {"ok": True, "result": {"status": "ok"}}
+                reply["command"] = command
                 connection.sendall(b"I (900) pn532-target: log line\r\n@nfc "
                                    + json.dumps(reply).encode() + b"\r\n")
 
@@ -115,5 +119,7 @@ def test_emulator_commands(tmp_path, monkeypatch, emulator_port):
         with pytest.raises(TimeoutError):
             emulator.command("silent", timeout=0.5)
         assert emulator.command("status") == {"status": "ok"}
+        assert "I (900) pn532-target: log line" in emulator.read_log()
+        assert emulator.read_log() == []
     finally:
         env.cleanup()
