@@ -132,6 +132,48 @@ and add its native labgrid power resource/driver to the same reader group.
 `uhubctl` is installed; use `extraUdevRules` for narrowly scoped permissions
 required by the actual hub. No power hardware is assumed in the example.
 
+## NFC card emulator
+
+A place can also export the [NFC card emulator](../attractap/nfc-emulator/README.md)
+(ESP32-S3 Supermini + PN532) mounted in front of its reader, so one claim
+holds both. Add the emulator's USB identity to the reader's exporter group
+under its own resource names:
+
+```nix
+exporter.settings.attractap-touch-v2-1 = {
+  # ...the reader's USBSerialPort, USBFlashableDevice and HTTPVideoStream...
+  NfcEmulatorSerial = {
+    cls = "USBSerialPort";
+    match.ID_SERIAL_SHORT = "REPLACE_WITH_EMULATOR_SERIAL";
+  };
+  NfcEmulatorFlash = {
+    cls = "USBFlashableDevice";
+    match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "REPLACE_WITH_EMULATOR_SERIAL"; };
+  };
+};
+```
+
+A place with two serial ports needs explicit bindings, so `example-env.yaml`
+and the janitor bind the reader's drivers to `USBSerialPort` and
+`USBFlashableDevice` by name. The janitor therefore never erases the emulator.
+Use `example-emulator-env.yaml` for sessions that drive the emulator:
+
+```python
+from attractap_lab.drivers import NfcEmulatorDriver
+
+with claim("example-emulator-env.yaml", "attractap-touch-v2-1") as target:
+    emulator = target.get_driver(NfcEmulatorDriver)
+    emulator.command("profiles.select", {"id": "supervisor"})
+    emulator.command("present")
+```
+
+`NfcEmulatorDriver` waits until the emulator answers after connecting, and
+raises `NfcEmulatorError` with the firmware's error code. Plain `SerialDriver`,
+`ConsoleProtocol`, `ESPToolDriver` and `ResetProtocol` lookups keep resolving
+to the reader. `NfcEmulatorFlashDriver` flashes the emulator's merged image.
+Emulator profiles persist across sessions; runtime state (selection,
+presentation, faults, overrides) resets when the emulator reboots.
+
 ## Web dashboard
 
 Enable the pinned upstream [labgrid-plugins dashboard](https://tfcollins.github.io/labgrid-plugins/user-guide/web-dashboard.html)

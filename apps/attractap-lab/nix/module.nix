@@ -23,7 +23,12 @@ let
     imports = [ "attractap_lab.drivers" ];
     targets.main = {
       resources.RemotePlace.name = "set-per-place-by-the-janitor";
-      drivers = { ESPToolDriver = { }; SerialDriver = { }; };
+      # Explicit bindings: a place may also export an NFC emulator, which the
+      # janitor must never erase.
+      drivers = {
+        ESPToolDriver.bindings.device = "USBFlashableDevice";
+        SerialDriver.bindings.port = "USBSerialPort";
+      };
     };
   };
   # The janitor reaches this host's exporter like any client: labgrid always
