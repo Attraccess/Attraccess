@@ -116,7 +116,7 @@ export function FirmwareDetails({ status }: { status: FirmwareStatus | null }) {
       <VersionRow label={t('firmware.installed')} value={status.currentVersion ?? t('devices.unknown')} />
       <VersionRow label={t('firmware.stable')} value={status.available.stable ?? t('firmware.upToDate')} />
       <VersionRow label={t('firmware.beta')} value={status.available.beta ?? t('firmware.nothingNewer')} />
-      <VersionRow label={t('firmware.checked')} value={formatDateTime(status.fetchedAt)} />
+      <VersionRow label={t('firmware.checked')} value={String(formatDateTime(status.fetchedAt))} />
     </section>
   );
 }
