@@ -1,10 +1,6 @@
-import { PageHeader } from '../../components/pageHeader/index';
 import { Card, Skeleton, Chip } from '@heroui/react';
-import { Button } from '../../components/button/index';
-import { LabeledSwitch } from '../../components/labeledSwitch';
 import { FolderIcon, PlusIcon } from 'lucide-react';
 import { UpsertProjectModal } from './upsertModal/index';
-import { EmptyState } from '../../components/emptyState';
 import { ProjectCard } from './projectCard/index';
 import {
   ApiError,
@@ -17,7 +13,14 @@ import {
   useProjectsServiceFindManyProjects,
   useProjectsServiceFindManyProjectsKey,
 } from '@attraccess/react-query-client';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  EmptyState,
+  LabeledSwitch,
+  PageHeader,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';

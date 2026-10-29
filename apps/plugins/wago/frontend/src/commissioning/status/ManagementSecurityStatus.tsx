@@ -1,3 +1,4 @@
+import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
 import { Alert, Button, Checkbox, Form, Input, Label, TextField } from '@heroui/react';
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -40,7 +41,7 @@ export function ManagementSummary({
         {status?.support ? tBackendMessage(status.support) : t('security.qualificationRequired')}
       </p>
       <Alert status="warning">
-        <Alert.Indicator />
+        <AlertStatusIcon status="warning" />
         <Alert.Content>
           <Alert.Description>{t('security.limitations')}</Alert.Description>
         </Alert.Content>

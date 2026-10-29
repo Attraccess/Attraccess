@@ -1,3 +1,4 @@
+import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
 import {
   NumberField,
   NumberFieldDecrementButton,
@@ -21,15 +22,12 @@ import {
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { PasswordPreview } from './PasswordPreview';
 import { RoleOverridesModal } from './RoleOverridesModal';
 import { POLICY_BOOL_FIELDS, POLICY_NUMBER_FIELDS } from './policy-fields';
 import { SubHeading, useSecuritySectionState, SecuritySettingsForm } from './components/SecuritySettingsForm';
 import { TwoFactorSettings } from './components/TwoFactorSettings';
 import { RateLimitSettings } from './components/RateLimitSettings';
-import { Button } from '../../../../components/button/index';
-import { StandardModal } from '../../../../components/standardModal';
 
 type Props = Pick<
   ReturnType<typeof useSecuritySectionState>,

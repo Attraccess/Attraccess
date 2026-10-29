@@ -12,9 +12,7 @@ import {
 } from '@heroui/react';
 import { Key, Pencil, Trash } from 'lucide-react';
 import { SSOProvider } from '@attraccess/react-query-client';
-import { Button } from '../../../components/button';
-import { EmptyState } from '../../../components/emptyState';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 

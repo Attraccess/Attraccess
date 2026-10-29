@@ -8,8 +8,11 @@ import { SsoSection } from './index';
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (k: string) => k.split('.').pop() ?? k }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (k: string) => k.split('.').pop() ?? k }),
+  }))()),
 }));
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),

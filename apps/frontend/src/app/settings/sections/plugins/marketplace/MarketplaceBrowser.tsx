@@ -1,6 +1,5 @@
+import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { StandardModal } from '../../../../../components/standardModal';
 import { dependencyError } from '../dependencies/DependencyPlan';
 import { MarketplaceSearchResults } from './MarketplaceSearchResults';
 import { usePluginsSectionState } from '../state/usePluginSettings';

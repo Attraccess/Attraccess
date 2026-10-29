@@ -3,31 +3,15 @@ import {
   useUsersServiceChangeUserEmail,
   useUsersServiceFindManyKey,
 } from '@attraccess/react-query-client';
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  cn,
-  Input,
-  Label,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  TextField,
-  useOverlayState,
-} from '@heroui/react';
-import { Button } from '../../../../../components/button';
+import { cn, Input, Label, TextField, useOverlayState } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useState } from 'react';
 
 import de from './de.json';
 import en from './en.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { ApiError } from '@attraccess/react-query-client';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
-import { StandardModal } from '../../../../../components/standardModal';
 
 interface Props {
   userId: number;
@@ -52,6 +36,7 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
         queryKey: [useUsersServiceFindManyKey],
       });
       showSuccess({ title: t('messages.updated') });
+      close();
     },
     onError: (rawError) => {
       let messageToDisplay = t('errors.updateFailed');
@@ -82,8 +67,7 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
         email: trimmedEmail,
       },
     });
-    close();
-  }, [close, mutate, trimmedEmail, userId]);
+  }, [mutate, trimmedEmail, userId]);
 
   return (
     <>
@@ -99,37 +83,16 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
           </Button>
         </div>
       </div>
-      <StandardModal
+      <StatusDialog
         isOpen={isOpen}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) close();
-        }}
-        size="md"
+        onClose={close}
+        status="warning"
+        title={t('modal.title')}
+        closeLabel={t('actions.cancel')}
+        action={{ label: t('actions.confirm'), onPress: confirmEmailChange, isPending }}
       >
-        {({ close: modalClose }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('modal.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <Alert status="warning">
-                <AlertStatusIcon status="warning" />
-                <AlertContent>
-                  <AlertDescription>{t('modal.warning')}</AlertDescription>
-                </AlertContent>
-              </Alert>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={modalClose}>
-                {t('actions.cancel')}
-              </Button>
-              <Button variant="primary" onPress={confirmEmailChange} isPending={isPending}>
-                {t('actions.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+        {t('modal.warning')}
+      </StatusDialog>
     </>
   );
 }

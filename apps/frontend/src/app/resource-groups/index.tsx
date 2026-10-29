@@ -1,7 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useResourcesServiceResourceGroupsGetOne } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../components/pageHeader';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { GroupDetailsForm } from './GroupDetailsForm';
 import { PeopleManagement } from '../resources/PeopleManagement';
 import { Spinner } from '@heroui/react';

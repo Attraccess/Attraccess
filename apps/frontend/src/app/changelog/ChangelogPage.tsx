@@ -1,7 +1,6 @@
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import changelog from '../../../../../CHANGELOG.md?raw';
-import { PageHeader } from '../../components/pageHeader';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Markdown } from '../../components/markdown';
 
 import de from './de.json';

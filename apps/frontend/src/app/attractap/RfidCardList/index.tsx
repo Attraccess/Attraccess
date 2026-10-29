@@ -21,7 +21,16 @@ import {
   ModalHeader,
 } from '@heroui/react';
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useTranslations, AttraccessUser, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
+import {
+  AttraccessUser,
+  DateTimeDisplay,
+  EmptyState,
+  PageAction,
+  PageHeader,
+  StandardDrawer,
+  StandardModal,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   useAttractapServiceGetAllCards,
   NFCCard,
@@ -31,15 +40,11 @@ import {
   useAttractapServiceResetNfcCard,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { EmptyState } from '../../../components/emptyState';
 import de from './de.json';
 import en from './en.json';
 import { PlusIcon, ServerIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react';
-import { PageAction, PageHeader } from '../../../components/pageHeader/index';
 import { useAuth } from '../../../hooks/useAuth';
-import { StandardDrawer } from '../../../components/standardDrawer';
 import { AttractapSelect } from '../AttractapSelect/index';
-import { StandardModal } from '../../../components/standardModal';
 import { NfcCardDeactivateModal } from './deactivate/index';
 import { NfcCardActivateModal } from './activate/index';
 

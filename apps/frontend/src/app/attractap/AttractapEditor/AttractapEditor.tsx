@@ -1,4 +1,4 @@
-import { useTranslations, ResourceSelector } from '@attraccess/plugins-frontend-ui';
+import { Button, ResourceSelector, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
 import {
@@ -16,9 +16,7 @@ import {
   TabPanel,
   Tabs,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
 import { TextField, Label, Input } from '@heroui/react';
-import { StandardDrawer } from '../../../components/standardDrawer';
 import { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {

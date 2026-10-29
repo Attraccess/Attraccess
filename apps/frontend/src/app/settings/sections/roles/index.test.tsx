@@ -24,19 +24,22 @@ vi.mock('@attraccess/react-query-client', () => ({
   useRbacServiceListRoles: () => ({ data: hoisted.roles, isLoading: false }),
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: ({ en, de }: { en: Record<string, unknown>; de: Record<string, unknown> }) => ({
-    t: (key: string) => {
-      const translations = hoisted.locale === 'de' ? de : en;
-      const value = key.split('.').reduce<unknown>((current, part) => {
-        if (current && typeof current === 'object' && part in current) {
-          return (current as Record<string, unknown>)[part];
-        }
-        return undefined;
-      }, translations);
-      return typeof value === 'string' ? value : key;
-    },
-  }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: ({ en, de }: { en: Record<string, unknown>; de: Record<string, unknown> }) => ({
+      t: (key: string) => {
+        const translations = hoisted.locale === 'de' ? de : en;
+        const value = key.split('.').reduce<unknown>((current, part) => {
+          if (current && typeof current === 'object' && part in current) {
+            return (current as Record<string, unknown>)[part];
+          }
+          return undefined;
+        }, translations);
+        return typeof value === 'string' ? value : key;
+      },
+    }),
+  }))()),
 }));
 
 vi.mock('../../../../hooks/useRbacCatalogTranslations', () => ({

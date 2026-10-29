@@ -14,12 +14,15 @@ const state = vi.hoisted(() => ({
   startOptions: {} as { onSuccess: () => void },
   stopOptions: {} as { onSuccess: () => void },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string, params?: { countdown?: string }) => (params?.countdown ? `${key}:${params.countdown}` : key),
-    tExists: () => true,
-  }),
-  useDateTimeFormatter: () => (date: string) => date,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({
+      t: (key: string, params?: { countdown?: string }) => (params?.countdown ? `${key}:${params.countdown}` : key),
+      tExists: () => true,
+    }),
+    useDateTimeFormatter: () => (date: string) => date,
+  }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.live }) }));

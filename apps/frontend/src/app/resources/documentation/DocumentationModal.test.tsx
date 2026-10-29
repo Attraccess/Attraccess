@@ -8,11 +8,14 @@ const hoisted = vi.hoisted(() => ({
   resource: undefined as Record<string, unknown> | undefined,
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string) => key,
-    tExists: () => true,
-  }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({
+      t: (key: string) => key,
+      tExists: () => true,
+    }),
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -41,7 +44,7 @@ const openModal = async () => {
         </button>
       )}
     </DocumentationModal>,
-    { wrapper: TestWrapper }
+    { wrapper: TestWrapper },
   );
   fireEvent.click(container.querySelector('[data-cy="open"]') as HTMLButtonElement);
   await screen.findByRole('dialog');
@@ -84,9 +87,7 @@ describe('DocumentationModal', () => {
   it('drops the forced width when switching to fullscreen', async () => {
     await openModal();
 
-    fireEvent.click(
-      document.querySelector('[data-cy="documentation-modal-fullscreen-button"]') as HTMLButtonElement
-    );
+    fireEvent.click(document.querySelector('[data-cy="documentation-modal-fullscreen-button"]') as HTMLButtonElement);
 
     const dialog = document.querySelector('.modal__dialog');
     expect(dialog).not.toHaveClass('sm:w-[72rem]');

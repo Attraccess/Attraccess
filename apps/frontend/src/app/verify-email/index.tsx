@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isValidEmail } from '../../utils/email';
-import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
+import { Button, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Input, Label, TextField } from '@heroui/react';
-import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -117,7 +116,12 @@ export function VerifyEmail() {
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
           </Card.Content>
           <Card.Footer>
-            <Button variant="primary" className="w-full" onPress={() => navigate('/')} data-cy="verify-email-success-login-button">
+            <Button
+              variant="primary"
+              className="w-full"
+              onPress={() => navigate('/')}
+              data-cy="verify-email-success-login-button"
+            >
               {t('success.goToLogin')}
             </Button>
           </Card.Footer>
@@ -186,7 +190,8 @@ export function VerifyEmail() {
             >
               {t('error.tryAgain')}
             </Button>
-            <Button variant="outline"
+            <Button
+              variant="outline"
               className="w-full"
               onPress={() => navigate('/')}
               data-cy="verify-email-error-back-to-login-button"

@@ -1,8 +1,6 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner, useOverlayState } from '@heroui/react';
-import { Button } from '../../../components/button';
-import { StandardModal } from '../../../components/standardModal';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';

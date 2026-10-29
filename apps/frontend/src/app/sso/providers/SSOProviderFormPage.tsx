@@ -1,11 +1,9 @@
 import { Input, Label, Spinner, TextField } from '@heroui/react';
 import { Navigate, useParams } from 'react-router-dom';
 import { SSOProviderType, useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
-import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
-import { PageHeader } from '../../../components/pageHeader';
 import { OIDCConfigForm } from './form/OIDCConfigForm';
 import { SAMLConfigForm } from './form/SAMLConfigForm';
 import { SetupInstructionsSection } from './form/SetupInstructionsSection';

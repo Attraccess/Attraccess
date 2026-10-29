@@ -11,7 +11,9 @@ vi.mock('@heroui/react', () => {
     <div className={className}>{children}</div>
   );
   return {
-    Button: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+    Button: ({ children }: { children: React.ReactNode | ((props: object) => React.ReactNode) }) => (
+      <button>{typeof children === 'function' ? children({}) : children}</button>
+    ),
     Card: Object.assign(part, { Header: part, Title: part, Description: part, Content: part }),
   };
 });

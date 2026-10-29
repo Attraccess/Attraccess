@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Card, Chip, Skeleton } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import {
   ApiError,
   ProjectsServiceRemoveProjectMemberMutationResult,
@@ -8,7 +7,7 @@ import {
   useProjectsServiceListProjectMembers,
   useProjectsServiceRemoveProjectMember,
 } from '@attraccess/react-query-client';
-import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UserMinus2Icon } from 'lucide-react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -82,10 +81,9 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
       >
         <AttraccessUser user={member.user} />
         <div className="flex items-center gap-2">
-          <Chip variant="soft">
-            {t(`roles.${member.role}` as const)}
-          </Chip>
-          <Button variant="danger-soft"
+          <Chip variant="soft">{t(`roles.${member.role}` as const)}</Chip>
+          <Button
+            variant="danger-soft"
 
             isIconOnly
             aria-label={t('actions.remove')}

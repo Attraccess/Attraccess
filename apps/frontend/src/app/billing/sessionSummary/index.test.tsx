@@ -26,10 +26,13 @@ vi.mock('@attraccess/react-query-client', () => ({
     refetch: state.refetch,
   }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
-  useNumberFormatter: (options: Intl.NumberFormatOptions) => (value: number) =>
-    value.toFixed(options.maximumFractionDigits),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+    useNumberFormatter: (options: Intl.NumberFormatOptions) => (value: number) =>
+      value.toFixed(options.maximumFractionDigits),
+  }))()),
 }));
 afterEach(cleanup);
 beforeEach(() => {

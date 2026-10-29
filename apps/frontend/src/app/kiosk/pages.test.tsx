@@ -19,7 +19,10 @@ const state = vi.hoisted(() => ({
   countdown: vi.fn(),
   remaining: 15 as number | null,
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+}));
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
     isAuthenticated: state.authenticated,

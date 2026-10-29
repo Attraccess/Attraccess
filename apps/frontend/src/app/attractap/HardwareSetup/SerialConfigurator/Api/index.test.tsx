@@ -14,29 +14,32 @@ vi.mock('../../../../../api', () => ({
   getBaseUrl: () => 'https://server.example.com:8443',
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => {
-    const translations: Record<string, string> = {
-      title: 'API',
-      'actions.refreshStatus': 'Refresh status',
-      'status.disconnected.title': 'API disconnected',
-      'status.disconnected.description': 'disconnected',
-      'apiDataDoesNotMatchesServer.alert.title': 'Server settings out of date',
-      'apiDataDoesNotMatchesServer.alert.description': 'mismatch',
-      'apiDataDoesNotMatchesServer.alert.button': 'Apply current server',
-      'manual.title': 'Manual server settings',
-    };
-    const t = (key: string, vars?: Record<string, unknown>) => {
-      let value = translations[key] ?? key;
-      if (vars) {
-        Object.entries(vars).forEach(([k, v]) => {
-          value = value.replace(`{{${k}}}`, String(v));
-        });
-      }
-      return value;
-    };
-    return { t, tExists: (key: string) => Boolean(translations[key]) };
-  },
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => {
+      const translations: Record<string, string> = {
+        title: 'API',
+        'actions.refreshStatus': 'Refresh status',
+        'status.disconnected.title': 'API disconnected',
+        'status.disconnected.description': 'disconnected',
+        'apiDataDoesNotMatchesServer.alert.title': 'Server settings out of date',
+        'apiDataDoesNotMatchesServer.alert.description': 'mismatch',
+        'apiDataDoesNotMatchesServer.alert.button': 'Apply current server',
+        'manual.title': 'Manual server settings',
+      };
+      const t = (key: string, vars?: Record<string, unknown>) => {
+        let value = translations[key] ?? key;
+        if (vars) {
+          Object.entries(vars).forEach(([k, v]) => {
+            value = value.replace(`{{${k}}}`, String(v));
+          });
+        }
+        return value;
+      };
+      return { t, tExists: (key: string) => Boolean(translations[key]) };
+    },
+  }))()),
 }));
 
 // Reader currently points at a DIFFERENT server than the browser -> mismatch.

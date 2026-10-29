@@ -1,7 +1,6 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { PageHeader } from '../../../../components/pageHeader';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import { SumUpConfigurationCard } from './configuration';
 import { SumUpReadersCard } from './readers';

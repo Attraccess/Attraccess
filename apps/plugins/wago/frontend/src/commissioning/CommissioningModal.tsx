@@ -1,4 +1,5 @@
-import { Alert, Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Key } from '@heroui/react';
+import { AlertStatusIcon, Button, StandardDrawer } from '@attraccess/plugins-frontend-ui';
+import { Alert, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Key } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { CommissioningSession } from '../api/client';
 import {
@@ -13,7 +14,6 @@ import {
 } from '../api/queries';
 import { RuntimeUpdateDetails } from '../controllers/Table';
 import { useWagoTranslations } from '../i18n';
-import { StandardDrawer } from '../shared/drawer';
 import { RuntimeArtifactInfo } from './artifacts/BundledRuntime';
 import { CancelSessionAction } from './workflow/CancelAction';
 import { CommissioningErrors } from './workflow/Errors';
@@ -440,7 +440,7 @@ export function CommissioningContent({ model }: { model: CommissioningModel }) {
               <CommissioningErrors model={model} />
               {isCancelConfirmationOpen && (
                 <Alert status="warning">
-                  <Alert.Indicator />
+                  <AlertStatusIcon status="warning" />
                   <Alert.Content>
                     <Alert.Description>{t('commissioningUI.cancelDescription')}</Alert.Description>
                   </Alert.Content>
@@ -542,7 +542,7 @@ export function CommissioningModal(props: CommissioningModalProps) {
   const model = useCommissioning(props);
   return (
     <StandardDrawer
-      ariaLabel={t('commissioningUI.title')}
+      dialogProps={{ 'aria-label': t('commissioningUI.title') }}
       isOpen={props.isOpen}
       onOpenChange={(open) => !open && model.close()}
     >

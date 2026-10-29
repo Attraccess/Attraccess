@@ -6,9 +6,8 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransaction,
 } from '@attraccess/react-query-client';
-import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { StandardModal } from '../../../components/standardModal';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLiveTransactionUpdates } from '../dashboard/summary/live-updates';
 import en from './en.json';

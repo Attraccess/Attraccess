@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useUrlQuery, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Loading } from '../loading';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Card } from '@heroui/react';
-import { Button } from '../../components/button';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -56,21 +55,24 @@ export function ConfirmDeleteAccount() {
     },
   });
 
-  const confirm = useCallback((force = false) => {
-    if (didSendRequest.current && !force) {
-      return;
-    }
+  const confirm = useCallback(
+    (force = false) => {
+      if (didSendRequest.current && !force) {
+        return;
+      }
 
-    if (!token || !email) {
-      setError(t('apiErrors.invalidLink'));
+      if (!token || !email) {
+        setError(t('apiErrors.invalidLink'));
+        didSendRequest.current = true;
+        return;
+      }
+
       didSendRequest.current = true;
-      return;
-    }
-
-    didSendRequest.current = true;
-    setAllowRetry(false);
-    confirmDelete.mutate({ requestBody: { token, email } });
-  }, [confirmDelete, email, token, t]);
+      setAllowRetry(false);
+      confirmDelete.mutate({ requestBody: { token, email } });
+    },
+    [confirmDelete, email, token, t],
+  );
 
   useEffect(() => {
     if (token && email) {
@@ -107,7 +109,12 @@ export function ConfirmDeleteAccount() {
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
           </Card.Content>
           <Card.Footer>
-            <Button variant="primary" className="w-full" onPress={() => navigate('/')} data-cy="confirm-delete-success-button">
+            <Button
+              variant="primary"
+              className="w-full"
+              onPress={() => navigate('/')}
+              data-cy="confirm-delete-success-button"
+            >
               {t('success.backToLogin')}
             </Button>
           </Card.Footer>
@@ -124,7 +131,7 @@ export function ConfirmDeleteAccount() {
             <h2 className="text-3xl font-bold">{t('error.title')}</h2>
           </Card.Header>
           <Card.Content>
-            <Alert status="danger" data-cy="confirm-delete-error-alert" >
+            <Alert status="danger" data-cy="confirm-delete-error-alert">
               <AlertContent>
                 <AlertTitle>{t('error.errorTitle')}</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
@@ -133,7 +140,8 @@ export function ConfirmDeleteAccount() {
           </Card.Content>
           <Card.Footer className="flex flex-col gap-2">
             {allowRetry && (
-              <Button variant="primary"
+              <Button
+                variant="primary"
                 className="w-full"
                 onPress={() => confirm(true)}
                 isDisabled={confirmDelete.isPending}
@@ -142,7 +150,8 @@ export function ConfirmDeleteAccount() {
                 {t('error.tryAgain')}
               </Button>
             )}
-            <Button variant="outline"
+            <Button
+              variant="outline"
               className="w-full"
               onPress={() => navigate('/')}
               data-cy="confirm-delete-error-back-button"

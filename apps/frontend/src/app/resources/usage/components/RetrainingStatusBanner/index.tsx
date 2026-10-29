@@ -1,7 +1,6 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useResourcesServiceResourceRetrainingGetStatus } from '@attraccess/react-query-client';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import en from './translations/en.json';
 import de from './translations/de.json';
 

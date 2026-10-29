@@ -1,4 +1,5 @@
-import { Alert } from '@heroui/react';
+import { StatusAlert } from '@attraccess/plugins-frontend-ui';
+
 import { useWagoTranslations } from '../../i18n';
 import { DEFAULT_SSH } from '../model';
 import { canRecover } from '../model';
@@ -21,13 +22,9 @@ export function RecoveryFields({ model }: { model: CommissioningModel }) {
     <>
       {session && canRecover(session) && (
         <div className="wg:space-y-4">
-          <Alert status="warning">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>{t('commissioningUI.cleanup')}</Alert.Title>
-              <Alert.Description>{t('commissioningUI.cleanupDescription')}</Alert.Description>
-            </Alert.Content>
-          </Alert>
+          <StatusAlert status="warning" title={t('commissioningUI.cleanup')}>
+            {t('commissioningUI.cleanupDescription')}
+          </StatusAlert>
           <CredentialFields
             intent="recovery"
             managed={session.managedAccessAvailable}

@@ -1,4 +1,4 @@
-import { PageHeader, PageAction } from '../../components/pageHeader/index';
+import { PageAction, PageHeader, StandardDrawer } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   TextField,
@@ -27,7 +27,6 @@ import { useUserManagementPageState, FilterKey, MultiValueCondition, FILTER_KEYS
 import { UserTable } from './components/UserTable';
 import { Select } from '../../components/select/index';
 import { useState } from 'react';
-import { StandardDrawer } from '../../components/standardDrawer';
 
 export type FilterOption = {
   key: string;

@@ -1,4 +1,5 @@
-import { Button, Drawer, Form, Input, Label, Switch, TextField } from '@heroui/react';
+import { Button, LabeledSwitch, StandardDrawer } from '@attraccess/plugins-frontend-ui';
+import { Drawer, Form, Input, Label, TextField } from '@heroui/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { outputBehavior } from '../../../../channel-behavior';
@@ -23,36 +24,33 @@ export function SettingsDrawer({
 }) {
   const { t } = useWagoTranslations();
   return (
-    <Drawer.Backdrop isOpen onOpenChange={(open) => !open && onClose()}>
-      <Drawer.Content placement="right">
-        <Drawer.Dialog
-          aria-label={title}
-          className="wg:w-full wg:max-w-full wg:sm:max-w-xl wg:bg-surface-secondary"
-          style={{ '--field-border': 'var(--border-secondary)', '--border-width-field': '1px' } as React.CSSProperties}
-        >
-          <Form
-            className="wg:flex wg:h-full wg:min-h-0 wg:flex-col"
-            onSubmit={(event) => {
-              event.preventDefault();
-              onSave();
-            }}
-          >
-            <Drawer.Header>
-              <Drawer.Heading>{title}</Drawer.Heading>
-              <Drawer.CloseTrigger aria-label={t('panel.closeSettings')} />
-            </Drawer.Header>
-            <Drawer.Body className="wg:flex wg:flex-col wg:gap-5">{children}</Drawer.Body>
-            <Drawer.Footer className="wg:flex wg:flex-wrap wg:gap-2">
-              {remove}
-              <Button variant="secondary" onPress={onClose}>
-                {t('panel.cancel')}
-              </Button>
-              <Button type="submit">{t('panel.done')}</Button>
-            </Drawer.Footer>
-          </Form>
-        </Drawer.Dialog>
-      </Drawer.Content>
-    </Drawer.Backdrop>
+    <StandardDrawer
+      isOpen
+      onOpenChange={(open) => !open && onClose()}
+      contentProps={{ placement: 'right' }}
+      dialogProps={{ 'aria-label': title, className: 'wg:w-full wg:max-w-full wg:sm:max-w-xl' }}
+    >
+      <Form
+        className="wg:flex wg:h-full wg:min-h-0 wg:flex-col"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave();
+        }}
+      >
+        <Drawer.Header>
+          <Drawer.Heading>{title}</Drawer.Heading>
+          <Drawer.CloseTrigger aria-label={t('panel.closeSettings')} />
+        </Drawer.Header>
+        <Drawer.Body className="wg:flex wg:flex-col wg:gap-5">{children}</Drawer.Body>
+        <Drawer.Footer className="wg:flex wg:flex-wrap wg:gap-2">
+          {remove}
+          <Button variant="secondary" onPress={onClose}>
+            {t('panel.cancel')}
+          </Button>
+          <Button type="submit">{t('panel.done')}</Button>
+        </Drawer.Footer>
+      </Form>
+    </StandardDrawer>
   );
 }
 
@@ -153,14 +151,9 @@ export function TerminalSettings({
       </TextField>
       <p className="wg:text-sm wg:text-muted">{t('panel.emptyName')}</p>
       {terminal.direction === 'input' ? (
-        <Switch isSelected={invert} onChange={setInvert}>
-          <Switch.Content>
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-            <Label>{t('panel.invert')}</Label>
-          </Switch.Content>
-        </Switch>
+        <LabeledSwitch isSelected={invert} onChange={setInvert}>
+          <Label>{t('panel.invert')}</Label>
+        </LabeledSwitch>
       ) : (
         <>
           <Choice

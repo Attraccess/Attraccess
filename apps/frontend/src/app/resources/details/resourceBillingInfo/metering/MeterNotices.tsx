@@ -6,8 +6,7 @@ import {
   useResourceMeteringServiceRetryResourceMeteringSettlement,
   useResourceMeteringServiceWaiveResourceMeteringSettlement,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button } from '../../../../../components/button';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useAuth } from '../../../../../hooks/useAuth';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';

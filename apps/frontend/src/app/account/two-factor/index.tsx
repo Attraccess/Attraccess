@@ -1,9 +1,8 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, Skeleton, TextField } from '@heroui/react';
-import { Button } from '../../../components/button';
 import { OneTimeCodeInput } from '../../../components/OneTimeCodeInput';
 import { QRCode } from 'react-qrcode-logo';
 import { useCallback, useMemo, useState } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import {
   TwoFactorSetupResponseDto,
@@ -99,12 +98,14 @@ export function TwoFactorCard() {
         <div className="text-sm text-default-500">{status?.enabled ? t('status.enabled') : t('status.disabled')}</div>
       </div>
 
-      {policyWarning && <Alert status="warning" >
-        <AlertContent>
-          <AlertTitle>{t('policy.title')}</AlertTitle>
-          <AlertDescription>{policyWarning}</AlertDescription>
-        </AlertContent>
-      </Alert>}
+      {policyWarning && (
+        <Alert status="warning">
+          <AlertContent>
+            <AlertTitle>{t('policy.title')}</AlertTitle>
+            <AlertDescription>{policyWarning}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      )}
 
       {showSetup && (
         <div className="flex flex-col gap-4">
@@ -149,7 +150,12 @@ export function TwoFactorCard() {
             isDisabled={isBusy}
             data-cy="two-factor-disable-code-input"
           />
-          <Button variant="danger" onPress={handleDisable} isPending={isDisabling} isDisabled={isBusy || !disableCode.trim()}>
+          <Button
+            variant="danger"
+            onPress={handleDisable}
+            isPending={isDisabling}
+            isDisabled={isBusy || !disableCode.trim()}
+          >
             {t('disable.button')}
           </Button>
         </div>

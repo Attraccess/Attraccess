@@ -1,4 +1,5 @@
 import { Alert, Button, Input, Label, TextField } from '@heroui/react';
+import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
@@ -202,7 +203,7 @@ function PreflightReportFindings({
       {report.exclusivity === 'output-container-conflict' && <p>{t('security.containerConflict')}</p>}
       {report.provision === 'unsupported-fw31-package-activation' && (
         <Alert status="warning">
-          <Alert.Indicator />
+          <AlertStatusIcon status="warning" />
           <Alert.Content>
             <Alert.Description>{t('security.packageActivation')}</Alert.Description>
           </Alert.Content>

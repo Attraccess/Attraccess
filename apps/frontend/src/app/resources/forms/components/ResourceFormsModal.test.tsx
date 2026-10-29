@@ -2,7 +2,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, expect, it, vi } from 'vitest';
 import { FormFieldType, type FormResponseDto } from '@attraccess/react-query-client';
 import { ResourceFormsModal } from './ResourceFormsModal';
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+}));
 afterEach(cleanup);
 function form(fields: Partial<FormResponseDto['fields'][number]>[]): FormResponseDto {
   return {

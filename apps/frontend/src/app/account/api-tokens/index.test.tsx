@@ -21,12 +21,15 @@ const state = vi.hoisted(() => ({
   toast: vi.fn(),
   clipboard: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useDateTimeLocale: () => 'en-GB',
-  useTranslations: () => ({
-    t: (key: string, params?: { name?: string }) => (params?.name ? `${key}:${params.name}` : key),
-  }),
-  DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useDateTimeLocale: () => 'en-GB',
+    useTranslations: () => ({
+      t: (key: string, params?: { name?: string }) => (params?.name ? `${key}:${params.name}` : key),
+    }),
+    DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
+  }))()),
 }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ showToast: state.toast }) }));
 vi.mock('../../../hooks/useRbacCatalogTranslations', () => ({

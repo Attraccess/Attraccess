@@ -18,8 +18,11 @@ vi.mock('@attraccess/react-query-client', () => ({
   UsePushServicePushGetVapidConfigKeyFn: () => ['vapid'],
   usePushServicePushReplaceVapidKeys: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+  }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData: vi.fn() }),
@@ -38,9 +41,9 @@ const LIMITS = {
 const saveLimits = vi.fn();
 
 const mockLimitsQuery = (data: unknown, isLoading = false) =>
-  vi.mocked(useSettingsServiceGetMessagingRateLimitSettings).mockReturnValue({ data, isLoading } as ReturnType<
-    typeof useSettingsServiceGetMessagingRateLimitSettings
-  >);
+  vi
+    .mocked(useSettingsServiceGetMessagingRateLimitSettings)
+    .mockReturnValue({ data, isLoading } as ReturnType<typeof useSettingsServiceGetMessagingRateLimitSettings>);
 
 const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
 
@@ -119,5 +122,28 @@ describe('MessagingSection', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.discard' }));
     expect(saveBar(container)).toBeNull();
+  });
+
+  it('walks the two-step key replacement and goes back to step one on Escape', async () => {
+    const replace = vi.fn();
+    vi.mocked(usePushServicePushReplaceVapidKeys).mockReturnValue({
+      mutate: replace,
+      isPending: false,
+    } as unknown as ReturnType<typeof usePushServicePushReplaceVapidKeys>);
+    render(<MessagingSection />);
+
+    await userEvent.click(screen.getByRole('button', { name: /regenerateButton/ }));
+    expect(await screen.findByRole('alertdialog', { name: 'confirmWarning.title' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'confirmWarning.continue' }));
+    expect(await screen.findByRole('alertdialog', { name: 'confirmFinal.title' })).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    expect(await screen.findByRole('alertdialog', { name: 'confirmWarning.title' })).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'confirmWarning.continue' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'confirmFinal.confirm' }));
+    expect(replace).toHaveBeenCalledWith({ requestBody: {} });
   });
 });

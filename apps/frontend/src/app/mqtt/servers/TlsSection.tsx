@@ -1,3 +1,4 @@
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -11,7 +12,6 @@ import {
   TextField,
 } from '@heroui/react';
 import { AlertTriangleIcon } from 'lucide-react';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
 import type { CreateMqttServerDto } from '@attraccess/react-query-client';
 
 interface TlsSectionProps {
@@ -38,11 +38,7 @@ export function TlsSection({ values, onChange, t, dataCyPrefix }: Readonly<TlsSe
 
       {values.useTls && (
         <>
-          <TextField
-            value={values.caCert ?? ''}
-            onChange={(v) => onChange({ caCert: v })}
-            className="w-full"
-          >
+          <TextField value={values.caCert ?? ''} onChange={(v) => onChange({ caCert: v })} className="w-full">
             <Label>{t('caCertLabel')}</Label>
             <TextArea
               id="caCert"

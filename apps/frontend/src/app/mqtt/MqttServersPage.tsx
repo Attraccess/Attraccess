@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, DrawerBody, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { Navigate } from 'react-router-dom';
 import { Plus, X } from 'lucide-react';
@@ -8,8 +8,6 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import { MqttServerList } from './servers/MqttServerList';
 import { CreateMqttServerForm } from './servers/CreateMqttServerPage';
-import { PageHeader } from '../../components/pageHeader';
-import { StandardDrawer } from '../../components/standardDrawer';
 
 export function MqttServersPage() {
   const { hasPermission } = useAuth();

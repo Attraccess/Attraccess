@@ -1,9 +1,6 @@
 import { HTMLAttributes, useState, useEffect, useCallback } from 'react';
 import { Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
-import { Button } from '../../../components/button/index';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
-import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal/index';
 import {
   useAccessControlServiceResourceIntroductionsGetPeopleKey,
   useResourcesServiceResourceGroupsGetOne,
@@ -12,7 +9,7 @@ import {
   useResourcesServiceResourceGroupsDeleteOne,
   UseResourcesServiceResourceGroupsGetManyKeyFn,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, DeleteConfirmationModal, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';

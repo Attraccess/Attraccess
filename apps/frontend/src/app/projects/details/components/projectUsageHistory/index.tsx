@@ -10,11 +10,10 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
-import { EmptyState } from '../../../../../components/emptyState';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { HistoryHeader } from '../../../../resources/usage/components/HistoryHeader';

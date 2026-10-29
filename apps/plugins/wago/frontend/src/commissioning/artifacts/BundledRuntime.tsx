@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { Button } from '@heroui/react';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import { useWagoTranslations } from '../../i18n';
@@ -74,7 +75,7 @@ export function BundledRuntime({
         </header>
       )}
       {loading ? (
-        <p>{t('artifacts.loading')}</p>
+        <TableDataLoadingIndicator label={t('artifacts.loading')} />
       ) : loadFailed ? (
         <p role="alert">{t('artifacts.loadError')}</p>
       ) : current ? (

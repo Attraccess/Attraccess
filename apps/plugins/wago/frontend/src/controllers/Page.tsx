@@ -1,4 +1,5 @@
-import { Alert, Button, Spinner } from '@heroui/react';
+import { PageHeader, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
+
 import { PlusIcon, RefreshCwIcon, SettingsIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ClaimControllerModal } from './ClaimControllerModal';
@@ -31,44 +32,44 @@ export function ControllersPage() {
 
   return (
     <main className="wg:mx-auto wg:flex wg:w-full wg:max-w-6xl wg:flex-col wg:gap-6 wg:p-4 wg:md:p-6">
-      <header className="wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-4">
-        <div>
-          <h1 className="wg:text-2xl wg:font-semibold">{t('controllers.title')}</h1>
-          <p className="wg:mt-1 wg:text-sm wg:text-muted">{t('controllers.description')}</p>
-        </div>
-        <div className="wg:flex wg:flex-wrap wg:gap-2">
-          <Button variant="secondary" onPress={() => setSettingsOpen(true)}>
-            <SettingsIcon className="wg:h-4 wg:w-4" /> {t('common.settings')}
-          </Button>
-          <Button onPress={() => setCommissioningOpen(true)}>
-            <PlusIcon className="wg:h-4 wg:w-4" /> {t('controllers.commission')}
-          </Button>
-          <Button
-            variant="ghost"
-            isPending={controllersQuery.isFetching}
-            onPress={() => void controllersQuery.refetch()}
-          >
-            <RefreshCwIcon className="wg:h-4 wg:w-4" /> {t('common.refresh')}
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title={t('controllers.title')}
+        subtitle={t('controllers.description')}
+        noMargin
+        actions={[
+          {
+            key: 'settings',
+            label: t('common.settings'),
+            icon: <SettingsIcon className="wg:h-4 wg:w-4" />,
+            variant: 'secondary',
+            onPress: () => setSettingsOpen(true),
+          },
+          {
+            key: 'commission',
+            label: t('controllers.commission'),
+            icon: <PlusIcon className="wg:h-4 wg:w-4" />,
+            variant: 'primary',
+            onPress: () => setCommissioningOpen(true),
+          },
+          {
+            key: 'refresh',
+            label: t('common.refresh'),
+            icon: <RefreshCwIcon className="wg:h-4 wg:w-4" />,
+            variant: 'secondary',
+            isPending: controllersQuery.isFetching,
+            onPress: () => void controllersQuery.refetch(),
+          },
+        ]}
+      />
 
       {controllersQuery.isError && (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>{t('controllers.loadError')}</Alert.Title>
-            <Alert.Description>
-              {controllersQuery.error instanceof Error ? controllersQuery.error.message : t('common.retry')}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
+        <StatusAlert status="danger" title={t('controllers.loadError')}>
+          {controllersQuery.error instanceof Error ? controllersQuery.error.message : t('common.retry')}
+        </StatusAlert>
       )}
 
       {controllersQuery.isPending ? (
-        <div className="wg:flex wg:justify-center wg:p-6">
-          <Spinner color="accent" />
-        </div>
+        <TableDataLoadingIndicator />
       ) : (
         <ControllersTable
           controllers={controllersQuery.data ?? []}

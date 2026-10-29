@@ -6,17 +6,20 @@ import { StatusChip } from './index';
 let sessionData: unknown;
 let maintenanceData: unknown;
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string) => {
-      const dict: Record<string, string> = {
-        'status.inUse': 'In Use',
-        'status.available': 'Available',
-        'status.maintenance': 'In Maintenance',
-      };
-      return dict[key] ?? key;
-    },
-  }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({
+      t: (key: string) => {
+        const dict: Record<string, string> = {
+          'status.inUse': 'In Use',
+          'status.available': 'Available',
+          'status.maintenance': 'In Maintenance',
+        };
+        return dict[key] ?? key;
+      },
+    }),
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

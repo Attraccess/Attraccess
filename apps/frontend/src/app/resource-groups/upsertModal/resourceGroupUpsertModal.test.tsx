@@ -11,7 +11,10 @@ const state = vi.hoisted(() => ({
   createOptions: {} as { onSuccess: (group: ResourceGroup) => void; onError: (error: unknown) => void },
   updateOptions: {} as { onSuccess: (group: ResourceGroup) => void; onError: (error: unknown) => void },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+}));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),

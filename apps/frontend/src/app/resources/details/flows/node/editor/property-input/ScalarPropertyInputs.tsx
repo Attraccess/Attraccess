@@ -14,16 +14,14 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import { StandardModal } from '../../../../../../../components/standardModal';
 import { MqttServerSelect } from '../../../../../../../components/mqttServerSelect/index';
 import { PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttServerPage';
-import { LabeledSwitch } from '../../../../../../../components/labeledSwitch';
 import { Select } from '../../../../../../../components/select/index';
 import { getNumberFieldMinimum } from './number-field-minimum';
 import { ResourceFlowNodeDto } from '@attraccess/react-query-client';
-import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, StandardModal, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';

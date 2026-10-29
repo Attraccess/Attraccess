@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, Form } from '@heroui/react';
-import { Button } from '../../../../components/button';
 import { KeyRoundIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
@@ -10,8 +9,6 @@ import {
   UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
   UseSettingsServiceGetSystemSettingsKeyFn,
 } from '@attraccess/react-query-client';
-import { PageHeader } from '../../../../components/pageHeader';
-import { PasswordInput } from '../../../../components/PasswordInput';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -68,13 +65,8 @@ export function LicenseStep({ onSuccess }: LicenseStepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        icon={<KeyRoundIcon size={18} />}
-        noMargin
-      />
-      <Alert status="default" >
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<KeyRoundIcon size={18} />} noMargin />
+      <Alert status="default">
         <AlertContent>
           <AlertDescription>{t('intro')}</AlertDescription>
         </AlertContent>
@@ -98,11 +90,7 @@ export function LicenseStep({ onSuccess }: LicenseStepProps) {
         />
         <input type="submit" hidden />
       </Form>
-      <Button variant="primary"
-        onPress={handleSubmit}
-        isPending={isPending}
-        isDisabled={!licenseKey.trim()}
-      >
+      <Button variant="primary" onPress={handleSubmit} isPending={isPending} isDisabled={!licenseKey.trim()}>
         {t('actions.save')}
       </Button>
     </div>

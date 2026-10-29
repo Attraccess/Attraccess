@@ -1,3 +1,4 @@
+import { StandardDrawer } from '@attraccess/plugins-frontend-ui';
 import {
   Accordion,
   AccordionBody,
@@ -16,7 +17,6 @@ import {
   useFilter,
 } from '@heroui/react';
 import { LockIcon, CreditCard, Database, Settings, ShieldCheck, UsersRound } from 'lucide-react';
-import { StandardDrawer } from '../../standardDrawer';
 import { useEffect, useMemo, useState } from 'react';
 import type { Key } from '@heroui/react';
 import type { Permission } from '@attraccess/react-query-client';

@@ -9,11 +9,7 @@ import {
   ListBox,
   ListBoxItem,
   ListBoxSection,
-  Modal,
-  ModalBackdrop,
   ModalBody,
-  ModalContainer,
-  ModalDialog,
   ModalHeader,
   ModalHeading,
   Spinner,
@@ -23,6 +19,7 @@ import {
 import { SearchIcon, UserPlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from '../../i18n';
+import { StandardModal } from '../StandardModal';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 
 import { PaginatedUsersResponseDto, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
@@ -253,9 +250,7 @@ function UserSearchTrigger({
   );
 }
 
-// Mirrors the app's StandardModal chrome (bg-surface-secondary + field-contrast
-// vars) so fields inside this modal match every other modal in the app. The lib
-// cannot import the app-level StandardModal (apps depend on libs, not vice versa).
+// Field-contrast vars so fields inside this modal match the other modals in the app.
 const FIELD_CONTRAST_STYLE: React.CSSProperties = {
   ['--field-border' as never]: 'var(--border-secondary)',
   ['--border-width-field' as never]: '1px',
@@ -310,98 +305,101 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
         afterSelection={afterSelection}
       />
 
-      <Modal isOpen={isOpen} onOpenChange={handleOpenChange}>
-        <ModalBackdrop>
-          <ModalContainer size="md">
-            <ModalDialog className="bg-surface-secondary" style={FIELD_CONTRAST_STYLE} aria-label={t('modalTitle')}>
-              <ModalHeader>
-                <ModalHeading>{t('modalTitle')}</ModalHeading>
-              </ModalHeader>
-              <ModalBody className="px-0 pb-0">
-                <div className="px-4">
-                  <TextField value={search} onChange={setSearch} className="w-full" aria-label={t('searchPlaceholder')}>
-                    <InputGroup>
-                      <InputGroup.Prefix>
-                        <SearchIcon className="size-4 text-muted" />
-                      </InputGroup.Prefix>
-                      <InputGroup.Input placeholder={placeholder ?? t('searchPlaceholder')} autoComplete="off" />
-                      {isLoading ? (
-                        <InputGroup.Suffix>
-                          <Spinner size="sm" />
-                        </InputGroup.Suffix>
-                      ) : null}
-                    </InputGroup>
-                  </TextField>
-                </div>
+      <StandardModal
+        isOpen={isOpen}
+        onOpenChange={handleOpenChange}
+        size="md"
+        dialogProps={{ style: FIELD_CONTRAST_STYLE, 'aria-label': t('modalTitle') }}
+      >
+        {() => (
+          <>
+            <ModalHeader>
+              <ModalHeading>{t('modalTitle')}</ModalHeading>
+            </ModalHeader>
+            <ModalBody className="px-0 pb-0">
+              <div className="px-4">
+                <TextField value={search} onChange={setSearch} className="w-full" aria-label={t('searchPlaceholder')}>
+                  <InputGroup>
+                    <InputGroup.Prefix>
+                      <SearchIcon className="size-4 text-muted" />
+                    </InputGroup.Prefix>
+                    <InputGroup.Input placeholder={placeholder ?? t('searchPlaceholder')} autoComplete="off" />
+                    {isLoading ? (
+                      <InputGroup.Suffix>
+                        <Spinner size="sm" />
+                      </InputGroup.Suffix>
+                    ) : null}
+                  </InputGroup>
+                </TextField>
+              </div>
 
-                <div aria-live="polite" className="sr-only">
-                  {t('resultCount', { count: users.length })}
-                </div>
+              <div aria-live="polite" className="sr-only">
+                {t('resultCount', { count: users.length })}
+              </div>
 
-                <div
-                  ref={listRef}
-                  className="mt-2"
-                  style={{ maxHeight: '60vh', overflowY: 'auto' }}
-                  data-cy="user-picker-list"
-                >
-                  {isError && users.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 py-10" data-cy="user-picker-error">
-                      <p className="text-sm text-muted">{t('loadError')}</p>
-                      <Button variant="secondary" size="sm" isPending={isFetching} onPress={() => refetch()}>
-                        {t('retry')}
-                      </Button>
-                    </div>
-                  ) : groups.length === 0 && !isLoading ? (
-                    <div className="py-10 text-center text-sm text-muted">{t('empty')}</div>
-                  ) : (
-                    <ListBox aria-label={t('usersListLabel')} selectionMode="none">
-                      {groups.map((group) => (
-                        <ListBoxSection key={group.letter} id={group.letter}>
-                          <Header className="sticky top-0 z-10 bg-surface-secondary px-2 py-1 text-xs font-semibold text-muted">
-                            {group.letter}
-                          </Header>
-                          {group.users.map((user) => (
-                            <ListBoxItem
-                              key={user.id}
-                              id={String(user.id)}
-                              textValue={user.username}
-                              onAction={() => handleSelect(user)}
-                              data-cy={`user-picker-item-${user.id}`}
-                            >
-                              <AttraccessUser user={user} interactive={false} />
-                            </ListBoxItem>
-                          ))}
-                        </ListBoxSection>
-                      ))}
-                    </ListBox>
-                  )}
-                  {isError ? null : <div ref={sentinelRef} />}
-                  {isError && users.length > 0 ? (
-                    // A later page failed: keep the loaded results and offer an inline
-                    // retry instead of discarding the list for the full error screen.
-                    <div className="flex items-center justify-center gap-3 py-3" data-cy="user-picker-load-more-error">
-                      <p className="text-sm text-muted">{t('loadError')}</p>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        isPending={isFetchingNextPage}
-                        onPress={() => fetchNextPage()}
-                      >
-                        {t('retry')}
-                      </Button>
-                    </div>
-                  ) : null}
-                  {isFetchingNextPage ? (
-                    <div className="flex justify-center py-3">
-                      <Spinner size="sm" />
-                    </div>
-                  ) : null}
-                </div>
-              </ModalBody>
-            </ModalDialog>
-          </ModalContainer>
-        </ModalBackdrop>
-      </Modal>
+              <div
+                ref={listRef}
+                className="mt-2"
+                style={{ maxHeight: '60vh', overflowY: 'auto' }}
+                data-cy="user-picker-list"
+              >
+                {isError && users.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-10" data-cy="user-picker-error">
+                    <p className="text-sm text-muted">{t('loadError')}</p>
+                    <Button variant="secondary" size="sm" isPending={isFetching} onPress={() => refetch()}>
+                      {t('retry')}
+                    </Button>
+                  </div>
+                ) : groups.length === 0 && !isLoading ? (
+                  <div className="py-10 text-center text-sm text-muted">{t('empty')}</div>
+                ) : (
+                  <ListBox aria-label={t('usersListLabel')} selectionMode="none">
+                    {groups.map((group) => (
+                      <ListBoxSection key={group.letter} id={group.letter}>
+                        <Header className="sticky top-0 z-10 bg-surface-secondary px-2 py-1 text-xs font-semibold text-muted">
+                          {group.letter}
+                        </Header>
+                        {group.users.map((user) => (
+                          <ListBoxItem
+                            key={user.id}
+                            id={String(user.id)}
+                            textValue={user.username}
+                            onAction={() => handleSelect(user)}
+                            data-cy={`user-picker-item-${user.id}`}
+                          >
+                            <AttraccessUser user={user} interactive={false} />
+                          </ListBoxItem>
+                        ))}
+                      </ListBoxSection>
+                    ))}
+                  </ListBox>
+                )}
+                {isError ? null : <div ref={sentinelRef} />}
+                {isError && users.length > 0 ? (
+                  // A later page failed: keep the loaded results and offer an inline
+                  // retry instead of discarding the list for the full error screen.
+                  <div className="flex items-center justify-center gap-3 py-3" data-cy="user-picker-load-more-error">
+                    <p className="text-sm text-muted">{t('loadError')}</p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      isPending={isFetchingNextPage}
+                      onPress={() => fetchNextPage()}
+                    >
+                      {t('retry')}
+                    </Button>
+                  </div>
+                ) : null}
+                {isFetchingNextPage ? (
+                  <div className="flex justify-center py-3">
+                    <Spinner size="sm" />
+                  </div>
+                ) : null}
+              </div>
+            </ModalBody>
+          </>
+        )}
+      </StandardModal>
     </div>
   );
 }

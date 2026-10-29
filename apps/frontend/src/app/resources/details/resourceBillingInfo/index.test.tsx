@@ -23,28 +23,31 @@ vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
   useResourcesServiceGetOneResourceById: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', async () => {
-  const translations = (await import('./en.json')).default as Record<string, unknown>;
-  const resolve = (key: string): string | undefined =>
-    key
-      .split('.')
-      .reduce<unknown>(
-        (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
-        translations,
-      ) as string | undefined;
-  const t = (key: string, params?: Record<string, string | number>) => {
-    let out = resolve(key) ?? key;
-    for (const [name, value] of Object.entries(params ?? {})) {
-      out = out.replaceAll(`{{${name}}}`, String(value));
-    }
-    return out;
-  };
-  return {
-    useTranslations: () => ({ t, tExists: (key: string) => resolve(key) !== undefined }),
-    useTranslationState: () => ({ language: 'en' }),
-    useNumberFormatter: () => (value: number) => String(value),
-  };
-});
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (async () => {
+    const translations = (await import('./en.json')).default as Record<string, unknown>;
+    const resolve = (key: string): string | undefined =>
+      key
+        .split('.')
+        .reduce<unknown>(
+          (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
+          translations,
+        ) as string | undefined;
+    const t = (key: string, params?: Record<string, string | number>) => {
+      let out = resolve(key) ?? key;
+      for (const [name, value] of Object.entries(params ?? {})) {
+        out = out.replaceAll(`{{${name}}}`, String(value));
+      }
+      return out;
+    };
+    return {
+      useTranslations: () => ({ t, tExists: (key: string) => resolve(key) !== undefined }),
+      useTranslationState: () => ({ language: 'en' }),
+      useNumberFormatter: () => (value: number) => String(value),
+    };
+  })()),
+}));
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1 }, hasPermission: () => auth.canManageBilling }),
 }));

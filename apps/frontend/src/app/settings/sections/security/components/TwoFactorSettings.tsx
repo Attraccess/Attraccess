@@ -2,11 +2,9 @@ import { Alert, AlertContent, AlertDescription, Input, Spinner, TextField } from
 import { TwoFactorPolicy } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { Select } from '../../../../../components/select/index';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { TWO_FACTOR_OPTIONS, useSecuritySectionState } from './SecuritySettingsForm';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button } from '../../../../../components/button/index';
+import { AlertStatusIcon, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
 import de from '../de.json';
 

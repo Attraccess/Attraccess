@@ -9,18 +9,22 @@ import { TestWrapper } from '../../../test-utils/wrappers';
 const state = vi.hoisted(() => ({ locale: 'en', pending: false }));
 const requestResetMock = vi.fn();
 const goBackMock = vi.fn();
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: (locales: Record<string, Record<string, unknown>>) => {
-    const translations = locales[state.locale];
-    const t = (key: string) =>
-      key
-        .split('.')
-        .reduce<unknown>(
-          (value, part) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined),
-          translations,
-        ) ?? key;
-    return { t };
-  },
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+      const translations = locales[state.locale];
+      const t = (key: string) =>
+        key
+          .split('.')
+          .reduce<unknown>(
+            (value, part) =>
+              value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+            translations,
+          ) ?? key;
+      return { t };
+    },
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

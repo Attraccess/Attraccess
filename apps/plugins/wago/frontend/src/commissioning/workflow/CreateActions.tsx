@@ -1,7 +1,7 @@
-import { Button } from '@heroui/react';
+import { Button } from '@attraccess/plugins-frontend-ui';
+
 import { useWagoTranslations } from '../../i18n';
 import { CommissioningModel } from '../CommissioningModal';
-
 export function CreateSessionActions({ model }: { model: CommissioningModel }) {
   const { t } = useWagoTranslations();
   const {

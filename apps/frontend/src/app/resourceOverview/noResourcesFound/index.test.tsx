@@ -10,13 +10,16 @@ vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => state.permissions.includes(permission) }),
 }));
 vi.mock('../createResourceButton', () => ({ CreateResourceButton: () => <button>Create resource</button> }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: (translations: Record<string, Record<string, Record<string, string>>>) => ({
-    t: (key: string) => {
-      const [group, name] = key.split('.');
-      return translations[state.locale][group][name];
-    },
-  }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: (translations: Record<string, Record<string, Record<string, string>>>) => ({
+      t: (key: string) => {
+        const [group, name] = key.split('.');
+        return translations[state.locale][group][name];
+      },
+    }),
+  }))()),
 }));
 
 describe.each([

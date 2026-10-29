@@ -16,9 +16,12 @@ const state = vi.hoisted(() => ({
   toast: vi.fn(),
   callbacks: {} as { onSuccess: (transaction: { id: number }) => void; onError: (error: Error) => void },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
-  useNumberFormatter: () => String,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
+    useNumberFormatter: () => String,
+  }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 } }) }));

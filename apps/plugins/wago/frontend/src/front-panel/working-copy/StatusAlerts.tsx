@@ -1,18 +1,14 @@
+import { AlertStatusIcon, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Alert } from '@heroui/react';
 import { ConfigurationErrors } from '../../configuration/ConfigurationChanges';
 import type { useFrontPanelState } from './useFrontPanelState';
 export function FrontPanelStatusAlerts({ model }: { model: ReturnType<typeof useFrontPanelState> }) {
   return (
     <>
-      {model.panel.loadError && (
-        <Alert status="danger">
-          <Alert.Content>
-            <Alert.Title>{model.t('panel.loadError')}</Alert.Title>
-          </Alert.Content>
-        </Alert>
-      )}
+      {model.panel.loadError && <StatusAlert status="danger" title={model.t('panel.loadError')} />}
       {(model.panel.errorKey || model.panel.backendError) && (
         <Alert status="danger">
+          <AlertStatusIcon status="danger" />
           <Alert.Content>
             <Alert.Title>
               {model.panel.errorKey ? model.t(model.panel.errorKey) : model.t('panel.applyError')}

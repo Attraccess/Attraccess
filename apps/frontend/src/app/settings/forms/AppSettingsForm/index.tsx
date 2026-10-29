@@ -13,9 +13,7 @@ import {
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../../../../components/PasswordInput';
+import { Button, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';

@@ -1,9 +1,6 @@
 import { Skeleton, Chip } from '@heroui/react';
-import { Button } from '../../../components/button/index';
 import { filenameToUrl } from '../../../api/index';
-import { PageHeader, PageAction } from '../../../components/pageHeader/index';
 import { ArchiveIcon, ArchiveRestoreIcon, Edit2Icon, FoldersIcon, Trash2Icon, UsersIcon } from 'lucide-react';
-import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal/index';
 import { UpsertProjectModal } from '../upsertModal/index';
 import { ProjectSummaryCards } from './components/projectSummaryCards/index';
 import { ProjectUsageCharts } from './components/projectUsageCharts/index';
@@ -21,7 +18,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  DeleteConfirmationModal,
+  PageAction,
+  PageHeader,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';

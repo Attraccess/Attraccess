@@ -12,12 +12,10 @@ import {
   ChevronRightIcon,
 } from 'lucide-react';
 import { formatDurationMs } from '@attraccess/shared';
-import { Button } from '../../../../components/button/index';
 import { FlatSection } from '../../../../components/flatSection';
 import { Select } from '../../../../components/select/index';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
 import { OperatingTrackingNotice } from '../operating-readiness/index';
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {

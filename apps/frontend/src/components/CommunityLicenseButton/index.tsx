@@ -1,18 +1,6 @@
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  Button,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  useOverlayState,
-} from '@heroui/react';
+import { Button, useOverlayState } from '@heroui/react';
 import { HeartHandshakeIcon } from 'lucide-react';
-import { AlertStatusIcon } from '../AlertStatusIcon';
-import { StandardModal } from '../standardModal';
-import { I18nTransComponent, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { I18nTransComponent, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
@@ -47,55 +35,32 @@ export function CommunityLicenseButton({ onAccept, isDisabled, ...rest }: Commun
         <HeartHandshakeIcon size={16} />
         {t('button')}
       </Button>
-      <StandardModal
+      <StatusDialog
         isOpen={isOpen}
-        onOpenChange={(o) => {
-          if (!o) close();
-        }}
-        size="md"
+        onClose={close}
+        status="warning"
+        title={t('modal.title')}
+        closeLabel={t('modal.cancel')}
+        closeDataCy="community-license-cancel"
+        action={{ label: t('modal.confirm'), onPress: handleConfirm, 'data-cy': 'community-license-confirm' }}
       >
-        {({ close: modalClose }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('modal.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p className="text-sm">
-                <I18nTransComponent
-                  t={t}
-                  i18nKey="modal.question"
-                  components={{
-                    link: (
-                      <a
-                        href={LICENSE_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        LICENSE.md
-                      </a>
-                    ),
-                  }}
-                />
-              </p>
-              <Alert status="warning">
-                <AlertStatusIcon status="warning" />
-                <AlertContent>
-                  <AlertDescription>{t('modal.commercialNotice')}</AlertDescription>
-                </AlertContent>
-              </Alert>
-            </ModalBody>
-            <ModalFooter className="flex-wrap">
-              <Button variant="ghost" onPress={modalClose} data-cy="community-license-cancel">
-                {t('modal.cancel')}
-              </Button>
-              <Button variant="primary" onPress={handleConfirm} data-cy="community-license-confirm">
-                {t('modal.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+        <div className="flex flex-col gap-3">
+          <p>
+            <I18nTransComponent
+              t={t}
+              i18nKey="modal.question"
+              components={{
+                link: (
+                  <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                    LICENSE.md
+                  </a>
+                ),
+              }}
+            />
+          </p>
+          <p>{t('modal.commercialNotice')}</p>
+        </div>
+      </StatusDialog>
     </>
   );
 }

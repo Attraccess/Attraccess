@@ -1,8 +1,6 @@
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Label, TextArea, TextField } from '@heroui/react';
 import { useCallback, useState } from 'react';
-import { Button } from '../../../components/button';
-import { TFunction, UserIdentity, UserSearch } from '@attraccess/plugins-frontend-ui';
-import { StandardDrawer } from '../../../components/standardDrawer';
+import { Button, StandardDrawer, TFunction, UserIdentity, UserSearch } from '@attraccess/plugins-frontend-ui';
 import { IntroductionTabs } from './IntroductionTabs';
 import { AddMode, PeopleTarget } from './types';
 

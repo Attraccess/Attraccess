@@ -1,8 +1,7 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
-import { Button } from '../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useReliableServerAvailability } from '../../hooks/useReliableServerAvailability';

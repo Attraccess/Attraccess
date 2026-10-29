@@ -1,8 +1,7 @@
 import { Tooltip } from '@heroui/react';
-import { Button } from '../../../components/button';
 import { HistoryIcon, ShieldCheckIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, TFunction } from '@attraccess/plugins-frontend-ui';
 import { PeopleTarget, PersonRow } from './types';
 
 interface PeopleRowActionsProps {

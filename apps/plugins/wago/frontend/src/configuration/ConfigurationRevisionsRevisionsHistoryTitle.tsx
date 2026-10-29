@@ -1,4 +1,4 @@
-import { Button } from '@heroui/react';
+import { Button, EmptyState, TableDataLoadingIndicator, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { RejectionErrors } from './ConfigurationRevisions';
 import { RollbackReview } from './ConfigurationRevisions';
 import { useConfigurationRevisionsState } from './useConfigurationRevisionsState';
@@ -7,7 +7,6 @@ type Props = Pick<
   | 'view'
   | 't'
   | 'history'
-  | 'language'
   | 'controllerId'
   | 'metadata'
   | 'disabled'
@@ -27,7 +26,6 @@ export function ConfigurationRevisionsRevisionsHistoryTitle({
   view,
   t,
   history,
-  language,
   controllerId,
   metadata,
   disabled,
@@ -43,14 +41,15 @@ export function ConfigurationRevisionsRevisionsHistoryTitle({
   setReconciling,
   onRollback,
 }: Props) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   return (
     <div hidden={view !== 'history'}>
       <div className="wg:flex wg:flex-col wg:gap-4">
         <h2 className="wg:text-xl wg:font-semibold">{t('revisions.historyTitle')}</h2>
         <p className="wg:text-sm wg:text-muted">{t('revisions.historyDescription')}</p>
-        {history.isPending && <p>{t('revisions.loading')}</p>}
+        {history.isPending && <TableDataLoadingIndicator label={t('revisions.loading')} />}
         {history.isError && <p role="alert">{t('revisions.loadError', { error: history.error.message })}</p>}
-        {!history.isPending && history.data?.revisions.length === 0 && <p>{t('revisions.empty')}</p>}
+        {!history.isPending && history.data?.revisions.length === 0 && <EmptyState message={t('revisions.empty')} />}
         {history.data?.revisions.map((revision) => (
           <section
             key={revision.revision}
@@ -62,10 +61,8 @@ export function ConfigurationRevisionsRevisionsHistoryTitle({
             </p>
             <p>
               {t('revisions.dates', {
-                published: new Date(revision.publishedAt).toLocaleString(language),
-                reported: revision.reportedAt
-                  ? new Date(revision.reportedAt).toLocaleString(language)
-                  : t('revisions.notReported'),
+                published: formatDateTime(revision.publishedAt),
+                reported: revision.reportedAt ? formatDateTime(revision.reportedAt) : t('revisions.notReported'),
               })}
             </p>
             <RejectionErrors

@@ -31,7 +31,14 @@ const USER_ROLE_ASSIGNMENTS_WITH_SSO = [
   { roleId: 1, source: 'manual', role: ROLES[0] },
   { roleId: 2, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'admins', role: ROLES[1] },
   // administrator via SSO — not in manageable list
-  { roleId: 5, source: 'sso', ssoProviderId: 10, ssoProviderType: 'oidc', externalValue: 'administrators', role: ROLES[4] },
+  {
+    roleId: 5,
+    source: 'sso',
+    ssoProviderId: 10,
+    ssoProviderType: 'oidc',
+    externalValue: 'administrators',
+    role: ROLES[4],
+  },
 ];
 
 let currentUserRoles: typeof USER_ROLE_ASSIGNMENTS_MANUAL | typeof USER_ROLE_ASSIGNMENTS_WITH_SSO =
@@ -41,18 +48,21 @@ let currentUserRoles: typeof USER_ROLE_ASSIGNMENTS_MANUAL | typeof USER_ROLE_ASS
 // via useRbacCatalogTranslations, so the fixture names above (e.g. 'System Admin') must
 // not appear in the output — the catalog name ('System Administrator') must.
 
-vi.mock('../../../../../components/labeledSwitch', () => ({
-  LabeledSwitch: ({ children, isSelected, isDisabled, onChange, ...props }: Record<string, unknown>) => (
-    <label {...props}>
-      <input
-        type="checkbox"
-        checked={Boolean(isSelected)}
-        disabled={Boolean(isDisabled)}
-        onChange={(e) => (onChange as (value: boolean) => void)?.(e.target.checked)}
-      />
-      {children as React.ReactNode}
-    </label>
-  ),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    LabeledSwitch: ({ children, isSelected, isDisabled, onChange, ...props }: Record<string, unknown>) => (
+      <label {...props}>
+        <input
+          type="checkbox"
+          checked={Boolean(isSelected)}
+          disabled={Boolean(isDisabled)}
+          onChange={(e) => (onChange as (value: boolean) => void)?.(e.target.checked)}
+        />
+        {children as React.ReactNode}
+      </label>
+    ),
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

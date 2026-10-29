@@ -1,6 +1,5 @@
 import { DrawerHeader, DrawerHeading, DrawerBody } from '@heroui/react';
-import { StandardDrawer } from '../../../../components/standardDrawer';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ScheduleForm } from './schedule-form';
 import { useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule } from '@attraccess/react-query-client';
 import de from './de.json';

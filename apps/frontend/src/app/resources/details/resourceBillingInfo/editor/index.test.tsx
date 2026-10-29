@@ -22,8 +22,11 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useResourceMeteringServiceListResourceMeters: () => ({ data: state.meters }),
   useResourceMeteringServiceSetResourceMeterRate: () => ({ mutateAsync: state.setRate, isPending: false }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
+  }))()),
 }));
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
 vi.mock('../../../../../components/toastProvider', () => ({

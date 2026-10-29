@@ -17,7 +17,6 @@ import {
   TooltipTrigger,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   ResourceFlowVariableScope,
@@ -29,10 +28,9 @@ import {
   useFlowVariablesServiceUpsertFlowVariable,
 } from '@attraccess/react-query-client';
 import { VariableEditor, EditorMode, VariableFormValues, ValueType } from './editor';
-import { StandardModal } from '../../../../../components/standardModal';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';

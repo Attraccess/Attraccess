@@ -12,15 +12,19 @@ import {
   Chip,
 } from '@heroui/react';
 import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
-import { EmptyState } from '../../../components/emptyState';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
-import { PageAction, PageHeader } from '../../../components/pageHeader/index';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
 import { AttractapDeleteModal } from './delete/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  EmptyState,
+  PageAction,
+  PageHeader,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
   useAttractapServiceGetFirmwares,

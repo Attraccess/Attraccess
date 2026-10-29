@@ -19,36 +19,39 @@ vi.mock('@attraccess/react-query-client', () => ({
   useResourceMeteringServiceWaiveResourceMeteringSettlement: vi.fn(),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock('@attraccess/plugins-frontend-ui', async () => {
-  const translations = (await import('./en.json')).default as Record<string, unknown>;
-  const resolve = (key: string): string | undefined =>
-    key
-      .split('.')
-      .reduce<unknown>(
-        (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
-        translations,
-      ) as string | undefined;
-  return {
-    useTranslations: () => ({
-      t: (key: string, params?: Record<string, string | number>) =>
-        Object.entries(params ?? {}).reduce(
-          (out, [name, value]) => out.replaceAll(`{{${name}}}`, String(value)),
-          resolve(key) ?? key,
-        ),
-      tExists: (key: string) => resolve(key) !== undefined,
-    }),
-  };
-});
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (async () => {
+    const translations = (await import('./en.json')).default as Record<string, unknown>;
+    const resolve = (key: string): string | undefined =>
+      key
+        .split('.')
+        .reduce<unknown>(
+          (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
+          translations,
+        ) as string | undefined;
+    return {
+      useTranslations: () => ({
+        t: (key: string, params?: Record<string, string | number>) =>
+          Object.entries(params ?? {}).reduce(
+            (out, [name, value]) => out.replaceAll(`{{${name}}}`, String(value)),
+            resolve(key) ?? key,
+          ),
+        tExists: (key: string) => resolve(key) !== undefined,
+      }),
+    };
+  })()),
+  ...(await (() => ({
+    Button: ({ children, onPress }: { children: ReactNode; onPress?: () => void }) => (
+      <button onClick={onPress}>{children}</button>
+    ),
+  }))()),
+}));
 vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => auth.permissions.has(permission) }),
 }));
 vi.mock('../../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn() }),
-}));
-vi.mock('../../../../../components/button', () => ({
-  Button: ({ children, onPress }: { children: ReactNode; onPress?: () => void }) => (
-    <button onClick={onPress}>{children}</button>
-  ),
 }));
 
 const retry = vi.fn();

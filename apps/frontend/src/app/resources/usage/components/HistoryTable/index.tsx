@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Table, TableScrollContainer, TableContent, TableHeader, TableBody, TableRow } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { generateHeaderColumns } from './utils/tableHeaders';
 import { generateRowCells } from './utils/tableRows';
 import {
@@ -11,7 +11,6 @@ import {
   ResourceUsageAction,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { EmptyState } from '../../../../../components/emptyState';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
 import { SimplePagination } from '../../../../../components/simplePagination/index';

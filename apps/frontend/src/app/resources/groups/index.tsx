@@ -13,8 +13,6 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button } from '../../../components/button/index';
-import { EmptyState } from '../../../components/emptyState';
 import { GroupsToolbar } from './GroupsToolbar';
 import {
   UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn,
@@ -27,7 +25,7 @@ import {
   useResourcesServiceResourceGroupsGetMany,
   useResourcesServiceResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './en.json';
 import de from './de.json';

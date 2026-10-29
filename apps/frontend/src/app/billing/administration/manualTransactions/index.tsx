@@ -1,8 +1,12 @@
-import { NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { PageHeader } from '../../../../components/pageHeader';
+import {
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+} from '@heroui/react';
 import { HandCoinsIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ComponentPropsWithoutRef, useCallback, useState } from 'react';

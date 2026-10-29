@@ -1,7 +1,6 @@
 import React, { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import { cn } from '@heroui/react';
-import { Button } from '../../../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useUsersServiceSetUserPassword } from '@attraccess/react-query-client';
 import { PasswordField } from '../../../../../components/PasswordField';
@@ -87,7 +86,8 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
       />
 
       <div className="flex w-full justify-end">
-        <Button variant="primary"
+        <Button
+          variant="primary"
           onPress={handleSubmit}
           isPending={isSettingPassword}
           data-cy="set-password-form-save-button"

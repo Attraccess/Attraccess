@@ -1,6 +1,5 @@
 import { AccordionBody, AccordionHeading, AccordionItem, AccordionPanel, AccordionTrigger, Chip } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ClockIcon, GaugeIcon, HashIcon, PencilIcon, TrashIcon } from 'lucide-react';
 import {
   ResourceMaintenanceSchedule,

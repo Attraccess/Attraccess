@@ -2,15 +2,20 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { TestWrapper } from '../../test-utils/wrappers';
+import { MemoryRouter } from 'react-router-dom';
+import type { PropsWithChildren } from 'react';
 import { PageHeaderActions, PageAction } from './actions';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
+vi.mock('../../i18n', () => ({
   useTranslations: () => ({
     t: (key: string) => (key === 'more' ? 'More actions' : key),
     language: 'en',
   }),
 }));
+
+function TestWrapper({ children }: PropsWithChildren) {
+  return <MemoryRouter>{children}</MemoryRouter>;
+}
 
 function renderActions(actions: PageAction[], extra?: { maxVisible?: number }) {
   return render(<PageHeaderActions actions={actions} maxVisible={extra?.maxVisible} />, {

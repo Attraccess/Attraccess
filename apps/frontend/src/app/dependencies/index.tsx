@@ -1,11 +1,10 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, Link, Skeleton } from '@heroui/react';
-import { PageHeader } from '../../components/pageHeader';
 
 interface Dependency {
   name: string;
@@ -135,13 +134,7 @@ export function Dependencies() {
                 </div>
               </Card.Content>
               <Card.Footer className="flex justify-end">
-                <Link
-                  href={dependency.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm"
-
-                >
+                <Link href={dependency.url} target="_blank" rel="noopener noreferrer" className="text-sm">
                   {getDomainFromUrl(dependency.url)}
                 </Link>
               </Card.Footer>

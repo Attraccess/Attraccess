@@ -14,9 +14,7 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import { Button } from '../../../components/button/index';
 import { ArrowLeft, Save } from 'lucide-react';
-import { PageHeader } from '../../../components/pageHeader/index';
 import {
   DocumentationType,
   useResourcesServiceGetOneResourceById,
@@ -26,7 +24,7 @@ import {
 } from '@attraccess/react-query-client';
 import { Markdown } from '../../../components/markdown/index';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './documentationEditor.en.json';
 import de from './documentationEditor.de.json';

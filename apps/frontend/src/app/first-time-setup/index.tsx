@@ -1,9 +1,16 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Accordion, AccordionItem, AccordionHeading, AccordionTrigger, AccordionPanel, AccordionBody, Spinner } from '@heroui/react';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionHeading,
+  AccordionTrigger,
+  AccordionPanel,
+  AccordionBody,
+  Spinner,
+} from '@heroui/react';
 import { CheckCircle2Icon, Settings2Icon } from 'lucide-react';
-import { PageHeader } from '../../components/pageHeader';
 import { AppSettingsForm } from '../settings/forms/AppSettingsForm';
 import { SmtpSettingsForm } from '../settings/forms/SmtpSettingsForm';
 import { CreateAdminStep } from './steps/CreateAdminStep';
@@ -15,7 +22,6 @@ import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-que
 
 const WIZARD_STEPS = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'] as const;
 type WizardStepKey = (typeof WIZARD_STEPS)[number];
-
 
 export function FirstTimeSetupPage() {
   const { t } = useTranslations({ en, de });
@@ -89,11 +95,7 @@ export function FirstTimeSetupPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl mx-auto">
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        icon={<Settings2Icon size={20} />}
-      />
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Settings2Icon size={20} />} />
 
       <Accordion
         variant="default"
@@ -113,9 +115,11 @@ export function FirstTimeSetupPage() {
               </span>
             </AccordionTrigger>
           </AccordionHeading>
-          <AccordionPanel><AccordionBody>
-            <AppSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep2} />
-          </AccordionBody></AccordionPanel>
+          <AccordionPanel>
+            <AccordionBody>
+              <AppSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep2} />
+            </AccordionBody>
+          </AccordionPanel>
         </AccordionItem>
         <AccordionItem key="step-2" id="step-2" aria-label={t('steps.smtp')}>
           <AccordionHeading>
@@ -126,9 +130,11 @@ export function FirstTimeSetupPage() {
               </span>
             </AccordionTrigger>
           </AccordionHeading>
-          <AccordionPanel><AccordionBody>
-            <SmtpSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep3} />
-          </AccordionBody></AccordionPanel>
+          <AccordionPanel>
+            <AccordionBody>
+              <SmtpSettingsForm variant="wizard" endpoint="first-time-setup" onNext={goToStep3} />
+            </AccordionBody>
+          </AccordionPanel>
         </AccordionItem>
         <AccordionItem key="step-3" id="step-3" aria-label={t('steps.license')}>
           <AccordionHeading>
@@ -139,9 +145,11 @@ export function FirstTimeSetupPage() {
               </span>
             </AccordionTrigger>
           </AccordionHeading>
-          <AccordionPanel><AccordionBody>
-            <LicenseStep onSuccess={goToStep4} />
-          </AccordionBody></AccordionPanel>
+          <AccordionPanel>
+            <AccordionBody>
+              <LicenseStep onSuccess={goToStep4} />
+            </AccordionBody>
+          </AccordionPanel>
         </AccordionItem>
         <AccordionItem key="step-4" id="step-4" aria-label={t('steps.admin')}>
           <AccordionHeading>
@@ -152,9 +160,11 @@ export function FirstTimeSetupPage() {
               </span>
             </AccordionTrigger>
           </AccordionHeading>
-          <AccordionPanel><AccordionBody>
-            <CreateAdminStep onSuccess={goToStep5} isOverwrite={isAdminStepOverwrite} />
-          </AccordionBody></AccordionPanel>
+          <AccordionPanel>
+            <AccordionBody>
+              <CreateAdminStep onSuccess={goToStep5} isOverwrite={isAdminStepOverwrite} />
+            </AccordionBody>
+          </AccordionPanel>
         </AccordionItem>
         <AccordionItem key="step-5" id="step-5" aria-label={t('steps.verify')}>
           <AccordionHeading>
@@ -165,9 +175,11 @@ export function FirstTimeSetupPage() {
               </span>
             </AccordionTrigger>
           </AccordionHeading>
-          <AccordionPanel><AccordionBody>
-            <VerifyEmailStep onCorrectAdminDetails={goToStep4} />
-          </AccordionBody></AccordionPanel>
+          <AccordionPanel>
+            <AccordionBody>
+              <VerifyEmailStep onCorrectAdminDetails={goToStep4} />
+            </AccordionBody>
+          </AccordionPanel>
         </AccordionItem>
       </Accordion>
     </div>

@@ -1,3 +1,4 @@
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import {
   NumberField,
   NumberFieldDecrementButton,
@@ -6,7 +7,6 @@ import {
   NumberFieldInput,
 } from '@heroui/react';
 import { SettingsRow } from '../../../components/SettingsRow';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { RATE_LIMIT_NUMBERS } from './SecuritySettingsForm';
 import { useSecuritySectionState } from './SecuritySettingsForm';
 type Props = Pick<

@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -11,9 +11,6 @@ import {
   TextArea,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button';
-import { StandardDrawer } from '../../../../../components/standardDrawer';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { WrenchIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import {

@@ -1,12 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
 import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { Markdown } from '../markdown';
-import { StandardModal } from '../standardModal';
 import { readDismissedVersion, writeDismissedVersion } from './storage';
 import en from './en.json';
 import de from './de.json';

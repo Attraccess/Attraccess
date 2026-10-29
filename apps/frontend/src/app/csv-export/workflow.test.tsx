@@ -1,8 +1,8 @@
+import { StandardDrawer } from '@attraccess/plugins-frontend-ui';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { StandardDrawer } from '../../components/standardDrawer';
 import { CsvExportDrawerContent } from './export-drawer';
 import { ResourceUsageExport } from './resource-usage';
 const state = vi.hoisted(() => ({

@@ -1,9 +1,20 @@
-import { Alert, AlertContent, AlertDescription, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { Button } from '../../../components/button';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
-import { StandardModal } from '../../../components/standardModal';
-import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../../../components/PasswordInput';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+} from '@heroui/react';
+import {
+  AlertStatusIcon,
+  Button,
+  PasswordInput,
+  StandardModal,
+  useTranslations,
+  useUrlQuery,
+} from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import {
   ApiError,

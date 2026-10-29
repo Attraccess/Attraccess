@@ -6,8 +6,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { TestWrapper } from '../../../test-utils/wrappers';
 import { DocumentationEditor } from './DocumentationEditor';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+  }))()),
 }));
 
 // stable identity: the editor resets its state in a useEffect keyed on the resource
@@ -31,7 +34,7 @@ describe('DocumentationEditor', () => {
       <TestWrapper
         initialRoute="/resources/7/documentation/edit"
         routes={<Route path="/resources/:id/documentation/edit" element={<DocumentationEditor />} />}
-      />
+      />,
     );
 
     const urlRadio = screen.getByRole('radio', { name: 'documentationType.url' });

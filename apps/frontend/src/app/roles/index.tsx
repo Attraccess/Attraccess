@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
-import { PageHeader, PageAction } from '../../components/pageHeader';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  EmptyState,
+  PageAction,
+  PageHeader,
+  TableDataLoadingIndicator,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Chip,
@@ -18,8 +23,6 @@ import {
 } from '@heroui/react';
 import { LockIcon, PencilIcon, PlusIcon, ShieldIcon, Trash2Icon } from 'lucide-react';
 import { RoleWithUsageDto, useRbacServiceListRoles } from '@attraccess/react-query-client';
-import { EmptyState } from '../../components/emptyState';
-import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { RoleFormDrawer } from './role-form-drawer';
 import { DeleteRoleModal } from './delete-role-modal';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';

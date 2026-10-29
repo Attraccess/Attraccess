@@ -1,6 +1,5 @@
 import { AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
-import { PageAction, PageHeader } from '../../../components/pageHeader';
+import { PageAction, PageHeader, TFunction } from '@attraccess/plugins-frontend-ui';
 import { AddMode, PeopleTarget } from './types';
 
 interface PeopleHeaderProps {

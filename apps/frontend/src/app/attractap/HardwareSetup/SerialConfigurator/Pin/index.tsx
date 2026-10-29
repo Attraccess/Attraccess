@@ -1,9 +1,6 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Alert, AlertContent, AlertDescription, Input, Label, TextField, cn } from '@heroui/react';
-import { Button } from '../../../../../components/button';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { useCallback, useState, type FormEvent } from 'react';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { useAttractapSerialComm } from '../Auth';
 
 import de from './de.json';
@@ -106,12 +103,14 @@ export function AttractapSerialConfiguratorPin({ className, mode = 'change' }: A
           <Label>{t('fields.confirmPin')}</Label>
           <Input maxLength={4} inputMode="numeric" required />
         </TextField>
-        {error && <Alert status="danger">
-          <AlertStatusIcon status="danger" />
-          <AlertContent>
-            <AlertDescription>{error}</AlertDescription>
-          </AlertContent>
-        </Alert>}
+        {error && (
+          <Alert status="danger">
+            <AlertStatusIcon status="danger" />
+            <AlertContent>
+              <AlertDescription>{error}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        )}
         <div className="flex gap-2">
           <Button variant="primary" type="submit" isPending={isSubmitting}>
             {t('submit')}

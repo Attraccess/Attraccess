@@ -1,4 +1,5 @@
-import { Alert, Button, ProgressBar, Spinner } from '@heroui/react';
+import { StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { Button, ProgressBar, Spinner } from '@heroui/react';
 import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { CommissioningSession } from '../../api/client';
 import { commissioningLabel } from '../../controllers/Table';
@@ -28,26 +29,18 @@ export function CommissioningStatusPanel({ isActive, session }: { isActive: bool
     : (session.progressDetail ?? t('commissioningUI.waiting'));
   if (hasFailure) {
     return (
-      <Alert status="danger">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>{t('commissioningUI.deliveryError')}</Alert.Title>
-          <Alert.Description>
-            <p>{tBackendMessage(session.failureReason)}</p>
-            {failedCheckpoint && (
-              <p>{t('commissioningUI.failedDuring', { step: tBackendMessage(failedCheckpoint) })}</p>
-            )}
-            <p>{t('commissioningUI.failedHost', { host: session.targetHost })}</p>
-            <p>
-              {t(
-                canRecover(session) || session.dockerProvisionState
-                  ? 'commissioningUI.cleanupNext'
-                  : 'commissioningUI.retryNext',
-              )}
-            </p>
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
+      <StatusAlert status="danger" title={t('commissioningUI.deliveryError')}>
+        <p>{tBackendMessage(session.failureReason)}</p>
+        {failedCheckpoint && <p>{t('commissioningUI.failedDuring', { step: tBackendMessage(failedCheckpoint) })}</p>}
+        <p>{t('commissioningUI.failedHost', { host: session.targetHost })}</p>
+        <p>
+          {t(
+            canRecover(session) || session.dockerProvisionState
+              ? 'commissioningUI.cleanupNext'
+              : 'commissioningUI.retryNext',
+          )}
+        </p>
+      </StatusAlert>
     );
   }
   return (
@@ -98,38 +91,31 @@ export function VerificationStatus({
   const managementControllerId = controllerId ?? session.managementControllerId;
   return (
     <div className="wg:space-y-3">
-      <Alert status={verification.enrollmentComplete ? 'success' : 'warning'}>
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>
-            {t(verification.enrollmentComplete ? 'commissioningUI.enrolled' : 'commissioningUI.verifying')}
-          </Alert.Title>
-          <Alert.Description>
-            {verification.unavailable ? (
-              t('commissioningUI.verificationUnavailable')
-            ) : verification.data ? (
-              <ul>
-                <li>
-                  {t('commissioningUI.heartbeat', {
-                    status: t(
-                      verification.data.permanentConnection ? 'commissioningUI.received' : 'commissioningUI.pending',
-                    ),
-                  })}
-                </li>
-                <li>
-                  {t('commissioningUI.credentialRevoked', {
-                    status: t(
-                      verification.data.enrollmentRevoked ? 'commissioningUI.verified' : 'commissioningUI.pending',
-                    ),
-                  })}
-                </li>
-              </ul>
-            ) : (
-              t('commissioningUI.checkingEvidence')
-            )}
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
+      <StatusAlert
+        status={verification.enrollmentComplete ? 'success' : 'warning'}
+        title={t(verification.enrollmentComplete ? 'commissioningUI.enrolled' : 'commissioningUI.verifying')}
+      >
+        {verification.unavailable ? (
+          t('commissioningUI.verificationUnavailable')
+        ) : verification.data ? (
+          <ul>
+            <li>
+              {t('commissioningUI.heartbeat', {
+                status: t(
+                  verification.data.permanentConnection ? 'commissioningUI.received' : 'commissioningUI.pending',
+                ),
+              })}
+            </li>
+            <li>
+              {t('commissioningUI.credentialRevoked', {
+                status: t(verification.data.enrollmentRevoked ? 'commissioningUI.verified' : 'commissioningUI.pending'),
+              })}
+            </li>
+          </ul>
+        ) : (
+          t('commissioningUI.checkingEvidence')
+        )}
+      </StatusAlert>
       {verification.data && (
         <section aria-label={t('commissioningUI.qualification')}>
           <h3>
@@ -186,7 +172,7 @@ export function OperationStatus({ title, description }: { title: string; descrip
   );
 }
 
-export function SummaryField({ label, value }: { label: string; value: string }) {
+export function SummaryField({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="wg:text-xs wg:text-muted">{label}</dt>
@@ -205,26 +191,18 @@ function CompletedSessionSummary({
   verification: ReturnType<typeof useCommissioningVerification>;
   onConfigure?: (controllerId: number) => void;
 }) {
-  const { t, language, tBackendMessage } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t, tBackendMessage } = useWagoTranslations();
   const controllerId = verification.data?.controllerId ?? session.managementControllerId ?? null;
   return (
     <div className="wg:space-y-4">
-      <Alert status="success">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>{t('commissioningUI.complete')}</Alert.Title>
-          <Alert.Description>
-            {t('commissioningUI.completeDescription', { name: session.controllerName ?? session.hardwareId })}
-          </Alert.Description>
-        </Alert.Content>
-      </Alert>
+      <StatusAlert status="success" title={t('commissioningUI.complete')}>
+        {t('commissioningUI.completeDescription', { name: session.controllerName ?? session.hardwareId })}
+      </StatusAlert>
       <dl className="wg:grid wg:gap-3 wg:text-sm wg:sm:grid-cols-2">
         <SummaryField label={t('commissioningUI.hardwareId')} value={session.hardwareId} />
         <SummaryField label={t('commissioningUI.firmware')} value={session.firmwareBaseline} />
-        <SummaryField
-          label={t('commissioningUI.claimed')}
-          value={new Date(session.updatedAt).toLocaleString(language)}
-        />
+        <SummaryField label={t('commissioningUI.claimed')} value={formatDateTime(session.updatedAt)} />
         <SummaryField
           label={t('commissioningUI.management')}
           value={tBackendMessage(verification.data?.managementHardening ?? t('commissioningUI.unverified'))}
@@ -238,7 +216,8 @@ function CompletedSessionSummary({
 }
 
 export function ActivityLog({ auditLog }: { auditLog: string }) {
-  const { t, language } = useWagoTranslations();
+  const formatTime = useDateTimeFormatter({ showDate: false, showSeconds: true });
+  const { t } = useWagoTranslations();
   const events = parseActivityLog(auditLog);
   if (!events.length) return null;
   return (
@@ -250,7 +229,7 @@ export function ActivityLog({ auditLog }: { auditLog: string }) {
         {events.map((event) => (
           <li key={`${event.at}-${event.event}`} className="wg:text-xs wg:text-muted">
             <span className="wg:text-foreground">{formatActivity(event.event)}</span>{' '}
-            <span>{new Date(event.at).toLocaleTimeString(language)}</span>
+            <span>{formatTime(event.at)}</span>
           </li>
         ))}
       </ol>

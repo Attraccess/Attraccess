@@ -1,15 +1,5 @@
-import {
-  Accordion,
-  Alert,
-  Button,
-  Description,
-  Input,
-  Label,
-  ListBox,
-  ProgressBar,
-  Select,
-  TextField,
-} from '@heroui/react';
+import { Button, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
+import { Accordion, Description, Input, Label, ListBox, ProgressBar, Select, TextField } from '@heroui/react';
 import { useState } from 'react';
 import { useWagoTranslations } from '../i18n';
 import messages from '../network-change.en.json';
@@ -64,7 +54,7 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
       {statusQuery.isError ? (
         <p role="alert">{t('networkChange.statusUnavailable')}</p>
       ) : !status ? (
-        <p role="status">{t('networkChange.loading')}</p>
+        <TableDataLoadingIndicator label={t('networkChange.loading')} />
       ) : !status.available ? (
         <p role="status">{t('networkChange.managementRequired')}</p>
       ) : (
@@ -124,26 +114,16 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
             </>
           )}
           {failure && (
-            <Alert status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>{t('networkChange.failed')}</Alert.Title>
-                <Alert.Description>
-                  {t(`networkChange.failures.${Object.hasOwn(messages.failures, failure) ? failure : 'unknown'}`)}
-                </Alert.Description>
-              </Alert.Content>
-            </Alert>
+            <StatusAlert status="danger" title={t('networkChange.failed')}>
+              {t(`networkChange.failures.${Object.hasOwn(messages.failures, failure) ? failure : 'unknown'}`)}
+            </StatusAlert>
           )}
           {mutation.isError && !failure && <p role="alert">{t('networkChange.actionFailed')}</p>}
           {operation?.phase === 'completed' && (
-            <Alert status="success">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>
-                  {t(operation.mqttServerId === null ? 'networkChange.addressSuccess' : 'networkChange.success')}
-                </Alert.Title>
-              </Alert.Content>
-            </Alert>
+            <StatusAlert
+              status="success"
+              title={t(operation.mqttServerId === null ? 'networkChange.addressSuccess' : 'networkChange.success')}
+            />
           )}
           {editable && (
             <Button

@@ -1,6 +1,6 @@
 import { Checkbox } from '@heroui/react';
 import { useWagoTranslations } from '../i18n';
-import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, type TFunction } from '@attraccess/plugins-frontend-ui';
 import type { ConfigurationDiff, ConfigurationValidationError, WagoConfigurationSnapshot } from '../api/client';
 import {
   configurationNames,
@@ -52,7 +52,7 @@ export function ConfigurationChanges({
   const valueOptions = { translateName: tBackendMessage, metadataNames: names };
   names = configurationNames(after, configurationNames(before, names, t, tBackendMessage), t, tBackendMessage);
   const displayed = onSelect ? changes : readableStructuralChanges(changes, before, after);
-  if (!displayed.length) return <p>{t('configuration.empty')}</p>;
+  if (!displayed.length) return <EmptyState message={t('configuration.empty')} />;
   return (
     <ul className="wg:flex wg:flex-col wg:gap-3">
       {displayed.map((change) => (

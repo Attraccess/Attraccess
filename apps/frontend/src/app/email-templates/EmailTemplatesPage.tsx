@@ -11,10 +11,8 @@ import {
   Button,
 } from '@heroui/react';
 import { Edit3, Mail } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/pageHeader';
-import { EmptyState } from '../../components/emptyState';
 
 import en from './en.json';
 import de from './de.json';
@@ -50,12 +48,7 @@ export function EmailTemplatesPage() {
 
   return (
     <>
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        icon={<Mail className="w-6 h-6" />}
-        backTo={basePath}
-      />
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<Mail className="w-6 h-6" />} backTo={basePath} />
 
       <Table>
         <TableScrollContainer>

@@ -274,6 +274,37 @@ Bibliothek als Peer-Abhängigkeit und setze `attraccess.host` beziehungsweise
 `attraccessVersion.min` auf mindestens Version **1.11.0**, da ältere Hosts diese
 Bibliothek noch nicht teilen.
 
+## Gemeinsame UI-Komponenten
+
+`@attraccess/plugins-frontend-ui` enthält auch die UI-Bausteine des Hosts, damit
+Plugins wie der Kern aussehen und sich verhalten, statt eigene Kopien mitzubringen:
+
+| Komponente                                              | Verwendung                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `StatusDialog`                                          | Hinweise und Bestätigungen (`info`, `success`, `warning`, `error`) |
+| `DeleteConfirmationModal`                               | Löschen eines benannten Eintrags bestätigen                        |
+| `StandardModal`, `StandardDrawer`                       | Umfangreichere Modals und Drawer (Formulare, Listen)               |
+| `Button`                                                | Buttons mit Ladeanzeige                                            |
+| `AlertStatusIcon`, `StatusAlert`                        | Hinweise mit Statussymbol                                          |
+| `LabeledSwitch`, `PasswordInput`                        | Schalter mit Beschriftung, Passwortfeld mit Anzeigen/Verbergen     |
+| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Leere Listen, zentrierte Ladeanzeige, Seitenkopf mit Aktionen      |
+| `DateTimeDisplay`, `useDateTimeFormatter`               | Datum und Uhrzeit nach den Einstellungen des Benutzers             |
+
+Verwende `StatusDialog` für kurze Hinweise und Bestätigungen. Nur `error` zeigt
+eine rote (Danger-)Aktionsschaltfläche, alle anderen Status eine primäre. Escape
+ruft `onClose` auf, ein Klick auf den Hintergrund bewirkt nichts. Nimm
+`StandardModal` nur, wenn der Dialog umfangreichere Inhalte braucht.
+
+Die Exporte `StandardModal` und `StandardDrawer` aus
+`@attraccess/plugins-frontend-sdk` sind **veraltet** (Re-Exports der obigen
+Komponenten); importiere sie aus `@attraccess/plugins-frontend-ui`.
+
+Diese Komponenten setzen einen Host und ein `@attraccess/plugins-frontend-ui`
+voraus, die sie bereits enthalten (**ab 1.11.0**, also dem Release, das sie
+einführt). Ein Plugin, das sie nutzt, schlägt auf älteren Hosts zur Laufzeit
+fehl; hebe daher `attraccess.host`, `attraccessVersion.min` und die
+Peer-Abhängigkeit entsprechend an.
+
 ## Live-Updates
 
 Mit `context.liveUpdates.register` im Backend-SDK und `usePluginLiveUpdates<T>`

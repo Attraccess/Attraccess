@@ -31,10 +31,13 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: state.remove };
   },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
-  useDateTimeFormatter: () => (date: string) => date,
-  I18nTransComponent: ({ values }: { values: { itemName: string } }) => <span>Delete {values.itemName}</span>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+    useDateTimeFormatter: () => (date: string) => date,
+    I18nTransComponent: ({ values }: { values: { itemName: string } }) => <span>Delete {values.itemName}</span>,
+  }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../components/toastProvider', () => ({
@@ -119,8 +122,8 @@ it('confirms removal, reports failures and ignores invalid version strings', asy
   show();
   expect(screen.queryByText('updateAvailable')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'devices.actions.delete' }));
-  expect(await screen.findByText('Delete Old PC')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'deleteButton' }));
+  expect(within(await screen.findByRole('alertdialog')).getByText('Old PC')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
   expect(state.remove).toHaveBeenCalledWith({ id: 3 });
   act(() => state.deleteOptions.onError());
   expect(state.error).toHaveBeenCalledWith({ title: 'devices.delete.error' });

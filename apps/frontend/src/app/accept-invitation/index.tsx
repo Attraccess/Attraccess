@@ -1,13 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useUrlQuery } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Form } from '@heroui/react';
-import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ApiError, useUsersServiceAcceptInvitation } from '@attraccess/react-query-client';
-import { PageHeader } from '../../components/pageHeader';
 import { PasswordField } from '../../components/PasswordField';
 import { useLogin } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
@@ -82,8 +80,7 @@ export function AcceptInvitation() {
 
   if (!token || !email) {
     return (
-      <Alert status="danger"
-      >
+      <Alert status="danger">
         <AlertContent>
           <AlertTitle>{t('error.noTokenOrEmail.title')}</AlertTitle>
           <AlertDescription>{t('error.noTokenOrEmail.description')}</AlertDescription>

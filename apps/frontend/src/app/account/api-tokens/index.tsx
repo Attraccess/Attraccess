@@ -14,9 +14,7 @@ import {
   TextField,
 } from '@heroui/react';
 import { Copy, KeyRound, Trash2, X } from 'lucide-react';
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Button } from '../../../components/button/index';
-import { EmptyState } from '../../../components/emptyState';
+import { Button, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PermissionPicker } from '../../../components/permissionPicker/index';
 import { SimplePagination } from '../../../components/simplePagination/index';
 import { useEffect, useMemo, useState } from 'react';

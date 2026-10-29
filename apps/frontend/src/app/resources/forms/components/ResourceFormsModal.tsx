@@ -10,8 +10,7 @@ import {
   Input,
   TextArea,
 } from '@heroui/react';
-import { StandardDrawer } from '../../../../components/standardDrawer';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormFieldType, FormSubmissionRequestDto, FormResponseDto } from '@attraccess/react-query-client';
 import {
   parseFieldOptions,
@@ -23,7 +22,6 @@ import {
 import en from '../translations/en.json';
 import de from '../translations/de.json';
 import { Select } from '../../../../components/select/index';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 
 export interface ResourceFormsModalProps {
   isOpen: boolean;

@@ -1,5 +1,6 @@
+// @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StatusDialog } from './index';
@@ -57,5 +58,50 @@ describe('StatusDialog', () => {
     render(<StatusDialog isOpen={false} onClose={vi.fn()} status="info" title="Hidden" />);
 
     expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('styles the action as danger for errors and primary for every other status', () => {
+    const statuses = ['error', 'warning', 'info', 'success', 'default'] as const;
+    for (const status of statuses) {
+      const { unmount } = render(
+        <StatusDialog isOpen onClose={vi.fn()} status={status} title="T" action={{ label: 'Go', onPress: vi.fn() }} />,
+      );
+      const expected = status === 'error' ? 'button--danger' : 'button--primary';
+      expect(screen.getByRole('button', { name: 'Go' }).className).toContain(expected);
+      unmount();
+    }
+  });
+
+  it('closes on Escape but not on a backdrop click', async () => {
+    const onClose = vi.fn();
+    render(<StatusDialog isOpen onClose={onClose} status="warning" title="Careful" data-cy="warn" />);
+
+    const dialog = screen.getByRole('alertdialog');
+    const backdrop =
+      dialog.closest('[data-slot="alert-dialog-backdrop"], [data-react-aria-top-layer]') ?? document.body;
+    await userEvent.click(backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+    // The ignored click must not pull the focus out of the dialog, or Escape would stop working.
+    expect(fireEvent.mouseDown(backdrop)).toBe(false);
+    expect(fireEvent.mouseDown(dialog)).toBe(true);
+
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Escape while the action is pending', async () => {
+    const onClose = vi.fn();
+    render(
+      <StatusDialog
+        isOpen
+        onClose={onClose}
+        status="error"
+        title="Deleting"
+        action={{ label: 'Delete', onPress: vi.fn(), isPending: true }}
+      />,
+    );
+
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

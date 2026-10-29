@@ -11,9 +11,7 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
 } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
+import { AlertStatusIcon, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MAX_PERMISSION_SYNC_TTL_MINUTES } from '../formDefaults';
 import en from '../en.json';
 import de from '../de.json';

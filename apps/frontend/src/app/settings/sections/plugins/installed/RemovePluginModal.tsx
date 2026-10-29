@@ -1,3 +1,4 @@
+import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -8,9 +9,6 @@ import {
   ModalHeader,
   ModalHeading,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
-import { StandardModal } from '../../../../../components/standardModal';
 import { dependencyError } from '../dependencies/DependencyPlan';
 import { usePluginsSectionState } from '../state/usePluginSettings';
 type Props = Pick<

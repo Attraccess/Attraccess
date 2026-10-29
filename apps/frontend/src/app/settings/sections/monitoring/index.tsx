@@ -1,10 +1,6 @@
 import {
   InputGroup,
   Label,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Spinner,
   TextField,
   Tooltip,
@@ -23,14 +19,10 @@ import {
 import { ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { Button } from '../../../../components/button/index';
-import { StandardModal } from '../../../../components/standardModal';
 import { SettingsRow } from '../../components/SettingsRow';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, LabeledSwitch, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useSettingsServiceDeleteMetricsApiKey,
   useSettingsServiceGenerateMetricsApiKey,
@@ -438,47 +430,27 @@ export function MonitoringSection() {
         onDiscard={() => setThresholdDraft(undefined)}
       />
 
-      <StandardModal isOpen={rerollModal.isOpen} onOpenChange={(open) => !open && rerollModal.close()} size="sm">
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('confirmReroll.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('confirmReroll.description')}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close}>
-                {t('confirmReroll.cancel')}
-              </Button>
-              <Button variant="tertiary" onPress={() => generateApiKey()} isPending={isGenerating}>
-                {t('confirmReroll.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+      <StatusDialog
+        isOpen={rerollModal.isOpen}
+        onClose={rerollModal.close}
+        status="warning"
+        title={t('confirmReroll.title')}
+        closeLabel={t('confirmReroll.cancel')}
+        action={{ label: t('confirmReroll.confirm'), onPress: () => generateApiKey(), isPending: isGenerating }}
+      >
+        {t('confirmReroll.description')}
+      </StatusDialog>
 
-      <StandardModal isOpen={removeModal.isOpen} onOpenChange={(open) => !open && removeModal.close()} size="sm">
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('confirmRemove.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('confirmRemove.description')}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close}>
-                {t('confirmRemove.cancel')}
-              </Button>
-              <Button variant="danger" onPress={() => deleteApiKey()} isPending={isDeleting}>
-                {t('confirmRemove.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+      <StatusDialog
+        isOpen={removeModal.isOpen}
+        onClose={removeModal.close}
+        status="error"
+        title={t('confirmRemove.title')}
+        closeLabel={t('confirmRemove.cancel')}
+        action={{ label: t('confirmRemove.confirm'), onPress: () => deleteApiKey(), isPending: isDeleting }}
+      >
+        {t('confirmRemove.description')}
+      </StatusDialog>
     </SettingsSection>
   );
 }

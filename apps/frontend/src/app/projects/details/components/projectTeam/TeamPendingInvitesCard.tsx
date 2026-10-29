@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Card, Chip, Skeleton } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import {
   ApiError,
   ProjectInvitation,
@@ -11,7 +10,7 @@ import {
   useProjectsServiceListProjectInvitations,
   useProjectsServiceResendProjectInvitation,
 } from '@attraccess/react-query-client';
-import { useDateTimeFormatter, AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, Button, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RefreshCcwIcon, XIcon } from 'lucide-react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';

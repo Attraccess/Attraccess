@@ -24,9 +24,8 @@ import {
   Rectangle,
 } from 'recharts';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
-import { EmptyState } from '../../../../../components/emptyState';
 import { useMemo, useCallback, useEffect, useState } from 'react';
-import { useTranslations, useNumberFormatter, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';

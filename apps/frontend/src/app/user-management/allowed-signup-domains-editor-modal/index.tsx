@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, EmptyState, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   useUsersServiceGetLocalSignupDomainWhitelist,
@@ -25,11 +25,7 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
-import { StandardDrawer } from '../../../components/standardDrawer';
-import { EmptyState } from '../../../components/emptyState';
 import { PlusIcon, Settings2Icon, Trash2Icon } from 'lucide-react';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import en from './en.json';
 import de from './de.json';

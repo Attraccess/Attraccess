@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -11,7 +11,6 @@ import {
   TextArea,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import de from '../de.json';
 import en from '../en.json';
 import {
@@ -20,8 +19,6 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
-import { StandardDrawer } from '../../../../../components/standardDrawer';
 
 interface Props {
   resourceId: number;

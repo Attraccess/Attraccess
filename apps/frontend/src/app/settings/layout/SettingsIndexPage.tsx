@@ -1,6 +1,16 @@
-import { ActivityIcon, FileClockIcon, InfoIcon, LockKeyholeIcon, MailIcon, MessageSquareIcon, PlugIcon, Settings2Icon, ShieldIcon, UsersIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../components/pageHeader';
+import {
+  ActivityIcon,
+  FileClockIcon,
+  InfoIcon,
+  LockKeyholeIcon,
+  MailIcon,
+  MessageSquareIcon,
+  PlugIcon,
+  Settings2Icon,
+  ShieldIcon,
+  UsersIcon,
+} from 'lucide-react';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useSettingsSections } from './useSettingsSections';
 import en from './en.json';
 import de from './de.json';

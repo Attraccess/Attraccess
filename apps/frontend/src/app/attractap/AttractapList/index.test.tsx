@@ -10,26 +10,31 @@ vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetFirmwares: () => ({ data: [] }),
   useAttractapServiceGetReaders: () => ({ data: [], error: null }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (k: string) => k.split('.').pop() ?? k }),
-  useDateTimeFormatter: () => () => '',
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (k: string) => k.split('.').pop() ?? k }),
+    useDateTimeFormatter: () => () => '',
+  }))()),
+  ...(await (() => ({
+    PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+    PageAction: () => null,
+  }))()),
+  ...(await (() => ({ AlertStatusIcon: () => null }))()),
+  ...(await (() => ({ EmptyState: () => <div data-testid="empty-state" /> }))()),
 }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn() }) }));
-vi.mock('../../../components/pageHeader', () => ({
-  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
-  PageAction: () => null,
-}));
+
 vi.mock('../HardwareSetup', () => ({
-  AttractapHardwareSetup: ({ children }: { children: (fn: () => void) => React.ReactNode }) =>
-    <div data-testid="hardware-setup">{children(vi.fn())}</div>,
+  AttractapHardwareSetup: ({ children }: { children: (fn: () => void) => React.ReactNode }) => (
+    <div data-testid="hardware-setup">{children(vi.fn())}</div>
+  ),
 }));
 vi.mock('../HardwareSetup/WebSerialConsole', () => ({ WebSerialConsole: () => null }));
 vi.mock('../AttractapEditor/AttractapEditor', () => ({ AttractapEditor: () => null }));
 vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
-vi.mock('../../../components/AlertStatusIcon', () => ({ AlertStatusIcon: () => null }));
-vi.mock('../../../components/emptyState', () => ({ EmptyState: () => <div data-testid="empty-state" /> }));
 
 function mockLicense(modules: string[] | undefined) {
   vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({

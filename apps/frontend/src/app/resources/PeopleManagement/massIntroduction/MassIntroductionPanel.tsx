@@ -16,7 +16,7 @@ import {
   ProgressBarTrack,
 } from '@heroui/react';
 import { QRCode } from 'react-qrcode-logo';
-import { AttraccessUser, TFunction } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, Button, LabeledSwitch, TFunction } from '@attraccess/plugins-frontend-ui';
 import {
   MassIntroductionParticipantDto,
   MassIntroductionReaderDto,
@@ -25,8 +25,6 @@ import {
   useAttractapServiceGetResourceAttractaps,
   useAttractapServiceGetResourceGroupAttractaps,
 } from '@attraccess/react-query-client';
-import { Button } from '../../../../components/button';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { AttractapSelect } from '../../../attractap/AttractapSelect';
 import { massIntroductionUrl } from '../../../mass-introduction/MassIntroductionRedeemModal';
 import { PeopleTarget } from '../types';
