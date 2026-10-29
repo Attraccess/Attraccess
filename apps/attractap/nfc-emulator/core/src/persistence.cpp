@@ -2,6 +2,7 @@
 
 #include "nfc_emulator/crypto.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 namespace nfc_emulator {

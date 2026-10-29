@@ -437,7 +437,11 @@ bool start_control_api(EmulatorState &state, NvsStore &store) {
   if (httpd_start(&server, &config) != ESP_OK) return false;
   static const httpd_method_t methods[] = {HTTP_GET, HTTP_POST, HTTP_PUT, HTTP_DELETE};
   for (httpd_method_t method : methods) {
-    httpd_uri_t uri{"/*", method, handle, &context, false};
+    httpd_uri_t uri{};
+    uri.uri = "/*";
+    uri.method = method;
+    uri.handler = handle;
+    uri.user_ctx = &context;
     if (httpd_register_uri_handler(server, &uri) != ESP_OK) return false;
   }
   return true;

@@ -97,7 +97,8 @@ void inv_mix(uint8_t *s) {
 void encrypt_block(const RoundKeys &keys, uint8_t *s) {
   add_key(s,keys,0);
   for(size_t r=1;r<10;++r){for(size_t i=0;i<16;++i)s[i]=sbox[s[i]];shift(s);mix(s);add_key(s,keys,r);}
-  for(size_t i=0;i<16;++i)s[i]=sbox[s[i]]; shift(s); add_key(s,keys,10);
+  for(size_t i=0;i<16;++i)s[i]=sbox[s[i]];
+  shift(s); add_key(s,keys,10);
 }
 void decrypt_block(const RoundKeys &keys, uint8_t *s) {
   add_key(s,keys,10);
@@ -107,7 +108,8 @@ void decrypt_block(const RoundKeys &keys, uint8_t *s) {
 Bytes dbl(const Bytes &in) {
   Bytes out(16); uint8_t carry=0;
   for(int i=15;i>=0;--i){uint8_t next=in[i]>>7;out[i]=static_cast<uint8_t>((in[i]<<1)|carry);carry=next;}
-  if(carry)out[15]^=0x87; return out;
+  if(carry)out[15]^=0x87;
+  return out;
 }
 }  // namespace
 
