@@ -17,6 +17,9 @@
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include "../platform.hpp"
+#ifdef ATTRACTAP_TEST_HOOKS
+#include "../testhooks/test_hooks.hpp"
+#endif
 
 std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
@@ -479,6 +482,13 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
         sendJsonResponse(topic, json);
         return;
     }
+
+#ifdef ATTRACTAP_TEST_HOOKS
+    if (TestHooks::handleCommand(topic, payloadObj))
+    {
+        return;
+    }
+#endif
 
     sendErrorResponse(topic, "UNKNOWN_TOPIC");
 }

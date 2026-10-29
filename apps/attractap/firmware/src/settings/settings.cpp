@@ -9,6 +9,12 @@
 #include "esp_random.h"
 #endif
 
+// Beeper state of a reader without a saved device.beeper setting. Lab and
+// test builds turn it off with -DATTRACTAP_BEEPER_DEFAULT=OFF.
+#ifndef ATTRACTAP_BEEPER_DEFAULT
+#define ATTRACTAP_BEEPER_DEFAULT 1
+#endif
+
 KVStore Settings::preferences;
 Logger Settings::logger("Settings");
 
@@ -27,7 +33,7 @@ void Settings::setup()
     preferences.begin("settings", true);
 
     _deviceConfig.passCode = preferences.getString("device.passCode", "0000");
-    _deviceConfig.beeperEnabled = preferences.getBool("device.beeper", true);
+    _deviceConfig.beeperEnabled = preferences.getBool("device.beeper", ATTRACTAP_BEEPER_DEFAULT != 0);
     _deviceConfig.ledBrightness = preferences.getUChar("device.ledBrt", 255);
 
     _networkConfig.ssid = preferences.getString("wifi.ssid", "");

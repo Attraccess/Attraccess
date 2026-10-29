@@ -28,6 +28,21 @@ void RgbGt911Driver::flush(const lv_area_t *area, uint8_t *px_map)
     esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px_map);
 }
 
+const uint8_t *RgbGt911Driver::frameBuffer()
+{
+    if (!initialized || !panel)
+    {
+        return nullptr;
+    }
+    // Flushes copy LVGL's draw buffer into this single PSRAM framebuffer.
+    void *fb = nullptr;
+    if (esp_lcd_rgb_panel_get_frame_buffer(panel, 1, &fb) != ESP_OK)
+    {
+        return nullptr;
+    }
+    return static_cast<const uint8_t *>(fb);
+}
+
 bool RgbGt911Driver::readTouch(TouchPoint &point)
 {
     point.pressed = false;

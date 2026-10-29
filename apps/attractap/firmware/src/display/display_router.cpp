@@ -15,6 +15,11 @@ uint32_t Display::transitionStartTime = 0;
 bool Display::transitionComplete = true;
 std::function<void()> Display::onTransitionComplete = nullptr;
 
+std::string Display::activeScreenName()
+{
+    return Display::activeScreen ? Display::activeScreen->getName() : std::string();
+}
+
 void Display::transitionToScreen(IScreen *screen)
 {
     Display::transitionToScreen(screen, nullptr);
