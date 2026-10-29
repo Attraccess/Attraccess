@@ -36,6 +36,7 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
         queryKey: [useUsersServiceFindManyKey],
       });
       showSuccess({ title: t('messages.updated') });
+      close();
     },
     onError: (rawError) => {
       let messageToDisplay = t('errors.updateFailed');
@@ -66,8 +67,7 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
         email: trimmedEmail,
       },
     });
-    close();
-  }, [close, mutate, trimmedEmail, userId]);
+  }, [mutate, trimmedEmail, userId]);
 
   return (
     <>

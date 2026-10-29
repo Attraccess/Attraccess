@@ -29,6 +29,7 @@ export function EmailForm() {
         queryKey: [useUsersServiceGetCurrentKey],
       });
       showSuccess({ title: t('messages.updated') });
+      close();
     },
     onError: (rawError) => {
       let messageToDisplay = t('errors.updateFailed');
@@ -56,8 +57,7 @@ export function EmailForm() {
     mutate({
       requestBody: { email: trimmedEmail },
     });
-    close();
-  }, [close, mutate, trimmedEmail]);
+  }, [mutate, trimmedEmail]);
 
   return (
     <>

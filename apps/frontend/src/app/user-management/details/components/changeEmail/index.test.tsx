@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,11 +7,15 @@ import { ChangeEmailForm } from './index';
 import { QueryWrapper } from '../../../../../test-utils/wrappers';
 
 const mutate = vi.fn();
+let hookOptions: { onSuccess?: () => void } = {};
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {},
   UseUsersServiceGetOneUserByIdKeyFn: vi.fn(),
-  useUsersServiceChangeUserEmail: () => ({ mutate, isPending: false }),
+  useUsersServiceChangeUserEmail: (options: typeof hookOptions) => {
+    hookOptions = options;
+    return { mutate, isPending: false };
+  },
   useUsersServiceFindManyKey: 'users',
 }));
 
@@ -118,5 +122,10 @@ describe('ChangeEmailForm', () => {
 
     await user.click(screen.getByRole('button', { name: 'Change email' }));
     expect(mutate).toHaveBeenCalledWith({ id: 7, requestBody: { email: 'new@example.com' } });
+
+    // A failed request keeps the dialog open; only success closes it.
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    act(() => hookOptions.onSuccess?.());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 });
