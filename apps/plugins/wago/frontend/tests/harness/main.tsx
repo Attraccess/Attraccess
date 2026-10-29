@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Button } from '@heroui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import '@heroui/styles/css';
 import '../../src/styles.css';
 import { ConfigurationEditor } from '../../src/configuration/ConfigurationEditor';
@@ -14,7 +15,9 @@ function Harness() {
     <QueryClientProvider client={client}>
       <h1>Fixture-only controller configuration</h1>
       <Button onPress={() => setOpen(true)}>Configure</Button>
-      <ConfigurationEditor controllerId={open ? 91058 : null} onOpenChange={setOpen} />
+      <MemoryRouter>
+        <ConfigurationEditor controllerId={open ? 91058 : null} onOpenChange={setOpen} />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }

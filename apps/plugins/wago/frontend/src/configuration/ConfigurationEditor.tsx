@@ -1,4 +1,10 @@
-import { AlertStatusIcon, Button, StatusDialog, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import {
+  AlertStatusIcon,
+  Button,
+  PageHeader,
+  StatusDialog,
+  type TranslationMessage,
+} from '@attraccess/plugins-frontend-ui';
 import { Alert, Card, Chip } from '@heroui/react';
 import { Activity, ArrowLeft, ArrowRight, GitCompareArrows, History, Network, Settings2 } from 'lucide-react';
 import { ConfigurationErrors } from './ConfigurationChanges';
@@ -212,18 +218,23 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
         <Button variant="ghost" isDisabled={model.busy} onPress={model.close}>
           <ArrowLeft className="wg:size-4" /> {model.t('controllers.title')}
         </Button>
-        <div className="wg:flex wg:flex-wrap wg:items-start wg:justify-between wg:gap-4">
-          <div>
-            <p className="wg:text-sm wg:font-medium wg:text-muted">
-              WAGO / {model.diagnostics.data?.name ?? model.t('editor.controller', { id: controllerId })}
-            </p>
-            <h1 className="wg:mt-1 wg:text-3xl wg:font-semibold">{model.t('editor.title')}</h1>
-            <p className="wg:mt-2 wg:text-muted">{model.t('editor.description')}</p>
-          </div>
-          {model.diagnostics.data && (
-            <Chip variant="soft">{model.t('editor.runtime', { version: model.diagnostics.data.runtimeVersion })}</Chip>
-          )}
-        </div>
+        <PageHeader
+          title={model.t('editor.title')}
+          subtitle={
+            <div className="wg:flex wg:flex-col wg:gap-2">
+              <div className="wg:flex wg:flex-wrap wg:items-center wg:gap-2">
+                <span>WAGO / {model.diagnostics.data?.name ?? model.t('editor.controller', { id: controllerId })}</span>
+                {model.diagnostics.data && (
+                  <Chip variant="soft">
+                    {model.t('editor.runtime', { version: model.diagnostics.data.runtimeVersion })}
+                  </Chip>
+                )}
+              </div>
+              <p>{model.t('editor.description')}</p>
+            </div>
+          }
+          noMargin
+        />
       </header>
       <ConfigurationToolbar
         snapshot={model.snapshot}

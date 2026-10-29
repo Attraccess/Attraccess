@@ -3,6 +3,7 @@ import { state } from './visual-editor.test.state';
 import { PluginLiveUpdatesProvider, type PluginLiveUpdatesClient } from '@attraccess/plugins-frontend-sdk';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -21,7 +22,9 @@ function mount(liveClient: PluginLiveUpdatesClient | null = null) {
   render(
     <QueryClientProvider client={client}>
       <PluginLiveUpdatesProvider client={liveClient}>
-        <ConfigurationEditor controllerId={1} onOpenChange={close} />
+        <MemoryRouter>
+          <ConfigurationEditor controllerId={1} onOpenChange={close} />
+        </MemoryRouter>
       </PluginLiveUpdatesProvider>
     </QueryClientProvider>,
   );
