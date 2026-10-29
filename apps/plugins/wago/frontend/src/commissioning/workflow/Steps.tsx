@@ -1,23 +1,11 @@
-import { AlertStatusIcon, Button, StatusAlert } from '@attraccess/plugins-frontend-ui';
-import { Alert, Input, Key, Label, ListBox, Select, Spinner, TextField } from '@heroui/react';
+import { Button, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
+import { Input, Key, Label, ListBox, Select, TextField } from '@heroui/react';
 import { CommissioningSession } from '../../api/client';
 import { useMqttServersQuery } from '../../api/queries';
 import { useWagoTranslations } from '../../i18n';
 import { canInstall } from '../model';
 import { CommissioningStatusPanel } from '../status/Status';
 import { useCommissioningVerification } from '../status/useCommissioningVerification';
-
-export function ErrorAlert({ error }: { error: unknown }) {
-  const { t } = useWagoTranslations();
-  return (
-    <Alert status="danger">
-      <AlertStatusIcon status="danger" />
-      <Alert.Content>
-        <Alert.Description>{error instanceof Error ? error.message : t('common.retry')}</Alert.Description>
-      </Alert.Content>
-    </Alert>
-  );
-}
 
 export function ConnectionStep({
   controllerIp,
@@ -49,11 +37,11 @@ export function ConnectionStep({
         />
       </TextField>
       {mqttServersQuery.isPending ? (
-        <div className="wg:flex wg:justify-center wg:p-2">
-          <Spinner color="accent" size="sm" />
-        </div>
+        <TableDataLoadingIndicator />
       ) : mqttServersQuery.isError ? (
-        <ErrorAlert error={mqttServersQuery.error} />
+        <StatusAlert status="danger">
+          {mqttServersQuery.error instanceof Error ? mqttServersQuery.error.message : t('common.retry')}
+        </StatusAlert>
       ) : (mqttServersQuery.data?.length ?? 0) > 1 ? (
         <Select
           className="wg:w-full"

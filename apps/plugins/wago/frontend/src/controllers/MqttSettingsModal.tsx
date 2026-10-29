@@ -1,6 +1,5 @@
-import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
+import { Button, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import {
-  Alert,
   Form,
   Label,
   ListBox,
@@ -13,7 +12,6 @@ import {
   ModalHeader,
   ModalHeading,
   Select,
-  Spinner,
 } from '@heroui/react';
 import type { Key } from '@heroui/react';
 import { useEffect, useState } from 'react';
@@ -47,6 +45,7 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
 
   const isLoading = settingsQuery.isPending || serversQuery.isPending;
   const error = settingsQuery.isError ? settingsQuery.error : serversQuery.isError ? serversQuery.error : null;
+  const errorMessage = (value: unknown) => (value instanceof Error ? value.message : t('common.retry'));
 
   return (
     <Modal isOpen={isOpen} onOpenChange={(open) => !open && close()}>
@@ -65,11 +64,9 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
               <ModalBody>
                 <p className="wg:text-sm wg:text-muted">{t('settings.description')}</p>
                 {isLoading ? (
-                  <div className="wg:flex wg:justify-center wg:p-4">
-                    <Spinner color="accent" size="sm" />
-                  </div>
+                  <TableDataLoadingIndicator />
                 ) : error ? (
-                  <ErrorAlert error={error} />
+                  <StatusAlert status="danger">{errorMessage(error)}</StatusAlert>
                 ) : (
                   <Select
                     className="wg:w-full"
@@ -105,7 +102,9 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
                     </Select.Popover>
                   </Select>
                 )}
-                {updateSettingsMutation.isError && <ErrorAlert error={updateSettingsMutation.error} />}
+                {updateSettingsMutation.isError && (
+                  <StatusAlert status="danger">{errorMessage(updateSettingsMutation.error)}</StatusAlert>
+                )}
               </ModalBody>
               <ModalFooter>
                 <Button variant="secondary" onPress={close}>
@@ -124,17 +123,5 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
         </ModalContainer>
       </ModalBackdrop>
     </Modal>
-  );
-}
-
-function ErrorAlert({ error }: { error: unknown }) {
-  const { t } = useWagoTranslations();
-  return (
-    <Alert status="danger">
-      <AlertStatusIcon status="danger" />
-      <Alert.Content>
-        <Alert.Description>{error instanceof Error ? error.message : t('common.retry')}</Alert.Description>
-      </Alert.Content>
-    </Alert>
   );
 }
