@@ -27,7 +27,10 @@ export interface StatusDialogAction {
 
 interface StatusDialogProps {
   isOpen: boolean;
-  /** Called when the dialog is dismissed (close button or Escape). A backdrop click does nothing. */
+  /**
+   * Called when the dialog is dismissed (close button or Escape). A backdrop click does nothing, and
+   * Escape is ignored while the action is pending, like the disabled close button.
+   */
   onClose: () => void;
   status: StatusDialogStatus;
   title: ReactNode;
@@ -53,7 +56,7 @@ export function StatusDialog(props: Readonly<StatusDialogProps>) {
   return (
     <AlertDialog.Backdrop
       isOpen={isOpen}
-      onOpenChange={(open) => !open && onClose()}
+      onOpenChange={(open) => !open && !action?.isPending && onClose()}
       isDismissable={false}
       isKeyboardDismissDisabled={false}
     >

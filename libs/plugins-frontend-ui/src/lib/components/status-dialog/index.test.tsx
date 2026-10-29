@@ -85,4 +85,20 @@ describe('StatusDialog', () => {
     await userEvent.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('ignores Escape while the action is pending', async () => {
+    const onClose = vi.fn();
+    render(
+      <StatusDialog
+        isOpen
+        onClose={onClose}
+        status="error"
+        title="Deleting"
+        action={{ label: 'Delete', onPress: vi.fn(), isPending: true }}
+      />,
+    );
+
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
