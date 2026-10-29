@@ -43,6 +43,10 @@ RESERVATION_POLL_SECONDS = 15
 # the exporter (re)connects; a client-side deadline would interrupt it.
 ACQUIRE_SECONDS = 60
 RUNS_KEPT_PER_PLACE = 10
+# The coordinator grants a place with whatever its exporter has registered, so
+# a reader acquired while the exporter (re)connects has nothing to flash.
+FLASH_RESOURCES = {"USBFlashableDevice", "NetworkUSBFlashableDevice"}
+SERIAL_RESOURCES = {"USBSerialPort", "NetworkSerialPort", "RawSerialPort", "SerialPort"}
 
 log = logging.getLogger("attractap-lab-janitor")
 
@@ -110,6 +114,8 @@ class Janitor:
             if place.acquired == OWNER:
                 if name in holds:
                     await self._drop_reservation(name)
+                elif not place.acquired_resources:
+                    await self._release_empty_claim(name)
                 else:
                     self.jobs[name] = asyncio.create_task(self._park(name, place.tags["variant"]))
                 continue
@@ -118,6 +124,12 @@ class Janitor:
                 continue
             reservation = self.reservations.get(name)
             if name in self.reserving:
+                continue
+            if not self._hardware_registered(place):
+                # Nothing to flash until the exporter registers the reader. A
+                # reservation meanwhile would only hold off maintenance.
+                if reservation is not None:
+                    await self._drop_reservation(name)
                 continue
             if reservation is None:
                 await self._reserve(name)
@@ -202,6 +214,27 @@ class Janitor:
                     messages.CancelReservationRequest(token=reservation[0]), timeout=10)
             except grpc.aio.AioRpcError as error:
                 log.warning("%s: could not cancel reservation: %s", name, error.details())
+
+    def _hardware_registered(self, place):
+        """Whether the exporter has registered the reader's flash and serial devices."""
+        classes = {entry.cls
+                   for exporter, groups in self.session.resources.items()
+                   for group, entries in groups.items()
+                   for resource, entry in entries.items()
+                   if place.hasmatch((exporter, group, entry.cls, resource))}
+        return bool(classes & FLASH_RESOURCES and classes & SERIAL_RESOURCES)
+
+    async def _release_empty_claim(self, name):
+        # Acquired before the exporter registered the reader, e.g. by an older
+        # janitor. Parking could not find the flash device and would end up
+        # quarantining a healthy reader.
+        log.warning("%s: held without resources; releasing to acquire again", name)
+        self.retry_after[name] = time.monotonic() + 5
+        try:
+            await self.session.stub.ReleasePlace(
+                messages.ReleasePlaceRequest(placename=name, fromuser=OWNER), timeout=10)
+        except grpc.aio.AioRpcError as error:
+            log.warning("%s: could not release: %s", name, error.details())
 
     async def _acquire(self, name):
         try:

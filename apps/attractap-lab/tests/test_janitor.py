@@ -194,10 +194,22 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
     def parked(place):
         return [entry for entry in map(json.loads, events.read_text().splitlines()) if entry["place"] == place]
 
+    # The fake park never touches these; the janitor only needs them registered.
+    (tmp_path / "exporter.yaml").write_text(json.dumps({place: {
+        "NetworkUSBFlashableDevice": {"host": "exporter.test", "busnum": 1, "devnum": index,
+                                      "path": f"1-{index}", "vendor_id": 0x303A, "model_id": 0x1001,
+                                      "devnode": f"/dev/ttyACM{index}"},
+        "NetworkSerialPort": {"host": "127.0.0.1", "port": 1, "protocol": "raw"},
+    } for index, place in enumerate(["reader-a", "reader-b"], 1)}))
+
     with running([executable("labgrid-coordinator"), "-l", address], tmp_path) as coordinator:
         eventually(lambda: client("places", check=False).returncode == 0, coordinator)
-        for place, variant in [("reader-a", "touch-v2"), ("reader-b", "touch-v2"), ("other", None)]:
+        # reader-c has no exporter resources: acquiring it would leave nothing to
+        # flash, and reserving it would hold off maintenance.
+        for place, variant in [("reader-a", "touch-v2"), ("reader-b", "touch-v2"),
+                               ("reader-c", "touch-v2"), ("other", None)]:
             client("-p", place, "create")
+            client("-p", place, "add-match", f"test/{place}/*")
             if variant:
                 client("-p", place, "set-tags", f"variant={variant}")
         janitor_command = [
@@ -208,8 +220,12 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
         ]
         monkeypatch.setenv("FAKE_PARK_ROOT", str(tmp_path))
         monkeypatch.setenv("FAKE_PARK_SECONDS", "1")
-        with running(janitor_command, tmp_path) as janitor:
-            # Startup parks every managed reader once and leaves "other" alone.
+        exporter_command = [executable("labgrid-exporter"), "-c", address, "-n", "test", "--isolated",
+                            "--hostname", "exporter.test", str(tmp_path / "exporter.yaml")]
+        with running(exporter_command, tmp_path), running(janitor_command, tmp_path) as janitor:
+            # Started with the exporter, as after a deploy: the janitor must wait
+            # until each reader is registered. Startup parks every managed
+            # reader once and leaves "other" alone.
             eventually(lambda: parked("reader-a") and holder("reader-a") is None, janitor, 20)
             eventually(lambda: (state / "quarantine/reader-b.json").exists(), janitor, 20)
             assert holder("reader-b") == OWNER
@@ -217,6 +233,7 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             assert parked("reader-a")[0] == {"place": "reader-a", "host": "attractap-lab-janitor",
                                              "image": "park.bin"}
             assert not parked("other") and holder("other") is None
+            assert not parked("reader-c") and holder("reader-c") is None
             assert client("-p", "reader-b", "acquire", check=False).returncode != 0
 
             # A waiting priority-0 session must not get the reader before it is parked.
@@ -293,3 +310,43 @@ def test_janitor_undoes_an_acquire_whose_call_failed(tmp_path):
     holder = "agent/someone"
     asyncio.run(janitor._acquire("reader"))
     assert released == [("reader", OWNER)], "Never release another owner's claim"
+
+
+def test_janitor_releases_a_claim_without_resources(tmp_path):
+    from labgrid.remote.common import Place, ResourceEntry, ResourceMatch
+    released, parked = [], []
+
+    class Stub:
+        async def ReleasePlace(self, request, timeout):
+            released.append((request.placename, request.fromuser))
+
+    def place(name, acquired_resources):
+        return Place(name=name, tags={"variant": "touch-v2"}, acquired=OWNER,
+                     matches=[ResourceMatch.fromstr(f"test/{name}/*")],
+                     acquired_resources=acquired_resources, reservation="TOKEN")
+
+    session = SimpleNamespace(stub=Stub(), resources={"test": {
+        "full": {"Flash": ResourceEntry({"cls": "NetworkUSBFlashableDevice"}),
+                 "Serial": ResourceEntry({"cls": "NetworkSerialPort"})},
+        "serial-only": {"Serial": ResourceEntry({"cls": "NetworkSerialPort"})},
+    }}, places={"empty": place("empty", []),
+                "full": place("full", [("test", "full", "NetworkUSBFlashableDevice", "Flash")])})
+    janitor = Janitor(session, config=None, images={"touch-v2": "park.bin"}, state_dir=tmp_path,
+                      priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
+                      marker_seconds=1)
+
+    async def fake_park(name, variant):
+        parked.append(name)
+
+    janitor._park = fake_park
+
+    async def tick():
+        await janitor.tick()
+        await asyncio.gather(*janitor.jobs.values())
+
+    asyncio.run(tick())
+    assert released == [("empty", OWNER)]
+    assert parked == ["full"]
+    assert janitor._hardware_registered(session.places["full"])
+    assert not janitor._hardware_registered(place("serial-only", []))
+    assert not janitor._hardware_registered(place("missing", []))
