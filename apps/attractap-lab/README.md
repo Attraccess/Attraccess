@@ -201,6 +201,29 @@ on the session's console. Inside a session, call
 the exporter host over labgrid's SSH connection. Set the reader's PIN first
 (`CMND auth.code.set {"newCode":"..."}`).
 
+## Hardware-in-the-loop tests
+
+`hil/` holds pytest tests that run real reader firmware against the NFC card
+emulator: card detection, enrollment (DESFire EV2/EV3, NTAG424), login,
+supervision, key reset, and rejected, faulty or removed cards.
+
+```sh
+. .tools/esp-idf/export.sh   # or set READER_IMAGE / EMULATOR_IMAGE
+pnpm nx run attractap-lab:hil            # all tests
+pnpm nx run attractap-lab:hil -- -k enroll
+```
+
+The runner builds both firmware images, starts an API on a free port with a
+throwaway database (`STORAGE_ROOT`), and runs pytest inside one labgrid
+session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The reader gets
+the lab Wi-Fi through `attractap-lab-reader-wifi`, so the host needs
+`readerWifi`, and connects to the API at the address of this machine on the
+route to the reader (override with `API_HOST`). `LAB_PYTHON` defaults to the
+interpreter of the installed `labgrid-client`, which must provide labgrid and
+pytest. Logs, the emulator trace and camera photos land in
+`apps/attractap-lab/hil-artifacts/lab-artifacts/<session>`. These tests are not part of `pnpm nx
+run attractap-lab:test`, which runs without hardware.
+
 ## Web dashboard
 
 Enable the pinned upstream [labgrid-plugins dashboard](https://tfcollins.github.io/labgrid-plugins/user-guide/web-dashboard.html)
