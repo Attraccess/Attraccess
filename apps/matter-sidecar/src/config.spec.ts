@@ -11,6 +11,8 @@ describe('loadConfig', () => {
       replayMaxEvents: 1_000,
       replayMaxAgeMs: 300_000,
       clientQueueBytes: 1024 * 1024,
+      maxClients: 64,
+      firstMessageTimeoutMs: 30_000,
     });
   });
 

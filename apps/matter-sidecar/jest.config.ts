@@ -2,6 +2,8 @@ export default {
   displayName: 'matter-sidecar',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
+  // The CRAP score run reuses this config but also executes the process-spawning specs.
+  testTimeout: 60_000,
   testMatch: ['<rootDir>/src/**/*.spec.ts'],
   testPathIgnorePatterns: ['\\.integration\\.spec\\.ts$', '\\.built\\.spec\\.ts$'],
   transform: {

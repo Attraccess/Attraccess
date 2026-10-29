@@ -8,6 +8,29 @@ describe('event stream', () => {
   let running: Running;
   afterEach(() => running?.stop());
 
+  it('refuses new clients beyond the configured cap', async () => {
+    running = await startSidecar({ maxClients: 1 });
+    const first = await WsClient.connect(running.port);
+    await expect(WsClient.connect(running.port)).rejects.toThrow('HTTP 503');
+    first.close();
+  });
+
+  it('closes a client that never sends its resume message', async () => {
+    running = await startSidecar({ firstMessageTimeoutMs: 100 });
+    const client = await WsClient.connect(running.port);
+    await client.until(() => client.closed !== null);
+    expect(client.closed?.code).toBe(CLOSE_CODES.policyViolation);
+  });
+
+  it('keeps a client open once it has sent a message', async () => {
+    running = await startSidecar({ firstMessageTimeoutMs: 100 });
+    const client = await WsClient.connect(running.port);
+    client.send({ type: 'ping', wireVersion: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(client.closed).toBeNull();
+    client.close();
+  });
+
   it('greets with hello and delivers lifecycle and capability events in one envelope', async () => {
     running = await startSidecar();
     const client = await WsClient.connect(running.port);

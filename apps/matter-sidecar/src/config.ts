@@ -31,6 +31,8 @@ export type SidecarConfig = {
   replayMaxEvents: number;
   replayMaxAgeMs: number;
   clientQueueBytes: number;
+  maxClients: number;
+  firstMessageTimeoutMs: number;
 };
 
 export class ConfigError extends Error {
@@ -54,6 +56,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     replayMaxEvents: values.MATTER_SIDECAR_REPLAY_MAX_EVENTS,
     replayMaxAgeMs: values.MATTER_SIDECAR_REPLAY_MAX_AGE_MS,
     clientQueueBytes: values.MATTER_SIDECAR_CLIENT_QUEUE_BYTES,
+    maxClients: 64,
+    firstMessageTimeoutMs: 30_000,
   };
 }
 

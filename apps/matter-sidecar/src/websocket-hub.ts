@@ -114,9 +114,6 @@ class Client {
   }
 }
 
-const MAX_CLIENTS = 64;
-const FIRST_MESSAGE_TIMEOUT_MS = 30_000;
-
 export class WebSocketHub {
   private readonly server: WebSocketServer;
   private readonly clients = new Set<Client>();
@@ -148,7 +145,7 @@ export class WebSocketHub {
       // A client that never sends its resume message would otherwise stay open forever.
       const idle = setTimeout(
         () => client.close(CLOSE_CODES.policyViolation, 'no resume message'),
-        FIRST_MESSAGE_TIMEOUT_MS,
+        this.config.firstMessageTimeoutMs,
       );
       idle.unref();
       ws.once('message', () => clearTimeout(idle));
@@ -166,7 +163,7 @@ export class WebSocketHub {
       return { code: 'not_found', message: 'Unknown path.' };
     }
     if (this.isDraining()) return { code: 'sidecar_unavailable', message: 'The Matter sidecar is shutting down.' };
-    if (this.clients.size >= MAX_CLIENTS) {
+    if (this.clients.size >= this.config.maxClients) {
       return { code: 'sidecar_unavailable', message: 'Too many event stream clients are connected.' };
     }
     const admission = checkAdmission(req.headers, this.running);
