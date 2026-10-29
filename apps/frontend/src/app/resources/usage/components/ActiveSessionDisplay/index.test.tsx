@@ -11,9 +11,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import usePluginState, { PluginManifestWithPlugin } from '../../../../plugins/plugin.state';
 import { ActiveSessionDisplay } from './index';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  AttraccessUser: () => null,
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    AttraccessUser: () => null,
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+  }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceUsageEndSession: () => ({ mutate: vi.fn(), isPending: false }),

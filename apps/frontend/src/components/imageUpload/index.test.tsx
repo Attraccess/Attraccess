@@ -2,7 +2,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ImageUpload } from './index';
 const mocks = vi.hoisted(() => ({ error: vi.fn(), process: vi.fn() }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+}));
 vi.mock('../toastProvider', () => ({ useToastMessage: () => ({ error: mocks.error }) }));
 vi.mock('./imageProcessing', () => ({ processImageWithAutoScale: mocks.process }));
 beforeEach(() => {

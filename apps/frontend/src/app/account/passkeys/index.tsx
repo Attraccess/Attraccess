@@ -16,15 +16,13 @@ import {
 import { KeyRound, Trash2 } from 'lucide-react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   PasskeysService,
   usePasskeysServiceDeletePasskey,
   usePasskeysServiceListPasskeys,
   type Passkey,
 } from '@attraccess/react-query-client';
-import { Button } from '../../../components/button';
-import { EmptyState } from '../../../components/emptyState';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
@@ -148,7 +146,12 @@ export function PasskeysCard() {
         <Input placeholder={t('namePlaceholder')} data-cy="passkey-name-input" />
       </TextField>
 
-      <Button onPress={handleRegister} isPending={isRegistering} isDisabled={isRegistering} data-cy="passkey-add-button">
+      <Button
+        onPress={handleRegister}
+        isPending={isRegistering}
+        isDisabled={isRegistering}
+        data-cy="passkey-add-button"
+      >
         <KeyRound size={16} />
         {t('actions.add')}
       </Button>

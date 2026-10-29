@@ -13,13 +13,12 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { Eye, EyeOff, MoreVertical } from 'lucide-react';
-import { Button } from '../../../../components/button/index';
 import { AuthentikDiscoveryDialog } from '../discovery/authentik/index';
 import { KeycloakDiscoveryDialog } from '../discovery/keycloak/index';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { PermissionSyncSection } from './PermissionSyncSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
 import de from '../de.json';
 

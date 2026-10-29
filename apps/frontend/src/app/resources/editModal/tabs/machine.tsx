@@ -1,4 +1,4 @@
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
 
 export function MachineTab(props: EditorTabProps) {

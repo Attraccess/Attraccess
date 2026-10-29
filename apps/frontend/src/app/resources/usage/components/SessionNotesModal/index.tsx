@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { TextArea } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { StandardModal } from '../../../../../components/standardModal';
+import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
 

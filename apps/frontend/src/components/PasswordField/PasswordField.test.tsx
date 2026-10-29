@@ -5,8 +5,27 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PasswordField } from './PasswordField';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+  }))()),
+  ...(await (() => ({
+    PasswordInput: ({
+      label,
+      value,
+      onValueChange,
+    }: {
+      label: string;
+      value: string;
+      onValueChange: (value: string) => void;
+    }) => (
+      <label>
+        {label}
+        <input value={value} onChange={(event) => onValueChange(event.target.value)} />
+      </label>
+    ),
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -15,23 +34,6 @@ vi.mock('@attraccess/react-query-client', () => ({
 
 vi.mock('../toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn() }),
-}));
-
-vi.mock('../PasswordInput', () => ({
-  PasswordInput: ({
-    label,
-    value,
-    onValueChange,
-  }: {
-    label: string;
-    value: string;
-    onValueChange: (value: string) => void;
-  }) => (
-    <label>
-      {label}
-      <input value={value} onChange={(event) => onValueChange(event.target.value)} />
-    </label>
-  ),
 }));
 
 vi.mock('../PasswordPolicyHints', () => ({

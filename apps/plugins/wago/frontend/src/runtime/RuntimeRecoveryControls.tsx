@@ -1,4 +1,5 @@
-import { Accordion, Button } from '@heroui/react';
+import { Button } from '@attraccess/plugins-frontend-ui';
+import { Accordion } from '@heroui/react';
 import type { useRuntimeUpdateDetailsState } from './useRuntimeUpdateDetailsState';
 export function RuntimeRecoveryControls({ model }: { model: ReturnType<typeof useRuntimeUpdateDetailsState> }) {
   if (!model.status) return null;

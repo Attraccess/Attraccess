@@ -8,12 +8,10 @@ import {
   ModalHeader,
   Spinner,
 } from '@heroui/react';
-import { StandardModal } from '../../../components/standardModal';
-import { Button } from '../../../components/button/index';
 import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourcesServiceGetAllResources,
   useResourcesServiceResourceUsageEndSession,

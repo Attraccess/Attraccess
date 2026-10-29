@@ -1,4 +1,11 @@
-import { AttraccessUser, UserIdentity, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  AttraccessUser,
+  Button,
+  EmptyState,
+  UserIdentity,
+  UserSearch,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { User } from '@attraccess/react-query-client';
 import {
   ButtonProps,
@@ -12,11 +19,9 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button } from '../button';
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import { SimplePagination } from '../simplePagination';
 import { PlusIcon } from 'lucide-react';
-import { EmptyState } from '../emptyState';
 
 import de from './de.json';
 import en from './en.json';

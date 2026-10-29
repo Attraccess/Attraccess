@@ -3,6 +3,7 @@ import { state } from './visual-editor.test.state';
 import { PluginLiveUpdatesProvider, type PluginLiveUpdatesClient } from '@attraccess/plugins-frontend-sdk';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -21,7 +22,9 @@ function mount(liveClient: PluginLiveUpdatesClient | null = null) {
   render(
     <QueryClientProvider client={client}>
       <PluginLiveUpdatesProvider client={liveClient}>
-        <ConfigurationEditor controllerId={1} onOpenChange={close} />
+        <MemoryRouter>
+          <ConfigurationEditor controllerId={1} onOpenChange={close} />
+        </MemoryRouter>
       </PluginLiveUpdatesProvider>
     </QueryClientProvider>,
   );
@@ -163,12 +166,12 @@ describe('visual configuration workflow', () => {
     state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostics)));
     mount();
     await section(userEvent.setup(), 'Diagnostics');
-    expect(await screen.findByText(/command\.v1/)).toHaveTextContent('9/6/2026');
-    expect(screen.getByText(/state\.changed/)).toHaveTextContent('9/6/2026');
+    expect(await screen.findByText(/command\.v1/)).toHaveTextContent('09/06/2026');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('09/06/2026');
     act(() => useTranslationState.getState().setLanguage('de'));
-    expect(screen.getByText(/command\.v1/)).toHaveTextContent('6.9.2026');
+    expect(screen.getByText(/command\.v1/)).toHaveTextContent('06.09.2026');
     expect(screen.getByText(/command\.v1/)).toHaveTextContent('Akzeptiert');
-    expect(screen.getByText(/state\.changed/)).toHaveTextContent('6.9.2026');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('06.09.2026');
     expect(state.diagnostics).toHaveBeenCalledTimes(1);
   });
 
@@ -233,7 +236,9 @@ describe('visual configuration workflow', () => {
   it('scopes diagnostics to the selected controller and removes it when the editor closes', async () => {
     const view = (controllerId: number | null) => (
       <QueryClientProvider client={client}>
-        <ConfigurationEditor controllerId={controllerId} onOpenChange={vi.fn()} />
+        <MemoryRouter>
+          <ConfigurationEditor controllerId={controllerId} onOpenChange={vi.fn()} />
+        </MemoryRouter>
       </QueryClientProvider>
     );
     const { rerender } = render(view(1));
@@ -678,7 +683,9 @@ describe('configuration workspace', () => {
     const close = vi.fn();
     const view = (id: number | null) => (
       <QueryClientProvider client={client}>
-        <ConfigurationEditor controllerId={id} onOpenChange={close} />
+        <MemoryRouter>
+          <ConfigurationEditor controllerId={id} onOpenChange={close} />
+        </MemoryRouter>
       </QueryClientProvider>
     );
     const { rerender } = render(view(1));
@@ -690,7 +697,7 @@ describe('configuration workspace', () => {
     rerender(view(1));
     expect(await screen.findByRole('textbox', { name: 'Channel name' })).toHaveValue('Retained local edit');
     await user.click(screen.getByRole('button', { name: 'WAGO controllers' }));
-    expect(await screen.findByRole('dialog', { name: 'Discard unsaved local edits?' })).toBeVisible();
+    expect(await screen.findByRole('alertdialog', { name: 'Discard unsaved local edits?' })).toBeVisible();
     expect(close).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Keep editing' }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));

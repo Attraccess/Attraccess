@@ -4,6 +4,7 @@ import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeMeasurement } from '../../measurement-contract';
 import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
@@ -57,7 +58,9 @@ const draft = {
 };
 let client: QueryClient;
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  <MemoryRouter>
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  </MemoryRouter>
 );
 
 it('shows all meter sections and keeps available phases current when one register faults', async () => {
@@ -407,7 +410,7 @@ describe('front panel page actions', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Revision history' }));
     expect(onHistory).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
   it('asks before leaving with unapplied changes and only leaves once confirmed', async () => {
@@ -417,7 +420,7 @@ describe('front panel page actions', () => {
     render(<FrontPanel controllerId={1} onClose={onClose} onHistory={onHistory} />, { wrapper });
     await screen.findByText('Unapplied changes');
     fireEvent.click(screen.getByRole('button', { name: 'Revision history' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Leave with unapplied changes?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Leave with unapplied changes?' });
     expect(onHistory).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Leave page' }));
     expect(onHistory).toHaveBeenCalledTimes(1);

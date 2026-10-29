@@ -1,9 +1,7 @@
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { StandardDrawer } from '../../../../components/standardDrawer';
 import de from './de.json';
 import en from './en.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   UseAttractapServiceGetAllCardsKeyFn,
   useAttractapServiceToggleCardActive,

@@ -8,36 +8,39 @@ import { TestWrapper } from '../../../test-utils/wrappers';
 
 const mutateMock = vi.fn();
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => {
-    const translations: Record<string, string> = {
-      title: 'Invite User',
-      'tabs.single': 'Single',
-      'tabs.csv': 'CSV import',
-      'actions.invite': 'Invite',
-      'inputs.username.label': 'Username',
-      'inputs.email.label': 'Email',
-      'inputs.username.description': '3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.',
-      'inputs.username.validation.length': 'Username must be between 3 and 32 characters.',
-      'inputs.username.validation.format': 'Only letters, numbers, underscores, hyphens, and dots are allowed.',
-      'success.title': 'Success',
-      'success.description': 'The user was successfully invited.',
-    };
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => {
+      const translations: Record<string, string> = {
+        title: 'Invite User',
+        'tabs.single': 'Single',
+        'tabs.csv': 'CSV import',
+        'actions.invite': 'Invite',
+        'inputs.username.label': 'Username',
+        'inputs.email.label': 'Email',
+        'inputs.username.description': '3-32 characters. Allowed: letters, numbers, underscores, hyphens, and dots.',
+        'inputs.username.validation.length': 'Username must be between 3 and 32 characters.',
+        'inputs.username.validation.format': 'Only letters, numbers, underscores, hyphens, and dots are allowed.',
+        'success.title': 'Success',
+        'success.description': 'The user was successfully invited.',
+      };
 
-    const t = (key: string, vars?: Record<string, unknown>) => {
-      let value = translations[key] ?? key;
-      if (vars) {
-        Object.entries(vars).forEach(([varKey, varValue]) => {
-          value = value.replace(`{{${varKey}}}`, String(varValue));
-        });
-      }
-      return value;
-    };
+      const t = (key: string, vars?: Record<string, unknown>) => {
+        let value = translations[key] ?? key;
+        if (vars) {
+          Object.entries(vars).forEach(([varKey, varValue]) => {
+            value = value.replace(`{{${varKey}}}`, String(varValue));
+          });
+        }
+        return value;
+      };
 
-    const tExists = (key: string) => Boolean(translations[key]);
+      const tExists = (key: string) => Boolean(translations[key]);
 
-    return { t, tExists };
-  },
+      return { t, tExists };
+    },
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -53,10 +56,9 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 
 function renderModal() {
-  return render(
-    <InviteUserModal>{(onOpen) => <button onClick={onOpen}>Open</button>}</InviteUserModal>,
-    { wrapper: TestWrapper },
-  );
+  return render(<InviteUserModal>{(onOpen) => <button onClick={onOpen}>Open</button>}</InviteUserModal>, {
+    wrapper: TestWrapper,
+  });
 }
 
 describe('InviteUserModal', () => {

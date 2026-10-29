@@ -5,13 +5,12 @@ import {
   useUsersServiceGetOneUserByIdKey,
 } from '@attraccess/react-query-client';
 import { cn, TextField, Label, Input } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useEffect, useState } from 'react';
 
 import de from './de.json';
 import en from './en.json';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { ApiError } from '@attraccess/react-query-client';
 

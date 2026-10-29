@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   SSOProvider,
   useAuthenticationServiceDeleteOneSsoProvider,
@@ -18,6 +18,7 @@ export const SSOProvidersList = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { success, error: showError } = useToastMessage();
+  const [providerToDelete, setProviderToDelete] = useState<number | null>(null);
   const { data: providers, error } = useAuthenticationServiceGetAllSsoProviders();
 
   const deleteSSOProvider = useAuthenticationServiceDeleteOneSsoProvider({
@@ -35,30 +36,47 @@ export const SSOProvidersList = () => {
     [navigate],
   );
 
-  const handleDelete = useCallback(
-    async (id: number) => {
-      if (!window.confirm(t('deleteConfirmation'))) {
-        return;
-      }
-      try {
-        await deleteSSOProvider.mutateAsync({ id });
-        success({
-          title: t('providerDeleted'),
-          description: t('providerDeletedDesc'),
-        });
-      } catch (err) {
-        showError({
-          title: t('errorGeneric'),
-          description: err instanceof Error ? err.message : t('failedToDelete'),
-        });
-      }
-    },
-    [deleteSSOProvider, showError, success, t],
-  );
+  const handleDeleteConfirmed = useCallback(async () => {
+    if (providerToDelete === null) {
+      return;
+    }
+    try {
+      await deleteSSOProvider.mutateAsync({ id: providerToDelete });
+      setProviderToDelete(null);
+      success({
+        title: t('providerDeleted'),
+        description: t('providerDeletedDesc'),
+      });
+    } catch (err) {
+      showError({
+        title: t('errorGeneric'),
+        description: err instanceof Error ? err.message : t('failedToDelete'),
+      });
+    }
+  }, [deleteSSOProvider, providerToDelete, showError, success, t]);
 
   if (error) {
     return <div className="text-red-500 p-4">{t('errorLoading')}</div>;
   }
 
-  return <SSOProvidersTable providers={providers ?? []} onEdit={handleEdit} onDelete={handleDelete} />;
+  return (
+    <>
+      <SSOProvidersTable providers={providers ?? []} onEdit={handleEdit} onDelete={setProviderToDelete} />
+      <StatusDialog
+        isOpen={providerToDelete !== null}
+        onClose={() => setProviderToDelete(null)}
+        status="error"
+        title={t('deleteProvider')}
+        closeLabel={t('cancel')}
+        action={{
+          label: t('deleteText'),
+          onPress: handleDeleteConfirmed,
+          isPending: deleteSSOProvider.isPending,
+          'data-cy': 'sso-provider-delete-confirm-button',
+        }}
+      >
+        {t('deleteConfirmation')}
+      </StatusDialog>
+    </>
+  );
 };

@@ -11,7 +11,6 @@ import {
   SupervisionMode,
   UpdateResourceDto,
 } from '@attraccess/react-query-client';
-import { PageHeader } from '../../../components/pageHeader/index';
 import { SettingsDirectory } from '../../../components/settingsDirectory';
 import type { SettingsDirectoryGroup } from '../../../components/settingsDirectory';
 import { SharedDataTab } from '../editModal/tabs/shared';
@@ -22,7 +21,7 @@ import { SupervisionTab } from '../editModal/tabs/supervision';
 import { ResourceMetadataEditor } from '../editModal/resourceMetadataEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import editorEn from '../editModal/resourceEditModal.en.json';
 import editorDe from '../editModal/resourceEditModal.de.json';

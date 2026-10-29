@@ -1,9 +1,8 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Tab, TabList, TabPanel, Tabs } from '@heroui/react';
 import { AttractapFirmware } from '@attraccess/react-query-client';
 import { ArrowLeft } from 'lucide-react';
 import { Key, useEffect, useRef, useState } from 'react';
-import { Button } from '../../../../components/button';
 import { FirmwareFlasher } from '../FirmwareFlasher';
 import { FirmwareSelector } from '../FirmwareSelector';
 import { AttractapSerialConfiguratorApi } from '../SerialConfigurator/Api';

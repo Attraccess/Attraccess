@@ -1,24 +1,11 @@
-import {
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerHeading,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Spinner,
-} from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner } from '@heroui/react';
 import { ArrowLeft, Palette, RotateCcw } from 'lucide-react';
 import Editor from '@monaco-editor/react';
-import { Button } from '../../components/button/index';
-import { StandardDrawer } from '../../components/standardDrawer';
-import { StandardModal } from '../../components/standardModal';
 import { MjmlVisualEditor } from '../email-templates/edit/MjmlVisualEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { OnMount } from '@monaco-editor/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAppTheme } from '@attraccess/ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
@@ -305,26 +292,16 @@ export function EmailLayoutPage() {
         </DrawerFooter>
       </StandardDrawer>
 
-      <StandardModal isOpen={resetConfirmOpen} onOpenChange={setResetConfirmOpen} size="sm">
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('resetConfirm.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('resetConfirm.message')}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close}>
-                {t('resetConfirm.cancel')}
-              </Button>
-              <Button variant="danger" isPending={resetLayout.isPending} onPress={onResetConfirm}>
-                {t('resetConfirm.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+      <StatusDialog
+        isOpen={resetConfirmOpen}
+        onClose={() => setResetConfirmOpen(false)}
+        status="error"
+        title={t('resetConfirm.title')}
+        closeLabel={t('resetConfirm.cancel')}
+        action={{ label: t('resetConfirm.confirm'), onPress: onResetConfirm, isPending: resetLayout.isPending }}
+      >
+        {t('resetConfirm.message')}
+      </StatusDialog>
     </div>
   );
 }

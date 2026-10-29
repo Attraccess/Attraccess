@@ -1,8 +1,6 @@
+import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
 import { Input, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { Select } from '../../../../../components/select/index';
-import { StandardModal } from '../../../../../components/standardModal';
 import { dependencyError, DependencyPlanDetails } from '../dependencies/DependencyPlan';
 import { VersionCandidates } from './VersionCandidates';
 import { usePluginsSectionState } from '../state/usePluginSettings';

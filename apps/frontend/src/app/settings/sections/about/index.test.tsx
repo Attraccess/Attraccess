@@ -13,9 +13,12 @@ vi.mock('@attraccess/react-query-client', () => ({
   useSystemServiceGetUpdateStatus: vi.fn(),
   useSystemServiceGetSystemInfo: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
-  useFormatedDuration: () => '2 hours',
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+    useFormatedDuration: () => '2 hours',
+  }))()),
 }));
 
 describe('AboutSection', () => {

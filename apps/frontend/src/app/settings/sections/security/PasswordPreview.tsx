@@ -1,3 +1,4 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chip, InputGroup, Spinner, TextField } from '@heroui/react';
 import { CheckIcon, EyeIcon, EyeOffIcon, XIcon } from 'lucide-react';
@@ -8,7 +9,6 @@ import {
   PreviewPasswordResultDto,
   UpdatePasswordPolicyDto,
 } from '@attraccess/react-query-client';
-import { Button } from '../../../../components/button';
 
 const DEBOUNCE_MS = 400;
 

@@ -155,7 +155,7 @@ it('requires reset confirmation and reseeds from the returned default', async ()
       'Default header',
     ),
   );
-  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.queryByRole('alertdialog')).toBeNull();
 });
 it('offers retry after a failed initial load', () => {
   state.body = undefined;

@@ -1,9 +1,8 @@
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PlusIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
-import { Button } from '../../../../components/button';
 import { SSOProvidersList } from '../../../sso/providers/SSOProvidersList';
 import { useAuth } from '../../../../hooks/useAuth';
 import en from './en.json';

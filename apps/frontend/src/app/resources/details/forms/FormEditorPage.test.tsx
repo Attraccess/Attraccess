@@ -6,9 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { TestWrapper } from '../../../../test-utils/wrappers';
 import { FormEditorPage } from './FormEditorPage';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
-  I18nTransComponent: () => null,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+    I18nTransComponent: () => null,
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
@@ -25,14 +28,12 @@ function renderEditor() {
     <TestWrapper
       initialRoute="/resources/7/forms/new"
       routes={<Route path="/resources/:id/forms/:formId" element={<FormEditorPage />} />}
-    />
+    />,
   );
 }
 
 const fieldTrigger = () =>
-  screen
-    .getAllByRole('button', { expanded: undefined })
-    .find((b) => /^#1/.test(b.textContent ?? '')) as HTMLElement;
+  screen.getAllByRole('button', { expanded: undefined }).find((b) => /^#1/.test(b.textContent ?? '')) as HTMLElement;
 
 describe('FormEditorPage field accordion', () => {
   // Regression for the drag-and-drop reorder change (#1676): AccordionTrigger carried its own

@@ -11,9 +11,7 @@ export function Button(props: ButtonProps) {
     <HeroButton {...rest} isPending={isPending} isIconOnly={isIconOnly}>
       {(renderProps) => (
         <>
-          <span
-            className={`inline-flex items-center gap-2 ${pendingContentClass}`}
-          >
+          <span className={`inline-flex items-center gap-2 ${pendingContentClass}`}>
             {typeof children === 'function' ? children(renderProps) : children}
           </span>
           {isPending && (

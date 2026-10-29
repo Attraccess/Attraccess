@@ -1,6 +1,6 @@
+import { EmptyState, StandardDrawer, StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import {
-  Alert,
   Button,
   Chip,
   Drawer,
@@ -96,11 +96,7 @@ export function ControllerStatus({
 
 export function EmptyControllers({ searching = false }: { searching?: boolean }) {
   const { t } = useWagoTranslations();
-  return (
-    <div className="wg:px-4 wg:py-12 wg:text-center wg:text-sm wg:text-muted">
-      {t(searching ? 'controllers.noResults' : 'controllers.empty')}
-    </div>
-  );
+  return <EmptyState message={t(searching ? 'controllers.noResults' : 'controllers.empty')} />;
 }
 
 export function isResumable(state: WagoCommissioningState): boolean {
@@ -157,7 +153,8 @@ export function CommissioningRow({
   onResume: (session: CommissioningSession) => void;
   onDetails: () => void;
 }) {
-  const { t, language } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t } = useWagoTranslations();
   const { session } = row;
   const name = session.controllerName ?? session.hardwareId ?? t('controllers.enrollment');
   return (
@@ -185,9 +182,7 @@ export function CommissioningRow({
       </TableCell>
       <TableCell className={cellClass}>—</TableCell>
       <TableCell className={`wg:hidden wg:lg:table-cell ${cellClass}`}>
-        {session.updatedAt
-          ? new Date(session.updatedAt).toLocaleString(language, { dateStyle: 'short', timeStyle: 'short' })
-          : '—'}
+        {session.updatedAt ? formatDateTime(session.updatedAt) : '—'}
       </TableCell>
       <TableCell className={cellClass}>
         <div className="wg:flex wg:justify-end wg:gap-2">
@@ -237,7 +232,8 @@ export function ControllerRow({
   onConfigure: (id: number) => void;
   onDetails: () => void;
 }) {
-  const { t, language } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t } = useWagoTranslations();
   const { controller, session } = row;
   const target =
     controller.trustState === 'claimed' ? { controller } : session?.managedAccessAvailable ? { session } : null;
@@ -262,9 +258,7 @@ export function ControllerRow({
         <RuntimeUpdateSummary controller={controller} status={status} unavailable={query.isError} compact />
       </TableCell>
       <TableCell className={`wg:hidden wg:lg:table-cell ${cellClass}`}>
-        {controller.lastHeartbeatAt
-          ? new Date(controller.lastHeartbeatAt).toLocaleString(language, { dateStyle: 'short', timeStyle: 'short' })
-          : '—'}
+        {controller.lastHeartbeatAt ? formatDateTime(controller.lastHeartbeatAt) : '—'}
       </TableCell>
       <TableCell className={cellClass}>
         <div className="wg:flex wg:justify-end wg:gap-2">
@@ -306,7 +300,8 @@ export function ControllerDetailsDrawer({
   onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
 }) {
-  const { t, language, tBackendMessage } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t, tBackendMessage } = useWagoTranslations();
   const controller = row.kind === 'controller' ? row.controller : null;
   const session = row.session;
   const name = controller?.name ?? session?.controllerName ?? controller?.hardwareId ?? t('controllers.enrollment');
@@ -319,93 +314,85 @@ export function ControllerDetailsDrawer({
     }
   };
   return (
-    <Drawer.Backdrop
+    <StandardDrawer
       isOpen
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
+      contentProps={{ placement: 'right' }}
+      dialogProps={{ 'aria-label': t('controllers.detailsFor', { name }), className: 'wg:w-full wg:max-w-xl' }}
     >
-      <Drawer.Content placement="right">
-        <Drawer.Dialog aria-label={t('controllers.detailsFor', { name })} className="wg:w-full wg:max-w-xl">
-          <Drawer.Header>
-            <Drawer.Heading>{name}</Drawer.Heading>
-            <Drawer.CloseTrigger aria-label={t('common.close')} />
-          </Drawer.Header>
-          <Drawer.Body className="wg:space-y-4">
-            <dl className="wg:space-y-2">
-              <div>
-                <dt className="wg:text-sm wg:text-muted">{t('controllers.hardwareId')}</dt>
-                <dd className="wg:break-all">{controller?.hardwareId ?? session?.hardwareId}</dd>
-              </div>
-              {controller && (
-                <div>
-                  <dt className="wg:text-sm wg:text-muted">{t('controllers.registration')}</dt>
-                  <dd>{t(`trust.${controller.trustState}`)}</dd>
-                </div>
-              )}
-              {session?.targetHost && (
-                <div>
-                  <dt className="wg:text-sm wg:text-muted">{t('controllers.address')}</dt>
-                  <dd>{session.targetHost}</dd>
-                </div>
-              )}
-              {controller && (
-                <div>
-                  <dt className="wg:text-sm wg:text-muted">{t('controllers.heartbeat')}</dt>
-                  <dd>
-                    {controller.lastHeartbeatAt
-                      ? new Date(controller.lastHeartbeatAt).toLocaleString(language)
-                      : t('controllers.never')}
-                  </dd>
-                </div>
-              )}
-              {session?.firmwareBaseline && (
-                <div>
-                  <dt className="wg:text-sm wg:text-muted">{t('controllers.systemFirmware')}</dt>
-                  <dd>{session.firmwareBaseline}</dd>
-                </div>
-              )}
-            </dl>
-            {session && (
-              <CommissioningStatus session={session} runtimeUpdate={controller?.connectivity === 'runtime_update'} />
-            )}
-            {controller?.compatibilityError && (
-              <Alert status="warning">
-                <Alert.Content>
-                  <Alert.Description>{tBackendMessage(controller.compatibilityError)}</Alert.Description>
-                </Alert.Content>
-              </Alert>
-            )}
-            {target && <RuntimeUpdateDetails target={target} />}
-            {controller?.trustState === 'claimed' && <NetworkChangeDetails controllerId={controller.id} />}
-            {session?.failureReason && <p role="alert">{tBackendMessage(session.failureReason)}</p>}
-          </Drawer.Body>
-          <Drawer.Footer className="wg:flex wg:flex-wrap wg:gap-2">
-            {controller?.trustState === 'claimed' && <Button onPress={configure}>{t('controllers.configure')}</Button>}
-            {session && (
-              <SessionProgressAction
-                session={session}
-                onResume={(value) => {
-                  onClose();
-                  onResume(value);
-                }}
-              />
-            )}
-            {controller && (
-              <Button
-                variant="danger"
-                onPress={() => {
-                  onClose();
-                  onRemove(controller);
-                }}
-              >
-                {t('common.remove')}
-              </Button>
-            )}
-          </Drawer.Footer>
-        </Drawer.Dialog>
-      </Drawer.Content>
-    </Drawer.Backdrop>
+      <Drawer.Header>
+        <Drawer.Heading>{name}</Drawer.Heading>
+        <Drawer.CloseTrigger aria-label={t('common.close')} />
+      </Drawer.Header>
+      <Drawer.Body className="wg:space-y-4">
+        <dl className="wg:space-y-2">
+          <div>
+            <dt className="wg:text-sm wg:text-muted">{t('controllers.hardwareId')}</dt>
+            <dd className="wg:break-all">{controller?.hardwareId ?? session?.hardwareId}</dd>
+          </div>
+          {controller && (
+            <div>
+              <dt className="wg:text-sm wg:text-muted">{t('controllers.registration')}</dt>
+              <dd>{t(`trust.${controller.trustState}`)}</dd>
+            </div>
+          )}
+          {session?.targetHost && (
+            <div>
+              <dt className="wg:text-sm wg:text-muted">{t('controllers.address')}</dt>
+              <dd>{session.targetHost}</dd>
+            </div>
+          )}
+          {controller && (
+            <div>
+              <dt className="wg:text-sm wg:text-muted">{t('controllers.heartbeat')}</dt>
+              <dd>
+                {controller.lastHeartbeatAt ? formatDateTime(controller.lastHeartbeatAt) : t('controllers.never')}
+              </dd>
+            </div>
+          )}
+          {session?.firmwareBaseline && (
+            <div>
+              <dt className="wg:text-sm wg:text-muted">{t('controllers.systemFirmware')}</dt>
+              <dd>{session.firmwareBaseline}</dd>
+            </div>
+          )}
+        </dl>
+        {session && (
+          <CommissioningStatus session={session} runtimeUpdate={controller?.connectivity === 'runtime_update'} />
+        )}
+        {controller?.compatibilityError && (
+          <StatusAlert status="warning">{tBackendMessage(controller.compatibilityError)}</StatusAlert>
+        )}
+        {target && <RuntimeUpdateDetails target={target} />}
+        {controller?.trustState === 'claimed' && <NetworkChangeDetails controllerId={controller.id} />}
+        {session?.failureReason && <p role="alert">{tBackendMessage(session.failureReason)}</p>}
+      </Drawer.Body>
+      <Drawer.Footer className="wg:flex wg:flex-wrap wg:gap-2">
+        {controller?.trustState === 'claimed' && <Button onPress={configure}>{t('controllers.configure')}</Button>}
+        {session && (
+          <SessionProgressAction
+            session={session}
+            onResume={(value) => {
+              onClose();
+              onResume(value);
+            }}
+          />
+        )}
+        {controller && (
+          <Button
+            variant="danger"
+            onPress={() => {
+              onClose();
+              onRemove(controller);
+            }}
+          >
+            {t('common.remove')}
+          </Button>
+        )}
+      </Drawer.Footer>
+    </StandardDrawer>
   );
 }
 

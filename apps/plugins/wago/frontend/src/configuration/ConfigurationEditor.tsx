@@ -1,5 +1,11 @@
-import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Card, Chip, Modal } from '@heroui/react';
+import {
+  AlertStatusIcon,
+  Button,
+  PageHeader,
+  StatusDialog,
+  type TranslationMessage,
+} from '@attraccess/plugins-frontend-ui';
+import { Alert, Card, Chip } from '@heroui/react';
 import { Activity, ArrowLeft, ArrowRight, GitCompareArrows, History, Network, Settings2 } from 'lucide-react';
 import { ConfigurationErrors } from './ConfigurationChanges';
 import { ConfigurationSessionContent } from './ConfigurationSessionContent';
@@ -111,7 +117,7 @@ export function DraftFeedback({
       )}
       {draftConflict && (
         <Alert status="danger">
-          <Alert.Indicator />
+          <AlertStatusIcon status="danger" />
           <Alert.Content>
             <Alert.Title>{t('editor.draftChanged')}</Alert.Title>
             <Alert.Description>{t('editor.conflict')}</Alert.Description>
@@ -125,6 +131,7 @@ export function DraftFeedback({
       {notice && <p role="status">{tMessage(notice)}</p>}
       {validate.data && !validate.data.valid && (
         <Alert status="danger">
+          <AlertStatusIcon status="danger" />
           <Alert.Content>
             <Alert.Title>{t('editor.resolveFields')}</Alert.Title>
             <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
@@ -211,18 +218,23 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
         <Button variant="ghost" isDisabled={model.busy} onPress={model.close}>
           <ArrowLeft className="wg:size-4" /> {model.t('controllers.title')}
         </Button>
-        <div className="wg:flex wg:flex-wrap wg:items-start wg:justify-between wg:gap-4">
-          <div>
-            <p className="wg:text-sm wg:font-medium wg:text-muted">
-              WAGO / {model.diagnostics.data?.name ?? model.t('editor.controller', { id: controllerId })}
-            </p>
-            <h1 className="wg:mt-1 wg:text-3xl wg:font-semibold">{model.t('editor.title')}</h1>
-            <p className="wg:mt-2 wg:text-muted">{model.t('editor.description')}</p>
-          </div>
-          {model.diagnostics.data && (
-            <Chip variant="soft">{model.t('editor.runtime', { version: model.diagnostics.data.runtimeVersion })}</Chip>
-          )}
-        </div>
+        <PageHeader
+          title={model.t('editor.title')}
+          subtitle={
+            <div className="wg:flex wg:flex-col wg:gap-2">
+              <div className="wg:flex wg:flex-wrap wg:items-center wg:gap-2">
+                <span>WAGO / {model.diagnostics.data?.name ?? model.t('editor.controller', { id: controllerId })}</span>
+                {model.diagnostics.data && (
+                  <Chip variant="soft">
+                    {model.t('editor.runtime', { version: model.diagnostics.data.runtimeVersion })}
+                  </Chip>
+                )}
+              </div>
+              <p>{model.t('editor.description')}</p>
+            </div>
+          }
+          noMargin
+        />
       </header>
       <ConfigurationToolbar
         snapshot={model.snapshot}
@@ -345,32 +357,22 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       <div hidden={model.section !== 'diagnostics'}>
         <ControllerDiagnostics controllerId={controllerId} />
       </div>
-      <Modal isOpen={model.discard} onOpenChange={model.setDiscard}>
-        <Modal.Backdrop>
-          <Modal.Container>
-            <Modal.Dialog>
-              <Modal.Header>
-                <Modal.Heading>{model.t('editor.discard')}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>{model.t('editor.draftRemains')}</Modal.Body>
-              <Modal.Footer>
-                <Button variant="secondary" onPress={() => model.setDiscard(false)}>
-                  {model.t('editor.keepEditing')}
-                </Button>
-                <Button
-                  variant="danger"
-                  onPress={() => {
-                    model.client.removeQueries({ queryKey: model.localKey, exact: true });
-                    onClose();
-                  }}
-                >
-                  {model.t('editor.discardAndClose')}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <StatusDialog
+        isOpen={model.discard}
+        onClose={() => model.setDiscard(false)}
+        status="error"
+        title={model.t('editor.discard')}
+        closeLabel={model.t('editor.keepEditing')}
+        action={{
+          label: model.t('editor.discardAndClose'),
+          onPress: () => {
+            model.client.removeQueries({ queryKey: model.localKey, exact: true });
+            onClose();
+          },
+        }}
+      >
+        {model.t('editor.draftRemains')}
+      </StatusDialog>
     </main>
   );
 }

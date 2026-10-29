@@ -15,7 +15,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: '1' }), Navigate: () => null }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+  ...(await (() => ({ PageHeader: () => null }))()),
+}));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ setQueryData: state.setQueryData, invalidateQueries: state.invalidateQueries }),
 }));
@@ -30,7 +34,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
-vi.mock('../../../components/pageHeader', () => ({ PageHeader: () => null }));
+
 vi.mock('../../../components/settingsDirectory', () => ({
   SettingsDirectory: ({ groups }: { groups: { items: { key: string; content?: React.ReactNode }[] }[] }) =>
     groups[0].items[0].content,

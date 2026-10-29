@@ -1,8 +1,8 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { useParams } from 'react-router-dom';
 import { Background, BackgroundVariant, Controls, ReactFlow, Panel, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ButtonGroup, Spinner } from '@heroui/react';
-import { Button } from '../../../../components/button';
 import {
   BoxSelectIcon,
   Braces as BracesIcon,

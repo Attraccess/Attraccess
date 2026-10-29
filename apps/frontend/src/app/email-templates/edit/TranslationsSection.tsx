@@ -18,11 +18,9 @@ import {
 } from '@heroui/react';
 import type { Key } from '@heroui/react';
 import { Languages, Trash2, Plus } from 'lucide-react';
-import { Button } from '../../../components/button/index';
-import { StandardModal } from '../../../components/standardModal';
 import { useEffect, useMemo, useState } from 'react';
 import { buttonVariants } from '@heroui/styles';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { extractTranslationKeys } from '@attraccess/shared';
 import { useTemplateTranslations } from './useTemplateTranslations';
@@ -283,43 +281,25 @@ export function useTranslationsSectionState({ templateType, liveContent }: Trans
 
 export function TranslationDeleteModal({ model }: { model: ReturnType<typeof useTranslationsSectionState> }) {
   return (
-    <StandardModal
+    <StatusDialog
       isOpen={!!model.deleteTarget}
-      onOpenChange={(open) => !open && model.setDeleteTarget(null)}
-      size="sm"
+      onClose={() => model.setDeleteTarget(null)}
+      status="error"
+      title={model.t('translations.removeLanguage', {
+        language: model.deleteTarget ? model.displayName(model.deleteTarget) : '',
+      })}
+      closeLabel={model.t('actions.cancel')}
+      action={{
+        label: model.t('translations.deleteConfirmButton'),
+        onPress: model.handleDeleteConfirmed,
+        isPending: model.deleteMutation.isPending,
+        'data-cy': 'translations-remove-language-confirm',
+      }}
     >
-      {({ close }) => (
-        <>
-          <ModalHeader>
-            <ModalHeading>
-              {model.t('translations.removeLanguage', {
-                language: model.deleteTarget ? model.displayName(model.deleteTarget) : '',
-              })}
-            </ModalHeading>
-          </ModalHeader>
-          <ModalBody>
-            <p>
-              {model.t('translations.deleteConfirm', {
-                language: model.deleteTarget ? model.displayName(model.deleteTarget) : '',
-              })}
-            </p>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" onPress={close}>
-              {model.t('actions.cancel')}
-            </Button>
-            <Button
-              variant="danger"
-              isPending={model.deleteMutation.isPending}
-              onPress={model.handleDeleteConfirmed}
-              data-cy="translations-remove-language-confirm"
-            >
-              {model.t('translations.deleteConfirmButton')}
-            </Button>
-          </ModalFooter>
-        </>
-      )}
-    </StandardModal>
+      {model.t('translations.deleteConfirm', {
+        language: model.deleteTarget ? model.displayName(model.deleteTarget) : '',
+      })}
+    </StatusDialog>
   );
 }
 

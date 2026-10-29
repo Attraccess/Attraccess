@@ -1,6 +1,6 @@
-import { Button, TextField, Label, Input, TextArea } from "@heroui/react";
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { Button, TextField, Label, Input, TextArea } from '@heroui/react';
 import { Select } from '../../../../../components/select';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { Trash2 } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, createDefaultFieldOptions } from '../types';
@@ -40,7 +40,10 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <TextField isRequired value={field.name} onChange={(v) => onChange({ ...field, name: v })}>
           <Label>{t('fields.label')}</Label>
-          <Input placeholder={t('fields.placeholder.label')} ref={labelInputRef as React.Ref<HTMLInputElement> | undefined} />
+          <Input
+            placeholder={t('fields.placeholder.label')}
+            ref={labelInputRef as React.Ref<HTMLInputElement> | undefined}
+          />
         </TextField>
 
         <Select
@@ -57,10 +60,12 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
         <LabeledSwitch isSelected={field.isRequired} onChange={(value) => onChange({ ...field, isRequired: value })}>
           {t('fields.required')}
         </LabeledSwitch>
-        <Button variant="danger-soft"
+        <Button
+          variant="danger-soft"
 
           onPress={onRemove}
-        ><Trash2 className="w-4 h-4" />
+        >
+          <Trash2 className="w-4 h-4" />
           {t('editor.deleteField')}
         </Button>
       </div>
@@ -71,11 +76,7 @@ export function FormFieldEditor(props: FormFieldEditorProps) {
         onChange={(value) => onChange({ ...field, description: value })}
       >
         <Label>{t('fields.description')}</Label>
-        <TextArea
-          rows={3}
-          placeholder={t('fields.placeholder.description')}
-          className="min-h-24 resize-y"
-        />
+        <TextArea rows={3} placeholder={t('fields.placeholder.description')} className="min-h-24 resize-y" />
       </TextField>
 
       <FieldOptionsEditor field={field} onChange={onChange} t={t} />

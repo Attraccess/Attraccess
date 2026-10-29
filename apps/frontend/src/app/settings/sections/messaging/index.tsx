@@ -1,9 +1,5 @@
 import {
   InputGroup,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Spinner,
   TextField,
   Tooltip,
@@ -20,13 +16,10 @@ import {
 import { ClipboardCopyIcon, RefreshCwIcon } from 'lucide-react';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { Button } from '../../../../components/button/index';
-import { StandardModal } from '../../../../components/standardModal';
-import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
 import { SettingsRow } from '../../components/SettingsRow';
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   usePushServicePushGetVapidConfig,
   UsePushServicePushGetVapidConfigKeyFn,
@@ -353,69 +346,34 @@ export function MessagingSection() {
         onDiscard={() => setDraft({})}
       />
 
-      <StandardModal
+      <StatusDialog
         isOpen={confirmStep === 'warning'}
-        onOpenChange={(open) => {
-          if (!open) {
-            setConfirmStep(null);
-            setPendingOverride(undefined);
-          }
+        onClose={() => {
+          setConfirmStep(null);
+          setPendingOverride(undefined);
         }}
-        size="sm"
+        status="warning"
+        title={t('confirmWarning.title')}
+        closeLabel={t('confirmWarning.cancel')}
+        action={{ label: t('confirmWarning.continue'), onPress: () => setConfirmStep('final') }}
       >
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('confirmWarning.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('confirmWarning.description', { count: vapidConfig?.subscriptionCount ?? 0 })}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close}>
-                {t('confirmWarning.cancel')}
-              </Button>
-              <Button variant="tertiary" onPress={() => setConfirmStep('final')}>
-                {t('confirmWarning.continue')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+        {t('confirmWarning.description', { count: vapidConfig?.subscriptionCount ?? 0 })}
+      </StatusDialog>
 
-      <StandardModal
+      <StatusDialog
         isOpen={confirmStep === 'final'}
-        onOpenChange={(open) => {
-          if (!open) {
-            setConfirmStep(null);
-            setPendingOverride(undefined);
-          }
+        onClose={() => setConfirmStep('warning')}
+        status="error"
+        title={t('confirmFinal.title')}
+        closeLabel={t('confirmFinal.cancel')}
+        action={{
+          label: t('confirmFinal.confirm'),
+          onPress: () => replaceKeys({ requestBody: pendingOverride ?? {} }),
+          isPending: isReplacing,
         }}
-        size="sm"
       >
-        {() => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('confirmFinal.title')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('confirmFinal.description')}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={() => setConfirmStep('warning')}>
-                {t('confirmFinal.cancel')}
-              </Button>
-              <Button
-                variant="danger"
-                isPending={isReplacing}
-                onPress={() => replaceKeys({ requestBody: pendingOverride ?? {} })}
-              >
-                {t('confirmFinal.confirm')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+        {t('confirmFinal.description')}
+      </StatusDialog>
     </SettingsSection>
   );
 }

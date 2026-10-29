@@ -2,10 +2,9 @@
 // FEATURE: Messaging inbox conversation list
 import { ConversationListItemDto } from '@attraccess/react-query-client';
 import { Chip, Skeleton, cn } from '@heroui/react';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { EmptyState } from '../../components/emptyState';
 
 interface Props {
   conversations?: ConversationListItemDto[];

@@ -28,11 +28,6 @@ import {
   TableRow,
 } from '@heroui/react';
 import { MonitorSmartphoneIcon, DownloadIcon, MonitorIcon, PencilIcon, Trash2Icon } from 'lucide-react';
-import { PageHeader } from '../../../components/pageHeader/index';
-import { Button } from '../../../components/button/index';
-import { StandardDrawer } from '../../../components/standardDrawer';
-import { EmptyState } from '../../../components/emptyState';
-import { DeleteConfirmationModal } from '../../../components/deleteConfirmationModal/index';
 import { ReactNode, useState } from 'react';
 import {
   useCompanionDevicesServiceGetCompanionDevice,
@@ -44,7 +39,15 @@ import {
   useCompanionServiceGetCompanionVersions,
 } from '@attraccess/react-query-client';
 import { lt, valid } from 'semver';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  DeleteConfirmationModal,
+  EmptyState,
+  PageHeader,
+  StandardDrawer,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
 import { getBaseUrl } from '../../../api/index';

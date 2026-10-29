@@ -140,7 +140,7 @@ it('unarchives archived projects and confirms deletion before navigating away', 
   await action('Delete Project');
   expect(state.remove).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   await action('Delete Project');
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   expect(state.remove).toHaveBeenCalledWith({ id: 7 });

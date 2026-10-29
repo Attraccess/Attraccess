@@ -1,6 +1,4 @@
-import { PageHeader } from '../../components/pageHeader';
-import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
-import { Button } from '../../components/button';
+import { useOverlayState } from '@heroui/react';
 import {
   BellIcon,
   CalendarClockIcon,
@@ -10,8 +8,7 @@ import {
   Trash2Icon,
   UserIcon,
 } from 'lucide-react';
-import { StandardDrawer } from '../../components/standardDrawer';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { UsernameForm } from './username';
@@ -37,7 +34,7 @@ export default function AccountPage() {
 
   const { user: me, hasPermission } = useAuth();
   const toast = useToastMessage();
-  const { isOpen, open, close, setOpen } = useOverlayState();
+  const { isOpen, open, close } = useOverlayState();
 
   const { mutate: requestDelete, isPending: isRequestingDelete } = useUsersServiceRequestDeleteAccount({
     onSuccess: () => {
@@ -170,27 +167,21 @@ export default function AccountPage() {
       <PageHeader title={t('title')} subtitle={t('subtitle')} backTo="/" />
       <SettingsDirectory groups={groups} searchLabel={t('search')} emptyMessage={t('noResults')} />
 
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
-        <DrawerHeader>
-          <DrawerHeading className="text-lg font-semibold">{t('deleteAccount.modal.title')}</DrawerHeading>
-        </DrawerHeader>
-        <DrawerBody>
-          <p className="text-sm text-default-500">{t('deleteAccount.modal.description')}</p>
-        </DrawerBody>
-        <DrawerFooter>
-          <Button variant="ghost" onPress={close} isDisabled={isRequestingDelete}>
-            {t('deleteAccount.actions.cancel')}
-          </Button>
-          <Button
-            variant="danger"
-            onPress={() => requestDelete()}
-            isPending={isRequestingDelete}
-            data-cy="delete-account-confirm-button"
-          >
-            {t('deleteAccount.actions.confirm')}
-          </Button>
-        </DrawerFooter>
-      </StandardDrawer>
+      <StatusDialog
+        isOpen={isOpen}
+        onClose={close}
+        status="error"
+        title={t('deleteAccount.modal.title')}
+        closeLabel={t('deleteAccount.actions.cancel')}
+        action={{
+          label: t('deleteAccount.actions.confirm'),
+          onPress: () => requestDelete(),
+          isPending: isRequestingDelete,
+          'data-cy': 'delete-account-confirm-button',
+        }}
+      >
+        {t('deleteAccount.modal.description')}
+      </StatusDialog>
     </div>
   );
 }

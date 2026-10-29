@@ -9,11 +9,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MailIcon, ArrowLeftIcon, Settings2Icon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { PageHeader } from '../../components/pageHeader';
-import { Button } from '../../components/button';
 import { useAuth } from '../../hooks/useAuth';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
@@ -98,7 +96,14 @@ export function MessagesPage() {
           icon={<MailIcon />}
           actions={
             hasPermission('system.settings.manage')
-              ? [{ key: 'settings', label: t('settingsButton'), icon: <Settings2Icon size={16} />, onPress: () => navigate('/settings/messaging') }]
+              ? [
+                  {
+                    key: 'settings',
+                    label: t('settingsButton'),
+                    icon: <Settings2Icon size={16} />,
+                    onPress: () => navigate('/settings/messaging'),
+                  },
+                ]
               : undefined
           }
         />

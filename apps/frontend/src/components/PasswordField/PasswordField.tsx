@@ -1,8 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { Button } from '@heroui/react';
 import { Wand2 } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../PasswordInput';
+import { PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordPolicyHints, generateStrongPassword } from '../PasswordPolicyHints';
 import { useToastMessage } from '../toastProvider';
 import { usePasswordPolicyServiceGetPublicPasswordPolicy } from '@attraccess/react-query-client';

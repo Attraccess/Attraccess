@@ -182,12 +182,33 @@ it('loads users and requires confirmation before deletion, then refreshes the li
   render(<RabbitmqUserPanel mqttServerId={104} />);
   expect(await screen.findByRole('row', { name: /sensor/ })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Delete user sensor' }));
-  const dialog = await screen.findByRole('dialog');
+  const dialog = await screen.findByRole('alertdialog');
   expect(request.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
   await waitFor(() => expect(request).toHaveBeenCalledWith('/api/rabbitmq/users/104/sensor', { method: 'DELETE' }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   expect(request.mock.calls.filter(([path]) => path === '/api/rabbitmq/users/104')).toHaveLength(2);
+});
+
+it('keeps the delete dialog open on failure and names a generic failure only once', async () => {
+  request.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (path.includes('/detection/')) return detected;
+    if (options?.method === 'DELETE') throw 'unreadable';
+    return { mqttServerId: 107, users: [user], vhosts: ['/'] };
+  });
+  render(<RabbitmqUserPanel mqttServerId={107} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete user sensor' }));
+  const dialog = await screen.findByRole('alertdialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+  expect(await within(dialog).findAllByText('Deleting the user failed.')).toHaveLength(1);
+
+  request.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (options?.method === 'DELETE') throw new Error('Broker refused');
+    return { mqttServerId: 107, users: [user], vhosts: ['/'] };
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+  expect(await within(dialog).findByText('Broker refused')).toBeTruthy();
+  expect(within(dialog).getByText('Deleting the user failed.')).toBeTruthy();
 });
 
 it('shows user-list failures and permits an explicit retry', async () => {

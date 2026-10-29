@@ -1,8 +1,5 @@
+import { Button, DeleteConfirmationModal, LabeledSwitch, PageHeader } from '@attraccess/plugins-frontend-ui';
 import { Accordion, Input, Label, Spinner, TextField } from '@heroui/react';
-import { Button } from '../../../../components/button';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
-import { PageHeader } from '../../../../components/pageHeader';
-import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal';
 import { FormPreview } from './components/FormPreview';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';

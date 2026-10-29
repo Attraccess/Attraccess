@@ -1,4 +1,3 @@
-import { ReactNode } from 'react';
 import {
   DrawerBackdrop,
   DrawerContent,
@@ -11,21 +10,23 @@ import {
 interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  children: ReactNode;
+  children: DrawerDialogProps['children'];
   backdropProps?: Omit<DrawerBackdropProps, 'children' | 'isOpen' | 'onOpenChange'>;
   contentProps?: Omit<DrawerContentProps, 'children'>;
   dialogProps?: Omit<DrawerDialogProps, 'children'>;
 }
 
-const DEFAULT_DIALOG_CLASSNAME = 'md:max-w-2xl md:mx-auto bg-overlay';
+const DEFAULT_DIALOG_CLASSNAME = 'md:max-w-2xl bg-overlay';
+// A bottom drawer is centred on wide screens; a side drawer stays docked to its edge.
+const CENTERED_DIALOG_CLASSNAME = `${DEFAULT_DIALOG_CLASSNAME} md:mx-auto`;
 
 /** Render DrawerHeading for the title, or name headerless content via dialogProps['aria-label']. */
 export function StandardDrawer(props: Props) {
   const { isOpen, onOpenChange, children, backdropProps, contentProps, dialogProps } = props;
 
-  const mergedDialogClassName = dialogProps?.className
-    ? `${DEFAULT_DIALOG_CLASSNAME} ${dialogProps.className}`
-    : DEFAULT_DIALOG_CLASSNAME;
+  const isSideDrawer = contentProps?.placement === 'left' || contentProps?.placement === 'right';
+  const baseClassName = isSideDrawer ? DEFAULT_DIALOG_CLASSNAME : CENTERED_DIALOG_CLASSNAME;
+  const mergedDialogClassName = dialogProps?.className ? `${baseClassName} ${dialogProps.className}` : baseClassName;
 
   return (
     <DrawerBackdrop {...backdropProps} isOpen={isOpen} onOpenChange={onOpenChange}>

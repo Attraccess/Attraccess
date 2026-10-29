@@ -11,8 +11,7 @@ interface TransProps {
 }
 
 type ParsedNode =
-  | { type: 'text'; text: string }
-  | { type: 'tag'; name: string; children: ParsedNode[]; selfClosing: boolean };
+  { type: 'text'; text: string } | { type: 'tag'; name: string; children: ParsedNode[]; selfClosing: boolean };
 
 function parseTemplateToTree(template: string): ParsedNode[] {
   const root: { children: ParsedNode[] } = { children: [] };

@@ -18,7 +18,8 @@ vi.mock('../../hooks/useAuth', () => ({
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: () => ({ data: { isNonProfit: true } }),
 }));
-vi.mock('../standardDrawer', () => ({
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   StandardDrawer: ({ children, isOpen }: { children: React.ReactNode; isOpen: boolean }) =>
     isOpen ? <div role="dialog">{children}</div> : null,
 }));

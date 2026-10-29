@@ -1,6 +1,6 @@
-import { Input, TextArea } from "@heroui/react";
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { Input, TextArea } from '@heroui/react';
 import { Select } from '../../../../../components/select';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
 

@@ -9,14 +9,17 @@ vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, username: 'operator' } }),
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  AttraccessUser: ({ user, variant }: { user: { username: string }; variant?: string }) => (
-    <div data-testid="supervisor-user" data-variant={variant ?? 'full'}>
-      {user.username}
-    </div>
-  ),
-  DateTimeDisplay: ({ date }: { date?: string | null }) => <time>{date}</time>,
-  useTranslations: () => ({ t: (key: string) => key }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    AttraccessUser: ({ user, variant }: { user: { username: string }; variant?: string }) => (
+      <div data-testid="supervisor-user" data-variant={variant ?? 'full'}>
+        {user.username}
+      </div>
+    ),
+    DateTimeDisplay: ({ date }: { date?: string | null }) => <time>{date}</time>,
+    useTranslations: () => ({ t: (key: string) => key }),
+  }))()),
 }));
 
 describe('UsageNotesDrawer', () => {

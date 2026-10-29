@@ -1,9 +1,7 @@
 import { Input, Label, TextArea, TextField } from '@heroui/react';
-import { Button } from '../../../../../components/button';
 import { Select } from '../../../../../components/select';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { ResourceFlowVariableScope } from '@attraccess/react-query-client';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
 
 export type ValueType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';

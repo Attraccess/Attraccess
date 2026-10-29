@@ -1,13 +1,12 @@
 import { MeterSelector } from '../../../meters/MeterSelector';
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form, useOverlayState } from '@heroui/react';
 import { Property, PropertyInput } from './property-input/index';
-import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import { isValueValid, initializeValue } from './property-input/schema-values';
 import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceResolveNodeSchema } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useFlowContext } from '../../context/index';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 export function useNodeEditorState(props: Props) {
   const { tNodeTranslations: t, tNodeExists, schema } = props;

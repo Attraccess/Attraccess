@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Description, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
-import { StandardModal } from '../standardModal';
-import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SupervisionRequestDto, User, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
-import { Button } from '../button';
 import en from './translations/en.json';
 import de from './translations/de.json';
 

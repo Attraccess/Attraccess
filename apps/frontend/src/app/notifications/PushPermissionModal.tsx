@@ -2,10 +2,7 @@
 // iOS Safari/PWA requires a gesture to call Notification.requestPermission(),
 // so auto-subscription on mount is not permitted — this modal bridges the gap.
 import { useCallback, useEffect, useState } from 'react';
-import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { Button } from '../../components/button';
-import { StandardModal } from '../../components/standardModal';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './permission.en.json';
 import de from './permission.de.json';
 import { useToastMessage } from '../../components/toastProvider';
@@ -86,31 +83,18 @@ export function PushPermissionModal({ enabled, userId }: { enabled: boolean; use
   }, [push, dismissedKey, showError, t, handleDismiss]);
 
   return (
-    <StandardModal
+    <StatusDialog
       isOpen={isOpen}
-      onOpenChange={(open) => {
-        if (!open) handleDismiss();
-      }}
+      onClose={handleDismiss}
+      status="info"
+      title={t('title')}
+      closeLabel={t('actions.defer')}
+      action={{ label: t('actions.allow'), onPress: handleAllow, isPending: push.isBusy }}
     >
-      {({ close: _close }) => (
-        <>
-          <ModalHeader>
-            <ModalHeading>{t('title')}</ModalHeading>
-          </ModalHeader>
-          <ModalBody>
-            <p className="text-sm text-default-600">{t('description')}</p>
-            <p className="text-sm text-default-600">{t('question')}</p>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" onPress={handleDismiss}>
-              {t('actions.defer')}
-            </Button>
-            <Button variant="primary" onPress={handleAllow} isPending={push.isBusy}>
-              {t('actions.allow')}
-            </Button>
-          </ModalFooter>
-        </>
-      )}
-    </StandardModal>
+      <div className="flex flex-col gap-2">
+        <p>{t('description')}</p>
+        <p>{t('question')}</p>
+      </div>
+    </StatusDialog>
   );
 }

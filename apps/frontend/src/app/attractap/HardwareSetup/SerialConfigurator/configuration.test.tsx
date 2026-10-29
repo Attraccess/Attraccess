@@ -22,7 +22,10 @@ const state = vi.hoisted(() => ({
         wifiNetworks: { ssid: string }[];
       },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+}));
 vi.mock('./Auth', () => ({ useAttractapSerialComm: () => state }));
 vi.mock('../../../../utils/esp-tools', () => ({
   ESPTools: { getInstance: () => ({ sendCommand: state.sendCommand }) },

@@ -1,8 +1,9 @@
+// @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { LabeledSwitch } from './labeledSwitch';
+import { LabeledSwitch } from './LabeledSwitch';
 
 // Regression tests for ATT-729: after the HeroUI 3.0 -> 3.2 bump, only
 // Switch.Content (a SwitchButton <label>) is interactive. The control (track)
@@ -12,7 +13,7 @@ describe('LabeledSwitch', () => {
     const { container } = render(
       <LabeledSwitch isSelected={false} onChange={vi.fn()}>
         My label
-      </LabeledSwitch>
+      </LabeledSwitch>,
     );
 
     const control = container.querySelector('[data-slot="switch-control"]');
@@ -25,7 +26,7 @@ describe('LabeledSwitch', () => {
     const { container } = render(
       <LabeledSwitch isSelected={false} onChange={onChange}>
         My label
-      </LabeledSwitch>
+      </LabeledSwitch>,
     );
 
     fireEvent.click(container.querySelector('[data-slot="switch-control"]') as HTMLElement);
@@ -45,7 +46,7 @@ describe('LabeledSwitch', () => {
     const { getByText } = render(
       <LabeledSwitch isSelected={false} onChange={onChange}>
         My label
-      </LabeledSwitch>
+      </LabeledSwitch>,
     );
 
     fireEvent.click(getByText('My label'));

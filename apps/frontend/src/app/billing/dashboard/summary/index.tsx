@@ -1,4 +1,4 @@
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Chip,
@@ -14,8 +14,6 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { PageHeader } from '../../../../components/pageHeader/index';
-import { EmptyState } from '../../../../components/emptyState';
 import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { TransactionDetailsModal } from './transactionDetailsModal/index';
 import { RefundModal } from './transactionDetailsModal/refund/index';

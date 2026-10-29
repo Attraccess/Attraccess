@@ -1,6 +1,5 @@
+import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
 import { ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { StandardModal } from '../../../../../components/standardModal';
 import { InstallPlan } from './InstallPlan';
 import { usePluginsSectionState } from '../state/usePluginSettings';
 type Props = Pick<

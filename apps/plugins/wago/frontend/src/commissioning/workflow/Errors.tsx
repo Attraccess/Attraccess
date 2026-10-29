@@ -1,21 +1,27 @@
-import { ErrorAlert } from './Steps';
+import { StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { useWagoTranslations } from '../../i18n';
 import { CommissioningModel } from '../CommissioningModal';
 
 export function CommissioningErrors({ model }: { model: CommissioningModel }) {
-  const {
-    createSessionMutation,
-    confirmHostKeyMutation,
-    deliverSessionMutation,
-    removeSessionMutation,
-    recoverSessionMutation,
-  } = model;
+  const { t } = useWagoTranslations();
+  const mutations = [
+    model.createSessionMutation,
+    model.confirmHostKeyMutation,
+    model.deliverSessionMutation,
+    model.removeSessionMutation,
+    model.recoverSessionMutation,
+  ];
   return (
     <>
-      {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
-      {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
-      {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
-      {removeSessionMutation.isError && <ErrorAlert error={removeSessionMutation.error} />}
-      {recoverSessionMutation.isError && <ErrorAlert error={recoverSessionMutation.error} />}
+      {mutations.map(
+        (mutation, slot) =>
+          mutation.isError && (
+            // The list is fixed, so the slot identifies the mutation.
+            <StatusAlert key={slot} status="danger">
+              {mutation.error instanceof Error ? mutation.error.message : t('common.retry')}
+            </StatusAlert>
+          ),
+      )}
     </>
   );
 }

@@ -1,7 +1,5 @@
-import { Button } from '../../../../../components/button/index';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { Separator, Chip } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   SSOProvider,
   UserRole,

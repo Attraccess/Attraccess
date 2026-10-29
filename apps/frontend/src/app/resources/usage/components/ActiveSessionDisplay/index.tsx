@@ -2,10 +2,9 @@ import { recordUsefulAction } from '../../../../../components/DonationPrompt/use
 import { useState, useCallback } from 'react';
 import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
 import { SessionStatusCard } from '../SessionStatusCard';
-import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
 import { StopCircle, ChevronDownIcon } from 'lucide-react';
-import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionTimer } from '../SessionTimer';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';

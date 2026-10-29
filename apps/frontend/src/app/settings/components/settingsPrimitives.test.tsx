@@ -6,8 +6,11 @@ import { SettingsSection } from './SettingsSection';
 import { SettingsRow } from './SettingsRow';
 import { SettingsSaveBar } from './SettingsSaveBar';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key.split('.').pop() ?? key }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key.split('.').pop() ?? key }),
+  }))()),
 }));
 
 describe('SettingsSection', () => {
@@ -68,9 +71,7 @@ describe('SettingsRow', () => {
 
 describe('SettingsSaveBar', () => {
   it('renders nothing while clean', () => {
-    const { container } = render(
-      <SettingsSaveBar isDirty={false} onSave={vi.fn()} onDiscard={vi.fn()} />,
-    );
+    const { container } = render(<SettingsSaveBar isDirty={false} onSave={vi.fn()} onDiscard={vi.fn()} />);
 
     expect(container).toBeEmptyDOMElement();
   });

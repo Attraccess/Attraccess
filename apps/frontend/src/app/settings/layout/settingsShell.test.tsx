@@ -7,13 +7,16 @@ import { useAuth } from '../../../hooks/useAuth';
 import { SettingsIndexPage } from './SettingsIndexPage';
 import { SettingsLayout } from './SettingsLayout';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+  }))()),
+  ...(await (() => ({
+    PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+  }))()),
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
-vi.mock('../../../components/pageHeader', () => ({
-  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
-}));
 
 function mockPermissions(granted: SystemPermission[]) {
   vi.mocked(useAuth).mockReturnValue({

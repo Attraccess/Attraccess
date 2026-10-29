@@ -13,9 +13,13 @@ const state = vi.hoisted(() => ({
   groupQuery: vi.fn(),
 }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
-  useDebounce: (value: unknown) => value,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+    useDebounce: (value: unknown) => value,
+  }))()),
+  ...(await (() => ({ EmptyState: () => <p>No resources</p> }))()),
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => state.manage, user: { id: 7 } }) }));
 vi.mock('@attraccess/react-query-client', () => ({
@@ -34,7 +38,7 @@ vi.mock('../../../components/ResourceListItem', () => ({
     <button onClick={onPress}>{resource.name}</button>
   ),
 }));
-vi.mock('../../../components/emptyState', () => ({ EmptyState: () => <p>No resources</p> }));
+
 beforeEach(() => {
   vi.clearAllMocks();
   state.resources = [];

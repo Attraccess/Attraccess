@@ -11,8 +11,11 @@ const state = vi.hoisted(() => ({
   error: vi.fn(),
   options: {} as { onSuccess: () => void; onError: (error: Error) => void },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
+  }))()),
 }));
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, apiError: state.error }),

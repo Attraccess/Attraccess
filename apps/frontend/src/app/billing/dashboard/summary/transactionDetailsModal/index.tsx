@@ -15,8 +15,7 @@ import {
   TableRow,
   useOverlayState,
 } from '@heroui/react';
-import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { StandardModal } from '../../../../../components/standardModal';
+import { AttraccessUser, DateTimeDisplay, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RefundModal } from './refund/index';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal/index';
 import { toExactCredits } from '@attraccess/shared';

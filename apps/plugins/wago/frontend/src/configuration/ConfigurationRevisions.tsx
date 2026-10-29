@@ -1,4 +1,5 @@
-import { Alert, Button, Checkbox, Link } from '@heroui/react';
+import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
+import { Alert, Checkbox, Link } from '@heroui/react';
 import { ConfigurationChanges, ConfigurationErrors, ConfigurationMetadataChanges } from './ConfigurationChanges';
 import { ConfigurationRevisionsRevisionsHistoryTitle } from './ConfigurationRevisionsRevisionsHistoryTitle';
 import type { ConfigurationEditorMetadata, ConfigurationImpact, ConfigurationValidationError } from '../api/client';
@@ -22,7 +23,7 @@ export function ImpactWarning({
   if (!impacts.length) return null;
   return (
     <Alert status="warning">
-      <Alert.Indicator />
+      <AlertStatusIcon status="warning" />
       <Alert.Content>
         <Alert.Title>{t('revisions.impacts')}</Alert.Title>
         <Alert.Description>{t('revisions.impactDescription')}</Alert.Description>
@@ -195,7 +196,6 @@ export function ConfigurationRevisions({
 }) {
   const {
     t,
-    language,
     tMessage,
     offset,
     setOffset,
@@ -277,7 +277,6 @@ export function ConfigurationRevisions({
           view,
           t,
           history,
-          language,
           controllerId,
           metadata,
           disabled,

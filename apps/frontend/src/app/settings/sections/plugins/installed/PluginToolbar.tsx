@@ -1,7 +1,7 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { ChevronDown, Store, Upload } from 'lucide-react';
-import { Button } from '../../../../../components/button/index';
 import { usePluginsSectionState } from '../state/usePluginSettings';
 type Props = Pick<
   ReturnType<typeof usePluginsSectionState>,

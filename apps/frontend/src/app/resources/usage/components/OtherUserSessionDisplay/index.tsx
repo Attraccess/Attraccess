@@ -1,9 +1,8 @@
 import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
 import { SessionStatusCard } from '../SessionStatusCard/index';
-import { Button } from '../../../../../components/button/index';
 import { buttonVariants } from '@heroui/styles';
 import { UserX, ChevronDownIcon, MessageCircle } from 'lucide-react';
-import { AttraccessUser, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, Button, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal/index';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';

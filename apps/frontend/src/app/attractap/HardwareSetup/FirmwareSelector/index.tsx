@@ -1,7 +1,19 @@
 import { AttractapFirmware, useAttractapServiceGetFirmwares } from '@attraccess/react-query-client';
-import { Accordion, AccordionBody, AccordionHeading, AccordionItem, AccordionPanel, AccordionTrigger, Card, Chip, ProgressCircle, ProgressCircleFillCircle, ProgressCircleTrack, ProgressCircleTrackCircle } from "@heroui/react";
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
+import {
+  Accordion,
+  AccordionBody,
+  AccordionHeading,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
+  Card,
+  Chip,
+  ProgressCircle,
+  ProgressCircleFillCircle,
+  ProgressCircleTrack,
+  ProgressCircleTrackCircle,
+} from '@heroui/react';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
@@ -64,7 +76,11 @@ export function FirmwareSelector(props: Props) {
               <AccordionBody className="flex flex-col gap-4">
                 <p className="text-sm text-default-500">{t('demo.description')}</p>
                 {demo.map((firmware) => (
-                  <FirmwareCard key={`${firmware.name}-${firmware.variant}`} firmware={firmware} onSelect={props.onSelect} />
+                  <FirmwareCard
+                    key={`${firmware.name}-${firmware.variant}`}
+                    firmware={firmware}
+                    onSelect={props.onSelect}
+                  />
                 ))}
               </AccordionBody>
             </AccordionPanel>

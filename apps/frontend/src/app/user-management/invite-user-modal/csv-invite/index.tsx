@@ -9,10 +9,8 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { Button } from '../../../../components/button/index';
 import { Select } from '../../../../components/select/index';
-import { EmptyState } from '../../../../components/emptyState';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useMemo, useState } from 'react';

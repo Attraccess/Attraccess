@@ -1,6 +1,6 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { Chip, TableCell, TableRow, Tooltip, TooltipContent } from '@heroui/react';
 import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
-import { Button } from '../../../../../components/button/index';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import { usePluginsSectionState } from '../state/usePluginSettings';
 type Model = ReturnType<typeof usePluginsSectionState>;

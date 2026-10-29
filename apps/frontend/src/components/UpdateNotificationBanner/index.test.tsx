@@ -10,32 +10,35 @@ import { UpdateNotificationBanner, buildUpdateDocsPath } from './index';
 
 let mockLanguage: 'en' | 'de' = 'en';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => {
-  const translations: Record<string, string> = {
-    title: 'A new Attraccess release is available',
-    versionSummary: 'Running {{current}} · Latest {{latest}}',
-    viewReleaseNotes: 'View release notes',
-    howToUpdate: 'How to update',
-    dismissThisVersion: 'Dismiss for this version',
-    releaseNotesModalTitle: 'Release notes for {{version}}',
-    releaseNotesFallback: 'No release notes provided.',
-    close: 'Close',
-  };
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => {
+    const translations: Record<string, string> = {
+      title: 'A new Attraccess release is available',
+      versionSummary: 'Running {{current}} · Latest {{latest}}',
+      viewReleaseNotes: 'View release notes',
+      howToUpdate: 'How to update',
+      dismissThisVersion: 'Dismiss for this version',
+      releaseNotesModalTitle: 'Release notes for {{version}}',
+      releaseNotesFallback: 'No release notes provided.',
+      close: 'Close',
+    };
 
-  const t = (key: string, vars?: Record<string, unknown>) => {
-    let value = translations[key] ?? key;
-    if (vars) {
-      Object.entries(vars).forEach(([varKey, varValue]) => {
-        value = value.replace(`{{${varKey}}}`, String(varValue));
-      });
-    }
-    return value;
-  };
+    const t = (key: string, vars?: Record<string, unknown>) => {
+      let value = translations[key] ?? key;
+      if (vars) {
+        Object.entries(vars).forEach(([varKey, varValue]) => {
+          value = value.replace(`{{${varKey}}}`, String(varValue));
+        });
+      }
+      return value;
+    };
 
-  const tExists = (key: string) => Boolean(translations[key]);
+    const tExists = (key: string) => Boolean(translations[key]);
 
-  return { useTranslations: () => ({ t, tExists, language: mockLanguage, setLanguage: vi.fn() }) };
-});
+    return { useTranslations: () => ({ t, tExists, language: mockLanguage, setLanguage: vi.fn() }) };
+  })()),
+}));
 
 vi.mock('react-markdown', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="markdown">{children}</div>,
@@ -61,11 +64,7 @@ vi.mock('../../hooks/useAuth', () => ({
 let updateStatusValue: UpdateStatusDto | undefined;
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useSystemServiceGetUpdateStatus: (
-    _params: unknown,
-    _queryKey: unknown,
-    options?: { enabled?: boolean },
-  ) => ({
+  useSystemServiceGetUpdateStatus: (_params: unknown, _queryKey: unknown, options?: { enabled?: boolean }) => ({
     data: options?.enabled === false ? undefined : updateStatusValue,
     isLoading: false,
     error: null,
@@ -243,10 +242,7 @@ describe('UpdateNotificationBanner', () => {
     const tagLabel = screen.getByText('v0.1.2');
     const tagLink = tagLabel.closest('a');
     expect(tagLink).not.toBeNull();
-    expect(tagLink).toHaveAttribute(
-      'href',
-      'https://github.com/Attraccess/Attraccess/releases/tag/v0.1.2',
-    );
+    expect(tagLink).toHaveAttribute('href', 'https://github.com/Attraccess/Attraccess/releases/tag/v0.1.2');
     expect(tagLink).toHaveAttribute('target', '_blank');
   });
 });

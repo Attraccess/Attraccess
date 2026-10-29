@@ -11,14 +11,13 @@ import {
   RadioGroup,
 } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   RoleWithUsageDto,
   useRbacServiceDeleteRole,
   useRbacServiceListRolesKey,
 } from '@attraccess/react-query-client';
-import { StandardModal } from '../../../components/standardModal';
 import { Select } from '../../../components/select';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';

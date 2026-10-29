@@ -1,16 +1,5 @@
-import {
-  Form,
-  Label,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  TextArea,
-  TextField,
-} from '@heroui/react';
-import { StandardModal } from '../../../components/standardModal';
-import { Button } from '../../../components/button';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { Form, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextArea, TextField } from '@heroui/react';
+import { Button, StandardModal, TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface IntroductionCommentModalProps {
   t: TFunction;
@@ -56,12 +45,7 @@ export function IntroductionCommentModal(props: Readonly<IntroductionCommentModa
             <Button variant="ghost" onPress={close} isDisabled={isPending}>
               {t('commentModal.cancel')}
             </Button>
-            <Button
-              variant="primary"
-              onPress={onSubmit}
-              isPending={isPending}
-              data-cy="people-revoke-submit"
-            >
+            <Button variant="primary" onPress={onSubmit} isPending={isPending} data-cy="people-revoke-submit">
               {t('commentModal.submit')}
             </Button>
           </ModalFooter>

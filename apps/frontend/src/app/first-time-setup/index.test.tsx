@@ -13,7 +13,10 @@ const state = vi.hoisted(() => ({
         stepsCompleted?: { app?: boolean; smtp?: boolean; admin?: boolean; adminEmailVerified?: boolean };
       },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: (key: string) => key }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
   useSettingsServiceGetFirstTimeSetupStatus: () => {
     const [, refresh] = useReducer((n: number) => n + 1, 0);

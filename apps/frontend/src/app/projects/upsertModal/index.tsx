@@ -10,11 +10,9 @@ import {
   TextArea,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { StandardDrawer } from '../../../components/standardDrawer';
 import { ImageUpload } from '../../../components/imageUpload';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {

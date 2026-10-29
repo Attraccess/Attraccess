@@ -4,7 +4,8 @@ import type { PublicPasswordPolicy } from '@attraccess/shared';
 import { PasswordPolicyHints } from './PasswordPolicyHints';
 import { generateStrongPassword } from './generatePassword';
 const state = vi.hoisted(() => ({ score: 0 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   useTranslations: () => ({
     t: (key: string) => key,
   }),

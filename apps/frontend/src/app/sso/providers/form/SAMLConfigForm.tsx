@@ -1,10 +1,8 @@
 import { Description, Input, InputGroup, Label, TextArea, TextField, Tooltip, TooltipContent } from '@heroui/react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Button } from '../../../../components/button/index';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from '../en.json';
 import de from '../de.json';
 

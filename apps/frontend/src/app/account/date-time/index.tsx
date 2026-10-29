@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { validateDateTimeLocale, DATE_TIME_LOCALE_MAX_LENGTH } from '@attraccess/shared';
-import { useDateTimeFormatter, useDateTimePreferences, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useDateTimeFormatter, useDateTimePreferences, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Description, FieldError, Input, Label, TextField } from '@heroui/react';
 import {
   useUsersServiceGetCurrent,
@@ -9,7 +9,6 @@ import {
   useUsersServiceUpdateMyDateTimePreferences,
 } from '@attraccess/react-query-client';
 import { Select } from '../../../components/select';
-import { Button } from '../../../components/button';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';

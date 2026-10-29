@@ -11,15 +11,19 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { PageHeader, PageAction } from '../../../../components/pageHeader/index';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay/index';
 import { HTMLAttributes, useMemo, useState } from 'react';
-import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  DateTimeDisplay,
+  EmptyState,
+  LabeledSwitch,
+  PageAction,
+  PageHeader,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { MarkDoneModal } from './mark-done/index';
 import { CheckCircleIcon, ConstructionIcon, CogIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
-import { EmptyState } from '../../../../components/emptyState';
 import { FlatSection } from '../../../../components/flatSection';
-import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
 import { useNavigate } from 'react-router-dom';
 import de from './de.json';

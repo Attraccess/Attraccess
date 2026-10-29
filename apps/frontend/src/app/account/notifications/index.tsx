@@ -1,5 +1,3 @@
-import { Button } from '../../../components/button/index';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
 import {
   ApiError,
   NotificationCategory,
@@ -11,7 +9,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';

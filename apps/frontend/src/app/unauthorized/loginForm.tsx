@@ -16,10 +16,8 @@ import {
   TextField,
   Alert,
 } from '@heroui/react';
-import { Button } from '../../components/button/index';
 import { OneTimeCodeInput } from '../../components/OneTimeCodeInput/index';
-import { TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PasswordInput } from '../../components/PasswordInput/index';
+import { Button, PasswordInput, TExists, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './loginForm.en.json';
 import de from './loginForm.de.json';
 import {
@@ -134,9 +132,7 @@ export function useLoginFormContentState(props: LoginFormProps & { t: TFunction;
 
     const responseBody = (error as ApiError).body as Record<string, unknown> | undefined;
     const retryAfterSeconds = Number(responseBody?.retryAfterSeconds);
-    const retryAfter = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
-      ? retryAfterSeconds
-      : undefined;
+    const retryAfter = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : undefined;
 
     return {
       errorTitle: t(key + '.title', { error }),

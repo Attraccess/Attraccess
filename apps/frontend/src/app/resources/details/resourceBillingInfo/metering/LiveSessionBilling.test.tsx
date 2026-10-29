@@ -12,27 +12,30 @@ vi.mock('@attraccess/react-query-client', () => ({
   useResourceMeteringServiceGetResourceMeteringLive: vi.fn(),
   useResourcesServiceResourceUsageGetActiveSession: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', async () => {
-  const translations = (await import('./en.json')).default as Record<string, unknown>;
-  const resolve = (key: string): string | undefined =>
-    key
-      .split('.')
-      .reduce<unknown>(
-        (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
-        translations,
-      ) as string | undefined;
-  return {
-    useTranslations: () => ({
-      t: (key: string, params?: Record<string, string | number>) =>
-        Object.entries(params ?? {}).reduce(
-          (out, [name, value]) => out.replaceAll(`{{${name}}}`, String(value)),
-          resolve(key) ?? key,
-        ),
-    }),
-    useTranslationState: () => ({ language: 'en' }),
-    useNumberFormatter: () => (value: number) => String(value),
-  };
-});
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (async () => {
+    const translations = (await import('./en.json')).default as Record<string, unknown>;
+    const resolve = (key: string): string | undefined =>
+      key
+        .split('.')
+        .reduce<unknown>(
+          (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
+          translations,
+        ) as string | undefined;
+    return {
+      useTranslations: () => ({
+        t: (key: string, params?: Record<string, string | number>) =>
+          Object.entries(params ?? {}).reduce(
+            (out, [name, value]) => out.replaceAll(`{{${name}}}`, String(value)),
+            resolve(key) ?? key,
+          ),
+      }),
+      useTranslationState: () => ({ language: 'en' }),
+      useNumberFormatter: () => (value: number) => String(value),
+    };
+  })()),
+}));
 
 const props = { resourceId: 7, currency: 'EUR', minorUnit: 2, dlClass: '', valueClass: '' };
 

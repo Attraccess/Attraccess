@@ -16,6 +16,7 @@ const sharedLibs = [
   '@tanstack/react-query',
   '@attraccess/react-query-client',
   '@attraccess/plugins-frontend-ui',
+  'lucide-react',
 ];
 
 export default defineConfig({

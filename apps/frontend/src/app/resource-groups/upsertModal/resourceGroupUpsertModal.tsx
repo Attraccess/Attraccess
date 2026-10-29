@@ -10,11 +10,8 @@ import {
   DrawerHeading,
   useOverlayState,
 } from '@heroui/react';
-import { Button } from '../../../components/button/index';
-import { LabeledSwitch } from '../../../components/labeledSwitch';
-import { StandardDrawer } from '../../../components/standardDrawer';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
 import {

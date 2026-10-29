@@ -1,8 +1,8 @@
 // Shared dialog for short status messages and confirmations: info, success, warning, error
 // FEATURE: one dialog design for results, failures and confirmations across the app
-import { ReactNode } from 'react';
+import { MouseEvent, ReactNode } from 'react';
 import { AlertDialog } from '@heroui/react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '../../i18n';
 import { Button } from '../button';
 import en from './en.json';
 import de from './de.json';
@@ -27,15 +27,18 @@ export interface StatusDialogAction {
 
 interface StatusDialogProps {
   isOpen: boolean;
-  /** Called when the dialog is dismissed (close button, Escape, backdrop). */
+  /**
+   * Called when the dialog is dismissed (close button or Escape). A backdrop click does nothing, and
+   * Escape is ignored while the action is pending, like the disabled close button.
+   */
   onClose: () => void;
   status: StatusDialogStatus;
   title: ReactNode;
   /** The message; plain text or richer content such as an error log. */
   children?: ReactNode;
   /**
-   * Optional primary action (confirm, retry, …). It is styled as destructive for errors and
-   * warnings, and does not close the dialog by itself.
+   * Optional primary action (confirm, retry, …). It is styled as destructive for errors only
+   * and does not close the dialog by itself.
    */
   action?: StatusDialogAction;
   /** Label of the dismiss button; defaults to "Close", or "Cancel" next to an action. */
@@ -45,13 +48,24 @@ interface StatusDialogProps {
   'data-cy'?: string;
 }
 
+// A click next to the dialog is ignored; keep the focus inside so Escape still works afterwards.
+const keepFocus = (event: MouseEvent<HTMLElement>) => {
+  if (event.target === event.currentTarget) event.preventDefault();
+};
+
 export function StatusDialog(props: Readonly<StatusDialogProps>) {
   const { isOpen, onClose, status, title, children, action, closeLabel, closeDataCy, 'data-cy': dataCy } = props;
   const { t } = useTranslations({ en, de });
-  const isDestructive = status === 'error' || status === 'warning';
+  const isDestructive = status === 'error';
 
   return (
-    <AlertDialog.Backdrop isOpen={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog.Backdrop
+      isOpen={isOpen}
+      onOpenChange={(open) => !open && !action?.isPending && onClose()}
+      isDismissable={false}
+      isKeyboardDismissDisabled={false}
+      onMouseDown={keepFocus}
+    >
       <AlertDialog.Container>
         <AlertDialog.Dialog className="sm:max-w-[440px]" data-cy={dataCy}>
           <AlertDialog.Header>

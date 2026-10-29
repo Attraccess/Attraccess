@@ -45,9 +45,7 @@
     "newDescription": "Protects the device's local web interface and API.",
     "error": "Could not set password",
     "required": "New password is required.",
-    "save": "Save password",
-    "show": "Show password",
-    "hide": "Hide password"
+    "save": "Save password"
   },
   "discovery": {
     "title": "Discover devices",

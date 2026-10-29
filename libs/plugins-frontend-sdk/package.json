@@ -18,5 +18,8 @@
     "index.js",
     "index.d.ts",
     "lib"
-  ]
+  ],
+  "peerDependencies": {
+    "@attraccess/plugins-frontend-ui": "^1.11.0"
+  }
 }

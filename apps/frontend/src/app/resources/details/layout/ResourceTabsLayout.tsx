@@ -15,8 +15,6 @@ import {
   WrenchIcon,
 } from 'lucide-react';
 import { memo, ReactNode, JSX, useMemo, useRef } from 'react';
-import { PageHeader, PageAction } from '../../../../components/pageHeader/index';
-import { DeleteConfirmationModal } from '../../../../components/deleteConfirmationModal/index';
 import { ResourceQrCode } from '../qrcode/index';
 import { filenameToUrl } from '../../../../api/index';
 import { ResourceHealthWarning } from '../health-state/index';
@@ -30,7 +28,7 @@ import {
   useResourcesServiceGetAllResourcesKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DeleteConfirmationModal, PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQrCodeAction } from '../useQrCodeAction';
 import de from '../resourceDetails.de.json';
 import en from '../resourceDetails.en.json';

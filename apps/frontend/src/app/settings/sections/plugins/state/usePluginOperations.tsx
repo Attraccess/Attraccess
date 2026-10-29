@@ -1,6 +1,6 @@
+import { Button } from '@attraccess/plugins-frontend-ui';
 import { BookOpen } from 'lucide-react';
 import { getBaseUrl } from '../../../../../api/index';
-import { Button } from '../../../../../components/button/index';
 import { dependencyError } from '../dependencies/DependencyPlan';
 import type { usePluginsSectionStateOpenMarketplacePlugin } from '../marketplace/useMarketplace';
 import { VersionCandidate, VersionPlugin } from '../types';

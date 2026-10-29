@@ -1,4 +1,4 @@
-import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, EmptyState } from '@attraccess/plugins-frontend-ui';
 import {
   Chip,
   Table,
@@ -15,7 +15,6 @@ import {
 } from '@heroui/react';
 import { KeyIcon, ShieldCheckIcon, ShieldOffIcon } from 'lucide-react';
 import { User, UserRole } from '@attraccess/react-query-client';
-import { EmptyState } from '../../../components/emptyState';
 import { useUserManagementPageState } from '../filters/types';
 
 export type AuthenticationDetailSummary = {

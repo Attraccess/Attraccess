@@ -4,9 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SupervisorApprovalModal } from './SupervisorApprovalModal';
 
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
-  AttraccessUser: ({ user }: { user: { username: string } }) => <div>requester:{user.username}</div>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+    AttraccessUser: ({ user }: { user: { username: string } }) => <div>requester:{user.username}</div>,
+  }))()),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({

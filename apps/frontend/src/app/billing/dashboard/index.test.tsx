@@ -7,16 +7,19 @@ import { BillingDashboardPage } from './index';
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (k: string) => k.split('.').pop() ?? k }),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (k: string) => k.split('.').pop() ?? k }),
+  }))()),
+  ...(await (() => ({
+    PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+  }))()),
 }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => false }) }));
 vi.mock('./topup', () => ({ BillingDashboardTopupCard: () => <div data-testid="topup" /> }));
 vi.mock('./summary', () => ({ SummaryCard: () => <div data-testid="summary" /> }));
-vi.mock('../../../components/pageHeader', () => ({
-  PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
-}));
 
 function mockLicense(modules: string[] | undefined) {
   vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({

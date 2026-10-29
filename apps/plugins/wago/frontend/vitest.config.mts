@@ -6,7 +6,10 @@ export default defineConfig({
     alias: {
       '@attraccess/shared': fileURLToPath(new URL('../../../../libs/shared/src/index.ts', import.meta.url)),
       '@attraccess/plugins-frontend-ui': fileURLToPath(
-        new URL('../../../../libs/plugins-frontend-ui/src/lib/i18n.ts', import.meta.url),
+        new URL('../../../../libs/plugins-frontend-ui/src/index.ts', import.meta.url),
+      ),
+      '@attraccess/react-query-client': fileURLToPath(
+        new URL('../../scripts/react-query-client.test-stub.ts', import.meta.url),
       ),
       '@attraccess/plugins-frontend-sdk': fileURLToPath(
         new URL('../../../../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),

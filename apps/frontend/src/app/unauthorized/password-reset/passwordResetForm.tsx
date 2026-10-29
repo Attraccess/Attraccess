@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { Button } from '../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useUsersServiceRequestPasswordReset } from '@attraccess/react-query-client';
@@ -44,10 +43,8 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
       <div>
         <h2 className="text-3xl font-bold">{t('title')}</h2>
         <p className="mt-2 text-gray-600 dark:text-gray-300">
-          <Button variant="secondary"
-            onPress={onGoBack}
-            data-cy="password-reset-form-go-back-button"
-          ><ArrowLeft />
+          <Button variant="secondary" onPress={onGoBack} data-cy="password-reset-form-go-back-button">
+            <ArrowLeft />
             {t('goBackButton')}
           </Button>
         </p>
@@ -58,7 +55,8 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
         <Input data-cy="password-reset-form-email-input" />
       </TextField>
 
-      <Button variant="primary"
+      <Button
+        variant="primary"
         onPress={() => requestPasswordReset({ requestBody: { email } })}
         className="w-full"
         isPending={isPending}
@@ -66,7 +64,8 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
         data-cy="password-reset-form-submit-button"
       >
         {t('mainButton')}
-      {arrowRight}</Button>
+        {arrowRight}
+      </Button>
     </>
   );
 }

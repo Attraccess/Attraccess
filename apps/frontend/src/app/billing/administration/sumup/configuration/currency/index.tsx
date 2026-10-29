@@ -1,4 +1,4 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -8,8 +8,6 @@ import {
   useBillingServiceSetBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { Form } from '@heroui/react';
-import { Button } from '../../../../../../components/button';
-import { PageHeader } from '../../../../../../components/pageHeader';
 import { ComponentPropsWithoutRef, useCallback, useEffect, useRef, useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { useToastMessage } from '../../../../../../components/toastProvider';
@@ -81,7 +79,7 @@ export function CurrencyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'c
       {...sectionProps}
       className={twMerge(
         'w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0 @xl:pt-0 @xl:border-t-0 @xl:pl-6 @xl:border-l @xl:first:pl-0 @xl:first:border-l-0',
-        className
+        className,
       )}
     >
       <PageHeader icon={<EuroIcon size={20} />} title={t('title')} subtitle={t('subtitle')} noMargin />

@@ -1,7 +1,5 @@
 import { PlusIcon, EyeIcon, LockIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { SettingsSection } from '../../components/SettingsSection';
-import { Button } from '../../../../components/button/index';
-import { TableDataLoadingIndicator } from '../../../../components/tableComponents';
 import { RoleFormDrawer } from '../../../roles/role-form-drawer/index';
 import { DeleteRoleModal } from '../../../roles/delete-role-modal/index';
 import {
@@ -18,14 +16,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@heroui/react';
-import { EmptyState } from '../../../../components/emptyState';
 import { useState } from 'react';
 import {
   RoleWithUsageDto,
   useRbacServiceListPermissions,
   useRbacServiceListRoles,
 } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, EmptyState, TableDataLoadingIndicator, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useRbacCatalogTranslations } from '../../../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';

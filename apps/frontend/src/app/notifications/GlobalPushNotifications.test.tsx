@@ -111,7 +111,7 @@ describe('GlobalPushNotifications', () => {
   });
   it('does not interrupt the first resource page', () => {
     render(<GlobalPushNotifications enabled />, { wrapper: TestWrapper });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(hoisted.subscribe).not.toHaveBeenCalled();
   });
 
@@ -136,7 +136,7 @@ describe('GlobalPushNotifications', () => {
     first.unmount();
     sessionStorage.clear();
     const next = render(<GlobalPushNotifications enabled userId={1} />, { wrapper });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     next.unmount();
     render(<GlobalPushNotifications enabled userId={2} />, { wrapper });
     expect(await screen.findByRole('button', { name: 'Allow' })).toBeInTheDocument();
@@ -147,7 +147,7 @@ describe('GlobalPushNotifications', () => {
     render(<GlobalPushNotifications enabled userId={1} />, {
       wrapper: ({ children }) => <TestWrapper initialRoute="/messages">{children}</TestWrapper>,
     });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
   it.each(['native-dismissal', 'subscription-error', 'granted-registration-error'])(
     'keeps retry available after %s without recording dismissal',
@@ -195,11 +195,22 @@ describe('GlobalPushNotifications', () => {
       wrapper: ({ children }) => <TestWrapper initialRoute="/messages">{children}</TestWrapper>,
     });
     await userEvent.click(await screen.findByRole('button', { name: action }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     view.rerender(<GlobalPushNotifications enabled={false} userId={1} />);
     view.rerender(<GlobalPushNotifications enabled userId={1} />);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(hoisted.subscribe).toHaveBeenCalledTimes(action === 'Allow' ? 1 : 0);
     expect(hoisted.errorToast).not.toHaveBeenCalled();
+  });
+
+  it('saves the dismissal when the prompt is closed with Escape', async () => {
+    render(<GlobalPushNotifications enabled userId={1} />, {
+      wrapper: ({ children }) => <TestWrapper initialRoute="/messages">{children}</TestWrapper>,
+    });
+    await screen.findByRole('alertdialog');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(localStorage.getItem('push-permission-dismissed:1')).toBe('true');
+    expect(hoisted.subscribe).not.toHaveBeenCalled();
   });
 });

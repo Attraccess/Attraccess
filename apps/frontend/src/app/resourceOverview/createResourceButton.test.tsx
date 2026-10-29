@@ -7,7 +7,10 @@ const state = vi.hoisted(() => ({ permissions: ['resources.create'], open: vi.fn
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => state.permissions.includes(permission) }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({ useTranslations: () => ({ t: () => 'Create resource' }) }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({ useTranslations: () => ({ t: () => 'Create resource' }) }))()),
+}));
 
 describe('CreateResourceButton permission', () => {
   beforeEach(() => {

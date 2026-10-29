@@ -27,9 +27,12 @@ vi.mock('@attraccess/react-query-client', async () => {
     },
   };
 });
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
-  AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+    AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
+  }))()),
 }));
 
 describe('introduction required tutor contacts', () => {

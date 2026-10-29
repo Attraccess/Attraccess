@@ -12,8 +12,7 @@ import {
 } from '@heroui/react';
 import { AwardIcon, CheckIcon, WrenchIcon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
-import { AttraccessUser, DateTimeDisplay, TFunction } from '@attraccess/plugins-frontend-ui';
-import { EmptyState } from '../../../components/emptyState';
+import { AttraccessUser, DateTimeDisplay, EmptyState, TFunction } from '@attraccess/plugins-frontend-ui';
 import { PeopleRowActions } from './PeopleRowActions';
 import { PeopleTarget, PersonRow } from './types';
 

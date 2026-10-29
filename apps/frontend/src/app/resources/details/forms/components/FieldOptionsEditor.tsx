@@ -1,5 +1,5 @@
+import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import { Button, TextField, Label, Input } from '@heroui/react';
-import { LabeledSwitch } from '../../../../../components/labeledSwitch';
 import { Plus, X } from 'lucide-react';
 import { FormFieldType } from '@attraccess/react-query-client';
 import { EditableFormField, TextFieldOptions, NumberFieldOptions, SelectFieldOptions } from '../types';
@@ -114,9 +114,12 @@ function renderOptionsByType(
             <div key={index} className="flex gap-2 items-center">
               <TextField value={option} onChange={(v) => handleOptionChange(index, v)}>
                 <Input
-
                   placeholder={t('fields.options.select.optionPlaceholder')}
-                  ref={index === currentOptions.length - 1 ? (lastOptionInputRef as React.Ref<HTMLInputElement>) : undefined}
+                  ref={
+                    index === currentOptions.length - 1
+                      ? (lastOptionInputRef as React.Ref<HTMLInputElement>)
+                      : undefined
+                  }
                 />
               </TextField>
               <Button variant="danger-soft" isIconOnly onPress={() => handleRemoveOption(index)}>
@@ -124,11 +127,13 @@ function renderOptionsByType(
               </Button>
             </div>
           ))}
-          <Button variant="secondary"
+          <Button
+            variant="secondary"
 
             onPress={handleAddOption}
             isDisabled={currentOptions.length >= 12}
-          ><Plus className="w-4 h-4" />
+          >
+            <Plus className="w-4 h-4" />
             {currentOptions.length >= 12 ? t('fields.options.select.maxOptions') : t('fields.options.select.addOption')}
           </Button>
         </div>

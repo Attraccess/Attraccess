@@ -1,5 +1,5 @@
 import { MehIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '../i18n';
 
 interface Props {
   message?: string;

@@ -8,11 +8,14 @@ const state = vi.hoisted(() => ({
   introducers: undefined as undefined | { id: number; user: { username: string } }[],
   status: undefined as undefined | { applies: boolean; isDue: boolean; blocksAccess: boolean; reason?: string },
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({
-    t: (key: string, params?: unknown) => (params ? `${key}:${JSON.stringify(params)}` : key),
-  }),
-  AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({
+      t: (key: string, params?: unknown) => (params ? `${key}:${JSON.stringify(params)}` : key),
+    }),
+    AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
+  }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useAccessControlServiceResourceIntroducersGetMany: () => ({ data: state.introducers, isLoading: state.loading }),

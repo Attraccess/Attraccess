@@ -20,28 +20,31 @@ let verifyOnError: ((error: unknown) => void) | undefined;
 let verifyOnSuccess: (() => void) | undefined;
 let resendOnSuccess: (() => void) | undefined;
 
-vi.mock('@attraccess/plugins-frontend-ui', async () => {
-  const actual = await vi.importActual<typeof import('@attraccess/plugins-frontend-ui')>(
-    '@attraccess/plugins-frontend-ui',
-  );
-  return {
-    ...actual,
-    useTranslations: (locales: Record<string, Record<string, unknown>>) => {
-      const translations = locales[locale.current];
-      const lookup = (key: string) =>
-        key
-          .split('.')
-          .reduce<unknown>(
-            (value, part) =>
-              value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
-            translations,
-          );
-      const t = (key: string) => lookup(key) ?? key;
-      const tExists = (key: string) => lookup(key) !== undefined;
-      return { t, tExists };
-    },
-  };
-});
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (async () => {
+    const actual = await vi.importActual<typeof import('@attraccess/plugins-frontend-ui')>(
+      '@attraccess/plugins-frontend-ui',
+    );
+    return {
+      ...actual,
+      useTranslations: (locales: Record<string, Record<string, unknown>>) => {
+        const translations = locales[locale.current];
+        const lookup = (key: string) =>
+          key
+            .split('.')
+            .reduce<unknown>(
+              (value, part) =>
+                value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined,
+              translations,
+            );
+        const t = (key: string) => lookup(key) ?? key;
+        const tExists = (key: string) => lookup(key) !== undefined;
+        return { t, tExists };
+      },
+    };
+  })()),
+}));
 
 vi.mock('@attraccess/react-query-client', () => ({
   useUsersServiceVerifyEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {

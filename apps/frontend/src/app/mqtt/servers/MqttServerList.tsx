@@ -1,12 +1,8 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, EmptyState, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
   AlertDescription,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Spinner,
   Table,
   TableBody,
@@ -19,8 +15,6 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { PencilIcon, Trash2Icon } from 'lucide-react';
-import { StandardModal } from '../../../components/standardModal';
-import { Button } from '../../../components/button';
 import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
@@ -32,8 +26,6 @@ import {
   useMqttServiceMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
-import { EmptyState } from '../../../components/emptyState';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 
@@ -110,10 +102,7 @@ export function MqttServerList() {
               <TableColumn>{t('columnAddress')}</TableColumn>
               <TableColumn>{t('columnActions')}</TableColumn>
             </TableHeader>
-            <TableBody
-              items={servers}
-              renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}
-            >
+            <TableBody items={servers} renderEmptyState={() => <EmptyState message={t('noServersConfigured')} />}>
               {(server) => (
                 <TableRow key={`mqtt-server-${server.id}`} id={server.id}>
                   <TableCell>{server.name}</TableCell>
@@ -151,42 +140,23 @@ export function MqttServerList() {
         </TableScrollContainer>
       </Table>
 
-      <StandardModal
+      <StatusDialog
         isOpen={isOpen}
-        onOpenChange={(o) => {
-          if (!o) closeDeleteModal();
+        onClose={closeDeleteModal}
+        status="error"
+        title={t('deleteServer')}
+        closeLabel={t('cancel')}
+        closeDataCy="mqtt-server-list-delete-confirmation-cancel-button"
+        action={{
+          label: t('deleteServer'),
+          onPress: confirmDelete,
+          isPending: deleteServer.isPending,
+          'data-cy': 'mqtt-server-list-delete-confirmation-delete-button',
         }}
         data-cy="mqtt-server-list-delete-confirmation-modal"
-        size="sm"
       >
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{t('deleteServer')}</ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              <p>{t('deleteConfirmation')}</p>
-            </ModalBody>
-            <ModalFooter>
-              <Button
-                variant="secondary"
-                onPress={close}
-                data-cy="mqtt-server-list-delete-confirmation-cancel-button"
-              >
-                {t('cancel')}
-              </Button>
-              <Button
-                variant="danger"
-                onPress={confirmDelete}
-                isPending={deleteServer.isPending}
-                data-cy="mqtt-server-list-delete-confirmation-delete-button"
-              >
-                {t('deleteServer')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+        {t('deleteConfirmation')}
+      </StatusDialog>
     </>
   );
 }

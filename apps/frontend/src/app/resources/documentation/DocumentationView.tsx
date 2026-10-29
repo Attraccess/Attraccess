@@ -1,10 +1,8 @@
 import { memo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, Spinner } from '@heroui/react';
-import { Button } from '../../../components/button';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, Edit, RefreshCw } from 'lucide-react';
-import { PageHeader } from '../../../components/pageHeader';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import en from './documentationModal.en.json';
 import de from './documentationModal.de.json';
@@ -57,16 +55,16 @@ function DocumentationViewComponent() {
           <p className="text-danger">{resourceError instanceof Error ? resourceError.message : t('error.unknown')}</p>
         </Card.Content>
         <Card.Footer className="flex justify-center gap-4">
-          <Button variant="primary"
-            onPress={() => refetchResource()}
-            data-cy="documentation-view-error-retry-button"
-          ><RefreshCw size={16} />
+          <Button variant="primary" onPress={() => refetchResource()} data-cy="documentation-view-error-retry-button">
+            <RefreshCw size={16} />
             {t('actions.retry')}
           </Button>
-          <Button variant="secondary"
+          <Button
+            variant="secondary"
             onPress={() => navigate('/resources')}
             data-cy="documentation-view-error-back-to-resources-button"
-          ><ArrowLeft size={16} />
+          >
+            <ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
         </Card.Footer>
@@ -85,10 +83,12 @@ function DocumentationViewComponent() {
           <p>{t('notFound.message')}</p>
         </Card.Content>
         <Card.Footer className="justify-center">
-          <Button variant="secondary"
+          <Button
+            variant="secondary"
             onPress={() => navigate('/resources')}
             data-cy="documentation-view-not-found-back-to-resources-button"
-          ><ArrowLeft size={16} />
+          >
+            <ArrowLeft size={16} />
             {t('actions.backToResources')}
           </Button>
         </Card.Footer>

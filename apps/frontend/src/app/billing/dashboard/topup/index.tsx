@@ -11,12 +11,10 @@ import {
   NumberFieldInput,
   Spinner,
 } from '@heroui/react';
-import { Button } from '../../../../components/button/index';
-import { PageHeader } from '../../../../components/pageHeader/index';
 import { SumUpIcon } from '../../../../components/icons/sumup.icon';
 import { Select } from '../../../../components/select/index';
 import { TransactionProcessingCard } from './transactionProcessingStatus/index';
-import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import {

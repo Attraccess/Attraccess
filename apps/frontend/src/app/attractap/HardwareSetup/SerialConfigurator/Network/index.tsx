@@ -1,9 +1,17 @@
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Alert, AlertContent, AlertTitle, Label, ProgressBar, ProgressBarFill, ProgressBarTrack, TextField, Input, cn } from '@heroui/react';
-import { Button } from '../../../../../components/button';
+import { Button, PageHeader, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Alert,
+  AlertContent,
+  AlertTitle,
+  Label,
+  ProgressBar,
+  ProgressBarFill,
+  ProgressBarTrack,
+  TextField,
+  Input,
+  cn,
+} from '@heroui/react';
 import { useMemo, useState } from 'react';
-import { PasswordInput } from '../../../../../components/PasswordInput';
-import { PageHeader } from '../../../../../components/pageHeader';
 import { useAttractapSerialComm } from '../Auth';
 
 import de from './de.json';
@@ -96,7 +104,7 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
           {t('ethernet.connected.description', { ip: status.ethernet_ip })}
         </Alert>
       ) : (
-        <Alert status="warning" >
+        <Alert status="warning">
           <AlertContent>
             <AlertTitle>{t('ethernet.disconnected.title')}</AlertTitle>
           </AlertContent>
@@ -108,17 +116,20 @@ export function AttractapSerialConfiguratorNetwork({ className }: { className?: 
         <Input list="wifi-ssid-list" />
         <datalist id="wifi-ssid-list">
           {networkSelectItems.map((item) => (
-            <option key={item.key} value={item.key}>{item.label}</option>
+            <option key={item.key} value={item.key}>
+              {item.label}
+            </option>
           ))}
         </datalist>
       </TextField>
       <PasswordInput
         label={t('password.label')}
         value={wifiPassword ?? ''}
-        onChange={(setWifiPassword)}
+        onChange={setWifiPassword}
         autoComplete="off"
       />
-      <Button variant="primary"
+      <Button
+        variant="primary"
         onPress={handleSetWifiCredentials}
         isPending={isWifiConnecting}
         isDisabled={!selectedWifiSSID}

@@ -1,7 +1,6 @@
 import { Card, Skeleton } from '@heroui/react';
 import { useParams } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { PageHeader } from '../../../../components/pageHeader';
+import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { filenameToUrl } from '../../../../api';
 import { FoldersIcon } from 'lucide-react';
 import { useProjectsServiceFindOneProject } from '@attraccess/react-query-client';

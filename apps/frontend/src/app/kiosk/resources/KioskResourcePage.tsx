@@ -2,11 +2,10 @@ import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-
 import { Spinner } from '@heroui/react';
 import { ArrowLeftIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { Button } from '../../../components/button';
 import { KioskLogin } from '../login/KioskLogin';
 import { ResourceOverviewTab } from '../../resources/details/overview/ResourceOverviewTab';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ResourceImage } from '../../../components/ResourceImage';
 import en from './KioskResourcePage.en.json';
 import de from './KioskResourcePage.de.json';
@@ -28,11 +27,7 @@ function KioskResourceContent({ resourceId }: { resourceId: number }) {
   }
 
   if (!resource) {
-    return (
-      <div className="text-center text-muted-foreground py-12">
-        {t('notFound')}
-      </div>
-    );
+    return <div className="text-center text-muted-foreground py-12">{t('notFound')}</div>;
   }
 
   return (
@@ -58,9 +53,7 @@ function KioskResourceContent({ resourceId }: { resourceId: number }) {
         />
         <div>
           <h1 className="text-2xl font-bold">{resource.name}</h1>
-          {resource.description && (
-            <p className="text-default-500 text-sm mt-1">{resource.description}</p>
-          )}
+          {resource.description && <p className="text-default-500 text-sm mt-1">{resource.description}</p>}
         </div>
       </div>
 

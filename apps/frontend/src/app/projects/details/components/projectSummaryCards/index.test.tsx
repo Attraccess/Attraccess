@@ -8,9 +8,12 @@ const state = vi.hoisted(() => ({
     | { totalSessions?: number; totalMinutes?: number; totalSpend?: number; currency: string; minorUnit: number },
   query: vi.fn(),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: () => ({ t: (key: string) => key }),
-  useNumberFormatter: () => (value: number) => value.toFixed(2),
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslations: () => ({ t: (key: string) => key }),
+    useNumberFormatter: () => (value: number) => value.toFixed(2),
+  }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useProjectsServiceGetProjectUsageStats: (params: unknown) => {

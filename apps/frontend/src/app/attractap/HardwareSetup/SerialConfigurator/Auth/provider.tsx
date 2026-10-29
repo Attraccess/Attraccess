@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useContext, createContext } from 'react';
 import type { PropsWithChildren, FormEvent } from 'react';
 import { ESPTools } from '../../../../../utils/esp-tools';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -14,8 +14,6 @@ import {
   ProgressCircleTrackCircle,
   TextField,
 } from '@heroui/react';
-import { Button } from '../../../../../components/button/index';
-import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
 import { AttractapSerialConfiguratorPin } from '../Pin/index';
 import de from './de.json';
 import en from './en.json';

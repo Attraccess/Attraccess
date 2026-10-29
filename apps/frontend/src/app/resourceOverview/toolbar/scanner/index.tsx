@@ -1,10 +1,9 @@
 import { Scanner, IDetectedBarcode, boundingBox } from '@yudiel/react-qr-scanner';
 import { useOverlayState } from '@heroui/react';
-import { StandardModal } from '../../../../components/standardModal';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';

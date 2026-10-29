@@ -63,6 +63,10 @@ Solo `pnpm nx serve api` is **not** wrapped. Prefer `pnpm serve --only=api`.
 
 We use HeroUI, use it. Use as little tailwind/custom css as possible.
 
+Use `StatusDialog` for notices and confirmations (info, success, warning, error); only `error` gets a danger
+action button. Use `StandardModal` only for richer dialog content. Shared UI comes from
+`@attraccess/plugins-frontend-ui`; do not add copies of these components in core or in plugins.
+
 Use HeroUI React documentation from @Docs https://heroui.com/react/llms.txt
 For component-specific documentation @Docs https://heroui.com/react/llms-components.txt
 For patterns and best practices @Docs https://heroui.com/react/llms-patterns.txt

@@ -12,12 +12,15 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useBillingServiceGetBillingTransaction: () => ({ data: state.transaction }),
   useBillingServiceGetBillingConfiguration: () => ({ data: state.configuration }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslationState: () => ({ language: 'de' }),
-  useTranslations: () => ({ t: (key: string) => key, tExists: (key: string) => key === 'items.system.usage' }),
-  useNumberFormatter: () => (value: number) => value.toFixed(2),
-  DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
-  AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  ...(await (() => ({
+    useTranslationState: () => ({ language: 'de' }),
+    useTranslations: () => ({ t: (key: string) => key, tExists: (key: string) => key === 'items.system.usage' }),
+    useNumberFormatter: () => (value: number) => value.toFixed(2),
+    DateTimeDisplay: ({ date }: { date: string }) => <span>{date}</span>,
+    AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
+  }))()),
 }));
 vi.mock('./refund', () => ({
   RefundModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(state.refund),
