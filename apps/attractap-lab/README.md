@@ -235,6 +235,12 @@ Tailscale tags, relay address/port, labgrid package) and the secrets it reuses
 from the hardware smoke workflow (`TS_OAUTH_CLIENT_ID`, `TS_AUDIENCE`,
 `LAB_SSH_PRIVATE_KEY`, `LAB_SSH_KNOWN_HOSTS`).
 
+When enabled, the tests gate publishing: in both workflows the `plugins`,
+`containerize` (and on release `balena` and `publish-attractap-desktop`) jobs
+need them and stop if they fail or are cancelled. Runs wait for the place in
+`labgrid-client session` (`ATTRACTAP_LAB_WAIT_MINUTES`) rather than in a
+GitHub concurrency group, which would cancel queued runs.
+
 A runner joins the tailnet, but readers only reach the lab's LAN. The runner
 therefore relays its API through the lab host: enable
 `services.attractap-lab.readerApiRelay` (default port 20480), which lets the

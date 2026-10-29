@@ -39,11 +39,9 @@ permissions:
   contents: read
   id-token: write
 
-# One run at a time: the lab has one reader with an emulator, and the API relay
-# port on the lab host is shared.
-concurrency:
-  group: attractap-lab-hil
-  cancel-in-progress: false
+# No concurrency group: it would cancel queued runs (and so block a release).
+# Runs queue for the place in `labgrid-client session` instead, and run.sh
+# opens the lab host's single relay port only while holding the place.
 
 jobs:
   hil:

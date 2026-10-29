@@ -72,7 +72,8 @@ jobs:
         run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin
 
   plugins:
-    needs: [lint, typecheck, test, build]
+    needs: [lint, typecheck, test, build, attractap-lab-hil]
+    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -106,7 +107,8 @@ jobs:
 
   attractap-lab-hil:
     # Real reader firmware against the NFC card emulator in the Attractap lab;
-    # skipped unless vars.ATTRACTAP_LAB_HIL_ENABLED is 'true'.
+    # skipped unless vars.ATTRACTAP_LAB_HIL_ENABLED is 'true'. Publishing jobs
+    # need it: a failed or cancelled run blocks them, a skipped one does not.
     uses: ./.github/workflows/attractap-lab-hil.yml
     secrets: inherit
 
@@ -115,8 +117,8 @@ jobs:
     secrets: inherit
 
   containerize:
-    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop]
-    if: always() && !failure() && !cancelled()
+    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop, attractap-lab-hil]
+    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

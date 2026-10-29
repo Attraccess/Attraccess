@@ -16,6 +16,25 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Second stage, run by labgrid-client inside the session: holding the place
+# also serializes use of the lab host's single relay port.
+if [[ "${1:-}" == --in-session ]]; then
+  shift
+  relay_pid=
+  if [[ -n "${API_RELAY_SSH:-}" ]]; then
+    ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
+      -R "0.0.0.0:$READER_API_PORT:127.0.0.1:$API_PORT" "$API_RELAY_SSH" &
+    relay_pid=$!
+    sleep 3
+    kill -0 "$relay_pid" 2>/dev/null || { echo "API relay through $API_RELAY_SSH failed" >&2; exit 1; }
+  fi
+  status=0
+  "$LAB_PYTHON" -m pytest "$HERE" -p no:cacheprovider -v "$@" || status=$?
+  [[ -z "$relay_pid" ]] || kill "$relay_pid" 2>/dev/null || true
+  exit "$status"
+fi
+
 ROOT="$(cd "$HERE/../../.." && pwd)"
 PLACE="${LG_PLACE_NAME:-attractap-touch-v2-1}"
 COORDINATOR="${LG_COORDINATOR:-attractap-lab:20408}"
@@ -60,8 +79,7 @@ set -m
 (cd "$ROOT" && PORT="$API_PORT" exec pnpm serve --only=api >"$WORK/api.log" 2>&1) &
 api_pid=$!
 set +m
-relay_pid=
-trap 'kill -- "-$api_pid" 2>/dev/null || true; [[ -z "$relay_pid" ]] || kill "$relay_pid" 2>/dev/null || true' EXIT
+trap 'kill -- "-$api_pid" 2>/dev/null || true' EXIT
 for _ in $(seq 1 120); do
   curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/api/info" && break
   kill -0 "$api_pid" 2>/dev/null || { cat "$WORK/api.log" >&2; exit 1; }
@@ -70,23 +88,18 @@ done
 READER_API_PORT="$API_PORT"
 if [[ -n "${API_RELAY_SSH:-}" ]]; then
   : "${API_RELAY_HOST:?set API_RELAY_HOST to the lab host address on the reader network}"
-  API_RELAY_PORT="${API_RELAY_PORT:-20480}"
-  ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
-    -R "0.0.0.0:$API_RELAY_PORT:127.0.0.1:$API_PORT" "$API_RELAY_SSH" &
-  relay_pid=$!
-  sleep 3
-  kill -0 "$relay_pid" 2>/dev/null || { echo "API relay through $API_RELAY_SSH failed" >&2; exit 1; }
   API_HOST="$API_RELAY_HOST"
-  READER_API_PORT="$API_RELAY_PORT"
+  READER_API_PORT="${API_RELAY_PORT:-20480}"
 fi
 (cd "$ROOT" && pnpm seed:dev -- --username admin --password password --allow-external-db >"$WORK/seed.log" 2>&1)
 
 mkdir -p "$HERE/../hil-artifacts"
 cd "$HERE/../hil-artifacts"
-GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" \
+GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTHON" \
   READER_IMAGE="$READER_IMAGE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
   API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
+  API_RELAY_SSH="${API_RELAY_SSH:-}" \
   labgrid-client -x "$COORDINATOR" -p "$PLACE" session \
     --purpose "${HIL_PURPOSE:-Attractap HIL: NFC emulator tests}" --wait-timeout "${HIL_WAIT_TIMEOUT:-1800}" -- \
-    "$LAB_PYTHON" -m pytest "$HERE" -p no:cacheprovider -v "$@"
+    bash "$HERE/run.sh" --in-session "$@"
