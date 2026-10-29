@@ -82,8 +82,13 @@ lines have an `event` field instead of `ok`. Lines are limited to 8192 bytes,
 and both `\n` and `\r\n` endings work.
 
 `scripts/nfcemu.py` sends one command and prints the result. It needs pyserial,
-which the ESP-IDF Python environment already has. It opens the port without
-toggling DTR/RTS, so it does not reset the board.
+which the ESP-IDF Python environment already has. The ESP32-S3 resets when RTS
+is asserted while DTR is not, which pyserial passes through on Linux when it
+releases both lines after opening. The client keeps both asserted, so opening
+the port does not reset the board or lose runtime state.
+
+In the Attractap hardware lab, the emulator is part of the reader's labgrid
+place; see `apps/attractap-lab/README.md`.
 
 ```sh
 alias nfcemu="python apps/attractap/nfc-emulator/scripts/nfcemu.py --port /dev/cu.usbmodemXXXX"

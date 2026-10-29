@@ -31,9 +31,11 @@ def main() -> int:
     connection.port = options.port
     connection.baudrate = 115200
     connection.timeout = 0.2
-    # Keep DTR/RTS released so opening the port does not reset the ESP32-S3.
-    connection.dtr = False
-    connection.rts = False
+    # The ESP32-S3 USB Serial/JTAG resets the chip while RTS is asserted and
+    # DTR is not. Opening asserts both; keep them asserted so no transition
+    # passes through that state and the emulator keeps its runtime state.
+    connection.dtr = True
+    connection.rts = True
     connection.open()
     connection.reset_input_buffer()
 
