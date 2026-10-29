@@ -1,0 +1,123 @@
+name: Attractap lab hardware tests
+
+# Runs the hardware-in-the-loop tests (apps/attractap-lab/hil) against real
+# reader firmware and the NFC card emulator in the Attractap lab. Called from
+# the release and main-branch (nightly) workflows; skipped unless the
+# ATTRACTAP_LAB_HIL_ENABLED variable is "true".
+#
+# Variables (repository or `attractap-lab` environment):
+#   ATTRACTAP_LAB_HIL_ENABLED       "true" to run at all
+#   LAB_HOST                        Lab host on the tailnet (SSH + coordinator)
+#   ATTRACTAP_LAB_COORDINATOR_PORT  Labgrid coordinator port (default 20408)
+#   ATTRACTAP_LAB_PLACE             Place with reader + emulator (default attractap-touch-v2-1)
+#   ATTRACTAP_LAB_TAILSCALE_TAGS    Tags for the runner's tailnet node (default tag:ci)
+#   ATTRACTAP_LAB_API_RELAY_HOST    Lab host address the readers reach on their LAN
+#   ATTRACTAP_LAB_API_RELAY_PORT    Port the lab host relays to the runner's API (default 20480)
+#   ATTRACTAP_LAB_LABGRID           pip requirement for the labgrid client with `session`
+#                                   (default git+https://github.com/JappyJan/labgrid@stable-26)
+#   ATTRACTAP_LAB_WAIT_MINUTES      How long to wait for a busy reader (default 30)
+# Secrets: TS_OAUTH_CLIENT_ID, TS_AUDIENCE, LAB_SSH_PRIVATE_KEY, LAB_SSH_KNOWN_HOSTS.
+
+on:
+  workflow_call:
+    inputs:
+      pytest-args:
+        description: Extra pytest arguments, e.g. "-k enroll"
+        type: string
+        required: false
+        default: ''
+  workflow_dispatch:
+    inputs:
+      pytest-args:
+        description: Extra pytest arguments, e.g. "-k enroll"
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+# One run at a time: the lab has one reader with an emulator, and the API relay
+# port on the lab host is shared.
+concurrency:
+  group: attractap-lab-hil
+  cancel-in-progress: false
+
+jobs:
+  hil:
+    if: vars.ATTRACTAP_LAB_HIL_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: attractap-lab
+    timeout-minutes: 90
+    env:
+      LAB_HOST: ${{ vars.LAB_HOST }}
+      LG_COORDINATOR: ${{ vars.LAB_HOST }}:${{ vars.ATTRACTAP_LAB_COORDINATOR_PORT || '20408' }}
+      LG_PLACE_NAME: ${{ vars.ATTRACTAP_LAB_PLACE || 'attractap-touch-v2-1' }}
+      API_RELAY_SSH: labgrid@${{ vars.LAB_HOST }}
+      API_RELAY_HOST: ${{ vars.ATTRACTAP_LAB_API_RELAY_HOST }}
+      API_RELAY_PORT: ${{ vars.ATTRACTAP_LAB_API_RELAY_PORT || '20480' }}
+      HIL_WAIT_MINUTES: ${{ vars.ATTRACTAP_LAB_WAIT_MINUTES || '30' }}
+      HIL_PURPOSE: CI ${{ github.workflow }} ${{ github.ref_name }} run ${{ github.run_id }}
+    steps:
+      - name: Check configuration
+        run: |
+          for name in LAB_HOST API_RELAY_HOST; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Set the lab variables (LAB_HOST, ATTRACTAP_LAB_API_RELAY_HOST) or disable ATTRACTAP_LAB_HIL_ENABLED"
+              exit 1
+            fi
+          done
+
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'true'
+
+      - name: Install the labgrid client
+        env:
+          LABGRID: ${{ vars.ATTRACTAP_LAB_LABGRID || 'git+https://github.com/JappyJan/labgrid@stable-26' }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/labgrid"
+          "$RUNNER_TEMP/labgrid/bin/pip" install --quiet "labgrid @ $LABGRID" pytest pyyaml
+          echo "$RUNNER_TEMP/labgrid/bin" >> "$GITHUB_PATH"
+          echo "LAB_PYTHON=$RUNNER_TEMP/labgrid/bin/python" >> "$GITHUB_ENV"
+
+      - uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: ${{ vars.ATTRACTAP_LAB_TAILSCALE_TAGS || 'tag:ci' }}
+          ping: ${{ vars.LAB_HOST }}
+
+      - name: Configure lab SSH access
+        env:
+          LAB_SSH_PRIVATE_KEY: ${{ secrets.LAB_SSH_PRIVATE_KEY }}
+          LAB_SSH_KNOWN_HOSTS: ${{ secrets.LAB_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$LAB_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$LAB_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host %s %s.*\n  User labgrid\n  BatchMode yes\n  StrictHostKeyChecking yes\n' "$LAB_HOST" "$LAB_HOST" > ~/.ssh/config
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts ~/.ssh/config
+
+      - name: Prepare the API environment
+        run: cp .env.example .env
+
+      - name: Run hardware tests
+        env:
+          PYTEST_ARGS: ${{ inputs.pytest-args }}
+        run: |
+          . "$HOME/esp/esp-idf/export.sh" >/dev/null
+          export HIL_WAIT_TIMEOUT=$((HIL_WAIT_MINUTES * 60))
+          # shellcheck disable=SC2086
+          pnpm nx run attractap-lab:hil -- $PYTEST_ARGS
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: attractap-lab-hil-${{ github.run_id }}
+          path: apps/attractap-lab/hil-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14

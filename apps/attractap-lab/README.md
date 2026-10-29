@@ -224,6 +224,23 @@ pytest. Logs, the emulator trace and camera photos land in
 `apps/attractap-lab/hil-artifacts/lab-artifacts/<session>`. These tests are
 not part of `pnpm nx run attractap-lab:test`, which runs without hardware.
 
+### In CI
+
+`.github/workflows/attractap-lab-hil.yml` runs these tests from the release
+workflow and on every push to `main`. It is off until the repository (or the
+`attractap-lab` environment) sets `ATTRACTAP_LAB_HIL_ENABLED=true`; the
+workflow file lists all variables (lab host, coordinator port, place,
+Tailscale tags, relay address/port, labgrid package) and the secrets it reuses
+from the hardware smoke workflow (`TS_OAUTH_CLIENT_ID`, `TS_AUDIENCE`,
+`LAB_SSH_PRIVATE_KEY`, `LAB_SSH_KNOWN_HOSTS`).
+
+A runner joins the tailnet, but readers only reach the lab's LAN. The runner
+therefore relays its API through the lab host: enable
+`services.attractap-lab.readerApiRelay` (default port 20480), which lets the
+`labgrid` account open exactly that remote forward, and allow the port from
+the readers' LAN in the host firewall. Set `ATTRACTAP_LAB_API_RELAY_HOST` to
+the lab host's address on that LAN.
+
 ## Reader touchscreen and screenshots
 
 Reader firmware built with `-DATTRACTAP_TEST_HOOKS=ON` (and, for the lab,

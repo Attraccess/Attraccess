@@ -107,6 +107,14 @@ in {
       coordinatorAddress = mkOption { type = types.str; default = "127.0.0.1:20408"; description = "Coordinator HOST:PORT (labgrid gRPC address)."; };
       settings = mkOption { type = yaml.type; default = { }; description = "Native labgrid exporter YAML: one resource group per reader. Use stable USB properties in match expressions."; };
     };
+    readerApiRelay = {
+      enable = mkEnableOption "letting lab users relay a test API to the readers' LAN with an SSH reverse tunnel (CI runners are not on that LAN)";
+      port = mkOption {
+        type = types.port;
+        default = 20480;
+        description = "The only port the labgrid account may forward. Open it to the readers' LAN in the host firewall; the module opens no ports.";
+      };
+    };
     readerWifi = {
       enable = mkEnableOption "sending the lab Wi-Fi credentials to claimed readers without revealing them to lab users";
       credentialsFile = mkOption {
@@ -241,6 +249,14 @@ in {
         RestartSec = 5;
       };
     };
+  })
+  (mkIf cfg.readerApiRelay.enable {
+    # Remote forwards on all addresses, but only on the relay port.
+    services.openssh.extraConfig = ''
+      Match User labgrid
+        GatewayPorts clientspecified
+        PermitListen 0.0.0.0:${toString cfg.readerApiRelay.port}
+    '';
   })
   (mkIf readerWifi.enable {
     assertions = [ {

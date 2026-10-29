@@ -105,6 +105,12 @@ jobs:
   build-attractap-desktop:
     uses: ./.github/workflows/build-attractap-desktop.yml
 
+  attractap-lab-hil:
+    # Real reader firmware against the NFC card emulator in the Attractap lab;
+    # skipped unless vars.ATTRACTAP_LAB_HIL_ENABLED is 'true'.
+    uses: ./.github/workflows/attractap-lab-hil.yml
+    secrets: inherit
+
   build-attractap-firmware:
     uses: ./.github/workflows/attractap-firmware.yml
     secrets: inherit

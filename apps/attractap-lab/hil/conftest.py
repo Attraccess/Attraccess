@@ -130,7 +130,8 @@ def reader(target, api, admin, artifacts):
     assert b"error" not in response.lower(), response
     reader_ip = console.expect(r"Got IP (\d+\.\d+\.\d+\.\d+)", mark, 60).group(1).decode()
     configuration = console.command("api.configuration.set", {
-        "authCode": PIN, "hostname": api_host(reader_ip), "port": int(os.environ["API_PORT"]), "useSSL": False,
+        "authCode": PIN, "hostname": api_host(reader_ip),
+        "port": int(os.environ.get("READER_API_PORT") or os.environ["API_PORT"]), "useSSL": False,
     })
     assert "error" not in configuration.lower(), configuration
     # Leave the configuration-required state with a reboot.
