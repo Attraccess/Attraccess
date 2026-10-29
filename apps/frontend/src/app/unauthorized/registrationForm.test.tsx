@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RegistrationForm } from './registrationForm';
@@ -12,6 +12,7 @@ const mutateMock = vi.fn();
 const onHasAccountMock = vi.fn();
 const locale = vi.hoisted(() => ({ current: 'en' }));
 const pending = vi.hoisted(() => ({ createAccount: false }));
+const createAccountOptions = vi.hoisted(() => ({ current: undefined as undefined | { onSuccess?: () => void } }));
 const labels = { en, de };
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -42,10 +43,13 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceCreateOneUser: () => ({
-    mutate: mutateMock,
-    isPending: pending.createAccount,
-  }),
+  useUsersServiceCreateOneUser: (options: { onSuccess?: () => void }) => {
+    createAccountOptions.current = options;
+    return {
+      mutate: mutateMock,
+      isPending: pending.createAccount,
+    };
+  },
   usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({
     data: {
       minLength: 12,
@@ -79,6 +83,7 @@ describe('RegistrationForm', () => {
     onHasAccountMock.mockReset();
     locale.current = 'en';
     pending.createAccount = false;
+    sessionStorage.clear();
   });
 
   it('shows username guidance text', async () => {
@@ -151,5 +156,22 @@ describe('RegistrationForm', () => {
         strategy: 'LOCAL_PASSWORD',
       },
     });
+  });
+
+  it('offers 2FA setup from the success dialog: sets the intent, closes and switches to sign-in', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    act(() => createAccountOptions.current?.onSuccess?.());
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent(en.twoFactor.title);
+    expect(dialog).toHaveTextContent(en.twoFactor.description);
+
+    await user.click(screen.getByRole('button', { name: en.twoFactor.action }));
+
+    expect(sessionStorage.getItem('twoFactorSetupIntent')).toBe('true');
+    expect(onHasAccountMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 });

@@ -1,14 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  AlertTitle,
-  Input,
-  Label,
-  TextField,
-  useOverlayState,
-} from '@heroui/react';
+import { Input, Label, TextField, useOverlayState } from '@heroui/react';
 import { UsernameInput, USERNAME_RULES, useUsernameValidation } from '../../components/UsernameInput/index';
 import { PasswordField } from '../../components/PasswordField/index';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -313,12 +304,10 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
       >
         <div className="flex flex-col gap-3">
           <p>{t('success.message').replace('{email}', registeredEmail)}</p>
-          <Alert status="default">
-            <AlertContent>
-              <AlertTitle>{t('twoFactor.title')}</AlertTitle>
-              <AlertDescription>{t('twoFactor.description')}</AlertDescription>
-            </AlertContent>
-          </Alert>
+          <div>
+            <p className="font-medium">{t('twoFactor.title')}</p>
+            <p>{t('twoFactor.description')}</p>
+          </div>
         </div>
       </StatusDialog>
     </>

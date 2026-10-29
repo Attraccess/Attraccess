@@ -7,7 +7,7 @@ import { ChangeEmailForm } from './index';
 import { QueryWrapper } from '../../../../../test-utils/wrappers';
 
 const mutate = vi.fn();
-let hookOptions: { onSuccess?: () => void } = {};
+let hookOptions: { onSuccess?: () => void; onError?: (error: unknown) => void } = {};
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {},
@@ -124,6 +124,7 @@ describe('ChangeEmailForm', () => {
     expect(mutate).toHaveBeenCalledWith({ id: 7, requestBody: { email: 'new@example.com' } });
 
     // A failed request keeps the dialog open; only success closes it.
+    act(() => hookOptions.onError?.(new Error('request failed')));
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     act(() => hookOptions.onSuccess?.());
     expect(screen.queryByRole('alertdialog')).toBeNull();
