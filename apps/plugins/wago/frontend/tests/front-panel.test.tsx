@@ -420,7 +420,7 @@ describe('front panel page actions', () => {
     render(<FrontPanel controllerId={1} onClose={onClose} onHistory={onHistory} />, { wrapper });
     await screen.findByText('Unapplied changes');
     fireEvent.click(screen.getByRole('button', { name: 'Revision history' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Leave with unapplied changes?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Leave with unapplied changes?' });
     expect(onHistory).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Leave page' }));
     expect(onHistory).toHaveBeenCalledTimes(1);
