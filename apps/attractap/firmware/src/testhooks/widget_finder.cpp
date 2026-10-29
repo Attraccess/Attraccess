@@ -76,7 +76,8 @@ namespace WidgetFinder
             for (uint32_t i = 0; i < count; i++)
             {
                 lv_obj_t *child = lv_obj_get_child(obj, static_cast<int32_t>(i));
-                if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN) || isTouchable(child))
+                // Clipped children (e.g. other tab pages) are not on screen.
+                if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN) || isTouchable(child) || !lv_obj_is_visible(child))
                 {
                     continue;
                 }
@@ -202,6 +203,13 @@ namespace WidgetFinder
                 {
                     addText(widget.texts, lv_label_get_text(obj));
                 }
+#if LV_USE_TEXTAREA
+                // An empty field shows its placeholder instead.
+                if (lv_obj_has_class(obj, &lv_textarea_class) && !*lv_textarea_get_text(obj))
+                {
+                    addText(widget.texts, lv_textarea_get_placeholder_text(obj));
+                }
+#endif
 #if LV_USE_DROPDOWN
                 if (lv_obj_has_class(obj, &lv_dropdown_class))
                 {

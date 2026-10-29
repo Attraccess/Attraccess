@@ -151,6 +151,18 @@ int main()
     lv_obj_align(lathe, LV_ALIGN_LEFT_MID, 0, 0);
     button(cardObj, "Info", 100, 0, 70, 40, &info);
 
+    // A clickable pager: only the label on the visible page is its text.
+    Counter pagerClicks;
+    lv_obj_t *pager = lv_obj_create(screen);
+    lv_obj_set_pos(pager, 340, 20);
+    lv_obj_set_size(pager, 120, 50);
+    lv_obj_add_event_cb(pager, countEvent, LV_EVENT_ALL, &pagerClicks);
+    lv_obj_t *pageA = lv_label_create(pager);
+    lv_label_set_text(pageA, "Page A");
+    lv_obj_t *pageB = lv_label_create(pager);
+    lv_label_set_text(pageB, "Page B");
+    lv_obj_set_pos(pageB, 300, 0);
+
     // A scroll list taller than its viewport.
     lv_obj_t *list = lv_obj_create(screen);
     lv_obj_set_pos(list, 240, 90);
@@ -168,6 +180,7 @@ int main()
     lv_obj_set_pos(textarea, 20, 180);
     lv_obj_set_size(textarea, 200, 50);
     lv_textarea_set_one_line(textarea, true);
+    lv_textarea_set_placeholder_text(textarea, "PIN");
     lv_obj_t *keyboard = lv_keyboard_create(screen);
     lv_keyboard_set_mode(keyboard, LV_KEYBOARD_MODE_NUMBER);
     lv_keyboard_set_textarea(keyboard, textarea);
@@ -182,12 +195,14 @@ int main()
     CHECK(find(widgets, "session")); // one of its labels
     CHECK(!find(widgets, "Sess") && find(widgets, "nd sess", WidgetFinder::Match::Contains));
     CHECK(!anyWithText(widgets, "Ghost"));
+    CHECK(find(widgets, "Page A") && find(widgets, "Page A")->text() == "Page A");
     CHECK(!anyWithText(widgets, "Title"));
     const auto *cardWidget = find(widgets, "Lathe");
     CHECK(cardWidget && cardWidget->obj == cardObj && cardWidget->texts.size() == 1);
     CHECK(find(widgets, "Info"));
     CHECK(find(widgets, "Item 0") && find(widgets, "Item 1"));
     CHECK(!anyWithText(widgets, "Item 9")); // scrolled out of the list viewport
+    CHECK(find(widgets, "PIN") && std::string(find(widgets, "PIN")->type) == "lv_textarea");
     const auto *key = find(widgets, "7");
     CHECK(key && std::string(key->type) == "key" && key->key >= 0 && key->obj == keyboard);
     // Front to back: the keyboard (created last) precedes the Start button.

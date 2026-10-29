@@ -201,6 +201,43 @@ on the session's console. Inside a session, call
 the exporter host over labgrid's SSH connection. Set the reader's PIN first
 (`CMND auth.code.set {"newCode":"..."}`).
 
+## Reader touchscreen and screenshots
+
+Reader firmware built with `-DATTRACTAP_TEST_HOOKS=ON` (and, for the lab,
+`-DATTRACTAP_BEEPER_DEFAULT=OFF`; see the firmware README, "Test hooks")
+accepts serial commands that tap, press and swipe the touchscreen, list the
+widgets on screen and stream screenshots. `attractap_lab.reader_screen` wraps
+them for tests:
+
+```python
+from attractap_lab.drivers import ESPToolDriver
+from attractap_lab.reader_screen import ReaderTestHooks
+
+with claim("example-emulator-env.yaml", os.environ["LG_PLACE"]) as target:
+    target.get_driver(ESPToolDriver).flash("tv2-hooks-merged.bin")
+    target.deactivate(target.get_driver(ESPToolDriver))
+    hooks = ReaderTestHooks(target.get_driver("SerialDriver"), "4711")
+    hooks.ensure_auth_code()                  # erased readers have no PIN yet
+    hooks.wait_for(screen="ConnectionConfigurationScreen")
+    hooks.tap_text("Device", timeout=10)      # waits for the widget first
+    hooks.swipe(240, 400, 240, 150)
+    hooks.screenshot().save("screen.png")
+    hooks.wait_for_log(r"Transitioning to screen: ResourceList", timeout=30)
+```
+
+`command(topic, payload)` sends any reader command with the PIN and returns
+its reply, raising `ReaderCommandError` (with `.code`) for error replies and
+resending commands that got no reply. `widgets()`, `screen()`,
+`find(text, match)`, `wait_for(text, screen=..., timeout=...)`,
+`tap(x, y)`, `press(x, y, hold_ms)`, `release()`, `swipe(...)` and
+`tap_text(text, match, index)` map to the `ui.*` topics; widget dictionaries
+carry `text`, `texts`, `cx`/`cy` and `hittable`. `read_log()` and
+`wait_for_log(pattern)` return the reader's other console lines.
+`screenshot()` returns a `Screenshot` (`width`, `height`, `rgb`, `pixel(x, y)`,
+`png()`, `save(path)`) and retries corrupt transfers. The pure functions
+`decode_rle565`, `assemble_screenshot`, `encode_png`, `matches` and `find`
+need no hardware.
+
 ## Web dashboard
 
 Enable the pinned upstream [labgrid-plugins dashboard](https://tfcollins.github.io/labgrid-plugins/user-guide/web-dashboard.html)

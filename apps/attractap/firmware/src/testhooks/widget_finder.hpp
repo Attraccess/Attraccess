@@ -17,7 +17,8 @@ namespace WidgetFinder
         int32_t key;
         const char *type;
         // Visible label texts inside the widget, whitespace-normalized. Labels
-        // of nested touchable widgets belong to those widgets instead.
+        // of nested touchable widgets belong to those widgets instead. Empty
+        // text areas report their placeholder, dropdowns their selection.
         std::vector<std::string> texts;
         lv_area_t area;
         // Center of the part not clipped by parents or the display.
