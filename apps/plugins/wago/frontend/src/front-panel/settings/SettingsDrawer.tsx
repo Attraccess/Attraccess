@@ -28,7 +28,7 @@ export function SettingsDrawer({
       isOpen
       onOpenChange={(open) => !open && onClose()}
       contentProps={{ placement: 'right' }}
-      dialogProps={{ 'aria-label': title }}
+      dialogProps={{ 'aria-label': title, className: 'wg:w-full wg:max-w-full wg:sm:max-w-xl' }}
     >
       <Form
         className="wg:flex wg:h-full wg:min-h-0 wg:flex-col"
