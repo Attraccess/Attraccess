@@ -75,7 +75,7 @@ export function BundledRuntime({
         </header>
       )}
       {loading ? (
-        <TableDataLoadingIndicator />
+        <TableDataLoadingIndicator label={t('artifacts.loading')} />
       ) : loadFailed ? (
         <p role="alert">{t('artifacts.loadError')}</p>
       ) : current ? (

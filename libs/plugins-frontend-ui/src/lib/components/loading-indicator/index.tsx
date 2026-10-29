@@ -8,12 +8,13 @@ import { useTranslations } from '../../i18n';
 import en from './en.json';
 import de from './de.json';
 
-export const TableDataLoadingIndicator = () => {
+/** `label` names the indicator for screen readers; it defaults to a generic "Loading". */
+export const TableDataLoadingIndicator = ({ label }: Readonly<{ label?: string }>) => {
   const { t } = useTranslations({ en, de });
 
   return (
     <div className="flex justify-center items-center p-4">
-      <ProgressCircle isIndeterminate aria-label={t('loading')}>
+      <ProgressCircle isIndeterminate aria-label={label ?? t('loading')}>
         <ProgressCircleTrack>
           <ProgressCircleTrackCircle />
           <ProgressCircleFillCircle />

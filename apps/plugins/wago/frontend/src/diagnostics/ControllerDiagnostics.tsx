@@ -154,7 +154,7 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
       </div>
       {query.isError && <p role="alert">{t('diagnostics.accessError')}</p>}
       {!query.isError && pollingStale && <p role="alert">{t('diagnostics.overdue')}</p>}
-      {query.isPending && <TableDataLoadingIndicator />}
+      {query.isPending && <TableDataLoadingIndicator label={t('diagnostics.loading')} />}
       {d && (
         <>
           <WagoStatus diagnostics={d} pollingUpdatedAt={query.dataUpdatedAt} />

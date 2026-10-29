@@ -54,7 +54,7 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
       {statusQuery.isError ? (
         <p role="alert">{t('networkChange.statusUnavailable')}</p>
       ) : !status ? (
-        <TableDataLoadingIndicator />
+        <TableDataLoadingIndicator label={t('networkChange.loading')} />
       ) : !status.available ? (
         <p role="status">{t('networkChange.managementRequired')}</p>
       ) : (
