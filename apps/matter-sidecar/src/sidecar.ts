@@ -102,6 +102,15 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     });
 
   async function start() {
+    try {
+      return await startUnsafe();
+    } catch (error) {
+      await shutdown().catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async function startUnsafe() {
     platform = await (options.loadPlatform ?? loadMatterPlatform)();
     running.matterJs = platform.version;
     state.matterPlatform = true;
@@ -113,6 +122,9 @@ export function createSidecar(options: SidecarOptions): Sidecar {
         sendError(res, { code: 'internal_error', message: 'The request failed.' }, correlationIdFrom(req.headers)),
       );
     });
+    // Bounds the whole request including a slow body, so the configured deadline also covers reading it.
+    server.requestTimeout = config.requestDeadlineMs;
+    server.headersTimeout = Math.min(config.requestDeadlineMs, 30_000);
     server.on('upgrade', (req, socket, head) => hub?.handleUpgrade(req, socket, head));
     server.on('clientError', (_error, socket) => socket.destroy());
     const port = await listen(server);
@@ -130,7 +142,11 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     state.draining = true;
     clearInterval(pruneTimer);
     const active = server;
-    if (!active) return;
+    if (!active?.listening) {
+      await platform?.close();
+      state.ready = false;
+      return;
+    }
     stream.publish('sidecar.lifecycle', { phase: 'draining' });
     const closed = new Promise<void>((resolve) => active.close(() => resolve()));
     hub?.closeAll(CLOSE_CODES.goingAway, 'sidecar shutting down');

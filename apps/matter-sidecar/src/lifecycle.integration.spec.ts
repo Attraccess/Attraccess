@@ -75,6 +75,19 @@ describe('lifecycle', () => {
     socket.destroy();
   });
 
+  it('releases the platform handle when the transport fails to start', async () => {
+    const first = await startSidecar();
+    const close = jest.fn(async () => undefined);
+    const clash = createSidecar({
+      config: configWith({ port: first.port }),
+      logger: createLogger(() => undefined),
+      loadPlatform: async () => ({ version: '0.0.0', close }),
+    });
+    await expect(clash.start()).rejects.toThrow(/EADDRINUSE/);
+    expect(close).toHaveBeenCalledTimes(1);
+    await first.stop();
+  });
+
   it('reports a start-up failure and keeps the process alive for the caller to decide', async () => {
     const first = await startSidecar();
     const clash = createSidecar({

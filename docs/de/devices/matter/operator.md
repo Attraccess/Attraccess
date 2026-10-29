@@ -74,7 +74,7 @@ So beheben Sie es: Vergleichen Sie `received` mit `supported` und **aktualisiere
 
 ## Sicherheitshinweise
 
-- Der Sidecar authentifiziert Aufrufer noch nicht. Jeder lokale Prozess kann ihn aufrufen. **Setzen Sie ihn nicht von außen erreichbar ein** und stellen Sie ihn nicht hinter einen öffentlichen Reverse-Proxy, bis Dienstauthentifizierung ([ATT-1001](https://linear.app/attraccess/issue/ATT-1001)) existiert.
+- Der Sidecar authentifiziert Aufrufer noch nicht. Jeder lokale Prozess kann ihn aufrufen. **Setzen Sie ihn nicht von außen erreichbar ein** und veröffentlichen Sie ihn nicht über eine Container-Portweiterleitung, einen gemeinsam genutzten Host oder einen öffentlichen Reverse-Proxy, bis Dienstauthentifizierung ([ATT-1001](https://linear.app/attraccess/issue/ATT-1001)) existiert.
 - Anfragen mit Browser-`Origin`-Header oder Nicht-Loopback-`Host` werden mit HTTP 403 abgewiesen.
 - Setup-Codes, Thread-Datasets und Fabric-Geheimnisse erscheinen nie in Logs, Events oder Health-Ausgaben.
 

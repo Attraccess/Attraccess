@@ -74,7 +74,7 @@ To fix it, compare `received` with `supported`, then **upgrade or downgrade** At
 
 ## Security notes
 
-- The sidecar does not authenticate callers yet. Any local process can call it. **Do not expose it remotely** and do not put it behind a public reverse proxy until service authentication ([ATT-1001](https://linear.app/attraccess/issue/ATT-1001)) exists.
+- The sidecar does not authenticate callers yet. Any local process can call it. **Do not expose it remotely** and do not publish it through a container port mapping, a shared host or a public reverse proxy until service authentication ([ATT-1001](https://linear.app/attraccess/issue/ATT-1001)) exists.
 - Requests with a browser `Origin` header or a non-loopback `Host` are refused with HTTP 403.
 - Setup codes, Thread datasets and fabric secrets never appear in logs, events or health output.
 

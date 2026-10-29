@@ -14,6 +14,7 @@
         "{projectRoot}/acceptance/**/*",
         "{workspaceRoot}/eslint.config.cjs",
         "{workspaceRoot}/tools/eslint-rules/**/*",
+        "{workspaceRoot}/libs/matter-contract/project.json",
         { "externalDependencies": ["eslint", "prettier"] }
       ],
       "outputs": [],
@@ -70,7 +71,12 @@
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/backend/**/!(*.spec).ts", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "inputs": [
+        "{projectRoot}/backend/**/!(*.spec).ts",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{workspaceRoot}/libs/matter-contract/src/**/!(*.spec).ts",
+        "{workspaceRoot}/tsconfig.base.json"
+      ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/matter",
