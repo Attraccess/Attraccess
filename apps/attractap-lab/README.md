@@ -227,8 +227,9 @@ not part of `pnpm nx run attractap-lab:test`, which runs without hardware.
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release
-workflow and on every push to `main`. It is off until the repository (or the
-`attractap-lab` environment) sets `ATTRACTAP_LAB_HIL_ENABLED=true`; the
+workflow and on every push to `main`. It is off until the repository variable
+`ATTRACTAP_LAB_HIL_ENABLED` is `true` (a repository variable, because the job's
+`if:` runs before the `attractap-lab` environment loads); the
 workflow file lists all variables (lab host, coordinator port, place,
 Tailscale tags, relay address/port, labgrid package) and the secrets it reuses
 from the hardware smoke workflow (`TS_OAUTH_CLIENT_ID`, `TS_AUDIENCE`,

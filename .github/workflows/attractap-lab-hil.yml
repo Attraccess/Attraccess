@@ -5,8 +5,9 @@ name: Attractap lab hardware tests
 # the release and main-branch (nightly) workflows; skipped unless the
 # ATTRACTAP_LAB_HIL_ENABLED variable is "true".
 #
-# Variables (repository or `attractap-lab` environment):
+# Repository variable (the job's `if:` cannot read environment variables):
 #   ATTRACTAP_LAB_HIL_ENABLED       "true" to run at all
+# Variables (repository or `attractap-lab` environment):
 #   LAB_HOST                        Lab host on the tailnet (SSH + coordinator)
 #   ATTRACTAP_LAB_COORDINATOR_PORT  Labgrid coordinator port (default 20408)
 #   ATTRACTAP_LAB_PLACE             Place with reader + emulator (default attractap-touch-v2-1)
