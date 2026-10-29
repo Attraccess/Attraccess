@@ -287,11 +287,7 @@ export function DevicesPage() {
         status="error"
         title={t('devices.delete')}
         action={{
-          label: (
-            <>
-              <Trash2Icon className="sh:h-4 sh:w-4" /> {t('common.delete')}
-            </>
-          ),
+          label: t('common.delete'),
           onPress: confirmDelete,
           isPending: deleting,
           'data-cy': 'shelly-delete-confirm',
