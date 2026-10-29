@@ -1,4 +1,4 @@
-import { Button, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { Button, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { Accordion, Description, Input, Label, ListBox, ProgressBar, Select, TextField } from '@heroui/react';
 import { useState } from 'react';
 import { useWagoTranslations } from '../i18n';
@@ -54,7 +54,7 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
       {statusQuery.isError ? (
         <p role="alert">{t('networkChange.statusUnavailable')}</p>
       ) : !status ? (
-        <p role="status">{t('networkChange.loading')}</p>
+        <TableDataLoadingIndicator />
       ) : !status.available ? (
         <p role="status">{t('networkChange.managementRequired')}</p>
       ) : (

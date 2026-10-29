@@ -1,4 +1,4 @@
-import { Button, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { Button, EmptyState, TableDataLoadingIndicator, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { RejectionErrors } from './ConfigurationRevisions';
 import { RollbackReview } from './ConfigurationRevisions';
 import { useConfigurationRevisionsState } from './useConfigurationRevisionsState';
@@ -47,9 +47,9 @@ export function ConfigurationRevisionsRevisionsHistoryTitle({
       <div className="wg:flex wg:flex-col wg:gap-4">
         <h2 className="wg:text-xl wg:font-semibold">{t('revisions.historyTitle')}</h2>
         <p className="wg:text-sm wg:text-muted">{t('revisions.historyDescription')}</p>
-        {history.isPending && <p>{t('revisions.loading')}</p>}
+        {history.isPending && <TableDataLoadingIndicator />}
         {history.isError && <p role="alert">{t('revisions.loadError', { error: history.error.message })}</p>}
-        {!history.isPending && history.data?.revisions.length === 0 && <p>{t('revisions.empty')}</p>}
+        {!history.isPending && history.data?.revisions.length === 0 && <EmptyState message={t('revisions.empty')} />}
         {history.data?.revisions.map((revision) => (
           <section
             key={revision.revision}

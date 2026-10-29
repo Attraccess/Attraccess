@@ -1,5 +1,5 @@
 import { Card } from '@heroui/react';
-import { Button, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
+import { Button, TableDataLoadingIndicator, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { presetDisplayName } from '../configuration/model';
 import { useWagoDiagnostics, type WagoDiagnostics } from './diagnostics';
@@ -154,7 +154,7 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
       </div>
       {query.isError && <p role="alert">{t('diagnostics.accessError')}</p>}
       {!query.isError && pollingStale && <p role="alert">{t('diagnostics.overdue')}</p>}
-      {query.isPending && <p>{t('diagnostics.loading')}</p>}
+      {query.isPending && <TableDataLoadingIndicator />}
       {d && (
         <>
           <WagoStatus diagnostics={d} pollingUpdatedAt={query.dataUpdatedAt} />

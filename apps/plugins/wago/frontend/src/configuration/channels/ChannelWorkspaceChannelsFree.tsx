@@ -1,3 +1,4 @@
+import { EmptyState } from '@attraccess/plugins-frontend-ui';
 import { Button, Input, TextField } from '@heroui/react';
 import { ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { availableDigitalTerminals, DIGITAL_TERMINALS } from '../../../../backend/configuration/digital';
@@ -76,9 +77,7 @@ export function ChannelWorkspaceChannelsFree({
                   </span>
                 </Button>
               ))}
-              {!channels.length && (
-                <p className="wg:py-5 wg:text-sm wg:text-muted">{t(search ? 'channels.noMatch' : 'channels.empty')}</p>
-              )}
+              {!channels.length && <EmptyState message={t(search ? 'channels.noMatch' : 'channels.empty')} />}
             </>
           ) : (
             <>
