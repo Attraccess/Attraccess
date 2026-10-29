@@ -410,7 +410,7 @@ describe('front panel page actions', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Revision history' }));
     expect(onHistory).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
   it('asks before leaving with unapplied changes and only leaves once confirmed', async () => {
