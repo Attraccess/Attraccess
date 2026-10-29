@@ -32,6 +32,8 @@ def fake_emulator(listener, received):
             buffer += data
             while b"\n" in buffer:
                 line, buffer = buffer.split(b"\n", 1)
+                if not line.strip():
+                    continue
                 command, _, arguments = line.decode().partition(" ")
                 received.append((command, json.loads(arguments) if arguments else None))
                 if command == "profiles.select":

@@ -15,6 +15,7 @@ from urllib.parse import urlsplit, urlunsplit
 from urllib.request import ProxyHandler, build_opener
 
 import attr
+import serial
 from labgrid.driver import Driver, SerialDriver
 from labgrid.factory import target_factory
 from labgrid.protocol import ConsoleProtocol, ResetProtocol
@@ -166,15 +167,27 @@ class NfcEmulatorDriver(SerialDriver):
         self._buffer = b""
 
     def on_activate(self):
-        super().on_activate()
-        self._buffer = b""
-        # Opening the port can reset the ESP32-S3. Wait until it answers.
         deadline = time.monotonic() + self.ready_timeout
+        # The first RFC2217 negotiation through the exporter occasionally times out.
+        while True:
+            try:
+                super().on_activate()
+                break
+            except serial.SerialException:
+                self.close()
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(1)
+        self._buffer = b""
+        # Opening the port can reset the ESP32-S3, and input arriving before the
+        # exporter configures the tty can leave a partial line. End it, then
+        # wait until the emulator answers.
+        self._write(b"\n")
         while True:
             try:
                 self._exchange("health", None, 1.0)
                 return
-            except TimeoutError:
+            except (TimeoutError, NfcEmulatorError):
                 if time.monotonic() >= deadline:
                     raise TimeoutError("NFC emulator did not answer after connecting") from None
 
