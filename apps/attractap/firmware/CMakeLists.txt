@@ -12,6 +12,15 @@ set(ATTRACTAP_VARIANT "attractap-touch" CACHE STRING "Attractap firmware variant
 # by logger.cpp). build_firmwares.py passes ERROR for production builds.
 set(ATTRACTAP_LOG_LEVEL "INFO" CACHE STRING "Runtime log level (ERROR/WARN/INFO/DEBUG)")
 
+# Lab/test-only serial topics (ui.*) that inject touches, list on-screen
+# widgets and stream screenshots, for hardware-in-the-loop tests. Never ship
+# them: build_firmwares.py forces this OFF. See README "Test hooks".
+option(ATTRACTAP_TEST_HOOKS "Compile the ui.* serial test hooks (display variants only)" OFF)
+
+# Beeper state of a reader that has no saved beeper setting yet (fresh or
+# erased). Lab builds set it OFF; the setting itself still works.
+option(ATTRACTAP_BEEPER_DEFAULT "Enable the beeper on readers without a saved beeper setting" ON)
+
 set(ATTRACTAP_VARIANT_FILE "${CMAKE_CURRENT_LIST_DIR}/variants/${ATTRACTAP_VARIANT}.cmake")
 if(NOT EXISTS "${ATTRACTAP_VARIANT_FILE}")
     file(GLOB _attractap_variants RELATIVE "${CMAKE_CURRENT_LIST_DIR}/variants" "${CMAKE_CURRENT_LIST_DIR}/variants/*.cmake")

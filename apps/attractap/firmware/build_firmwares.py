@@ -212,6 +212,9 @@ def build_variant(variant, variant_path, log_level):
         f"-DSDKCONFIG={sdkconfig_path}",
         f"-DATTRACTAP_VARIANT={variant}",
         f"-DATTRACTAP_LOG_LEVEL={log_level}",
+        # Shipped images never contain the lab test hooks and keep the beeper on.
+        "-DATTRACTAP_TEST_HOOKS=OFF",
+        "-DATTRACTAP_BEEPER_DEFAULT=ON",
         "build",
     ]
     print(f"Running: idf.py {' '.join(build_args)}")
