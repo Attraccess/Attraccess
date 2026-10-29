@@ -163,12 +163,12 @@ describe('visual configuration workflow', () => {
     state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostics)));
     mount();
     await section(userEvent.setup(), 'Diagnostics');
-    expect(await screen.findByText(/command\.v1/)).toHaveTextContent('9/6/2026');
-    expect(screen.getByText(/state\.changed/)).toHaveTextContent('9/6/2026');
+    expect(await screen.findByText(/command\.v1/)).toHaveTextContent('09/06/2026');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('09/06/2026');
     act(() => useTranslationState.getState().setLanguage('de'));
-    expect(screen.getByText(/command\.v1/)).toHaveTextContent('6.9.2026');
+    expect(screen.getByText(/command\.v1/)).toHaveTextContent('06.09.2026');
     expect(screen.getByText(/command\.v1/)).toHaveTextContent('Akzeptiert');
-    expect(screen.getByText(/state\.changed/)).toHaveTextContent('6.9.2026');
+    expect(screen.getByText(/state\.changed/)).toHaveTextContent('06.09.2026');
     expect(state.diagnostics).toHaveBeenCalledTimes(1);
   });
 

@@ -1,4 +1,4 @@
-import { StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { RuntimeRecoveryControls } from './RuntimeRecoveryControls';
 import { Label, ProgressBar } from '@heroui/react';
 import { type ManagedAccessTarget } from './useRuntimeStatus';
@@ -7,6 +7,7 @@ import { useRuntimeUpdateDetailsState } from './useRuntimeUpdateDetailsState';
 import { RuntimeUpdateDetailsAlert } from './RuntimeUpdateDetailsAlert';
 
 export function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const model = useRuntimeUpdateDetailsState({ target });
 
   if (model.query.isError)
@@ -87,7 +88,7 @@ export function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }
               })}{' '}
               {model.status.update.retryAt > 0 &&
                 model.t('runtimeManagement.retryAfter', {
-                  date: new Date(model.status.update.retryAt).toLocaleString(model.language),
+                  date: formatDateTime(model.status.update.retryAt),
                 })}
             </p>
           )}
@@ -123,7 +124,7 @@ export function RuntimeUpdateDetails({ target }: { target: ManagedAccessTarget }
           {!!model.status.update.cleanupRetryAt && (
             <p role="status">
               {model.t('runtimeManagement.cleanup', {
-                date: new Date(model.status.update.cleanupRetryAt).toLocaleString(model.language),
+                date: formatDateTime(model.status.update.cleanupRetryAt),
               })}
             </p>
           )}

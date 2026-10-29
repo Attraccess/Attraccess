@@ -66,7 +66,7 @@ export function StatusDialog(props: Readonly<StatusDialogProps>) {
       isKeyboardDismissDisabled={false}
       onMouseDown={keepFocus}
     >
-      <AlertDialog.Container onMouseDown={keepFocus}>
+      <AlertDialog.Container>
         <AlertDialog.Dialog className="sm:max-w-[440px]" data-cy={dataCy}>
           <AlertDialog.Header>
             <AlertDialog.Icon status={ICON_STATUS[status]} />

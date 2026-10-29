@@ -1,5 +1,5 @@
-import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button } from '@heroui/react';
+import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
+import { Alert } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { useWagoTranslations } from '../../i18n';
 import { CommissioningModel } from '../CommissioningModal';

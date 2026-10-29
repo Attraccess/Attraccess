@@ -1,4 +1,5 @@
 import {
+  Button,
   EmptyState,
   PasswordInput,
   StandardDrawer,
@@ -6,7 +7,7 @@ import {
   TableDataLoadingIndicator,
   useDateTimeFormatter,
 } from '@attraccess/plugins-frontend-ui';
-import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner, Tooltip } from '@heroui/react';
+import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Spinner, Tooltip } from '@heroui/react';
 import { ArrowUpCircleIcon, CpuIcon, DownloadIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { type FirmwareOverviewEntry, type FirmwareStatus, type ShellyDevice } from '../../api';
 import { useShellyTranslations } from '../../i18n';

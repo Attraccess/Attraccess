@@ -1,4 +1,5 @@
-import { Button, Card } from '@heroui/react';
+import { Card } from '@heroui/react';
+import { Button, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { presetDisplayName } from '../configuration/model';
 import { useWagoDiagnostics, type WagoDiagnostics } from './diagnostics';
@@ -32,7 +33,8 @@ export function WagoStatus({
   pollingFailed?: boolean;
   pollingUpdatedAt?: number;
 }) {
-  const { t, language, tBackendMessage } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t, tBackendMessage } = useWagoTranslations();
   const now = useDiagnosticsClock();
   const c = d.configuration;
   if (pollingFailed || (pollingUpdatedAt !== undefined && !pollFresh(pollingUpdatedAt, now)))
@@ -47,7 +49,7 @@ export function WagoStatus({
       <Card.Content>
         <p>
           {t('diagnostics.heartbeat', {
-            time: d.heartbeatAt ? new Date(d.heartbeatAt).toLocaleString(language) : t('controllers.never'),
+            time: d.heartbeatAt ? formatDateTime(d.heartbeatAt) : t('controllers.never'),
             freshness: tBackendMessage(d.heartbeatFreshness),
           })}
         </p>
@@ -96,7 +98,7 @@ export function WagoStatus({
                   ? 'diagnostics.connected'
                   : 'diagnostics.disconnected',
             ),
-            time: d.stateSourceAt ? new Date(d.stateSourceAt).toLocaleString(language) : t('diagnostics.unavailable'),
+            time: d.stateSourceAt ? formatDateTime(d.stateSourceAt) : t('diagnostics.unavailable'),
           })}
         </p>
         <p>
@@ -116,7 +118,7 @@ export function WagoStatus({
             {t('diagnostics.fault', {
               channel: fault.channelId,
               code: fault.code,
-              time: new Date(fault.receivedAt).toLocaleString(language),
+              time: formatDateTime(fault.receivedAt),
             })}
           </p>
         ))}
@@ -126,7 +128,8 @@ export function WagoStatus({
 }
 
 export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: number; onConfigure?: () => void }) {
-  const { t, tExists, language, tBackendMessage } = useWagoTranslations();
+  const { t, tExists, tBackendMessage } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const query = useWagoDiagnostics(controllerId);
   const now = useDiagnosticsClock();
   const pollingStale = !!query.data && !pollFresh(query.dataUpdatedAt, now);
@@ -182,11 +185,9 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
                     </p>
                     <p>
                       {t('diagnostics.sampleTime', {
-                        source: sample.sourceAt
-                          ? new Date(sample.sourceAt).toLocaleString(language)
-                          : t('diagnostics.unavailable'),
+                        source: sample.sourceAt ? formatDateTime(sample.sourceAt) : t('diagnostics.unavailable'),
                         freshness: tBackendMessage(sample.sourceFreshness),
-                        received: new Date(sample.receivedAt).toLocaleString(language),
+                        received: formatDateTime(sample.receivedAt),
                       })}
                     </p>
                     <p>
@@ -209,7 +210,7 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
                 <p>
                   {t('diagnostics.acknowledgement')}{' '}
                   {channel.acknowledgement
-                    ? `${tBackendMessage(channel.acknowledgement.status)} · ${channel.acknowledgement.id} · ${new Date(channel.acknowledgement.receivedAt).toLocaleString(language)}`
+                    ? `${tBackendMessage(channel.acknowledgement.status)} · ${channel.acknowledgement.id} · ${formatDateTime(channel.acknowledgement.receivedAt)}`
                     : t('diagnostics.noAcknowledgement')}
                 </p>
               </Card.Content>
@@ -237,7 +238,7 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
             <summary>{t('diagnostics.events', { count: d.events.length })}</summary>
             {d.events.map((event, index) => (
               <p key={index}>
-                {new Date(event.receivedAt).toLocaleString(language)}: {event.kind}
+                {formatDateTime(event.receivedAt)}: {event.kind}
               </p>
             ))}
             <p>{d.sequenceExplanation}</p>

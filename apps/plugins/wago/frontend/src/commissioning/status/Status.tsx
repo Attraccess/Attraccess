@@ -1,4 +1,4 @@
-import { StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Button, ProgressBar, Spinner } from '@heroui/react';
 import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { CommissioningSession } from '../../api/client';
@@ -172,7 +172,7 @@ export function OperationStatus({ title, description }: { title: string; descrip
   );
 }
 
-export function SummaryField({ label, value }: { label: string; value: string }) {
+export function SummaryField({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="wg:text-xs wg:text-muted">{label}</dt>
@@ -191,7 +191,8 @@ function CompletedSessionSummary({
   verification: ReturnType<typeof useCommissioningVerification>;
   onConfigure?: (controllerId: number) => void;
 }) {
-  const { t, language, tBackendMessage } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t, tBackendMessage } = useWagoTranslations();
   const controllerId = verification.data?.controllerId ?? session.managementControllerId ?? null;
   return (
     <div className="wg:space-y-4">
@@ -201,10 +202,7 @@ function CompletedSessionSummary({
       <dl className="wg:grid wg:gap-3 wg:text-sm wg:sm:grid-cols-2">
         <SummaryField label={t('commissioningUI.hardwareId')} value={session.hardwareId} />
         <SummaryField label={t('commissioningUI.firmware')} value={session.firmwareBaseline} />
-        <SummaryField
-          label={t('commissioningUI.claimed')}
-          value={new Date(session.updatedAt).toLocaleString(language)}
-        />
+        <SummaryField label={t('commissioningUI.claimed')} value={formatDateTime(session.updatedAt)} />
         <SummaryField
           label={t('commissioningUI.management')}
           value={tBackendMessage(verification.data?.managementHardening ?? t('commissioningUI.unverified'))}
@@ -218,7 +216,8 @@ function CompletedSessionSummary({
 }
 
 export function ActivityLog({ auditLog }: { auditLog: string }) {
-  const { t, language } = useWagoTranslations();
+  const formatTime = useDateTimeFormatter({ showDate: false, showSeconds: true });
+  const { t } = useWagoTranslations();
   const events = parseActivityLog(auditLog);
   if (!events.length) return null;
   return (
@@ -230,7 +229,7 @@ export function ActivityLog({ auditLog }: { auditLog: string }) {
         {events.map((event) => (
           <li key={`${event.at}-${event.event}`} className="wg:text-xs wg:text-muted">
             <span className="wg:text-foreground">{formatActivity(event.event)}</span>{' '}
-            <span>{new Date(event.at).toLocaleTimeString(language)}</span>
+            <span>{formatTime(event.at)}</span>
           </li>
         ))}
       </ol>

@@ -1,11 +1,12 @@
 import {
+  Button,
   PasswordInput,
   StandardDrawer,
   StatusAlert,
-  useDateTimeFormatter,
   type TFunction,
+  useDateTimeFormatter,
 } from '@attraccess/plugins-frontend-ui';
-import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form, Skeleton } from '@heroui/react';
+import { Card, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form, Skeleton } from '@heroui/react';
 import { InfoIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { getDeviceInfo, type AuthState, type ShellyDevice, type ShellyDeviceInfo } from '../../api';

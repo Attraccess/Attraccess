@@ -4,8 +4,8 @@
 // The subnet field is optional but, in practice, required for the common
 // deployment: inside Docker the API cannot see LAN multicast and its own network
 // is the container bridge, so the operator names their LAN CIDR here.
-import { StandardDrawer, StatusAlert } from '@attraccess/plugins-frontend-ui';
-import { Button, Chip, DrawerBody, DrawerHeader, DrawerHeading, Form, Spinner } from '@heroui/react';
+import { Button, StandardDrawer, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { Chip, DrawerBody, DrawerHeader, DrawerHeading, Form, Spinner } from '@heroui/react';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { discoverDevices, type DiscoveryResult } from './api';

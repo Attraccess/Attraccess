@@ -1,4 +1,4 @@
-import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, useDateTimeFormatter, EmptyState } from '@attraccess/plugins-frontend-ui';
 import type { TFunction } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
@@ -97,11 +97,7 @@ export function ControllerStatus({
 
 export function EmptyControllers({ searching = false }: { searching?: boolean }) {
   const { t } = useWagoTranslations();
-  return (
-    <div className="wg:px-4 wg:py-12 wg:text-center wg:text-sm wg:text-muted">
-      {t(searching ? 'controllers.noResults' : 'controllers.empty')}
-    </div>
-  );
+  return <EmptyState message={t(searching ? 'controllers.noResults' : 'controllers.empty')} />;
 }
 
 export function isResumable(state: WagoCommissioningState): boolean {
@@ -158,7 +154,8 @@ export function CommissioningRow({
   onResume: (session: CommissioningSession) => void;
   onDetails: () => void;
 }) {
-  const { t, language } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t } = useWagoTranslations();
   const { session } = row;
   const name = session.controllerName ?? session.hardwareId ?? t('controllers.enrollment');
   return (
@@ -186,9 +183,7 @@ export function CommissioningRow({
       </TableCell>
       <TableCell className={cellClass}>—</TableCell>
       <TableCell className={`wg:hidden wg:lg:table-cell ${cellClass}`}>
-        {session.updatedAt
-          ? new Date(session.updatedAt).toLocaleString(language, { dateStyle: 'short', timeStyle: 'short' })
-          : '—'}
+        {session.updatedAt ? formatDateTime(session.updatedAt) : '—'}
       </TableCell>
       <TableCell className={cellClass}>
         <div className="wg:flex wg:justify-end wg:gap-2">
@@ -238,7 +233,8 @@ export function ControllerRow({
   onConfigure: (id: number) => void;
   onDetails: () => void;
 }) {
-  const { t, language } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t } = useWagoTranslations();
   const { controller, session } = row;
   const target =
     controller.trustState === 'claimed' ? { controller } : session?.managedAccessAvailable ? { session } : null;
@@ -263,9 +259,7 @@ export function ControllerRow({
         <RuntimeUpdateSummary controller={controller} status={status} unavailable={query.isError} compact />
       </TableCell>
       <TableCell className={`wg:hidden wg:lg:table-cell ${cellClass}`}>
-        {controller.lastHeartbeatAt
-          ? new Date(controller.lastHeartbeatAt).toLocaleString(language, { dateStyle: 'short', timeStyle: 'short' })
-          : '—'}
+        {controller.lastHeartbeatAt ? formatDateTime(controller.lastHeartbeatAt) : '—'}
       </TableCell>
       <TableCell className={cellClass}>
         <div className="wg:flex wg:justify-end wg:gap-2">
@@ -307,7 +301,8 @@ export function ControllerDetailsDrawer({
   onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
 }) {
-  const { t, language, tBackendMessage } = useWagoTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { t, tBackendMessage } = useWagoTranslations();
   const controller = row.kind === 'controller' ? row.controller : null;
   const session = row.session;
   const name = controller?.name ?? session?.controllerName ?? controller?.hardwareId ?? t('controllers.enrollment');
@@ -354,9 +349,7 @@ export function ControllerDetailsDrawer({
                 <div>
                   <dt className="wg:text-sm wg:text-muted">{t('controllers.heartbeat')}</dt>
                   <dd>
-                    {controller.lastHeartbeatAt
-                      ? new Date(controller.lastHeartbeatAt).toLocaleString(language)
-                      : t('controllers.never')}
+                    {controller.lastHeartbeatAt ? formatDateTime(controller.lastHeartbeatAt) : t('controllers.never')}
                   </dd>
                 </div>
               )}

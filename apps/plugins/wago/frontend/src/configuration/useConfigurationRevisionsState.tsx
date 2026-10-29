@@ -24,7 +24,7 @@ export function useConfigurationRevisionsState({
   generation: number;
   onBusyChange: (busy: boolean) => void;
 }) {
-  const { t, language, tMessage } = useWagoTranslations();
+  const { t, tMessage } = useWagoTranslations();
   const [offset, setOffset] = useState(0);
   const history = useConfigurationRevisionsQuery(controllerId, offset);
   const actions = useConfigurationActions(controllerId);
@@ -66,7 +66,6 @@ export function useConfigurationRevisionsState({
   }
   return {
     t,
-    language,
     tMessage,
     offset,
     setOffset,

@@ -1,11 +1,11 @@
 // Manual "add a device by IP" drawer (ATT-496).
-import { Button, DrawerBody, DrawerHeader, DrawerHeading, Form } from '@heroui/react';
+import { DrawerBody, DrawerHeader, DrawerHeading, Form } from '@heroui/react';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { addDevice } from '../api';
 import { TextFieldRow } from '../shared/drawer';
 import { useShellyTranslations } from '../i18n';
-import { StandardDrawer, StatusAlert, TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, StatusAlert, TranslationMessage } from '@attraccess/plugins-frontend-ui';
 
 export function AddDeviceDrawer({
   isOpen,

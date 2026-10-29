@@ -196,7 +196,6 @@ export function ConfigurationRevisions({
 }) {
   const {
     t,
-    language,
     tMessage,
     offset,
     setOffset,
@@ -278,7 +277,6 @@ export function ConfigurationRevisions({
           view,
           t,
           history,
-          language,
           controllerId,
           metadata,
           disabled,
