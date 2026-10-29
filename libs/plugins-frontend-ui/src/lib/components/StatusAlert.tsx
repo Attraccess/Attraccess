@@ -9,7 +9,7 @@ import { AlertStatusIcon } from './AlertStatusIcon';
 
 interface StatusAlertProps {
   status: 'default' | 'accent' | 'success' | 'warning' | 'danger';
-  title: ReactNode;
+  title?: ReactNode;
   children?: ReactNode;
   'data-cy'?: string;
 }
@@ -19,7 +19,7 @@ export function StatusAlert({ status, title, children, 'data-cy': dataCy }: Read
     <Alert status={status}>
       <AlertStatusIcon status={status} />
       <AlertContent>
-        <AlertTitle>{title}</AlertTitle>
+        {title !== undefined && <AlertTitle>{title}</AlertTitle>}
         {children !== undefined && <AlertDescription data-cy={dataCy}>{children}</AlertDescription>}
       </AlertContent>
     </Alert>

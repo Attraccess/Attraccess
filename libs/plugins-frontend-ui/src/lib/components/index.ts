@@ -8,7 +8,7 @@ export * from './Trans';
 export * from './AlertStatusIcon';
 export * from './EmptyState';
 export * from './LabeledSwitch';
-export * from './LoadingIndicator';
+export * from './loading-indicator';
 export * from './StandardDrawer';
 export * from './StatusAlert';
 export * from './StandardModal';

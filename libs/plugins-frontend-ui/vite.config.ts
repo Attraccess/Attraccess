@@ -14,6 +14,7 @@ const sharedLibs = [
   'react-pluggable',
   'react-router-dom',
   '@heroui/react',
+  '@heroui/styles',
   '@tanstack/react-query',
   '@attraccess/react-query-client',
   '@attraccess/plugins-frontend-ui',

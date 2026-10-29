@@ -1,4 +1,3 @@
-import { ReactNode } from 'react';
 import {
   DrawerBackdrop,
   DrawerContent,
@@ -11,7 +10,7 @@ import {
 interface Props {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  children: ReactNode;
+  children: DrawerDialogProps['children'];
   backdropProps?: Omit<DrawerBackdropProps, 'children' | 'isOpen' | 'onOpenChange'>;
   contentProps?: Omit<DrawerContentProps, 'children'>;
   dialogProps?: Omit<DrawerDialogProps, 'children'>;
