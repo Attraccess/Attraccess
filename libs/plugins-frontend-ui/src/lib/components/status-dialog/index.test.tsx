@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StatusDialog } from './index';
@@ -81,6 +81,9 @@ describe('StatusDialog', () => {
       dialog.closest('[data-slot="alert-dialog-backdrop"], [data-react-aria-top-layer]') ?? document.body;
     await userEvent.click(backdrop);
     expect(onClose).not.toHaveBeenCalled();
+    // The ignored click must not pull the focus out of the dialog, or Escape would stop working.
+    expect(fireEvent.mouseDown(backdrop)).toBe(false);
+    expect(fireEvent.mouseDown(dialog)).toBe(true);
 
     await userEvent.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);

@@ -1,6 +1,6 @@
 // Shared dialog for short status messages and confirmations: info, success, warning, error
 // FEATURE: one dialog design for results, failures and confirmations across the app
-import { ReactNode } from 'react';
+import { MouseEvent, ReactNode } from 'react';
 import { AlertDialog } from '@heroui/react';
 import { useTranslations } from '../../i18n';
 import { Button } from '../button';
@@ -48,6 +48,11 @@ interface StatusDialogProps {
   'data-cy'?: string;
 }
 
+// A click next to the dialog is ignored; keep the focus inside so Escape still works afterwards.
+const keepFocus = (event: MouseEvent<HTMLElement>) => {
+  if (event.target === event.currentTarget) event.preventDefault();
+};
+
 export function StatusDialog(props: Readonly<StatusDialogProps>) {
   const { isOpen, onClose, status, title, children, action, closeLabel, closeDataCy, 'data-cy': dataCy } = props;
   const { t } = useTranslations({ en, de });
@@ -59,8 +64,9 @@ export function StatusDialog(props: Readonly<StatusDialogProps>) {
       onOpenChange={(open) => !open && !action?.isPending && onClose()}
       isDismissable={false}
       isKeyboardDismissDisabled={false}
+      onMouseDown={keepFocus}
     >
-      <AlertDialog.Container>
+      <AlertDialog.Container onMouseDown={keepFocus}>
         <AlertDialog.Dialog className="sm:max-w-[440px]" data-cy={dataCy}>
           <AlertDialog.Header>
             <AlertDialog.Icon status={ICON_STATUS[status]} />
