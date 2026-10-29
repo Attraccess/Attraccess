@@ -9,10 +9,13 @@ namespace nfc_emulator {
 
 class Pn532Target {
  public:
+  enum class Activation { Activated, Pending, Failed };
+
   bool begin(gpio_num_t sda = GPIO_NUM_8, gpio_num_t scl = GPIO_NUM_9,
              gpio_num_t reset = GPIO_NUM_7);
   bool arm(const std::array<uint8_t, 4> &uid);
-  bool poll_activation(uint32_t timeout_ms);
+  // Pending: still waiting for a reader; TgInitAsTarget stays armed.
+  Activation poll_activation(uint32_t timeout_ms);
   bool receive(Bytes &apdu, uint32_t timeout_ms);
   bool respond(const Bytes &response);
   void deactivate();
@@ -22,9 +25,11 @@ class Pn532Target {
   bool command(uint8_t command, const Bytes &payload, Bytes &response,
                uint32_t timeout_ms = 1000);
   bool begin_command(uint8_t command, const Bytes &payload);
+  bool configure();
   bool write_frame(uint8_t command, const Bytes &payload);
   bool read_frame(Bytes &response, uint32_t timeout_ms);
   bool ready(uint32_t timeout_ms);
+  Bytes first_command_;
   bool active_ = false;
   bool armed_ = false;
   gpio_num_t reset_pin_ = GPIO_NUM_NC;

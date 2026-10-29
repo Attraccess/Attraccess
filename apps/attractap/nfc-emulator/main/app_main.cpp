@@ -64,16 +64,21 @@ void emulator_task(void *argument) {
       }
       if (needs_arm) {
         if (!target.arm(uid)) {
-          std::lock_guard<std::mutex> lock(state.mutex);
-          state.target_armed = false; state.rf_active = false;
-          state.engine.reset_session(); state.changed.notify_all();
+          {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.target_armed = false; state.rf_active = false;
+            state.engine.reset_session(); state.changed.notify_all();
+          }
+          vTaskDelay(pdMS_TO_TICKS(100));
           continue;
         }
         std::lock_guard<std::mutex> lock(state.mutex);
         state.target_armed = true;
         state.changed.notify_all();
       }
-      if (!target.poll_activation(250)) {
+      Pn532Target::Activation activation = target.poll_activation(250);
+      if (activation == Pn532Target::Activation::Pending) continue;
+      if (activation == Pn532Target::Activation::Failed) {
         std::lock_guard<std::mutex> lock(state.mutex);
         state.target_armed = false; state.rf_active = false;
         state.engine.reset_session(); state.changed.notify_all();

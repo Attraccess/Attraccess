@@ -42,7 +42,8 @@ def main() -> int:
     line = options.command
     if options.arguments is not None:
         line += " " + options.arguments
-    connection.write((line + "\n").encode())
+    # The leading newline ends any stray partial line the emulator buffered.
+    connection.write(("\n" + line + "\n").encode())
 
     deadline = time.monotonic() + options.timeout
     buffer = b""
@@ -54,7 +55,7 @@ def main() -> int:
             if not text.startswith(PREFIX):
                 continue
             reply = json.loads(text[len(PREFIX):])
-            if "ok" not in reply:
+            if "ok" not in reply or reply.get("command") != options.command:
                 continue
             if reply["ok"]:
                 print(json.dumps(reply["result"], indent=2))

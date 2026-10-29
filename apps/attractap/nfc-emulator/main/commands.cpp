@@ -416,7 +416,7 @@ Reply trace(EmulatorState &state) {
 
 constexpr const char *command_names[] = {
     "help", "health", "status", "profiles.list", "profiles.create", "profiles.get",
-    "profiles.update", "profiles.delete", "profiles.select", "scenario", "fault.set",
+    "profiles.update", "profiles.delete", "profiles.select", "scenario", "behavior.clear", "fault.set",
     "fault.clear", "overrides.set", "overrides.clear", "removal.set", "present",
     "remove", "reset", "trace.get", "trace.clear"};
 
@@ -442,6 +442,11 @@ Reply run_command(EmulatorState &state, NvsStore &store, const std::string &comm
   if (command == "profiles.delete") return delete_profile(state, arguments);
   if (command == "profiles.select") return select_profile(state, arguments);
   if (command == "scenario") return set_scenario(state, arguments);
+  if (command == "behavior.clear") {
+    std::lock_guard<std::mutex> lock(state.mutex);
+    state.behavior.clear();
+    return ok();
+  }
   if (command == "fault.set") return set_fault(state, arguments);
   if (command == "fault.clear") {
     std::lock_guard<std::mutex> lock(state.mutex);

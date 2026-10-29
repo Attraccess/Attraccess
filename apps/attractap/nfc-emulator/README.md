@@ -73,9 +73,14 @@ time, in order. Reply lines start with `@nfc ` so they can be told apart from
 ESP-IDF log output on the same port:
 
 ```text
-@nfc {"ok":true,"result":{"state":"armed"}}
-@nfc {"ok":false,"error":"profile_presented","message":"remove the current profile before selecting another"}
+@nfc {"command":"present","ok":true,"result":{"state":"armed"}}
+@nfc {"command":"profiles.select","ok":false,"error":"profile_presented","message":"remove the current profile before selecting another"}
 ```
+
+`command` names the request a reply answers. It is missing only when a line
+could not be parsed (`invalid_command`); that message quotes the start of the
+rejected line. Hosts should match replies by `command` and start each request
+with a newline, which ends any stray partial line.
 
 After boot the firmware prints `@nfc {"event":"ready","protocol":1}`. Event
 lines have an `event` field instead of `ok`. Lines are limited to 8192 bytes,
@@ -109,24 +114,25 @@ Mutating commands reply only after the requested control state is visible.
 `TgInitAsTarget`; it does not report RF activation before a reader is present.
 `status` exposes `presentRequested`, `targetArmed`, and `rfActive`.
 
-| Command                            | Arguments   | Purpose                                         |
-| ---------------------------------- | ----------- | ----------------------------------------------- |
-| `help`                             |             | List commands                                   |
-| `health`                           |             | Liveness                                        |
-| `status`                           |             | Presentation and complete active card/key state |
-| `profiles.list`                    |             | Enumerate persisted profiles                    |
-| `profiles.create`                  | profile     | Create a profile and its factory snapshot       |
-| `profiles.get`                     | `{"id"}`    | Read a persisted profile                        |
-| `profiles.update`                  | profile     | Replace a persisted profile                     |
-| `profiles.delete`                  | `{"id"}`    | Delete a persisted profile                      |
-| `profiles.select`                  | `{"id"}`    | Select the active profile                       |
-| `scenario`                         | `{"name"}`  | Select a named scenario                         |
-| `fault.set`, `fault.clear`         | fault       | Configure or clear one fault                    |
-| `overrides.set`, `overrides.clear` | `{"rules"}` | Replace or clear raw APDU rules                 |
-| `removal.set`                      | removal     | Configure removal timing/command/count          |
-| `present`, `remove`                |             | Enter or leave PN532 target mode                |
-| `reset`                            |             | Restore and persist the active factory snapshot |
-| `trace.get`, `trace.clear`         |             | Read or clear the bounded 128-exchange trace    |
+| Command                            | Arguments   | Purpose                                                  |
+| ---------------------------------- | ----------- | -------------------------------------------------------- |
+| `help`                             |             | List commands                                            |
+| `health`                           |             | Liveness                                                 |
+| `status`                           |             | Presentation and complete active card/key state          |
+| `profiles.list`                    |             | Enumerate persisted profiles                             |
+| `profiles.create`                  | profile     | Create a profile and its factory snapshot                |
+| `profiles.get`                     | `{"id"}`    | Read a persisted profile                                 |
+| `profiles.update`                  | profile     | Replace a persisted profile                              |
+| `profiles.delete`                  | `{"id"}`    | Delete a persisted profile                               |
+| `profiles.select`                  | `{"id"}`    | Select the active profile                                |
+| `scenario`                         | `{"name"}`  | Select a named scenario                                  |
+| `behavior.clear`                   |             | Reset scenario, fault, overrides and removal to defaults |
+| `fault.set`, `fault.clear`         | fault       | Configure or clear one fault                             |
+| `overrides.set`, `overrides.clear` | `{"rules"}` | Replace or clear raw APDU rules                          |
+| `removal.set`                      | removal     | Configure removal timing/command/count                   |
+| `present`, `remove`                |             | Enter or leave PN532 target mode                         |
+| `reset`                            |             | Restore and persist the active factory snapshot          |
+| `trace.get`, `trace.clear`         |             | Read or clear the bounded 128-exchange trace             |
 
 Errors carry a stable `error` code, for example `invalid_json`,
 `invalid_profile`, `not_found`, `profile_exists`, `profile_presented`,

@@ -32,8 +32,11 @@ void write_line(cJSON *json) {
   cJSON_free(text);
 }
 
-void send(const Reply &reply) {
+// `command` names the request this reply answers, so hosts can match replies
+// to requests; it is omitted when the line could not be parsed.
+void send(const Reply &reply, const std::string &command = "") {
   cJSON *json = cJSON_CreateObject();
+  if (!command.empty()) cJSON_AddStringToObject(json, "command", command.c_str());
   cJSON_AddBoolToObject(json, "ok", reply.ok);
   if (reply.ok) {
     cJSON_AddItemToObject(json, "result", reply.result);
@@ -44,27 +47,43 @@ void send(const Reply &reply) {
   write_line(json);
 }
 
-void send_error(const char *code, const char *message) {
+void send_error(const char *code, std::string message, const std::string &command = "") {
   Reply reply;
   reply.ok = false;
   reply.code = code;
-  reply.message = message;
-  send(reply);
+  reply.message = std::move(message);
+  send(reply, command);
+}
+
+// A printable excerpt of a rejected line, for diagnosing stray input.
+std::string excerpt(const std::string &line) {
+  std::string out;
+  for (size_t i = 0; i < line.size() && i < 40; ++i) {
+    unsigned char c = line[i];
+    if (c >= 0x20 && c < 0x7f) {
+      out.push_back(static_cast<char>(c));
+    } else {
+      char escaped[5];
+      snprintf(escaped, sizeof(escaped), "\\x%02x", c);
+      out += escaped;
+    }
+  }
+  return out;
 }
 
 void handle_line(ConsoleContext &context, const std::string &line) {
   std::string command, arguments_text;
   if (!parse_command_line(line, command, arguments_text))
-    return send_error("invalid_command", "expected <command> [json-object]");
+    return send_error("invalid_command", "expected <command> [json-object], got: " + excerpt(line));
   cJSON *arguments = nullptr;
   if (!arguments_text.empty()) {
     arguments = cJSON_Parse(arguments_text.c_str());
     if (!cJSON_IsObject(arguments)) {
       cJSON_Delete(arguments);
-      return send_error("invalid_json", "arguments must be one JSON object");
+      return send_error("invalid_json", "arguments must be one JSON object", command);
     }
   }
-  send(run_command(*context.state, *context.store, command, arguments));
+  send(run_command(*context.state, *context.store, command, arguments), command);
   cJSON_Delete(arguments);
 }
 
