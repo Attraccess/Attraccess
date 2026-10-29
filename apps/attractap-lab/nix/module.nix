@@ -6,7 +6,7 @@ let
   exporterConfig = yaml.generate "attractap-exporter.yaml" cfg.exporter.settings;
   placesConfig = yaml.generate "attractap-places.yaml" { places = cfg.coordinator.places; };
   labgrid = pkgs.python3Packages.labgrid;
-  tools = [ cfg.package labgrid pkgs.ser2net pkgs.esptool pkgs.ffmpeg pkgs.openssh pkgs.uhubctl pkgs.usbutils pkgs.v4l-utils ] ++ cfg.extraPackages;
+  tools = [ cfg.package labgrid pkgs.ser2net pkgs.esptool pkgs.ffmpeg pkgs.openssh pkgs.rsync pkgs.uhubctl pkgs.usbutils pkgs.v4l-utils ] ++ cfg.extraPackages;
   waitForCoordinator = pkgs.writeShellScript "labgrid-wait-for-coordinator" ''
     until ${labgrid}/bin/labgrid-client -x ${lib.escapeShellArg cfg.coordinator.syncAddress} places >/dev/null; do
       ${pkgs.coreutils}/bin/sleep 1

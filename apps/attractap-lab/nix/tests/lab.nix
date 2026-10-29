@@ -74,7 +74,9 @@
     machine.succeed("labgrid-client -p lock acquire")
     machine.fail("env LG_USERNAME=competing-client labgrid-client -p lock acquire")
     machine.succeed("labgrid-client -p lock release")
-    machine.succeed("su -s /bin/sh labgrid -c 'command -v esptool; command -v espefuse; command -v ffmpeg; test -w /var/lib/labgrid'")
+    machine.succeed("su -s /bin/sh labgrid -c 'command -v esptool; command -v espefuse; command -v ffmpeg; command -v rsync; test -w /var/lib/labgrid'")
+    # Parking copies the image to the exporter with rsync from the janitor service.
+    machine.succeed("systemctl show -p Environment attractap-lab-janitor.service | grep -q -- '-rsync-'")
     machine.succeed("systemctl start attractap-lab-janitor.service")
     machine.wait_for_unit("attractap-lab-janitor.service")
     # The janitor key reaches this host's own exporter account over SSH.
