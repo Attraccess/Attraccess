@@ -34,7 +34,7 @@ const LIST_ROW_HEIGHT_PX = 49;
 const LIST_HEADER_HEIGHT_PX = 44;
 
 export const ListboxWrapper = ({ children }: PropsWithChildren) => (
-  <div className="border-small px-1 py-2 rounded-small border-default-200 dark:border-default-100">{children}</div>
+  <div className="border px-1 py-2 rounded-lg border-default-200 dark:border-default-100">{children}</div>
 );
 
 export function ResourceSelector(props: Readonly<Props>) {
