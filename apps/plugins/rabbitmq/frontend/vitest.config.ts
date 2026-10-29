@@ -8,7 +8,7 @@ export default defineConfig({
         new URL('../../../../libs/plugins-frontend-ui/src/index.ts', import.meta.url),
       ),
       '@attraccess/react-query-client': fileURLToPath(
-        new URL('../../../../libs/react-query-client/src/index.ts', import.meta.url),
+        new URL('../../scripts/react-query-client.test-stub.ts', import.meta.url),
       ),
       '@attraccess/plugins-frontend-sdk': fileURLToPath(
         new URL('../../../../libs/plugins-frontend-sdk/src/lib/frontend.api-client.ts', import.meta.url),
