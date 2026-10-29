@@ -1,9 +1,8 @@
-import { StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
   AlertDescription,
-  Button,
   Checkbox,
   Form,
   Input,

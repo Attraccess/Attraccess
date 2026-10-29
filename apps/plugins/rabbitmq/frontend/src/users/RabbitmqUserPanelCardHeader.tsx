@@ -1,4 +1,5 @@
-import { Button, Card, Spinner } from '@heroui/react';
+import { Button } from '@attraccess/plugins-frontend-ui';
+import { Card } from '@heroui/react';
 import { PlusIcon, RefreshCwIcon, UsersIcon } from 'lucide-react';
 import { useRabbitmqUserPanelState } from './useRabbitmqUserPanelState';
 type Props = Pick<
@@ -19,10 +20,10 @@ export function RabbitmqUserPanelCardHeader({ t, reload, loading, mqttServerId, 
           variant="ghost"
           aria-label={t('users.reload')}
           onPress={() => void reload()}
-          isDisabled={loading}
+          isPending={loading}
           data-cy={`rabbitmq-user-panel-reload-${mqttServerId}`}
         >
-          {loading ? <Spinner size="sm" /> : <RefreshCwIcon className="rmq:w-4 rmq:h-4" />}
+          <RefreshCwIcon className="rmq:w-4 rmq:h-4" />
         </Button>
         <Button
           size="sm"

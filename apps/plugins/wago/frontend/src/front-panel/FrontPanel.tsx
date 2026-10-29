@@ -1,8 +1,14 @@
 import { FrontPanelStatusAlerts } from './working-copy/StatusAlerts';
 // Combines controller configuration and live controls on one responsive page.
 // FEATURE: WAGO front panel exposes physical terminals and device settings.
-import { AlertStatusIcon, PageHeader, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Spinner } from '@heroui/react';
+import {
+  AlertStatusIcon,
+  Button,
+  PageHeader,
+  StatusAlert,
+  TableDataLoadingIndicator,
+} from '@attraccess/plugins-frontend-ui';
+import { Alert } from '@heroui/react';
 import { ArrowLeft, History, Plus } from 'lucide-react';
 import { OnboardCard } from './controls/Cards';
 import { DeviceSettings } from './settings/DeviceSettings';
@@ -69,9 +75,9 @@ export function FrontPanel({
             </Button>
             <Button
               isDisabled={model.panel.busy || model.panel.pending || model.panel.conflict}
+              isPending={model.panel.busy}
               onPress={model.panel.apply}
             >
-              {model.panel.busy ? <Spinner size="sm" /> : null}
               {model.t('panel.apply')}
             </Button>
           </div>

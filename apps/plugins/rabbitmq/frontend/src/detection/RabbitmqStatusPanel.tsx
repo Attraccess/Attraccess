@@ -4,7 +4,8 @@
 // management API is reachable, whether the configured credentials are accepted,
 // and the broker / management-plugin versions. No management actions yet —
 // status only.
-import { Alert, AlertContent, AlertDescription, Button, Card, Chip, Spinner } from '@heroui/react';
+import { Button } from '@attraccess/plugins-frontend-ui';
+import { Alert, AlertContent, AlertDescription, Card, Chip } from '@heroui/react';
 import { CheckCircle2Icon, RabbitIcon, RefreshCwIcon, XCircleIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useDetection } from './detection';
@@ -57,9 +58,9 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
           aria-label={t('status.refresh')}
           data-cy={`rabbitmq-status-refresh-${mqttServerId}`}
           onPress={refresh}
-          isDisabled={loading}
+          isPending={loading}
         >
-          {loading ? <Spinner size="sm" /> : <RefreshCwIcon className="rmq:w-4 rmq:h-4" />}
+          <RefreshCwIcon className="rmq:w-4 rmq:h-4" />
         </Button>
       </Card.Header>
       <Card.Content className="rmq:flex rmq:flex-col rmq:gap-1">

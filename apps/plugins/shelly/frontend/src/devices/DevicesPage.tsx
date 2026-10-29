@@ -1,4 +1,5 @@
 import {
+  Button,
   EmptyState,
   PageHeader,
   StatusAlert,
@@ -6,7 +7,6 @@ import {
   TableDataLoadingIndicator,
 } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
   Chip,
   Dropdown,
   DropdownItem,

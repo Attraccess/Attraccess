@@ -1,9 +1,8 @@
-import { EmptyState, StandardModal, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { Button, EmptyState, StandardModal, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
   AlertDescription,
-  Button,
   Input,
   Label,
   ModalBody,
