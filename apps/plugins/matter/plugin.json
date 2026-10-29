@@ -1,0 +1,14 @@
+{
+  "name": "matter",
+  "version": "0.1.0-alpha.0",
+  "main": {
+    "backend": {
+      "directory": "dist",
+      "entryPoint": "index.js"
+    }
+  },
+  "attraccessVersion": {
+    "min": "1.11.0"
+  },
+  "permissions": []
+}

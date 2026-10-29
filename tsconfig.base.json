@@ -31,6 +31,9 @@
       "@attraccess/env": [
         "./libs/env/src/index.ts"
       ],
+      "@attraccess/matter-contract": [
+        "./libs/matter-contract/src/index.ts"
+      ],
       "@attraccess/plugins-backend-sdk": [
         "./libs/plugins-backend-sdk/src/index.ts"
       ],

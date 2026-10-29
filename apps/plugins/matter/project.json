@@ -1,0 +1,124 @@
+{
+  "name": "plugin-matter",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/plugins/matter",
+  "tags": ["type:plugin", "scope:plugin"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/acceptance/**/*",
+        "{workspaceRoot}/eslint.config.cjs",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        { "externalDependencies": ["eslint", "prettier"] }
+      ],
+      "outputs": [],
+      "options": {
+        "command": "eslint apps/plugins/matter --max-warnings=0 && prettier --check apps/plugins/matter"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/**/*",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/plugins-backend-sdk/src/**/*",
+        "{workspaceRoot}/libs/matter-contract/src/**/*",
+        { "externalDependencies": ["typescript"] }
+      ],
+      "options": {
+        "command": "tsc --noEmit -p apps/plugins/matter/backend/tsconfig.json && tsc --noEmit -p apps/plugins/matter/tsconfig.spec.json"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/libs/matter-contract/src/**/*",
+        { "externalDependencies": ["jest"] }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/matter"],
+      "options": {
+        "jestConfig": "apps/plugins/matter/jest.config.ts"
+      }
+    },
+    "e2e": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "dependsOn": ["build-backend"],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/apps/api/src/plugin-system/**/*",
+        "{workspaceRoot}/libs/matter-contract/src/**/*",
+        { "externalDependencies": ["jest"] }
+      ],
+      "outputs": [],
+      "options": {
+        "jestConfig": "apps/plugins/matter/jest.e2e.config.ts"
+      }
+    },
+    "build-backend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/backend/**/!(*.spec).ts", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "outputs": ["{projectRoot}/package/dist"],
+      "options": {
+        "cwd": "apps/plugins/matter",
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build-backend"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
+      "outputs": ["{projectRoot}/package"],
+      "options": {
+        "cwd": "apps/plugins/matter",
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
+      }
+    },
+    "pack": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/plugins/matter",
+        "command": "rm -rf dist && mkdir dist && (cd package && npm pack --pack-destination ../dist)"
+      }
+    },
+    "pack-test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["pack", "plugins-backend-sdk:build"],
+      "inputs": [
+        "{projectRoot}/package/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/verify-packed-plugin.mjs",
+        "{workspaceRoot}/package.json"
+      ],
+      "options": {
+        "cwd": "apps/plugins/matter",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js",
+        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/matter"
+      }
+    }
+  }
+}

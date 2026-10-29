@@ -70,6 +70,8 @@
   - [MQTT Examples](devices/mqtt/examples.md)
   - [Guided WAGO CC100 Commissioning](devices/wago-cc100-commissioning.md)
   - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
+  - [Matter: Architecture](devices/matter/architecture.md)
+  - [Matter: Operator Guide](devices/matter/operator.md)
 
 - **Billing**
   - [Overview](billing/overview.md)
