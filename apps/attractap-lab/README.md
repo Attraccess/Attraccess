@@ -174,6 +174,33 @@ to the reader. `NfcEmulatorFlashDriver` flashes the emulator's merged image.
 Emulator profiles persist across sessions; runtime state (selection,
 presentation, faults, overrides) resets when the emulator reboots.
 
+## Reader Wi-Fi without revealing the secret
+
+Readers start empty after every release, so each session has to put its
+reader on the lab Wi-Fi. Enable `readerWifi` and store the credentials on the
+host, readable by root only:
+
+```nix
+services.attractap-lab.readerWifi.enable = true;
+```
+
+```sh
+ssh root@lab-host 'umask 077; cat > /var/lib/attractap-lab/reader-wifi.json' <<'EOF'
+{"ssid": "Lab WiFi", "password": "..."}
+EOF
+```
+
+Lab users (the shared `labgrid` account) can then run
+`attractap-lab-reader-wifi --place PLACE --auth-code PIN` on the host, but
+cannot read the file: the command runs as root through a single sudo rule. It
+refuses places that no session holds (or that the janitor is parking), and
+writes the `network.wifi.credentials.set` command straight to the reader's
+tty. The reader's `RESP` reply, which does not contain the password, arrives
+on the session's console. Inside a session, call
+`attractap_lab.workflow.send_reader_wifi(target, pin)`; it runs the command on
+the exporter host over labgrid's SSH connection. Set the reader's PIN first
+(`CMND auth.code.set {"newCode":"..."}`).
+
 ## Web dashboard
 
 Enable the pinned upstream [labgrid-plugins dashboard](https://tfcollins.github.io/labgrid-plugins/user-guide/web-dashboard.html)

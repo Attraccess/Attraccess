@@ -7,6 +7,18 @@ let
   placesConfig = yaml.generate "attractap-places.yaml" { places = cfg.coordinator.places; };
   labgrid = pkgs.python3Packages.labgrid;
   tools = [ cfg.package labgrid pkgs.ser2net pkgs.esptool pkgs.ffmpeg pkgs.openssh pkgs.rsync pkgs.uhubctl pkgs.usbutils pkgs.v4l-utils ] ++ cfg.extraPackages;
+  readerWifi = cfg.readerWifi;
+  # Runs as root through sudo, so the credentials file can stay root-only.
+  readerWifiRoot = pkgs.writeShellScript "attractap-lab-reader-wifi-root" ''
+    exec ${cfg.package}/bin/attractap-lab-reader-wifi \
+      --credentials ${lib.escapeShellArg readerWifi.credentialsFile} \
+      --exporter-config ${exporterConfig} \
+      --coordinator ${lib.escapeShellArg cfg.coordinator.syncAddress} \
+      --labgrid-client ${labgrid}/bin/labgrid-client "$@"
+  '';
+  readerWifiCommand = pkgs.writeShellScriptBin "attractap-lab-reader-wifi" ''
+    exec /run/wrappers/bin/sudo -n ${readerWifiRoot} "$@"
+  '';
   waitForCoordinator = pkgs.writeShellScript "labgrid-wait-for-coordinator" ''
     until ${labgrid}/bin/labgrid-client -x ${lib.escapeShellArg cfg.coordinator.syncAddress} places >/dev/null; do
       ${pkgs.coreutils}/bin/sleep 1
@@ -94,6 +106,14 @@ in {
       hostname = mkOption { type = types.str; default = config.networking.hostName; description = "Reachable hostname advertised for serial, SSH and other exported resources."; };
       coordinatorAddress = mkOption { type = types.str; default = "127.0.0.1:20408"; description = "Coordinator HOST:PORT (labgrid gRPC address)."; };
       settings = mkOption { type = yaml.type; default = { }; description = "Native labgrid exporter YAML: one resource group per reader. Use stable USB properties in match expressions."; };
+    };
+    readerWifi = {
+      enable = mkEnableOption "sending the lab Wi-Fi credentials to claimed readers without revealing them to lab users";
+      credentialsFile = mkOption {
+        type = types.str;
+        default = "/var/lib/attractap-lab/reader-wifi.json";
+        description = ''Root-only JSON file {"ssid": "...", "password": "..."}. Provision it on the host, outside the Nix store.'';
+      };
     };
     janitor = {
       enable = mkEnableOption "erasing and parking every reader as soon as it is released";
@@ -221,6 +241,20 @@ in {
         RestartSec = 5;
       };
     };
+  })
+  (mkIf readerWifi.enable {
+    assertions = [ {
+      assertion = cfg.exporter.enable;
+      message = "services.attractap-lab.readerWifi needs the exporter on the same host.";
+    } ];
+    # Lab users run the command but cannot read the credentials it sends.
+    environment.systemPackages = [ readerWifiCommand ];
+    users.users.labgrid.packages = [ readerWifiCommand ];
+    security.sudo.extraRules = [ {
+      users = [ "labgrid" ];
+      commands = [ { command = "${readerWifiRoot}"; options = [ "NOPASSWD" ]; } ];
+    } ];
+    systemd.tmpfiles.rules = [ "d ${dirOf readerWifi.credentialsFile} 0700 root root -" ];
   })
   (mkIf janitor.enable {
     systemd.services.attractap-lab-janitor = {
