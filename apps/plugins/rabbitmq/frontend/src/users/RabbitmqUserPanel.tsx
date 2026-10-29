@@ -5,7 +5,12 @@
 // tags and per-vhost permissions, and offers create / edit / permission /
 // delete actions. All operations go through the plugin backend, which talks to
 // the RabbitMQ management HTTP API with the MQTT server's credentials.
-import { StatusAlert, StatusDialog, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
+import {
+  StatusAlert,
+  StatusDialog,
+  TableDataLoadingIndicator,
+  type TranslationMessage,
+} from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Card,
@@ -43,6 +48,12 @@ function PermissionChips({ user }: { user: RabbitmqUser }) {
   );
 }
 
+// A failure without a server message falls back to the generic text, which is
+// already the title — show it only once, as the description.
+function errorTitle(error: string | TranslationMessage, title: string) {
+  return typeof error === 'string' ? title : undefined;
+}
+
 export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
   const model = useRabbitmqUserPanelState({ mqttServerId });
 
@@ -69,7 +80,11 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
       />
       <Card.Content className="rmq:flex rmq:flex-col rmq:gap-3">
         {model.loadError && (
-          <StatusAlert status="danger" title={model.t('users.loadError')} data-cy="rabbitmq-user-panel-error-alert">
+          <StatusAlert
+            status="danger"
+            title={errorTitle(model.loadError, model.t('users.loadError'))}
+            data-cy="rabbitmq-user-panel-error-alert"
+          >
             {model.tMessage(model.loadError)}
           </StatusAlert>
         )}
@@ -197,7 +212,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
           {model.deleteError && (
             <StatusAlert
               status="danger"
-              title={model.t('users.deleteError')}
+              title={errorTitle(model.deleteError, model.t('users.deleteError'))}
               data-cy="rabbitmq-user-delete-error-alert"
             >
               {model.tMessage(model.deleteError)}
