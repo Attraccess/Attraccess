@@ -16,6 +16,7 @@ import pytest
 from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
 )
+from attractap_lab.reader_screen import ReaderTestHooks
 from attractap_lab.workflow import claim, send_reader_wifi
 
 from support import Api, ReaderConsole
@@ -151,6 +152,12 @@ def reader(target, api, admin, artifacts):
     console.stop()
 
 
+@pytest.fixture
+def hooks(reader):
+    """Touch and widget hooks on the reader (test firmware), reading from now on."""
+    return ReaderTestHooks(reader["console"].stream(), PIN)
+
+
 @pytest.fixture(scope="session")
 def users(api):
     return {"alice": api.create_user("alice"), "bob": api.create_user("bob")}
@@ -171,6 +178,25 @@ def resource(api, admin, reader, users):
     assert status == 200, body
     reader["console"].expect(r"Resource list updated: 1", mark, 20)
     return created["id"]
+
+
+@pytest.fixture(scope="session")
+def laser(api, admin, reader, resource, users):
+    """A second resource on the reader that alice may use (introduced).
+
+    Short name: the reader's list truncates long ones.
+    """
+    status, created = api.call("POST", "/resources", token=admin, form={"name": "Lab Laser", "type": "machine"})
+    assert status in (200, 201), created
+    status, body = api.call("POST", f"/resources/{created['id']}/introductions/{users['alice']}/grant",
+                            {}, token=admin)
+    assert status in (200, 201), body
+    mark = reader["console"].mark()
+    status, body = api.call("PATCH", f"/attractap/readers/{reader['id']}",
+                            {"name": "Lab Reader", "connectedResourceIds": [resource, created["id"]]}, token=admin)
+    assert status == 200, body
+    reader["console"].expect(r"Resource list updated: 2", mark, 20)
+    return created
 
 
 @pytest.fixture(scope="session")

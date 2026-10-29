@@ -9,9 +9,12 @@ import time
 
 import pytest
 
-# The touch reader ignores the logged-in user's card until its 30 s session
-# timeout logs the user out (no log marker), so wait it out after logins.
-LOGOUT_SECONDS = 35
+from attractap_lab.reader_screen import ReaderCommandError, find
+
+# The reader ignores the signed-in user's card until they sign out, so tests
+# tap "Sign out"; only test_session_times_out waits for the 30 s timeout.
+SESSION_TIMEOUT_SECONDS = 30
+SIGN_OUT = ("Sign out", "Abmelden")
 
 
 def present(emulator, profile):
@@ -50,6 +53,39 @@ def enroll(api, admin, reader, emulator, user_id, profile):
     return card["id"]
 
 
+def signed_in(hooks):
+    """Whether the session header shows, even behind a popup."""
+    return any(widget["text"] in SIGN_OUT for widget in hooks.widgets()["widgets"])
+
+
+def dismiss_popup(hooks):
+    """Tap OK on a modal popup (e.g. a session-ended notice); True if there was one."""
+    try:
+        hooks.tap_text("OK")
+        return True
+    except ReaderCommandError as error:
+        if error.code != "WIDGET_NOT_FOUND":
+            raise
+        return False
+
+
+def sign_out(hooks, timeout=10):
+    """Tap "Sign out" in the session header and wait for the idle screen."""
+    deadline = time.monotonic() + timeout
+    while True:
+        listing = hooks.widgets()
+        button = next((text for text in SIGN_OUT if find(listing, text)), None)
+        if button:
+            hooks.tap_text(button)
+            break
+        dismiss_popup(hooks)
+        assert time.monotonic() < deadline, f"no sign-out button on {listing['screen']}"
+        time.sleep(0.3)
+    while signed_in(hooks):
+        assert time.monotonic() < deadline, "reader still signed in after tapping Sign out"
+        time.sleep(0.3)
+
+
 def authenticate(reader, emulator, profile, expect, timeout=25):
     console = reader["console"]
     mark = console.mark()
@@ -58,8 +94,19 @@ def authenticate(reader, emulator, profile, expect, timeout=25):
         return console.expect(expect, mark, timeout).group(0).decode()
     finally:
         emulator.command("remove")
-        if expect == "Authentication successful":
-            time.sleep(LOGOUT_SECONDS)
+
+
+def login(reader, emulator, hooks, profile="alice"):
+    # A signed-in reader (e.g. the supervisor after a confirmation) ignores cards.
+    dismiss_popup(hooks)
+    if signed_in(hooks):
+        sign_out(hooks)
+    authenticate(reader, emulator, profile, "Authentication successful")
+    deadline = time.monotonic() + 10
+    while not signed_in(hooks):
+        assert time.monotonic() < deadline, f"no session on screen {hooks.screen()} after login"
+        time.sleep(0.3)
+    dismiss_popup(hooks)
 
 
 def test_reader_detects_emulated_card(reader, resource, emulator, screenshot):
@@ -116,9 +163,52 @@ def test_supervision_confirmed_with_ntag424(api, admin, reader, resource, emulat
     time.sleep(8)
 
 
-def test_login_with_desfire_ev3(reader, resource, emulator, state):
+def test_login_with_desfire_ev3(reader, resource, emulator, state, hooks):
     requires(state, "alice-card")
-    authenticate(reader, emulator, "alice", "Authentication successful")
+    login(reader, emulator, hooks)
+    sign_out(hooks)
+
+
+def test_session_times_out(reader, resource, emulator, state, hooks):
+    requires(state, "alice-card")
+    login(reader, emulator, hooks)
+    started = time.monotonic()
+    while signed_in(hooks):
+        assert time.monotonic() - started < SESSION_TIMEOUT_SECONDS + 15, "session never timed out"
+        time.sleep(2)
+    assert time.monotonic() - started > SESSION_TIMEOUT_SECONDS - 5, "session ended before its timeout"
+
+
+def test_use_second_resource_by_touch(api, admin, reader, resource, laser, emulator, users, state, hooks, screenshot):
+    requires(state, "alice-card")
+    login(reader, emulator, hooks)
+    try:
+        listing = hooks.widgets()
+        assert find(listing, "Lab Laser", "contains") and find(listing, "Lab Mill", "contains"), listing
+        hooks.tap_text("Lab Laser", "contains")
+        hooks.tap_text("Use resource", timeout=10)
+        usage = wait_for_usage(api, admin, laser["id"], lambda usage: usage is not None)
+        assert usage["userId"] == users["alice"], usage
+        screenshot("touch-session")
+        hooks.tap_text("End session", timeout=10)
+        wait_for_usage(api, admin, laser["id"], lambda usage: usage is None)
+    finally:
+        # Ending a session signs the user out; otherwise tap the button.
+        time.sleep(2)
+        if signed_in(hooks):
+            sign_out(hooks)
+
+
+def wait_for_usage(api, admin, resource_id, done, timeout=20):
+    deadline = time.monotonic() + timeout
+    while True:
+        status, active = api.call("GET", f"/resources/{resource_id}/usage/active", token=admin)
+        assert status == 200, active
+        usage = (active or {}).get("usage")
+        if done(usage):
+            return usage
+        assert time.monotonic() < deadline, f"usage of resource {resource_id} stayed {usage}"
+        time.sleep(0.5)
 
 
 def test_wrong_key_is_rejected(reader, resource, emulator, state):
@@ -165,25 +255,34 @@ def test_authentication_timeout_fails(reader, resource, emulator, state):
 def test_removal_during_authentication(reader, resource, emulator, state):
     requires(state, "alice-card")
     console = reader["console"]
-    emulator.command("removal.set", {"afterInstruction": 0x71})
+    mark = console.mark()
     try:
-        mark = console.mark()
-        present(emulator, "alice")
-        console.expect(r"authenticate failed|Authentication failed|Card removed", mark, 25)
+        # A garbled radio exchange can end the read before AuthenticateEV2First;
+        # the reader then waits for the card to leave, so present it again.
+        for attempt in range(3):
+            emulator.command("removal.set", {"afterInstruction": 0x71})
+            present(emulator, "alice")
+            deadline = time.monotonic() + 15
+            while emulator.command("status")["presentRequested"] and time.monotonic() < deadline:
+                time.sleep(0.2)
+            if not emulator.command("status")["presentRequested"]:
+                break
+            emulator.command("remove")
+            time.sleep(2)
+        else:
+            pytest.fail("the reader never reached AuthenticateEV2First, so the card was never pulled")
+        console.expect(r"authenticate failed|Authentication failed|Card removed", mark, 10)
         assert "Authentication successful" not in console.since(mark), "reader authenticated a removed card"
-        deadline = time.monotonic() + 5
-        while emulator.command("status")["presentRequested"] and time.monotonic() < deadline:
-            time.sleep(0.2)
-        assert not emulator.command("status")["presentRequested"], "emulator did not leave the field"
     finally:
         emulator.command("remove")
         emulator.command("behavior.clear")
         time.sleep(8)
 
 
-def test_login_still_works_after_faults(reader, resource, emulator, state):
+def test_login_still_works_after_faults(reader, resource, emulator, state, hooks):
     requires(state, "alice-card")
-    authenticate(reader, emulator, "alice", "Authentication successful")
+    login(reader, emulator, hooks)
+    sign_out(hooks)
 
 
 def test_reset_card_to_factory_keys(api, admin, reader, resource, emulator, users, state, screenshot):

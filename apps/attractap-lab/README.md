@@ -205,7 +205,11 @@ the exporter host over labgrid's SSH connection. Set the reader's PIN first
 
 `hil/` holds pytest tests that run real reader firmware against the NFC card
 emulator: card detection, enrollment (DESFire EV2/EV3, NTAG424), login,
-supervision, key reset, and rejected, faulty or removed cards.
+supervision, key reset, and rejected, faulty or removed cards. The reader
+image has the test hooks, so tests also use the touchscreen: they sign out
+with the "Sign out" button instead of waiting for the 30 s session timeout
+(only `test_session_times_out` waits for it), and start and end a session on
+a second resource by touch.
 
 ```sh
 . .tools/esp-idf/export.sh   # or set READER_IMAGE / EMULATOR_IMAGE

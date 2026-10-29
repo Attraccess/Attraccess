@@ -13,7 +13,12 @@ from pexpect import TIMEOUT
 
 
 class ReaderConsole:
-    """Background capture of the reader's UART with marker waits and commands."""
+    """Background capture of the reader's UART with marker waits and commands.
+
+    Uses the driver's unwrapped ``_read``/``_write``: labgrid tracks steps
+    (``read``, ``write``, file transfers) on one global stack, so a step in
+    this thread that overlaps one in the test thread breaks both.
+    """
 
     def __init__(self, driver, log_path):
         self.driver = driver
@@ -36,7 +41,7 @@ class ReaderConsole:
     def _run(self):
         while self.running:
             try:
-                chunk = self.driver.read(timeout=0.2, max_size=4096)
+                chunk = self.driver._read(timeout=0.2, max_size=4096)
             except TIMEOUT:
                 continue
             except Exception:  # The console reconnects after a reader reset.
@@ -67,6 +72,9 @@ class ReaderConsole:
             time.sleep(0.1)
         raise AssertionError(f"reader log did not show /{pattern}/ within {timeout}s")
 
+    def stream(self):
+        return ConsoleStream(self)
+
     def command(self, topic, payload, attempts=3, timeout=5):
         """Send a serial CMND and return the RESP payload text.
 
@@ -76,12 +84,39 @@ class ReaderConsole:
         line = f"\nCMND {topic} {json.dumps(payload, separators=(',', ':'))}\n".encode()
         for attempt in range(attempts):
             mark = self.mark()
-            self.driver.write(line)
+            self.driver._write(line)
             try:
                 return self.expect(rf"RESP {re.escape(topic)} ([^\r\n]*)", mark, timeout).group(1).decode()
             except AssertionError:
                 if attempt == attempts - 1:
                     raise
+
+
+class ConsoleStream:
+    """New output of a ReaderConsole as a read/write console for ReaderTestHooks.
+
+    The console's capture thread owns the serial port; this reads its buffer
+    from the moment the stream was opened.
+    """
+
+    def __init__(self, console):
+        self.console = console
+        self.cursor = console.mark()
+
+    def write(self, data):
+        self.console.driver._write(data)
+
+    def read(self, timeout=0.25, max_size=65536):
+        deadline = time.monotonic() + timeout
+        while True:
+            with self.console.lock:
+                chunk = self.console.data[self.cursor:self.cursor + max_size]
+            if chunk:
+                self.cursor += len(chunk)
+                return chunk
+            if time.monotonic() >= deadline:
+                raise TIMEOUT("no reader output")
+            time.sleep(0.02)
 
 
 class Api:
