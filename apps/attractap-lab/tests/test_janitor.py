@@ -12,10 +12,14 @@ import sys
 import textwrap
 import time
 
+import asyncio
+from types import SimpleNamespace
+
+import grpc
 import pytest
 
 from attractap_lab import efuse
-from attractap_lab.janitor import OWNER
+from attractap_lab.janitor import OWNER, Janitor
 from attractap_lab.workflow import park
 from test_lab_workflow import eventually, executable, free_port, running
 
@@ -259,3 +263,33 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             assert len(parked("reader-a")) == before + 2
             reason = json.loads((state / "quarantine/reader-a.json").read_text())["reason"]
             assert "failed 2 times" in reason
+
+
+def test_janitor_undoes_an_acquire_whose_call_failed(tmp_path):
+    # The coordinator records the claim before the exporter locks resources; a
+    # cancelled call leaves the place held by the janitor without resources.
+    released = []
+
+    class Stub:
+        async def AcquirePlace(self, request, timeout):
+            raise grpc.aio.AioRpcError(grpc.StatusCode.DEADLINE_EXCEEDED, grpc.aio.Metadata(),
+                                       grpc.aio.Metadata(), details="Deadline Exceeded")
+
+        async def GetPlaces(self, request, timeout):
+            return SimpleNamespace(places=[SimpleNamespace(name="other", acquired=OWNER),
+                                           SimpleNamespace(name="reader", acquired=holder)])
+
+        async def ReleasePlace(self, request, timeout):
+            released.append((request.placename, request.fromuser))
+
+    janitor = Janitor(SimpleNamespace(stub=Stub()), config=None, images={}, state_dir=tmp_path,
+                      priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
+                      marker_seconds=1)
+    holder = OWNER
+    asyncio.run(janitor._acquire("reader"))
+    assert released == [("reader", OWNER)]
+    assert janitor.retry_after["reader"] > time.monotonic()
+
+    holder = "agent/someone"
+    asyncio.run(janitor._acquire("reader"))
+    assert released == [("reader", OWNER)], "Never release another owner's claim"

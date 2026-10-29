@@ -39,6 +39,9 @@ OWNER = f"{OWNER_HOST}/{OWNER_USER}"
 QUARANTINE_EXIT = 3
 # Pending reservations expire 60 s after their last poll.
 RESERVATION_POLL_SECONDS = 15
+# Acquiring waits for the exporter to lock each resource, which is slow while
+# the exporter (re)connects; a client-side deadline would interrupt it.
+ACQUIRE_SECONDS = 60
 RUNS_KEPT_PER_PLACE = 10
 
 log = logging.getLogger("attractap-lab-janitor")
@@ -202,13 +205,32 @@ class Janitor:
 
     async def _acquire(self, name):
         try:
-            await self.session.stub.AcquirePlace(messages.AcquirePlaceRequest(placename=name), timeout=10)
+            await self.session.stub.AcquirePlace(messages.AcquirePlaceRequest(placename=name),
+                                                 timeout=ACQUIRE_SECONDS)
         except grpc.aio.AioRpcError as error:
             log.warning("%s: allocated but not acquired: %s", name, error.details())
             self.retry_after[name] = time.monotonic() + 5
+            await self._undo_partial_acquire(name)
             return
         # The place update arrives over the stream; the next tick starts parking.
         await self.session.sync_with_coordinator()
+
+    async def _undo_partial_acquire(self, name):
+        """Release a claim the coordinator recorded although AcquirePlace failed.
+
+        The coordinator marks the place acquired before the exporter locks its
+        resources. An interrupted call leaves it acquired without resources and
+        without a place update, so this session would retry an acquire that
+        can never succeed, and parking could not find the flash device.
+        """
+        try:
+            response = await self.session.stub.GetPlaces(messages.GetPlacesRequest(), timeout=10)
+            if any(place.name == name and place.acquired == OWNER for place in response.places):
+                log.warning("%s: releasing a half-finished acquire", name)
+                await self.session.stub.ReleasePlace(
+                    messages.ReleasePlaceRequest(placename=name, fromuser=OWNER), timeout=10)
+        except grpc.aio.AioRpcError as error:
+            log.warning("%s: could not check for a half-finished acquire: %s", name, error.details())
 
     async def _park(self, name, variant):
         try:
