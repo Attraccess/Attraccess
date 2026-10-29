@@ -145,6 +145,8 @@ FAKE_PARK = textwrap.dedent("""
         events.write(json.dumps({"place": place, "host": os.environ.get("LG_HOSTNAME"),
                                  "image": Path(value("--image")).name}) + "\\n")
     time.sleep(float(os.environ.get("FAKE_PARK_SECONDS", "0")))
+    while (root / f"hold-{place}").exists():
+        time.sleep(0.05)
     outcome = root / f"outcome-{place}"
     code = int(outcome.read_text()) if outcome.exists() else 0
     if code == 3:
@@ -219,11 +221,14 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             waiter = client("reserve", "name=reader-a", user="waiter").stdout
             token = next(line.split("'")[1] for line in waiter.splitlines() if "Reservation '" in line)
             before = len(parked("reader-a"))
+            # Hold the fake park open so a slow machine cannot finish it early.
+            (tmp_path / "hold-reader-a").touch()
             client("-p", "reader-a", "release")
-            # Allocation happens inside the release; the fake park takes 1 s.
+            # Allocation happens inside the release, so the janitor already owns it.
+            eventually(lambda: len(parked("reader-a")) == before + 1, janitor, 20)
             assert reservations()[token]["state"] == "waiting"
             assert client("-p", "reader-a", "acquire", user="sneaky", check=False).returncode != 0
-            eventually(lambda: len(parked("reader-a")) == before + 1, janitor, 20)
+            (tmp_path / "hold-reader-a").unlink()
             eventually(lambda: reservations()[token]["state"] == "allocated", janitor, 20)
             client("cancel-reservation", token, user="waiter")
             eventually(lambda: holder("reader-a") is None and not reservations(), janitor)
