@@ -31,7 +31,7 @@ it('configures development ports and proxies from the worktree launcher environm
     port: 4250,
     host: '0.0.0.0',
     proxy: {
-      '/api': { target: 'http://localhost:3050', changeOrigin: true, ws: true },
+      '/api': { target: 'http://localhost:3050', changeOrigin: false, ws: true },
       '/cdn': { target: 'http://localhost:3050', changeOrigin: true },
     },
   });

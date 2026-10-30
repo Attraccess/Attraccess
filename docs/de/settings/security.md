@@ -110,6 +110,9 @@ Nicht betroffen:
 - Routen, die andere Systeme gezielt aufrufen: SAML-Assertion und -Logout, OIDC-Back-Channel-Logout, SSO-Provisionierung und der SumUp-Callback. Sie authentifizieren den Aufrufer selbst.
 
 > [!NOTE]
+> Schreibzugriffe, die nur einen `x-api-key`-Header enthalten, werden weiterhin geprüft. Eine Website, die im Browser mit einem API-Key aufruft, muss in `ATTRACCESS_TRUSTED_ORIGINS` stehen oder stattdessen ein Bearer-Token verwenden.
+
+> [!NOTE]
 > **Skripte, die das Browser-Cookie verwenden**, müssen bei Schreibzugriffen einen freigegebenen `Origin`-Header senden. Verwenden Sie besser ein Bearer-Token (z.B. ein API-Token).
 
 > [!WARNING]

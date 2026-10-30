@@ -85,13 +85,23 @@ describe('sibling website against a real API in headless Chromium', () => {
   });
   afterEach(async () => context?.close());
   afterAll(async () => {
-    await browser?.close();
-    await new Promise((resolve) => pages?.close(resolve));
-    await app?.close();
-    if (db?.isInitialized) await db.destroy();
+    // Bounded steps: a lingering stream or socket must not hang the suite, and the log names the step.
+    const step = async (name: string, run: () => Promise<unknown>) => {
+      let timer: NodeJS.Timeout | undefined;
+      const timedOut = new Promise<'timeout'>((resolve) => (timer = setTimeout(() => resolve('timeout'), 15_000)));
+      const result = await Promise.race([run().then(() => 'done' as const), timedOut]);
+      clearTimeout(timer);
+      if (result === 'timeout') process.stderr.write(`teardown step "${name}" did not finish within 15s\n`);
+    };
+    await step('browser', async () => browser?.close());
+    pages?.closeAllConnections();
+    await step('pages', () => new Promise((resolve) => (pages ? pages.close(resolve) : resolve(undefined))));
+    (app?.getHttpServer() as Server | undefined)?.closeAllConnections();
+    await step('app', async () => app?.close());
+    await step('db', async () => (db?.isInitialized ? db.destroy() : undefined));
     delete process.env.ATTRACCESS_TRUSTED_ORIGINS;
     disposeStorage();
-  });
+  }, 90_000);
 
   const cookieValue = async () => (await context.cookies(appUrl)).find((c) => c.name === AUTH_COOKIE_NAME)?.value;
 
@@ -313,7 +323,8 @@ describe('sibling website against a real API in headless Chromium', () => {
         socket.once('error', reject);
       });
     } finally {
-      socket.close();
+      // terminate() drops the socket at once; close() would wait for the server's close frame.
+      socket.terminate();
     }
   });
 });

@@ -110,6 +110,9 @@ Not affected:
 - the routes other systems call on purpose: SAML assertion and logout, OIDC back-channel logout, SSO provisioning and the SumUp callback. They authenticate the caller themselves.
 
 > [!NOTE]
+> Writes that carry only an `x-api-key` header are still checked. A website calling with an API key from the browser must be listed in `ATTRACCESS_TRUSTED_ORIGINS`, or use a bearer token instead.
+
+> [!NOTE]
 > **Scripts that use the browser cookie** must send an approved `Origin` header on writes. Prefer a bearer token (for example an API token) instead.
 
 > [!WARNING]
