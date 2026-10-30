@@ -63,6 +63,7 @@ BootScreen Display::bootScreen;
 SetPinScreen Display::setPinScreen;
 ConnectionConfigurationScreen Display::connectionConfigurationScreen;
 InitScreen Display::initScreen;
+PendingApprovalScreen Display::pendingApprovalScreen;
 Lockscreen Display::lockscreen;
 NoResourcesScreen Display::noResourcesScreen;
 SessionSummaryScreen Display::sessionSummaryScreen;

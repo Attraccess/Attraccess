@@ -10,6 +10,8 @@
 #include "websocket/websocket.hpp"
 #ifdef DEMO_MODE
 #include "api/demo/websocket.hpp"
+#else
+#include "api/security/reader_link.hpp"
 #endif
 #include "logger/logger.hpp"
 #include "platform.hpp"
@@ -24,10 +26,19 @@
 NFC nfc;
 #ifdef DEMO_MODE
 DemoWebsocket websocket;
+API api(websocket);
 #else
 Websocket websocket;
+// Pairing, the TLS 1.3 session and the token channel all run over the one WebSocket.
+ReaderLink readerLink(websocket, {
+#ifdef HAS_LVGL_DISPLAY
+                                     false,
+#else
+                                     true,
 #endif
-API api(websocket);
+                                     {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION}});
+API api(readerLink);
+#endif
 Application application(nfc, api);
 
 Logger mainLogger("Main");

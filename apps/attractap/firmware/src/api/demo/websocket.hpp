@@ -29,6 +29,8 @@ public:
     void disableConnectionAttempts() override {}
     void forceReconnect(const char *) override {}
     void resetCertificateTrust() override {}
+    // The local mock stands in for a paired session: no token, no pairing.
+    bool authenticatesReader() const override { return true; }
 #ifdef ESP_PLATFORM
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)>) override {}
 #endif

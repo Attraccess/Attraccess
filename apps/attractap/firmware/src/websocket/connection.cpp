@@ -85,7 +85,12 @@ void Websocket::connectWebSocketLocked()
         logger.info("connectWebSocket: non secure (no SSL)");
     }
 
+    lockWsClient();
+    const std::string subprotocol = this->_subprotocol;
+    unlockWsClient();
+
     bool configMatchesClient =
+        _clientSubprotocol == subprotocol &&
         _lastApiConfig.hostname == apiConfig.hostname &&
         _lastApiConfig.port == apiConfig.port &&
         _lastApiConfig.useSSL == apiConfig.useSSL &&
@@ -159,8 +164,11 @@ void Websocket::connectWebSocketLocked()
         websocket_cfg.transport = WEBSOCKET_TRANSPORT_OVER_SSL;
         websocket_cfg.cert_pem = certPem;
     }
+    // Selects the reader channel (session / pairing); none is the token channel.
+    websocket_cfg.subprotocol = subprotocol.empty() ? nullptr : subprotocol.c_str();
 
     _clientCertIndex = certIndex;
+    _clientSubprotocol = subprotocol;
 
     esp_websocket_client_handle_t newClient = esp_websocket_client_init(&websocket_cfg);
     if (!newClient)
@@ -288,7 +296,10 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
         { // Binary frame
             logger.debug(("Received binary data: " + std::to_string(data->data_len) + " bytes").c_str());
 
-            if (this->binaryDataCallback)
+            const bool consumed = this->rawBinaryCallback &&
+                                  this->rawBinaryCallback(reinterpret_cast<const uint8_t *>(data->data_ptr),
+                                                          static_cast<size_t>(data->data_len));
+            if (!consumed && this->binaryDataCallback)
             {
                 this->binaryDataCallback(*data);
             }

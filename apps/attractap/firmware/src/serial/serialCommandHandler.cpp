@@ -434,6 +434,7 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
     {
         auto ws = State::getWebsocketState();
         auto api = State::getApiState();
+        auto enrollment = State::getEnrollmentState();
         AttraccessAuthConfig authCfg = Settings::getAttraccessAuthConfig();
 
         std::string status = "disconnected";
@@ -442,6 +443,10 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
             if (ws.connected)
             {
                 status = api.authenticated ? "authenticated" : "connected";
+                if (!api.authenticated && enrollment.pending && !enrollment.stale)
+                {
+                    status = "pending_approval";
+                }
             }
             else
             {
@@ -449,8 +454,24 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
             }
         }
 
-        DynamicJsonDocument resp(192);
+        DynamicJsonDocument resp(640);
         resp["status"] = status;
+        if (status == "pending_approval")
+        {
+            // Lets the web flasher offer an Approve button for readers without a screen. Lite readers
+            // also report the colour pattern their LED ring shows.
+            static const char *const colorNames[State::ENROLLMENT_COLOR_COUNT] = {"red", "green", "blue", "yellow", "white", "magenta"};
+            resp["enrollmentCode"] = enrollment.code;
+            resp["enrollmentRotatesInMs"] = enrollment.rotatesInMs;
+            if (enrollment.lite && enrollment.hasPattern)
+            {
+                JsonArray pattern = resp.createNestedArray("enrollmentPattern");
+                for (uint8_t i = 0; i < State::ENROLLMENT_PATTERN_LENGTH; i++)
+                {
+                    pattern.add(colorNames[enrollment.pattern[i] % State::ENROLLMENT_COLOR_COUNT]);
+                }
+            }
+        }
         resp["hostname"] = ws.hostname;
         resp["port"] = ws.port;
         resp["useSSL"] = ws.useSSL;

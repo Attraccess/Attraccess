@@ -6,13 +6,13 @@ Firmware for the Attractap NFC readers (ESP32-S3), built on **ESP-IDF v6.0.2** (
 
 One firmware per hardware flavor, defined by a file in `variants/`:
 
-| Variant                    | Board                          | Hardware                                                                    |
-| -------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
-| `attractap-touch`          | ESP32-S3 DevKitC (V3 hardware) | ST7701 480x480 RGB panel, GT911 touch, TCA9554 IO expander, PN532 NFC, WiFi |
-| `attractap-touch-v2`       | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64             |
-| `attractap-lite-ethernet`  | Adafruit Qualia S3             | headless, WS2812 24-LED ring, W5500 ethernet                                |
-| `attractap-touch-demo`     | V3 display hardware            | Offline demo API and demo settings                                          |
-| `attractap-touch-v2-demo`  | V4 display hardware            | Offline demo API, demo settings and power button                            |
+| Variant                   | Board                          | Hardware                                                                    |
+| ------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| `attractap-touch`         | ESP32-S3 DevKitC (V3 hardware) | ST7701 480x480 RGB panel, GT911 touch, TCA9554 IO expander, PN532 NFC, WiFi |
+| `attractap-touch-v2`      | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64             |
+| `attractap-lite-ethernet` | Adafruit Qualia S3             | headless, WS2812 24-LED ring, W5500 ethernet                                |
+| `attractap-touch-demo`    | V3 display hardware            | Offline demo API and demo settings                                          |
+| `attractap-touch-v2-demo` | V4 display hardware            | Offline demo API, demo settings and power button                            |
 
 Offline demos preserve an already set device clock, including dates before 2025.
 An unset clock is at zero or still counting uptime from the Unix epoch. On a cold
@@ -60,11 +60,11 @@ flash; missing or malformed fields do not overwrite the persisted choice.
 Locale variants are normalized by the server; firmware accepts canonical
 `en`/`de` wire values and uses English for a noncanonical default.
 
-| Server | Reader firmware | Behavior |
-| --- | --- | --- |
-| With language support | 1.6.5 | The system default applies outside a cardholder session; a supported user's language applies during the session, with the system default as fallback for missing or unsupported user languages. Form error identifiers translate in both languages. |
-| Without language support | 1.6.5 | Missing authentication language fields select English. Form errors without a code show the English invalid-input fallback. Resource and card operations retain their existing protocol. |
-| With language support | Pre-localization implementation on main | Additional payload fields are ignored. `READER_LANGUAGE` is acknowledged, then logged as an unknown event; it does not change authentication or resource state. Existing German screens remain unchanged. Form errors still use the retained `message`. |
+| Server                   | Reader firmware                         | Behavior                                                                                                                                                                                                                                                |
+| ------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| With language support    | 1.6.5                                   | The system default applies outside a cardholder session; a supported user's language applies during the session, with the system default as fallback for missing or unsupported user languages. Form error identifiers translate in both languages.     |
+| Without language support | 1.6.5                                   | Missing authentication language fields select English. Form errors without a code show the English invalid-input fallback. Resource and card operations retain their existing protocol.                                                                 |
+| With language support    | Pre-localization implementation on main | Additional payload fields are ignored. `READER_LANGUAGE` is acknowledged, then logged as an unknown event; it does not change authentication or resource state. Existing German screens remain unchanged. Form errors still use the retained `message`. |
 
 The predecessor behavior was inspected at main commit
 `721ba7a6891042bf65d356f4dcf276d893ecaa0a`: `src/api/api.cpp` acknowledges events
@@ -93,15 +93,15 @@ arms any reader that reports `capabilities.cardEnrollment`. Firmware older than
 1.7.0 acknowledges and ignores these events, so readers must be updated before
 they can take part in mass introductions.
 
-| Direction | Event | Payload |
-| --- | --- | --- |
-| Server → reader | `MASS_INTRODUCTION_START` | `sessionId`, `targetName`, `introducerUsername`, `remainingMs` |
-| Reader → server | `REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` | `sessionId`, `uid` (lowercase hex) |
-| Server → reader | `MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` | `sessionId` plus `keyNo`, `key`, `username`, or `error` |
-| Reader → server | `MASS_INTRODUCTION_CARD_AUTH_CONFIRMED` | `sessionId`, `uid` |
-| Server → reader | `MASS_INTRODUCTION_RESULT` | `sessionId`, `success` plus `username`, `alreadyIntroduced`, `participantCount`, or `error` |
-| Reader → server | `MASS_INTRODUCTION_CANCEL` | `sessionId` |
-| Server → reader | `MASS_INTRODUCTION_END` | `sessionId`, `reason` (`expired`, `cancelled`, `revoked`) |
+| Direction       | Event                                                | Payload                                                                                     |
+| --------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Server → reader | `MASS_INTRODUCTION_START`                            | `sessionId`, `targetName`, `introducerUsername`, `remainingMs`                              |
+| Reader → server | `REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` | `sessionId`, `uid` (lowercase hex)                                                          |
+| Server → reader | `MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA`         | `sessionId` plus `keyNo`, `key`, `username`, or `error`                                     |
+| Reader → server | `MASS_INTRODUCTION_CARD_AUTH_CONFIRMED`              | `sessionId`, `uid`                                                                          |
+| Server → reader | `MASS_INTRODUCTION_RESULT`                           | `sessionId`, `success` plus `username`, `alreadyIntroduced`, `participantCount`, or `error` |
+| Reader → server | `MASS_INTRODUCTION_CANCEL`                           | `sessionId`                                                                                 |
+| Server → reader | `MASS_INTRODUCTION_END`                              | `sessionId`, `reason` (`expired`, `cancelled`, `revoked`)                                   |
 
 Each tapped card is authenticated with its key like a supervisor card before it
 is confirmed. Errors stay on the scan screen instead of opening the generic error
@@ -115,6 +115,79 @@ the reader to its normal screens. A disconnect does too. Messages for any other
 `MassIntroduction: introduced user=… already=… count=…`,
 `MassIntroduction: refused session=… reason=…` and
 `MassIntroduction: ended reason=… session=…`.
+
+## Pairing and session protocol (1.8.0)
+
+Firmware 1.8.0 no longer registers itself with a token (ATT-1165, ATT-1168, ATT-1170,
+ATT-1171). A new reader joins through one approval by an admin of a rotating code, then talks to
+the server only inside mutually authenticated TLS 1.3. Both run inside the WebSocket at
+`/api/attractap/websocket`; the server selects them by WebSocket subprotocol, so a reverse proxy
+must pass `Sec-WebSocket-Protocol`.
+
+| Protocol / firmware            | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
+| ------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token (up to 1.7.x)            | none                   | Plain-text events, token sign-in. Existing token readers keep working and are updated over the air. New readers cannot enroll.                                                                                                                                               |
+| `attractap-pairing.v1` (1.8.0) | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
+| `attractap-session.v1` (1.8.0) | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
+| Legacy `READER_REGISTER`       | none                   | Creates nothing and gets **no reply**, for old and new firmware alike. New firmware without credentials goes straight to pairing.                                                                                                                                            |
+
+| Reader firmware                   | Server with pairing                                                                                                | Older server                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| 1.7.x and older, token registered | Works with its token and updates over the air; must then be paired from its row (settings stay locked until then). | Unchanged.                                |
+| 1.7.x and older, never registered | Registration gets no reply; update it with the web flasher first.                                                  | Registers as before.                      |
+| 1.8.0 and newer, no credentials   | Pairing, then the TLS session.                                                                                     | Cannot pair; needs a server with pairing. |
+| 1.8.0 and newer, paired           | TLS session. Never falls back to token or plain channel.                                                           | Cannot connect.                           |
+
+Pairing sequence:
+
+1. The reader opens a WebSocket with `attractap-pairing.v1` and sends `hello` within 30 s: kind
+   (`touch` or `lite`), its public key (canonical uncompressed P-256 SubjectPublicKeyInfo,
+   91 bytes), firmware name, variant and version. A reader that signed in with a token may add
+   the one-time `ticket` it received through `READER_START_PAIRING` when an admin clicked **Pair**
+   on its row; that binds the pairing to the existing record.
+2. The server sends a `round` immediately and then every 30 s: the installation CA public key,
+   a commitment to the server nonce, the app URL (or `null`) and the times until rotation and
+   expiry. The reader answers with its own `nonce` (at least 16 random bytes); the server
+   `reveal`s its nonce. The reader checks the commitment and, on a mismatch, aborts, closes and
+   starts a new request.
+3. Both sides derive the code from `SHA-256` of the length-prefixed fields tag, reader key, CA
+   key, reader nonce, server nonce (tag `attractap-pairing-code-v1`). The code is the first
+   eight bytes as a big-endian integer mod 31^6 in base 31 over `23456789ABCDEFGHJKMNPQRSTUVWXYZ`,
+   shown as `XXX-XXX`. For Lite readers, eight colours come from the following digest bytes
+   (`uint16` big-endian mod 6 over red, green, blue, yellow, white, magenta). The previous round
+   stays valid until the next rotation. `tests/pairing/vectors.json` holds the shared test
+   vectors; the API and the firmware host tests run the same file.
+4. An admin approves the code once. The server issues the reader certificate, sends `accepted`,
+   and the reader pins the CA and opens `attractap-session.v1`. The first session grant carries
+   its reader ID, installation ID and certificate; the reader stores them and the token hash is
+   deleted on the server. A pending request lasts at most 10 minutes; then the server sends
+   `failed` (`expired`) and the reader asks again with the same key.
+
+After pairing the reader never erases its pinned CA or key because of an unauthenticated message.
+A TLS failure against the pinned CA shows an error and retries; the reader does not enroll again
+by itself. When an admin removes the pairing, the session ends within 1 s, the reader shows
+"Pairing removed", generates a **new** key and returns to pending approval.
+
+Touch variants show the code on the pending-approval screen with a countdown and a QR code of
+`<app URL>/?enroll=<code without hyphen>` (dark modules on a white card with a quiet border of at
+least 4 modules, light and dark themes). One LVGL QR object (`LV_USE_QRCODE`) is created with the
+screen and updated in place with `lv_qrcode_update` on each rotation. Without an app URL, or when
+the QR cannot be built (link over 200 bytes), the screen shows the code only. `tests/lvgl-memory`
+covers create, update and delete cycles.
+
+Lite variants show the pattern on the LED ring: 8 segments of 3 LEDs, the start segment blinks
+and the colours follow clockwise. A slowly breathing white ring means there is no pattern yet
+(connecting, or no round received). The ring flashes green when the pairing was accepted and red
+when it failed. Rendering lives in `src/led/led_pattern.hpp` (state
+`LED_STATE_ENROLLMENT_PENDING`), covered by the host tests in `tests/led-pattern`.
+
+Every variant, including Lite, reports pairing on the serial console: `api.status.get` returns
+`status: "pending_approval"` plus the code and the time until rotation, which the web flasher uses
+for its **Approve** button. Each new code is also logged on the UART as
+`Enrollment: code=K7P-3XQ`. Treat that line as a stable contract: the lab tool
+(`apps/attractap-lab/src/attractap_lab/enrollment.py`) parses the `Enrollment: code=` marker
+(`ENROLLMENT_LOG_MARKER`) to approve readers without a screen, so do not reword it. Codes, keys,
+nonces and tokens are never logged otherwise.
 
 ## Building
 
@@ -265,15 +338,15 @@ maintenance drawer and touch timeouts behave as with a finger. Touch commands
 reply after LVGL has processed the whole gesture. Coordinates are display
 pixels (480 x 480, origin top left as shown on screen).
 
-| Topic | Payload (besides `authCode`) | Reply |
-| --- | --- | --- |
-| `ui.widgets.get` | — | `{"screen","width","height","widgets":[...]}` |
-| `ui.widgets.tap` | `text`, optional `match` (`exact`/`contains`), `index` (default 0), `holdMs` (default 60) | `{"success":true,"widget":{...}}` |
-| `ui.touch.tap` | `x`, `y`, optional `holdMs` (1-60000, default 60) | `{"success":true}` |
-| `ui.touch.press` | `x`, `y`, optional `holdMs`; without it the finger stays down until `ui.touch.release` (at most 60 s) | `{"success":true}` once pressed or, with `holdMs`, released |
-| `ui.touch.release` | — | `{"success":true}` |
-| `ui.touch.swipe` | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300) | `{"success":true}` |
-| `ui.screenshot.get` | — | header, data lines and end line (below) |
+| Topic               | Payload (besides `authCode`)                                                                          | Reply                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `ui.widgets.get`    | —                                                                                                     | `{"screen","width","height","widgets":[...]}`               |
+| `ui.widgets.tap`    | `text`, optional `match` (`exact`/`contains`), `index` (default 0), `holdMs` (default 60)             | `{"success":true,"widget":{...}}`                           |
+| `ui.touch.tap`      | `x`, `y`, optional `holdMs` (1-60000, default 60)                                                     | `{"success":true}`                                          |
+| `ui.touch.press`    | `x`, `y`, optional `holdMs`; without it the finger stays down until `ui.touch.release` (at most 60 s) | `{"success":true}` once pressed or, with `holdMs`, released |
+| `ui.touch.release`  | —                                                                                                     | `{"success":true}`                                          |
+| `ui.touch.swipe`    | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300)                                  | `{"success":true}`                                          |
+| `ui.screenshot.get` | —                                                                                                     | header, data lines and end line (below)                     |
 
 `ui.widgets.get` lists the visible touchable widgets front to back, in the
 order LVGL hit-tests them: system layer, top layer (popups, dialogs), then the
@@ -284,8 +357,20 @@ event handler; each key of a keyboard or button matrix is its own entry with
 type `key` and its `key` index. Example entry:
 
 ```json
-{"type":"lv_button","text":"End session","texts":["End","session"],"x":40,"y":380,"w":400,"h":60,
- "cx":239,"cy":409,"hittable":true,"disabled":false,"checked":false}
+{
+  "type": "lv_button",
+  "text": "End session",
+  "texts": ["End", "session"],
+  "x": 40,
+  "y": 380,
+  "w": 400,
+  "h": 60,
+  "cx": 239,
+  "cy": 409,
+  "hittable": true,
+  "disabled": false,
+  "checked": false
+}
 ```
 
 `texts` holds the visible label texts inside the widget (labels of nested

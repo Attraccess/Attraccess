@@ -127,6 +127,9 @@
  *has effectively been running since the v9 migration. Do not trim without
  *re-testing every screen.*/
 
+/*QR code of the enrollment link on the pending-approval screen (ATT-1170).*/
+#define LV_USE_QRCODE 1
+
 /*--END OF LV_CONF_H--*/
 
 #endif /*LV_CONF_H*/

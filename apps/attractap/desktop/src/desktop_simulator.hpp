@@ -2,6 +2,7 @@
 
 #include "application/application.hpp"
 #include "api/api.hpp"
+#include "api/security/reader_link.hpp"
 #include "host_runtime.hpp"
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
@@ -24,6 +25,7 @@ public:
     void tick();
     void reconnect();
     bool authenticated() const;
+    ReaderLink &link() { return *readerLink; }
     uint32_t authenticationGeneration() const;
     VirtualNfc &nfc() { return virtualNfc; }
     SdlDisplay &display() { return sdlDisplay; }
@@ -34,6 +36,7 @@ private:
     VirtualNfc virtualNfc;
     SdlDisplay sdlDisplay;
     std::optional<HostWebsocket> websocket;
+    std::optional<ReaderLink> readerLink;
     std::optional<API> api;
     std::optional<Application> application;
 };

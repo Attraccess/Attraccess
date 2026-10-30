@@ -152,12 +152,17 @@ void Websocket::forceReconnect(const char *reason)
 
 void Websocket::setState(ConnectionState state)
 {
-    if (this->_state == CONNECTED && state != CONNECTED)
+    const bool wasConnected = this->_state == CONNECTED;
+    if (wasConnected && state != CONNECTED)
     {
         // A PONG from the old socket must not time out after a new socket connects.
         clearPendingPongProbe();
     }
     _state = state;
+    if (this->connectionCallback && wasConnected != (state == CONNECTED))
+    {
+        this->connectionCallback(state == CONNECTED);
+    }
 
     State::WebsocketPhase phase = State::WS_INIT;
     switch (state)
@@ -186,6 +191,31 @@ void Websocket::setMessageCallbackRaw(std::function<void(const char *, size_t)> 
 void Websocket::setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback)
 {
     this->binaryDataCallback = callback;
+}
+
+void Websocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> callback)
+{
+    this->rawBinaryCallback = callback;
+}
+
+void Websocket::setConnectionCallback(std::function<void(bool connected)> callback)
+{
+    this->connectionCallback = callback;
+}
+
+void Websocket::setSubprotocol(const std::string &subprotocol)
+{
+    lockWsClient();
+    this->_subprotocol = subprotocol;
+    unlockWsClient();
+    // A channel switch is not a failure: reconnect without waiting out the back-off.
+    resetReconnectBackoff();
+    this->lastReconnectAttemptTime = millis() - this->nextRetryDelayMs;
+}
+
+bool Websocket::sendBinary(const uint8_t *data, size_t length)
+{
+    return enqueueMessage(reinterpret_cast<const char *>(data), length, false, true);
 }
 
 void Websocket::enableConnectionAttempts()
@@ -337,9 +367,11 @@ void Websocket::resetReconnectBackoff()
 
 void Websocket::logHeapStats()
 {
-    this->logger.infof("Heap internal: free=%u largest=%u",
+    // min = lowest free internal heap since boot (the budget the lab checks).
+    this->logger.infof("Heap internal: free=%u largest=%u min=%u",
                        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+                       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+                       (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
 }
 
 // Deliberate-reboot reason handed to the crash reporter across the SW reset (see
@@ -362,7 +394,7 @@ bool Websocket::sendHeartbeat(const char *message, size_t length)
     return enqueueMessage(message, length, true);
 }
 
-bool Websocket::enqueueMessage(const char *data, size_t length, bool isHeartbeat)
+bool Websocket::enqueueMessage(const char *data, size_t length, bool isHeartbeat, bool isBinary)
 {
     if (!tx_queue)
     {
@@ -378,7 +410,7 @@ bool Websocket::enqueueMessage(const char *data, size_t length, bool isHeartbeat
     }
     memcpy(copy, data, length);
 
-    TxMessage msg{copy, length, isHeartbeat};
+    TxMessage msg{copy, length, isHeartbeat, isBinary};
     if (xQueueSend(tx_queue, &msg, 0) != pdTRUE)
     {
         logger.error("enqueueMessage: tx queue full, dropping message");
@@ -420,7 +452,9 @@ void Websocket::txTaskLoop()
             free(msg.data);
             continue;
         }
-        int ret = esp_websocket_client_send_text(ws_client, msg.data, static_cast<int>(msg.length), SEND_TIMEOUT_TICKS);
+        int ret = msg.isBinary
+                      ? esp_websocket_client_send_bin(ws_client, msg.data, static_cast<int>(msg.length), SEND_TIMEOUT_TICKS)
+                      : esp_websocket_client_send_text(ws_client, msg.data, static_cast<int>(msg.length), SEND_TIMEOUT_TICKS);
         unlockWsClient();
 
         if (ret == -1)

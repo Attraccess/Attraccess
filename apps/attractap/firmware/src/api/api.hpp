@@ -519,8 +519,8 @@ private:
 
     void sendHeartbeat();
 
-    void onRegistrationData(JsonObject data);
     void onUnauthorized(JsonObject data);
+    void onStartPairing(JsonObject data);
     void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
     void onServerTime(JsonVariantConst serverTime);

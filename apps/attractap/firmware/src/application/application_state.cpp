@@ -50,11 +50,26 @@ void Application::updateLedState() {
   case APPLICATION_STATE_FIRMWARE_UPDATE:
     ledState = LedController::LED_STATE_FIRMWARE_UPDATE;
     break;
+  case APPLICATION_STATE_PENDING_APPROVAL: {
+    // The ring shows the pattern the admin compares; a stale one must not match another reader.
+    ledState = LedController::LED_STATE_ENROLLMENT_PENDING;
+    const State::EnrollmentState enrollment = State::getEnrollmentState();
+    this->led.setEnrollmentPattern(enrollment.hasPattern && !enrollment.stale, enrollment.pattern);
+    break;
+  }
   default:
     ledState = LedController::LED_STATE_WAIT_FOR_CARD;
     break;
   }
   this->led.setState(ledState);
+
+  // Flash the result of a pairing request exactly once.
+  const uint8_t outcome = State::consumeEnrollmentOutcome();
+  if (outcome == State::ENROLLMENT_OUTCOME_ACCEPTED) {
+    this->led.triggerSuccess();
+  } else if (outcome == State::ENROLLMENT_OUTCOME_FAILED) {
+    this->led.triggerError();
+  }
 }
 #endif
 
@@ -162,6 +177,19 @@ bool Application::processConnectionState()
     this->supervision.onDisconnect();
     this->massIntroduction.onDisconnect();
 #endif
+    // A reader without credentials shows the code (screen) or pattern (ring) an admin approves.
+    const State::EnrollmentState enrollment = State::getEnrollmentState();
+    if (enrollment.pending || enrollment.pairingRemoved) {
+      if (this->state != APPLICATION_STATE_PENDING_APPROVAL) {
+        this->logger.debug("Waiting for pairing approval");
+        this->state = APPLICATION_STATE_PENDING_APPROVAL;
+#ifdef HAS_LVGL_DISPLAY
+        Display::transitionToScreen(&Display::pendingApprovalScreen);
+#endif
+      }
+      return true;
+    }
+
         if (this->state == APPLICATION_STATE_INIT)
         {
             return true;

@@ -259,6 +259,14 @@ enum class Message {
     ErrorCardMismatch,
     ErrorNoMassIntroductionInProgress,
     ErrorMassIntroductionFailed,
+    ApproveThisReaderInAttraccess,
+    ScanOrEnterCodeInAttraccess,
+    EnterCodeInAttraccess,
+    PairingCodeChangesIn,
+    PairingWaitingForServer,
+    PairingRequestFailed,
+    PairingRemoved,
+    PairingRemovedAskingAgain,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -540,6 +548,14 @@ inline constexpr Entry catalog[] = {
     {Message::ErrorCardMismatch, "Karte stimmt nicht überein", "Card does not match"},
     {Message::ErrorNoMassIntroductionInProgress, "Keine Sammeleinweisung aktiv", "No mass introduction in progress"},
     {Message::ErrorMassIntroductionFailed, "Einweisung fehlgeschlagen", "Introduction failed"},
+    {Message::ApproveThisReaderInAttraccess, "Dieses Lesegerät in Attraccess freigeben", "Approve this reader in Attraccess"},
+    {Message::ScanOrEnterCodeInAttraccess, "Scannen oder Code in Attraccess eingeben", "Scan or enter the code in Attraccess"},
+    {Message::EnterCodeInAttraccess, "Code in Attraccess eingeben", "Enter the code in Attraccess"},
+    {Message::PairingCodeChangesIn, "Der Code ändert sich in {0} s", "The code changes in {0} s"},
+    {Message::PairingWaitingForServer, "Warte auf den Server", "Waiting for the server"},
+    {Message::PairingRequestFailed, "Anfrage fehlgeschlagen. Neuer Versuch gleich.", "Request failed. Trying again soon."},
+    {Message::PairingRemoved, "Kopplung entfernt", "Pairing removed"},
+    {Message::PairingRemovedAskingAgain, "Das Lesegerät fordert gleich eine neue Freigabe an", "The reader asks for a new approval shortly"},
 };
 
 } // namespace FirmwareI18n
