@@ -1,5 +1,7 @@
 import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
 
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -13,6 +15,8 @@ import { NotificationDispatchService } from '../../notifications/notification-di
 import { NotificationCategory } from '../../notifications/notification-types';
 
 import { ResourceIntroducerChangedEvent } from './events/resource-introducer-changed.event';
+
+import { ResourceIntroducerNameDto } from './dtos/introducerName.dto';
 
 import { createTranslator } from '../../i18n/translate';
 
@@ -68,6 +72,37 @@ export class ResourceIntroducersService {
     }
 
     return Array.from(byUserAndType.values());
+  }
+
+  /** Direct and group introducers and maintainers, reduced to what a help panel needs. */
+  public async getNames(resourceId: number): Promise<ResourceIntroducerNameDto[]> {
+    const byUser = new Map<number, ResourceIntroducerNameDto>();
+    for (const introducer of await this.getMany(resourceId)) {
+      const existing = byUser.get(introducer.userId);
+      if (existing?.role === ResourceIntroducerType.INTRODUCER) continue;
+      byUser.set(introducer.userId, {
+        userId: introducer.userId,
+        username: introducer.user.username,
+        role: introducer.type,
+      });
+    }
+    return Array.from(byUser.values());
+  }
+
+  /**
+   * Who may read the full access lists (introductions, introducers, maintainers, history) of a resource:
+   * resource and access managers, and introducers of the resource or one of its groups.
+   */
+  public async canViewAccessLists(
+    resourceId: number,
+    user: Pick<AuthenticatedUser, 'id' | 'effectivePermissions'>,
+  ): Promise<boolean> {
+    const permissions = user.effectivePermissions;
+    return (
+      permissions?.has('resources.update') === true ||
+      permissions?.has('resources.access.manage') === true ||
+      (await this.isIntroducer(resourceId, user.id, true))
+    );
   }
 
   public async getByResourceIdAndUserId(

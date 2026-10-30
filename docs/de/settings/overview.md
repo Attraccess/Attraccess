@@ -26,6 +26,28 @@ Allgemeine Einstellungen fuer die Attraccess-Instanz:
 > [!TIP]
 > Die meisten Einstellungen koennen auch ueber [Umgebungsvariablen](installation/environment-variables.md) konfiguriert werden. In der Oberflaeche geaenderte Einstellungen ueberschreiben die Standardwerte der Umgebungsvariablen.
 
+## Sichtbarkeit der Gerätenutzung
+
+Unter **Allgemein** legt **Wer die Gerätenutzung sehen darf** fest, wer sieht, welche Geräte in Benutzung sind und von wem. Zum Ändern ist die Berechtigung **Systemkonfiguration verwalten** nötig; jede Änderung wird im [Audit-Log](settings/audit-log.md) protokolliert.
+
+| Option | Wer die Nutzung eines Geräts sieht |
+|--------|-------------------------------------|
+| **Alle Geräte** (Standard) | Alle mit der Berechtigung **Ressourcen ansehen**. |
+| **Nur eingewiesene Geräte** | Personen, die das Gerät benutzen dürfen (direkt oder über eine Gruppe eingewiesen), seine Einweisenden und Wartenden sowie alle mit **Ressourcen verwalten** oder **Zugriff verwalten**. |
+
+In beiden Modi gilt:
+
+- Man muss angemeldet sein. Abgemeldete Anfragen erhalten `401` und keine Daten.
+- Die eigene laufende Sitzung sieht man immer.
+- Die Namen der Einweisenden und Wartenden eines Geräts bleiben für alle mit **Ressourcen ansehen** sichtbar, damit noch nicht eingewiesene Personen wissen, wen sie fragen können. E-Mail-Adressen werden nie angezeigt.
+
+Im Modus **Nur eingewiesene Geräte** sehen alle anderen das Gerät weiterhin im Katalog, aber ohne Nutzung: Es erscheint nicht in der Liste der Geräte in Benutzung, Statusabfragen antworten mit `403`, und Live-Aktualisierungen werden abgelehnt. Bei Geräten mit [betreuter Nutzung](resources/introductions.md) sehen sie nur *frei* oder *in Benutzung*, ohne Namen.
+
+Die Einstellung liegt in den Systemeinstellungen. Instanzen, die sie nie gesetzt haben, verhalten sich wie **Alle Geräte**; ein Upgrade braucht also keine Migration.
+
+> [!NOTE]
+> Skripte und Plugins, die die Liste der Geräte in Benutzung, Einweisungen oder Einweisende ohne Anmeldung lesen, funktionieren nicht mehr. Melden Sie sich stattdessen mit einem [API-Token](developer/api-reference.md) an. Die vollständigen Einweisungs- und Einweisenden-Listen sowie die Abfrage, ob eine andere Person einweisen darf, erfordern **Ressourcen verwalten**, **Zugriff verwalten** oder die Rolle Einweisende:r des Geräts bzw. seiner Gruppe.
+
 ## E-Mail-Einstellungen
 
 Konfigurieren Sie, wie Attraccess E-Mails versendet:

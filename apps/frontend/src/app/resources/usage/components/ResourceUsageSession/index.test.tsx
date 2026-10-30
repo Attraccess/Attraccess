@@ -59,7 +59,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
     isLoading: loading.canControl,
   }),
   useResourcesServiceResourceUsageCanControlKey: 'canControl',
-  useAccessControlServiceResourceIntroducersGetMany: () => ({ data: [], isLoading: loading.introducers }),
+  useAccessControlServiceResourceIntroducersGetNames: () => ({ data: [], isLoading: loading.introducers }),
   useResourcesServiceResourceUsageGetActiveSession: () => ({
     data: { usage: activeSession.value },
     isLoading: loading.activeSession,

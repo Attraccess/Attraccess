@@ -24,6 +24,8 @@ import { PaginatedResponse } from '../types/response';
 import { FileUpload } from '../common/types/file-upload.types';
 import { PaginatedResourceResponseDto } from './dtos/paginatedResourceResponse.dto';
 import { ResourceImageService } from './resourceImage.service';
+import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
+import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
 
 @ApiTags('Resources')
 @Controller('resources')
@@ -31,6 +33,8 @@ export class ResourcesController {
   constructor(
     private readonly resourcesService: ResourcesService,
     private readonly resourceImageService: ResourceImageService,
+    private readonly activityVisibility: ResourceActivityVisibilityService,
+    private readonly introducers: ResourceIntroducersService,
   ) {}
 
   private transformResource(resource: Resource): Resource {
@@ -52,7 +56,11 @@ export class ResourcesController {
   @Auth('resources.create')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('image'))
-  async createOne(@Body() createDto: CreateResourceDto, @Req() req: AuthenticatedRequest, @UploadedFile() image?: FileUpload): Promise<Resource> {
+  async createOne(
+    @Body() createDto: CreateResourceDto,
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() image?: FileUpload,
+  ): Promise<Resource> {
     const resource = await this.resourcesService.createResource(createDto, image, req.user);
     return this.transformResource(resource);
   }
@@ -97,18 +105,31 @@ export class ResourcesController {
   }
 
   @Get('in-use')
+  @Auth()
   @ApiOperation({ summary: 'Get all resources in use', operationId: 'getAllResourcesInUse' })
   @ApiResponse({
     status: 200,
     description: 'List of resources in use.',
     type: [Resource],
   })
-  async getAllInUse(): Promise<Resource[]> {
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not authenticated',
+  })
+  async getAllInUse(@Req() req: AuthenticatedRequest): Promise<Resource[]> {
     const resources = await this.resourcesService.listResources({
       onlyInUse: true,
       returnUsingUser: true,
     });
-    return resources.data.map((resource) => this.transformResource(resource));
+    const access = await this.activityVisibility.resolveMany(
+      req.user,
+      resources.data.map((resource) => resource.id),
+    );
+    // Machines the viewer may not see activity for are left out: they have no in-use entry for this viewer.
+    return this.activityVisibility
+      .applyToResources(resources.data, access, req.user.id)
+      .filter((resource) => resource.usages.length > 0)
+      .map((resource) => this.transformResource(resource));
   }
 
   @Get(':id')
@@ -127,9 +148,13 @@ export class ResourcesController {
     status: 404,
     description: 'Resource not found',
   })
-  async getOneById(@Param('id', ParseIntPipe) id: number): Promise<Resource> {
+  async getOneById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<Resource> {
     const resource = await this.resourcesService.getResourceById(id);
-    return this.transformResource(resource);
+    const access = await this.activityVisibility.resolveMany(req.user, [id]);
+    const [visible] = this.activityVisibility.applyToResources([resource], access, req.user.id);
+    // The embedded introductions are the full access list; they follow the same rule as the People tab.
+    const introductions = (await this.introducers.canViewAccessLists(id, req.user)) ? visible.introductions : [];
+    return this.transformResource({ ...visible, introductions });
   }
 
   @Put(':id')

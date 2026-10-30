@@ -24,6 +24,15 @@
     },
     "defaultLanguage": {
       "label": "Default system language"
+    },
+    "activityVisibility": {
+      "label": "Who can see equipment activity",
+      "description": "Controls who sees which machines are in use and by whom. People always see their own sessions.",
+      "all": "All equipment (everyone who can view resources)",
+      "introduced": "Introduced equipment only",
+      "introducedHint": "Only people who may use a machine, its introducers and maintainers, and managers see its activity. On machines that allow supervised use, everyone else sees only free or in use.",
+      "saved": "Visibility saved",
+      "loadFailed": "The visibility setting could not be loaded."
     }
   },
   "success": {

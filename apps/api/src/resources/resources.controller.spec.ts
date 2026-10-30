@@ -8,6 +8,8 @@ import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { NotFoundException, type ExecutionContext } from '@nestjs/common';
 import { PaginatedResponse } from '../types/response';
 import { ResourceImageService } from './resourceImage.service';
+import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
+import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
 import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import supertest from 'supertest';
 
@@ -42,6 +44,14 @@ describe('ResourcesController', () => {
           provide: ResourceImageService,
           useValue: mockResourceImageService,
         },
+        {
+          provide: ResourceActivityVisibilityService,
+          useValue: {
+            resolveMany: jest.fn(async (_user: unknown, ids: number[]) => new Map(ids.map((id) => [id, 'full']))),
+            applyToResources: jest.fn((resources: Resource[]) => resources),
+          },
+        },
+        { provide: ResourceIntroducersService, useValue: { canViewAccessLists: jest.fn(async () => true) } },
       ],
     }).compile();
 
@@ -103,7 +113,7 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
 
-      const result = await controller.getOneById(1);
+      const result = await controller.getOneById(1, request);
 
       expect(result).toEqual({
         ...resource,
@@ -115,7 +125,7 @@ describe('ResourcesController', () => {
     it('should throw NotFoundException if resource not found', async () => {
       jest.spyOn(service, 'getResourceById').mockRejectedValue(new NotFoundException());
 
-      await expect(controller.getOneById(999)).rejects.toThrow(NotFoundException);
+      await expect(controller.getOneById(999, request)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -199,6 +209,14 @@ describe('ResourcesController', () => {
         providers: [
           { provide: ResourcesService, useValue: service },
           { provide: ResourceImageService, useValue: {} },
+          {
+            provide: ResourceActivityVisibilityService,
+            useValue: {
+              resolveMany: jest.fn(async (_user: unknown, ids: number[]) => new Map(ids.map((id) => [id, 'full']))),
+              applyToResources: jest.fn((resources: Resource[]) => resources),
+            },
+          },
+          { provide: ResourceIntroducersService, useValue: { canViewAccessLists: jest.fn(async () => true) } },
         ],
       })
         .overrideGuard(DualAuthGuard)

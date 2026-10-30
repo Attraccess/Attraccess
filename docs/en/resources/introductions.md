@@ -108,6 +108,16 @@ Every introduction change is logged with:
 
 This audit trail is visible on the resource detail page and helps track who granted or revoked access and when.
 
+## Who Can See the Lists
+
+Reading access information requires signing in:
+
+- The **full lists** (introductions, introducers, maintainers and history of a resource) are visible to users with **Manage resources** or **Manage access**, and to introducers of the resource or of one of its groups. This is the same rule as the **People** tab.
+- **Introducer checks** (whether a user is an introducer) answer only about yourself. Users with **Manage resources** or **Manage access** can ask about anyone; everyone else gets `403`.
+- **Names only:** everyone with **View resources** can see the usernames and roles (introducer or maintainer) of a resource's introducers, including those inherited from groups. People who are not introduced yet use this to find out who to ask. Email addresses are not included.
+
+Who sees which machine is in use is a separate [system setting](settings/overview.md#equipment-activity-visibility).
+
 ## See Also
 
 - [Detail Page](resources/resource-details.md)

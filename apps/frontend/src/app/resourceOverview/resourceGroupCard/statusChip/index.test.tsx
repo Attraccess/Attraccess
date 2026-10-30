@@ -5,6 +5,7 @@ import { StatusChip } from './index';
 
 let sessionData: unknown;
 let maintenanceData: unknown;
+let sessionError: unknown;
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -23,7 +24,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceUsageGetActiveSession: () => ({ data: sessionData }),
+  useResourcesServiceResourceUsageGetActiveSession: () => ({ data: sessionData, error: sessionError }),
   useResourceMaintenancesServiceFindMaintenances: () => ({ data: maintenanceData }),
 }));
 
@@ -31,6 +32,13 @@ describe('StatusChip', () => {
   beforeEach(() => {
     sessionData = undefined;
     maintenanceData = undefined;
+    sessionError = undefined;
+  });
+
+  it('shows no status when activity is not visible to the viewer (403)', () => {
+    sessionError = { status: 403 };
+    const { container } = render(<StatusChip resourceId={1} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('shows Available when idle and not under maintenance', () => {

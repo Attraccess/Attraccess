@@ -108,6 +108,16 @@ Jede Einweisungsänderung wird protokolliert mit:
 
 Dieses Protokoll ist auf der Detailseite der Ressource einsehbar und ermöglicht die Nachverfolgung, wer wann Zugang erteilt oder entzogen hat.
 
+## Wer die Listen sehen darf
+
+Zugangsinformationen zu lesen setzt eine Anmeldung voraus:
+
+- Die **vollständigen Listen** (Einweisungen, Einweisende, Wartende und Verlauf einer Ressource) sehen Benutzer mit **Ressourcen verwalten** oder **Zugriff verwalten** sowie Einweisende der Ressource oder einer ihrer Gruppen. Das ist dieselbe Regel wie beim Reiter **Personen**.
+- **Prüfungen auf Einweisungsberechtigung** (ob ein Benutzer einweisen darf) antworten nur für Sie selbst. Benutzer mit **Ressourcen verwalten** oder **Zugriff verwalten** können nach beliebigen Personen fragen; alle anderen erhalten `403`.
+- **Nur Namen:** Alle mit **Ressourcen ansehen** sehen Benutzernamen und Rolle (Einweisende:r oder Wartende:r) der Einweisenden einer Ressource, auch wenn sie über Gruppen geerbt sind. Noch nicht eingewiesene Personen erfahren so, wen sie fragen können. E-Mail-Adressen sind nicht enthalten.
+
+Wer sehen darf, welches Gerät in Benutzung ist, regelt eine eigene [Systemeinstellung](settings/overview.md#sichtbarkeit-der-gerätenutzung).
+
 ## Siehe auch
 
 - [Detailseite](resources/resource-details.md)

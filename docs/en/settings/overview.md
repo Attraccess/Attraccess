@@ -26,6 +26,28 @@ General settings for the Attraccess instance:
 > [!TIP]
 > Most settings can also be configured via [environment variables](installation/environment-variables.md). Settings changed in the UI override environment variable defaults.
 
+## Equipment Activity Visibility
+
+Under **General**, **Who can see equipment activity** controls who sees which machines are in use and by whom. Changing it requires the **Manage System Configuration** permission, and every change is recorded in the [audit log](settings/audit-log.md).
+
+| Option | Who sees a machine's activity |
+|--------|-------------------------------|
+| **All equipment** (default) | Everyone with the **View resources** permission. |
+| **Introduced equipment only** | People who may use the machine (introduced directly or through a group), its introducers and maintainers, and anyone with **Manage resources** or **Manage access**. |
+
+In both modes:
+
+- You need to be signed in. Signed-out requests get `401` and no data.
+- You always see your own running session.
+- The names of a machine's introducers and maintainers stay visible to everyone with **View resources**, so people who are not yet introduced know who to ask. Email addresses are never shown.
+
+In **Introduced equipment only** mode, everyone else still sees the machine in the catalog, but without activity: it has no entry in the in-use list, status requests answer `403`, and live updates for it are refused. On machines that allow [supervised use](resources/introductions.md), they see only *free* or *in use*, without a name.
+
+The setting is stored in the system settings. Instances that never set it behave as **All equipment**, so upgrading needs no migration.
+
+> [!NOTE]
+> Scripts and plugins that read the in-use list, introductions or introducers without signing in no longer work. Sign in with an [API token](developer/api-reference.md) instead. Reading the full introduction and introducer lists, and asking about another user's introducer status, requires **Manage resources**, **Manage access**, or being an introducer of the machine or its group.
+
 ## Email Settings
 
 Configure how Attraccess sends emails:

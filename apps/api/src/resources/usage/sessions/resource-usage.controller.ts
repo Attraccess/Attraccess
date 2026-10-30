@@ -13,6 +13,7 @@ import { GetResourceHistoryQueryDto } from '../dtos/getResourceHistoryQuery.dto'
 import { GetResourceHistoryResponseDto } from '../dtos/GetResourceHistoryResponse.dto';
 
 import { ResourceUsageService } from './resource-usage.service';
+import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
 import { GetActiveUsageSessionDto } from '../dtos/getActiveUsageSession.dto';
@@ -24,7 +25,10 @@ import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.
 @ApiTags('Resources')
 @Controller('resources/:resourceId/usage')
 export class ResourceUsageController {
-  constructor(protected readonly resourceUsageService: ResourceUsageService) {}
+  constructor(
+    protected readonly resourceUsageService: ResourceUsageService,
+    protected readonly activityVisibility: ResourceActivityVisibilityService,
+  ) {}
 
   @Post('lock')
   @Auth()
@@ -144,6 +148,10 @@ export class ResourceUsageController {
     // If not an admin, force filtering by the current user's ID
     if (!canUpdateResources) {
       query.userId = req.user.id;
+    } else if (query.userId !== req.user.id) {
+      // Other people's sessions follow the instance's activity visibility, same as the live status.
+      const access = await this.activityVisibility.resolve(req.user, resourceId);
+      if (access !== 'full') throw new ForbiddenException('You cannot view activity on this resource');
     }
 
     const { data, total } = await this.resourceUsageService.getResourceUsageHistory(
@@ -298,11 +306,23 @@ export class ResourceUsageController {
     status: 404,
     description: 'Resource not found',
   })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Activity on this resource is not visible to the user',
+  })
   public async getActiveSession(
     @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<GetActiveUsageSessionDto> {
+    const access = await this.activityVisibility.resolve(req.user, resourceId);
     const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
-    return { usage: activeSession || null };
+    if (!activeSession) {
+      if (access === 'none') throw new ForbiddenException('You cannot view activity on this resource');
+      return { usage: null };
+    }
+    const usage = this.activityVisibility.viewUsage(activeSession, access, req.user.id);
+    if (!usage) throw new ForbiddenException('You cannot view activity on this resource');
+    return { usage };
   }
 
   @Get(':usageId')
@@ -315,6 +335,11 @@ export class ResourceUsageController {
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
+    const usage = await this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
+    if (usage.userId !== req.user.id) {
+      const access = await this.activityVisibility.resolve(req.user, resourceId);
+      if (access !== 'full') throw new ForbiddenException('You cannot view activity on this resource');
+    }
+    return usage;
   }
 }

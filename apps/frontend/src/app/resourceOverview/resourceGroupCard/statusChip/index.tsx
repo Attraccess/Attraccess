@@ -5,6 +5,7 @@ import {
 } from '@attraccess/react-query-client';
 import { Chip } from '@heroui/react';
 import { useMemo } from 'react';
+import { isForbiddenError } from '../../../../api/isForbiddenError';
 
 import en from './en.json';
 import de from './de.json';
@@ -18,7 +19,7 @@ export function StatusChip(props: Readonly<Props>) {
 
   const { t } = useTranslations({ de, en });
 
-  const { data: session } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
+  const { data: session, error: sessionError } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
   const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
     resourceId,
     includeActive: true,
@@ -31,6 +32,11 @@ export function StatusChip(props: Readonly<Props>) {
   const isUnderMaintenance = useMemo(() => {
     return (activeMaintenances?.data?.length ?? 0) > 0;
   }, [activeMaintenances]);
+
+  // "Introduced only" mode: this viewer may not see activity here, so show no status rather than a wrong one.
+  if (isForbiddenError(sessionError)) {
+    return null;
+  }
 
   // In-use takes priority over maintenance to mirror the resource details view.
   if (isInUse) {

@@ -8,6 +8,7 @@ import {
 } from '@attraccess/react-query-client';
 import { GeneralSection } from './index';
 
+vi.mock('./ResourceVisibilitySetting', () => ({ ResourceVisibilitySetting: () => null }));
 vi.mock('@attraccess/react-query-client', () => ({
   useSettingsServiceGetSystemSettings: vi.fn(),
   UseSettingsServiceGetSystemSettingsKeyFn: () => ['settings'],

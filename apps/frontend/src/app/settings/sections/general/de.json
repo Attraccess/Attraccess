@@ -24,6 +24,15 @@
     },
     "defaultLanguage": {
       "label": "Standardsprache des Systems"
+    },
+    "activityVisibility": {
+      "label": "Wer die Gerätenutzung sehen darf",
+      "description": "Legt fest, wer sieht, welche Geräte in Benutzung sind und von wem. Die eigenen Sitzungen sieht jede Person immer.",
+      "all": "Alle Geräte (alle mit Berechtigung „Ressourcen ansehen“)",
+      "introduced": "Nur eingewiesene Geräte",
+      "introducedHint": "Nur Personen, die ein Gerät benutzen dürfen, seine Einweisenden und Wartenden sowie Verwaltende sehen dessen Nutzung. Bei Geräten mit betreuter Nutzung sehen alle anderen nur „frei“ oder „in Benutzung“.",
+      "saved": "Sichtbarkeit gespeichert",
+      "loadFailed": "Die Einstellung zur Sichtbarkeit konnte nicht geladen werden."
     }
   },
   "success": {

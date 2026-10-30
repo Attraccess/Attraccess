@@ -17,9 +17,9 @@ const { requestMutate, ApiErrorMock, candidates } = vi.hoisted(() => {
     ApiErrorMock,
     candidates: {
       value: [
-        { id: 10, userId: 2, type: 'introducer', user: { id: 2, username: 'alice' } },
-        { id: 11, userId: 1, type: 'introducer', user: { id: 1, username: 'me' } },
-        { id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } },
+        { userId: 2, username: 'alice', role: 'introducer' },
+        { userId: 1, username: 'me', role: 'introducer' },
+        { userId: 3, username: 'marcel', role: 'maintainer' },
       ],
     },
   };
@@ -40,7 +40,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: ApiErrorMock,
   ResourceIntroducerType: { INTRODUCER: 'introducer', MAINTAINER: 'maintainer' },
-  useAccessControlServiceResourceIntroducersGetMany: () => ({
+  useAccessControlServiceResourceIntroducersGetNames: () => ({
     isLoading: false,
     data: candidates.value,
   }),
@@ -73,9 +73,9 @@ describe('SupervisedStartModal', () => {
   beforeEach(() => {
     requestMutate.mockClear();
     candidates.value = [
-      { id: 10, userId: 2, type: 'introducer', user: { id: 2, username: 'alice' } },
-      { id: 11, userId: 1, type: 'introducer', user: { id: 1, username: 'me' } },
-      { id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } },
+      { userId: 2, username: 'alice', role: 'introducer' },
+      { userId: 1, username: 'me', role: 'introducer' },
+      { userId: 3, username: 'marcel', role: 'maintainer' },
     ];
   });
 
@@ -100,16 +100,7 @@ describe('SupervisedStartModal', () => {
   });
 
   it('does not offer a reader when no introducer is available', () => {
-    candidates.value = [{ id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } }];
-
-    renderModal();
-
-    expect(screen.getByText('select.empty')).toBeInTheDocument();
-    expect(screen.queryByText('Workshop reader')).not.toBeInTheDocument();
-  });
-
-  it('does not offer a deleted introducer or a reader', () => {
-    candidates.value = [{ id: 10, userId: 2, type: 'introducer', user: null }];
+    candidates.value = [{ userId: 3, username: 'marcel', role: 'maintainer' }];
 
     renderModal();
 

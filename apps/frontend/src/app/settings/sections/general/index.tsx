@@ -13,6 +13,7 @@ import {
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
+import { ResourceVisibilitySetting } from './ResourceVisibilitySetting';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton/index';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -215,6 +216,8 @@ export function GeneralSection() {
         </SettingsRow>
         <input type="submit" hidden />
       </Form>
+
+      <ResourceVisibilitySetting />
 
       <SettingsSaveBar isDirty={isDirty} isSaving={isSaving} onSave={handleSave} onDiscard={() => setDraft({})} />
     </SettingsSection>

@@ -16,13 +16,19 @@ export class ResourceIntroductionsController {
   ) {}
 
   @Get()
+  @Auth()
   @ApiOperation({ summary: 'Get all introductions for a resource', operationId: 'resourceIntroductionsGetMany' })
   @ApiResponse({
     status: 200,
     description: 'All introductions for a resource',
     type: [ResourceIntroduction],
   })
-  async getManyByResource(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceIntroduction[]> {
+  @ApiResponse({ status: 403, description: 'Only managers and introducers may read the full list' })
+  async getManyByResource(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceIntroduction[]> {
+    await this.assertCanViewAccessLists(resourceId, req);
     return await this.resourceIntroductionsService.getMany(resourceId);
   }
 
@@ -38,15 +44,14 @@ export class ResourceIntroductionsController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroduction[]> {
-    const permissions = req.user.effectivePermissions;
-    if (
-      !permissions?.has('resources.update') &&
-      !permissions?.has('resources.access.manage') &&
-      !(await this.resourceIntroducersService.isIntroducer(resourceId, req.user.id, true))
-    ) {
-      throw new ForbiddenException('User cannot view this resource’s People tab');
-    }
+    await this.assertCanViewAccessLists(resourceId, req);
     return this.resourceIntroductionsService.getMany(resourceId, true);
+  }
+
+  private async assertCanViewAccessLists(resourceId: number, req: AuthenticatedRequest): Promise<void> {
+    if (!(await this.resourceIntroducersService.canViewAccessLists(resourceId, req.user))) {
+      throw new ForbiddenException('User cannot view the access lists of this resource');
+    }
   }
 
   @Post('/:userId/grant')
@@ -64,7 +69,9 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceIntroductionsService.grant(resourceId, userId, data, {
-      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+      performedByUserId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
     });
   }
 
@@ -86,7 +93,9 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
-      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+      performedByUserId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
     });
   }
 
@@ -105,7 +114,7 @@ export class ResourceIntroductionsController {
   @IsResourceIntroducer()
   async getHistory(
     @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
     return await this.resourceIntroductionsService.getHistoryByResourceIdAndUserId(resourceId, userId);
   }

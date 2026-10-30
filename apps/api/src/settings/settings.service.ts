@@ -29,6 +29,11 @@ import {
   MessagingRateLimitPolicy,
   RATE_LIMIT_DEFAULTS,
   RateLimitPolicy,
+  RESOURCES_KEYS,
+  RESOURCES_PARENT,
+  RESOURCE_ACTIVITY_VISIBILITY_DEFAULT,
+  RESOURCE_ACTIVITY_VISIBILITY_VALUES,
+  ResourceActivityVisibility,
 } from './constants';
 
 import { SmtpSettingsDto, SmtpServiceType } from './dto/smtp-settings.dto';
@@ -65,6 +70,10 @@ import { MessagingRateLimitSettingsDto } from './dto/messaging-rate-limit-settin
 import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-settings.dto';
 
 import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
+
+import { ResourceVisibilitySettingsDto } from './dto/resource-visibility-settings.dto';
+
+import { UpdateResourceVisibilitySettingsDto } from './dto/update-resource-visibility-settings.dto';
 
 export function parsePositiveInt(raw: string | null, fallback: number): number {
   if (raw === null || raw === undefined || raw === '') {
@@ -383,6 +392,30 @@ export class SettingsService {
       exponentialBackoff: exponentialBackoff === 'true',
       backoffMultiplier: parsePositiveFloat(backoffMultiplier, RATE_LIMIT_DEFAULTS.backoffMultiplier),
     };
+  }
+
+  async getResourceActivityVisibility(): Promise<ResourceActivityVisibility> {
+    const stored = await this.settingsStore.getPlainSetting(RESOURCES_PARENT, RESOURCES_KEYS.activityVisibility);
+    return (
+      RESOURCE_ACTIVITY_VISIBILITY_VALUES.find((value) => value === stored) ?? RESOURCE_ACTIVITY_VISIBILITY_DEFAULT
+    );
+  }
+
+  async getResourceVisibilitySettings(): Promise<ResourceVisibilitySettingsDto> {
+    return { activityVisibility: await this.getResourceActivityVisibility() };
+  }
+
+  async updateResourceVisibilitySettings(
+    update: UpdateResourceVisibilitySettingsDto,
+  ): Promise<ResourceVisibilitySettingsDto> {
+    if (update.activityVisibility !== undefined) {
+      await this.settingsStore.setPlainSetting(
+        RESOURCES_PARENT,
+        RESOURCES_KEYS.activityVisibility,
+        update.activityVisibility,
+      );
+    }
+    return this.getResourceVisibilitySettings();
   }
 
   async getMessagingRateLimitSettings(): Promise<MessagingRateLimitSettingsDto> {
