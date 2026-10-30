@@ -51,6 +51,12 @@ def test_approve_omits_the_name_when_not_given(server):
     assert requests[1][2] == {"code": "K7P-3XQ", "mode": "new"}
 
 
+def test_approve_can_take_over_an_existing_record(server):
+    url, requests = server
+    approve(url, "secret", "K7P-3XQ", mode="takeover", target_reader_id=7)
+    assert requests[1][2] == {"code": "K7P-3XQ", "mode": "takeover", "targetReaderId": 7}
+
+
 def test_approve_raises_for_an_unknown_or_rotated_code(server):
     url, requests = server
     with pytest.raises(urllib.error.HTTPError) as refused:

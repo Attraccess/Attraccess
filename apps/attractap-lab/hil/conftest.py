@@ -115,16 +115,20 @@ def admin(api):
     return api.login("admin")
 
 
-def approve_pairing(console, url, token, timeout=180):
-    """Approve the newest pairing code on the reader's UART as a new reader; return its id."""
+def approve_pairing(console, url, token, timeout=180, since=0, **options):
+    """Approve the newest pairing code on the reader's UART; return the record id.
+
+    Only codes logged after position ``since`` (see ``console.mark()``) count. ``options`` are
+    passed to ``approve`` (default: a new reader).
+    """
     deadline = time.monotonic() + timeout
     tried = set()
     while time.monotonic() < deadline:
         with console.lock:
-            code = latest_code(console.data)
+            code = latest_code(console.data[since:])
         if code and code not in tried:
             try:
-                return approve(url, token, code, name="Lab Reader")["targetReaderId"]
+                return approve(url, token, code, **{"name": "Lab Reader", **options})["targetReaderId"]
             except urllib.error.HTTPError as error:
                 if error.code not in (404, 409):  # rotated away, or ambiguous: wait for the next code
                     raise

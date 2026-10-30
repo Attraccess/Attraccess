@@ -32,15 +32,20 @@ def _post(url, token, path, body, timeout):
         return json.load(response)
 
 
-def approve(url, token, code, *, name=None, timeout=30):
-    """Resolve ``code`` and approve it as a new reader; return the pairing.
+def approve(url, token, code, *, name=None, mode="new", target_reader_id=None, timeout=30):
+    """Resolve ``code`` and approve it (by default as a new reader); return the pairing.
+
+    ``mode="takeover"`` with ``target_reader_id`` gives a reader that lost its pairing
+    (revoked, reset) back its existing record.
 
     Raises ``urllib.error.HTTPError`` for refusals (404: unknown or rotated code,
     409: two readers show the same code, 403: missing permission, 429: too many
     wrong codes).
     """
     pairing = _post(url, token, "/resolve", {"code": code}, timeout)
-    body = {"code": code, "mode": "new"}
+    body = {"code": code, "mode": mode}
+    if target_reader_id is not None:
+        body["targetReaderId"] = target_reader_id
     if name:
         body["name"] = name
     return _post(url, token, f"/{pairing['id']}/approve", body, timeout)
