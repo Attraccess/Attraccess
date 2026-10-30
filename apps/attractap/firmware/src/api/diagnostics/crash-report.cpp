@@ -12,7 +12,10 @@
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
-#include "esp_core_dump.h"
+#include "sdkconfig.h"
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+#include "esp_core_dump.h" // absent when coredumps are off (secure profile)
+#endif
 #include "mbedtls/base64.h"
 
 #include "crash-record.hpp"
@@ -186,7 +189,10 @@ void API::sendPendingCrashReport() {}
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
-#include "esp_core_dump.h"
+#include "sdkconfig.h"
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+#include "esp_core_dump.h" // absent when coredumps are off (secure profile)
+#endif
 #include "mbedtls/base64.h"
 
 #include "crash-record.hpp"
@@ -226,6 +232,10 @@ const char *crashResetReasonToString(uint8_t reason)
 std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len)
 {
     b64Len = 0;
+#if !CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+    (void)logger;
+    return nullptr;
+#else
     size_t addr = 0;
     size_t size = 0;
     if (esp_core_dump_image_get(&addr, &size) != ESP_OK || size == 0)
@@ -281,6 +291,7 @@ std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len)
     }
     b64Len = written;
     return encoded;
+#endif
 }
 #endif
 
@@ -295,7 +306,10 @@ std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len)
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
-#include "esp_core_dump.h"
+#include "sdkconfig.h"
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+#include "esp_core_dump.h" // absent when coredumps are off (secure profile)
+#endif
 #include "mbedtls/base64.h"
 
 #include "crash-record.hpp"
@@ -319,6 +333,7 @@ void API::onCrashReportResponse(JsonObject data)
     prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);
     prefs.end();
 
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
     if (this->crashReportSentCoredump)
     {
         esp_err_t err = esp_core_dump_image_erase();
@@ -327,6 +342,7 @@ void API::onCrashReportResponse(JsonObject data)
             this->logger.errorf("esp_core_dump_image_erase failed: %s", esp_err_to_name(err));
         }
     }
+#endif
 
     this->crashReportAwaitingAck = false;
 }

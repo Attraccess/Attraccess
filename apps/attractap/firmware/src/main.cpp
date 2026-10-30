@@ -71,9 +71,11 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(nvsErr);
 
+#ifndef ATTRACTAP_SECURE_PROFILE
     // Console input (serialCommandHandler) reads from the USB-Serial-JTAG
     // driver; log output goes through stdout, which the VFS console routes to
-    // the same port (CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG).
+    // the same port (CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG). The secure profile
+    // has no console and no serial config handler.
     usb_serial_jtag_driver_config_t usbConfig = {
         .tx_buffer_size = 1024,
         .rx_buffer_size = 512,
@@ -83,6 +85,7 @@ extern "C" void app_main(void)
     // Give the host time to enumerate USB before the first log lines
     // (parity with the old `Serial.begin(); delay(2000);` boot).
     delay(2000);
+#endif
 
     // log firmware info
     mainLogger.info("Welcome to Attractap");

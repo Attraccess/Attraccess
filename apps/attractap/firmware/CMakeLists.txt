@@ -28,6 +28,30 @@ if(NOT EXISTS "${ATTRACTAP_VARIANT_FILE}")
 endif()
 include("${ATTRACTAP_VARIANT_FILE}")
 
+# Secure profile (ATT-1166): Secure Boot v2 + flash encryption + locked debug paths.
+# Never for demo builds; images stay unsigned, the API signs them per installation.
+option(ATTRACTAP_SECURE_PROFILE "Build the secure firmware profile (sdkconfig.secure overlay)" OFF)
+if(ATTRACTAP_SECURE_PROFILE)
+    if(ATTRACTAP_FIRMWARE_VARIANT STREQUAL "demo")
+        message(FATAL_ERROR "The secure profile is not available for demo variant '${ATTRACTAP_VARIANT}'")
+    endif()
+    # Keep any defaults the caller passed (e.g. sdkconfig.debug); the secure overlay always comes last.
+    if(NOT SDKCONFIG_DEFAULTS AND DEFINED ENV{SDKCONFIG_DEFAULTS})
+        set(SDKCONFIG_DEFAULTS "$ENV{SDKCONFIG_DEFAULTS}")
+    endif()
+    if(NOT SDKCONFIG_DEFAULTS)
+        set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
+    endif()
+    list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure")
+    # Compiles out the USB serial config handler and console driver.
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_PROFILE=1)
+    if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
+        set(ATTRACTAP_EXCLUDE_REGEX "${ATTRACTAP_EXCLUDE_REGEX}|src/serial/")
+    else()
+        set(ATTRACTAP_EXCLUDE_REGEX "src/serial/")
+    endif()
+endif()
+
 # Single source of truth for the firmware version (also read by
 # scripts/check-attractap-firmware-version.sh and build_firmwares.py).
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/version.txt" ATTRACTAP_VERSION LIMIT_COUNT 1)
@@ -40,3 +64,14 @@ add_compile_definitions(LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/include/lv_conf.
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(attractap)
+
+# ESP-IDF only applies SDKCONFIG_DEFAULTS when the sdkconfig does not exist yet,
+# so a reused sdkconfig can silently flip the profile. A standard build must never
+# carry fuse-burning options (it is web-flashable); a secure build must have them.
+if(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_SECURE_BOOT AND CONFIG_SECURE_FLASH_ENC_ENABLED))
+    message(FATAL_ERROR "ATTRACTAP_SECURE_PROFILE=ON but ${SDKCONFIG} lacks Secure Boot / flash encryption. "
+                        "It predates the secure profile; build in a clean directory with its own -DSDKCONFIG.")
+elseif(NOT ATTRACTAP_SECURE_PROFILE AND (CONFIG_SECURE_BOOT OR CONFIG_SECURE_FLASH_ENC_ENABLED))
+    message(FATAL_ERROR "${SDKCONFIG} enables Secure Boot or flash encryption, but ATTRACTAP_SECURE_PROFILE is OFF. "
+                        "It comes from a secure build; build in a clean directory with its own -DSDKCONFIG.")
+endif()
