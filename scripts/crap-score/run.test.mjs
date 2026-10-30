@@ -483,5 +483,6 @@ test('WAGO includes the complete serial frontend suite once, the CC100 runtime s
     'apps/plugins/wago/cc100-runtime/jest.config.ts',
     'apps/plugins/wago/scripts/jest.audit-hooks.config.cjs',
     'apps/plugins/wago/scripts/jest.commissioning.config.cjs',
+    'apps/plugins/wago/scripts/jest.reliability-plan.config.cjs',
   ]);
 });

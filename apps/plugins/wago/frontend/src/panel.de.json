@@ -108,5 +108,28 @@
     "quadrant-energy": "Quadrantenenergie und Tarife",
     "information": "Zählerdaten und Einstellungen"
   },
-  "partialReadings": "Einige Register konnten nicht gelesen werden. Verfügbare Messwerte bleiben aktuell."
+  "partialReadings": "Einige Register konnten nicht gelesen werden. Verfügbare Messwerte bleiben aktuell.",
+  "readingDisabled": "Deaktiviert",
+  "readings": {
+    "title": "Messwerte",
+    "count": "{{enabled}} von {{max}} Kanälen auf diesem Controller aktiviert",
+    "countOver": "{{enabled}} von {{max}} Kanälen auf diesem Controller aktiviert. Deaktiviere Messwerte vor dem Anwenden.",
+    "hint": "Nur aktivierte Messwerte werden abgefragt und veröffentlicht. Ein deaktivierter Messwert behält Kanal, Namen und Kalibrierung.",
+    "unsupported": "Die CC100-Laufzeit auf diesem Controller kann keine Kanäle deaktivieren. Daher lassen sich Messwerte hier nicht umschalten und ein neuer 879-3020-Zähler erhält nur seine empfohlenen Messwerte. Aktualisiere die CC100-Laufzeit, um Kanäle zu deaktivieren und Messwerte einzeln auszuwählen.",
+    "recommendedOnly": "Nur empfohlene Messwerte",
+    "enableSection": "Bereich aktivieren",
+    "disableSection": "Bereich deaktivieren",
+    "section": "{{section}} ({{enabled}} von {{total}} aktiviert)",
+    "countOverUnsupported": "{{enabled}} von {{max}} Kanälen auf diesem Controller aktiviert. Die CC100-Laufzeit auf diesem Controller kann keine Messwerte deaktivieren, daher lässt sich dieses Gerät so nicht speichern. Aktualisiere die CC100-Laufzeit oder entferne Register oder Geräte.",
+    "countOverChecking": "{{enabled}} von {{max}} Kanälen auf diesem Controller aktiviert. Messwerte lassen sich deaktivieren, sobald der Controller meldet, dass seine CC100-Laufzeit das unterstützt.",
+    "checking": "Es wird geprüft, ob die CC100-Laufzeit auf diesem Controller Messwerte deaktivieren kann …",
+    "unknown": "Es konnte nicht geprüft werden, ob die CC100-Laufzeit auf diesem Controller Messwerte deaktivieren kann, weil der Controller-Status nicht geladen wurde. Bis dahin lassen sich Messwerte nicht umschalten.",
+    "checkingAdd": "Die CC100-Laufzeit auf diesem Controller wird geprüft. Geräte lassen sich hinzufügen, sobald ihre Fähigkeiten bekannt sind.",
+    "unknownAdd": "Der Controller-Status wurde nicht geladen, daher sind die Fähigkeiten seiner CC100-Laufzeit unbekannt. Lade die Seite neu, um ein Gerät hinzuzufügen.",
+    "unusedOnly": "Alle ungenutzten Messwerte deaktivieren",
+    "enableSectionNamed": "Bereich aktivieren: {{section}}",
+    "disableSectionNamed": "Bereich deaktivieren: {{section}}",
+    "required": "Bleibt aktiviert: wird von {{outputs}} als Freigabe oder Rückmeldung verwendet."
+  },
+  "readingNotConfigured": "Nicht konfiguriert"
 }

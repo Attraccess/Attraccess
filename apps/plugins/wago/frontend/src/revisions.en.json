@@ -39,5 +39,6 @@
   "restore": "Restore revision {{revision}} as a new revision",
   "restoreDescription": "This replaces the saved draft and publishes a new revision. The historical revision is retained.",
   "publishRollback": "Publish rollback as new revision",
-  "cancelRollback": "Cancel rollback"
+  "cancelRollback": "Cancel rollback",
+  "rollbackInvalid": "This revision cannot be published again. Fix these fields in a new draft instead."
 }

@@ -8,6 +8,7 @@ import {
   snapshot,
   validCommand,
 } from '../../runtime.test-utils';
+import { SEQUENCE_RESERVATION_BLOCK } from './telemetry';
 
 describe('WagoRuntime state and measurements', () => {
   let transport: TestTransport;
@@ -369,7 +370,7 @@ describe('WagoRuntime state and measurements', () => {
     await expect(store.load()).resolves.toEqual(
       expect.objectContaining({
         credentials: { username: 'controller', password: 'secret' },
-        sequence: 200,
+        sequence: 100 + SEQUENCE_RESERVATION_BLOCK,
       }),
     );
   });

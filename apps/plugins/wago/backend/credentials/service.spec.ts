@@ -176,6 +176,37 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     },
   );
 
+  it('ignores oversized and over-nested acknowledgements even when their token is valid', async () => {
+    let acknowledge!: () => Promise<void>;
+    let started!: () => void;
+    const dispatched = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    publish.mockImplementation(async (serverId, topic, payload) => {
+      const { revision, token } = JSON.parse(payload);
+      const valid = { revision, token, credentialEpoch, status: 'reconnected' };
+      acknowledge = async () => {
+        await receive({ serverId, topic: `${topic}/ack`, payload: Buffer.from(JSON.stringify(valid)) });
+      };
+      await receive({
+        serverId,
+        topic: `${topic}/ack`,
+        payload: Buffer.from(JSON.stringify({ ...valid, padding: 'x'.repeat(64 * 1024) })),
+      });
+      await receive({
+        serverId,
+        topic: `${topic}/ack`,
+        payload: Buffer.from(JSON.stringify({ ...valid, nested: JSON.parse('{"a":'.repeat(8) + '1' + '}'.repeat(8)) })),
+      });
+      started();
+    });
+    const operation = service.rotate(1, 'attraccess/wago', principal, guard());
+    await dispatched;
+    expect((await row())?.phase).toBe('pending');
+    await acknowledge();
+    await expect(operation).resolves.toEqual({ state: 'completed', revision: 1 });
+  });
+
   it('times out, then retries the same durable credential and token after service restart without rotating again', async () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
     let started!: () => void;
@@ -360,7 +391,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       device: new MemoryDeviceAdapter(),
       transport: {
         subscribe: async (topic, handler) => {
-          listeners.set(topic, handler);
+          listeners.set(topic, (payload) => handler(payload, { release: () => undefined }));
         },
         publish: async (topic, payload) => {
           if (topic.endsWith('/credentials/rotate/ack')) {

@@ -1,6 +1,6 @@
 import { supportsOutputAction } from '../../../../channel-behavior';
 import { RuntimeConfiguration } from '../configuration/configuration';
-import { WriteAdmissionError } from '../types';
+import { type MessageSlot, WriteAdmissionError } from '../types';
 
 type OutputCommand = {
   id: string;
@@ -59,7 +59,7 @@ function interruptedCommandFailure(error: unknown): CommandFailure {
 }
 
 export abstract class RuntimeCommands extends RuntimeConfiguration {
-  async receiveCommand(payload: Buffer): Promise<void> {
+  async receiveCommand(payload: Buffer, slot?: MessageSlot): Promise<void> {
     const command = parseCommand(payload);
     if (!command) return;
     const formatFailure = commandFormatFailure(command);
@@ -82,7 +82,8 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
       if (configurationFailure)
         return this.acknowledge(command.id, 'rejected', configurationFailure.error, configurationFailure.code);
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
-      if (!channel || !channel.capabilities.includes('output'))
+      // Validation never lets a disabled channel act; refuse one defensively anyway.
+      if (!channel || channel.enabled === false || !channel.capabilities.includes('output'))
         return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
       if (command.action !== 'release' && !supportsOutputAction(channel, command.action))
         return this.acknowledge(
@@ -97,6 +98,8 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
       this.state.commandIds = [...this.state.commandIds, command.id];
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
       await this.saveState();
+      // The command is about to join its channel queue; one slow output must not hold a handling slot.
+      slot?.release();
       const failure = await this.outputs.runForCommand(channel.id, async () => {
         if (this.runtimeUpdateRequired || this.runtimeFailsafePending) {
           await this.releaseCommand(command.id);
@@ -107,7 +110,8 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
         );
         if (
           this.state.accepted?.revision !== expectedConfigurationRevision ||
-          !currentChannel?.capabilities.includes('output')
+          !currentChannel?.capabilities.includes('output') ||
+          currentChannel.enabled === false
         ) {
           await this.releaseCommand(command.id);
           return { error: 'controller configuration revision is stale', code: 'stale_revision' };

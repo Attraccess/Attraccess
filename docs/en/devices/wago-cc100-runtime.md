@@ -29,7 +29,7 @@ Migration retains the previous broker association for credential cleanup. When t
 ### Build-owned assets and managed-update engineering status (ATT-1099)
 
 `apps/plugins/wago/cc100-runtime/manifest.json` is the manually maintained
-runtime version file. Increase `runtimeVersion` (currently `0.2.1`) when changing
+runtime version file. Increase `runtimeVersion` when changing
 runtime source, shared runtime contracts, image dependencies or deployment code.
 Discovery, permanent heartbeats and packaged assets all use this version. The
 required `wago-runtime-version` CI job rejects runtime changes without a strictly
@@ -402,9 +402,9 @@ WAGO documents these relevant host paths:
 
 The current image instantiates only the onboard I/O adapter. It can read or write the file paths supplied through `WAGO_IO_PATHS`, but does not read `/etc/calib` or implement calibration transforms. Its RS-485 and Modbus TCP adapter classes are not selected by the entry point, so RS-485 and Modbus deployment are not available in this artifact. The listed paths are WAGO host documentation and an input to future hardware validation, not a claim of current runtime support.
 
-The current runtime release declares `privileged: true`. This is a temporary hardware-access model from the release manifest, not an endorsement of broad host access. The image process itself runs as UID `10001`. The exact production device and bind-mount list is not yet validated and must be supplied by the ATT-984 hardware gate.
+The current release manifest declares `privileged: false`, UID `10001`, all capabilities dropped and an explicit device and bind-mount list. The manual `docker run --privileged` commands in this engineering reference record the historical baseline at `9e0a1c47` and are not the supported installation path. The exact production device and bind-mount list is not yet validated on hardware and must be confirmed by the ATT-984 hardware gate.
 
-Until then, do not claim a least-privilege deployment. The intended replacement model is:
+Until then, do not claim a validated least-privilege deployment. The intended replacement model is:
 
 - Bind only the specific configured sysfs/IIO files required for the controller's onboard I/O, read-only for inputs and read-write only for output files. These expose the physical I/O paths used by the adapter.
 - Add a read-only `/etc/calib` mount only after a runtime release reads it to implement analog or Pt1000 calibration. This preserves WAGO's production calibration without allowing modification.

@@ -106,5 +106,6 @@
     "binary": "binary integer",
     "bcd": "packed decimal (BCD)"
   },
-  "numericEncoding": "Number encoding"
+  "numericEncoding": "Number encoding",
+  "pointDisabled": "Disabled: this reading already has a channel, which is neither polled nor published, so no second channel can be added. Enable the existing channel in the device settings on the Inputs & outputs page."
 }

@@ -108,5 +108,28 @@
     "quadrant-energy": "Quadrant energy & tariffs",
     "information": "Meter information & settings"
   },
-  "partialReadings": "Some registers could not be read. Available readings remain current."
+  "partialReadings": "Some registers could not be read. Available readings remain current.",
+  "readingDisabled": "Disabled",
+  "readings": {
+    "title": "Readings",
+    "count": "{{enabled}} of {{max}} channels enabled on this controller",
+    "countOver": "{{enabled}} of {{max}} channels enabled on this controller. Disable readings before applying.",
+    "hint": "Only enabled readings are polled and published. A disabled reading keeps its channel, name and calibration.",
+    "unsupported": "The CC100 runtime on this controller cannot disable channels, so readings cannot be switched here and a new 879-3020 meter only gets its recommended readings. Update the CC100 runtime to disable channels and choose readings per register.",
+    "recommendedOnly": "Recommended readings only",
+    "enableSection": "Enable section",
+    "disableSection": "Disable section",
+    "section": "{{section}} ({{enabled}} of {{total}} enabled)",
+    "countOverUnsupported": "{{enabled}} of {{max}} channels enabled on this controller. The CC100 runtime on this controller cannot disable readings, so this device cannot be saved like this. Update the CC100 runtime, or remove registers or devices.",
+    "countOverChecking": "{{enabled}} of {{max}} channels enabled on this controller. Readings can be disabled once the controller reports that its CC100 runtime supports it.",
+    "checking": "Checking whether the CC100 runtime on this controller can disable readings…",
+    "unknown": "Could not check whether the CC100 runtime on this controller can disable readings, because the controller status did not load. Readings cannot be switched until it does.",
+    "checkingAdd": "Checking the CC100 runtime on this controller. Devices can be added once its capabilities are known.",
+    "unknownAdd": "The controller status did not load, so its CC100 runtime capabilities are unknown. Reload the page to add a device.",
+    "unusedOnly": "Disable all unused readings",
+    "enableSectionNamed": "Enable section: {{section}}",
+    "disableSectionNamed": "Disable section: {{section}}",
+    "required": "Stays enabled: used as guard or feedback by {{outputs}}."
+  },
+  "readingNotConfigured": "Not configured"
 }

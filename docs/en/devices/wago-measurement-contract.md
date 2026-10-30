@@ -32,6 +32,12 @@ The preferred physical resolution is 0.001 of the configured unit. The wire magn
 
 `kind` is `live` or `cumulative`; omitted configuration kinds default to `live`. This slice does not infer cumulative rollover/reset behavior.
 
+## Publication cadence
+
+The runtime acquires every enabled measurement channel on its poll interval but publishes a reading only when it changes. An unchanged reading is published again with the first acquisition at least 30 seconds after its last publication. The 30 s bound therefore applies to what the controller publishes: because a repeat waits for the next acquisition, a consumer can see an unchanged channel up to about 30 s plus the device's poll interval apart while the controller is connected and the read succeeds. With a poll interval above 30 s (the editor allows up to 3600 s) every acquisition is published. Every published sample, including such a repeat, is a fresh acquisition and carries the `timestamp` of that read; the runtime never republishes an old sample with a new time. A reading is also published with the next acquisition, changed or not, after a runtime restart, a newly accepted configuration revision, a change of the controller's `hardwareAvailable` state, and a reconnect to the broker (the first state publication after connecting). A repeated identical fault on a channel is likewise suppressed until a good sample or 30 seconds pass. Channels with `enabled: false` are never acquired or published and produce no faults.
+
+Measurements are not retained (see [Identity and sequencing](#identity-and-sequencing)), and neither the broker nor the server replays them. After a server restart or a short broker interruption that does not disconnect the controller, a consumer has no value for an unchanged reading until it is published again, which happens within about 30 s plus the device's poll interval.
+
 ## Existing configurations and consumers
 
 Persisted v1 configurations keep their existing physical unit, scale, offset, revision, and content hash. Runtime startup uses the same conversion as newly published configurations, including whole-unit overflow fallback; no database or snapshot rewrite is needed. Missing measurement transforms retain the existing percent/1/0 default. Invalid persisted units/transforms/readings fault when sampled, without publishing a measurement. Values that fit neither exact integer milli-units nor safe whole-unit fallback fail explicitly.

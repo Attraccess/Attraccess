@@ -68,3 +68,6 @@ apps/plugins/*/package.zip
 apps/attractap/firmware/__pycache__/
 # Generated build-owned CC100 Docker assets (never commit bundles or keys).
 apps/plugins/wago/runtime-assets/
+
+# WAGO reliability summaries are measurement output, never committed
+reliability-summary*.json

@@ -122,6 +122,8 @@ export interface ConfigurationDiff {
 export interface ConfigurationImpact {
   channelId: string;
   message: string;
+  /** `channel_disabled`: the revision disables a channel that flows may read. */
+  code?: 'channel_disabled';
   references: Array<{ resourceId: number; nodeId: string; nodeType: string }>;
 }
 
@@ -190,6 +192,8 @@ export interface RevisionPreview {
   diff: ConfigurationDiff[];
   impacts: ConfigurationImpact[];
   metadataDiff?: ConfigurationDiff[];
+  /** Why the server would refuse to publish this revision again, including the configuration limits. */
+  errors?: ConfigurationValidationError[];
 }
 
 export interface RuntimeUpdateStatus {

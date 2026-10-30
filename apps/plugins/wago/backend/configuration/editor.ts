@@ -9,6 +9,7 @@ import {
   type ConfigurationValidationError,
 } from './model';
 import { DIGITAL_TERMINALS } from './digital';
+import { configurationLimitErrors } from '../../shared/configuration-limits';
 
 /** Editor-only metadata, stored alongside provenance; never sent to a controller. */
 export interface ConfigurationEditorMetadata {
@@ -40,8 +41,19 @@ export function editorMetadata(value: unknown): ConfigurationEditorMetadata {
   return { names, presets };
 }
 
-/** Additional editor safeguards; the version 1 wire model remains unchanged. */
+/** Editor validation before publishing: the configuration limits first, then the detailed model checks. */
 export function validateEditorSnapshot(snapshot: unknown): ConfigurationValidationError[] {
+  // The same limits the runtime enforces on a new revision or rollback; checked first so an
+  // oversized document is never walked by the detailed validation.
+  const limits = configurationLimitErrors(snapshot, '$');
+  return limits.length ? limits : validateEditorModel(snapshot);
+}
+
+/**
+ * Additional editor safeguards on the model itself, without the configuration limits; the version 1
+ * wire model remains unchanged. Only call this directly on input already known to be within the limits.
+ */
+export function validateEditorModel(snapshot: unknown): ConfigurationValidationError[] {
   const errors = validateSnapshot(snapshot);
   if (errors.length) return errors;
   const value = snapshot as WagoConfigurationSnapshot;
@@ -161,8 +173,22 @@ export function selectPresetChanges(
   return candidate;
 }
 
-export function configurationImpacts(previous: WagoConfigurationSnapshot | null, current: WagoConfigurationSnapshot) {
-  return (previous?.logicalChannels ?? []).flatMap((channel) => {
+/** Stable code of the impact a newly disabled channel has on flows that read it. */
+export const CHANNEL_DISABLED_IMPACT_CODE = 'channel_disabled';
+export const CHANNEL_DISABLED_IMPACT_MESSAGE = 'Channel disabled. Flows reading it will see it as unavailable.';
+
+export interface ConfigurationImpact {
+  channelId: string;
+  message: string;
+  /** Set only for impacts with a dedicated meaning, such as `channel_disabled`. */
+  code?: typeof CHANNEL_DISABLED_IMPACT_CODE;
+}
+
+export function configurationImpacts(
+  previous: WagoConfigurationSnapshot | null,
+  current: WagoConfigurationSnapshot,
+): ConfigurationImpact[] {
+  return (previous?.logicalChannels ?? []).flatMap((channel): ConfigurationImpact[] => {
     const next = current.logicalChannels.find((item) => item.id === channel.id);
     const oldPoint = previous?.physicalPoints.find((point) => point.id === channel.physicalPointId);
     const newPoint = current.physicalPoints.find((point) => point.id === next?.physicalPointId);
@@ -171,6 +197,8 @@ export function configurationImpacts(previous: WagoConfigurationSnapshot | null,
       configurationHash({ channel, point: oldPoint }) === configurationHash({ channel: next, point: newPoint })
     )
       return [];
+    if (next && next.enabled === false && channel.enabled !== false)
+      return [{ channelId: channel.id, code: CHANNEL_DISABLED_IMPACT_CODE, message: CHANNEL_DISABLED_IMPACT_MESSAGE }];
     return [
       {
         channelId: channel.id,

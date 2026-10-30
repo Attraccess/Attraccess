@@ -6,7 +6,8 @@ import { BUILTIN_MODBUS_PROFILES, duplicateProfile, type ModbusDevice } from '..
 import { randomUUID } from '../../configuration/identity';
 import { Choice, NumericField } from '../../configuration/channels/DigitalChannelEditor';
 import { ModbusProfileForm } from '../../configuration/modbus/ConfigurationForm';
-import { removeDevice, saveDevice, type PanelConfiguration } from '../model';
+import { removeDevice, saveDevice, type ChannelEnabledSupport, type PanelConfiguration } from '../model';
+import { ReadingSettings } from './ReadingSettings';
 import { SettingsDrawer } from './SettingsDrawer';
 import { useDeviceSettingsState } from './useDeviceSettingsState';
 
@@ -16,8 +17,14 @@ export function DeviceSettings({
   onChange,
   onClose,
   isNew = false,
+  support = 'unsupported',
+  flowChannelIds,
 }: {
   isNew?: boolean;
+  /** Whether the controller's runtime supports disabled channels (`channel-enabled-v1`). */
+  support?: ChannelEnabledSupport;
+  /** Channels that flows read, kept enabled by "Disable all unused readings". */
+  flowChannelIds?: ReadonlySet<string>;
   configuration: PanelConfiguration;
   device: ModbusDevice;
   onChange: (configuration: PanelConfiguration) => void;
@@ -38,13 +45,32 @@ export function DeviceSettings({
     profiles,
     chooseProfile,
     chooseTransport,
-  } = useDeviceSettingsState({ configuration, device: original, onChange, onClose, isNew });
+    disabledReadings,
+    setReadingsEnabled,
+    applyRecommended,
+    applyUnused,
+    recommended,
+    required,
+    count,
+    canSave,
+    disabledChannels,
+  } = useDeviceSettingsState({
+    configuration,
+    device: original,
+    onChange,
+    onClose,
+    isNew,
+    support,
+    flowChannelIds,
+  });
 
   return (
     <SettingsDrawer
       title={device.name || t('panel.deviceTitle')}
       onClose={onClose}
+      isSaveDisabled={!canSave}
       onSave={() => {
+        if (!canSave) return;
         onChange(
           saveDevice(
             configuration,
@@ -56,6 +82,7 @@ export function DeviceSettings({
             },
             connection,
             profile,
+            { disabledChannels, disabledReadings: disabledChannels ? disabledReadings : undefined },
           ),
         );
         onClose();
@@ -154,19 +181,20 @@ export function DeviceSettings({
           </Button>
         )}
       </div>
-      {builtin ? (
-        <ul className="wg:flex wg:flex-col wg:gap-3">
-          {profile.measurements.map((register) => (
-            <li key={register.id} className="wg:flex wg:flex-wrap wg:justify-between wg:gap-2 wg:text-sm">
-              <span>{tBackendMessage(register.name)}</span>
-              <span className="wg:text-muted">
-                0x{register.address.toString(16)} · {register.dataType} · {t(`modbus.options.${register.unit}`)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ModbusProfileForm value={profile} onChange={setProfile} showIdentifiers={false} collapseSignals />
+      {!builtin && <ModbusProfileForm value={profile} onChange={setProfile} showIdentifiers={false} collapseSignals />}
+      {profile.measurements.length > 0 && (
+        <ReadingSettings
+          profile={profile}
+          translateNames={builtin}
+          disabledReadings={disabledReadings}
+          recommended={recommended}
+          required={required}
+          count={count}
+          support={support}
+          onChange={setReadingsEnabled}
+          onRecommended={applyRecommended}
+          onUnused={applyUnused}
+        />
       )}
     </SettingsDrawer>
   );
