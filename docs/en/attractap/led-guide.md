@@ -20,7 +20,7 @@ These animations run continuously while the device is in a given state.
 | **Ready / Wait for Card** | Green | Six alternating segments breathing in and out of phase (circular) or gentle pulsing (linear) | The device is ready. Present an RFID card to authenticate. |
 | **Authenticating** | Cyan | Fast-moving dot with 6-LED fading tail (circular) or quick pulsing (linear) | A card is being read and authenticated. |
 | **No Resources** | Orange | Alternating on/off flash of the entire ring | No resources are assigned to this device. Assign at least one resource in Attraccess. |
-| **Waiting for approval** | Four colours | Four steady colour segments of 5 lit LEDs each, with one dark LED between them. The pattern changes every 30 seconds. If no pattern is free the whole ring breathes white. | A new reader waits for an administrator to approve it. Compare the colours with the **Waiting Lite readers** list in Attraccess, see [Setup](setup.md). |
+| **Waiting for approval** | Four colours | Four steady colour segments of 5 lit LEDs each, with one dark LED between them (circular), or four segments from left to right (linear). The pattern changes every 30 seconds. Without a pattern (none free, server busy, or connection lost) the whole ring breathes white. | A new reader waits for an administrator to approve it. Compare the colours with the **Waiting Lite readers** list in Attraccess, see [Setup](setup.md). |
 | **Firmware Update** | Blue / White | Static alternating blue and white pixels | A firmware update is in progress. Do not power off. |
 
 ## LED Triggers (One-Time Feedback)
@@ -31,7 +31,7 @@ These are short overlays that interrupt the current state animation for a few hu
 |---------|-------|----------|---------|
 | **Success** | Solid green | ~400 ms | Card authentication succeeded. Access granted. |
 | **Error** | Red flashing | ~600 ms (3 flashes) | Authentication failed (invalid card, wrong key, or other error). |
-| **Approved** | Solid green | ~400 ms | The administrator approved the reader. It continues starting up. |
+| **Approved** | Solid green | ~400 ms | The administrator approved the reader. It continues starting up. Looks the same as **Success**. |
 | **Indicate** | Yellow flashing | ~400 ms (4 pulses) | Card has been held on the reader for a long time. Remove the card and try again if needed. |
 
 ## Quick Reference
@@ -44,7 +44,7 @@ These are short overlays that interrupt the current state animation for a few hu
 | Cyan fast-moving dot with tail | Card is being read |
 | Orange full-ring flash | No resources assigned |
 | Four colour segments with dark gaps | Waiting for approval, match the colours in Attraccess |
-| White breathing ring (new reader) | Waiting for approval, use the web flasher |
+| White breathing ring (new reader) | Waiting for approval without a pattern. Wait a moment; if it stays white, use the web flasher |
 | Alternating blue and white pixels (static) | Firmware update in progress |
 | Solid green flash | Success — access granted |
 | Red flashing | Error — authentication failed |

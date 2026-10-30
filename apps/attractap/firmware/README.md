@@ -149,8 +149,11 @@ screen `READER_ENROLLMENT_CODE` also carries `pattern`: four colour names out of
 `green`, `blue`, `yellow`, `magenta`, `white` (no two neighbours equal, segment 4 counts as
 neighbour of segment 1), or `null` when all 120 patterns are in use. The pattern changes with
 the code, the previous one stays valid until the next rotation. The reader draws it with
-`LedPattern` (`src/led/led_pattern.hpp`, host tests in `tests/led-pattern`), breathes white
-for `null` and flashes green when the credentials arrive. An administrator approves it in the
+`LedPattern` (`src/led/led_pattern.hpp`, host tests in `tests/led-pattern`) and breathes white
+for `null`, after a rejection, or once the pattern is `LedPattern::STALE_GRACE_MS` (10 s) past its
+rotation without a new one (e.g. a dropped connection). The server keeps the patterns of a reader
+that left reserved for that long (`ENROLLMENT_PATTERN_COOLDOWN_MS`), so a stale ring never matches
+another reader's list entry. The ring lights up green (`triggerSuccess()`) when the credentials arrive. An administrator approves it in the
 **Waiting Lite readers** card (`GET /api/device-enrollment/lite-pending`,
 `POST /api/device-enrollment/approve-lite`). The code keeps working for the web flasher.
 
@@ -162,6 +165,8 @@ for `null` and flashes green when the credentials arrive. An administrator appro
 | With enrollment codes | Older than 1.8.0, not registered | Its `READER_REGISTER` has no `enrollment` field. The server creates nothing and sends no reply, so the reader waits quietly. Update it with the web flasher first. |
 | With enrollment codes | Any version, already registered | Authenticates with its stored credentials exactly as before. |
 | Without enrollment codes (older server) | 1.8.0 and newer | `READER_REGISTER` receives the old immediate `id`/`token` reply and works as before; `READER_ENROLLMENT_*` are never sent. |
+| With enrollment codes, without LED patterns | Lite 1.8.1 and newer | No `pattern` arrives, the ring breathes white. Approve it with the code in the web flasher. |
+| With LED patterns | Lite 1.8.0 | Sends no `hasScreen`, so it is treated as a screen reader and not listed. Approve it with the code in the web flasher. |
 
 ## Building
 
@@ -305,6 +310,6 @@ The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a use
 
 | Trigger             | Color        | When used          |
 | ------------------- | ------------ | ------------------ |
-| `triggerSuccess()`  | Green        | Auth succeeded     |
+| `triggerSuccess()`  | Green        | Auth succeeded, enrollment approved |
 | `triggerError()`    | Red flash    | Auth failed        |
 | `triggerIndicate()` | Yellow flash | Card held too long |
