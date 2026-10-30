@@ -33,12 +33,12 @@ Stellen Sie vor Beginn sicher, dass:
 
 Ein neuer Leser registriert sich nicht von selbst. Sobald er mit Ihrem Netzwerk verbunden ist, zeigt er einen **Code** wie `K7P-3XQ` an und wartet. Der Leser existiert in Attraccess erst, nachdem ein Administrator diesen Code freigegeben hat. So kann niemand Geraete zu Ihrem System hinzufuegen, nur indem er sie einsteckt.
 
-1. Warten Sie, bis der Leser **Dieses Lesegeraet in Attraccess freigeben** und einen Code anzeigt. Der Code aendert sich alle 30 Sekunden, der Countdown auf dem Display zeigt wann.
-2. Oeffnen Sie Attraccess im Browser und gehen Sie zu **Attractap > Lesegeraete**.
-3. Klicken Sie auf **Geraet einrichten**.
-4. Geben Sie den Code ein. Gross- und Kleinschreibung sowie der Bindestrich spielen keine Rolle.
+1. Warten Sie, bis der Leser **Dieses Lesegerät in Attraccess freigeben** und einen Code anzeigt. Der Code aendert sich alle 30 Sekunden, der Countdown auf dem Display zeigt wann.
+2. Oeffnen Sie Attraccess im Browser und gehen Sie zu **Geräte > Attractap-Lesegeräte**.
+3. Klicken Sie auf **Gerät registrieren**.
+4. Geben Sie den Code ein. Gross- und Kleinschreibung spielen keine Rolle, der Bindestrich ist optional (`k7p3xq` funktioniert auch).
 5. Geben Sie optional einen Namen fuer den Leser ein.
-6. Klicken Sie auf **Freigeben**. Attraccess oeffnet den neuen Leser, damit Sie die Einrichtung abschliessen koennen.
+6. Klicken Sie auf **Freigeben** oder druecken Sie die Eingabetaste. Attraccess oeffnet den neuen Leser, damit Sie die Einrichtung abschliessen koennen.
 
 Der Leser erhaelt seine Zugangsdaten und verbindet sich. Er behaelt sie ueber Neustarts hinweg, Sie muessen einen Leser also nur einmal freigeben.
 
@@ -49,7 +49,7 @@ Zum Freigeben benoetigen Sie die Berechtigung, Ressourcen zu aendern (`resources
 
 ### Leser ohne Display (Attractap Lite)
 
-Ein Lite-Leser hat keinen Bildschirm. Nutzen Sie stattdessen den Web-Flasher (**RFID-Leser einrichten**): Nach der seriellen Einrichtung zeigt er **Wartet auf Freigabe** mit dem aktuellen Code und eine Schaltflaeche **Freigeben**. Der Code steht auch auf der USB-Seriell-Konsole des Lesers bereit (`api.status.get`, Feld `enrollmentCode`).
+Ein Lite-Leser hat keinen Bildschirm. Nutzen Sie stattdessen den Web-Flasher (**RFID-Leser Einrichten**): Nach der seriellen Einrichtung zeigt er **Wartet auf Freigabe** mit dem aktuellen Code und eine Schaltflaeche **Freigeben**. Der Code steht auch auf der USB-Seriell-Konsole des Lesers bereit (`api.status.get`, Feld `enrollmentCode`).
 
 ### Grenzen und falsche Codes
 
@@ -105,8 +105,8 @@ Der Leser kommuniziert mit dem Attraccess-Backend ueber WebSocket. Die Verbindun
 | Problem | Loesung |
 |---------|---------|
 | Leser-Display zeigt "Keine Verbindung" | Pruefen Sie die Netzwerkkonnektivitaet und ueberpruefen Sie die Attraccess-Server-URL |
-| Leser erscheint nicht in Attraccess | Stellen Sie sicher, dass der Leser im selben Netzwerk ist und das Backend erreichen kann, und geben Sie den angezeigten Code unter **Attractap > Lesegeraete > Geraet einrichten** frei |
-| Leser zeigt einen Code, Attraccess meldet ihn als unbekannt | Der Code hat sich geaendert (alle 30 s), Sie sind auf einem anderen Attraccess-Server als der Leser, oder die Firmware ist aelter als 1.8.0 |
+| Leser erscheint nicht in Attraccess oder zeigt keinen Code | Stellen Sie sicher, dass der Leser im selben Netzwerk ist und das Backend erreichen kann, und geben Sie den angezeigten Code unter **Geräte > Attractap-Lesegeräte > Gerät registrieren** frei. Ein Leser mit Firmware aelter als 1.8.0 zeigt nie einen Code an: Aktualisieren Sie ihn zuerst mit dem Web-Flasher |
+| Leser zeigt einen Code, Attraccess meldet ihn als unbekannt | Der Code hat sich geaendert (alle 30 s) oder Sie sind auf einem anderen Attraccess-Server als der Leser |
 | "Zu viele Versuche" | Mehr als 5 falsche Codes in einer Minute. Warten Sie eine Minute |
 | Kartenscan ohne Reaktion | Ueberpruefen Sie, ob die RFID-Karte registriert ist und der Leser eine zugewiesene Ressource hat |
 

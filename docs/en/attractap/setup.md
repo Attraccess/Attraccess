@@ -34,11 +34,11 @@ Before you begin, make sure:
 A new reader does not register itself. Once it is connected to your network it shows a **code** such as `K7P-3XQ` and waits. The reader only exists in Attraccess after an administrator approves that code, so nobody can add devices to your system just by plugging them in.
 
 1. Wait until the reader shows **Approve this reader in Attraccess** and a code. The code changes every 30 seconds and the countdown on the display tells you when.
-2. Open Attraccess in your browser and open **Attractap > Readers**.
+2. Open Attraccess in your browser and open **Devices > Attractap Readers**.
 3. Click **Enroll device**.
-4. Type the code. Upper and lower case and the hyphen do not matter.
+4. Type the code. It is not case-sensitive and the hyphen is optional (`k7p3xq` works too).
 5. Optionally enter a name for the reader.
-6. Click **Approve**. Attraccess opens the new reader so you can finish its setup.
+6. Click **Approve** or press Enter. Attraccess opens the new reader so you can finish its setup.
 
 The reader receives its credentials and connects. It keeps them across restarts, so you only approve a reader once.
 
@@ -105,8 +105,8 @@ The reader communicates with the Attraccess backend via WebSocket. The connectio
 | Problem | Solution |
 |---------|----------|
 | Reader display shows "No connection" | Check network connectivity and verify the Attraccess server URL |
-| Reader not appearing in Attraccess | Ensure the reader is on the same network and can reach the backend, then approve the code it shows under **Attractap > Readers > Enroll device** |
-| Reader shows a code but Attraccess says the code is unknown | The code changed (every 30 s), you are on another Attraccess server than the reader, or the reader's firmware is older than 1.8.0 |
+| Reader not appearing in Attraccess or shows no code | Ensure the reader is on the same network and can reach the backend, then approve the code it shows under **Devices > Attractap Readers > Enroll device**. A reader with firmware older than 1.8.0 never shows a code: update it with the web flasher first |
+| Reader shows a code but Attraccess says the code is unknown | The code changed (every 30 s) or you are on another Attraccess server than the reader |
 | "Too many attempts" | More than 5 wrong codes in a minute. Wait a minute |
 | Card scan has no response | Verify the RFID card is registered and the reader has an assigned resource |
 
