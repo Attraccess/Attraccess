@@ -103,4 +103,4 @@ Every event carries an event ID, schema version, timestamp, correlation context,
 - [ATT-998](https://linear.app/attraccess/issue/ATT-998): fabric persistence, encrypted backup and recovery.
 - Later Matter feature tickets: commissioning, device inventory, commands, subscriptions, Thread, OTA, permissions and audit. Defining their contract shapes here does not deliver those features.
 
-See also the [operator guide](operator.md).
+See also the [operator guide](devices/matter/operator.md).

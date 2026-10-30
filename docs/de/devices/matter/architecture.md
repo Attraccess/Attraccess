@@ -103,4 +103,4 @@ Jedes Event trägt Event-ID, Schemaversion, Zeitstempel, Korrelationskontext, St
 - [ATT-998](https://linear.app/attraccess/issue/ATT-998): Fabric-Persistenz, verschlüsseltes Backup und Wiederherstellung.
 - Spätere Matter-Feature-Tickets: Commissioning, Geräteinventar, Befehle, Subscriptions, Thread, OTA, Berechtigungen und Audit. Dass ihre Vertragsformen hier definiert sind, liefert diese Funktionen nicht.
 
-Siehe auch die [Betriebsanleitung](operator.md).
+Siehe auch die [Betriebsanleitung](devices/matter/operator.md).

@@ -1,6 +1,6 @@
 # Matter: Betriebsanleitung
 
-> **Nur Grundlage.** Der Sidecar lässt sich bauen, starten und überwachen, steuert aber noch keine Geräte. Lesen Sie zuerst die [Architektur](architecture.md).
+> **Nur Grundlage.** Der Sidecar lässt sich bauen, starten und überwachen, steuert aber noch keine Geräte. Lesen Sie zuerst die [Architektur](devices/matter/architecture.md).
 
 ## Bauen und starten
 

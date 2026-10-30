@@ -1,6 +1,6 @@
 # Matter: Operator Guide
 
-> **Groundwork only.** The sidecar can be built, started and monitored, but it controls no devices yet. Read the [architecture](architecture.md) first.
+> **Groundwork only.** The sidecar can be built, started and monitored, but it controls no devices yet. Read the [architecture](devices/matter/architecture.md) first.
 
 ## Build and start
 
