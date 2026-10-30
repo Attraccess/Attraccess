@@ -112,11 +112,11 @@ Dieses Protokoll ist auf der Detailseite der Ressource einsehbar und ermöglicht
 
 Zugangsinformationen zu lesen setzt eine Anmeldung voraus:
 
-- Die **vollständigen Listen** (Einweisungen, Einweisende, Wartende und Verlauf einer Ressource) sehen Benutzer mit **Ressourcen verwalten** oder **Zugriff verwalten** sowie Einweisende der Ressource oder einer ihrer Gruppen. Das ist dieselbe Regel wie beim Reiter **Personen**.
-- **Prüfungen auf Einweisungsberechtigung** (ob ein Benutzer einweisen darf) antworten nur für Sie selbst. Benutzer mit **Ressourcen verwalten** oder **Zugriff verwalten** können nach beliebigen Personen fragen; alle anderen erhalten `403`.
-- **Nur Namen:** Alle mit **Ressourcen ansehen** sehen Benutzernamen und Rolle (Einweisende:r oder Wartende:r) der Einweisenden einer Ressource, auch wenn sie über Gruppen geerbt sind. Noch nicht eingewiesene Personen erfahren so, wen sie fragen können. E-Mail-Adressen sind nicht enthalten.
+- Die **vollständigen Listen** (Einweisungen, Einweiser, Wartende und Verlauf einer Ressource) sehen Benutzer mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`) sowie Einweiser der Ressource oder einer ihrer Gruppen. Das ist dieselbe Regel wie beim Reiter **Personen**.
+- **Prüfungen auf Einweiser-Status** (ob ein Benutzer einweisen darf) antworten nur für Sie selbst. Benutzer mit **Ressourcen bearbeiten** oder **Ressourcen-Zugriff verwalten** können nach beliebigen Personen fragen; alle anderen erhalten `403`.
+- **Nur Namen:** Alle mit **Ressourcen lesen** (`resources.read`) sehen Benutzernamen und Rolle (Einweiser oder Wartender) der Einweiser einer Ressource, auch wenn sie über Gruppen geerbt sind. Noch nicht eingewiesene Personen erfahren so, wen sie fragen können. E-Mail-Adressen sind nicht enthalten.
 
-Wer sehen darf, welches Gerät in Benutzung ist, regelt eine eigene [Systemeinstellung](settings/overview.md#sichtbarkeit-der-gerätenutzung).
+Wer sehen darf, welche Ressource in Benutzung ist, regelt eine eigene [Systemeinstellung](settings/overview.md#sichtbarkeit-der-ressourcennutzung).
 
 ## Siehe auch
 

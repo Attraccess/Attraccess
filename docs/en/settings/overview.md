@@ -26,27 +26,27 @@ General settings for the Attraccess instance:
 > [!TIP]
 > Most settings can also be configured via [environment variables](installation/environment-variables.md). Settings changed in the UI override environment variable defaults.
 
-## Equipment Activity Visibility
+## Resource Activity Visibility
 
-Under **General**, **Who can see equipment activity** controls who sees which machines are in use and by whom. Changing it requires the **Manage System Configuration** permission, and every change is recorded in the [audit log](settings/audit-log.md).
+Under **General**, **Who can see resource activity** controls who sees which resources are in use and by whom. Changing it requires the **Manage System Settings** (`system.settings.manage`) permission, and every change is recorded in the [audit log](settings/audit-log.md).
 
-| Option | Who sees a machine's activity |
-|--------|-------------------------------|
-| **All equipment** (default) | Everyone with the **View resources** permission. |
-| **Introduced equipment only** | People who may use the machine (introduced directly or through a group), its introducers and maintainers, and anyone with **Manage resources** or **Manage access**. |
+| Option | Who sees a resource's activity |
+|--------|--------------------------------|
+| **Everyone with Read Resources** (default) | Everyone with the **Read Resources** (`resources.read`) permission. |
+| **Only people introduced to the resource** | People introduced to the resource (directly or through a group), its introducers and maintainers, and anyone with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`). |
 
 In both modes:
 
 - You need to be signed in. Signed-out requests get `401` and no data.
 - You always see your own running session.
-- The names of a machine's introducers and maintainers stay visible to everyone with **View resources**, so people who are not yet introduced know who to ask. Email addresses are never shown.
+- The names of a resource's introducers and maintainers stay visible to everyone with **Read Resources**, so people who are not yet introduced know who to ask. Email addresses are never shown.
 
-In **Introduced equipment only** mode, everyone else still sees the machine in the catalog, but without activity: it has no entry in the in-use list, status requests answer `403`, and live updates for it are refused. On machines that allow [supervised use](resources/introductions.md), they see only *free* or *in use*, without a name.
+With **Only people introduced to the resource**, everyone else still sees the resource in the catalog, but without activity: it has no entry in the in-use list, status requests answer `403`, and live updates for it are refused. On resources that allow or require [supervised use](resources/introductions.md#supervision-mode), they see only **Available** or **In Use**, without a name.
 
-The setting is stored in the system settings. Instances that never set it behave as **All equipment**, so upgrading needs no migration.
+The setting is stored in the system settings. Instances that never set it behave as **Everyone with Read Resources**, so upgrading needs no migration.
 
 > [!NOTE]
-> Scripts and plugins that read the in-use list, introductions or introducers without signing in no longer work. Sign in with an [API token](developer/api-reference.md) instead. Reading the full introduction and introducer lists, and asking about another user's introducer status, requires **Manage resources**, **Manage access**, or being an introducer of the machine or its group.
+> Scripts and plugins that read the in-use list, introductions or introducers without signing in no longer work. Sign in with an [API token](developer/api-reference.md) instead. Reading the full introduction and introducer lists, and asking about another user's introducer status, requires **Update Resources**, **Manage Resource Access**, or being an introducer of the resource or its group.
 
 ## Email Settings
 

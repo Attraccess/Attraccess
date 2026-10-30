@@ -1,6 +1,8 @@
 # Nutzungsverfolgung
 
-Attraccess erfasst, wer welche Ressource wann nutzt. Jede Nutzungssitzung wird aufgezeichnet und ist in der Nutzungshistorie der Ressource einsehbar.
+Attraccess erfasst, wer welche Ressource wann nutzt. Jede Nutzungssitzung wird in der Nutzungshistorie der Ressource aufgezeichnet.
+
+Wer sehen darf, ob eine Ressource in Benutzung ist und von wem, hängt von der Einstellung [Sichtbarkeit der Ressourcennutzung](settings/overview.md#sichtbarkeit-der-ressourcennutzung) ab. Die eigenen Sitzungen sehen Sie immer.
 
 ## Was ist eine Nutzungssitzung?
 
@@ -46,7 +48,7 @@ Die Nutzungshistorie wird auf der [Detailseite](resources/resource-details.md) d
 
 <!-- TODO: Screenshot der Nutzungshistorie einfügen -->
 
-Ressourcenverwalter und Administratoren können Sitzungen aller Benutzer einsehen. Reguläre Benutzer sehen ebenfalls die vollständige Historie.
+Personen mit **Ressourcen bearbeiten** (`resources.update`) sehen die Sitzungen aller Benutzer. Alle anderen sehen nur ihre eigenen Sitzungen.
 
 ## Siehe auch
 

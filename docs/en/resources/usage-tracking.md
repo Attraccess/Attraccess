@@ -1,6 +1,8 @@
 # Usage Tracking
 
-Attraccess tracks who uses which resource and when. Every usage session is recorded and visible in the resource's usage history.
+Attraccess tracks who uses which resource and when. Every usage session is recorded in the resource's usage history.
+
+Who can see whether a resource is in use, and by whom, depends on the [resource activity visibility](settings/overview.md#resource-activity-visibility) setting. You always see your own sessions.
 
 ## What is a Usage Session?
 
@@ -46,7 +48,7 @@ The usage history is displayed on the resource [detail page](resources/resource-
 
 <!-- TODO: Screenshot of usage history -->
 
-Resource managers and administrators can see sessions from all users. Regular users see the full history as well.
+People with **Update Resources** (`resources.update`) see the sessions of all users. Everyone else sees only their own sessions.
 
 ## See Also
 

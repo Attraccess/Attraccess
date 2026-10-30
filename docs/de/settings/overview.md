@@ -26,27 +26,27 @@ Allgemeine Einstellungen fuer die Attraccess-Instanz:
 > [!TIP]
 > Die meisten Einstellungen koennen auch ueber [Umgebungsvariablen](installation/environment-variables.md) konfiguriert werden. In der Oberflaeche geaenderte Einstellungen ueberschreiben die Standardwerte der Umgebungsvariablen.
 
-## Sichtbarkeit der Gerätenutzung
+## Sichtbarkeit der Ressourcennutzung
 
-Unter **Allgemein** legt **Wer die Gerätenutzung sehen darf** fest, wer sieht, welche Geräte in Benutzung sind und von wem. Zum Ändern ist die Berechtigung **Systemkonfiguration verwalten** nötig; jede Änderung wird im [Audit-Log](settings/audit-log.md) protokolliert.
+Unter **Allgemein** legt **Wer die Ressourcennutzung sehen darf** fest, wer sieht, welche Ressourcen in Benutzung sind und von wem. Zum Ändern ist die Berechtigung **Systemeinstellungen verwalten** (`system.settings.manage`) nötig; jede Änderung wird im [Audit-Log](settings/audit-log.md) protokolliert.
 
-| Option | Wer die Nutzung eines Geräts sieht |
-|--------|-------------------------------------|
-| **Alle Geräte** (Standard) | Alle mit der Berechtigung **Ressourcen ansehen**. |
-| **Nur eingewiesene Geräte** | Personen, die das Gerät benutzen dürfen (direkt oder über eine Gruppe eingewiesen), seine Einweisenden und Wartenden sowie alle mit **Ressourcen verwalten** oder **Zugriff verwalten**. |
+| Option | Wer die Nutzung einer Ressource sieht |
+|--------|----------------------------------------|
+| **Alle mit „Ressourcen lesen“** (Standard) | Alle mit der Berechtigung **Ressourcen lesen** (`resources.read`). |
+| **Nur in die Ressource eingewiesene Personen** | Personen, die in die Ressource eingewiesen sind (direkt oder über eine Gruppe), ihre Einweiser und Wartenden sowie alle mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`). |
 
 In beiden Modi gilt:
 
 - Man muss angemeldet sein. Abgemeldete Anfragen erhalten `401` und keine Daten.
 - Die eigene laufende Sitzung sieht man immer.
-- Die Namen der Einweisenden und Wartenden eines Geräts bleiben für alle mit **Ressourcen ansehen** sichtbar, damit noch nicht eingewiesene Personen wissen, wen sie fragen können. E-Mail-Adressen werden nie angezeigt.
+- Die Namen der Einweiser und Wartenden einer Ressource bleiben für alle mit **Ressourcen lesen** sichtbar, damit noch nicht eingewiesene Personen wissen, wen sie fragen können. E-Mail-Adressen werden nie angezeigt.
 
-Im Modus **Nur eingewiesene Geräte** sehen alle anderen das Gerät weiterhin im Katalog, aber ohne Nutzung: Es erscheint nicht in der Liste der Geräte in Benutzung, Statusabfragen antworten mit `403`, und Live-Aktualisierungen werden abgelehnt. Bei Geräten mit [betreuter Nutzung](resources/introductions.md) sehen sie nur *frei* oder *in Benutzung*, ohne Namen.
+Mit **Nur in die Ressource eingewiesene Personen** sehen alle anderen die Ressource weiterhin im Katalog, aber ohne Nutzung: Sie erscheint nicht in der Liste der Ressourcen in Benutzung, Statusabfragen antworten mit `403`, und Live-Aktualisierungen werden abgelehnt. Bei Ressourcen, die [beaufsichtigte Nutzung](resources/introductions.md#beaufsichtigungsmodus) erlauben oder erfordern, sehen sie nur **Verfügbar** oder **In Benutzung**, ohne Namen.
 
-Die Einstellung liegt in den Systemeinstellungen. Instanzen, die sie nie gesetzt haben, verhalten sich wie **Alle Geräte**; ein Upgrade braucht also keine Migration.
+Die Einstellung liegt in den Systemeinstellungen. Instanzen, die sie nie gesetzt haben, verhalten sich wie **Alle mit „Ressourcen lesen“**; ein Upgrade braucht also keine Migration.
 
 > [!NOTE]
-> Skripte und Plugins, die die Liste der Geräte in Benutzung, Einweisungen oder Einweisende ohne Anmeldung lesen, funktionieren nicht mehr. Melden Sie sich stattdessen mit einem [API-Token](developer/api-reference.md) an. Die vollständigen Einweisungs- und Einweisenden-Listen sowie die Abfrage, ob eine andere Person einweisen darf, erfordern **Ressourcen verwalten**, **Zugriff verwalten** oder die Rolle Einweisende:r des Geräts bzw. seiner Gruppe.
+> Skripte und Plugins, die die Liste der Ressourcen in Benutzung, Einweisungen oder Einweiser ohne Anmeldung lesen, funktionieren nicht mehr. Melden Sie sich stattdessen mit einem [API-Token](developer/api-reference.md) an. Die vollständigen Einweisungs- und Einweiser-Listen sowie die Abfrage, ob eine andere Person einweisen darf, erfordern **Ressourcen bearbeiten**, **Ressourcen-Zugriff verwalten** oder die Rolle Einweiser der Ressource bzw. ihrer Gruppe.
 
 ## E-Mail-Einstellungen
 
