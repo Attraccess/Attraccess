@@ -5,6 +5,77 @@ import { NotificationCategory } from './../../notifications/notification-types';
 describe('ResourceIntroducersService', () => {
   const fixture = registerResourceIntroducersServiceFixture();
 
+  describe('getNames (ATT-1149)', () => {
+    const grant = (id: number, userId: number, type: ResourceIntroducerType, group = false) =>
+      ({
+        id,
+        userId,
+        ...(group ? { resourceGroupId: 5 } : { resourceId: 1 }),
+        type,
+        user: { id: userId, username: `user${userId}`, email: `user${userId}@example.test` },
+      }) as unknown as ResourceIntroducer;
+    const withGrants = (direct: ResourceIntroducer[], group: ResourceIntroducer[]) => {
+      fixture.repository.find.mockResolvedValue(direct);
+      fixture.repository.createQueryBuilder.mockReturnValue({
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(group),
+      });
+    };
+
+    it('lists direct and group introducers and maintainers with exactly id, username and role', async () => {
+      withGrants(
+        [grant(1, 10, ResourceIntroducerType.INTRODUCER), grant(2, 11, ResourceIntroducerType.MAINTAINER)],
+        [grant(3, 20, ResourceIntroducerType.INTRODUCER, true)],
+      );
+      const names = await fixture.service.getNames(1);
+      expect(names).toEqual([
+        { userId: 10, username: 'user10', role: ResourceIntroducerType.INTRODUCER },
+        { userId: 11, username: 'user11', role: ResourceIntroducerType.MAINTAINER },
+        { userId: 20, username: 'user20', role: ResourceIntroducerType.INTRODUCER },
+      ]);
+      expect(JSON.stringify(names)).not.toContain('@example.test');
+    });
+
+    it('lists someone holding both roles once, as introducer, whichever grant comes first', async () => {
+      withGrants(
+        [grant(1, 10, ResourceIntroducerType.MAINTAINER)],
+        [grant(2, 10, ResourceIntroducerType.INTRODUCER, true)],
+      );
+      expect(await fixture.service.getNames(1)).toEqual([
+        { userId: 10, username: 'user10', role: ResourceIntroducerType.INTRODUCER },
+      ]);
+    });
+
+    it('skips grants whose user is gone', async () => {
+      withGrants([{ ...grant(1, 10, ResourceIntroducerType.INTRODUCER), user: null } as never], []);
+      expect(await fixture.service.getNames(1)).toEqual([]);
+    });
+  });
+
+  describe('canViewAccessLists (ATT-1149)', () => {
+    const user = (permissions: string[]) => ({ id: 10, effectivePermissions: new Set(permissions) }) as never;
+
+    it.each([['resources.update'], ['resources.access.manage']])('lets %s read the lists', async (permission) => {
+      const isIntroducer = jest.spyOn(fixture.service, 'isIntroducer').mockResolvedValue(false);
+      expect(await fixture.service.canViewAccessLists(1, user([permission]))).toBe(true);
+      expect(isIntroducer).not.toHaveBeenCalled();
+    });
+
+    it('lets introducers of the resource or one of its groups read the lists', async () => {
+      const isIntroducer = jest.spyOn(fixture.service, 'isIntroducer').mockResolvedValue(true);
+      expect(await fixture.service.canViewAccessLists(1, user(['resources.read']))).toBe(true);
+      expect(isIntroducer).toHaveBeenCalledWith(1, 10, true);
+    });
+
+    it('refuses everyone else', async () => {
+      jest.spyOn(fixture.service, 'isIntroducer').mockResolvedValue(false);
+      expect(await fixture.service.canViewAccessLists(1, user(['resources.read']))).toBe(false);
+    });
+  });
+
   describe('getMany', () => {
     it('returns both direct and group-inherited introducers, deduped by user', async () => {
       const directIntroducer = {
