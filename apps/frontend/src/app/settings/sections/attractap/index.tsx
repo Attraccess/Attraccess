@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Checkbox, CheckboxGroup, Label, Radio, RadioGroup, Spinner } from '@heroui/react';
+import { Checkbox, CheckboxGroup, Description, Label, Radio, RadioGroup, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -40,7 +40,11 @@ export function AttractapSection() {
   // background refetch can never overwrite what the operator is typing.
   const [draft, setDraft] = useState<Partial<CardWriterSettingsDto>>({});
   const mode: Mode = draft.mode ?? settings?.mode ?? 'all';
-  const readerIds = draft.readerIds ?? settings?.readerIds ?? [];
+  // A deleted reader stays in the stored list; it must neither count as picked nor make the form dirty.
+  const existingOnly = (ids: number[]) =>
+    readers ? ids.filter((id) => readers.some((reader) => reader.id === id)) : ids;
+  const savedReaderIds = existingOnly(settings?.readerIds ?? []);
+  const readerIds = draft.readerIds ?? savedReaderIds;
 
   const { mutate: save, isPending: isSaving } = useAttractapServiceUpdateCardWriterSettings({
     onSuccess(data) {
@@ -54,8 +58,7 @@ export function AttractapSection() {
   });
 
   const sameIds = (a: number[], b: number[]) => a.length === b.length && a.every((id) => b.includes(id));
-  const isDirty =
-    mode !== (settings?.mode ?? 'all') || (mode === 'selected' && !sameIds(readerIds, settings?.readerIds ?? []));
+  const isDirty = mode !== (settings?.mode ?? 'all') || (mode === 'selected' && !sameIds(readerIds, savedReaderIds));
   // "Selected readers" with nothing selected would silently switch card enrollment off everywhere.
   const isSaveDisabled = mode === 'selected' && readerIds.length === 0;
 
@@ -83,11 +86,9 @@ export function AttractapSection() {
                 <Radio.Control>
                   <Radio.Indicator />
                 </Radio.Control>
-                <span className="flex flex-col">
-                  <span className="text-small">{t(`mode.options.${option}.label`)}</span>
-                  <span className="text-tiny text-muted">{t(`mode.options.${option}.description`)}</span>
-                </span>
+                <Label>{t(`mode.options.${option}.label`)}</Label>
               </Radio.Content>
+              <Description>{t(`mode.options.${option}.description`)}</Description>
             </Radio>
           ))}
         </RadioGroup>
@@ -95,28 +96,30 @@ export function AttractapSection() {
 
       {mode === 'selected' && (
         <SettingsRow label={t('readers.label')} hint={t('readers.description')} stacked>
-          {readers?.length ? (
-            <CheckboxGroup
-              value={readerIds.map(String)}
-              onChange={(values) => setDraft((current) => ({ ...current, readerIds: values.map(Number) }))}
-              aria-label={t('readers.label')}
-              data-testid="card-writer-readers"
-            >
-              {readers.map((reader) => (
-                <Checkbox key={reader.id} value={String(reader.id)}>
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Checkbox.Content>
-                    <Label>{reader.name}</Label>
-                  </Checkbox.Content>
-                </Checkbox>
-              ))}
-            </CheckboxGroup>
-          ) : (
-            <span className="text-sm text-muted">{t('readers.none')}</span>
-          )}
-          {isSaveDisabled ? <span className="text-sm text-danger">{t('readers.required')}</span> : null}
+          <div className="flex flex-col gap-2">
+            {readers?.length ? (
+              <CheckboxGroup
+                value={readerIds.map(String)}
+                onChange={(values) => setDraft((current) => ({ ...current, readerIds: values.map(Number) }))}
+                aria-label={t('readers.label')}
+                data-testid="card-writer-readers"
+              >
+                {readers.map((reader) => (
+                  <Checkbox key={reader.id} value={String(reader.id)}>
+                    <Checkbox.Content>
+                      <Checkbox.Control>
+                        <Checkbox.Indicator />
+                      </Checkbox.Control>
+                      <Label>{reader.name}</Label>
+                    </Checkbox.Content>
+                  </Checkbox>
+                ))}
+              </CheckboxGroup>
+            ) : (
+              <span className="text-sm text-muted">{t('readers.none')}</span>
+            )}
+            {isSaveDisabled ? <span className="text-sm text-danger">{t('readers.required')}</span> : null}
+          </div>
         </SettingsRow>
       )}
 
@@ -124,9 +127,7 @@ export function AttractapSection() {
         isDirty={isDirty}
         isSaving={isSaving}
         isSaveDisabled={isSaveDisabled}
-        onSave={() =>
-          save({ requestBody: { mode, readerIds: mode === 'selected' ? readerIds : (settings?.readerIds ?? []) } })
-        }
+        onSave={() => save({ requestBody: { mode, readerIds: mode === 'selected' ? readerIds : savedReaderIds } })}
         onDiscard={() => setDraft({})}
       />
     </SettingsSection>

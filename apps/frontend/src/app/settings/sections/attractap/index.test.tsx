@@ -73,4 +73,15 @@ describe('AttractapSection (which readers may write cards)', () => {
     expect(view.container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
     expect(screen.queryByTestId('card-writer-readers')).toBeNull();
   });
+
+  it('ignores a deleted reader that is still in the stored list', () => {
+    vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+      data: { mode: 'selected', readerIds: [2, 99] },
+      isLoading: false,
+    } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+    const view = render(<AttractapSection />);
+    expect(screen.getByRole('checkbox', { name: 'Workshop' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Entrance' })).not.toBeChecked();
+    expect(view.container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+  });
 });
