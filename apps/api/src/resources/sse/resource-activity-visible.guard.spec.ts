@@ -1,4 +1,4 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import {
   ResourceActivityAccess,
   ResourceActivityVisibilityService,
@@ -26,6 +26,14 @@ describe('ResourceActivityVisibleGuard', () => {
   it('refuses before the stream opens when activity is hidden', async () => {
     const { guard } = guardWith('none');
     await expect(guard.canActivate(contextFor('7'))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('answers 401, not a crash, if it ever runs before sign-in', async () => {
+    const { guard } = guardWith('full');
+    const signedOut = {
+      switchToHttp: () => ({ getRequest: () => ({ params: { resourceId: '7' } }) }),
+    } as unknown as ExecutionContext;
+    await expect(guard.canActivate(signedOut)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('leaves a malformed id to the route pipe', async () => {

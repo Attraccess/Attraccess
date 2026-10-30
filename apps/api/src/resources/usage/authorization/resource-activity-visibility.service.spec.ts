@@ -1,5 +1,6 @@
 import { Resource, ResourceUsage, SupervisionMode } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Subject } from 'rxjs';
 import { ResourceActivityVisibility } from '../../../settings/constants';
 import { ResourceActivityVisibilityService } from './resource-activity-visibility.service';
 
@@ -33,14 +34,18 @@ function setup(mode: ResourceActivityVisibility) {
     ),
   };
   const controllable = new Set<number>();
-  const usage = { canControllResource: jest.fn(async (id: number) => controllable.has(id)) };
+  const activeSessions = new Map<number, { id: number; userId: number }>();
+  const usage = {
+    canControllResource: jest.fn(async (id: number) => controllable.has(id)),
+    getActiveSession: jest.fn(async (id: number) => activeSessions.get(id) ?? null),
+  };
   const service = new ResourceActivityVisibilityService(settings as never, resources as never, usage as never);
   const user = (persona: Persona, id = 10) => {
     controllable.clear();
     if (persona.canControl) controllable.add(MACHINE).add(SUPERVISED_MACHINE);
     return { id, effectivePermissions: new Set(persona.permissions) } as unknown as AuthenticatedUser;
   };
-  return { service, user, settings };
+  return { service, user, settings, resources, controllable, activeSessions };
 }
 
 describe('ResourceActivityVisibilityService', () => {
@@ -72,6 +77,36 @@ describe('ResourceActivityVisibilityService', () => {
       expect(await service.resolve(user(PERSONAS['not introduced']), SUPERVISED_MACHINE)).toBe('anonymous');
       expect(await service.resolve(user(PERSONAS['without view resources']), SUPERVISED_MACHINE)).toBe('none');
       expect(await service.resolve(user(PERSONAS['introducer']), SUPERVISED_MACHINE)).toBe('full');
+    });
+
+    it('gives managers full access even without "view resources"', async () => {
+      const { service, user } = setup('introduced');
+      for (const permission of ['resources.update', 'resources.access.manage']) {
+        expect(await service.resolve(user({ permissions: [permission] }), MACHINE)).toBe('full');
+      }
+    });
+
+    it('looks up the supervision mode only for machines the viewer may not use', async () => {
+      const { service, user, resources } = setup('introduced');
+      await service.resolveMany(user(PERSONAS['introduced directly']), [MACHINE, SUPERVISED_MACHINE]);
+      expect(resources.find).not.toHaveBeenCalled();
+    });
+
+    it('lets the owner, and only people with full access, see the running session', async () => {
+      const { service, user, activeSessions } = setup('introduced');
+      activeSessions.set(MACHINE, { id: 5, userId: 10 });
+      expect(await service.activeSessionView(user(PERSONAS['not introduced'], 10), MACHINE)).toEqual({
+        full: false,
+        ownUsageId: 5,
+      });
+      expect(await service.activeSessionView(user(PERSONAS['not introduced'], 11), MACHINE)).toEqual({
+        full: false,
+        ownUsageId: null,
+      });
+      expect(await service.activeSessionView(user(PERSONAS['introduced directly'], 11), MACHINE)).toEqual({
+        full: true,
+        ownUsageId: null,
+      });
     });
 
     it('resolves many machines in one pass', async () => {
@@ -128,6 +163,58 @@ describe('ResourceActivityVisibilityService', () => {
       expect(service.viewLiveEvent(event, 'full', 10)).toBe(event);
       const keepalive = { data: { keepalive: true } };
       expect(service.viewLiveEvent(keepalive, 'anonymous', 10)).toBe(keepalive);
+      expect(service.viewLiveEvent(keepalive, 'none', 10)).toBe(keepalive);
+    });
+    it('reduces any event to the allowlist for anonymous viewers, even without a usage field', () => {
+      const event = {
+        data: { eventType: 'resource.usage.session_taken_over', resourceId: 2, inUse: true, newUser: session.user },
+      };
+      expect(service.viewLiveEvent(event, 'anonymous', 10)).toEqual({
+        data: { eventType: 'resource.usage.session_taken_over', resourceId: 2, inUse: true },
+      });
+    });
+    it('drops events the viewer may not see at all, except their own session', () => {
+      const event = { data: { eventType: 'started', inUse: true, usage: session } };
+      expect(service.viewLiveEvent(event, 'none', 10)).toBeNull();
+      expect(service.viewLiveEvent(event, 'none', 77)).toBe(event);
+    });
+  });
+
+  describe('open live streams', () => {
+    it('apply a changed setting to events that arrive after the change', async () => {
+      const { service, user, settings } = setup('all');
+      const viewer = user(PERSONAS['not introduced']);
+      const events = new Subject<{ data: object }>();
+      const seen: object[] = [];
+      service.viewLiveStream(events, viewer, SUPERVISED_MACHINE).subscribe((event) => seen.push(event.data));
+      const started = { eventType: 'started', inUse: true, usage: { resourceId: SUPERVISED_MACHINE, userId: 77 } };
+
+      events.next({ data: started });
+      await new Promise((resolve) => setImmediate(resolve));
+      settings.getResourceActivityVisibility.mockResolvedValue('introduced');
+      events.next({ data: started });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(seen).toEqual([started, { eventType: 'started', inUse: true, resourceId: SUPERVISED_MACHINE }]);
+    });
+
+    it('stop delivering activity once the viewer loses access, but keep the connection alive', async () => {
+      const { service, user, settings, controllable } = setup('introduced');
+      const viewer = user(PERSONAS['introduced directly']);
+      settings.getResourceActivityVisibility.mockResolvedValue('introduced');
+      const events = new Subject<{ data: object }>();
+      const seen: object[] = [];
+      service.viewLiveStream(events, viewer, MACHINE).subscribe((event) => seen.push(event.data));
+      const started = { eventType: 'started', inUse: true, usage: { resourceId: MACHINE, userId: 77 } };
+
+      events.next({ data: started });
+      await new Promise((resolve) => setImmediate(resolve));
+      controllable.clear();
+      events.next({ data: started });
+      events.next({ data: { keepalive: true } });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(seen).toEqual([started, { keepalive: true }]);
     });
   });
 });

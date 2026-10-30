@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, INestApplication, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom, of, Subject } from 'rxjs';
 import supertest from 'supertest';
 import { Resource, ResourceIntroducerType, ResourceUsage, SupervisionMode } from '@attraccess/database-entities';
 import { AuthenticatedUser, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
@@ -64,7 +64,6 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
   let introducer: boolean;
   let activeUsageOwner: number;
   let sseController: SSEController;
-  let usageController: ResourceUsageController;
   let topics: ResourceLiveTopicsProvider;
 
   const usage = () =>
@@ -75,6 +74,18 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       user: { id: activeUsageOwner, username: 'operator', email: 'operator@example.test' },
       startTime: new Date('2026-10-30T10:00:00Z'),
       endTime: null,
+      usageAction: 'usage',
+      isFinalized: true,
+      lifecyclePending: false,
+    }) as unknown as ResourceUsage;
+  /** A finished session; resource reads must never embed these. */
+  const pastUsage = () =>
+    ({
+      ...usage(),
+      id: 4,
+      userId: OTHER,
+      startNotes: 'past session notes',
+      endTime: new Date('2026-10-29T12:00:00Z'),
     }) as unknown as ResourceUsage;
 
   const resourcesService = {
@@ -92,7 +103,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         ({
           id,
           name: 'Lathe',
-          usages: [usage()],
+          usages: [pastUsage(), usage()],
           introductions: [{ id: 1, receiverUserId: OTHER }],
         }) as unknown as Resource,
     ),
@@ -142,7 +153,13 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         { provide: ResourceImageService, useValue: { getPublicPath: jest.fn() } },
         { provide: ResourceUsageService, useValue: usageService },
         { provide: ResourceIntroducersService, useValue: introducersService },
-        { provide: ResourceIntroductionsService, useValue: { getMany: jest.fn(async () => []) } },
+        {
+          provide: ResourceIntroductionsService,
+          useValue: {
+            getMany: jest.fn(async () => []),
+            getHistoryByResourceIdAndUserId: jest.fn(async () => []),
+          },
+        },
         {
           provide: ResourceGroupsIntroducersService,
           useValue: { getMany: jest.fn(async () => []), isIntroducer: jest.fn(async () => introducer) },
@@ -174,7 +191,6 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
     app = module.createNestApplication();
     await app.init();
     sseController = module.get(SSEController);
-    usageController = module.get(ResourceUsageController);
     topics = module.get(ResourceLiveTopicsProvider);
   });
 
@@ -193,6 +209,12 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
     return user ? call.set('x-test-user', user) : call;
   };
 
+  /** Opens the live feed; the test stream completes after one event, so the response ends on its own. */
+  const feed = async (resourceId: number, user: string) => {
+    const response = await get(`/resources/${resourceId}/events`, user);
+    return { status: response.status, type: String(response.headers['content-type']), text: response.text ?? '' };
+  };
+
   describe('signed out', () => {
     it.each([
       '/resources/in-use',
@@ -200,6 +222,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       `/resources/${MACHINE}/events`,
       `/resources/${MACHINE}/introductions`,
       `/resources/${MACHINE}/introducers`,
+      `/resources/${MACHINE}/introductions/${OTHER}/history`,
       `/resources/${MACHINE}/introducers/names`,
       `/resources/${MACHINE}/introducers/${OTHER}/is-introducer`,
       `/resource-groups/1/introducers`,
@@ -233,6 +256,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       const user = as(name);
       for (const path of [
         `/resources/${MACHINE}/introductions`,
+        `/resources/${MACHINE}/introductions/${OTHER}/history`,
         `/resources/${MACHINE}/introducers`,
         `/resource-groups/1/introducers`,
       ]) {
@@ -265,10 +289,24 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
     it.each(Object.keys(PERSONAS))('%s sees activity exactly when they may view resources', async (name) => {
       mode = 'all';
       const user = as(name);
-      const sees = PERSONAS[name].permissions.includes('resources.read');
+      const permissions = PERSONAS[name].permissions;
+      const sees =
+        permissions.includes('resources.read') ||
+        permissions.includes('resources.update') ||
+        permissions.includes('resources.access.manage');
       const list = await get('/resources/in-use', user);
       expect(list.body.map((resource: Resource) => resource.id)).toEqual(sees ? [MACHINE, SUPERVISED_MACHINE] : []);
       expect((await get(`/resources/${MACHINE}/usage/active`, user)).status).toBe(sees ? 200 : 403);
+      expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(sees ? 200 : 403);
+      expect((await get(`/resources/${MACHINE}`, user)).body.usages?.length ?? 0).toBe(sees ? 1 : 0);
+      const live = await feed(MACHINE, user);
+      expect(live.status).toBe(sees ? 200 : 403);
+      if (sees) expect(live.type).toContain('text/event-stream');
+      const rejected = await topics.authorize([{ topic: 'resource', resourceId: MACHINE }], {
+        id: ME,
+        effectivePermissions: new Set(permissions),
+      } as unknown as AuthenticatedUser);
+      expect(rejected.size).toBe(sees ? 0 : 1);
     });
   });
 
@@ -301,14 +339,16 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       const active = await get(`/resources/${MACHINE}/usage/active`, user);
       expect(active.status).toBe(sees ? 200 : 403);
       expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(sees ? 200 : 403);
-      expect((await get(`/resources/${MACHINE}`, user)).body.usages?.length ?? 0).toBe(sees ? 1 : 0);
-      expect(
-        (
-          await get(`/resources/${MACHINE}/events`, user)
-            .timeout(500)
-            .catch(() => ({ status: 200 }))
-        ).status,
-      ).toBe(sees ? 200 : 403);
+      const detail = await get(`/resources/${MACHINE}`, user);
+      expect(detail.body.usages?.length ?? 0).toBe(sees ? 1 : 0);
+      // Only the running session is embedded, never past ones.
+      expect(JSON.stringify(detail.body)).not.toContain('past session notes');
+      const live = await feed(MACHINE, user);
+      expect(live.status).toBe(sees ? 200 : 403);
+      if (sees) {
+        expect(live.type).toContain('text/event-stream');
+        expect(live.text).toContain('operator');
+      }
 
       const rejected = await topics.authorize([{ topic: 'resource', resourceId: MACHINE }], {
         id: ME,
@@ -350,13 +390,39 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(200);
     });
 
-    it('refuses the live feed outright to people without visibility', async () => {
-      await expect(
-        sseController.streamEvents(MACHINE, {
-          user: { id: ME, effectivePermissions: new Set(['resources.read']) },
-        } as never),
-      ).rejects.toThrow('cannot view activity');
-      expect(eventsService.subscribeResource).not.toHaveBeenCalled();
+    it('lets someone eligible for a supervised session subscribe to the live topic there', async () => {
+      const rejected = await topics.authorize([{ topic: 'resource', resourceId: SUPERVISED_MACHINE }], {
+        id: ME,
+        effectivePermissions: new Set(['resources.read']),
+      } as unknown as AuthenticatedUser);
+      expect(rejected.size).toBe(0);
+      const live = await feed(SUPERVISED_MACHINE, as('not introduced'));
+      expect(live.status).toBe(200);
+      expect(live.text).toContain('"inUse":true');
+      expect(live.text).not.toContain('operator');
+    });
+
+    it('shows the supervised-use machine on a resource read only as free/in use', async () => {
+      const detail = await get(`/resources/${SUPERVISED_MACHINE}`, as('not introduced'));
+      expect(detail.status).toBe(200);
+      expect(detail.body.usages).toHaveLength(1);
+      expect(JSON.stringify(detail.body)).not.toContain('operator');
+      expect(detail.body.usages[0].userId).toBeUndefined();
+    });
+
+    it('drops events from an open feed for a viewer who has lost access', async () => {
+      controllable = true;
+      const user = { id: ME, effectivePermissions: new Set(['resources.read']) } as unknown as AuthenticatedUser;
+      const events = new Subject<{ data: object }>();
+      eventsService.subscribeResource.mockResolvedValueOnce(events);
+      const seen: object[] = [];
+      (await sseController.streamEvents(MACHINE, { user } as never)).subscribe((event) => seen.push(event));
+      events.next({ data: { eventType: 'started', inUse: true, usage: usage() } });
+      await new Promise((resolve) => setImmediate(resolve));
+      controllable = false;
+      events.next({ data: { eventType: 'started', inUse: true, usage: usage() } });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(seen).toHaveLength(1);
     });
 
     it('answers a real 403 over HTTP, not an SSE error frame, when the live feed is hidden', async () => {
@@ -366,10 +432,36 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       expect(eventsService.subscribeResource).not.toHaveBeenCalled();
     });
 
-    it("keeps other people's history away from non-managers in both modes", async () => {
-      const user = as('introducer');
-      expect((await get(`/resources/${MACHINE}/usage/history?userId=${OTHER}`, user)).status).toBe(403);
-      expect(usageController).toBeDefined();
+  });
+
+  describe.each(['all', 'introduced'] as const)('usage history in "%s" mode', (visibility) => {
+    it.each(Object.keys(PERSONAS))("%s: other people's history needs manage resources", async (name) => {
+      mode = visibility;
+      const user = as(name);
+      const status = (await get(`/resources/${MACHINE}/usage/history?userId=${OTHER}`, user)).status;
+      expect(status).toBe(name === 'manage resources' ? 200 : 403);
     });
+  });
+
+  it('pages through every in-use machine before filtering, not only the first page', async () => {
+    mode = 'all';
+    resourcesService.listResources
+      .mockResolvedValueOnce({
+        data: [{ id: MACHINE, name: 'Lathe', usages: [usage()] }] as unknown as Resource[],
+        total: 101,
+        page: 1,
+        limit: 100,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          { id: SUPERVISED_MACHINE, name: 'Mill', usages: [{ ...usage(), resourceId: SUPERVISED_MACHINE }] },
+        ] as unknown as Resource[],
+        total: 101,
+        page: 2,
+        limit: 100,
+      });
+    const list = await get('/resources/in-use', as('not introduced'));
+    expect(list.body.map((resource: Resource) => resource.id)).toEqual([MACHINE, SUPERVISED_MACHINE]);
+    expect(resourcesService.listResources).toHaveBeenCalledTimes(2);
   });
 });

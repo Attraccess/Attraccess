@@ -5,7 +5,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { defer } from 'rxjs';
-import { finalize, map } from 'rxjs/operators';
+import { finalize } from 'rxjs/operators';
 import { LiveTopicProvider } from '../live-updates/live-topic-provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
@@ -55,10 +55,9 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
 
   async source(subscription: LiveSubscription, user: AuthenticatedUser) {
     if (subscription.topic === 'resource') {
-      const access = await this.activityVisibility.resolve(user, subscription.resourceId);
-      if (access === 'none') throw new Error('Activity on this resource is not visible');
+      // `authorize` refused hidden viewers; each event is checked again so later changes apply to open subscriptions.
       const stream = await this.resourceEvents.subscribeResource(subscription.resourceId);
-      return stream.pipe(map((event) => this.activityVisibility.viewLiveEvent(event, access, user.id)));
+      return this.activityVisibility.viewLiveStream(stream, user, subscription.resourceId);
     }
     if (subscription.topic === 'flow-logs') {
       return defer(() => this.flowLogs.subjectFor(subscription.resourceId).asObservable()).pipe(

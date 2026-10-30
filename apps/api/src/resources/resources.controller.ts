@@ -26,6 +26,9 @@ import { PaginatedResourceResponseDto } from './dtos/paginatedResourceResponse.d
 import { ResourceImageService } from './resourceImage.service';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 import { ResourceIntroducersService } from './introducers/resourceIntroducers.service';
+import { isActiveUsage } from './usage/sessions/active-usage';
+
+const IN_USE_PAGE_SIZE = 100;
 
 @ApiTags('Resources')
 @Controller('resources')
@@ -117,17 +120,25 @@ export class ResourcesController {
     description: 'Unauthorized - User is not authenticated',
   })
   async getAllInUse(@Req() req: AuthenticatedRequest): Promise<Resource[]> {
-    const resources = await this.resourcesService.listResources({
-      onlyInUse: true,
-      returnUsingUser: true,
-    });
+    // Every in-use machine, not one page: the visibility filter below would otherwise drop machines past the first page.
+    const inUse: Resource[] = [];
+    for (let page = 1; ; page++) {
+      const { data, total } = await this.resourcesService.listResources({
+        onlyInUse: true,
+        returnUsingUser: true,
+        page,
+        limit: IN_USE_PAGE_SIZE,
+      });
+      inUse.push(...data);
+      if (data.length === 0 || page * IN_USE_PAGE_SIZE >= total) break;
+    }
     const access = await this.activityVisibility.resolveMany(
       req.user,
-      resources.data.map((resource) => resource.id),
+      inUse.map((resource) => resource.id),
     );
     // Machines the viewer may not see activity for are left out: they have no in-use entry for this viewer.
     return this.activityVisibility
-      .applyToResources(resources.data, access, req.user.id)
+      .applyToResources(inUse, access, req.user.id)
       .filter((resource) => resource.usages.length > 0)
       .map((resource) => this.transformResource(resource));
   }
@@ -150,6 +161,8 @@ export class ResourcesController {
   })
   async getOneById(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<Resource> {
     const resource = await this.resourcesService.getResourceById(id);
+    // Only the current session is embedded; past sessions are read through usage/history, which has its own rule.
+    resource.usages = (resource.usages ?? []).filter(isActiveUsage);
     const access = await this.activityVisibility.resolveMany(req.user, [id]);
     const [visible] = this.activityVisibility.applyToResources([resource], access, req.user.id);
     // The embedded introductions are the full access list; they follow the same rule as the People tab.

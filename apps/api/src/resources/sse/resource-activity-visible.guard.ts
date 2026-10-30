@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceActivityVisibilityService } from '../usage/authorization/resource-activity-visibility.service';
 
@@ -12,6 +12,8 @@ export class ResourceActivityVisibleGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    // Sign-in runs first (`@Auth()` sits below `@UseGuards` on the route); refuse rather than crash if that changes.
+    if (!request.user) throw new UnauthorizedException();
     const resourceId = Number(request.params['resourceId']);
     // A malformed id is answered with a 400 by the route's ParseIntPipe.
     if (!Number.isInteger(resourceId)) return true;

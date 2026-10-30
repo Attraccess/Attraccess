@@ -146,12 +146,9 @@ export class ResourceUsageController {
     }
 
     // If not an admin, force filtering by the current user's ID
+    // Other people's history needs "manage resources", which always sees full activity under the visibility rule.
     if (!canUpdateResources) {
       query.userId = req.user.id;
-    } else if (query.userId !== req.user.id) {
-      // Other people's sessions follow the instance's activity visibility, same as the live status.
-      const access = await this.activityVisibility.resolve(req.user, resourceId);
-      if (access !== 'full') throw new ForbiddenException('You cannot view activity on this resource');
     }
 
     const { data, total } = await this.resourceUsageService.getResourceUsageHistory(

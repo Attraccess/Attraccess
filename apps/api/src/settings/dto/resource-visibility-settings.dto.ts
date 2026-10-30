@@ -4,7 +4,7 @@ import { RESOURCE_ACTIVITY_VISIBILITY_VALUES, ResourceActivityVisibility } from 
 export class ResourceVisibilitySettingsDto {
   @ApiProperty({
     description:
-      'Who may see which equipment is in use and by whom. "all": everyone with "view resources". "introduced": only people who may use the machine, its introducers and maintainers, and managers. People always see their own sessions.',
+      'Who may see which resources are in use and by whom. "all": everyone with resources.read. "introduced": only people who may use the resource, its introducers and maintainers, and holders of resources.update or resources.access.manage. People always see their own sessions.',
     enum: RESOURCE_ACTIVITY_VISIBILITY_VALUES,
     enumName: 'ResourceActivityVisibility',
     default: 'all',

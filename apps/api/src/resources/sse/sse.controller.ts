@@ -1,7 +1,6 @@
-import { Controller, ForbiddenException, Param, ParseIntPipe, Req, Sse, UseGuards } from '@nestjs/common';
+import { Controller, Param, ParseIntPipe, Req, Sse, UseGuards } from '@nestjs/common';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { map } from 'rxjs/operators';
 import { ResourceEventsService } from './resource-events.service';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 import { ResourceActivityVisibilityService } from '../usage/authorization/resource-activity-visibility.service';
@@ -22,12 +21,8 @@ export class SSEController {
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'Forbidden - Activity on this resource is not visible to the user' })
   async streamEvents(@Param('resourceId', ParseIntPipe) resourceId: number, @Req() req: AuthenticatedRequest) {
-    const access = await this.activityVisibility.resolve(req.user, resourceId);
-    if (access === 'none') throw new ForbiddenException('You cannot view activity on this resource');
+    // The guard has already refused viewers who may not see activity; every event is checked again on the way out.
     const stream = await this.events.subscribeResource(resourceId);
-    return this.sse.wrap(
-      'resource_usage',
-      stream.pipe(map((event) => this.activityVisibility.viewLiveEvent(event, access, req.user.id))),
-    );
+    return this.sse.wrap('resource_usage', this.activityVisibility.viewLiveStream(stream, req.user, resourceId));
   }
 }

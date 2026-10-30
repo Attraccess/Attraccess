@@ -6,7 +6,7 @@ export class UpdateResourceVisibilitySettingsDto {
   @ApiPropertyOptional({
     enum: RESOURCE_ACTIVITY_VISIBILITY_VALUES,
     enumName: 'ResourceActivityVisibility',
-    description: 'Who may see equipment activity',
+    description: 'Who may see which resources are in use and by whom (see ResourceVisibilitySettingsDto)',
   })
   @IsOptional()
   @IsIn(RESOURCE_ACTIVITY_VISIBILITY_VALUES)

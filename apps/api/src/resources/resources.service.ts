@@ -226,7 +226,9 @@ export class ResourcesService {
     const queryBuilder = this.resourceRepository
       .createQueryBuilder('resource')
       .leftJoinAndSelect('resource.groups', 'groups')
-      .orderBy('resource.name', 'ASC');
+      .orderBy('resource.name', 'ASC')
+      // Same-named resources keep a stable order across pages.
+      .addOrderBy('resource.id', 'ASC');
 
     if (onlyInUse || onlyInUseByUserId !== undefined || returnUsingUser) {
       if (returnUsingUser) {

@@ -111,11 +111,14 @@ export class ResourceIntroductionsController {
     description: 'The history has been successfully retrieved.',
     type: [ResourceIntroductionHistoryItem],
   })
-  @IsResourceIntroducer()
+  @ApiResponse({ status: 403, description: 'Only managers and introducers may read the full list' })
+  @Auth()
   async getHistory(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('userId', ParseIntPipe) userId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem[]> {
+    await this.assertCanViewAccessLists(resourceId, req);
     return await this.resourceIntroductionsService.getHistoryByResourceIdAndUserId(resourceId, userId);
   }
 }

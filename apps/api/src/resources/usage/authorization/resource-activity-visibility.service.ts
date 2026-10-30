@@ -3,10 +3,22 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { Observable } from 'rxjs';
+import { concatMap, filter } from 'rxjs/operators';
 import { SettingsService } from '../../../settings/settings.service';
 import { ResourceUsageService } from '../sessions/resource-usage.service';
 
-const LIVE_EVENT_ANONYMOUS_KEYS = new Set(['eventType', 'resourceId', 'inUse']);
+/** What a viewer without full access gets from a live event: free or in use, and the machine's health. */
+const LIVE_EVENT_ANONYMOUS_KEYS = new Set([
+  'eventType',
+  'resourceId',
+  'inUse',
+  'timestamp',
+  'identifier',
+  'status',
+  'previousStatus',
+  'reason',
+]);
 
 /**
  * - `full`: may see who uses the machine and the session details.
@@ -36,35 +48,56 @@ export class ResourceActivityVisibilityService {
   async resolveMany(user: AuthenticatedUser, resourceIds: number[]): Promise<Map<number, ResourceActivityAccess>> {
     const ids = [...new Set(resourceIds)];
     const access = new Map<number, ResourceActivityAccess>(ids.map((id) => [id, 'none']));
+    if (ids.length === 0) return access;
     const permissions = user.effectivePermissions;
-    if (ids.length === 0 || !permissions?.has('resources.read')) return access;
+
+    // Resource and access managers see all activity in both modes.
+    if (permissions?.has('resources.update') || permissions?.has('resources.access.manage')) {
+      for (const id of ids) access.set(id, 'full');
+      return access;
+    }
+    if (!permissions?.has('resources.read')) return access;
 
     if ((await this.settings.getResourceActivityVisibility()) === 'all') {
       for (const id of ids) access.set(id, 'full');
       return access;
     }
 
-    if (permissions.has('resources.update') || permissions.has('resources.access.manage')) {
-      for (const id of ids) access.set(id, 'full');
-      return access;
-    }
-
-    const supervised = new Set(
-      (await this.resources.find({ where: { id: In(ids) }, select: { id: true, supervisionMode: true } }))
-        .filter(
-          (resource) =>
-            resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
-            resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED,
-        )
-        .map((resource) => resource.id),
-    );
     await Promise.all(
       ids.map(async (id) => {
         if (await this.usage.canControllResource(id, user)) access.set(id, 'full');
-        else if (supervised.has(id)) access.set(id, 'anonymous');
       }),
     );
+    // Only the machines the viewer may not use need their supervision mode.
+    const hidden = ids.filter((id) => access.get(id) === 'none');
+    if (hidden.length > 0) {
+      const resources = await this.resources.find({
+        where: { id: In(hidden) },
+        select: { id: true, supervisionMode: true },
+      });
+      for (const resource of resources) {
+        if (
+          resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
+          resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED
+        ) {
+          access.set(resource.id, 'anonymous');
+        }
+      }
+    }
     return access;
+  }
+
+  /**
+   * How much of the running session the viewer may see: everything with full access, otherwise only their own
+   * session (`ownUsageId`), or nothing.
+   */
+  async activeSessionView(
+    user: AuthenticatedUser,
+    resourceId: number,
+  ): Promise<{ full: boolean; ownUsageId: number | null }> {
+    if ((await this.resolve(user, resourceId)) === 'full') return { full: true, ownUsageId: null };
+    const active = await this.usage.getActiveSession(resourceId);
+    return { full: false, ownUsageId: active?.userId === user.id ? active.id : null };
   }
 
   /** The "free or in use" view for viewers who may not see who is using the machine. */
@@ -96,14 +129,39 @@ export class ResourceActivityVisibilityService {
     });
   }
 
-  /** Live-feed counterpart of {@link viewUsage}: drops who is using the machine from events the viewer may not see in full. */
-  viewLiveEvent(event: { data: object }, access: ResourceActivityAccess, viewerId: number): { data: object } {
-    const { usage, ...rest } = event.data as { usage?: ResourceUsage; [key: string]: unknown };
-    if (access === 'full' || !usage || usage.userId === viewerId) return event;
+  /**
+   * Live-feed counterpart of {@link viewUsage}. Returns the event as the viewer may see it, or null to drop it.
+   * Anything short of full access is reduced to an allowlist, so a new event field never leaks a name by default.
+   */
+  viewLiveEvent(event: { data: object }, access: ResourceActivityAccess, viewerId: number): { data: object } | null {
+    const data = event.data as { usage?: ResourceUsage; keepalive?: unknown; [key: string]: unknown };
+    if ('keepalive' in data) return event;
+    if (access === 'full' || (data.usage && data.usage.userId === viewerId)) return event;
+    if (access === 'none') return null;
+    const resourceId = data.usage?.resourceId ?? data['resourceId'];
     return {
       data: Object.fromEntries(
-        Object.entries({ ...rest, resourceId: usage.resourceId }).filter(([key]) => LIVE_EVENT_ANONYMOUS_KEYS.has(key)),
+        Object.entries({ ...data, resourceId }).filter(([key]) => LIVE_EVENT_ANONYMOUS_KEYS.has(key)),
       ),
     };
+  }
+
+  /**
+   * Applies the rule to a resource's live stream. Access is looked up again for every event (keepalives excepted),
+   * so a changed setting or a revoked introduction takes effect on open streams. The viewer's permissions are the
+   * ones from when the stream opened; a role change applies on the next connect.
+   */
+  viewLiveStream<T extends { data: object }>(
+    stream: Observable<T>,
+    user: AuthenticatedUser,
+    resourceId: number,
+  ): Observable<{ data: object }> {
+    return stream.pipe(
+      concatMap(async (event) => {
+        if ('keepalive' in event.data) return event;
+        return this.viewLiveEvent(event, await this.resolve(user, resourceId), user.id);
+      }),
+      filter((event): event is { data: object } => event !== null),
+    );
   }
 }
