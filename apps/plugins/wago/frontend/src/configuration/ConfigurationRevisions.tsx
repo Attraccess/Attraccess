@@ -153,6 +153,8 @@ export function RollbackReview({
   onCancel: () => void;
 }) {
   const { t } = useWagoTranslations();
+  const snapshot = JSON.parse(preview.revision.snapshot);
+  const errors = preview.errors ?? [];
   return (
     <>
       <h3>{t('revisions.restore', { revision: preview.revision.revision })}</h3>
@@ -160,12 +162,25 @@ export function RollbackReview({
       <ConfigurationChanges
         changes={preview.diff}
         before={preview.current ? JSON.parse(preview.current.snapshot) : null}
-        after={JSON.parse(preview.revision.snapshot)}
+        after={snapshot}
         names={names}
       />
       <ConfigurationMetadataChanges changes={preview.metadataDiff ?? []} names={names} />
+      {errors.length > 0 && (
+        <Alert status="danger">
+          <AlertStatusIcon status="danger" />
+          <Alert.Content>
+            <Alert.Title>{t('revisions.rollbackInvalid')}</Alert.Title>
+            <ConfigurationErrors errors={errors} snapshot={snapshot} names={names} />
+          </Alert.Content>
+        </Alert>
+      )}
       <ImpactWarning impacts={preview.impacts} names={names} acknowledged={force} onChange={onForceChange} />
-      <Button variant="danger" isDisabled={disabled || (!!preview.impacts.length && !force)} onPress={onPublish}>
+      <Button
+        variant="danger"
+        isDisabled={disabled || errors.length > 0 || (!!preview.impacts.length && !force)}
+        onPress={onPublish}
+      >
         {t('revisions.publishRollback')}
       </Button>
       <Button variant="secondary" isDisabled={busy} onPress={onCancel}>

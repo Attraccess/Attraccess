@@ -41,12 +41,19 @@ export function editorMetadata(value: unknown): ConfigurationEditorMetadata {
   return { names, presets };
 }
 
-/** Additional editor safeguards; the version 1 wire model remains unchanged. */
+/** Editor validation before publishing: the configuration limits first, then the detailed model checks. */
 export function validateEditorSnapshot(snapshot: unknown): ConfigurationValidationError[] {
   // The same limits the runtime enforces on a new revision or rollback; checked first so an
   // oversized document is never walked by the detailed validation.
   const limits = configurationLimitErrors(snapshot, '$');
-  if (limits.length) return limits;
+  return limits.length ? limits : validateEditorModel(snapshot);
+}
+
+/**
+ * Additional editor safeguards on the model itself, without the configuration limits; the version 1
+ * wire model remains unchanged. Only call this directly on input already known to be within the limits.
+ */
+export function validateEditorModel(snapshot: unknown): ConfigurationValidationError[] {
   const errors = validateSnapshot(snapshot);
   if (errors.length) return errors;
   const value = snapshot as WagoConfigurationSnapshot;

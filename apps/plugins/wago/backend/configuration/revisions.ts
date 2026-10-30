@@ -8,7 +8,7 @@ import { configurationFlowImpacts } from './flow-references';
 
 import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
 
-import { configurationHash, configurationDiff, canonicalSnapshot } from './model';
+import { configurationHash, configurationDiff, canonicalSnapshot, type ConfigurationValidationError } from './model';
 
 import { validateEditorSnapshot, editorMetadata, type ConfigurationEditorMetadata } from './editor';
 
@@ -246,6 +246,7 @@ export abstract class WagoRevisions extends WagoDrafts {
     current: WagoConfigurationRevision | null;
     diff: ReturnType<typeof configurationDiff>;
     metadataDiff: ReturnType<typeof configurationDiff>;
+    errors: ConfigurationValidationError[];
   }> {
     return this.withConfigurationLock(controllerId, async () => {
       await this.claimedController(controllerId);
@@ -253,22 +254,25 @@ export abstract class WagoRevisions extends WagoDrafts {
       if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
       const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
       const draft = await this.drafts.findOneBy({ controllerId });
+      const snapshot = JSON.parse(selected.snapshot);
       const impacts = await configurationFlowImpacts(
         this.context,
         controllerId,
         current ? JSON.parse(current.snapshot) : null,
-        JSON.parse(selected.snapshot),
+        snapshot,
       );
       return {
         draftHash: this.rollbackIdentity(draft, current ?? null, selected, impacts),
         impacts,
         revision: selected,
         current: current ?? null,
-        diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, JSON.parse(selected.snapshot)),
+        diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, snapshot),
         metadataDiff: configurationDiff(
           this.metadataFromProvenance(current?.presetProvenance),
           this.metadataFromProvenance(selected.presetProvenance),
         ),
+        // The same check `rollback` runs, so the editor can refuse the rollback before publishing.
+        errors: validateEditorSnapshot(snapshot),
       };
     });
   }

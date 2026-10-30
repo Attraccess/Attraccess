@@ -190,6 +190,8 @@ export interface RevisionPreview {
   diff: ConfigurationDiff[];
   impacts: ConfigurationImpact[];
   metadataDiff?: ConfigurationDiff[];
+  /** Why the server would refuse to publish this revision again, including the configuration limits. */
+  errors?: ConfigurationValidationError[];
 }
 
 export interface RuntimeUpdateStatus {

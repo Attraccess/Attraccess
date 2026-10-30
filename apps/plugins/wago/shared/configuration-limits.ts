@@ -123,13 +123,17 @@ export function configurationLimitViolations(snapshot: unknown): ConfigurationLi
  * editor can translate it by exact message (see the German entries in `server-messages.de.json`).
  */
 export const CONFIGURATION_LIMIT_MESSAGES = {
-  bytes: 'The configuration is larger than 1 MiB.',
-  depth: 'The configuration is nested deeper than 16 levels.',
-  identifierLength: 'An ID is longer than 256 characters.',
-  identifierControl: 'An ID contains control characters.',
-  points: 'The configuration has more than 256 physical points.',
-  channels: 'The configuration has more than 256 channels.',
-  statusReport: 'The controller status report could exceed 64 KiB with these channel IDs. Shorten IDs or remove channels.',
+  bytes:
+    'The configuration is too large to send to the controller (limit 1 MiB). Remove devices, channels or custom profiles.',
+  depth: 'The configuration is nested deeper than 16 levels. Simplify custom profiles or remove nested settings.',
+  identifierLength: 'An ID is longer than 256 characters. Shorten it.',
+  identifierControl: 'An ID contains control characters such as line breaks or tabs. Remove them.',
+  points:
+    'The configuration has more than 256 physical points. Remove points or devices; each built-in 879-3020 meter adds 131.',
+  channels:
+    'The configuration has more than 256 channels. Remove channels or devices; each built-in 879-3020 meter adds 131.',
+  statusReport:
+    'The controller status report could exceed 64 KiB with these channel IDs. Shorten IDs or remove channels.',
 } as const;
 
 export function describeConfigurationLimit(violation: ConfigurationLimitViolation): string {

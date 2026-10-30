@@ -486,11 +486,13 @@
   "Rotated 180°": "Um 180° gedreht",
   "Off": "Aus",
   "On": "Ein",
-  "The configuration is larger than 1 MiB.": "Die Konfiguration ist größer als 1 MiB.",
-  "The configuration is nested deeper than 16 levels.": "Die Konfiguration ist tiefer als 16 Ebenen verschachtelt.",
-  "An ID is longer than 256 characters.": "Eine ID ist länger als 256 Zeichen.",
-  "An ID contains control characters.": "Eine ID enthält Steuerzeichen.",
-  "The configuration has more than 256 physical points.": "Die Konfiguration hat mehr als 256 physische Punkte.",
-  "The configuration has more than 256 channels.": "Die Konfiguration hat mehr als 256 Kanäle.",
-  "The controller status report could exceed 64 KiB with these channel IDs. Shorten IDs or remove channels.": "Der Statusbericht der Steuerung könnte mit diesen Kanal-IDs 64 KiB überschreiten. Kürze die IDs oder entferne Kanäle."
+  "The configuration is too large to send to the controller (limit 1 MiB). Remove devices, channels or custom profiles.": "Die Konfiguration ist zu groß für die Steuerung (Grenze 1 MiB). Entferne Geräte, Kanäle oder eigene Profile.",
+  "The configuration is nested deeper than 16 levels. Simplify custom profiles or remove nested settings.": "Die Konfiguration ist tiefer als 16 Ebenen verschachtelt. Vereinfache eigene Profile oder entferne verschachtelte Einstellungen.",
+  "An ID is longer than 256 characters. Shorten it.": "Eine ID ist länger als 256 Zeichen. Kürze sie.",
+  "An ID contains control characters such as line breaks or tabs. Remove them.": "Eine ID enthält Steuerzeichen wie Zeilenumbrüche oder Tabulatoren. Entferne sie.",
+  "The configuration has more than 256 physical points. Remove points or devices; each built-in 879-3020 meter adds 131.": "Die Konfiguration hat mehr als 256 physische Punkte. Entferne Punkte oder Geräte; jeder integrierte 879-3020-Zähler fügt 131 hinzu.",
+  "The configuration has more than 256 channels. Remove channels or devices; each built-in 879-3020 meter adds 131.": "Die Konfiguration hat mehr als 256 Kanäle. Entferne Kanäle oder Geräte; jeder integrierte 879-3020-Zähler fügt 131 hinzu.",
+  "The controller status report could exceed 64 KiB with these channel IDs. Shorten IDs or remove channels.": "Der Statusbericht der Steuerung könnte mit diesen Kanal-IDs 64 KiB überschreiten. Kürze die IDs oder entferne Kanäle.",
+  "configuration draft is invalid": "Der Konfigurationsentwurf ist ungültig",
+  "rollback configuration is invalid": "Die Konfiguration für das Zurücksetzen ist ungültig"
 }

@@ -2,8 +2,7 @@
 // FEATURE: WAGO front panel configuration preserves routing and profile contracts.
 import { describe, expect, it } from 'vitest';
 import { DIGITAL_TERMINALS } from '../../backend/configuration/digital';
-import { validateEditorSnapshot as validateEditorSnapshotWithLimits } from '../../backend/configuration/editor';
-import { CONFIGURATION_LIMIT_CODE } from '../../shared/configuration-limits';
+import { validateEditorModel, validateEditorSnapshot } from '../../backend/configuration/editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import {
   addDevice,
@@ -15,13 +14,6 @@ import {
   updateTerminal,
   type PanelConfiguration,
 } from '../src/front-panel/model';
-
-/**
- * These tests exercise the editor model, not the publish limits: every built-in 879-3020 meter adds 131
- * points and channels, so two meters exceed the 256 item limit (covered by its own test below).
- */
-const validateEditorSnapshot = (snapshot: unknown) =>
-  validateEditorSnapshotWithLimits(snapshot).filter((error) => error.code !== CONFIGURATION_LIMIT_CODE);
 
 const empty = (): PanelConfiguration => ({
   snapshot: { version: 1, physicalPoints: [], logicalChannels: [] },
@@ -61,7 +53,7 @@ describe('front panel configuration', () => {
       );
     }
     for (const [id, name] of Object.entries(existingNames)) expect(next.metadata.names[id]).toBe(name);
-    expect(validateEditorSnapshot(next.snapshot)).toEqual([]);
+    expect(validateEditorModel(next.snapshot)).toEqual([]);
   });
 
   it('preserves measurement calibration on both edited and unrelated devices', () => {
@@ -87,7 +79,7 @@ describe('front panel configuration', () => {
     for (const terminal of DIGITAL_TERMINALS)
       configuration = updateTerminal(configuration, terminal, terminal.label, {});
     expect(configuration.snapshot.logicalChannels).toHaveLength(12);
-    expect(validateEditorSnapshot(configuration.snapshot)).toEqual([]);
+    expect(validateEditorModel(configuration.snapshot)).toEqual([]);
     const before = required(terminalChannel(configuration.snapshot, DIGITAL_TERMINALS[0]));
     configuration = updateTerminal(configuration, DIGITAL_TERMINALS[0], 'Laser power', {});
     expect(terminalChannel(configuration.snapshot, DIGITAL_TERMINALS[0])?.id).toBe(before.id);
@@ -112,9 +104,9 @@ describe('front panel configuration', () => {
     let configuration = addDevice(empty(), 'Laser meter').configuration;
     configuration = addDevice(configuration, 'CNC meter').configuration;
     expect(configuration.snapshot.logicalChannels.length).toBeGreaterThan(256);
-    expect(validateEditorSnapshotWithLimits(configuration.snapshot).map((error) => error.message)).toEqual([
-      'The configuration has more than 256 physical points.',
-      'The configuration has more than 256 channels.',
+    expect(validateEditorSnapshot(configuration.snapshot).map((error) => error.message)).toEqual([
+      'The configuration has more than 256 physical points. Remove points or devices; each built-in 879-3020 meter adds 131.',
+      'The configuration has more than 256 channels. Remove channels or devices; each built-in 879-3020 meter adds 131.',
     ]);
   });
 
@@ -125,7 +117,7 @@ describe('front panel configuration', () => {
     expect(configuration.snapshot.modbus?.connections).toHaveLength(1);
     expect(configuration.snapshot.modbus?.devices.map((device) => device.unitId)).toEqual([1, 2]);
     expect(configuration.snapshot.logicalChannels).toHaveLength(profile.measurements.length * 2);
-    expect(validateEditorSnapshot(configuration.snapshot)).toEqual([]);
+    expect(validateEditorModel(configuration.snapshot)).toEqual([]);
     const bus = busConnection(configuration.snapshot);
     configuration = updateBus(configuration, {
       ...bus,
@@ -156,7 +148,7 @@ describe('front panel configuration', () => {
     expect(next.snapshot.modbus?.devices.find((device) => device.id === id)?.pollIntervalMs).toBe(2500);
     expect(next.snapshot.modbus?.profiles[0]).toEqual(profile);
     expect(BUILTIN_MODBUS_PROFILES[0].id).toBe('wago-879-3020');
-    expect(validateEditorSnapshot(next.snapshot)).toEqual([]);
+    expect(validateEditorModel(next.snapshot)).toEqual([]);
   });
 
   it('reconciles every device when a shared custom profile loses registers', () => {
@@ -175,7 +167,7 @@ describe('front panel configuration', () => {
     expect(configuration.snapshot.physicalPoints.every((point) => point.modbus?.measurementId === retained.id)).toBe(
       true,
     );
-    expect(validateEditorSnapshot(configuration.snapshot)).toEqual([]);
+    expect(validateEditorModel(configuration.snapshot)).toEqual([]);
   });
 
   it('adds switch bindings, prunes removed registers and removes all bindings of a removed device', () => {
@@ -210,7 +202,7 @@ describe('front panel configuration', () => {
     );
     expect(next.snapshot.logicalChannels).toHaveLength(1);
     expect(next.snapshot.logicalChannels[0].capabilities).toEqual(['output']);
-    expect(validateEditorSnapshot(next.snapshot)).toEqual([]);
+    expect(validateEditorModel(next.snapshot)).toEqual([]);
     const removed = removeDevice(next, id);
     expect(removed.snapshot.logicalChannels).toEqual([]);
     expect(removed.snapshot.physicalPoints).toEqual([]);

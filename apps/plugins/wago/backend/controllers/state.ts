@@ -443,6 +443,7 @@ export abstract class WagoServiceState {
     current: WagoConfigurationRevision | null;
     diff: ReturnType<typeof configurationDiff>;
     metadataDiff: ReturnType<typeof configurationDiff>;
+    errors: ConfigurationValidationError[];
   }>;
 
   protected abstract revisionIdentity(revision: WagoConfigurationRevision | null): unknown;
