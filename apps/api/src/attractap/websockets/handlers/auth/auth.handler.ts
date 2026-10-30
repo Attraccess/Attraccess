@@ -32,6 +32,20 @@ export class AttractapAuthHandler {
   @Inject(WebsocketService)
   private websocketService: WebsocketService;
 
+  /** Link a phone camera can open to land in the enroll dialog; null without an app URL. */
+  private async buildEnrollUrl(code: string): Promise<string | null> {
+    try {
+      const appUrl = (await this.settingsService.getUrl())?.trim();
+      if (!appUrl) {
+        return null;
+      }
+      return `${appUrl.replace(/\/+$/, '')}/?enroll=${encodeURIComponent(code)}`;
+    } catch (error) {
+      this.logger.warn(`Could not read the app URL for the enrollment link: ${String(error)}`);
+      return null;
+    }
+  }
+
   /**
    * A new reader only asks for a code here. The record and its credentials are created once an
    * admin approved that code, see DeviceEnrollmentService.approve. Firmware without the `enrollment`
@@ -48,8 +62,15 @@ export class AttractapAuthHandler {
       id: socket.id,
       address: socket.clientAddress,
       sendCode: (code, rotatesInMs, expiresInMs) => {
-        void socket.sendMessage(
-          new AttractapEvent(AttractapEventType.READER_ENROLLMENT_CODE, { code, rotatesInMs, expiresInMs }),
+        void this.buildEnrollUrl(code).then((enrollUrl) =>
+          socket.sendMessage(
+            new AttractapEvent(AttractapEventType.READER_ENROLLMENT_CODE, {
+              code,
+              rotatesInMs,
+              expiresInMs,
+              enrollUrl,
+            }),
+          ),
         );
       },
       sendRejected: (reason, retryAfterMs) => {

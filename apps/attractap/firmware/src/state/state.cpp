@@ -44,6 +44,7 @@ int State::websocket_next_attempt_seconds = 0;
 bool State::enrollment_pending = false;
 bool State::enrollment_rejected = false;
 std::string State::enrollment_code = "";
+std::string State::enrollment_url = "";
 uint32_t State::enrollment_received_at = 0;
 uint32_t State::enrollment_rotates_in_ms = 0;
 uint32_t State::enrollment_expires_in_ms = 0;
@@ -126,10 +127,11 @@ State::ApiState State::getApiState()
     return state;
 }
 
-void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs)
+void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs, std::string enrollUrl)
 {
     StateLock lock(state_mutex);
     enrollment_pending = true;
+    enrollment_url = enrollUrl;
     enrollment_rejected = false;
     enrollment_code = code;
     enrollment_received_at = millis();
@@ -143,6 +145,7 @@ void State::setEnrollmentRejected(uint32_t retryAfterMs)
     enrollment_pending = false;
     enrollment_rejected = true;
     enrollment_code = "";
+    enrollment_url = "";
     enrollment_received_at = millis();
     enrollment_retry_in_ms = retryAfterMs;
 }
@@ -153,6 +156,7 @@ void State::clearEnrollment()
     enrollment_pending = false;
     enrollment_rejected = false;
     enrollment_code = "";
+    enrollment_url = "";
 }
 
 State::EnrollmentState State::getEnrollmentState()
@@ -163,6 +167,7 @@ State::EnrollmentState State::getEnrollmentState()
     state.pending = enrollment_pending;
     state.rejected = enrollment_rejected;
     state.code = enrollment_code;
+    state.enrollUrl = enrollment_url;
     state.rotatesInMs = enrollment_rotates_in_ms > elapsed ? enrollment_rotates_in_ms - elapsed : 0;
     state.expiresInMs = enrollment_expires_in_ms > elapsed ? enrollment_expires_in_ms - elapsed : 0;
     state.retryInMs = enrollment_retry_in_ms > elapsed ? enrollment_retry_in_ms - elapsed : 0;

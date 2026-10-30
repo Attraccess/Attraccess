@@ -40,6 +40,8 @@ A new reader does not register itself. Once it is connected to your network it s
 5. Optionally enter a name for the reader.
 6. Click **Approve**. Attraccess opens the new reader so you can finish its setup.
 
+**Faster with a QR code:** if an application URL is set in the Attraccess settings, touch readers also show a QR code above the code. Scan it with any phone camera to open Attraccess with the dialog and the code already filled in, then click **Approve**. The QR code changes together with the code. Without an application URL the reader shows the code only.
+
 The reader receives its credentials and connects. It keeps them across restarts, so you only approve a reader once.
 
 You need the permission to update resources (`resources.update`) to approve a reader. Other ways to open the dialog:

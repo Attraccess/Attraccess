@@ -113,13 +113,15 @@ public:
     {
         bool pending;
         std::string code;
+        // Link a phone camera opens to land in the enroll dialog; empty without an app URL.
+        std::string enrollUrl;
         uint32_t rotatesInMs;
         uint32_t expiresInMs;
         // Server refused the request (limits); retry once retryInMs passed.
         bool rejected;
         uint32_t retryInMs;
     };
-    static void setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs);
+    static void setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs, std::string enrollUrl = "");
     static void setEnrollmentRejected(uint32_t retryAfterMs);
     static void clearEnrollment();
     static EnrollmentState getEnrollmentState();
@@ -165,6 +167,7 @@ private:
     static bool enrollment_pending;
     static bool enrollment_rejected;
     static std::string enrollment_code;
+    static std::string enrollment_url;
     static uint32_t enrollment_received_at;
     static uint32_t enrollment_rotates_in_ms;
     static uint32_t enrollment_expires_in_ms;

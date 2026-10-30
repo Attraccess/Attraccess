@@ -72,7 +72,8 @@ void API::onEnrollmentCode(JsonObject data)
                  static_cast<unsigned>(payload["rotatesInMs"] | 30000U));
     State::setEnrollmentCode(payload["code"].as<std::string>(),
                              payload["rotatesInMs"] | 30000U,
-                             payload["expiresInMs"] | 600000U);
+                             payload["expiresInMs"] | 600000U,
+                             payload["enrollUrl"].is<const char *>() ? payload["enrollUrl"].as<std::string>() : std::string());
 }
 
 void API::onEnrollmentRejected(JsonObject data)

@@ -17,17 +17,38 @@ void ReaderWorkflow::testEnrollment()
     assert(registration["data"]["payload"]["enrollment"]["protocol"].as<int>() == 1);
     assert(server.count("READER_AUTHENTICATE") == 0);
 
-    server.push("READER_ENROLLMENT_CODE", R"({"code":"K7P-3XQ","rotatesInMs":30000,"expiresInMs":600000})"); pump();
+    server.push("READER_ENROLLMENT_CODE", R"({"code":"K7P-3XQ","rotatesInMs":30000,"expiresInMs":600000,"enrollUrl":"https://access.example/?enroll=K7P-3XQ"})"); pump();
     assert(State::getEnrollmentState().pending);
     assert(lv_screen_active() == Display::pendingApprovalScreen.getScreen());
+    // With an app URL the screen shows the QR of the link next to the code.
+    assert(Display::pendingApprovalScreen.isQrVisible());
+    requireLabel(lv_screen_active(), text(FirmwareI18n::Message::ScanOrEnterCodeInAttraccess));
+    lv_obj_t *qr = Display::pendingApprovalScreen.getQrCode();
     requireLabel(lv_screen_active(), text(FirmwareI18n::Message::ApproveThisReaderInAttraccess));
     requireLabel(lv_screen_active(), "K7P-3XQ");
     display.capture(output, "enrollment-pending-approval");
 
     // Every rotation replaces the code on screen.
-    server.push("READER_ENROLLMENT_CODE", R"({"code":"M4N-8ZB","rotatesInMs":30000,"expiresInMs":570000})"); pump();
+    server.push("READER_ENROLLMENT_CODE", R"({"code":"M4N-8ZB","rotatesInMs":30000,"expiresInMs":570000,"enrollUrl":"https://access.example/?enroll=M4N-8ZB"})"); pump();
     requireLabel(lv_screen_active(), "M4N-8ZB");
     assert(!label(lv_screen_active(), "K7P-3XQ"));
+    // The same QR object is updated in place and stays visible.
+    assert(Display::pendingApprovalScreen.getQrCode() == qr && Display::pendingApprovalScreen.isQrVisible());
+    display.capture(output, "enrollment-pending-approval-rotated");
+
+    // No app URL (null or empty): code only, without leaving the screen; the QR returns with the next URL.
+    server.push("READER_ENROLLMENT_CODE", R"({"code":"B5C-6DF","rotatesInMs":30000,"expiresInMs":540000,"enrollUrl":null})"); pump();
+    requireLabel(lv_screen_active(), "B5C-6DF");
+    assert(lv_screen_active() == Display::pendingApprovalScreen.getScreen() && !Display::pendingApprovalScreen.isQrVisible());
+    display.capture(output, "enrollment-pending-approval-code-only");
+    server.push("READER_ENROLLMENT_CODE", R"({"code":"D7E-8FG","rotatesInMs":30000,"expiresInMs":510000,"enrollUrl":""})"); pump();
+    assert(!Display::pendingApprovalScreen.isQrVisible());
+    server.push("READER_ENROLLMENT_CODE", R"({"code":"H2J-3KL","rotatesInMs":30000,"expiresInMs":480000,"enrollUrl":"https://access.example/?enroll=H2J-3KL"})"); pump();
+    assert(Display::pendingApprovalScreen.getQrCode() == qr && Display::pendingApprovalScreen.isQrVisible());
+    // A link too long for a QR code falls back to the code alone.
+    server.push("READER_ENROLLMENT_CODE", "{\"code\":\"M2N-3PQ\",\"rotatesInMs\":30000,\"expiresInMs\":450000,\"enrollUrl\":\"https://access.example/?enroll=" + std::string(400, 'x') + "\"}"); pump();
+    requireLabel(lv_screen_active(), "M2N-3PQ");
+    assert(!Display::pendingApprovalScreen.isQrVisible());
 
     // A refused request shows when the reader asks again and keeps no stale code.
     server.push("READER_ENROLLMENT_REJECTED", R"({"reason":"RATE_LIMITED","retryAfterMs":8000})"); pump();

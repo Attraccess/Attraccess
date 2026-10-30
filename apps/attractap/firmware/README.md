@@ -116,7 +116,7 @@ the reader to its normal screens. A disconnect does too. Messages for any other
 `MassIntroduction: refused session=… reason=…` and
 `MassIntroduction: ended reason=… session=…`.
 
-## Enrollment protocol (1.8.0)
+## Enrollment protocol (1.8.0, QR code since 1.8.1)
 
 Firmware 1.8.0 no longer registers itself. A reader without credentials sends
 `READER_REGISTER` with `enrollment: {protocol: 1}`. The server answers with a
@@ -127,11 +127,17 @@ unregistered reader has no synced clock.
 | Direction | Event | Payload |
 | --- | --- | --- |
 | Reader → server | `READER_REGISTER` | `enrollment: {protocol: 1}` |
-| Server → reader | `READER_ENROLLMENT_CODE` | `code` (`K7P-3XQ`), `rotatesInMs`, `expiresInMs`; sent again on every rotation (30 s) |
+| Server → reader | `READER_ENROLLMENT_CODE` | `code` (`K7P-3XQ`), `rotatesInMs`, `expiresInMs`, `enrollUrl` (`<app URL>/?enroll=CODE`, `null` without an app URL); sent again on every rotation (30 s) |
 | Server → reader | `READER_ENROLLMENT_REJECTED` | `reason` (`RATE_LIMITED`, `BUSY`), `retryAfterMs`; the reader asks again after that time (5 s to 10 min) |
 | Server → reader | `READER_REGISTER` | `id`, `token`, sent once after approval; the reader stores them and authenticates |
 
 Touch variants show the code on the pending-approval screen with a countdown.
+Since 1.8.1 they also show a QR code of `enrollUrl` above the code (dark modules
+on a white card with a quiet border of at least 4 modules, in light and dark
+themes). One LVGL QR object (`LV_USE_QRCODE`) is created with the screen and
+updated in place with `lv_qrcode_update` on each rotation. Without `enrollUrl`
+(null, empty) or when the QR cannot be built (link over 200 bytes) the screen
+shows the code only. `tests/lvgl-memory` covers create, update and delete cycles.
 Every variant, including Lite, reports it on the serial console:
 `api.status.get` returns `status: "pending_approval"` plus `enrollmentCode` and
 `enrollmentRotatesInMs`, which the web flasher uses for its **Approve** button.

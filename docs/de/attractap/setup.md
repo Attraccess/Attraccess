@@ -40,6 +40,8 @@ Ein neuer Leser registriert sich nicht von selbst. Sobald er mit Ihrem Netzwerk 
 5. Geben Sie optional einen Namen fuer den Leser ein.
 6. Klicken Sie auf **Freigeben**. Attraccess oeffnet den neuen Leser, damit Sie die Einrichtung abschliessen koennen.
 
+**Schneller mit QR-Code:** Ist in den Attraccess-Einstellungen eine Anwendungs-URL gesetzt, zeigen Touch-Leser ueber dem Code zusaetzlich einen QR-Code. Scannen Sie ihn mit der Kamera eines beliebigen Smartphones, um Attraccess mit geoeffnetem Dialog und eingetragenem Code zu oeffnen, und klicken Sie dann auf **Freigeben**. Der QR-Code aendert sich zusammen mit dem Code. Ohne Anwendungs-URL zeigt der Leser nur den Code.
+
 Der Leser erhaelt seine Zugangsdaten und verbindet sich. Er behaelt sie ueber Neustarts hinweg, Sie muessen einen Leser also nur einmal freigeben.
 
 Zum Freigeben benoetigen Sie die Berechtigung, Ressourcen zu aendern (`resources.update`). Weitere Wege, den Dialog zu oeffnen:

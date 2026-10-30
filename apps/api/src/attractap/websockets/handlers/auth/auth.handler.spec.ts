@@ -67,7 +67,10 @@ describe('AttractapAuthHandler', () => {
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
-    (handler as any).settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
+    (handler as any).settingsService = {
+      getDefaultLanguage: jest.fn().mockResolvedValue('de'),
+      getUrl: jest.fn().mockResolvedValue('https://access.example/'),
+    };
     (handler as any).websocketService = new WebsocketService();
   });
 
@@ -113,12 +116,18 @@ describe('AttractapAuthHandler', () => {
 
       connection.sendCode('K7P-3XQ', 30000, 600000);
       connection.sendRejected('RATE_LIMITED', 5000);
+      await new Promise((resolve) => setImmediate(resolve));
 
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.READER_ENROLLMENT_CODE,
-            payload: { code: 'K7P-3XQ', rotatesInMs: 30000, expiresInMs: 600000 },
+            payload: {
+              code: 'K7P-3XQ',
+              rotatesInMs: 30000,
+              expiresInMs: 600000,
+              enrollUrl: 'https://access.example/?enroll=K7P-3XQ',
+            },
           }),
         }),
       );
@@ -128,6 +137,23 @@ describe('AttractapAuthHandler', () => {
             type: AttractapEventType.READER_ENROLLMENT_REJECTED,
             payload: { reason: 'RATE_LIMITED', retryAfterMs: 5000 },
           }),
+        }),
+      );
+    });
+
+    it('sends enrollUrl null without an app URL', async () => {
+      (handler as any).settingsService.getUrl.mockResolvedValue(null);
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        {
+          payload: { enrollment: { protocol: 1 } },
+        } as AttractapEvent['data'],
+      );
+      mockEnrollment.request.mock.calls[0][0].sendCode('K7P-3XQ', 30000, 600000);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ payload: expect.objectContaining({ enrollUrl: null }) }),
         }),
       );
     });
