@@ -18,8 +18,12 @@ void Application::processCardAuthenticationData() {
 #endif
     this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
+    // Also reached from the NFC callback on the main loop, outside lv_lock;
+    // LVGL calls racing the render task crash it (recursive lock).
+    lv_lock();
     this->finishCardAuthentication(false);
     Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
+    lv_unlock();
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
 #endif
@@ -38,8 +42,12 @@ void Application::processCardAuthenticationData() {
 #endif
     this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
+    // Also reached from the NFC callback on the main loop, outside lv_lock;
+    // LVGL calls racing the render task crash it (recursive lock).
+    lv_lock();
     this->finishCardAuthentication(false);
     Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
+    lv_unlock();
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
 #endif
@@ -57,7 +65,9 @@ void Application::processCardAuthenticationData() {
   this->unlocked = true;
   State::setUserLanguage(true, this->cardAuthenticationData.language);
 #ifdef HAS_LVGL_DISPLAY
+  lv_lock();
   this->finishCardAuthentication(true);
+  lv_unlock();
 #endif
 
 #ifndef HAS_LVGL_DISPLAY

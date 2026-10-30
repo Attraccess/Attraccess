@@ -20,6 +20,11 @@ public:
     static void loop();
 #endif
 
+#ifndef ATTRACTAP_HOST
+    static void sendJsonResponse(const std::string &topic, const std::string &payload);
+    static void sendErrorResponse(const std::string &topic, const char *error);
+#endif
+
 private:
 #ifndef ATTRACTAP_HOST
     static constexpr size_t MAX_COMMAND_LENGTH = 256;
@@ -37,8 +42,5 @@ private:
 
     static std::string ipToString(const esp_ip4_addr_t &ip);
     static const char *encryptionTypeToString(wifi_auth_mode_t mode);
-
-    static void sendJsonResponse(const std::string &topic, const std::string &payload);
-    static void sendErrorResponse(const std::string &topic, const char *error);
 #endif
 };

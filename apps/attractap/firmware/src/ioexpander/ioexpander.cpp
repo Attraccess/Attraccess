@@ -56,6 +56,10 @@ void IOExpander::writeDefaultState()
         logger.error("Failed to write OUTPUT port 0 (reg 0x02)");
     if (!writeRegister(IOEXP_REG_OUTPUT_1, outputState1))
         logger.error("Failed to write OUTPUT port 1 (reg 0x03)");
+    // A lab parking image or earlier firmware may have left the backlight dark.
+    delay(IOEXP_CH32_WRITE_GAP_MS);
+    if (!writeRegister(IOEXP_REG_BACKLIGHT_PWM, IOEXP_BACKLIGHT_PWM_ON))
+        logger.error("Failed to write backlight PWM (reg 0x05)");
     logger.infof("State written: port0=0x%02X port1=0x%02X", outputState, outputState1);
 #else
     if (!writeRegister(IOEXP_REG_CONFIG, 0x00))

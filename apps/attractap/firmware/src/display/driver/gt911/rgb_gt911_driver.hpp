@@ -26,6 +26,7 @@ public:
     void flush(const lv_area_t *area, uint8_t *px_map) override;
     bool readTouch(TouchPoint &point) override;
     bool touchAvailable() const override { return touchInitialized; }
+    const uint8_t *frameBuffer() override;
 
 private:
     Logger &logger;

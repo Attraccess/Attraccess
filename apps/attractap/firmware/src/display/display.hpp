@@ -71,6 +71,12 @@ public:
     static void setDemoDeviceName();
     static void logFromLvgl(lv_log_level_t level, const char *buf);
 
+    // Name of the screen the router shows last, or "" before the first one.
+    static std::string activeScreenName();
+    // The RGB565 frame on the panel (see IDisplayDriver::frameBuffer), or nullptr.
+    // Callers hold lv_lock so no flush writes it meanwhile.
+    static const uint8_t *frameBuffer();
+
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
     static uint32_t touchPressSequence;

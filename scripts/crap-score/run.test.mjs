@@ -446,6 +446,7 @@ test('every JS/TS Nx project has a report target with an isolated output path', 
   const nativeProjects = new Set([
     'apps/attractap/desktop/project.json',
     'apps/attractap-lab/project.json',
+    'apps/attractap/nfc-emulator/project.json',
   ]);
   const outputs = new Set();
   for (const file of files.filter((file) => /(^|\/)project\.json$/.test(file))) {
