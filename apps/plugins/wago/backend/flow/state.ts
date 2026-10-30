@@ -40,6 +40,9 @@ export abstract class WagoFlowServiceState {
 
   protected readonly channelCache = new Map<number, WagoConfigurationSnapshot['logicalChannels']>();
 
+  /** IDs of the disabled channels in `channelCache`, kept in step with it so reads need no scan. */
+  protected readonly disabledChannelCache = new Map<number, Set<string>>();
+
   protected readonly waiters = new Set<Waiter>();
 
   protected readonly waitersByKey = new Map<string, Set<Waiter>>();

@@ -383,6 +383,30 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
     expect(await result).toMatchObject({ mqttServerId: 2, operation: { phase: 'completed' } });
   });
 
+  it('ignores a network-change acknowledgement over 1 KiB before decoding it', async () => {
+    allowEvidence = false;
+    const result = service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
+    for (let i = 0; i < 50 && payloads.length === 0; i++) await new Promise((resolve) => setTimeout(resolve, 10));
+    const payload = JSON.parse(payloads[0].toString()),
+      topic = `${payload.prefix}/v1/controllers/${payload.hardwareId}/credentials/rotate/ack`;
+    const ack = { revision: 1, token: payload.token, credentialEpoch: payload.credentialEpoch, status: 'reconnected' };
+    const oversized = Buffer.from(JSON.stringify({ ...ack, pad: 'x'.repeat(1024) }));
+    expect(oversized.length).toBeGreaterThan(1024);
+    const toString = jest.spyOn(oversized, 'toString');
+    const parse = jest.spyOn(JSON, 'parse');
+    try {
+      listener({ serverId: 2, topic, payload: oversized });
+      expect(toString).not.toHaveBeenCalled();
+      expect(parse).not.toHaveBeenCalled();
+    } finally {
+      parse.mockRestore();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await service.status(1)).toMatchObject({ mqttServerId: 1, targetHost: oldHost });
+    listener({ serverId: 2, topic, payload: Buffer.from(JSON.stringify(ack)) });
+    expect(await result).toMatchObject({ mqttServerId: 2, operation: { phase: 'completed' } });
+  });
+
   it('keeps previous broker cleanup retryable and does not hide the successful migration', async () => {
     await service.apply(1, { targetHost: newHost, mqttServerId: 2 }, principal);
     await expect(service.retirePreviousCredentials(1, principal)).rejects.toThrow('could not be retired');

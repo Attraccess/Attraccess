@@ -29,6 +29,24 @@ const information = (
   extra: Partial<ModbusMeasurement> = {},
 ): ModbusMeasurement => ({ ...field(id, name, address, 'number', 'information'), dataType, ...extra });
 
+/**
+ * Measurement IDs a new built-in 879-3020 meter enables; its other registers are added disabled. Kept
+ * outside the profile so profile versions and custom copies (`duplicateProfile`) stay unchanged.
+ */
+export const WAGO_879_3020_DEFAULT_ENABLED: readonly string[] = Object.freeze([
+  'active-power',
+  'import-energy',
+  'export-energy',
+  'voltage-l1',
+  'voltage-l2',
+  'voltage-l3',
+  'current-l1',
+  'current-l2',
+  'current-l3',
+  'frequency',
+  'current',
+]);
+
 export function wago8793020Measurements(): ModbusMeasurement[] {
   // Preserve the original five IDs, transforms and order for existing configurations.
   const original = [

@@ -132,6 +132,163 @@ and add its native labgrid power resource/driver to the same reader group.
 `uhubctl` is installed; use `extraUdevRules` for narrowly scoped permissions
 required by the actual hub. No power hardware is assumed in the example.
 
+## NFC card emulator
+
+A place can also export the [NFC card emulator](../attractap/nfc-emulator/README.md)
+(ESP32-S3 Supermini + PN532) mounted in front of its reader, so one claim
+holds both. Add the emulator's USB identity to the reader's exporter group
+under its own resource names:
+
+```nix
+exporter.settings.attractap-touch-v2-1 = {
+  # ...the reader's USBSerialPort, USBFlashableDevice and HTTPVideoStream...
+  NfcEmulatorSerial = {
+    cls = "USBSerialPort";
+    match.ID_SERIAL_SHORT = "REPLACE_WITH_EMULATOR_SERIAL";
+  };
+  NfcEmulatorFlash = {
+    cls = "USBFlashableDevice";
+    match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "REPLACE_WITH_EMULATOR_SERIAL"; };
+  };
+};
+```
+
+A place with two serial ports needs explicit bindings, so `example-env.yaml`
+and the janitor bind the reader's drivers to `USBSerialPort` and
+`USBFlashableDevice` by name. The janitor therefore never erases the emulator.
+Use `example-emulator-env.yaml` for sessions that drive the emulator:
+
+```python
+from attractap_lab.drivers import NfcEmulatorDriver
+
+with claim("example-emulator-env.yaml", "attractap-touch-v2-1") as target:
+    emulator = target.get_driver(NfcEmulatorDriver)
+    emulator.command("profiles.select", {"id": "supervisor"})
+    emulator.command("present")
+```
+
+`NfcEmulatorDriver` waits until the emulator answers after connecting, and
+raises `NfcEmulatorError` with the firmware's error code. Plain `SerialDriver`,
+`ConsoleProtocol`, `ESPToolDriver` and `ResetProtocol` lookups keep resolving
+to the reader. `NfcEmulatorFlashDriver` flashes the emulator's merged image.
+Emulator profiles persist across sessions; runtime state (selection,
+presentation, faults, overrides) resets when the emulator reboots.
+
+## Reader Wi-Fi without revealing the secret
+
+Readers start empty after every release, so each session has to put its
+reader on the lab Wi-Fi. Enable `readerWifi` and store the credentials on the
+host, readable by root only:
+
+```nix
+services.attractap-lab.readerWifi.enable = true;
+```
+
+```sh
+ssh root@lab-host 'umask 077; cat > /var/lib/attractap-lab/reader-wifi.json' <<'EOF'
+{"ssid": "Lab WiFi", "password": "..."}
+EOF
+```
+
+Lab users (the shared `labgrid` account) can then run
+`attractap-lab-reader-wifi --place PLACE --auth-code PIN` on the host, but
+cannot read the file: the command runs as root through a single sudo rule. It
+refuses places that no session holds (or that the janitor is parking), and
+writes the `network.wifi.credentials.set` command straight to the reader's
+tty. The reader's `RESP` reply, which does not contain the password, arrives
+on the session's console. Inside a session, call
+`attractap_lab.workflow.send_reader_wifi(target, pin)`; it runs the command on
+the exporter host over labgrid's SSH connection. Set the reader's PIN first
+(`CMND auth.code.set {"newCode":"..."}`).
+
+## Hardware-in-the-loop tests
+
+`hil/` holds pytest tests that run real reader firmware against the NFC card
+emulator: card detection, enrollment (DESFire EV2/EV3, NTAG424), login,
+supervision, key reset, and rejected, faulty or removed cards. The reader
+image has the test hooks, so tests also use the touchscreen: they sign out
+with the "Sign out" button instead of waiting for the 30 s session timeout
+(only `test_session_times_out` waits for it), and start and end a session on
+a second resource by touch.
+
+```sh
+. .tools/esp-idf/export.sh   # or set READER_IMAGE / EMULATOR_IMAGE
+pnpm nx run attractap-lab:hil            # all tests
+pnpm nx run attractap-lab:hil -- -k enroll
+```
+
+The runner builds both firmware images, starts an API on a free port with a
+throwaway database (`STORAGE_ROOT`), and runs pytest inside one labgrid
+session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The reader gets
+the lab Wi-Fi through `attractap-lab-reader-wifi`, so the host needs
+`readerWifi`, and connects to the API at the address of this machine on the
+route to the reader (override with `API_HOST`). `LAB_PYTHON` defaults to the
+interpreter of the installed `labgrid-client`, which must provide labgrid and
+pytest. Logs, the emulator trace and camera photos land in
+`apps/attractap-lab/hil-artifacts/lab-artifacts/<session>`. These tests are
+not part of `pnpm nx run attractap-lab:test`, which runs without hardware.
+
+### In CI
+
+`.github/workflows/attractap-lab-hil.yml` runs these tests from the release
+workflow and on every push to `main`. It is off until the repository variable
+`ATTRACTAP_LAB_HIL_ENABLED` is `true` (a repository variable, because the job's
+`if:` runs before the `attractap-lab` environment loads); the
+workflow file lists all variables (lab host, coordinator port, place,
+Tailscale tags, relay address/port, labgrid package) and the secrets it reuses
+from the hardware smoke workflow (`TS_OAUTH_CLIENT_ID`, `TS_AUDIENCE`,
+`LAB_SSH_PRIVATE_KEY`, `LAB_SSH_KNOWN_HOSTS`).
+
+When enabled, the tests gate publishing: in both workflows the `plugins`,
+`containerize` (and on release `balena` and `publish-attractap-desktop`) jobs
+need them and stop if they fail or are cancelled. Runs wait for the place in
+`labgrid-client session` (`ATTRACTAP_LAB_WAIT_MINUTES`) rather than in a
+GitHub concurrency group, which would cancel queued runs.
+
+A runner joins the tailnet, but readers only reach the lab's LAN. The runner
+therefore relays its API through the lab host: enable
+`services.attractap-lab.readerApiRelay` (default port 20480), which lets the
+`labgrid` account open exactly that remote forward, and allow the port from
+the readers' LAN in the host firewall. Set `ATTRACTAP_LAB_API_RELAY_HOST` to
+the lab host's address on that LAN.
+
+## Reader touchscreen and screenshots
+
+Reader firmware built with `-DATTRACTAP_TEST_HOOKS=ON` (and, for the lab,
+`-DATTRACTAP_BEEPER_DEFAULT=OFF`; see the firmware README, "Test hooks")
+accepts serial commands that tap, press and swipe the touchscreen, list the
+widgets on screen and stream screenshots. `attractap_lab.reader_screen` wraps
+them for tests:
+
+```python
+from attractap_lab.drivers import ESPToolDriver
+from attractap_lab.reader_screen import ReaderTestHooks
+
+with claim("example-emulator-env.yaml", os.environ["LG_PLACE"]) as target:
+    target.get_driver(ESPToolDriver).flash("tv2-hooks-merged.bin")
+    target.deactivate(target.get_driver(ESPToolDriver))
+    hooks = ReaderTestHooks(target.get_driver("SerialDriver"), "4711")
+    hooks.ensure_auth_code()                  # erased readers have no PIN yet
+    hooks.wait_for(screen="ConnectionConfigurationScreen")
+    hooks.tap_text("Device", timeout=10)      # waits for the widget first
+    hooks.swipe(240, 400, 240, 150)
+    hooks.screenshot().save("screen.png")
+    hooks.wait_for_log(r"Transitioning to screen: ResourceList", timeout=30)
+```
+
+`command(topic, payload)` sends any reader command with the PIN and returns
+its reply, raising `ReaderCommandError` (with `.code`) for error replies and
+resending commands that got no reply. `widgets()`, `screen()`,
+`find(text, match)`, `wait_for(text, screen=..., timeout=...)`,
+`tap(x, y)`, `press(x, y, hold_ms)`, `release()`, `swipe(...)` and
+`tap_text(text, match, index)` map to the `ui.*` topics; widget dictionaries
+carry `text`, `texts`, `cx`/`cy` and `hittable`. `read_log()` and
+`wait_for_log(pattern)` return the reader's other console lines.
+`screenshot()` returns a `Screenshot` (`width`, `height`, `rgb`, `pixel(x, y)`,
+`png()`, `save(path)`) and retries corrupt transfers. The pure functions
+`decode_rle565`, `assemble_screenshot`, `encode_png`, `matches` and `find`
+need no hardware.
+
 ## Web dashboard
 
 Enable the pinned upstream [labgrid-plugins dashboard](https://tfcollins.github.io/labgrid-plugins/user-guide/web-dashboard.html)

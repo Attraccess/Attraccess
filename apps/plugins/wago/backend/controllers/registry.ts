@@ -30,6 +30,8 @@ import { WagoConfigurationRevision } from '../configuration/revision.entity';
 
 import { MqttSubscriptionError } from './model';
 
+import { runtimeSupportErrors } from '../configuration/channel-enabled';
+
 import { WagoServiceState } from './state';
 
 export abstract class WagoRegistry extends WagoServiceState {
@@ -97,9 +99,16 @@ export abstract class WagoRegistry extends WagoServiceState {
       JSON.stringify({ runtimeImageId: desired, runtimePolicyToken }),
       { qos: 1, retain: false },
     );
-    // Replay configuration skipped by the boot-time runtime gate, without creating a revision.
+    // Replay configuration skipped by the boot-time runtime gate, without creating a revision. It passes
+    // the same runtime gate as a publication: a runtime that cannot run it would only reject it.
     const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
-    if (revision && (revision.state === 'published' || revision.state === 'applied'))
+    const replay = revision && (revision.state === 'published' || revision.state === 'applied') ? revision : null;
+    const unsupported = replay ? runtimeSupportErrors(JSON.parse(replay.snapshot), controller.capabilities) : [];
+    if (replay && unsupported.length)
+      this.context.logger.warn(
+        `Not replaying WAGO configuration revision ${replay.revision} to controller ${controllerId}: ${unsupported[0].message}`,
+      );
+    else if (replay)
       await this.context.mqtt.publish(
         controller.mqttServerId,
         topic,
@@ -107,9 +116,9 @@ export abstract class WagoRegistry extends WagoServiceState {
           protocolVersion: CONFIGURATION_PROTOCOL_VERSION,
           runtimeImageId: desired,
           runtimePolicyToken,
-          revision: revision.revision,
-          contentHash: revision.contentHash,
-          snapshot: JSON.parse(revision.snapshot),
+          revision: replay.revision,
+          contentHash: replay.contentHash,
+          snapshot: JSON.parse(replay.snapshot),
         }),
         { qos: 1, retain: true },
       );
@@ -150,7 +159,7 @@ export abstract class WagoRegistry extends WagoServiceState {
       runtimeVersion: controller.runtimeVersion,
       capabilities: controller.capabilities,
       lastSequence: controller.lastSequence,
-      lastHeartbeatAt: this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt,
+      lastHeartbeatAt: this.diagnostics.heartbeatAt(controller.id) ?? controller.lastHeartbeatAt,
       lastSeenAt: controller.lastSeenAt,
       compatibilityError: controller.compatibilityError,
       createdAt: controller.createdAt,

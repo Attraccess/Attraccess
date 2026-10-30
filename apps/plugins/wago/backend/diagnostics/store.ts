@@ -1,4 +1,6 @@
+import { BOUNDED_MESSAGES_CAPABILITY, DROP_REASONS, type DropReason } from '../../shared/capabilities';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
+import { parseControllerJson } from '../protocol/index';
 import type { DiagnosticStream } from './envelope';
 import {
   admitEnvelope,
@@ -31,6 +33,8 @@ export interface DiagnosticSample {
 export interface RuntimeDiagnostics extends DiagnosticStream {
   touched: number;
   heartbeatAt?: string;
+  /** Messages the controller dropped by reason; only from runtimes that advertise bounded messages. */
+  dropCounts?: Record<DropReason, number>;
   legacyHeartbeatSequence?: number;
   connected?: boolean;
   hardwareAvailable?: boolean;
@@ -52,6 +56,26 @@ export interface RuntimeDiagnostics extends DiagnosticStream {
   faults: Record<string, { code: string; receivedAt: string; sourceAt: string | null }>;
   acknowledgements: Record<string, DiagnosticAcknowledgement>;
   events: Array<{ kind: string; receivedAt: string }>;
+}
+
+/** Drop counters are read only from a runtime that advertises the capability, and only known reasons. */
+export function heartbeatDropCounts(data: Record<string, unknown>): Record<DropReason, number> | undefined {
+  const counts = data.dropCounts;
+  if (
+    !Array.isArray(data.capabilities) ||
+    !data.capabilities.includes(BOUNDED_MESSAGES_CAPABILITY) ||
+    !counts ||
+    typeof counts !== 'object' ||
+    Array.isArray(counts)
+  )
+    return undefined;
+  const result = {} as Record<DropReason, number>;
+  for (const reason of DROP_REASONS) {
+    const value = (counts as Record<string, unknown>)[reason];
+    if (!Number.isSafeInteger(value) || (value as number) < 0) return undefined;
+    result[reason] = value as number;
+  }
+  return result;
 }
 
 export type SampleMetadata = Pick<DiagnosticSample, 'sourceAt' | 'receivedAt' | 'streamId' | 'sequence'>;
@@ -341,10 +365,9 @@ export class WagoDiagnosticsStore {
 
   ingest(id: number, kind: string, payload: Buffer): boolean {
     this.prune();
-    if (payload.length > 65_536) return false;
     let data: Record<string, unknown>;
     try {
-      data = JSON.parse(payload.toString('utf8'));
+      data = parseControllerJson(payload, 'diagnostic message') as Record<string, unknown>;
     } catch {
       return false;
     }
@@ -358,7 +381,7 @@ export class WagoDiagnosticsStore {
     if (!this.controllers.has(id) && this.controllers.size >= MAX_CONTROLLERS && oldest === undefined) return false;
     if (!this.controllers.has(id) && this.controllers.size >= MAX_CONTROLLERS && oldest !== undefined)
       this.controllers.delete(oldest);
-    const state = this.read(id);
+    const state = this.working(id);
     if (!this.admitIncoming(id, state, kind, data, canonical)) return false;
     state.touched = this.now();
     const receivedAt = new Date(this.now()).toISOString();
@@ -368,7 +391,10 @@ export class WagoDiagnosticsStore {
       streamId: canonical ? (state.activeStream as string) : null,
       sequence: canonical ? (data.sequence as number) : null,
     };
-    if (kind === 'heartbeat') state.heartbeatAt = canonical ? (data.timestamp as string) : receivedAt;
+    if (kind === 'heartbeat') {
+      state.heartbeatAt = canonical ? (data.timestamp as string) : receivedAt;
+      state.dropCounts = heartbeatDropCounts(data);
+    }
     if (kind === 'state') this.applyState(state, data, canonical, metadata);
     this.applyEvents(id, state, kind, data, canonical, metadata);
     for (const collection of [
@@ -421,22 +447,47 @@ export class WagoDiagnosticsStore {
     this.commands.set(id, { controllerId, channelId, at: this.now() });
   }
 
+  /** The last heartbeat time without copying the whole diagnostics state, as `read(id).heartbeatAt`. */
+  heartbeatAt(id: number): string | undefined {
+    this.prune();
+    return this.controllers.get(id)?.heartbeatAt;
+  }
+
   read(id: number): RuntimeDiagnostics {
     this.prune();
     const state = this.controllers.get(id);
-    const copy: RuntimeDiagnostics = state
-      ? JSON.parse(JSON.stringify(state))
-      : {
-          touched: 0,
-          inputs: {},
-          outputs: {},
-          measurements: {},
-          cumulativeMeasurements: {},
-          faults: {},
-          acknowledgements: {},
-          events: [],
-          ...emptyStream(),
-        };
+    return this.retained(state ? JSON.parse(JSON.stringify(state)) : this.empty());
+  }
+
+  protected empty(): RuntimeDiagnostics {
+    return {
+      touched: 0,
+      inputs: {},
+      outputs: {},
+      measurements: {},
+      cumulativeMeasurements: {},
+      faults: {},
+      acknowledgements: {},
+      events: [],
+      ...emptyStream(),
+    };
+  }
+
+  /**
+   * The copy `ingest` mutates and stores only once the message is admitted. It shares the immutable
+   * sample, fault and acknowledgement records with the stored state instead of deep-copying them on
+   * every message: those records are only ever replaced or deleted, never changed in place. Only the
+   * containers a message can change are copied, so a rejected message still leaves no trace.
+   */
+  protected working(id: number): RuntimeDiagnostics {
+    const state = this.controllers.get(id);
+    if (!state) return this.retained(this.empty());
+    // Stream admission mutates these two in place; `retained` copies the collections and events.
+    return this.retained({ ...state, retiredStreams: [...state.retiredStreams], watermarks: { ...state.watermarks } });
+  }
+
+  /** Copies the per-channel collections (shallowly) and drops everything past the retention window. */
+  protected retained(copy: RuntimeDiagnostics): RuntimeDiagnostics {
     const cutoff = this.now() - RETENTION_MS;
     for (const field of [
       'inputs',

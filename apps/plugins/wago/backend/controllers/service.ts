@@ -28,9 +28,12 @@ import {
   compatibilityError,
   configurationDesiredTopic,
   discoveryTopic,
+  parseControllerJson,
 } from '../protocol/index';
 
 import { parseConfigurationReport } from '../configuration/model';
+
+import { requireRuntimeSupport } from '../configuration/channel-enabled';
 
 import { WagoSubscriptions } from './subscriptions';
 
@@ -219,7 +222,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
 
   protected connectivity(controller: WagoController): WagoControllerSummary['connectivity'] {
     if (controller.trustState === 'untrusted') return 'untrusted';
-    const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt;
+    const heartbeatAt = this.diagnostics.heartbeatAt(controller.id) ?? controller.lastHeartbeatAt;
     if (freshness(heartbeatAt, Date.now(), STALE_AFTER_MS) !== 'fresh') return 'stale';
     if (this.isRuntimeUpdateRequired(controller.id)) {
       const policy = this.runtimePolicies.get(controller.id);
@@ -238,6 +241,9 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
       capabilities: JSON.parse(controller.capabilities) as string[],
     });
     if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
+    // Rechecks publications and rollbacks at dispatch; the snapshot is never altered. The runtime policy
+    // replay in `setRuntimePolicy` publishes without this method and applies the same gate itself.
+    requireRuntimeSupport(JSON.parse(revision.snapshot), controller.capabilities);
     const settings = await this.getSettings();
     const runtimePolicy = this.runtimePolicies.get(controller.id);
     await this.context.mqtt.publish(
@@ -261,15 +267,11 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
     return this.revisions.save(revision);
   }
 
+  /** Revision a queued report acknowledges; throws for a report outside the controller payload limits. */
   protected configurationReportRevision(payload: Buffer): number | null {
-    try {
-      const report = JSON.parse(payload.toString('utf8')) as { revision?: unknown };
-      return Number.isSafeInteger(report.revision) && (report.revision as number) >= 1
-        ? (report.revision as number)
-        : null;
-    } catch {
-      return null;
-    }
+    const report = parseControllerJson(payload, 'configuration report');
+    const revision = report && typeof report === 'object' ? (report as { revision?: unknown }).revision : undefined;
+    return Number.isSafeInteger(revision) && (revision as number) >= 1 ? (revision as number) : null;
   }
 
   protected async processConfigurationReports(
@@ -300,8 +302,17 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
     const queue = this.configurationReportQueues.get(controllerId) ?? { pending: new Map(), processing: false };
     this.configurationReportQueues.set(controllerId, queue);
     if (queue.processing) {
-      // Preserve acknowledgements for distinct immutable revisions in arrival order.
-      const revision = this.configurationReportRevision(payload);
+      // Preserve acknowledgements for distinct immutable revisions in arrival order. A report that is
+      // too large, too deep or not JSON is dropped here, so the pending queue only holds bounded payloads.
+      let revision: number | null;
+      try {
+        revision = this.configurationReportRevision(payload);
+      } catch (error) {
+        this.context.logger.warn(
+          `Dropping invalid WAGO configuration report for controller ${controllerId}: ${(error as Error).message}`,
+        );
+        return;
+      }
       const key = revision ?? Number.NaN;
       if (queue.pending.has(key) || queue.pending.size < MAX_PENDING_CONFIGURATION_REPORTS)
         queue.pending.set(key, payload);
@@ -319,7 +330,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   protected async onConfigurationReported(controllerId: number, payload: Buffer): Promise<void> {
     let report: ReturnType<typeof parseConfigurationReport>;
     try {
-      report = parseConfigurationReport(JSON.parse(payload.toString('utf8')));
+      report = parseConfigurationReport(parseControllerJson(payload, 'configuration report'));
     } catch {
       this.context.logger.warn(`Ignoring invalid WAGO configuration report for controller ${controllerId}`);
       return;

@@ -17,7 +17,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
 
   constructor(
     @InjectRepository(ResourceIntroducer)
-    private resourceIntroducerRepository: Repository<ResourceIntroducer>
+    private resourceIntroducerRepository: Repository<ResourceIntroducer>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -30,7 +30,13 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
     }
 
     // Check if the user has system permissions to manage all resources
-    if ((user as unknown as AuthenticatedUser).effectivePermissions?.has('resources.access.manage') === true) {
+    const permissions = (user as unknown as AuthenticatedUser).effectivePermissions;
+    if (permissions?.has('resources.access.manage') === true) {
+      return true;
+    }
+    // Reading the list and history (GET) also allows resource managers, like the machine-level canViewAccessLists rule.
+    // Granting and revoking stay with introducers and access managers.
+    if (request.method === 'GET' && permissions?.has('resources.update') === true) {
       return true;
     }
 

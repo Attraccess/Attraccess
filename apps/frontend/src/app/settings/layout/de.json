@@ -13,7 +13,7 @@
   "sections": {
     "general": {
       "label": "Allgemein",
-      "description": "Basis-URLs und Lizenz"
+      "description": "Basis-URLs, Lizenz und Sichtbarkeit der Ressourcennutzung"
     },
     "email": {
       "label": "E-Mail",

@@ -7,9 +7,10 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeMeasurement } from '../../measurement-contract';
-import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
+import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
+import { CHANNEL_ENABLED_CAPABILITY } from '../../shared/capabilities';
 import { FrontPanel } from '../src/front-panel/FrontPanel';
-import { addDevice } from '../src/front-panel/model';
+import { addDevice, busConnection, deviceReadingChannels, saveDevice } from '../src/front-panel/model';
 import { useFrontPanel } from '../src/front-panel/working-copy/useFrontPanel';
 import { DIGITAL_TERMINALS } from '../../backend/configuration/digital';
 import { updateTerminal } from '../src/front-panel/model';
@@ -64,10 +65,17 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 it('shows all meter sections and keeps available phases current when one register faults', async () => {
-  const configuration = addDevice(
+  const added = addDevice(
     { snapshot: { version: 1, physicalPoints: [], logicalChannels: [] }, metadata: { names: {}, presets: [] } },
     'Three-phase meter',
+    { disabledChannels: true },
   ).configuration;
+  // Every reading enabled, as in a configuration published before readings could be disabled.
+  const meter = required(added.snapshot.modbus?.devices[0]);
+  const configuration = saveDevice(added, meter, busConnection(added.snapshot), BUILTIN_MODBUS_PROFILES[0], {
+    disabledChannels: true,
+    disabledReadings: new Set(),
+  });
   const meterDraft = {
     ...draft,
     snapshot: JSON.stringify(configuration.snapshot),
@@ -460,5 +468,210 @@ describe('front panel page actions', () => {
     expect(
       screen.getByText('$.logicalChannels[0]: unsupported_capability, $.physicalPoints[0]: unknown_terminal'),
     ).toBeTruthy();
+  });
+});
+
+describe('meter readings', () => {
+  const withCapabilities = (capabilities: string[]) => {
+    const diagnostics = api.diagnostics();
+    api.diagnostics.mockReturnValue({ ...diagnostics, data: { ...diagnostics.data, capabilities } });
+  };
+  const enabledChannels = (value: { logicalChannels: Array<{ enabled?: false }> }) =>
+    value.logicalChannels.filter((channel) => channel.enabled !== false).length;
+
+  it('adds a meter with the recommended readings and switches readings per register and section', async () => {
+    withCapabilities(['front-panel-v1', CHANNEL_ENABLED_CAPABILITY]);
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Modbus device' }, { timeout: 10000 }));
+    const dialog = await screen.findByRole('dialog');
+    // The onboard output channel counts too.
+    expect(within(dialog).getByText('12 of 256 channels enabled on this controller')).toBeTruthy();
+    expect(within(dialog).getByRole('switch', { name: 'L2 voltage' })).toHaveProperty('checked', true);
+    const reactive = within(dialog).getByRole('switch', { name: 'Total reactive power' });
+    expect(reactive).toHaveProperty('checked', false);
+    fireEvent.click(reactive);
+    expect(reactive).toHaveProperty('checked', true);
+    expect(within(dialog).getByText('13 of 256 channels enabled on this controller')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enable section: Electrical measurements' }));
+    expect(within(dialog).getByText('Electrical measurements (28 of 28 enabled)')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Recommended readings only' }));
+    expect(within(dialog).getByText('12 of 256 channels enabled on this controller')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disable section: Electrical measurements' }));
+    expect(within(dialog).getByText('Electrical measurements (0 of 28 enabled)')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('switch', { name: 'Active power' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    await waitFor(() => expect(api.save).toHaveBeenCalled());
+    const saved = api.save.mock.calls[0][1];
+    expect(saved.logicalChannels).toHaveLength(132);
+    // The output, total active power and the two energy counters.
+    expect(enabledChannels(saved)).toBe(4);
+  });
+
+  it('adds only the recommended readings and locks the switches when the runtime cannot disable channels', async () => {
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Modbus device' }, { timeout: 10000 }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/cannot disable channels/)).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Recommended readings only' })).toHaveProperty('disabled', true);
+    expect(within(dialog).queryByRole('button', { name: /^Enable section/ })).toBeNull();
+    const voltage = within(dialog).getByRole('switch', { name: 'L2 voltage' });
+    expect(voltage).toHaveProperty('checked', true);
+    expect(voltage).toHaveProperty('disabled', true);
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(within(dialog).getByText('12 von 256 Kanälen auf diesem Controller aktiviert')).toBeTruthy();
+    expect(within(dialog).getByText(/Aktualisiere die CC100-Laufzeit, um Kanäle zu deaktivieren/)).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('en'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    await waitFor(() => expect(api.save).toHaveBeenCalled());
+    const saved = api.save.mock.calls[0][1];
+    expect(saved.logicalChannels).toHaveLength(12);
+    expect(enabledChannels(saved)).toBe(12);
+  });
+
+  it('shows disabled readings as disabled instead of a missing value', async () => {
+    withCapabilities(['front-panel-v1', CHANNEL_ENABLED_CAPABILITY]);
+    const configuration = addDevice(
+      { snapshot: { version: 1, physicalPoints: [], logicalChannels: [] }, metadata: { names: {}, presets: [] } },
+      'Hall meter',
+      { disabledChannels: true },
+    ).configuration;
+    const meterDraft = {
+      ...draft,
+      snapshot: JSON.stringify(configuration.snapshot),
+      presetProvenance: JSON.stringify({ editor: configuration.metadata }),
+    };
+    api.getDraft.mockResolvedValue(meterDraft);
+    api.baseline.mockResolvedValue({ ...meterDraft, revision: 7, state: 'applied' });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    const card = (await screen.findByText('Hall meter')).closest('.card') ?? document.body;
+    const row = (name: string) => required(within(card as HTMLElement).getByText(name).parentElement);
+    expect(within(row('L2 voltage')).getByText('—')).toBeTruthy();
+    expect(within(row('Total reactive power')).getByText('Disabled')).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(await within(card as HTMLElement).findAllByText('Deaktiviert')).not.toHaveLength(0);
+  });
+
+  /** Serves a configuration as both the saved draft and the applied revision. */
+  const serve = (configuration: { snapshot: unknown; metadata: unknown }) => {
+    const meterDraft = {
+      ...draft,
+      snapshot: JSON.stringify(configuration.snapshot),
+      presetProvenance: JSON.stringify({ editor: configuration.metadata }),
+    };
+    api.getDraft.mockResolvedValue(meterDraft);
+    api.baseline.mockResolvedValue({ ...meterDraft, revision: 7, state: 'applied' });
+  };
+  const emptyPanel = () => ({
+    snapshot: { version: 1 as const, physicalPoints: [], logicalChannels: [] },
+    metadata: { names: {}, presets: [] },
+  });
+
+  it('keeps a reading that a guard uses enabled and names the output that needs it', async () => {
+    withCapabilities(['front-panel-v1', CHANNEL_ENABLED_CAPABILITY]);
+    const { configuration: added, id } = addDevice(emptyPanel(), 'Hall meter', { disabledChannels: true });
+    const power = required(deviceReadingChannels(added.snapshot, id).get('active-power'));
+    serve(
+      updateTerminal(added, DIGITAL_TERMINALS[0], 'Laser power', {
+        capabilities: ['output', 'guard'],
+        guard: { channelId: power, when: 'on' },
+      }),
+    );
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure Hall meter' }, { timeout: 10000 }));
+    const dialog = await screen.findByRole('dialog');
+    const active = within(dialog).getByRole('switch', { name: 'Active power' });
+    expect(active).toHaveProperty('checked', true);
+    expect(active).toHaveProperty('disabled', true);
+    const description = (active.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((part) => document.getElementById(part)?.textContent)
+      .join(' ');
+    expect(description).toContain('0x');
+    expect(description).toContain('Stays enabled: used as guard or feedback by Laser power.');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disable section: Electrical measurements' }));
+    expect(active).toHaveProperty('checked', true);
+    expect(within(dialog).getByText('Electrical measurements (1 of 28 enabled)')).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(
+      within(dialog).getByText(/Bleibt aktiviert: wird von Laser power als Freigabe oder Rückmeldung/),
+    ).toBeTruthy();
+    act(() => useTranslationState.getState().setLanguage('en'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    await waitFor(() => expect(api.save).toHaveBeenCalled());
+    const saved = api.save.mock.calls[0][1];
+    expect(saved.logicalChannels.find((channel: { id: string }) => channel.id === power).enabled).toBeUndefined();
+  });
+
+  /** Two meters on one custom copy of the 879-3020 map with every reading enabled: 262 of 256. */
+  const overLimit = () => {
+    let configuration = addDevice(emptyPanel(), 'First meter', { disabledChannels: true }).configuration;
+    configuration = addDevice(configuration, 'Second meter', { disabledChannels: true }).configuration;
+    const custom = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'custom-meter');
+    for (const device of required(configuration.snapshot.modbus).devices)
+      configuration = saveDevice(configuration, device, busConnection(configuration.snapshot), custom, {
+        disabledChannels: true,
+        disabledReadings: new Set(),
+      });
+    return configuration;
+  };
+
+  it('offers to disable every unused reading of a custom map over the channel limit', async () => {
+    withCapabilities(['front-panel-v1', CHANNEL_ENABLED_CAPABILITY]);
+    serve(overLimit());
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure First meter' }, { timeout: 10000 }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/^262 of 256 channels enabled on this controller\. Disable readings/)).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: 'Recommended readings only' })).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disable all unused readings' }));
+    expect(within(dialog).getByText('131 of 256 channels enabled on this controller')).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Done' })).toHaveProperty('disabled', false);
+  });
+
+  it('blocks saving over the channel limit when the runtime cannot disable readings', async () => {
+    serve(overLimit());
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure First meter' }, { timeout: 10000 }));
+    const dialog = await screen.findByRole('dialog');
+    const status = within(dialog).getByText(/^262 of 256 channels enabled/);
+    expect(status.textContent).toContain('cannot disable readings');
+    expect(status.textContent).toContain('Update the CC100 runtime');
+    expect(status.textContent).not.toContain('Disable readings');
+    expect(within(dialog).getByRole('button', { name: 'Disable all unused readings' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    expect(within(dialog).getByRole('button', { name: 'Done' })).toHaveProperty('disabled', true);
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(
+      within(dialog).getByText(/kann keine Messwerte deaktivieren, daher lässt sich dieses Gerät so nicht speichern/),
+    ).toBeTruthy();
+  });
+
+  it('shows a reading without a channel as not configured rather than disabled', async () => {
+    // An older runtime only gets the recommended readings, so the other registers have no channel.
+    serve(addDevice(emptyPanel(), 'Hall meter').configuration);
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    const card = (await screen.findByText('Hall meter')).closest('.card') ?? document.body;
+    const row = (name: string) => required(within(card as HTMLElement).getByText(name).parentElement);
+    expect(within(row('Total reactive power')).getByText('Not configured')).toBeTruthy();
+    expect(within(card as HTMLElement).queryByText('Disabled')).toBeNull();
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(await within(row('Gesamtblindleistung')).findByText('Nicht konfiguriert')).toBeTruthy();
+  });
+
+  it.each([
+    [{ isSuccess: false, isError: false, data: undefined }, 'Checking the CC100 runtime on this controller'],
+    [{ isSuccess: false, isError: true, data: undefined }, 'The controller status did not load'],
+  ])('waits for the runtime capabilities before adding a meter (%j)', async (diagnostics, hint) => {
+    api.diagnostics.mockReturnValue({ ...diagnostics, refetch: vi.fn() });
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper });
+    const add = await screen.findByRole('button', { name: 'Add Modbus device' }, { timeout: 10000 });
+    expect(add).toHaveProperty('disabled', true);
+    expect(document.getElementById(add.getAttribute('aria-describedby') ?? '')?.textContent).toContain(hint);
+    expect(screen.queryByText(/cannot disable channels/)).toBeNull();
   });
 });

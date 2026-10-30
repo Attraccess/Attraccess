@@ -3,7 +3,9 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/attractap-lab/src",
   "projectType": "application",
-  "tags": ["scope:hardware"],
+  "tags": [
+    "scope:hardware"
+  ],
   "targets": {
     "check": {
       "executor": "nx:run-commands",
@@ -30,6 +32,14 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "nix run path:./apps/attractap-lab --"
+      },
+      "cache": false
+    },
+    "hil": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "./hil/run.sh",
+        "cwd": "apps/attractap-lab"
       },
       "cache": false
     }

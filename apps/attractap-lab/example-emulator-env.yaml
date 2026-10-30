@@ -1,0 +1,23 @@
+# Reader plus the NFC card emulator mounted in front of it. Only for places
+# that export NfcEmulatorSerial and NfcEmulatorFlash.
+imports:
+  - attractap_lab.drivers
+targets:
+  main:
+    resources:
+      RemotePlace:
+        name: reader-1
+    drivers:
+      ESPToolDriver:
+        bindings:
+          device: USBFlashableDevice
+      SerialDriver:
+        bindings:
+          port: USBSerialPort
+      ScreenCaptureDriver: {}
+      NfcEmulatorDriver:
+        bindings:
+          port: NfcEmulatorSerial
+      NfcEmulatorFlashDriver:
+        bindings:
+          device: NfcEmulatorFlash

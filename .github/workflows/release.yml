@@ -73,7 +73,8 @@ jobs:
         run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:type:plugin,tag:scope:companion
 
   plugins:
-    needs: [lint, typecheck, test, build]
+    needs: [lint, typecheck, test, build, attractap-lab-hil]
+    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -105,12 +106,20 @@ jobs:
   build-attractap-desktop:
     uses: ./.github/workflows/build-attractap-desktop.yml
 
+  attractap-lab-hil:
+    # Real reader firmware against the NFC card emulator in the Attractap lab;
+    # skipped unless vars.ATTRACTAP_LAB_HIL_ENABLED is 'true'. Publishing jobs
+    # need it: a failed or cancelled run blocks them, a skipped one does not.
+    uses: ./.github/workflows/attractap-lab-hil.yml
+    secrets: inherit
+
   build-attractap-firmware:
     uses: ./.github/workflows/attractap-firmware.yml
     secrets: inherit
 
   publish-attractap-desktop:
-    needs: build-attractap-desktop
+    needs: [build-attractap-desktop, attractap-lab-hil]
+    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -132,8 +141,8 @@ jobs:
           gh release upload "$RELEASE_TAG" simulator-packages/*.dmg --clobber
 
   containerize:
-    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop]
-    if: always() && !failure() && !cancelled()
+    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop, attractap-lab-hil]
+    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -200,7 +209,8 @@ jobs:
           append_body: true
 
   balena:
-    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop]
+    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop, attractap-lab-hil]
+    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

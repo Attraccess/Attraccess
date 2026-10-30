@@ -31,11 +31,11 @@ import {
   Attractap,
   ResourceIntroducerType,
   ResourceUsage,
-  useAccessControlServiceResourceIntroducersGetMany,
+  useAccessControlServiceResourceIntroducersGetNames,
   useAttractapServiceGetReaders,
   useResourcesServiceResourceUsageRequestSupervisedSession,
   RequestSupervisedSessionDto,
-  ResourceIntroducer,
+  ResourceIntroducerNameDto,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import en from './translations/en.json';
@@ -61,7 +61,7 @@ type Props = {
   secondsLeft: number;
   t: TFunction;
   isLoadingCandidates: boolean;
-  supervisors: ResourceIntroducer[];
+  supervisors: ResourceIntroducerNameDto[];
   resourceReaders: Attractap[];
   otherReaders: Attractap[];
   renderReaderButton: (reader: Attractap) => ReactNode;
@@ -126,12 +126,15 @@ export function SupervisedStartBody({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {supervisors.map((supervisor) => (
             <Button
-              key={supervisor.id}
+              key={supervisor.userId}
               variant="outline"
               className="h-auto w-full justify-start py-2"
               onPress={() => handleSelectSupervisor(supervisor.userId)}
             >
-              <AttraccessUser user={supervisor.user} description={t('select.role.introducer')} />
+              <AttraccessUser
+                user={{ id: supervisor.userId, username: supervisor.username }}
+                description={t('select.role.introducer')}
+              />
             </Button>
           ))}
         </div>
@@ -177,15 +180,14 @@ export function useSupervisedStartModalState({
   const [waitingAtReader, setWaitingAtReader] = useState<string | null>(null);
 
   // Only introducers may supervise, excluding the requester themselves.
-  const { data: candidates, isLoading: isLoadingCandidates } = useAccessControlServiceResourceIntroducersGetMany({
+  const { data: candidates, isLoading: isLoadingCandidates } = useAccessControlServiceResourceIntroducersGetNames({
     resourceId,
   });
 
   const supervisors = useMemo(
     () =>
       (candidates ?? []).filter(
-        (candidate) =>
-          candidate.type === ResourceIntroducerType.INTRODUCER && candidate.userId !== user?.id && candidate.user,
+        (candidate) => candidate.role === ResourceIntroducerType.INTRODUCER && candidate.userId !== user?.id,
       ),
     [candidates, user?.id],
   );

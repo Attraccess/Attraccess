@@ -7,6 +7,18 @@ let
   placesConfig = yaml.generate "attractap-places.yaml" { places = cfg.coordinator.places; };
   labgrid = pkgs.python3Packages.labgrid;
   tools = [ cfg.package labgrid pkgs.ser2net pkgs.esptool pkgs.ffmpeg pkgs.openssh pkgs.rsync pkgs.uhubctl pkgs.usbutils pkgs.v4l-utils ] ++ cfg.extraPackages;
+  readerWifi = cfg.readerWifi;
+  # Runs as root through sudo, so the credentials file can stay root-only.
+  readerWifiRoot = pkgs.writeShellScript "attractap-lab-reader-wifi-root" ''
+    exec ${cfg.package}/bin/attractap-lab-reader-wifi \
+      --credentials ${lib.escapeShellArg readerWifi.credentialsFile} \
+      --exporter-config ${exporterConfig} \
+      --coordinator ${lib.escapeShellArg cfg.coordinator.syncAddress} \
+      --labgrid-client ${labgrid}/bin/labgrid-client "$@"
+  '';
+  readerWifiCommand = pkgs.writeShellScriptBin "attractap-lab-reader-wifi" ''
+    exec /run/wrappers/bin/sudo -n ${readerWifiRoot} "$@"
+  '';
   waitForCoordinator = pkgs.writeShellScript "labgrid-wait-for-coordinator" ''
     until ${labgrid}/bin/labgrid-client -x ${lib.escapeShellArg cfg.coordinator.syncAddress} places >/dev/null; do
       ${pkgs.coreutils}/bin/sleep 1
@@ -23,7 +35,12 @@ let
     imports = [ "attractap_lab.drivers" ];
     targets.main = {
       resources.RemotePlace.name = "set-per-place-by-the-janitor";
-      drivers = { ESPToolDriver = { }; SerialDriver = { }; };
+      # Explicit bindings: a place may also export an NFC emulator, which the
+      # janitor must never erase.
+      drivers = {
+        ESPToolDriver.bindings.device = "USBFlashableDevice";
+        SerialDriver.bindings.port = "USBSerialPort";
+      };
     };
   };
   # The janitor reaches this host's exporter like any client: labgrid always
@@ -89,6 +106,22 @@ in {
       hostname = mkOption { type = types.str; default = config.networking.hostName; description = "Reachable hostname advertised for serial, SSH and other exported resources."; };
       coordinatorAddress = mkOption { type = types.str; default = "127.0.0.1:20408"; description = "Coordinator HOST:PORT (labgrid gRPC address)."; };
       settings = mkOption { type = yaml.type; default = { }; description = "Native labgrid exporter YAML: one resource group per reader. Use stable USB properties in match expressions."; };
+    };
+    readerApiRelay = {
+      enable = mkEnableOption "letting lab users relay a test API to the readers' LAN with an SSH reverse tunnel (CI runners are not on that LAN)";
+      port = mkOption {
+        type = types.port;
+        default = 20480;
+        description = "The only port the labgrid account may forward. Open it to the readers' LAN in the host firewall; the module opens no ports.";
+      };
+    };
+    readerWifi = {
+      enable = mkEnableOption "sending the lab Wi-Fi credentials to claimed readers without revealing them to lab users";
+      credentialsFile = mkOption {
+        type = types.str;
+        default = "/var/lib/attractap-lab/reader-wifi.json";
+        description = ''Root-only JSON file {"ssid": "...", "password": "..."}. Provision it on the host, outside the Nix store.'';
+      };
     };
     janitor = {
       enable = mkEnableOption "erasing and parking every reader as soon as it is released";
@@ -216,6 +249,28 @@ in {
         RestartSec = 5;
       };
     };
+  })
+  (mkIf cfg.readerApiRelay.enable {
+    # Remote forwards on all addresses, but only on the relay port.
+    services.openssh.extraConfig = ''
+      Match User labgrid
+        GatewayPorts clientspecified
+        PermitListen 0.0.0.0:${toString cfg.readerApiRelay.port}
+    '';
+  })
+  (mkIf readerWifi.enable {
+    assertions = [ {
+      assertion = cfg.exporter.enable;
+      message = "services.attractap-lab.readerWifi needs the exporter on the same host.";
+    } ];
+    # Lab users run the command but cannot read the credentials it sends.
+    environment.systemPackages = [ readerWifiCommand ];
+    users.users.labgrid.packages = [ readerWifiCommand ];
+    security.sudo.extraRules = [ {
+      users = [ "labgrid" ];
+      commands = [ { command = "${readerWifiRoot}"; options = [ "NOPASSWD" ]; } ];
+    } ];
+    systemd.tmpfiles.rules = [ "d ${dirOf readerWifi.credentialsFile} 0700 root root -" ];
   })
   (mkIf janitor.enable {
     systemd.services.attractap-lab-janitor = {

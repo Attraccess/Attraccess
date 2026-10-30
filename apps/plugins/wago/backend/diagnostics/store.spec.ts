@@ -1,4 +1,10 @@
-import { freshness, WagoDiagnosticsStore } from './store';
+import { BOUNDED_MESSAGES_CAPABILITY } from '../../shared/capabilities';
+import { CONFIGURATION_LIMIT_CODE, CONFIGURATION_LIMIT_MESSAGES } from '../../shared/configuration-limits';
+import manifest from '../../cc100-runtime/manifest.json';
+import { CAPABILITIES } from '../../cc100-runtime/src/runtime/identity/protocol';
+import { parseConfigurationReport } from '../configuration/model';
+import { parseHeartbeat } from '../protocol/index';
+import { freshness, RETENTION_MS, WagoDiagnosticsStore } from './store';
 
 describe('WAGO bounded diagnostics', () => {
   let now: number;
@@ -7,6 +13,20 @@ describe('WAGO bounded diagnostics', () => {
   beforeEach(() => {
     now = Date.parse('2026-09-05T12:00:00Z');
     store = new WagoDiagnosticsStore(() => now);
+  });
+  it('keeps the configuration limit code of a runtime rejection and hides unknown codes', () => {
+    send('configuration/reported', {
+      revision: 3,
+      contentHash: 'a'.repeat(64),
+      errors: [
+        { path: 'snapshot', code: CONFIGURATION_LIMIT_CODE, message: CONFIGURATION_LIMIT_MESSAGES.channels },
+        { path: 'snapshot', code: 'made_up_code', message: 'anything' },
+      ],
+    });
+    expect(store.read(1).rejection?.errors).toEqual([
+      { path: 'snapshot', code: CONFIGURATION_LIMIT_CODE },
+      { path: 'snapshot', code: 'validation_error' },
+    ]);
   });
   it('distinguishes missing, invalid, stale and future source times', () => {
     expect(freshness(null, now)).toBe('missing');
@@ -27,6 +47,79 @@ describe('WAGO bounded diagnostics', () => {
       sourceAt: null,
     });
     expect(store.read(1).outputs.invalid).toBeUndefined();
+  });
+  it('reads the heartbeat time without copying the diagnostics state, and forgets it after retention', () => {
+    expect(store.heartbeatAt(1)).toBeUndefined();
+    send('heartbeat', { hardwareId: 'cc100-1', sequence: 1 });
+    expect(store.heartbeatAt(1)).toBe(new Date(now).toISOString());
+    expect(store.heartbeatAt(1)).toBe(store.read(1).heartbeatAt);
+    expect(store.heartbeatAt(2)).toBeUndefined();
+    now += RETENTION_MS + 1;
+    expect(store.heartbeatAt(1)).toBeUndefined();
+  });
+  describe('mixed runtime and server versions', () => {
+    const heartbeat = (extra: Record<string, unknown>) => ({
+      hardwareId: 'cc100-1',
+      protocolVersion: '1.0.0',
+      runtimeVersion: '0.2.10',
+      timestamp: '2026-09-05T12:00:00.000Z',
+      streamId: '6b6b0b0e-3d0c-4d2a-9b7b-5f0f0b0b0b0b',
+      sequence: 1,
+      ...extra,
+    });
+    const counts = { oversized: 2, overload: 1 };
+
+    it('reads drop counters only from a runtime that advertises bounded messages', () => {
+      send('heartbeat', heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts: counts }));
+      expect(store.read(1).dropCounts).toEqual(counts);
+    });
+
+    it('ignores drop counters from a runtime without the capability', () => {
+      send('heartbeat', heartbeat({ capabilities: ['claim'], dropCounts: counts }));
+      expect(store.read(1).dropCounts).toBeUndefined();
+    });
+
+    it('treats an older runtime heartbeat without counters as unsupported', () => {
+      send('heartbeat', heartbeat({ capabilities: ['claim', 'heartbeat'] }));
+      expect(store.read(1).dropCounts).toBeUndefined();
+    });
+
+    it.each([{ oversized: -1, overload: 0 }, { oversized: 1.5, overload: 0 }, { oversized: 1 }, [1, 2], 'many'])(
+      'ignores malformed counters %j',
+      (dropCounts) => {
+        send('heartbeat', heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts }));
+        expect(store.read(1).dropCounts).toBeUndefined();
+      },
+    );
+
+    it('drops counters again when a later heartbeat no longer reports them', () => {
+      send('heartbeat', heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts: counts }));
+      send('heartbeat', heartbeat({ capabilities: ['claim'], sequence: 2 }));
+      expect(store.read(1).dropCounts).toBeUndefined();
+    });
+
+    it('lets an older server keep parsing heartbeats and reports that carry the new fields', () => {
+      const payload = Buffer.from(
+        JSON.stringify(heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts: counts })),
+      );
+      expect(parseHeartbeat(payload).capabilities).toContain(BOUNDED_MESSAGES_CAPABILITY);
+      expect(
+        parseConfigurationReport({
+          revision: 2,
+          contentHash: 'a'.repeat(64),
+          errors: [{ path: 'snapshot', code: 'configuration_limit_exceeded', message: 'too big' }],
+          omittedErrors: 12,
+        }),
+      ).toEqual({
+        revision: 2,
+        contentHash: 'a'.repeat(64),
+        errors: [{ path: 'snapshot', code: 'configuration_limit_exceeded', message: 'too big' }],
+      });
+    });
+
+    it('keeps the same runtime capability list in the manifest and the code', () => {
+      expect(manifest.capabilities).toEqual(CAPABILITIES);
+    });
   });
   it('excludes secrets and safely stores own prototype-named channels', () => {
     send('heartbeat', { pairingCode: 'SECRET', enrollmentSecret: 'SECRET', password: 'SECRET' });
@@ -66,6 +159,58 @@ describe('WAGO bounded diagnostics', () => {
     send('state', { outputs: { relay: false } });
     store.read(1).outputs.relay.value = true;
     expect(store.read(1).outputs.relay.value).toBe(false);
+  });
+  it('shares unchanged channel records between messages instead of deep-copying the state', () => {
+    send('measurements', { channelId: 'a', value: 1, unit: 'watt' });
+    const stored = () => Reflect.get(store, 'controllers').get(1);
+    const first = stored().measurements.a;
+    send('measurements', { channelId: 'b', value: 2, unit: 'watt' });
+    expect(stored().measurements.a).toBe(first);
+    expect(stored().measurements.b).toMatchObject({ value: 2 });
+    // A reader still gets a detached copy, so it can never mutate the shared records.
+    store.read(1).measurements.a.value = 99;
+    expect(stored().measurements.a.value).toBe(1);
+    expect(store.read(1).measurements.a.value).toBe(1);
+  });
+  it('leaves the stored stream and samples untouched when a canonical message is rejected', () => {
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    const envelope = (sequence: number) => ({ timestamp: new Date(now).toISOString(), streamId, sequence });
+    send('state', { ...envelope(2), connected: true, revision: 1, contentHash: 'a'.repeat(64), outputs: {} });
+    send('measurements', { ...envelope(5), channelId: 'm', value: 1000, unit: 'milliwatt', kind: 'live' });
+    const before = store.read(1);
+    // Out-of-order sequence for the category, and a second stream that may not start with a measurement.
+    expect(send('measurements', { ...envelope(4), channelId: 'm', value: 2000, unit: 'milliwatt', kind: 'live' })).toBe(
+      false,
+    );
+    expect(
+      send('measurements', {
+        ...envelope(1),
+        streamId: '00000000-0000-4000-8000-000000000002',
+        channelId: 'm',
+        value: 3000,
+        unit: 'milliwatt',
+        kind: 'live',
+      }),
+    ).toBe(false);
+    expect(store.read(1)).toEqual(before);
+  });
+  it('keeps a repeated on-change measurement up to 30 s apart as one fresh sample', () => {
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    const envelope = (sequence: number) => ({ timestamp: new Date(now).toISOString(), streamId, sequence });
+    send('state', { ...envelope(1), connected: true, revision: 1, contentHash: 'a'.repeat(64), outputs: {} });
+    const measurement = (sequence: number) =>
+      send('measurements', { ...envelope(sequence), channelId: 'm', value: 1000, unit: 'milliwatt', kind: 'live' });
+    expect(measurement(1)).toBe(true);
+    now += 30_000;
+    // The keepalive repeats the unchanged value; it advances the sample's source time.
+    expect(measurement(2)).toBe(true);
+    now += 89_000;
+    // 119 s after the first report, but only 89 s after the keepalive: still within the 90 s rule.
+    const sample = store.read(1).measurements.m;
+    expect(sample).toMatchObject({ value: 1000, sequence: 2 });
+    expect(freshness(sample.sourceAt, now)).toBe('fresh');
+    now += 2_000;
+    expect(freshness(store.read(1).measurements.m.sourceAt, now)).toBe('stale');
   });
   it('rejects measurements from before a canonical reconnect after a legacy disconnect', () => {
     const streamId = '00000000-0000-4000-8000-000000000001';

@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { CRASH_WATCHDOG_REASONS } from './reset-report-metrics';
 
 const MONITORING_ROOT = join(__dirname, '..', '..', '..', '..', 'monitoring');
 const METRICS_ROOT = join(__dirname);
@@ -248,6 +249,7 @@ describe('Monitoring configuration consistency', () => {
       // ATT-517 device + system health additions
       'AttractapAllReadersOffline',
       'AttractapReaderCrashes',
+      'AttractapReaderPowerOnResets',
       'CronJobFailing',
       'CronJobStale',
       'FlowExecutionFailures',
@@ -277,6 +279,40 @@ describe('Monitoring configuration consistency', () => {
 
       for (const alert of metricValueAlerts) {
         expectAlertNoDataState(grafanaRules, alert, 'OK');
+      }
+    });
+
+    it('reset-report warnings pin the agreed timing, threshold and wording', () => {
+      expect(grafanaRules).toMatch(/^ {4}interval: 1m$/m);
+      for (const [title, category] of [
+        ['AttractapReaderCrashes', 'crash_watchdog'],
+        ['AttractapReaderPowerOnResets', 'power_on'],
+      ]) {
+        const block = grafanaRules.match(new RegExp(`title: ${title}[\\s\\S]*?(?=\\n\\s+- uid:|\\n\\s*$)`))?.[0] ?? '';
+        expect(block).toMatch(/^ {8}for: 5m$/m);
+        expect(block).toContain('execErrState: Error');
+        expect(block).toContain('severity: warning');
+        expect(block).toMatch(/type: gt\n\s+params: \[3\]/);
+        expect(block).toContain('four or more');
+        expect(block).toContain(`category="${category}"`);
+        expect(block).toContain(
+          `max(last_over_time(attraccess_attractap_reset_reports_last_hour{job="attraccess", category="${category}"}[2m]))`,
+        );
+        expect(block).not.toContain('sum(');
+        expect(block).not.toContain('increase(');
+      }
+      const crash = grafanaRules.match(/title: AttractapReaderCrashes[\s\S]*?(?=\n\s+- uid:|\n\s*$)/)?.[0] ?? '';
+      // The reasons named in the warning text must be the ones the collector counts.
+      expect(crash).toContain(`(${CRASH_WATCHDOG_REASONS.join(', ')})`);
+      const powerOn = grafanaRules.match(/title: AttractapReaderPowerOnResets[\s\S]*?(?=\n\s+- uid:|\n\s*$)/)?.[0] ?? '';
+      expect(powerOn).toContain('does not confirm a reader fault');
+      expect(powerOn).not.toMatch(/crash/i);
+    });
+
+    it('alert rule expressions only reference defined metrics', () => {
+      const known = collectMetricNames();
+      for (const name of extractMetricRefs(grafanaRules)) {
+        expect(known.has(name) || known.has(stripHistogramSuffix(name))).toBe(true);
       }
     });
 

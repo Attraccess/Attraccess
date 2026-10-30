@@ -28,4 +28,8 @@ public:
     // Returns true if a touch input device was successfully initialized.
     // Drivers without a hardware-verified touch panel should override to return false.
     virtual bool touchAvailable() const { return true; }
+
+    // The RGB565 frame the panel shows (width x height, little-endian), or
+    // nullptr when the driver keeps no readable framebuffer.
+    virtual const uint8_t *frameBuffer() { return nullptr; }
 };

@@ -15,6 +15,11 @@ vi.mock('@heroui/react', () => {
       <button>{typeof children === 'function' ? children({}) : children}</button>
     ),
     Card: Object.assign(part, { Header: part, Title: part, Description: part, Content: part }),
+    Alert: part,
+    AlertContent: part,
+    AlertDescription: part,
+    AlertIndicator: part,
+    AlertTitle: part,
   };
 });
 
@@ -38,6 +43,7 @@ function fixture(): WagoDiagnostics {
     capabilities: [],
     incompatible: false,
     sequenceGaps: 0,
+    dropCounts: null,
     sequenceExplanation: 'Per category',
     activeStream: 'boot',
     trackingExhausted: false,
@@ -136,6 +142,94 @@ describe('diagnostics isolation', () => {
     expect(screen.getByText(/Latest input: true/)).toBeTruthy();
     expect(screen.getByText(/Hardware readiness: unknown/)).toBeTruthy();
     expect(screen.queryByText(/Latest output/)).toBeNull();
+  });
+  it.each([
+    ['en', 'fresh', true, null, 'No current report from the controller'],
+    ['de', 'fresh', true, null, 'Kein aktueller Bericht der Steuerung'],
+    ['en', 'stale', true, { oversized: 3, overload: 1 }, 'No current report from the controller'],
+    ['en', 'stale', false, { oversized: 3, overload: 1 }, 'Not reported by this runtime version'],
+  ] as const)(
+    'does not present missing or stale drop counters as current (%s, heartbeat %s, bounded %s)',
+    (language, freshness, bounded, dropCounts, summary) => {
+      useTranslationState.getState().setLanguage(language);
+      vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
+        isError: false,
+        isPending: false,
+        data: {
+          ...fixture(),
+          heartbeatFreshness: freshness,
+          capabilities: bounded ? ['bounded-messages-v1'] : [],
+          dropCounts,
+        },
+        dataUpdatedAt: Date.now(),
+        refetch: vi.fn(),
+      });
+      render(<ControllerDiagnostics controllerId={1} />);
+      expect(screen.getByText(summary).tagName).toBe('DD');
+      expect(screen.queryByText(/times out like|Zeitüberschreitung/)).toBeNull();
+    },
+  );
+  it.each([
+    ['en', 1, '1 disabled channel is configured. The controller neither polls nor publishes it, so it has no samples.'],
+    [
+      'en',
+      2,
+      '2 disabled channels are configured. The controller neither polls nor publishes them, so they have no samples.',
+    ],
+    [
+      'de',
+      1,
+      '1 deaktivierter Kanal ist konfiguriert. Der Controller fragt ihn weder ab noch veröffentlicht er ihn, daher hat er keine Werte.',
+    ],
+    [
+      'de',
+      2,
+      '2 deaktivierte Kanäle sind konfiguriert. Der Controller fragt sie weder ab noch veröffentlicht er sie, daher haben sie keine Werte.',
+    ],
+  ] as const)('counts disabled channels with singular and plural wording (%s, %i)', (language, count, text) => {
+    useTranslationState.getState().setLanguage(language);
+    vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
+      isError: false,
+      isPending: false,
+      data: {
+        ...fixture(),
+        disabledChannels: Array.from({ length: count }, (_, index) => ({
+          id: `reading-${index}`,
+          profile: 'generic-monitored-input',
+          capabilities: ['input', 'measurement'],
+          availability: 'disabled' as const,
+        })),
+      },
+      dataUpdatedAt: Date.now(),
+      refetch: vi.fn(),
+    });
+    render(<ControllerDiagnostics controllerId={1} />);
+    expect(screen.getByText(text)).toBeTruthy();
+  });
+  it.each([
+    ['en', { oversized: 3, overload: 1 }, 'Dropped messages', '3 too large · 1 while overloaded', /times out like/],
+    [
+      'de',
+      { oversized: 3, overload: 1 },
+      'Verworfene Nachrichten',
+      '3 zu groß · 1 bei Überlastung',
+      /Zeitüberschreitung/,
+    ],
+    ['en', null, 'Dropped messages', 'Not reported by this runtime version', null],
+    ['de', null, 'Verworfene Nachrichten', 'Diese Version der Laufzeitumgebung meldet sie nicht', null],
+  ] as const)('shows the drop counters in %s: %j', (language, dropCounts, label, value, explanation) => {
+    useTranslationState.getState().setLanguage(language);
+    vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
+      isError: false,
+      isPending: false,
+      data: { ...fixture(), dropCounts },
+      dataUpdatedAt: Date.now(),
+      refetch: vi.fn(),
+    });
+    render(<ControllerDiagnostics controllerId={1} />);
+    expect(screen.getByText(label).nextElementSibling?.textContent).toBe(value);
+    if (explanation) expect(screen.getByText(explanation)).toBeTruthy();
+    else expect(screen.queryByText(/times out like|Zeitüberschreitung/)).toBeNull();
   });
   it('hides cached online status when successful polling stalls, without another query update', () => {
     vi.useFakeTimers();

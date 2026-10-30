@@ -7,17 +7,25 @@ import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
+import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 
 function setup() {
   const registry = new LiveTopicsService();
   const resources = { find: jest.fn(async () => [{ id: 1 }]) };
   const events = { subscribeResource: jest.fn(async () => new Subject<{ data: object }>()) };
   const logs = { subjectFor: jest.fn(() => new Subject<{ data: object }>()), releaseSubject: jest.fn() };
+  const visibility = {
+    resolveMany: jest.fn(async (_user: AuthenticatedUser, ids: number[]) => new Map(ids.map((id) => [id, 'full']))),
+    resolve: jest.fn(async () => 'full'),
+    canFollowLive: jest.fn(async () => true),
+    viewLiveStream: jest.fn((stream: unknown) => stream),
+  };
   const provider = new ResourceLiveTopicsProvider(
     registry,
     resources as unknown as Repository<Resource>,
     events as unknown as ResourceEventsService,
     logs as unknown as FlowLogRecorderService,
+    visibility as unknown as ResourceActivityVisibilityService,
   );
   provider.onModuleInit();
   return { registry, resources, events, logs };

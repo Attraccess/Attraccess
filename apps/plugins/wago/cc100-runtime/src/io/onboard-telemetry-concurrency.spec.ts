@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { OnboardIoFixture, snapshot, deferred } from './onboard-io.test-utils';
+import { SEQUENCE_RESERVATION_BLOCK } from '../runtime/telemetry/telemetry';
 jest.mock('node:fs/promises', () => ({ __esModule: true, ...jest.requireActual('node:fs/promises') }));
 describe('CC100 packed digital I/O', () => {
   let fixture: OnboardIoFixture;
@@ -58,6 +59,8 @@ describe('CC100 packed digital I/O', () => {
     await fixture.apply();
     for (let index = 0; index < 100; index++) await fixture.command('missing', true, `unknown-${index}`);
     expect(Number(fixture.messages.at(-1)?.payload.sequence)).toBe(100);
+    // Exhaust the reserved block so the next allocation must save a new reservation.
+    fixture.runtime['reservedSequence'] = 100;
     const started = deferred();
     const release = deferred();
     const save = fixture.store.save.bind(fixture.store);
@@ -76,7 +79,7 @@ describe('CC100 packed digital I/O', () => {
     release.resolve();
     await Promise.all([applying, allocation]);
     expect((await fixture.store.load()).accepted?.revision).toBe(2);
-    expect((await fixture.store.load()).sequence).toBe(200);
+    expect((await fixture.store.load()).sequence).toBe(100 + SEQUENCE_RESERVATION_BLOCK);
   });
 
   it('coalesces many writes behind stalled telemetry into one pending refresh', async () => {

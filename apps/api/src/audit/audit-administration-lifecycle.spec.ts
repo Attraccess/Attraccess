@@ -184,18 +184,22 @@ describe('administration lifecycle hooks', () => {
       getMetricsToggles: jest.fn().mockResolvedValueOnce({ http: true }).mockResolvedValueOnce({ http: false }),
       getMetricsSlowQueryThresholdSeconds: jest.fn().mockResolvedValue(1),
       updateMetricsToggles: jest.fn().mockResolvedValue(undefined),
+      getResourceVisibilitySettings: jest.fn().mockResolvedValue({ activityVisibility: 'all' }),
+      updateResourceVisibilitySettings: jest.fn().mockResolvedValue({ activityVisibility: 'introduced' }),
     };
     const controller = new SettingsController(service as never, audit as never);
     await controller.updateAuditSettings({ retention_days: 30 }, req);
     await controller.updateAuthRateLimitSettings({ maxAttempts: 3, exponentialBackoff: true }, req);
     await controller.updateMessagingRateLimitSettings({ sendMaxPerWindow: 20 }, req);
     await controller.updateMetricsSettings({ toggles: { http: false } }, req);
+    await controller.updateResourceVisibilitySettings({ activityVisibility: 'introduced' }, req);
     expect(recorded(audit).map((event) => event.details.settingKey)).toEqual([
       'audit.retention_days',
       'auth.rateLimit.maxAttempts',
       'auth.rateLimit.exponentialBackoff',
       'messaging.rateLimit.sendMaxPerWindow',
       'metrics.toggles.http',
+      'resources.activityVisibility',
     ]);
   });
 

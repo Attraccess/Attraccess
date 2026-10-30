@@ -16,6 +16,7 @@ test = ["pytest>=8"]
 attractap-lab = "attractap_lab.cli:main"
 attractap-lab-maintenance = "attractap_lab.maintenance:main"
 attractap-lab-janitor = "attractap_lab.janitor:main"
+attractap-lab-reader-wifi = "attractap_lab.reader_wifi:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

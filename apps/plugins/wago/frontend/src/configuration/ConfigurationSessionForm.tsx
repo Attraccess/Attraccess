@@ -87,6 +87,7 @@ export function ConfigurationSessionForm({
               <ModbusChannels
                 deviceId={deviceId}
                 configuration={snapshot.modbus ?? emptyModbus}
+                snapshot={snapshot}
                 onAdd={(binding, name) => {
                   const next = addModbusChannel(snapshot, binding);
                   setFocusChannelId(next.channel.id);

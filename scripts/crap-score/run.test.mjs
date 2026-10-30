@@ -446,6 +446,7 @@ test('every JS/TS Nx project has a report target with an isolated output path', 
   const nativeProjects = new Set([
     'apps/attractap/desktop/project.json',
     'apps/attractap-lab/project.json',
+    'apps/attractap/nfc-emulator/project.json',
   ]);
   const outputs = new Set();
   for (const file of files.filter((file) => /(^|\/)project\.json$/.test(file))) {
@@ -482,5 +483,6 @@ test('WAGO includes the complete serial frontend suite once, the CC100 runtime s
     'apps/plugins/wago/cc100-runtime/jest.config.ts',
     'apps/plugins/wago/scripts/jest.audit-hooks.config.cjs',
     'apps/plugins/wago/scripts/jest.commissioning.config.cjs',
+    'apps/plugins/wago/scripts/jest.reliability-plan.config.cjs',
   ]);
 });

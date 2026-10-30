@@ -2,6 +2,8 @@ import { configurationHash } from './model';
 import { WagoEnrollment } from '../controllers/enrollment.entity';
 import { controller, createWagoServiceFixture } from '../wago-service.test-fixture';
 import { WagoService } from '../controllers/service';
+import { CHANNEL_ENABLED_CAPABILITY } from '../../shared/capabilities';
+import { CHANNEL_ENABLED_UNSUPPORTED_MESSAGE } from './channel-enabled';
 
 describe('WagoService configuration and commands', () => {
   const services: WagoService[] = [];
@@ -28,6 +30,33 @@ describe('WagoService configuration and commands', () => {
       expect(context.mqtt.publish).toHaveBeenCalledTimes(['published', 'applied'].includes(state) ? 2 : 1);
     },
   );
+
+  it.each([
+    ['without', '["claim","heartbeat","configuration-v1"]', 1],
+    ['with', `["claim","heartbeat","configuration-v1","${CHANNEL_ENABLED_CAPABILITY}"]`, 2],
+  ])('replays disabled channels only to a runtime %s channel-enabled-v1', async (_name, capabilities, publishes) => {
+    const { service, context, revisionRepository } = createService([
+      { ...controller(), trustState: 'claimed', capabilities },
+    ]);
+    revisionRepository.find.mockResolvedValue([
+      {
+        revision: 4,
+        state: 'applied',
+        contentHash: 'a'.repeat(64),
+        snapshot: JSON.stringify({ logicalChannels: [{ id: 'power', enabled: false }] }),
+      },
+    ]);
+    const image = `sha256:${'a'.repeat(64)}`;
+    await service.setRuntimePolicy(1, image, image, 'boot-token');
+    expect(context.mqtt.publish).toHaveBeenCalledTimes(publishes);
+    if (publishes === 1)
+      expect(context.logger.warn).toHaveBeenCalledWith(
+        `Not replaying WAGO configuration revision 4 to controller 1: ${CHANNEL_ENABLED_UNSUPPORTED_MESSAGE}`,
+      );
+    else expect(context.logger.warn).not.toHaveBeenCalled();
+    // The policy is still recorded, so the controller is not held in a runtime update.
+    expect(service.isRuntimeUpdateRequired(1)).toBe(false);
+  });
 
   it('publishes a configured command without waiting when dispatch completion is selected', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
@@ -320,6 +349,20 @@ describe('WagoService configuration and commands', () => {
     );
   });
 
+  it('ignores oversized and over-nested configuration reports before parsing them', async () => {
+    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const report = { revision: 2, contentHash: 'a'.repeat(64), errors: [] };
+    const onConfigurationReported = (
+      Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
+    ).bind(service);
+    await onConfigurationReported(1, Buffer.from(JSON.stringify({ ...report, pad: 'x'.repeat(64 * 1024) })));
+    await onConfigurationReported(
+      1,
+      Buffer.from(JSON.stringify({ ...report, nested: JSON.parse('{"a":'.repeat(8) + '1' + '}'.repeat(8)) })),
+    );
+    expect(revisionRepository.findOneBy).not.toHaveBeenCalled();
+  });
+
   it.each(['applied', 'rejected'] as const)('ignores reports for a terminal %s revision state', async (state) => {
     const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
     const revision = {
@@ -521,6 +564,58 @@ describe('WagoService configuration and commands', () => {
     expect(processed).toContain(replacement);
     expect(processed).not.toContainEqual(Buffer.from('{"revision":102}'));
     expect(context.logger.warn).toHaveBeenCalledWith('Dropping excess WAGO configuration report for controller 1');
+  });
+
+  it('drops oversized and over-nested reports for a busy controller without decoding or queueing them', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed]);
+    let releaseFirst!: () => void;
+    const processed: Buffer[] = [];
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
+
+    await service.onApplicationBootstrap();
+
+    const reportSubscription = (context.mqtt.subscribe as jest.Mock).mock.calls.find(([, topic]) =>
+      topic.endsWith('/configuration/reported'),
+    );
+    const handler = reportSubscription?.[2] as (message: { topic: string; payload: Buffer }) => void;
+    const topic = 'attraccess/wago/v1/controllers/cc100-01/configuration/reported';
+    handler({ topic, payload: Buffer.from('{"revision":1}') });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const oversized = Buffer.alloc(64 * 1024 + 1, 0x20);
+    const toString = jest.spyOn(oversized, 'toString');
+    const parse = jest.spyOn(JSON, 'parse');
+    try {
+      handler({ topic, payload: oversized });
+      expect(toString).not.toHaveBeenCalled();
+      expect(parse).not.toHaveBeenCalled();
+      handler({ topic, payload: Buffer.from(`{"revision":2,"nested":${'['.repeat(8)}${']'.repeat(8)}}`) });
+      expect(parse).not.toHaveBeenCalled();
+    } finally {
+      parse.mockRestore();
+    }
+    const valid = Buffer.from('{"revision":3}');
+    handler({ topic, payload: valid });
+
+    releaseFirst();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(processed).toEqual([Buffer.from('{"revision":1}'), valid]);
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      'Dropping invalid WAGO configuration report for controller 1: configuration report is too large',
+    );
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      'Dropping invalid WAGO configuration report for controller 1: configuration report is nested too deeply',
+    );
   });
 
   it('returns bounded revision metadata pages without snapshots', async () => {

@@ -100,6 +100,8 @@ function channelLabel(
     const terminal = DIGITAL_TERMINALS.find((item) => item.channel === point.channel)?.label;
     if (terminal && !channelName.includes(terminal)) channelName += ` · ${terminal}`;
   }
+  // A disabled channel stays selectable, but flows that read it only ever see it unavailable.
+  if (channel?.enabled === false) channelName += ` (${text('disabled, unavailable', 'deaktiviert, nicht verfügbar')})`;
   return channelName;
 }
 

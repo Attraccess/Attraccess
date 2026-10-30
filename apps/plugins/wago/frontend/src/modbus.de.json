@@ -106,5 +106,6 @@
     "binary": "Binäre Ganzzahl",
     "bcd": "Dezimalziffern (BCD)"
   },
-  "numericEncoding": "Zahlenkodierung"
+  "numericEncoding": "Zahlenkodierung",
+  "pointDisabled": "Deaktiviert: Dieser Messwert hat bereits einen Kanal, der weder abgefragt noch veröffentlicht wird, daher lässt sich kein zweiter Kanal hinzufügen. Aktiviere den vorhandenen Kanal in den Geräteeinstellungen auf der Seite „Ein- & Ausgänge“."
 }

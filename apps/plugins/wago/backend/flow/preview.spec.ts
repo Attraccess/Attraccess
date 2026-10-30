@@ -106,4 +106,17 @@ describe('localized WAGO flow previews', () => {
     expect(unset[2].value).toBe('Not selected = Not set');
     expect(unset[2].translations?.de.value).toBe('Nicht ausgewählt = Nicht festgelegt');
   });
+  it('marks a disabled channel as unavailable in both languages', () => {
+    const disabled = {
+      ...snapshot,
+      logicalChannels: snapshot.logicalChannels.map((channel) =>
+        channel.id === 'power' ? { ...channel, enabled: false as const } : channel,
+      ),
+    } as WagoConfigurationSnapshot;
+    const rows = wagoFlowPreview({ controllerId: 1, channelId: 'power' }, 'read', { name: 'CC100' }, disabled, {});
+    expect(rows[1]).toMatchObject({
+      value: 'power · Main meter (disabled, unavailable)',
+      translations: { de: { value: 'power · Main meter (deaktiviert, nicht verfügbar)' } },
+    });
+  });
 });

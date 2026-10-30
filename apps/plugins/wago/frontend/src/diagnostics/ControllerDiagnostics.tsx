@@ -4,6 +4,7 @@ import { Component, useEffect, useState, type ReactNode } from 'react';
 import { presetDisplayName } from '../configuration/model';
 import { useWagoDiagnostics, type WagoDiagnostics } from './diagnostics';
 import { useWagoTranslations } from '../i18n';
+import { DropCounts } from './DropCounts';
 
 export function DiagnosticsFailure() {
   const { t } = useWagoTranslations();
@@ -107,6 +108,7 @@ export function WagoStatus({
             boot: d.activeStream ?? t('diagnostics.legacy'),
           })}
         </p>
+        <DropCounts diagnostics={d} />
         {d.trackingExhausted && <p role="alert">{t('diagnostics.trackingLimit')}</p>}
         <p>
           {t('diagnostics.versions', { runtime: d.runtimeVersion, protocol: d.protocolVersion })}
@@ -216,6 +218,9 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
               </Card.Content>
             </Card>
           ))}
+          {Boolean(d.disabledChannels?.length) && (
+            <p>{t('diagnostics.disabledChannels', { count: d.disabledChannels?.length ?? 0 })}</p>
+          )}
           <Card>
             <Card.Header>
               <Card.Title>{t('diagnostics.references')}</Card.Title>

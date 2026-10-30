@@ -196,3 +196,11 @@ it('enforces distinct takeover and stop permissions and hides own or absent sess
   mount();
   expect(screen.queryByText('In use')).toBeNull();
 });
+it('shows a redacted session as in use without a holder to contact', () => {
+  state.update = false;
+  state.session = { startTime: '2026-09-01T12:00:00Z' };
+  mount();
+  expect(screen.getByText('In use')).toBeTruthy();
+  expect(screen.getByText('Unknown User')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Contact current user' })).toBeNull();
+});

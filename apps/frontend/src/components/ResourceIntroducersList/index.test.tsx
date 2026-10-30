@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IntroductionRequiredDisplay } from '../../app/resources/usage/components/IntroductionRequiredDisplay';
 
 const query = vi.hoisted(() => ({
-  rows: Array.from({ length: 30 }, (_, index) => ({ id: index + 1, user: { username: `Tutor ${index + 1}` } })),
+  rows: Array.from({ length: 30 }, (_, index) => ({
+    userId: index + 1,
+    username: `Tutor ${index + 1}`,
+    role: 'introducer',
+  })),
   load: vi.fn(),
   listeners: new Set<() => void>(),
 }));
@@ -12,7 +16,7 @@ vi.mock('@attraccess/react-query-client', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
     ResourceIntroducerType: { INTRODUCER: 'introducer' },
-    useAccessControlServiceResourceIntroducersGetMany: (...args: unknown[]) => {
+    useAccessControlServiceResourceIntroducersGetNames: (...args: unknown[]) => {
       query.load(...args);
       const data = useSyncExternalStore(
         (listener) => {
@@ -38,8 +42,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 describe('introduction required tutor contacts', () => {
   beforeEach(() => {
     query.rows = Array.from({ length: 30 }, (_, index) => ({
-      id: index + 1,
-      user: { username: `Tutor ${index + 1}` },
+      userId: index + 1,
+      username: `Tutor ${index + 1}`,
+      role: 'introducer',
     }));
     query.load.mockClear();
   });
@@ -47,11 +52,11 @@ describe('introduction required tutor contacts', () => {
     render(<IntroductionRequiredDisplay resourceId={1} />);
     expect(screen.getByText('needsIntroduction')).toBeInTheDocument();
     for (let i = 1; i <= 30; i++) expect(screen.getByText(`Tutor ${i}`)).toBeInTheDocument();
-    expect(query.load).toHaveBeenCalledWith({ resourceId: 1, type: 'introducer' }, undefined, {
+    expect(query.load).toHaveBeenCalledWith({ resourceId: 1 }, undefined, {
       refetchInterval: 10000,
     });
     act(() => {
-      query.rows = [{ id: 50, user: { username: 'New tutor' } }];
+      query.rows = [{ userId: 50, username: 'New tutor', role: 'introducer' }];
       query.listeners.forEach((listener) => listener());
     });
     expect(screen.getByText('New tutor')).toBeInTheDocument();

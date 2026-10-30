@@ -174,6 +174,18 @@ describe('AttractapCrashReportHandler', () => {
       );
     });
 
+    it.each(['POWERON', 'SW'])('still increments the legacy counter for %s reports', async (resetReason) => {
+      mockAttractapService.createCrashReport.mockResolvedValue({ id: 'report-legacy', resetReason });
+
+      await handler.handleCrashReport(mockSocket as any, { payload: { resetReason } } as AttractapEvent['data']);
+
+      expect(mockMetricsService.attractapCrashReportsTotal.inc).toHaveBeenCalledTimes(1);
+      expect(mockMetricsService.attractapCrashReportsTotal.inc).toHaveBeenCalledWith({
+        reader_id: '42',
+        reset_reason: resetReason,
+      });
+    });
+
     it('maps unknown reset reasons to UNKNOWN before auditing', async () => {
       const payload = { resetReason: 'diagnostic-secret-123' };
       mockAttractapService.createCrashReport.mockResolvedValue({ id: 'report-unknown', ...payload });

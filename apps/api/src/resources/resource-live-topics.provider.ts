@@ -10,6 +10,7 @@ import { LiveTopicProvider } from '../live-updates/live-topic-provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
+import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 
 @Injectable()
 export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleInit {
@@ -23,6 +24,7 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
     @InjectRepository(Resource) private readonly resources: Repository<Resource>,
     private readonly resourceEvents: ResourceEventsService,
     private readonly flowLogs: FlowLogRecorderService,
+    private readonly activityVisibility: ResourceActivityVisibilityService,
   ) {}
 
   onModuleInit(): void {
@@ -38,18 +40,32 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
     const resources = await this.resources.find({ where: { id: In(ids) }, select: { id: true } });
     const existingIds = new Set(resources.map((resource) => resource.id));
     const rejected = new Map<string, string>();
+    const access = await this.activityVisibility.resolveMany(user, [...existingIds]);
     for (const subscription of subscriptions) {
       if (subscription.topic === 'flow-logs' && !user.effectivePermissions?.has('resources.update')) {
         rejected.set(liveSubscriptionKey(subscription), 'Resource update permission required');
       } else if (!existingIds.has(subscription.resourceId)) {
         rejected.set(liveSubscriptionKey(subscription), 'Resource not found');
+      } else if (
+        subscription.topic === 'resource' &&
+        !(await this.activityVisibility.canFollowLive(
+          user,
+          subscription.resourceId,
+          access.get(subscription.resourceId),
+        ))
+      ) {
+        rejected.set(liveSubscriptionKey(subscription), 'Activity on this resource is not visible');
       }
     }
     return rejected;
   }
 
-  source(subscription: LiveSubscription) {
-    if (subscription.topic === 'resource') return this.resourceEvents.subscribeResource(subscription.resourceId);
+  async source(subscription: LiveSubscription, user: AuthenticatedUser) {
+    if (subscription.topic === 'resource') {
+      // `authorize` refused hidden viewers; each event is checked again so later changes apply to open subscriptions.
+      const stream = await this.resourceEvents.subscribeResource(subscription.resourceId);
+      return this.activityVisibility.viewLiveStream(stream, user, subscription.resourceId);
+    }
     if (subscription.topic === 'flow-logs') {
       return defer(() => this.flowLogs.subjectFor(subscription.resourceId).asObservable()).pipe(
         finalize(() => this.flowLogs.releaseSubject(subscription.resourceId)),

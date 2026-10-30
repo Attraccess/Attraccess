@@ -1,4 +1,5 @@
 import type { ModbusConfiguration, ModbusPoint } from '../../../modbus/model';
+import type { MessageSlot } from '../transport/admission';
 export type DisconnectPolicy = { mode: 'hold' | 'immediate' | 'watchdog'; timeoutMs?: number };
 
 export type Snapshot = {
@@ -15,6 +16,8 @@ export type Snapshot = {
     physicalPointId: string;
     profile: string;
     capabilities: string[];
+    /** Only Modbus measurement channels may be disabled; absent means enabled. */
+    enabled?: false;
     invert?: boolean;
     disconnectPolicy: DisconnectPolicy;
     range?: { minimum: number; maximum: number };
@@ -49,9 +52,23 @@ export type RuntimeState = {
   sequence?: number;
 };
 
+/** Frees the subscription's handling slot early, for handlers that hand their work to a queue. */
+export type { MessageSlot };
+
+export type SubscribeOptions = {
+  /** Larger payloads are dropped, counted and never decoded. */
+  maxBytes: number;
+};
+
 export interface Transport {
   publish(topic: string, payload: unknown, options?: { retain?: boolean }): Promise<void>;
-  subscribe(topic: string, listener: (payload: Buffer) => void | Promise<void>): Promise<void>;
+  subscribe(
+    topic: string,
+    listener: (payload: Buffer, slot: MessageSlot) => void | Promise<void>,
+    options?: SubscribeOptions,
+  ): Promise<void>;
+  /** Messages dropped before handling, by reason. Absent on transports without admission control. */
+  dropCounts?(): Record<string, number>;
 }
 
 /** Optional absolute expiry also travels to a subprocess's final pre-send check. */

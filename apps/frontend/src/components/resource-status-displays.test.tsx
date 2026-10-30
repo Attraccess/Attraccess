@@ -5,7 +5,7 @@ import { ResourceIntroducersList } from './ResourceIntroducersList';
 import { RetrainingStatusBanner } from '../app/resources/usage/components/RetrainingStatusBanner';
 const state = vi.hoisted(() => ({
   loading: false,
-  introducers: undefined as undefined | { id: number; user: { username: string } }[],
+  introducers: undefined as undefined | { userId: number; username: string; role: string }[],
   status: undefined as undefined | { applies: boolean; isDue: boolean; blocksAccess: boolean; reason?: string },
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -18,7 +18,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAccessControlServiceResourceIntroducersGetMany: () => ({ data: state.introducers, isLoading: state.loading }),
+  useAccessControlServiceResourceIntroducersGetNames: () => ({ data: state.introducers, isLoading: state.loading }),
   useResourcesServiceResourceRetrainingGetStatus: () => ({ data: state.status }),
 }));
 beforeEach(() => {
@@ -53,12 +53,21 @@ it('shows loading, empty and populated introducer lists', () => {
   expect(screen.getByText('No instructors')).toBeTruthy();
   view.unmount();
   state.introducers = [
-    { id: 1, user: { username: 'Ada' } },
-    { id: 2, user: { username: 'Ben' } },
+    { userId: 1, username: 'Ada', role: 'introducer' },
+    { userId: 2, username: 'Ben', role: 'maintainer' },
   ];
   render(<ResourceIntroducersList resourceId={7} title="Contact instructors" />);
   expect(screen.getByText('Contact instructors:')).toBeTruthy();
   expect(screen.getByText('Ada')).toBeTruthy();
+  expect(screen.getByText('Ben')).toBeTruthy();
+});
+it('lists only the requested role when a type is given', () => {
+  state.introducers = [
+    { userId: 1, username: 'Ada', role: 'introducer' },
+    { userId: 2, username: 'Ben', role: 'maintainer' },
+  ];
+  render(<ResourceIntroducersList resourceId={7} type={'maintainer' as never} />);
+  expect(screen.queryByText('Ada')).toBeNull();
   expect(screen.getByText('Ben')).toBeTruthy();
 });
 it.each([

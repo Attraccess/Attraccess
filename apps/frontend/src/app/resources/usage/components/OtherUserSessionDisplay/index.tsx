@@ -273,18 +273,21 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
           </div>
         )}
 
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            isPending={contactHolder.isPending}
-            onPress={handleContactHolder}
-            data-cy="contact-current-user-button"
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            {t('contact.button')}
-          </Button>
-        </div>
+        {/* A redacted session has no user: the viewer may not know who holds the resource, so they cannot contact them. */}
+        {activeSession.user && (
+          <div>
+            <Button
+              variant="ghost"
+              size="sm"
+              isPending={contactHolder.isPending}
+              onPress={handleContactHolder}
+              data-cy="contact-current-user-button"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              {t('contact.button')}
+            </Button>
+          </div>
+        )}
 
         {canTakeover && (
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">

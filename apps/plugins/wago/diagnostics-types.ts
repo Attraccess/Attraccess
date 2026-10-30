@@ -1,3 +1,5 @@
+import type { DropReason } from './shared/capabilities';
+
 export type Freshness = 'missing' | 'invalid' | 'future' | 'stale' | 'fresh';
 export interface DiagnosticValue {
   kind: 'input' | 'output' | 'measurement';
@@ -26,6 +28,8 @@ export interface WagoDiagnostics {
   capabilities: string[];
   incompatible: boolean;
   sequenceGaps: number | null;
+  /** Messages the controller dropped unanswered, by reason; null for runtimes without bounded messages. */
+  dropCounts: Record<DropReason, number> | null;
   activeStream: string | null;
   trackingExhausted: boolean;
   stateConnected: boolean | null;
@@ -64,6 +68,11 @@ export interface WagoDiagnostics {
       receivedAt: string;
     } | null;
   }>;
+  /**
+   * Channels configured with `enabled: false`. The runtime never polls or publishes them, so they have
+   * no samples and are not counted in `channels`. Always sent by this server; optional for older ones.
+   */
+  disabledChannels?: Array<{ id: string; profile: string; capabilities: string[]; availability: 'disabled' }>;
   faults: Array<{ channelId: string; code: string; receivedAt: string }>;
   references: Array<{
     nodeId: string;
