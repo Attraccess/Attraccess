@@ -10,7 +10,7 @@
     },
     "pending_approval": {
       "title": "Waiting for approval — {{code}}",
-      "description": "Approve this reader in Attraccess to finish setting it up. Works for readers without a screen too.",
+      "description": "Press Approve to add this reader to Attraccess.",
       "approve": "Approve",
       "failed": "Could not approve the reader"
     },

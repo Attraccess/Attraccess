@@ -12,6 +12,11 @@ interface Props {
   /** Heading of the scanner dialog; defaults to the resource scanner title. */
   title?: string;
   children: (open: () => void) => React.ReactNode;
+  /**
+   * Takes over scanned content instead of navigating to it. Return true when it was handled; the
+   * scanner then closes. Return false to show an "unknown QR code" notice and keep scanning.
+   */
+  onDetected?: (rawValue: string) => boolean;
 }
 
 export function ResourceScanner(props: Props) {
@@ -23,24 +28,41 @@ export function ResourceScanner(props: Props) {
 
   const frontendOrigin = window.location.origin;
 
+  const { onDetected } = props;
   const onScan = useCallback(
     (codes: IDetectedBarcode[]) => {
-      for (const code of codes) {
-        const url = new URL(code.rawValue);
+      const rawValue = codes[0]?.rawValue;
+      if (!rawValue) return;
 
-        if (url.origin !== frontendOrigin) {
-          toast.error({
-            title: t('scan.error.wrongOrigin.title'),
-            description: t('scan.error.wrongOrigin.description'),
-          });
-          return;
-        }
+      const showUnknown = () =>
+        toast.error({ title: t('scan.error.unknown.title'), description: t('scan.error.unknown.description') });
 
-        navigate(url.pathname + url.search + url.hash);
-        setOpen(false);
+      if (onDetected) {
+        if (onDetected(rawValue)) setOpen(false);
+        else showUnknown();
+        return;
       }
+
+      let url: URL;
+      try {
+        url = new URL(rawValue);
+      } catch {
+        showUnknown();
+        return;
+      }
+
+      if (url.origin !== frontendOrigin) {
+        toast.error({
+          title: t('scan.error.wrongOrigin.title'),
+          description: t('scan.error.wrongOrigin.description'),
+        });
+        return;
+      }
+
+      navigate(url.pathname + url.search + url.hash);
+      setOpen(false);
     },
-    [navigate, frontendOrigin, toast, t, setOpen],
+    [navigate, frontendOrigin, toast, t, setOpen, onDetected],
   );
 
   return (

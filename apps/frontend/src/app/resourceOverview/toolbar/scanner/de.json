@@ -5,6 +5,10 @@
       "wrongOrigin": {
         "title": "Falsche Quelladresse",
         "description": "Die Quelladresse des QR-Codes ist nicht korrekt. Bitte überprüfen Sie die Adresse und versuchen Sie es erneut."
+      },
+      "unknown": {
+        "title": "Unbekannter QR-Code",
+        "description": "Dieser QR-Code kann hier nicht verwendet werden."
       }
     }
   }

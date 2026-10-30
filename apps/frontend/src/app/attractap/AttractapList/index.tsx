@@ -180,6 +180,7 @@ export function AttractapList() {
                       key: 'enroll-device',
                       label: t('page.actions.enrollDevice'),
                       icon: <PlusIcon className="w-4 h-4" />,
+                      variant: 'primary',
                       onPress: () => openEnrollDialog(),
                       dataCy: 'attractap-list-enroll-device-button',
                     },

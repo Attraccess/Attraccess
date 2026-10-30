@@ -2,31 +2,34 @@
 // FEATURE: ATT-1168 Device enrollment
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { Description, Input, Label, TextField } from '@heroui/react';
-import { ScanIcon } from 'lucide-react';
-import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  ApiError,
-  ApproveDeviceEnrollmentResponseDto,
-  useDeviceEnrollmentServiceApproveDeviceEnrollment,
-} from '@attraccess/react-query-client';
-import { getApiErrorMessage } from '../../utils/apiError';
+  Description,
+  Form,
+  Input,
+  Label,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  TextField,
+} from '@heroui/react';
+import { ScanIcon } from 'lucide-react';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useToastMessage } from '../../components/toastProvider';
 import { useDeviceEnrollmentStore } from '../../stores/deviceEnrollment.store';
 import { ResourceScanner } from '../resourceOverview/toolbar/scanner';
+import {
+  DEVICE_ENROLLMENT_PARAM,
+  enrollmentCodeFromScan,
+  formatEnrollmentCode,
+  normalizeEnrollmentCode,
+} from './enrollmentCode';
+import { useApproveDeviceEnrollment } from './useApproveDeviceEnrollment';
 import en from './en.json';
 import de from './de.json';
 
-/** Query parameter of the link a device (or its QR code) points to. */
-export const DEVICE_ENROLLMENT_PARAM = 'enroll';
-
-/** Where a device's QR code points: the app opens the enroll dialog with the code filled in. */
-export function deviceEnrollmentUrl(code: string): string {
-  const url = new URL(window.location.origin);
-  url.pathname = '/';
-  url.searchParams.set(DEVICE_ENROLLMENT_PARAM, code);
-  return url.toString();
-}
+/** Matches the API limit on device names. */
+const NAME_MAX_LENGTH = 64;
 
 interface Props {
   /** Signed in, past the two-factor gate, and allowed to update resources. */
@@ -35,31 +38,25 @@ interface Props {
 
 /**
  * Mount once in the app shell. Opens from the "Enroll device" button, from a `?enroll=` link, or
- * after a camera scan. Renders nothing while closed.
+ * after a camera scan. Renders nothing while closed. On approval it opens the new reader's editor.
  */
 export function DeviceEnrollModal({ canEnroll }: Readonly<Props>) {
   const { t } = useTranslations({ en, de });
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const toast = useToastMessage();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isOpen, code: initialCode, open, close } = useDeviceEnrollmentStore();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ApproveDeviceEnrollmentResponseDto | null>(null);
 
-  const { mutate: approve, isPending } = useDeviceEnrollmentServiceApproveDeviceEnrollment({
+  const { approve, isPending } = useApproveDeviceEnrollment({
     onSuccess: (approved) => {
-      setResult(approved);
-      void queryClient.invalidateQueries();
+      close();
+      toast.success({ title: t('success.title'), description: t('success.description', { name: approved.name }) });
+      navigate(`/attractap/readers?editReader=${approved.id}`);
     },
-    onError: (failure) => {
-      const status = (failure as ApiError)?.status;
-      if (status === 404) setError(t('error.notFound'));
-      else if (status === 429) setError(t('error.tooManyAttempts'));
-      else if (status === 502) setError(t('error.deliveryFailed'));
-      else setError(t('error.generic', { error: getApiErrorMessage(failure as ApiError) }));
-    },
+    onError: setError,
   });
 
   // A link or a scan lands here as ?enroll=CODE. Take the code and drop it from the URL so a
@@ -79,99 +76,106 @@ export function DeviceEnrollModal({ canEnroll }: Readonly<Props>) {
 
   useEffect(() => {
     if (!isOpen) return;
-    setCode(initialCode);
+    setCode(initialCode.toUpperCase());
     setName('');
     setError(null);
-    setResult(null);
   }, [isOpen, initialCode]);
 
+  const normalizedCode = normalizeEnrollmentCode(code);
+
   const submit = useCallback(() => {
-    if (!code.trim() || isPending) return;
+    if (!normalizedCode || isPending) return;
     setError(null);
-    approve({ requestBody: { code, ...(name.trim() ? { name: name.trim() } : {}) } });
-  }, [code, name, isPending, approve]);
+    approve(normalizedCode, name);
+  }, [normalizedCode, name, isPending, approve]);
+
+  const onScanned = useCallback((rawValue: string) => {
+    const scanned = enrollmentCodeFromScan(rawValue);
+    if (!scanned) return false;
+    setCode(formatEnrollmentCode(scanned));
+    setError(null);
+    return true;
+  }, []);
 
   if (!isOpen || !canEnroll) return null;
 
-  if (result) {
-    return (
-      <StatusDialog
-        isOpen
-        onClose={close}
-        status="success"
-        title={t('success.title')}
-        closeLabel={t('close')}
-        action={{
-          label: t('success.openReader'),
-          onPress: () => {
-            close();
-            navigate(`/attractap/readers?editReader=${result.id}`);
-          },
-          'data-cy': 'device-enroll-open-reader',
-        }}
-        data-cy="device-enroll-success"
-      >
-        {t('success.description', { name: result.name })}
-      </StatusDialog>
-    );
-  }
-
   return (
-    <StatusDialog
+    <StandardModal
       isOpen
-      onClose={close}
-      status="info"
-      title={t('form.title')}
-      action={{
-        label: t('form.submit'),
-        onPress: submit,
-        isPending,
-        isDisabled: !code.trim(),
-        'data-cy': 'device-enroll-submit',
+      onOpenChange={(next) => {
+        if (!next) close();
       }}
+      size="md"
       data-cy="device-enroll"
     >
-      <div className="flex flex-col gap-3">
+      <ModalHeader>
+        <ModalHeading>{t('form.title')}</ModalHeading>
         <Description>{t('form.description')}</Description>
-        <TextField
-          value={code}
-          onChange={(value) => {
-            setCode(value.toUpperCase());
-            setError(null);
+      </ModalHeader>
+      <ModalBody>
+        <Form
+          className="flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
           }}
-          autoFocus
-          isDisabled={isPending}
         >
-          <Label>{t('form.codeLabel')}</Label>
-          <Input
-            placeholder={t('form.codePlaceholder')}
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            data-cy="device-enroll-code"
-          />
-        </TextField>
-        <TextField value={name} onChange={setName} isDisabled={isPending}>
-          <Label>{t('form.nameLabel')}</Label>
-          <Input autoComplete="off" data-cy="device-enroll-name" />
-        </TextField>
-        {/* Camera access needs HTTPS or localhost; typing always works. */}
-        {window.isSecureContext && (
-          <ResourceScanner title={t('form.scan')}>
-            {(openScanner) => (
-              <Button variant="secondary" onPress={openScanner} data-cy="device-enroll-scan">
-                <ScanIcon className="w-4 h-4" />
-                {t('form.scan')}
-              </Button>
-            )}
-          </ResourceScanner>
-        )}
-        {error && (
-          <Description className="text-danger" role="alert">
-            {error}
-          </Description>
-        )}
-      </div>
-    </StatusDialog>
+          <TextField
+            value={code}
+            onChange={(value) => {
+              setCode(value.toUpperCase());
+              setError(null);
+            }}
+            autoFocus
+            isDisabled={isPending}
+          >
+            <Label>{t('form.codeLabel')}</Label>
+            <Input
+              placeholder={t('form.codePlaceholder')}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              data-cy="device-enroll-code"
+            />
+          </TextField>
+          <TextField value={name} onChange={setName} isDisabled={isPending} maxLength={NAME_MAX_LENGTH}>
+            <Label>{t('form.nameLabel')}</Label>
+            <Input autoComplete="off" data-cy="device-enroll-name" />
+          </TextField>
+          {/* Camera access needs HTTPS or localhost; typing always works. */}
+          {window.isSecureContext && (
+            <ResourceScanner title={t('form.scan')} onDetected={onScanned}>
+              {(openScanner) => (
+                <Button variant="secondary" onPress={openScanner} data-cy="device-enroll-scan">
+                  <ScanIcon className="w-4 h-4" />
+                  {t('form.scan')}
+                </Button>
+              )}
+            </ResourceScanner>
+          )}
+          {error && (
+            <Description className="text-danger" role="alert">
+              {error}
+            </Description>
+          )}
+          {/* Lets Enter in either field submit. */}
+          <input type="submit" hidden />
+        </Form>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="secondary" onPress={close} isDisabled={isPending}>
+          {t('form.cancel')}
+        </Button>
+        <Button
+          variant="primary"
+          onPress={submit}
+          isPending={isPending}
+          isDisabled={!normalizedCode}
+          data-cy="device-enroll-submit"
+        >
+          {t('form.submit')}
+        </Button>
+      </ModalFooter>
+    </StandardModal>
   );
 }

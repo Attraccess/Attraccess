@@ -13,7 +13,7 @@
     },
     "pending_approval": {
       "title": "Wartet auf Freigabe — {{code}}",
-      "description": "Gib dieses Lesegerät in Attraccess frei, um die Einrichtung abzuschließen. Funktioniert auch bei Lesegeräten ohne Bildschirm.",
+      "description": "Klicken Sie auf „Freigeben“, um dieses Lesegerät zu Attraccess hinzuzufügen.",
       "approve": "Freigeben",
       "failed": "Lesegerät konnte nicht freigegeben werden"
     },

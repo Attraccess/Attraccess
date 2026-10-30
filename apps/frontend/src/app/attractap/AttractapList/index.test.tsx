@@ -1,9 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
+import { useDeviceEnrollmentStore } from '../../../stores/deviceEnrollment.store';
 
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
@@ -17,7 +18,22 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
     useDateTimeFormatter: () => () => '',
   }))()),
   ...(await (() => ({
-    PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+    PageHeader: ({
+      title,
+      actions = [],
+    }: {
+      title: string;
+      actions?: Array<{ key: string; label: string; variant?: string; onPress?: () => void }>;
+    }) => (
+      <>
+        <h1>{title}</h1>
+        {actions.map((action) => (
+          <button key={action.key} data-variant={action.variant} onClick={action.onPress}>
+            {action.label}
+          </button>
+        ))}
+      </>
+    ),
     PageAction: () => null,
   }))()),
   ...(await (() => ({ AlertStatusIcon: () => null }))()),
@@ -34,7 +50,9 @@ vi.mock('../HardwareSetup', () => ({
     <div data-testid="hardware-setup">{children(vi.fn())}</div>
   ),
 }));
-vi.mock('../HardwareSetup/WebSerialConsole', () => ({ WebSerialConsole: () => null }));
+vi.mock('../HardwareSetup/WebSerialConsole', () => ({
+  WebSerialConsole: ({ children }: { children: (fn: () => void) => React.ReactNode }) => <>{children(vi.fn())}</>,
+}));
 vi.mock('../AttractapEditor/AttractapEditor', () => ({ AttractapEditor: () => null }));
 vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
@@ -62,5 +80,19 @@ describe('AttractapList license gate', () => {
     mockLicense(undefined);
     const { container } = render(<AttractapList />);
     expect(container).not.toBeEmptyDOMElement();
+  });
+});
+
+describe('AttractapList enroll action', () => {
+  it('opens the enroll dialog as the primary page action', () => {
+    mockLicense(['attractap']);
+    useDeviceEnrollmentStore.getState().close();
+    render(<AttractapList />);
+
+    const enroll = screen.getByRole('button', { name: 'enrollDevice' });
+    expect(enroll).toHaveAttribute('data-variant', 'primary');
+    fireEvent.click(enroll);
+
+    expect(useDeviceEnrollmentStore.getState()).toMatchObject({ isOpen: true, code: '' });
   });
 });

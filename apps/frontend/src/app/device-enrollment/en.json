@@ -6,18 +6,17 @@
     "codePlaceholder": "K7P-3XQ",
     "nameLabel": "Name (optional)",
     "submit": "Approve",
+    "cancel": "Cancel",
     "scan": "Scan with camera"
   },
   "success": {
     "title": "Device approved",
-    "description": "{{{name}}} is now registered and connects on its own.",
-    "openReader": "Open reader"
+    "description": "{{{name}}} is now registered and connects on its own."
   },
   "error": {
     "notFound": "No waiting device shows this code. Check the code and try again.",
     "tooManyAttempts": "Too many attempts. Wait a minute and try again.",
-    "deliveryFailed": "The device did not answer. Nothing was created. Check its connection and try again.",
+    "deliveryFailed": "The device did not confirm. Nothing was created. It will show a new code — enter that one.",
     "generic": "Something went wrong: {{{error}}}"
-  },
-  "close": "Done"
+  }
 }
