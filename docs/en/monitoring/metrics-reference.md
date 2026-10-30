@@ -99,13 +99,27 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Number of connected Attractap RFID readers |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Total RFID tap events |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Total firmware update events |
-| `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Crash reports received from readers. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
+| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Reset reports received from readers, for every reset reason (including `POWERON` and `SW`), so it is not a count of crashes. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). Unchanged; used by the dashboards |
+| `attraccess_attractap_reset_reports_last_hour` | Gauge | `category` | Exact number of stored reset reports received in the last hour. `category` is `crash_watchdog` (`PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`) or `power_on` (`POWERON`). Other reasons (`SW`, `BROWNOUT`, `UNKNOWN`, ...) are not counted |
+| `attraccess_attractap_reset_report_readers_last_hour` | Gauge | `category`, `readers` | Same count, with the contributing readers and reset reasons as text in the `readers` label (e.g. `Door (#1): PANIC x2; Laser (#2): WDT x2`). Used only for the alert text. Reader names are shortened to 40 characters with `<` and `>` removed, and the list is capped at about 200 characters (`; +N more`) |
+
+### Hourly reset report counts
+
+The two `..._last_hour` gauges are counted from the database every time `/api/metrics` is scraped, over the last 3600 whole seconds, measured by when the server stored each report. A report exactly one hour old is excluded; a report stored at scrape time is included. Notes:
+
+- They count **stored reports**. A reader that uploads a report again after a lost acknowledgement is counted twice.
+- The count has a 5-second timeout. If the query fails or times out, `/api/metrics` returns an error instead of zero, so Prometheus marks the target down (`AttractapServiceDown` and `ScrapeFailures` can fire). The timeout does not cancel the underlying SQLite query.
+- The alert rules use `max` across scrape targets, so several targets of **one** installation (one shared database) are not double counted. Combining independent installations in one Prometheus/Grafana instance gives incorrect totals and is unsupported.
+- The counts rely on an index on `attractap_crash_report.createdAt` added by a database migration.
 
 ### Example PromQL Queries
 
 ```promql
-# Reader crashes in the last hour, broken down by reset cause
+# Reader reset reports in the last hour, broken down by reset cause (all reasons)
 sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
+
+# Exact crash/watchdog reports in the last hour (what the crash warning uses)
+max(attraccess_attractap_reset_reports_last_hour{category="crash_watchdog"})
 
 # Alert signal: all readers offline (but some were connected recently)
 sum(

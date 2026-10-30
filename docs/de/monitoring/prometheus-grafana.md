@@ -236,6 +236,28 @@ Da die Konfigurationen im `attraccess`-Image liegen und bei jedem Stack-Start in
 - **Dashboards / Datenquellen**: `monitoring/grafana/**` im Fork/PR ändern und Image neu bauen.
 - **Per-Deploy-Overrides**: Compose mit einer `docker-compose.override.yml` erweitern, die eigene Dateien über den Mount-Punkt des benannten Volumes legt.
 
+## Attractap-Reset-Warnungen
+
+Zwei Grafana-Warnungen überwachen die Reset-Berichte der Lesegeräte. Beide zählen die exakte Anzahl gespeicherter Berichte aller Lesegeräte in der letzten Stunde (`attraccess_attractap_reset_reports_last_hour`, keine `increase()`-Schätzung), lösen bei **vier oder mehr** aus, wenn dies **5 Minuten ununterbrochen** anhält (Auswertung jede Minute), und nennen in der Benachrichtigung die beteiligten Lesegeräte und Reset-Ursachen:
+
+| Warnung | Zählt | Zusammenfassung in der Benachrichtigung |
+|-------|-------|------------------------------------------|
+| `AttractapReaderCrashes` | `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT` | „Attractap readers crashing“ |
+| `AttractapReaderPowerOnResets` | `POWERON` | „Attractap readers restarting (power-on resets)“ |
+
+Die Einschalt-Warnung bezeichnet die Resets nie als Crash. Ihre Nachricht sagt, dass ein Einschalt-Reset (Power-on) allein keinen Fehler des Lesegeräts belegt: Der Strom war weg und kam wieder, z. B. durch einen Stromausfall, ein lockeres Kabel oder weil jemand ein eingefrorenes Lesegerät aus- und wieder eingeschaltet hat.
+
+Drei oder weniger Berichte lösen nie eine Warnung aus. Fällt die Anzahl unter vier, wird das Warten abgebrochen; kehrt sie auf vier zurück, beginnt eine neue 5-Minuten-Wartezeit. Ein Wechsel der beteiligten Lesegeräte startet die Wartezeit nicht neu. Alle anderen Reset-Ursachen (z. B. `SW`, `BROWNOUT`, `EXT`, `DEEPSLEEP`, `SDIO` und `UNKNOWN`) bleiben als Reset-Berichte in den Dashboards sichtbar, haben aber keine Warnung.
+
+Hinweise:
+
+- **Reihenfolge beim Deployment:** Aktualisieren Sie Attraccess (mit der Datenbank-Migration) vor oder zusammen mit den Grafana-Regeln. Regeln, die zuerst ausgerollt werden, sehen keine Daten und bleiben still (`noDataState: OK`), was ein echtes Problem verdecken kann. Der gebündelte Stack liefert beides in einem Image aus.
+- **Wiederholungen:** Gezählt werden gespeicherte Berichte; ein wiederholter Upload zählt doppelt.
+- **Datenbankfehler:** Die Anzahl wird bei jedem Abruf mit einem Zeitlimit von 5 Sekunden aus der Datenbank gelesen. Bei einem Fehler liefert `/api/metrics` einen Fehler statt null, und das Ziel erscheint als nicht erreichbar. Ein einzelner fehlgeschlagener Abruf setzt eine laufende Wartezeit nicht zurück: Die Regeln verwenden die letzte Anzahl aus den vergangenen zwei Minuten.
+- **Eine Installation:** Replikate müssen sich eine Datenbank teilen. Mehrere unabhängige Installationen in einer Grafana-Instanz zu kombinieren wird nicht unterstützt.
+- **Lange Lesegeräte-Listen** werden auf etwa 200 Zeichen begrenzt (`; +N more`), damit die Pushover-Nachricht unter der Pushover-Grenze von 1.024 Zeichen bleibt und ihre Links zum Stummschalten und Ansehen behält. Namen von Lesegeräten werden auf 40 Zeichen gekürzt und `<` sowie `>` entfernt, weil Pushover die Nachricht als HTML darstellt.
+- **Upgrades:** Die frühere einzelne Regel `AttractapReaderCrashes` behält ihre UID und wird an Ort und Stelle ersetzt, der alte Wortlaut bleibt also nicht erhalten. Eine bestehende Grafana-Stummschaltung auf `AttractapReaderCrashes` unterdrückt daher auch die neue Crash-Warnung, bis sie abläuft.
+
 ## Prometheus extern verfügbar machen (optional)
 
 Standardmäßig ist Prometheus nur intern verfügbar (keine `ports`-Zuordnung). Wenn Sie direkten Zugriff zum Debuggen benötigen:

@@ -60,6 +60,7 @@ Push your branch and create a pull request against the `main` branch on the orig
 - **Framework:** Jest is used for unit tests
 - Place test files next to the source files they test (e.g., `my-service.spec.ts`)
 - Write tests for new features and bug fixes
+- `pnpm nx run api:test-alerting` runs the Prometheus/Grafana alert test with real containers (testcontainers) and needs Docker. It is not part of `pnpm nx test api`; CI runs it with the other `test-*` targets and it fails if Docker is unavailable
 
 ## Issue Tracking
 

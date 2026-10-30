@@ -22,6 +22,7 @@ import { createOperationsMetrics } from './definitions/operations.metrics';
 export class MetricsService implements OnModuleInit {
   private readonly logger = new Logger(MetricsService.name);
   public readonly registry: Registry;
+  private readonly refreshers: Array<() => Promise<void>> = [];
 
   public readonly authLoginTotal: Counter;
   public readonly authActiveSessions: Gauge;
@@ -50,6 +51,8 @@ export class MetricsService implements OnModuleInit {
   public readonly attractapNfcTapsTotal: Counter;
   public readonly attractapFirmwareUpdatesTotal: Counter;
   public readonly attractapCrashReportsTotal: Counter;
+  public readonly attractapResetReportsLastHour: Gauge;
+  public readonly attractapResetReportReadersLastHour: Gauge;
 
   public readonly billingTransactionsTotal: Counter;
   public readonly billingTransactionAmount: Histogram;
@@ -114,6 +117,8 @@ export class MetricsService implements OnModuleInit {
     this.attractapNfcTapsTotal = devices.attractapNfcTapsTotal;
     this.attractapFirmwareUpdatesTotal = devices.attractapFirmwareUpdatesTotal;
     this.attractapCrashReportsTotal = devices.attractapCrashReportsTotal;
+    this.attractapResetReportsLastHour = devices.attractapResetReportsLastHour;
+    this.attractapResetReportReadersLastHour = devices.attractapResetReportReadersLastHour;
     const operations = createOperationsMetrics(this.registry);
     this.billingTransactionsTotal = operations.billingTransactionsTotal;
     this.billingTransactionAmount = operations.billingTransactionAmount;
@@ -170,7 +175,13 @@ export class MetricsService implements OnModuleInit {
     );
   }
 
+  /** Registers work that must finish (or fail the scrape) before each metrics collection. */
+  registerRefresher(refresh: () => Promise<void>): void {
+    this.refreshers.push(refresh);
+  }
+
   async getMetrics(): Promise<string> {
+    await Promise.all(this.refreshers.map((refresh) => refresh()));
     return this.registry.metrics();
   }
 
