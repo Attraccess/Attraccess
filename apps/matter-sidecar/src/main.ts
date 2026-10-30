@@ -4,10 +4,12 @@ import { createSidecar } from './sidecar';
 
 const logger = createLogger();
 
+// Operational failures (ConfigError, listen errors like EADDRINUSE) are fully described by the message itself.
+const isOperational = (error: unknown) => error instanceof ConfigError || (error instanceof Error && 'code' in error);
+
 function fatal(message: string, error?: unknown): never {
   process.stderr.write(`matter-sidecar: ${message}\n`);
-  if (error instanceof Error && !(error instanceof ConfigError))
-    process.stderr.write(`${error.stack ?? error.message}\n`);
+  if (error instanceof Error && !isOperational(error)) process.stderr.write(`${error.stack ?? error.message}\n`);
   process.exit(1);
 }
 
