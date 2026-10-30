@@ -9,10 +9,15 @@ import { z } from 'zod';
 
 export const LOOPBACK_HOST = '127.0.0.1';
 
-const positiveInt = (fallback: number, max: number) => z.coerce.number().int().min(1).max(max).default(fallback);
+// An empty or blank variable (`MATTER_SIDECAR_PORT=` in an env file) means "not set". Without this, coercion turns it
+// into 0, which for the port silently picks a random one.
+const unsetWhenBlank = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? undefined : value);
+const integer = (min: number, max: number, fallback: number) =>
+  z.preprocess(unsetWhenBlank, z.coerce.number().int().min(min).max(max).default(fallback));
+const positiveInt = (fallback: number, max: number) => integer(1, max, fallback);
 
 const configSchema = z.object({
-  MATTER_SIDECAR_PORT: z.coerce.number().int().min(0).max(65_535).default(8581),
+  MATTER_SIDECAR_PORT: integer(0, 65_535, 8581),
   MATTER_SIDECAR_MAX_MESSAGE_BYTES: positiveInt(MAX_MESSAGE_BYTES, 16 * 1024 * 1024),
   MATTER_SIDECAR_REQUEST_DEADLINE_MS: positiveInt(DEFAULT_REQUEST_DEADLINE_MS, 60_000),
   MATTER_SIDECAR_SHUTDOWN_GRACE_MS: positiveInt(DEFAULT_SHUTDOWN_GRACE_MS, 60_000),

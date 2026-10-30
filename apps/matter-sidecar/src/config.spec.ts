@@ -36,6 +36,13 @@ describe('loadConfig', () => {
     }
   });
 
+  it('treats an empty or blank variable as unset instead of coercing it to 0', () => {
+    expect(loadConfig({ MATTER_SIDECAR_PORT: '', MATTER_SIDECAR_REQUEST_DEADLINE_MS: '  ' })).toMatchObject({
+      port: 8581,
+      requestDeadlineMs: 10_000,
+    });
+  });
+
   it('configWith binds an ephemeral port', () => {
     expect(configWith({ replayMaxEvents: 3 })).toMatchObject({ port: 0, replayMaxEvents: 3 });
   });

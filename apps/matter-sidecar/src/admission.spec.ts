@@ -1,5 +1,5 @@
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
-import { checkAdmission } from './admission';
+import { checkAdmission, versionedRefusal } from './admission';
 import { SIMULATED_MATTER_VERSION, validHeaders } from './testing/harness';
 
 const running = { sidecar: COMPATIBILITY_TABLE[0].sidecar, matterJs: SIMULATED_MATTER_VERSION };
@@ -51,5 +51,31 @@ describe('checkAdmission', () => {
       'x-matter-plugin-version': ['0.1.0-alpha.0', '0.1.0-alpha.0'] as unknown as string,
     };
     expect(checkAdmission(repeated, running)).toMatchObject({ ok: false, code: 'incompatible_release' });
+  });
+});
+
+describe('versionedRefusal', () => {
+  const draining = () => true;
+  const open = () => false;
+
+  it('admits a correctly versioned client while the sidecar is not draining', () => {
+    expect(versionedRefusal(headers(), running, open)).toBeNull();
+  });
+
+  it('refuses every client with sidecar_unavailable while draining, before looking at its version', () => {
+    expect(versionedRefusal(headers(), running, draining)).toMatchObject({ code: 'sidecar_unavailable' });
+    expect(versionedRefusal(headers({ 'x-matter-wire-version': '2' }), running, draining)).toMatchObject({
+      code: 'sidecar_unavailable',
+    });
+  });
+
+  it('passes the admission refusal through unchanged when not draining', () => {
+    expect(versionedRefusal(headers({ 'x-matter-wire-version': '2' }), running, open)).toMatchObject({
+      code: 'unsupported_wire_version',
+      details: { supportedWireVersion: 1 },
+    });
+    expect(versionedRefusal(headers({ 'x-matter-plugin-version': '9.9.9' }), running, open)).toMatchObject({
+      code: 'incompatible_release',
+    });
   });
 });

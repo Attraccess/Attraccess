@@ -1,4 +1,7 @@
-import { connect } from 'node:net';
+import { Server } from 'node:http';
+import { connect, type AddressInfo } from 'node:net';
+
+const originalListen = Server.prototype.listen;
 import { createSidecar } from './sidecar';
 import { configWith } from './config';
 import { createLogger } from './logger';
@@ -25,7 +28,9 @@ describe('lifecycle', () => {
     await expect(http(port, 'GET', '/health/live')).rejects.toThrow();
   });
 
-  it('answers 503 during draining for versioned routes', async () => {
+  // The 503 refusal itself is covered by the versionedRefusal unit tests; a new connection cannot reach a draining
+  // server because it stops accepting at once.
+  it('lets an in-flight versioned request finish while draining', async () => {
     let release: () => void = () => undefined;
     const running = await startSidecar(
       {},
@@ -80,7 +85,9 @@ describe('lifecycle', () => {
   });
 
   it('does not come up when stop() is called while the platform is still loading', async () => {
-    const close = jest.fn(async () => undefined);
+    let closed = false;
+    // A close that takes a while, as a real platform's would.
+    const close = jest.fn(() => new Promise<void>((resolve) => setTimeout(() => resolve(void (closed = true)), 50)));
     let finishLoading: () => void = () => undefined;
     const sidecar = createSidecar({
       config: configWith(),
@@ -88,12 +95,58 @@ describe('lifecycle', () => {
       loadPlatform: () => new Promise((resolve) => (finishLoading = () => resolve({ version: '0.18.0', close }))),
     });
     const starting = sidecar.start();
+    const rejected = expect(starting).rejects.toThrow('stopped while starting');
     const stopping = sidecar.stop();
     finishLoading();
-    await expect(starting).rejects.toThrow('stopped while starting');
+    // stop() resolves only after the late platform is closed, so a process that exits on stop() does not leak it.
     await stopping;
+    expect(closed).toBe(true);
     expect(close).toHaveBeenCalledTimes(1);
+    await rejected;
     expect(sidecar.state.ready).toBe(false);
+  });
+
+  it('does not stay bound when stop() is called while the server is starting to listen', async () => {
+    const close = jest.fn(async () => undefined);
+    const sidecar = createSidecar({
+      config: configWith(),
+      logger: createLogger(() => undefined),
+      loadPlatform: async () => ({ version: '0.18.0', close }),
+    });
+    let port = 0;
+    let stopping: Promise<void> = Promise.resolve();
+    // Calls stop() at the exact moment the server starts listening, then lets the real listen() run.
+    const listen = jest.spyOn(Server.prototype, 'listen').mockImplementationOnce(function (
+      this: Server,
+      ...args: unknown[]
+    ) {
+      stopping = sidecar.stop();
+      this.once('listening', () => (port = (this.address() as AddressInfo).port));
+      return originalListen.apply(this, args as Parameters<Server['listen']>);
+    });
+    await expect(sidecar.start()).rejects.toThrow('stopped while starting');
+    await stopping;
+    listen.mockRestore();
+    expect(port).toBeGreaterThan(0);
+    await expect(http(port, 'GET', '/health/live')).rejects.toThrow();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let a refused upgrade socket that stays half open stall shutdown', async () => {
+    const running = await startSidecar({ shutdownGraceMs: 60_000 });
+    const socket = connect({ port: running.port, host: '127.0.0.1', allowHalfOpen: true });
+    await new Promise<void>((resolve) => socket.once('connect', () => resolve()));
+    const ended = new Promise<void>((resolve) => socket.once('end', () => resolve()));
+    socket.write(
+      'GET /v1/events HTTP/1.1\r\nhost: 127.0.0.1\r\nconnection: Upgrade\r\nupgrade: websocket\r\n' +
+        'sec-websocket-version: 13\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\nx-matter-wire-version: 2\r\n\r\n',
+    );
+    socket.resume();
+    await ended; // the 426 arrived; this client keeps its own half open on purpose
+    const started = Date.now();
+    await running.stop();
+    expect(Date.now() - started).toBeLessThan(5_000);
+    socket.destroy();
   });
 
   it('exits within the bounded grace period even when a connection refuses to close', async () => {

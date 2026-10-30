@@ -62,6 +62,8 @@ export function createSidecar(options: SidecarOptions): Sidecar {
   let hub: WebSocketHub | null = null;
   let pruneTimer: NodeJS.Timeout | undefined;
   let stopping: Promise<void> | null = null;
+  /** The startup in progress, if any. A stop() that overlaps it waits for it, so the platform is closed before stop resolves. */
+  let starting: Promise<unknown> | null = null;
   const running = { sidecar: SIDECAR_VERSION, matterJs: '' };
 
   const readiness = () => {
@@ -103,7 +105,9 @@ export function createSidecar(options: SidecarOptions): Sidecar {
 
   async function start() {
     try {
-      return await startUnsafe();
+      const attempt = startUnsafe();
+      starting = attempt;
+      return await attempt;
     } catch (error) {
       // The shared stop path closes the platform once; a later stop() joins it instead of closing again.
       await stop().catch(() => undefined);
@@ -130,9 +134,11 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     server = createServer((req, res) => {
       req.on('error', () => undefined);
       res.on('error', () => undefined);
-      handleRequest(req, res, deps).catch(() =>
-        sendError(res, { code: 'internal_error', message: 'The request failed.' }, correlationIdFrom(req.headers)),
-      );
+      handleRequest(req, res, deps).catch(() => {
+        const correlationId = correlationIdFrom(req.headers);
+        logger('error', 'request failed', { correlationId });
+        sendError(res, { code: 'internal_error', message: 'The request failed.' }, correlationId);
+      });
     });
     // Bounds the whole request including a slow body, so the configured deadline also covers reading it.
     server.requestTimeout = config.requestDeadlineMs;
@@ -159,6 +165,8 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     clearInterval(pruneTimer);
     const active = server;
     if (!active?.listening) {
+      // A startup that overlaps this stop() bails out at its next check and closes what it opened since then.
+      await starting?.catch(() => undefined);
       await closePlatform();
       state.ready = false;
       return;

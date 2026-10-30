@@ -91,6 +91,7 @@ describe('built sidecar process', () => {
     const started = launch({ MATTER_SIDECAR_PORT: 'banana' });
     expect(await started.exited).toBe(1);
     expect(started.stderr.join('')).toMatch(/MATTER_SIDECAR_PORT.*Fix the MATTER_SIDECAR_\* environment variables/s);
+    expect(started.stderr.join('')).not.toMatch(/\n\s+at /);
     expect(started.stdout.join('')).not.toContain('listening');
   });
 
@@ -99,7 +100,7 @@ describe('built sidecar process', () => {
     const port = await ready(first);
     const second = launch({ MATTER_SIDECAR_PORT: String(port) });
     expect(await second.exited).toBe(1);
-    expect(second.stderr.join('')).toMatch(/Only the sidecar stopped/);
+    expect(second.stderr.join('')).toMatch(/Set MATTER_SIDECAR_PORT to a free port\. Only the sidecar stopped/);
     expect(second.stderr.join('')).not.toMatch(/\n\s+at /); // no stack trace for an expected operational failure
     expect((await http(port, 'GET', '/health/live')).status).toBe(200);
   });
