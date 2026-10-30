@@ -3,6 +3,7 @@ import { STORAGE_SCHEMA_VERSION, WIRE_VERSION } from './constants';
 import {
   clusterIdSchema,
   deadlineSchema,
+  deviceTypeIdSchema,
   endpointIdSchema,
   matterId64Schema,
   outcomeSchema,
@@ -61,7 +62,7 @@ export const commissioningSessionSchema = z.strictObject({
 
 export const endpointSchema = z.strictObject({
   endpointId: endpointIdSchema,
-  deviceTypes: z.array(z.int().min(0)).max(32),
+  deviceTypes: z.array(deviceTypeIdSchema).max(32),
 });
 export const nodeSchema = z.strictObject({
   nodeId: matterId64Schema,

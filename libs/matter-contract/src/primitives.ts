@@ -15,6 +15,8 @@ export const matterId64Schema = z
   .refine((value) => DECIMAL_ID.test(value) && BigInt(value) <= UINT64_MAX, 'must fit into 64 bits');
 export const endpointIdSchema = z.int().min(0).max(65_534);
 export const clusterIdSchema = z.int().min(0).max(0xffff_ffff);
+/** Matter device type IDs are uint32. */
+export const deviceTypeIdSchema = z.int().min(0).max(0xffff_ffff);
 
 export const initiatorSchema = z.strictObject({
   userId: z.string().max(128).nullable(),

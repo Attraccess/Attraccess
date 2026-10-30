@@ -122,6 +122,11 @@ describe('families', () => {
     expect(threadDatasetRequestSchema.safeParse({ activeDataset: '0e08' }).success).toBe(true);
   });
 
+  it('caps device type IDs at uint32', () => {
+    expect(families.endpointSchema.safeParse({ endpointId: 1, deviceTypes: [0xffff_ffff] }).success).toBe(true);
+    expect(families.endpointSchema.safeParse({ endpointId: 1, deviceTypes: [0x1_0000_0000] }).success).toBe(false);
+  });
+
   it('keeps the subscription interval invariant in the shared schema', () => {
     const base = { nodeId: '1', minIntervalSec: 1, maxIntervalSec: 5 };
     expect(subscriptionRequestSchema.safeParse(base).success).toBe(true);
