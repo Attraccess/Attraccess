@@ -37,15 +37,22 @@ export class WagoRuntime extends RuntimeTelemetry {
     if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
     else await this.outputs.applyDisconnectPolicies(this.connected);
     if (!this.desiredSubscribed) {
+      // Desired messages are admitted concurrently on purpose: a runtime-update message must raise its
+      // failsafe while earlier configurations still wait for the update lock, so they are skipped.
+      // Each one is decoded only under that lock, so at most one parsed configuration is held.
       await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload), {
         maxBytes: MAX_DESIRED_BYTES,
       });
       this.desiredSubscribed = true;
     }
     if (!this.commandsSubscribed) {
-      await this.options.transport.subscribe(this.commandTopic(), (payload, slot) => this.receiveCommand(payload, slot), {
-        maxBytes: MAX_COMMAND_BYTES,
-      });
+      await this.options.transport.subscribe(
+        this.commandTopic(),
+        (payload, slot) => this.receiveCommand(payload, slot),
+        {
+          maxBytes: MAX_COMMAND_BYTES,
+        },
+      );
       this.commandsSubscribed = true;
     }
     await this.retryCredentialRotationSubscription();

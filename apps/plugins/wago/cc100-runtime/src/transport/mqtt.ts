@@ -3,7 +3,6 @@ import { Transport } from '../runtime';
 import type { MessageSlot, SubscribeOptions } from '../runtime/types';
 import { DEFAULT_MAX_MESSAGE_BYTES, DropCounters, SubscriptionAdmission } from './admission';
 
-
 export class MqttTransport implements Transport {
   private readonly pending = new Set<(error: Error) => void>();
   private recovering = false;

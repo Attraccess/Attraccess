@@ -1,9 +1,9 @@
-import { MAX_CLAIM_BYTES } from './runtime/limits';
 import { connect, type MqttClient } from 'mqtt';
 import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } from '../../shared/hardware-profile';
 import { Cc100OnboardIoAdapter } from './io/adapters';
 import { ModbusDeviceRouter } from './modbus/routing/adapter';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim } from './runtime';
+import { MAX_CLAIM_BYTES } from './runtime/limits';
 import { RunLed } from './io/status-led';
 import { MqttTransport } from './transport/mqtt';
 

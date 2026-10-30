@@ -1,5 +1,6 @@
 import { encodeMeasurement } from '../../../../measurement-contract';
 import { acquireMeasurements, measurementErrorCode } from '../../modbus/routing/acquisition';
+import { boundFaultText } from '../bounded';
 import { RuntimeCommandReservations } from '../commands/reservations';
 
 export abstract class RuntimeMeasurements extends RuntimeCommandReservations {
@@ -44,7 +45,7 @@ export abstract class RuntimeMeasurements extends RuntimeCommandReservations {
             await this.publishOperational('faults', {
               channelId: channel.id,
               code: measurementErrorCode(error),
-              message: error instanceof Error ? error.message : String(error),
+              message: boundFaultText(error instanceof Error ? error.message : String(error)),
             });
           }
         }

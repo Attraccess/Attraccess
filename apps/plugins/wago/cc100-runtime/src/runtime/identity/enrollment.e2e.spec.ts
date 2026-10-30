@@ -117,7 +117,8 @@ describe('CC100 MQTT enrollment (e2e)', () => {
 function transport(client: MqttClient): Transport {
   return {
     publish: (topic, payload, options) => publish(client, topic, payload, options?.retain),
-    subscribe: (topic, listener) => subscribe(client, [topic], (payload) => listener(payload, { release: () => undefined })),
+    subscribe: (topic, listener) =>
+      subscribe(client, [topic], (payload) => listener(payload, { release: () => undefined })),
   };
 }
 

@@ -1,11 +1,6 @@
 import { EventEmitter } from 'node:events';
 import type { MqttClient } from 'mqtt';
-import {
-  DropCounters,
-  MAX_CONCURRENT_MESSAGES,
-  MAX_WAITING_MESSAGES,
-  SubscriptionAdmission,
-} from './admission';
+import { DropCounters, MAX_CONCURRENT_MESSAGES, MAX_WAITING_MESSAGES, SubscriptionAdmission } from './admission';
 import { MqttTransport } from './mqtt';
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -15,6 +10,13 @@ function admission(maxBytes = 1024) {
   const counters = new DropCounters();
   const onError = jest.fn();
   return { counters, onError, admission: new SubscriptionAdmission(maxBytes, counters, onError) };
+}
+
+/** A handler that stays running until its gate is opened. */
+function blocking() {
+  const gates: Array<() => void> = [];
+  const handler = () => new Promise<void>((resolve) => gates.push(resolve));
+  return { gates, handler };
 }
 
 describe('subscription admission', () => {
@@ -83,6 +85,11 @@ describe('subscription admission', () => {
     for (let index = 0; index < MAX_CONCURRENT_MESSAGES + 1; index += 1) subject.admit(body(), failing);
     await flush();
     expect(onError).toHaveBeenCalledTimes(MAX_CONCURRENT_MESSAGES + 1);
+    // A second release of the same slot must not free another one: the limit still holds afterwards.
+    const { gates, handler } = blocking();
+    for (let index = 0; index < MAX_CONCURRENT_MESSAGES + 1; index += 1) subject.admit(body(), handler);
+    await flush();
+    expect(gates).toHaveLength(MAX_CONCURRENT_MESSAGES);
   });
 });
 
