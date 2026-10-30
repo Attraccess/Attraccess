@@ -15,17 +15,17 @@ Beim Start lädt der Sidecar matter.js, öffnet aber keine Matter-Ports (UDP 554
 
 ## Konfiguration
 
-Alle Einstellungen sind optionale Umgebungsvariablen und werden validiert, bevor der Sidecar lauscht. Ein ungültiger Wert beendet nur den Sidecar und nennt die zu korrigierende Variable.
+Alle Einstellungen sind optionale Umgebungsvariablen und werden validiert, bevor der Sidecar lauscht. Eine leere Variable gilt als nicht gesetzt. Ein Wert außerhalb seines Bereichs beendet nur den Sidecar und nennt die zu korrigierende Variable.
 
-| Variable | Standard | Bedeutung |
-| --- | --- | --- |
-| `MATTER_SIDECAR_PORT` | `8581` | TCP-Port auf Loopback (`0` wählt einen freien Port) |
-| `MATTER_SIDECAR_MAX_MESSAGE_BYTES` | `1048576` | Größter Request-Body und größte WebSocket-Nachricht |
-| `MATTER_SIDECAR_REQUEST_DEADLINE_MS` | `10000` | Frist einer Anfrage |
-| `MATTER_SIDECAR_SHUTDOWN_GRACE_MS` | `5000` | Zeit für das Herunterfahren |
-| `MATTER_SIDECAR_REPLAY_MAX_EVENTS` | `1000` | Für die Wiedergabe vorgehaltene Events |
-| `MATTER_SIDECAR_REPLAY_MAX_AGE_MS` | `300000` | Höchstalter wiedergebbarer Events |
-| `MATTER_SIDECAR_CLIENT_QUEUE_BYTES` | `1048576` | Warteschlangenbudget je WebSocket-Client |
+| Variable | Standard | Bereich | Bedeutung |
+| --- | --- | --- | --- |
+| `MATTER_SIDECAR_PORT` | `8581` | `0`–`65535` | TCP-Port auf Loopback (`0` wählt einen freien Port) |
+| `MATTER_SIDECAR_MAX_MESSAGE_BYTES` | `1048576` | `1`–`16777216` | Größter Request-Body und größte WebSocket-Nachricht |
+| `MATTER_SIDECAR_REQUEST_DEADLINE_MS` | `10000` | `1`–`60000` | Frist einer Anfrage |
+| `MATTER_SIDECAR_SHUTDOWN_GRACE_MS` | `5000` | `1`–`60000` | Zeit für das Herunterfahren |
+| `MATTER_SIDECAR_REPLAY_MAX_EVENTS` | `1000` | `1`–`100000` | Für die Wiedergabe vorgehaltene Events |
+| `MATTER_SIDECAR_REPLAY_MAX_AGE_MS` | `300000` | `1`–`86400000` | Höchstalter wiedergebbarer Events |
+| `MATTER_SIDECAR_CLIENT_QUEUE_BYTES` | `1048576` | `1`–`67108864` | Warteschlangenbudget je WebSocket-Client, einschließlich der Wiedergabe nach einem Neuverbinden |
 
 Es gibt keine Einstellung für die Bindeadresse. Der Sidecar lauscht nie auf etwas anderem als Loopback.
 
@@ -70,7 +70,7 @@ So beheben Sie es: Vergleichen Sie `received` mit `supported` und **aktualisiere
 
 ## Herunterfahren
 
-`SIGTERM` und `SIGINT` fahren den Sidecar geordnet herunter: Er meldet sich als nicht bereit, nimmt keine neue Arbeit an, schließt WebSocket-Clients mit Code 1001, beendet laufende Anfragen und endet innerhalb der Schonfrist. Wiederholte Signale sind unbedenklich. Ein Fehler einer Anfrage oder eines Clients beendet den Prozess nie, und ein fataler Fehler beendet nur den Sidecar, mit einer verständlichen Meldung auf stderr. Attraccess läuft weiter.
+`SIGTERM` und `SIGINT` fahren den Sidecar geordnet herunter: Er meldet sich als nicht bereit, nimmt keine neue Arbeit an, schließt WebSocket-Clients mit Code 1001, beendet laufende Anfragen und endet innerhalb der Schonfrist. Wiederholte Signale sind unbedenklich. Ein Fehler einer Anfrage oder eines Clients beendet den Prozess nie, und ein fataler Fehler beendet nur den Sidecar, mit einer verständlichen Meldung auf stderr. Ist der Port bereits belegt, rät die Meldung, `MATTER_SIDECAR_PORT` auf einen freien Port zu setzen. Attraccess läuft weiter.
 
 ## Sicherheitshinweise
 

@@ -44,7 +44,7 @@ Unversioned endpoints (`/health/live`, `/health/ready`, `/version`) need no head
 | `X-Matter-Plugin-Version` | the plugin release |
 | `X-Matter-Sidecar-Version` | the sidecar release the caller expects |
 
-Optional: `X-Correlation-Id` (a UUID; one is generated otherwise) and `X-Request-Deadline-Ms`. Unknown versioned paths (for example `/v2/...`) return 404 and never fall through to `/v1`.
+Optional: `X-Correlation-Id` (a UUID; one is generated otherwise) and `X-Request-Deadline-Ms`, which can only shorten the configured request deadline, never extend it. Unknown versioned paths (for example `/v2/...`) return 404 and never fall through to `/v1`.
 
 Identifiers that Matter defines as 64-bit (node and fabric IDs) travel as decimal strings. matter.js objects never cross the wire.
 
@@ -54,7 +54,7 @@ Every error uses one envelope: `{ "error": { "code", "message", "correlationId",
 
 | Code | HTTP | Meaning |
 | --- | --- | --- |
-| `validation_failed` | 400 | Invalid path parameters, body or WebSocket message |
+| `validation_failed` | 400 | Invalid path parameters or body (for WebSocket messages, see [Events](#events-ordering-replay-and-duplicates)) |
 | `forbidden_origin` | 403 | Browser `Origin` or non-loopback `Host` |
 | `not_found` / `method_not_allowed` | 404 / 405 | Unknown path or method |
 | `incompatible_release` | 409 | Unsupported release combination |
@@ -76,12 +76,13 @@ Every event carries an event ID, schema version, timestamp, correlation context,
 
 - **Ordering** is guaranteed only within one sidecar run (one stream instance ID). Ordering across restarts is not promised.
 - **Delivery is at least once.** Consumers must drop duplicates by event ID.
-- **Resume.** A client connects to `/v1/events` (WebSocket), receives `hello` with the stream instance ID and head cursor, then sends `resume` with an optional cursor. The server replays everything after the cursor and continues live with no gap and no duplicate.
-- **Reconciliation.** If the cursor is malformed, expired, evicted, in the future or from an earlier sidecar run, the server sends `reconciliation-required` with `"snapshot": "unavailable"` and closes the connection. This foundation has no snapshot to offer and never fabricates one.
+- **Resume.** A client connects to `/v1/events` (WebSocket), receives `hello` with the stream instance ID and head cursor, then sends `{"type":"resume","wireVersion":1}` with an optional `cursor`. The server replays everything after the cursor and continues live with no gap and no duplicate.
+- **Reconciliation.** If the cursor is malformed, expired, evicted, in the future or from an earlier sidecar run, the server sends `reconciliation-required` with `"snapshot": "unavailable"` and closes the connection with code 1000. This foundation has no snapshot to offer and never fabricates one.
 - **Bounds.** Replay is bounded in memory by count (default 1,000 events) and age (default 5 minutes); idle events expire too.
 - **Client limit.** At most 64 WebSocket clients may be connected at once. A further upgrade is refused with 503 `sidecar_unavailable`. The version check comes first, so a client with a wrong version always gets 409 or 426, even when the limit is reached.
-- **First-message timeout.** A client that does not send `resume` within 30 seconds of connecting is closed with code 1008. A `ping` does not count: only `resume` stops the timer.
-- **Slow clients.** Each client has a queue budget that also counts error messages. A client that exceeds it is closed with code 1013 and told to reconnect with its last cursor.
+- **First-message timeout.** A client that does not send `resume` within 30 seconds of connecting is closed with code 1008. A `ping` (`{"type":"ping","wireVersion":1}`, answered with `pong`) does not count: only `resume` stops the timer.
+- **Invalid messages.** A binary, non-JSON or off-contract message, or a second `resume` on the same connection, is answered with an `error` message (`validation_failed`, carrying the upgrade's correlation ID) and the connection is closed with code 1008.
+- **Slow clients.** Each client has a queue budget that also counts error messages and the replay sent after `resume`. A client that exceeds it is closed with code 1013 and told to reconnect with its last cursor. Keep the budget larger than the replay a reconnecting client may need.
 - **Oversized messages.** The WebSocket parser closes them with code 1009 (message too big) before application code sees them.
 
 ## Security boundaries

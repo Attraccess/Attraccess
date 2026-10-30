@@ -15,17 +15,17 @@ Starting the sidecar loads matter.js but opens no Matter ports (UDP 5540, mDNS),
 
 ## Configuration
 
-All settings are optional environment variables, validated before the sidecar listens. An invalid value stops only the sidecar and prints which variable to fix.
+All settings are optional environment variables, validated before the sidecar listens. An empty variable counts as unset. A value outside its range stops only the sidecar and prints which variable to fix.
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `MATTER_SIDECAR_PORT` | `8581` | TCP port on loopback (`0` picks a free port) |
-| `MATTER_SIDECAR_MAX_MESSAGE_BYTES` | `1048576` | Largest request body and WebSocket message |
-| `MATTER_SIDECAR_REQUEST_DEADLINE_MS` | `10000` | Request deadline |
-| `MATTER_SIDECAR_SHUTDOWN_GRACE_MS` | `5000` | Time allowed for shutdown |
-| `MATTER_SIDECAR_REPLAY_MAX_EVENTS` | `1000` | Events kept for replay |
-| `MATTER_SIDECAR_REPLAY_MAX_AGE_MS` | `300000` | Maximum age of replayable events |
-| `MATTER_SIDECAR_CLIENT_QUEUE_BYTES` | `1048576` | Per-WebSocket-client queue budget |
+| Variable | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `MATTER_SIDECAR_PORT` | `8581` | `0`–`65535` | TCP port on loopback (`0` picks a free port) |
+| `MATTER_SIDECAR_MAX_MESSAGE_BYTES` | `1048576` | `1`–`16777216` | Largest request body and WebSocket message |
+| `MATTER_SIDECAR_REQUEST_DEADLINE_MS` | `10000` | `1`–`60000` | Request deadline |
+| `MATTER_SIDECAR_SHUTDOWN_GRACE_MS` | `5000` | `1`–`60000` | Time allowed for shutdown |
+| `MATTER_SIDECAR_REPLAY_MAX_EVENTS` | `1000` | `1`–`100000` | Events kept for replay |
+| `MATTER_SIDECAR_REPLAY_MAX_AGE_MS` | `300000` | `1`–`86400000` | Maximum age of replayable events |
+| `MATTER_SIDECAR_CLIENT_QUEUE_BYTES` | `1048576` | `1`–`67108864` | Per-WebSocket-client queue budget, including the replay after a reconnect |
 
 There is no bind-address setting. The sidecar never listens on anything but loopback.
 
@@ -70,7 +70,7 @@ To fix it, compare `received` with `supported`, then **upgrade or downgrade** At
 
 ## Shutdown
 
-`SIGTERM` and `SIGINT` shut the sidecar down gracefully: it reports unready, refuses new work, closes WebSocket clients with code 1001, finishes in-flight requests and exits within the grace period. Repeated signals are safe. A request or client error never crashes the process, and a fatal error ends only the sidecar, with an actionable message on stderr. Attraccess keeps running.
+`SIGTERM` and `SIGINT` shut the sidecar down gracefully: it reports unready, refuses new work, closes WebSocket clients with code 1001, finishes in-flight requests and exits within the grace period. Repeated signals are safe. A request or client error never crashes the process, and a fatal error ends only the sidecar, with an actionable message on stderr. If the port is already taken, the message says to set `MATTER_SIDECAR_PORT` to a free port. Attraccess keeps running.
 
 ## Security notes
 

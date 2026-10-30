@@ -44,7 +44,7 @@ Unversionierte Endpunkte (`/health/live`, `/health/ready`, `/version`) brauchen 
 | `X-Matter-Plugin-Version` | das Plugin-Release |
 | `X-Matter-Sidecar-Version` | das Sidecar-Release, das der Aufrufer erwartet |
 
-Optional: `X-Correlation-Id` (eine UUID; sonst wird eine erzeugt) und `X-Request-Deadline-Ms`. Unbekannte versionierte Pfade (zum Beispiel `/v2/...`) liefern 404 und fallen nie auf `/v1` zurück.
+Optional: `X-Correlation-Id` (eine UUID; sonst wird eine erzeugt) und `X-Request-Deadline-Ms`, das die konfigurierte Frist nur verkürzen, nie verlängern kann. Unbekannte versionierte Pfade (zum Beispiel `/v2/...`) liefern 404 und fallen nie auf `/v1` zurück.
 
 Bezeichner, die Matter als 64-Bit definiert (Node- und Fabric-IDs), werden als Dezimalzeichenfolgen übertragen. matter.js-Objekte verlassen den Prozess nie.
 
@@ -54,7 +54,7 @@ Jeder Fehler nutzt einen Umschlag: `{ "error": { "code", "message", "correlation
 
 | Code | HTTP | Bedeutung |
 | --- | --- | --- |
-| `validation_failed` | 400 | Ungültige Pfadparameter, ungültiger Body oder ungültige WebSocket-Nachricht |
+| `validation_failed` | 400 | Ungültige Pfadparameter oder ungültiger Body (zu WebSocket-Nachrichten siehe [Events](#events-reihenfolge-wiedergabe-und-duplikate)) |
 | `forbidden_origin` | 403 | Browser-`Origin` oder `Host`, der nicht Loopback ist |
 | `not_found` / `method_not_allowed` | 404 / 405 | Unbekannter Pfad oder unbekannte Methode |
 | `incompatible_release` | 409 | Nicht unterstützte Release-Kombination |
@@ -76,12 +76,13 @@ Jedes Event trägt Event-ID, Schemaversion, Zeitstempel, Korrelationskontext, St
 
 - **Reihenfolge** ist nur innerhalb eines Sidecar-Laufs garantiert (eine Stream-Instanz-ID). Über Neustarts hinweg wird keine Reihenfolge zugesichert.
 - **Die Zustellung ist mindestens einmal.** Konsumenten müssen Duplikate anhand der Event-ID verwerfen.
-- **Fortsetzen.** Ein Client verbindet sich per WebSocket mit `/v1/events`, erhält `hello` mit Stream-Instanz-ID und Head-Cursor und sendet dann `resume` mit optionalem Cursor. Der Server gibt alles nach dem Cursor wieder und läuft ohne Lücke und ohne Duplikat live weiter.
-- **Abgleich (Reconciliation).** Ist der Cursor fehlerhaft, abgelaufen, verdrängt, in der Zukunft oder aus einem früheren Sidecar-Lauf, sendet der Server `reconciliation-required` mit `"snapshot": "unavailable"` und schließt die Verbindung. Dieses Fundament hat keinen Snapshot anzubieten und erfindet nie einen.
+- **Fortsetzen.** Ein Client verbindet sich per WebSocket mit `/v1/events`, erhält `hello` mit Stream-Instanz-ID und Head-Cursor und sendet dann `{"type":"resume","wireVersion":1}` mit optionalem `cursor`. Der Server gibt alles nach dem Cursor wieder und läuft ohne Lücke und ohne Duplikat live weiter.
+- **Abgleich (Reconciliation).** Ist der Cursor fehlerhaft, abgelaufen, verdrängt, in der Zukunft oder aus einem früheren Sidecar-Lauf, sendet der Server `reconciliation-required` mit `"snapshot": "unavailable"` und schließt die Verbindung mit Code 1000. Dieses Fundament hat keinen Snapshot anzubieten und erfindet nie einen.
 - **Grenzen.** Die Wiedergabe ist im Speicher nach Anzahl (Standard 1.000 Events) und Alter (Standard 5 Minuten) begrenzt; ungenutzte Events laufen ebenfalls ab.
-- **Client-Limit.** Es dürfen höchstens 64 WebSocket-Clients gleichzeitig verbunden sein. Ein weiterer Upgrade wird mit 503 `sidecar_unavailable` abgelehnt. Die Versionsprüfung kommt zuerst: Ein Client mit falscher Version erhält daher immer 409 oder 426, auch wenn das Limit erreicht ist.
-- **Zeitlimit für die erste Nachricht.** Ein Client, der nicht innerhalb von 30 Sekunden nach dem Verbinden `resume` sendet, wird mit Code 1008 geschlossen. Ein `ping` zählt nicht: Nur `resume` stoppt den Timer.
-- **Langsame Clients.** Jeder Client hat ein Warteschlangenbudget, das auch Fehlernachrichten zählt. Ein Client, der es überschreitet, wird mit Code 1013 geschlossen und aufgefordert, sich mit seinem letzten Cursor neu zu verbinden.
+- **Client-Limit.** Es dürfen höchstens 64 WebSocket-Clients gleichzeitig verbunden sein. Ein weiteres Upgrade wird mit 503 `sidecar_unavailable` abgelehnt. Die Versionsprüfung kommt zuerst: Ein Client mit falscher Version erhält daher immer 409 oder 426, auch wenn das Limit erreicht ist.
+- **Zeitlimit für die erste Nachricht.** Ein Client, der nicht innerhalb von 30 Sekunden nach dem Verbinden `resume` sendet, wird mit Code 1008 geschlossen. Ein `ping` (`{"type":"ping","wireVersion":1}`, beantwortet mit `pong`) zählt nicht: Nur `resume` stoppt den Timer.
+- **Ungültige Nachrichten.** Eine binäre, nicht als JSON lesbare oder nicht vertragsgemäße Nachricht sowie ein zweites `resume` auf derselben Verbindung werden mit einer `error`-Nachricht beantwortet (`validation_failed`, mit der Korrelations-ID des Upgrades), und die Verbindung wird mit Code 1008 geschlossen.
+- **Langsame Clients.** Jeder Client hat ein Warteschlangenbudget, das auch Fehlernachrichten und die Wiedergabe nach `resume` zählt. Ein Client, der es überschreitet, wird mit Code 1013 geschlossen und aufgefordert, sich mit seinem letzten Cursor neu zu verbinden. Das Budget sollte größer sein als die Wiedergabe, die ein neu verbundener Client nachholen muss.
 - **Zu große Nachrichten.** Der WebSocket-Parser schließt sie mit Code 1009 (message too big), bevor Anwendungscode sie sieht.
 
 ## Sicherheitsgrenzen
