@@ -24,6 +24,7 @@ void API::onRegistrationData(JsonObject data)
 
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
             State::clearEnrollment();
+            this->enrollmentRetryPending = false;
 
             this->logger.infof("Reader registered with ID: %d", readerId);
 
@@ -52,12 +53,26 @@ void API::onUnauthorized(JsonObject data)
 }
 
 // The server only creates the reader once an admin approved the code it answers with.
-void API::sendRegistrationRequest()
+bool API::sendRegistrationRequest()
 {
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["enrollment"]["protocol"] = 1;
-    this->sendMessage("READER_REGISTER", payload);
+    if (this->sendMessage("READER_REGISTER", payload))
+    {
+        return true;
+    }
+    // The socket can stay up while a send fails; nothing else would ask again, so re-arm.
+    logger.warn("Registration request could not be sent, trying again");
+    this->scheduleEnrollmentRetry(ENROLLMENT_MIN_RETRY_MS);
+    return false;
+}
+
+void API::scheduleEnrollmentRetry(uint32_t delayMs)
+{
+    // Publish the deadline before the flag the main loop checks first.
+    this->enrollmentRetryAt = millis() + delayMs;
+    this->enrollmentRetryPending = true;
 }
 
 void API::onEnrollmentCode(JsonObject data)
@@ -67,24 +82,26 @@ void API::onEnrollmentCode(JsonObject data)
     {
         return;
     }
-    // The lab helper reads this line from the UART to approve readers without a screen reader.
-    logger.infof("Enrollment: code=%s rotatesInMs=%u", payload["code"].as<const char *>(),
-                 static_cast<unsigned>(payload["rotatesInMs"] | 30000U));
+    // A live request needs no retry; asking again would only hit the one-pending-per-connection limit.
+    this->enrollmentRetryPending = false;
+    const uint32_t rotatesInMs = payload["rotatesInMs"] | ENROLLMENT_CODE_ROTATION_MS;
+    // The lab helper reads this line from the UART to approve readers without a screen.
+    logger.infof("%s%s rotatesInMs=%u", ENROLLMENT_LOG_MARKER, payload["code"].as<const char *>(),
+                 static_cast<unsigned>(rotatesInMs));
     State::setEnrollmentCode(payload["code"].as<std::string>(),
-                             payload["rotatesInMs"] | 30000U,
-                             payload["expiresInMs"] | 600000U);
+                             rotatesInMs,
+                             payload["expiresInMs"] | ENROLLMENT_REQUEST_TTL_MS);
 }
 
 void API::onEnrollmentRejected(JsonObject data)
 {
-    uint32_t retryAfterMs = data["payload"]["retryAfterMs"] | 30000U;
-    // Never hammer the server: wait at least 5 s, at most the request lifetime.
-    if (retryAfterMs < 5000U) retryAfterMs = 5000U;
-    if (retryAfterMs > 600000U) retryAfterMs = 600000U;
+    uint32_t retryAfterMs = data["payload"]["retryAfterMs"] | ENROLLMENT_DEFAULT_RETRY_MS;
+    // Never hammer the server: wait at least the minimum, at most the request lifetime.
+    if (retryAfterMs < ENROLLMENT_MIN_RETRY_MS) retryAfterMs = ENROLLMENT_MIN_RETRY_MS;
+    if (retryAfterMs > ENROLLMENT_REQUEST_TTL_MS) retryAfterMs = ENROLLMENT_REQUEST_TTL_MS;
     logger.warnf("Enrollment request refused, retrying in %u ms", static_cast<unsigned>(retryAfterMs));
     State::setEnrollmentRejected(retryAfterMs);
-    this->enrollmentRetryAt = millis() + retryAfterMs;
-    this->enrollmentRetryPending = true;
+    this->scheduleEnrollmentRetry(retryAfterMs);
 }
 
 bool API::isRegistered()

@@ -546,7 +546,7 @@ inline constexpr Entry catalog[] = {
     {Message::ErrorMassIntroductionFailed, "Einweisung fehlgeschlagen", "Introduction failed"},
     {Message::ApproveThisReaderInAttraccess, "Dieses Lesegerät in Attraccess freigeben", "Approve this reader in Attraccess"},
     {Message::EnrollmentCodeChangesIn, "Der Code ändert sich in {0} s", "The code changes in {0} s"},
-    {Message::EnrollmentTooManyAttempts, "Zu viele Anfragen. Neuer Versuch gleich.", "Too many requests. Trying again soon."},
+    {Message::EnrollmentTooManyAttempts, "Zu viele Anfragen", "Too many requests"},
     {Message::EnrollmentRetryIn, "Neuer Versuch in {0} s", "Trying again in {0} s"},
 };
 

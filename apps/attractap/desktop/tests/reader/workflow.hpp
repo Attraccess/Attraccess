@@ -136,6 +136,7 @@ struct ReaderWorkflow
         pump();
     }
     void testEnrollment();
+    void testEnrollmentRetry();
     void testLocalization();
     void testListAndAuthentication();
     void testSessionStart();

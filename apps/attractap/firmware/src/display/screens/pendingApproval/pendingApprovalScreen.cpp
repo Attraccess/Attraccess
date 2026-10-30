@@ -20,12 +20,11 @@ void PendingApprovalScreen::init()
    lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
    lv_obj_set_style_pad_all(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *title = lv_label_create(this->screen);
-   lv_obj_set_width(title, lv_pct(100));
-   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   FirmwareI18n::setLabel(title, FirmwareI18n::Message::ApproveThisReaderInAttraccess);
-   lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->titleLabel = lv_label_create(this->screen);
+   lv_obj_set_width(this->titleLabel, lv_pct(100));
+   lv_obj_set_style_text_align(this->titleLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->titleLabel, &attractap_font_montserrat_latin1_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->titleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->codeLabel = lv_label_create(this->screen);
    lv_obj_set_style_text_font(this->codeLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -38,7 +37,16 @@ void PendingApprovalScreen::init()
    lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
+   this->resetShown();
    this->loop();
+}
+
+void PendingApprovalScreen::resetShown()
+{
+   this->hasShown = false;
+   this->shownRejected = false;
+   this->shownCode.clear();
+   this->shownSeconds = 0;
 }
 
 void PendingApprovalScreen::loop()
@@ -48,16 +56,29 @@ void PendingApprovalScreen::loop()
       return;
    }
    const State::EnrollmentState enrollment = State::getEnrollmentState();
-   const auto seconds = [](uint32_t ms) { return std::to_string((ms + 999) / 1000); };
-
-   if (enrollment.rejected)
+   // Round up so the countdown reaches 0 exactly when the code rotates or the retry fires.
+   const uint32_t seconds = ((enrollment.rejected ? enrollment.retryInMs : enrollment.rotatesInMs) + 999) / 1000;
+   if (this->hasShown && enrollment.rejected == this->shownRejected && seconds == this->shownSeconds &&
+       (enrollment.rejected || enrollment.code == this->shownCode))
    {
-      setDynamicLabelTextIfChanged(this->codeLabel, "- - -");
-      setLabelTextIfChanged(this->hintLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EnrollmentRetryIn, {FirmwareI18n::Text::literal(seconds(enrollment.retryInMs)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
       return;
    }
-   setDynamicLabelTextIfChanged(this->codeLabel, enrollment.code.c_str());
-   setLabelTextIfChanged(this->hintLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EnrollmentCodeChangesIn, {FirmwareI18n::Text::literal(seconds(enrollment.rotatesInMs)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
+   this->hasShown = true;
+   this->shownRejected = enrollment.rejected;
+   this->shownSeconds = seconds;
+   this->shownCode = enrollment.rejected ? std::string() : enrollment.code;
+
+   const FirmwareI18n::Text secondsText = FirmwareI18n::Text::literal(std::to_string(seconds)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
+   if (enrollment.rejected)
+   {
+      setLabelTextIfChanged(this->titleLabel, FirmwareI18n::Message::EnrollmentTooManyAttempts);
+      setDynamicLabelTextIfChanged(this->codeLabel, "- - -") /* i18n-data: Language-neutral placeholder while no code is issued. */;
+      setLabelTextIfChanged(this->hintLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EnrollmentRetryIn, {secondsText}));
+      return;
+   }
+   setLabelTextIfChanged(this->titleLabel, FirmwareI18n::Message::ApproveThisReaderInAttraccess);
+   setDynamicLabelTextIfChanged(this->codeLabel, enrollment.code.c_str()) /* i18n-data: Server-issued enrollment code. */;
+   setLabelTextIfChanged(this->hintLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EnrollmentCodeChangesIn, {secondsText}));
 }
 
 lv_obj_t *PendingApprovalScreen::getScreen()
@@ -82,6 +103,8 @@ void PendingApprovalScreen::destroy()
    }
    lv_obj_del(this->screen);
    this->screen = nullptr;
+   this->titleLabel = nullptr;
    this->codeLabel = nullptr;
    this->hintLabel = nullptr;
+   this->resetShown();
 }

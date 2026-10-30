@@ -216,6 +216,9 @@ add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workfl
 add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
 set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
+# Enrollment retry back-off waits out the real 5-second minimum a few times.
+add_test(NAME attractap-reader-enrollment-retry-tests COMMAND attractap-reader-workflow-tests --enrollment-retry)
+set_tests_properties(attractap-reader-enrollment-retry-tests PROPERTIES TIMEOUT 90)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
 # Includes the bilingual reader journey plus four real 30-second expiry windows.
@@ -230,4 +233,5 @@ set_property(TEST
     attractap-ota-interrupt-enrollment
     attractap-ota-interrupt-reset
     attractap-reader-timeout-tests
+    attractap-reader-enrollment-retry-tests
     APPEND PROPERTY ENVIRONMENT "SDL_AUDIO_DRIVER=dummy")

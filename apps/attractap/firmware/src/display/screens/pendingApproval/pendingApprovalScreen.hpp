@@ -17,7 +17,15 @@ public:
     void destroy() override;
 
 private:
+    // loop() runs every main-loop tick; only touch the labels when what they show changes.
+    void resetShown();
+
     lv_obj_t *screen = nullptr;
+    lv_obj_t *titleLabel = nullptr;
     lv_obj_t *codeLabel = nullptr;
     lv_obj_t *hintLabel = nullptr;
+    bool hasShown = false;
+    bool shownRejected = false;
+    std::string shownCode;
+    uint32_t shownSeconds = 0;
 };

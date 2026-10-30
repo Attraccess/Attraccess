@@ -65,10 +65,14 @@ void API::loop()
 
     this->firmware.tick();
 
-    if (this->enrollmentRetryPending && static_cast<int32_t>(millis() - this->enrollmentRetryAt) >= 0)
+    if (this->enrollmentRetryPending && static_cast<int32_t>(millis() - this->enrollmentRetryAt) >= 0 &&
+        this->enrollmentRetryPending.exchange(false))
     {
-        this->enrollmentRetryPending = false;
-        this->sendRegistrationRequest();
+        if (!this->sendRegistrationRequest() && State::getEnrollmentState().rejected)
+        {
+            // sendRegistrationRequest() re-armed the retry; restart the countdown on screen.
+            State::setEnrollmentRejected(ENROLLMENT_MIN_RETRY_MS);
+        }
     }
 }
 

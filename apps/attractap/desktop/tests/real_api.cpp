@@ -318,7 +318,15 @@ int main(int argc, char **argv)
         std::ofstream(temporary) << enrollment.code << "\n";
         std::filesystem::rename(temporary, control / "pending-approval");
     };
-    if (!waitFor([&] { announce(); return simulator.authenticated(); }, simulator, 60000)) return 1;
+    // The original 15 s startup bound applies until the reader announces a code; approval through
+    // the API then gets up to 60 s in total (a failed startup, e.g. a bad endpoint, still exits early).
+    const auto startupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+    waitFor([&] {
+        announce();
+        return simulator.authenticated() ||
+               (announcedCode.empty() && std::chrono::steady_clock::now() >= startupDeadline);
+    }, simulator, 60000);
+    if (!simulator.authenticated()) return 1;
     std::ofstream(control / "ready") << "authenticated\n";
 
     // Numbered files avoid blocking stdin while the real websocket and LVGL

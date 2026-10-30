@@ -379,6 +379,18 @@ public:
 class API : public ApiState
 {
 public:
+    // Enrollment timing (ATT-1168). Defaults mirror the server constants in
+    // apps/api/src/device-enrollment/device-enrollment.constants.ts; keep them in sync.
+    static constexpr uint32_t ENROLLMENT_CODE_ROTATION_MS = 30000U;  // ENROLLMENT_CODE_ROTATION_MS
+    static constexpr uint32_t ENROLLMENT_REQUEST_TTL_MS = 600000U;   // ENROLLMENT_REQUEST_TTL_MS
+    // Default wait when a rejection carries no retryAfterMs (one code rotation).
+    static constexpr uint32_t ENROLLMENT_DEFAULT_RETRY_MS = ENROLLMENT_CODE_ROTATION_MS;
+    // Reader-side floor so a misbehaving server can never make the reader hammer it.
+    static constexpr uint32_t ENROLLMENT_MIN_RETRY_MS = 5000U;
+    // Stable UART contract: the lab tool (apps/attractap-lab/src/attractap_lab/enrollment.py)
+    // parses "Enrollment: code=<XXX-XXX>" from the serial log. Do not reword it.
+    static constexpr const char *ENROLLMENT_LOG_MARKER = "Enrollment: code=";
+
     explicit API(IReaderTransport &transport);
 
     void setup();
@@ -523,10 +535,12 @@ private:
     void onUnauthorized(JsonObject data);
     void onEnrollmentCode(JsonObject data);
     void onEnrollmentRejected(JsonObject data);
-    void sendRegistrationRequest();
+    bool sendRegistrationRequest();
+    void scheduleEnrollmentRetry(uint32_t delayMs);
     void sendAuthenticationRequest();
-    bool enrollmentRetryPending = false;
-    uint32_t enrollmentRetryAt = 0;
+    // Set by the websocket task (rejections), consumed by the main loop.
+    std::atomic<bool> enrollmentRetryPending{false};
+    std::atomic<uint32_t> enrollmentRetryAt{0};
     void onReaderAuthenticated(JsonObject data);
     void onServerTime(JsonVariantConst serverTime);
     void sendFirmwareInfo();

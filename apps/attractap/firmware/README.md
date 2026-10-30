@@ -135,6 +135,12 @@ Touch variants show the code on the pending-approval screen with a countdown.
 Every variant, including Lite, reports it on the serial console:
 `api.status.get` returns `status: "pending_approval"` plus `enrollmentCode` and
 `enrollmentRotatesInMs`, which the web flasher uses for its **Approve** button.
+Each new code is also logged on the UART as
+`Enrollment: code=K7P-3XQ rotatesInMs=30000`. Treat that line as a stable
+contract: the lab tool (`apps/attractap-lab/src/attractap_lab/enrollment.py`)
+parses the `Enrollment: code=` marker (`API::ENROLLMENT_LOG_MARKER`) to approve
+readers without a screen, so do not reword it. If a registration request cannot
+be sent while the socket stays up, the reader tries again after 5 s.
 A pending request ends when the connection closes or after 10 minutes, when the
 server closes the socket. A rejection (`READER_UNAUTHORIZED`) still clears the
 stored credentials, so a reader that connects to the wrong server waits for
