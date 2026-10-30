@@ -58,7 +58,7 @@ Jeder Fehler nutzt einen Umschlag: `{ "error": { "code", "message", "correlation
 | `forbidden_origin` | 403 | Browser-`Origin` oder `Host`, der nicht Loopback ist |
 | `not_found` / `method_not_allowed` | 404 / 405 | Unbekannter Pfad oder unbekannte Methode |
 | `incompatible_release` | 409 | Nicht unterstützte Release-Kombination |
-| `reconciliation_required` | 409 | Wiedergabe unmöglich (siehe unten) |
+| `reconciliation_required` | 409 | Reserviert; in diesem Release kommt eine unmögliche Wiedergabe als WebSocket-Nachricht (siehe unten) |
 | `payload_too_large` | 413 | Body über dem Limit |
 | `unsupported_wire_version` | 426 | Wire-Version fehlt, ist fehlerhaft oder nicht `1` |
 | `internal_error` | 500 | Unerwarteter Fehler; es wird kein interner Text zurückgegeben |

@@ -38,7 +38,7 @@ curl http://127.0.0.1:8581/version
 ```
 
 - `/health/live` answers `{"status":"live"}` whenever the process runs.
-- `/health/ready` answers 200 with `"status":"ready"` once configuration, matter.js start-up and the transport succeeded. It answers 503 with `"starting"` or `"draining"` otherwise. The `fabric` field (`uninitialized` in this release) is reported separately and never affects readiness.
+- `/health/ready` answers 200 with `"status":"ready"` once configuration, matter.js start-up and the transport succeeded. It answers 503 with `"draining"` while the sidecar shuts down. The sidecar opens its port only after start-up, so `"starting"` never reaches a caller in this release. The `fabric` field (`uninitialized` in this release) is reported separately and never affects readiness.
 - `/version` reports `build.version` and `build.commit` (the Git revision the sidecar was built from), `sidecar` (the sidecar release), `matterJs` (the matter.js release actually loaded), `storageSchemaVersion` (`1`; reporting it adds no persistence) and `wireVersion` (`1`).
 
 These endpoints need no compatibility headers, so they stay reachable while you troubleshoot a version mismatch.

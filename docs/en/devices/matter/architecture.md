@@ -58,7 +58,7 @@ Every error uses one envelope: `{ "error": { "code", "message", "correlationId",
 | `forbidden_origin` | 403 | Browser `Origin` or non-loopback `Host` |
 | `not_found` / `method_not_allowed` | 404 / 405 | Unknown path or method |
 | `incompatible_release` | 409 | Unsupported release combination |
-| `reconciliation_required` | 409 | Replay impossible (see below) |
+| `reconciliation_required` | 409 | Reserved; in this release an impossible replay arrives as a WebSocket message (see below) |
 | `payload_too_large` | 413 | Body over the limit |
 | `unsupported_wire_version` | 426 | Wire version missing, malformed or not `1` |
 | `internal_error` | 500 | Unexpected failure; no internal text is returned |
