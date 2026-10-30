@@ -1,0 +1,79 @@
+# Secure profile overlay (ATT-1166), layered after sdkconfig.defaults when a
+# variant is built with -DATTRACTAP_SECURE_PROFILE=ON. Images are built UNSIGNED;
+# the API signs them per installation. tools/check_secure_profile.py fails the
+# build if the resolved sdkconfig differs from any line below, so `is not set`
+# lines double as a deny-list for options that must stay off.
+#
+# eFuse key block layout (BLOCK_KEY0..5), fixed so blocks never collide:
+#   KEY0, KEY1  Secure Boot digests (signing key, recovery key), burned during conversion
+#   KEY2        flash encryption key (the bootloader takes the first free block)
+#   KEY3        DS identity HMAC key (secure app, first boot)
+#   KEY4        NVS encryption HMAC key (NVS_SEC_HMAC_EFUSE_KEY_ID below)
+#   KEY5        spare
+
+# --- Secure Boot v2 (RSA-3072); signing happens on the server ---
+CONFIG_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_V2_ENABLED=y
+CONFIG_SECURE_BOOT_V2_RSA_ENABLED=y
+# CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES is not set
+# CONFIG_SECURE_BOOT_ALLOW_JTAG is not set
+# CONFIG_SECURE_BOOT_INSECURE is not set
+# CONFIG_SECURE_BOOT_ENABLE_AGGRESSIVE_KEY_REVOKE is not set
+# CONFIG_SECURE_BOOT_SKIP_WRITE_PROTECTION_SCA is not set
+# The NVS and DS HMAC keys are burned read-protected by the app after Secure
+# Boot is on, so the bootloader must not lock RD_DIS on first boot.
+# TODO(ATT-1166 conversion protocol): the app must burn WR_DIS_RD_DIS once both
+# keys exist; until then RD_DIS stays writable. Required before any variant is
+# marked secure-profile hardware-tested.
+CONFIG_SECURE_BOOT_V2_ALLOW_EFUSE_RD_DIS=y
+
+# --- Flash encryption: release mode, XTS-AES-128 (256-bit key) ---
+CONFIG_SECURE_FLASH_ENC_ENABLED=y
+CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE=y
+# CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT is not set
+CONFIG_SECURE_FLASH_ENCRYPTION_AES128=y
+CONFIG_SECURE_FLASH_CHECK_ENC_EN_IN_APP=y
+# CONFIG_SECURE_FLASH_SKIP_WRITE_PROTECTION_CACHE is not set
+# CONFIG_EFUSE_VIRTUAL is not set
+
+# --- ROM download in secure mode, JTAG closed ---
+CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE=y
+# CONFIG_SECURE_FLASH_UART_BOOTLOADER_ALLOW_ENC is not set
+
+# --- NVS encryption, key protected by the HMAC scheme (no extra partition) ---
+CONFIG_NVS_ENCRYPTION=y
+CONFIG_NVS_SEC_KEY_PROTECT_USING_HMAC=y
+CONFIG_NVS_SEC_HMAC_EFUSE_KEY_ID=4
+
+# --- App rollback + anti-rollback. Bump SECURE_VERSION only for security fixes:
+# the eFuse field has 16 steps. Keep secure-version-floor.txt equal to it; CI
+# fails if either ever decreases.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK=y
+CONFIG_BOOTLOADER_APP_SECURE_VERSION=1
+# CONFIG_BOOTLOADER_EFUSE_SECURE_VERSION_EMULATE is not set
+
+# --- No console, serial config, debugger or coredumps on the secure profile ---
+# (the serial config handler is compiled out via ATTRACTAP_SECURE_PROFILE)
+# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set
+CONFIG_ESP_CONSOLE_NONE=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+# CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG is not set
+# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED is not set
+# CONFIG_ESP_SYSTEM_PANIC_GDBSTUB is not set
+# CONFIG_ESP_SYSTEM_GDBSTUB_RUNTIME is not set
+CONFIG_ESP_COREDUMP_ENABLE_TO_NONE=y
+# CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH is not set
+# CONFIG_ESP_COREDUMP_ENABLE is not set
+
+# --- Bootloader logging off: the signed bootloader only fits 0x8000 this way ---
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+
+# --- Fielded flash layout ---
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_OFFSET=0x8000
+
+# --- TLS memory in internal RAM (no PSRAM-resident key material) ---
+# CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC is not set
+CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC=y

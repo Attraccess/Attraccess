@@ -116,6 +116,8 @@ jobs:
         run: ./scripts/attractap-firmware-version-check.spec.sh
       - name: Ensure Attractap firmware version was bumped
         run: ./scripts/check-attractap-firmware-version.sh "${{ env.NX_AFFECTED_BASE }}"
+      - name: Ensure the secure-profile secure_version never decreases
+        run: python3 -I apps/attractap/firmware/tools/check_secure_profile.py --base-ref "${{ env.NX_AFFECTED_BASE }}"
 
   wago-runtime-version:
     runs-on: ubuntu-latest

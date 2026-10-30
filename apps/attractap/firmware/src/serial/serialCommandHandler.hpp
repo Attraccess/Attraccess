@@ -12,7 +12,8 @@
 class SerialCommandHandler
 {
 public:
-#ifdef ATTRACTAP_HOST
+    // Host tests have no USB; the secure profile (ATT-1166) has no serial config path at all.
+#if defined(ATTRACTAP_HOST) || defined(ATTRACTAP_SECURE_PROFILE)
     static void setup() {}
     static void loop() {}
 #else

@@ -72,6 +72,13 @@ export class AttractapFirmware {
   chip: string;
 
   @ApiProperty({
+    description: 'Whether the secure firmware profile has been verified on real hardware for this variant. Missing means false; always false for demo variants.',
+    example: false,
+    required: false,
+  })
+  secureProfileHardwareTested?: boolean;
+
+  @ApiProperty({
     description: 'The flash mode for programming (qio, qout, dio, dout)',
     example: 'dio',
   })
