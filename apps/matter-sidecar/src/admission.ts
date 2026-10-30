@@ -10,6 +10,7 @@ import {
 import type { SupportedCombination } from '@attraccess/matter-contract';
 import { satisfies } from 'semver';
 import type { IncomingHttpHeaders } from 'node:http';
+import type { ErrorReply } from './http-utils';
 
 export type AdmissionResult =
   | { ok: true }
@@ -83,4 +84,19 @@ export function checkAdmission(headers: IncomingHttpHeaders, running: RunningRel
       supported: COMPATIBILITY_TABLE,
     },
   };
+}
+
+/**
+ * The refusals every versioned request shares, HTTP and WebSocket alike: first a draining sidecar, then the client's
+ * release headers. Transport-specific limits (such as the WebSocket client cap) must be checked after this, so a client
+ * with the wrong version always learns that, even when the sidecar is full.
+ */
+export function versionedRefusal(
+  headers: IncomingHttpHeaders,
+  running: RunningReleases,
+  isDraining: () => boolean,
+): ErrorReply | null {
+  if (isDraining()) return { code: 'sidecar_unavailable', message: 'The Matter sidecar is shutting down.' };
+  const admission = checkAdmission(headers, running);
+  return admission.ok ? null : { code: admission.code, message: admission.message, details: admission.details };
 }

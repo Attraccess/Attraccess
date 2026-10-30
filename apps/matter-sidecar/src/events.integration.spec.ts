@@ -1,6 +1,12 @@
-import { formatCursor, serverMessageSchema, CLOSE_CODES } from '@attraccess/matter-contract';
+import {
+  CLOSE_CODES,
+  HEADER_ATTRACCESS_VERSION,
+  HEADER_WIRE_VERSION,
+  formatCursor,
+  serverMessageSchema,
+} from '@attraccess/matter-contract';
 import { WebSocket } from 'ws';
-import { WsClient, http, startSidecar, validHeaders, type Running } from './testing/harness';
+import { WsClient, http, startSidecar, upgradeStatus, validHeaders, type Running } from './testing/harness';
 
 const resume = (cursor?: string) => ({ type: 'resume', wireVersion: 1, ...(cursor ? { cursor } : {}) });
 
@@ -15,6 +21,19 @@ describe('event stream', () => {
     first.close();
   });
 
+  it('tells a client with the wrong version about the version even when the client cap is reached', async () => {
+    running = await startSidecar({ maxClients: 1 });
+    const first = await WsClient.connect(running.port);
+    const wrongVersion = await upgradeStatus(running.port, validHeaders({ [HEADER_WIRE_VERSION]: '2' }));
+    expect(wrongVersion.status).toBe(426);
+    expect(wrongVersion.body.error.code).toBe('unsupported_wire_version');
+    const incompatible = await upgradeStatus(running.port, validHeaders({ [HEADER_ATTRACCESS_VERSION]: '9.0.0' }));
+    expect(incompatible.status).toBe(409);
+    expect(incompatible.body.error.code).toBe('incompatible_release');
+    expect((await upgradeStatus(running.port, validHeaders())).status).toBe(503);
+    first.close();
+  });
+
   it('closes a client that never sends its resume message', async () => {
     running = await startSidecar({ firstMessageTimeoutMs: 100 });
     const client = await WsClient.connect(running.port);
@@ -22,13 +41,22 @@ describe('event stream', () => {
     expect(client.closed?.code).toBe(CLOSE_CODES.policyViolation);
   });
 
-  it('keeps a client open once it has sent a message', async () => {
+  it('keeps a client open once it has sent its resume message', async () => {
     running = await startSidecar({ firstMessageTimeoutMs: 100 });
     const client = await WsClient.connect(running.port);
-    client.send({ type: 'ping', wireVersion: 1 });
+    client.send(resume());
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(client.closed).toBeNull();
     client.close();
+  });
+
+  it('still closes a client that only sends pings', async () => {
+    running = await startSidecar({ firstMessageTimeoutMs: 200 });
+    const client = await WsClient.connect(running.port);
+    client.send({ type: 'ping', wireVersion: 1 });
+    await client.until(() => client.messages.some((message) => message.type === 'pong'));
+    await client.until(() => client.closed !== null);
+    expect(client.closed?.code).toBe(CLOSE_CODES.policyViolation);
   });
 
   it('greets with hello and delivers lifecycle and capability events in one envelope', async () => {
@@ -216,7 +244,7 @@ describe('event stream', () => {
 
   it('keeps unrelated sockets usable after a rejected upgrade', async () => {
     running = await startSidecar();
-    await expect(WsClient.connect(running.port, validHeaders({ 'x-matter-wire-version': '9' }))).rejects.toThrow(
+    await expect(WsClient.connect(running.port, validHeaders({ [HEADER_WIRE_VERSION]: '9' }))).rejects.toThrow(
       'HTTP 426',
     );
     const client = await WsClient.connect(running.port);

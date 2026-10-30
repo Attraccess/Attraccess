@@ -15,6 +15,7 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["node"]
   },
   "files": [],

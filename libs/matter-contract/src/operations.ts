@@ -19,9 +19,10 @@ export type OperationDefinition = {
   physical?: boolean;
 };
 
-const op = (definition: OperationDefinition): OperationDefinition => definition;
+/** `const T` keeps each `id` a string literal so `OperationId` is a union of the real operation IDs. */
+const op = <const T extends OperationDefinition>(definition: T): T => definition;
 
-export const OPERATIONS: readonly OperationDefinition[] = [
+const DEFINITIONS = [
   op({
     id: 'health.live',
     family: 'health',
@@ -193,9 +194,13 @@ export const OPERATIONS: readonly OperationDefinition[] = [
   }),
 ];
 
+export type OperationId = (typeof DEFINITIONS)[number]['id'];
+export type TypedOperation = OperationDefinition & { id: OperationId };
+export const OPERATIONS: readonly TypedOperation[] = DEFINITIONS;
+
 export const EVENTS_PATH = '/v1/events';
 
-export type OperationMatch = { operation: OperationDefinition; params: Record<string, string> };
+export type OperationMatch = { operation: TypedOperation; params: Record<string, string> };
 
 function safeDecode(value: string): string | null {
   try {

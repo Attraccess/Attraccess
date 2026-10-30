@@ -2,14 +2,14 @@ import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { OPERATIONS } from '../src';
 import {
-  OPERATIONS,
   buildJsonSchemaDocument,
   buildOpenApiDocument,
   collectSchemas,
   operationSchemaName,
   serializeArtifact,
-} from '../src';
+} from '../src/artifacts';
 
 const dir = resolve(__dirname, '../../../dist/contracts/matter');
 const openapi = JSON.parse(readFileSync(join(dir, 'openapi.json'), 'utf8'));

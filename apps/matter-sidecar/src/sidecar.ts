@@ -105,14 +105,26 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     try {
       return await startUnsafe();
     } catch (error) {
-      await shutdown().catch(() => undefined);
+      // The shared stop path closes the platform once; a later stop() joins it instead of closing again.
+      await stop().catch(() => undefined);
       throw error;
     }
   }
 
+  /** Every wait during startup can overlap a stop(); bail out so a late start never revives a stopped sidecar. */
+  function assertNotStopping() {
+    if (state.draining) throw new Error('The sidecar was stopped while starting.');
+  }
+
   async function startUnsafe() {
-    platform = await (options.loadPlatform ?? loadMatterPlatform)();
-    running.matterJs = platform.version;
+    const loaded = await (options.loadPlatform ?? loadMatterPlatform)();
+    if (state.draining) {
+      // stop() already finished without seeing this platform, so nobody else will close it.
+      await loaded.close();
+      assertNotStopping();
+    }
+    platform = loaded;
+    running.matterJs = loaded.version;
     state.matterPlatform = true;
     hub = new WebSocketHub(config, stream, running, () => state.draining, logger);
     server = createServer((req, res) => {
@@ -127,7 +139,11 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     server.headersTimeout = Math.min(config.requestDeadlineMs, 30_000);
     server.on('upgrade', (req, socket, head) => hub?.handleUpgrade(req, socket, head));
     server.on('clientError', (_error, socket) => socket.destroy());
-    const port = await listen(server);
+    const instance = server;
+    const port = await listen(instance);
+    // A stop() that ran during listen() saw a server that was not listening yet, so this one must close it itself.
+    if (state.draining) await new Promise<void>((resolve) => instance.close(() => resolve()));
+    assertNotStopping();
     state.transport = true;
     state.ready = true;
     pruneTimer = setInterval(() => stream.prune(), PRUNE_INTERVAL_MS);
@@ -143,7 +159,7 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     clearInterval(pruneTimer);
     const active = server;
     if (!active?.listening) {
-      await platform?.close();
+      await closePlatform();
       state.ready = false;
       return;
     }
@@ -159,13 +175,21 @@ export function createSidecar(options: SidecarOptions): Sidecar {
       active.closeAllConnections();
       await closed;
     }
-    await platform?.close();
+    await closePlatform();
     state.ready = false;
   }
 
+  async function closePlatform() {
+    const active = platform;
+    platform = null;
+    await active?.close();
+  }
+
+  const stop = () => (stopping ??= shutdown());
+
   return {
     start,
-    stop: () => (stopping ??= shutdown()),
+    stop,
     stream,
     state: {
       get ready() {

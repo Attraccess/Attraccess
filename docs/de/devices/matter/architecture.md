@@ -63,7 +63,7 @@ Jeder Fehler nutzt einen Umschlag: `{ "error": { "code", "message", "correlation
 | `unsupported_wire_version` | 426 | Wire-Version fehlt, ist fehlerhaft oder nicht `1` |
 | `internal_error` | 500 | Unerwarteter Fehler; es wird kein interner Text zurückgegeben |
 | `unsupported_capability` | 501 | Die Familie ist definiert, aber nicht verfügbar |
-| `sidecar_unavailable` | 503 | Der Sidecar fährt herunter |
+| `sidecar_unavailable` | 503 | Der Sidecar fährt herunter oder (nur WebSocket) es sind bereits 64 Event-Stream-Clients verbunden |
 | `timeout` | 504 | Die Frist der Anfrage ist abgelaufen |
 
 `GET /v1/capabilities` listet jede Familie mit `defined`, `available` und, falls nicht verfügbar, einem `reason`. In diesem Release ist nur `health` verfügbar. Eine Anfrage an eine nicht verfügbare Familie wird validiert und dann mit `unsupported_capability` beantwortet. Platzhalter täuschen nie Erfolg vor: kein vorgetäuschtes Commissioning, kein leeres Inventar, das als verbindlich dargestellt wird, kein vorgetäuscht abgeschlossener Befehl.
@@ -79,6 +79,8 @@ Jedes Event trägt Event-ID, Schemaversion, Zeitstempel, Korrelationskontext, St
 - **Fortsetzen.** Ein Client verbindet sich per WebSocket mit `/v1/events`, erhält `hello` mit Stream-Instanz-ID und Head-Cursor und sendet dann `resume` mit optionalem Cursor. Der Server gibt alles nach dem Cursor wieder und läuft ohne Lücke und ohne Duplikat live weiter.
 - **Abgleich (Reconciliation).** Ist der Cursor fehlerhaft, abgelaufen, verdrängt, in der Zukunft oder aus einem früheren Sidecar-Lauf, sendet der Server `reconciliation-required` mit `"snapshot": "unavailable"` und schließt die Verbindung. Dieses Fundament hat keinen Snapshot anzubieten und erfindet nie einen.
 - **Grenzen.** Die Wiedergabe ist im Speicher nach Anzahl (Standard 1.000 Events) und Alter (Standard 5 Minuten) begrenzt; ungenutzte Events laufen ebenfalls ab.
+- **Client-Limit.** Es dürfen höchstens 64 WebSocket-Clients gleichzeitig verbunden sein. Ein weiterer Upgrade wird mit 503 `sidecar_unavailable` abgelehnt. Die Versionsprüfung kommt zuerst: Ein Client mit falscher Version erhält daher immer 409 oder 426, auch wenn das Limit erreicht ist.
+- **Zeitlimit für die erste Nachricht.** Ein Client, der nicht innerhalb von 30 Sekunden nach dem Verbinden `resume` sendet, wird mit Code 1008 geschlossen. Ein `ping` zählt nicht: Nur `resume` stoppt den Timer.
 - **Langsame Clients.** Jeder Client hat ein Warteschlangenbudget, das auch Fehlernachrichten zählt. Ein Client, der es überschreitet, wird mit Code 1013 geschlossen und aufgefordert, sich mit seinem letzten Cursor neu zu verbinden.
 - **Zu große Nachrichten.** Der WebSocket-Parser schließt sie mit Code 1009 (message too big), bevor Anwendungscode sie sieht.
 

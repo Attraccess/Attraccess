@@ -63,7 +63,7 @@ Every error uses one envelope: `{ "error": { "code", "message", "correlationId",
 | `unsupported_wire_version` | 426 | Wire version missing, malformed or not `1` |
 | `internal_error` | 500 | Unexpected failure; no internal text is returned |
 | `unsupported_capability` | 501 | The family is defined but not available |
-| `sidecar_unavailable` | 503 | The sidecar is shutting down |
+| `sidecar_unavailable` | 503 | The sidecar is shutting down, or (WebSocket only) 64 event stream clients are already connected |
 | `timeout` | 504 | The request deadline passed |
 
 `GET /v1/capabilities` lists each family with `defined`, `available` and, when unavailable, a `reason`. In this release only `health` is available. A request for an unavailable family is validated and then answered with `unsupported_capability`. Placeholders never fake success: no fake commissioning, no empty inventory presented as authoritative, no fake completed command.
@@ -79,6 +79,8 @@ Every event carries an event ID, schema version, timestamp, correlation context,
 - **Resume.** A client connects to `/v1/events` (WebSocket), receives `hello` with the stream instance ID and head cursor, then sends `resume` with an optional cursor. The server replays everything after the cursor and continues live with no gap and no duplicate.
 - **Reconciliation.** If the cursor is malformed, expired, evicted, in the future or from an earlier sidecar run, the server sends `reconciliation-required` with `"snapshot": "unavailable"` and closes the connection. This foundation has no snapshot to offer and never fabricates one.
 - **Bounds.** Replay is bounded in memory by count (default 1,000 events) and age (default 5 minutes); idle events expire too.
+- **Client limit.** At most 64 WebSocket clients may be connected at once. A further upgrade is refused with 503 `sidecar_unavailable`. The version check comes first, so a client with a wrong version always gets 409 or 426, even when the limit is reached.
+- **First-message timeout.** A client that does not send `resume` within 30 seconds of connecting is closed with code 1008. A `ping` does not count: only `resume` stops the timer.
 - **Slow clients.** Each client has a queue budget that also counts error messages. A client that exceeds it is closed with code 1013 and told to reconnect with its last cursor.
 - **Oversized messages.** The WebSocket parser closes them with code 1009 (message too big) before application code sees them.
 

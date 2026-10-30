@@ -12,7 +12,7 @@ import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
-import { checkAdmission, type RunningReleases } from './admission';
+import { versionedRefusal, type RunningReleases } from './admission';
 import type { SidecarConfig } from './config';
 import { checkLocalAccess, correlationIdFrom, rejectUpgrade, type ErrorReply } from './http-utils';
 import type { Logger } from './logger';
@@ -28,6 +28,7 @@ class Client {
     private readonly socket: WebSocket,
     private readonly stream: EventStream,
     private readonly queueBudgetBytes: number,
+    private readonly onResume: () => void,
   ) {
     socket.on('error', () => socket.terminate());
     socket.on('close', () => this.unsubscribe?.());
@@ -78,6 +79,7 @@ class Client {
     }
     if (this.resumed) return this.fail('validation_failed', 'The stream was already resumed on this connection.');
     this.resumed = true;
+    this.onResume();
     this.resume(parsed.data.cursor);
   }
 
@@ -140,15 +142,14 @@ export class WebSocketHub {
     const refusal = this.refusal(req);
     if (refusal) return rejectUpgrade(socket, refusal, correlationId);
     this.server.handleUpgrade(req, socket, head, (ws) => {
-      const client = new Client(ws, this.stream, this.config.clientQueueBytes);
-      this.clients.add(client);
-      // A client that never sends its resume message would otherwise stay open forever.
+      // A client that never sends its resume message would otherwise stay open forever. Pings do not count.
       const idle = setTimeout(
         () => client.close(CLOSE_CODES.policyViolation, 'no resume message'),
         this.config.firstMessageTimeoutMs,
       );
       idle.unref();
-      ws.once('message', () => clearTimeout(idle));
+      const client = new Client(ws, this.stream, this.config.clientQueueBytes, () => clearTimeout(idle));
+      this.clients.add(client);
       ws.on('close', () => {
         clearTimeout(idle);
         this.clients.delete(client);
@@ -162,12 +163,13 @@ export class WebSocketHub {
     if (new URL(req.url ?? '/', 'http://localhost').pathname !== EVENTS_PATH) {
       return { code: 'not_found', message: 'Unknown path.' };
     }
-    if (this.isDraining()) return { code: 'sidecar_unavailable', message: 'The Matter sidecar is shutting down.' };
+    const refused = versionedRefusal(req.headers, this.running, this.isDraining);
+    if (refused) return refused;
+    // After the version check on purpose: a client with the wrong version is told so even when the cap is reached.
     if (this.clients.size >= this.config.maxClients) {
       return { code: 'sidecar_unavailable', message: 'Too many event stream clients are connected.' };
     }
-    const admission = checkAdmission(req.headers, this.running);
-    return admission.ok ? null : { code: admission.code, message: admission.message, details: admission.details };
+    return null;
   }
 
   closeAll(code: number, reason: string): void {

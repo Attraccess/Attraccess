@@ -64,6 +64,38 @@ describe('lifecycle', () => {
     await sidecar.stop();
   });
 
+  it('closes the platform exactly once when startup fails and stop() follows', async () => {
+    const occupied = await startSidecar();
+    const close = jest.fn(async () => undefined);
+    const sidecar = createSidecar({
+      config: configWith({ port: occupied.port }),
+      logger: createLogger(() => undefined),
+      loadPlatform: async () => ({ ...(await simulatedPlatform()), close }),
+    });
+    await expect(sidecar.start()).rejects.toThrow();
+    await sidecar.stop();
+    await sidecar.stop();
+    expect(close).toHaveBeenCalledTimes(1);
+    await occupied.stop();
+  });
+
+  it('does not come up when stop() is called while the platform is still loading', async () => {
+    const close = jest.fn(async () => undefined);
+    let finishLoading: () => void = () => undefined;
+    const sidecar = createSidecar({
+      config: configWith(),
+      logger: createLogger(() => undefined),
+      loadPlatform: () => new Promise((resolve) => (finishLoading = () => resolve({ version: '0.18.0', close }))),
+    });
+    const starting = sidecar.start();
+    const stopping = sidecar.stop();
+    finishLoading();
+    await expect(starting).rejects.toThrow('stopped while starting');
+    await stopping;
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(sidecar.state.ready).toBe(false);
+  });
+
   it('exits within the bounded grace period even when a connection refuses to close', async () => {
     const running = await startSidecar({ shutdownGraceMs: 150 });
     const socket = connect(running.port, '127.0.0.1');

@@ -2,11 +2,13 @@ import {
   HEADER_REQUEST_DEADLINE,
   MAX_REQUEST_DEADLINE_MS,
   findOperation,
+  type OperationId,
+  type TypedOperation,
   type FeatureFamily,
   type OperationDefinition,
 } from '@attraccess/matter-contract';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { checkAdmission, type RunningReleases } from './admission';
+import { versionedRefusal, type RunningReleases } from './admission';
 import type { SidecarConfig } from './config';
 import {
   BodyTooLargeError,
@@ -27,7 +29,7 @@ export type HandlerContext = {
   signal: AbortSignal;
 };
 export type FeatureHandler = (context: HandlerContext) => Promise<unknown> | unknown;
-export type FeatureHandlers = Partial<Record<string, FeatureHandler>>;
+export type FeatureHandlers = Partial<Record<OperationId, FeatureHandler>>;
 
 /** Built-in health handlers receive the live sidecar state. */
 export type PipelineDeps = {
@@ -35,7 +37,7 @@ export type PipelineDeps = {
   running: RunningReleases;
   logger: Logger;
   isDraining: () => boolean;
-  builtIns: Record<string, (correlationId: string) => { status: number; body: unknown }>;
+  builtIns: Partial<Record<OperationId, (correlationId: string) => { status: number; body: unknown }>>;
   features: FeatureHandlers;
 };
 
@@ -67,9 +69,7 @@ async function withDeadline<T>(work: Promise<T> | T, ms: number, controller: Abo
 
 function preflight(req: IncomingMessage, operation: OperationDefinition, deps: PipelineDeps): ErrorReply | null {
   if (!operation.versioned) return null;
-  if (deps.isDraining()) return { code: 'sidecar_unavailable', message: 'The Matter sidecar is shutting down.' };
-  const admission = checkAdmission(req.headers, deps.running);
-  return admission.ok ? null : { code: admission.code, message: admission.message, details: admission.details };
+  return versionedRefusal(req.headers, deps.running, deps.isDraining);
 }
 
 async function parseInput(
@@ -150,7 +150,7 @@ function unsupported(family: FeatureFamily): ErrorReply {
 
 async function respond(
   req: IncomingMessage,
-  operation: OperationDefinition,
+  operation: TypedOperation,
   params: Record<string, string>,
   correlationId: string,
   deps: PipelineDeps,

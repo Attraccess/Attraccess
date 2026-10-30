@@ -206,7 +206,9 @@ describe('compatibility table', () => {
     expect(COMPATIBILITY_TABLE).toHaveLength(1);
     expect(COMPATIBILITY_TABLE[0].wireVersion).toBe(WIRE_VERSION);
     expect(minimumAttraccessVersion()).toBe('1.11.0');
-    expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '>=1' })).toThrow();
+    expect(minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '>=1.12.0 <2' })).toBe('1.12.0');
+    expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: 'not a range' })).toThrow();
+    expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '<0.0.0' })).toThrow();
   });
 
   it('recognizes well-formed versions only', () => {

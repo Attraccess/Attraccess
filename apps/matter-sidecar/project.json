@@ -18,8 +18,12 @@
         "{workspaceRoot}/libs/matter-contract/src/**/!(*.spec).ts",
         "{workspaceRoot}/package.json",
         "{workspaceRoot}/pnpm-lock.yaml",
-        { "externalDependencies": ["esbuild"] },
-        { "runtime": "git rev-parse HEAD" }
+        {
+          "externalDependencies": ["esbuild"]
+        },
+        {
+          "runtime": "git rev-parse HEAD"
+        }
       ],
       "outputs": ["{workspaceRoot}/dist/apps/matter-sidecar"],
       "options": {
@@ -33,7 +37,9 @@
         "default",
         "{workspaceRoot}/tsconfig.base.json",
         "{workspaceRoot}/libs/matter-contract/src/**/*",
-        { "externalDependencies": ["typescript"] }
+        {
+          "externalDependencies": ["typescript"]
+        }
       ],
       "options": {
         "command": "tsc --noEmit -p apps/matter-sidecar/tsconfig.app.json && tsc --noEmit -p apps/matter-sidecar/tsconfig.spec.json"
@@ -46,7 +52,9 @@
         "default",
         "{workspaceRoot}/eslint.config.cjs",
         "{workspaceRoot}/tools/eslint-rules/**/*",
-        { "externalDependencies": ["eslint", "prettier"] }
+        {
+          "externalDependencies": ["eslint", "prettier"]
+        }
       ],
       "options": {
         "command": "eslint apps/matter-sidecar --max-warnings=0 && prettier --check apps/matter-sidecar"
@@ -56,11 +64,11 @@
       "executor": "@nx/jest:jest",
       "cache": true,
       "inputs": [
-        "default",
-        "{workspaceRoot}/jest.preset.js",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/libs/matter-contract/src/**/*",
-        { "externalDependencies": ["jest"] }
+        "jestShared",
+        "contractSources",
+        {
+          "externalDependencies": ["jest"]
+        }
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar"],
       "options": {
@@ -71,11 +79,11 @@
       "executor": "@nx/jest:jest",
       "cache": true,
       "inputs": [
-        "default",
-        "{workspaceRoot}/jest.preset.js",
-        "{workspaceRoot}/package.json",
-        "{workspaceRoot}/libs/matter-contract/src/**/*",
-        { "externalDependencies": ["jest", "ws"] }
+        "jestShared",
+        "contractSources",
+        {
+          "externalDependencies": ["jest", "ws"]
+        }
       ],
       "outputs": [],
       "options": {
@@ -87,12 +95,14 @@
       "cache": true,
       "dependsOn": ["build"],
       "inputs": [
-        "default",
-        "{workspaceRoot}/jest.preset.js",
+        "jestShared",
         "{workspaceRoot}/dist/apps/matter-sidecar/**/*",
-        "{workspaceRoot}/package.json",
-        { "externalDependencies": ["jest", "ws"] },
-        { "runtime": "git rev-parse HEAD" }
+        {
+          "externalDependencies": ["jest", "ws"]
+        },
+        {
+          "runtime": "git rev-parse HEAD"
+        }
       ],
       "outputs": [],
       "options": {
@@ -106,5 +116,14 @@
         "command": "node scripts/crap-score/run.mjs apps/matter-sidecar"
       }
     }
+  },
+  "namedInputs": {
+    "jestShared": [
+      "default",
+      "{workspaceRoot}/jest.preset.js",
+      "{workspaceRoot}/package.json",
+      "{projectRoot}/jest.base.config.ts"
+    ],
+    "contractSources": ["{workspaceRoot}/libs/matter-contract/src/**/*"]
   }
 }

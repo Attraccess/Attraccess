@@ -1,3 +1,4 @@
+import { minVersion, validRange } from 'semver';
 import { z } from 'zod';
 import { WIRE_VERSION } from './constants';
 import { SEMVER_PATTERN } from './headers';
@@ -41,7 +42,7 @@ export type ReceivedCombination = z.infer<typeof receivedCombinationSchema>;
 
 /** Minimum Attraccess version implied by the table's range (`^1.11.0` -> `1.11.0`). */
 export function minimumAttraccessVersion(combination: SupportedCombination = COMPATIBILITY_TABLE[0]): string {
-  const match = /^\^(\d+\.\d+\.\d+)$/.exec(combination.attraccess);
-  if (!match) throw new Error(`Unsupported Attraccess range in compatibility table: ${combination.attraccess}`);
-  return match[1];
+  const minimum = validRange(combination.attraccess) ? minVersion(combination.attraccess) : null;
+  if (!minimum) throw new Error(`Unsupported Attraccess range in compatibility table: ${combination.attraccess}`);
+  return minimum.version;
 }

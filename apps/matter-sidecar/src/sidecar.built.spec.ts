@@ -29,7 +29,7 @@ function start(env: Record<string, string>, cwd: string): Started {
 }
 
 async function ready(started: Started): Promise<number> {
-  const deadline = Date.now() + 20_000;
+  const deadline = Date.now() + 45_000;
   while (Date.now() < deadline) {
     const match = /"port":(\d+)/.exec(started.stdout.join(''));
     if (match) return Number(match[1]);

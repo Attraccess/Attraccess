@@ -1,4 +1,3 @@
-export * from './artifacts';
 export * from './capabilities';
 export * from './compatibility';
 export * from './constants';

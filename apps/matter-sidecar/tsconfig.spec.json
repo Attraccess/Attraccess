@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "outDir": "../../dist/out-tsc", "types": ["jest", "node"] },
-  "include": ["jest.config.ts", "jest.integration.config.ts", "src/**/*.ts"]
+  "include": ["jest*.ts", "src/**/*.ts"]
 }
