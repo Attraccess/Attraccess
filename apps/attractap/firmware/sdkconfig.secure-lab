@@ -1,0 +1,25 @@
+# Device-lab secure test reader overlay (ATT-1166), layered after sdkconfig.secure
+# when a variant is built with -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON.
+# Never shipped: build_firmwares.py never sets ATTRACTAP_SECURE_LAB, and
+# tools/check_secure_profile.py rejects this configuration.
+#
+# Same Secure Boot v2, eFuse key layout, NVS encryption and anti-rollback as the
+# secure profile. The differences keep a lab reader recoverable over USB:
+# development-mode flash encryption with encrypted writes from ROM download mode
+# (`esptool write-flash --encrypt`), and a USB console with the serial config
+# handler for provisioning. Every image must still be signed with a key whose
+# digest is burned (lab/secure-boot/). Running a release-mode image on a lab
+# reader switches it to release mode permanently: never do that by accident.
+
+# --- Flash encryption: development mode, encrypted USB writes stay possible ---
+CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT=y
+# CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE is not set
+CONFIG_SECURE_FLASH_UART_BOOTLOADER_ALLOW_ENC=y
+
+# --- ROM download mode stays fully enabled (no Secure Download Mode) ---
+CONFIG_SECURE_INSECURE_ALLOW_DL_MODE=y
+# CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE is not set
+
+# --- USB console for logs and the serial config handler ---
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+# CONFIG_ESP_CONSOLE_NONE is not set

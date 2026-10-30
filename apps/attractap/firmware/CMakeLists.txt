@@ -31,6 +31,12 @@ include("${ATTRACTAP_VARIANT_FILE}")
 # Secure profile (ATT-1166): Secure Boot v2 + flash encryption + locked debug paths.
 # Never for demo builds; images stay unsigned, the API signs them per installation.
 option(ATTRACTAP_SECURE_PROFILE "Build the secure firmware profile (sdkconfig.secure overlay)" OFF)
+# Device-lab secure test reader (sdkconfig.secure-lab on top): development-mode
+# flash encryption and a USB console, signed with the committed lab key. Never shipped.
+option(ATTRACTAP_SECURE_LAB "Build the lab-only secure test reader profile (needs ATTRACTAP_SECURE_PROFILE)" OFF)
+if(ATTRACTAP_SECURE_LAB AND NOT ATTRACTAP_SECURE_PROFILE)
+    message(FATAL_ERROR "ATTRACTAP_SECURE_LAB=ON needs ATTRACTAP_SECURE_PROFILE=ON")
+endif()
 if(ATTRACTAP_SECURE_PROFILE)
     if(ATTRACTAP_FIRMWARE_VARIANT STREQUAL "demo")
         message(FATAL_ERROR "The secure profile is not available for demo variant '${ATTRACTAP_VARIANT}'")
@@ -43,12 +49,17 @@ if(ATTRACTAP_SECURE_PROFILE)
         set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
     endif()
     list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure")
-    # Compiles out the USB serial config handler and console driver.
-    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_PROFILE=1)
-    if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
-        set(ATTRACTAP_EXCLUDE_REGEX "${ATTRACTAP_EXCLUDE_REGEX}|src/serial/")
+    if(ATTRACTAP_SECURE_LAB)
+        # Lab readers keep the console and serial config handler for provisioning.
+        list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure-lab")
     else()
-        set(ATTRACTAP_EXCLUDE_REGEX "src/serial/")
+        # Compiles out the USB serial config handler and console driver.
+        list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_PROFILE=1)
+        if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
+            set(ATTRACTAP_EXCLUDE_REGEX "${ATTRACTAP_EXCLUDE_REGEX}|src/serial/")
+        else()
+            set(ATTRACTAP_EXCLUDE_REGEX "src/serial/")
+        endif()
     endif()
 endif()
 
@@ -74,4 +85,10 @@ if(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_SECURE_BOOT AND CONFIG_SECURE_FLASH_
 elseif(NOT ATTRACTAP_SECURE_PROFILE AND (CONFIG_SECURE_BOOT OR CONFIG_SECURE_FLASH_ENC_ENABLED))
     message(FATAL_ERROR "${SDKCONFIG} enables Secure Boot or flash encryption, but ATTRACTAP_SECURE_PROFILE is OFF. "
                         "It comes from a secure build; build in a clean directory with its own -DSDKCONFIG.")
+elseif(ATTRACTAP_SECURE_LAB AND NOT CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT)
+    message(FATAL_ERROR "ATTRACTAP_SECURE_LAB=ON but ${SDKCONFIG} uses release-mode flash encryption. "
+                        "Build in a clean directory with its own -DSDKCONFIG.")
+elseif(ATTRACTAP_SECURE_PROFILE AND NOT ATTRACTAP_SECURE_LAB AND CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT)
+    message(FATAL_ERROR "${SDKCONFIG} comes from a lab build (development-mode flash encryption), but ATTRACTAP_SECURE_LAB is OFF. "
+                        "Build in a clean directory with its own -DSDKCONFIG.")
 endif()
