@@ -1,5 +1,5 @@
-import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Chip, DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
+import { AlertStatusIcon, Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Alert, AlertContent, AlertDescription, Chip, DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
 import { UsbIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ConnectionStateEvent, ESPTools } from '../../../utils/esp-tools';
@@ -8,10 +8,12 @@ import { SetupTabs } from './SetupTabs';
 import de from './de.json';
 import en from './en.json';
 
-function ConnectScreen() {
+export function ConnectScreen() {
   const { t } = useTranslations({ de, en });
   const espTools = useRef(ESPTools.getInstance());
   const [isConnecting, setIsConnecting] = useState(false);
+  // Web Serial is Chromium-only; Firefox and Safari have no navigator.serial.
+  const isSupported = 'serial' in navigator;
 
   const connect = useCallback(async () => {
     setIsConnecting(true);
@@ -33,7 +35,22 @@ function ConnectScreen() {
         <h3 className="text-lg font-semibold">{t('connect.title')}</h3>
         <p className="max-w-md text-sm text-muted">{t('connect.description')}</p>
       </div>
-      <Button variant="primary" onPress={connect} isPending={isConnecting} className="w-full max-w-xs">
+      {!isSupported && (
+        <Alert status="warning" className="max-w-md text-left">
+          <AlertStatusIcon status="warning" />
+          <AlertContent>
+            <AlertDescription id="connect-unsupported">{t('connect.unsupported')}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      )}
+      <Button
+        variant="primary"
+        onPress={connect}
+        isPending={isConnecting}
+        isDisabled={!isSupported}
+        aria-describedby={isSupported ? undefined : 'connect-unsupported'}
+        className="w-full max-w-xs"
+      >
         {t('connect.button.label')}
       </Button>
     </div>
