@@ -9,7 +9,8 @@
 # (NixOS option readerApiRelay).
 #
 # Builds both firmware images (unless READER_IMAGE / EMULATOR_IMAGE are set),
-# starts an API with a throwaway database, and runs pytest inside one labgrid
+# starts an API with a throwaway database (waiting up to API_START_TIMEOUT
+# seconds, default 600), and runs pytest inside one labgrid
 # session on LG_PLACE_NAME. Needs ESP-IDF (source export.sh) for the builds,
 # the labgrid client environment (LAB_PYTHON: labgrid fork + pytest) and a lab
 # host with readerWifi enabled. Artifacts land in apps/attractap-lab/hil-artifacts.
@@ -80,9 +81,14 @@ set -m
 api_pid=$!
 set +m
 trap 'kill -- "-$api_pid" 2>/dev/null || true' EXIT
-for _ in $(seq 1 120); do
-  curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/api/info" && break
+api_deadline=$((SECONDS + ${API_START_TIMEOUT:-600}))
+until curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/api/info"; do
   kill -0 "$api_pid" 2>/dev/null || { cat "$WORK/api.log" >&2; exit 1; }
+  if ((SECONDS > api_deadline)); then
+    cat "$WORK/api.log" >&2
+    echo "API did not start within ${API_START_TIMEOUT:-600}s (set API_START_TIMEOUT)" >&2
+    exit 1
+  fi
   sleep 2
 done
 READER_API_PORT="$API_PORT"

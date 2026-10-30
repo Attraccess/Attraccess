@@ -10,7 +10,8 @@ import {
 
 const project = new Project({ skipAddingFilesFromTsConfig: true, skipFileDependencyResolution: true });
 
-function inheritedMethods(
+/** Own and inherited methods, own first; base classes in relative imports are followed like Nest does. */
+export function inheritedMethods(
   declaration: ClassDeclaration,
 ): Map<string, ReturnType<ClassDeclaration['getMethods']>[number]> {
   const methods = new Map(declaration.getMethods().map((method) => [method.getName(), method]));

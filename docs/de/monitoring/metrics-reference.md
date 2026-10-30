@@ -99,13 +99,27 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Anzahl verbundener Attractap-RFID-Leser |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Gesamtanzahl der RFID-Tap-Ereignisse |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Gesamtanzahl der Firmware-Update-Ereignisse |
-| `attraccess_attractap_crash_reports_total` | Counter | `reset_reason` | Von Lesegeräten empfangene Crash-Berichte. `reset_reason` ist eine normalisierte Reset-Ursache (z. B. `PANIC`, `INT_WDT`, `BROWNOUT`, `unknown`) |
+| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Von Lesegeräten empfangene Reset-Berichte für jede Reset-Ursache (auch `POWERON` und `SW`), also keine reine Crash-Zählung. `reset_reason` ist eine normalisierte Reset-Ursache (z. B. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). Unverändert; wird von den Dashboards genutzt |
+| `attraccess_attractap_reset_reports_last_hour` | Gauge | `category` | Exakte Anzahl gespeicherter Reset-Berichte der letzten Stunde. `category` ist `crash_watchdog` (`PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`) oder `power_on` (`POWERON`). Andere Ursachen (`SW`, `BROWNOUT`, `UNKNOWN`, ...) werden nicht gezählt |
+| `attraccess_attractap_reset_report_readers_last_hour` | Gauge | `category`, `readers` | Dieselbe Anzahl, mit den beteiligten Lesegeräten und Reset-Ursachen als Text im Label `readers` (z. B. `Door (#1): PANIC x2; Laser (#2): WDT x2`). Wird nur für den Text der Warnung verwendet. Namen von Lesegeräten werden auf 40 Zeichen gekürzt und `<` sowie `>` entfernt; die Liste ist auf etwa 200 Zeichen begrenzt (`; +N more`) |
+
+### Stündliche Reset-Bericht-Zähler
+
+Die beiden `..._last_hour`-Gauges werden bei jedem Abruf von `/api/metrics` aus der Datenbank gezählt, über die letzten 3600 ganzen Sekunden, gemessen am Speicherzeitpunkt auf dem Server. Ein Bericht, der genau eine Stunde alt ist, zählt nicht mehr; ein Bericht, der zum Abrufzeitpunkt gespeichert wurde, zählt. Hinweise:
+
+- Gezählt werden **gespeicherte Berichte**. Lädt ein Lesegerät einen Bericht nach einer verlorenen Bestätigung erneut hoch, wird er doppelt gezählt.
+- Die Zählung hat ein Zeitlimit von 5 Sekunden. Schlägt die Abfrage fehl oder überschreitet sie das Zeitlimit, antwortet `/api/metrics` mit einem Fehler statt mit null; Prometheus markiert das Ziel dann als nicht erreichbar (`AttractapServiceDown` und `ScrapeFailures` können auslösen). Das Zeitlimit bricht die zugrunde liegende SQLite-Abfrage nicht ab.
+- Die Alarmregeln verwenden `max` über alle Scrape-Ziele, daher werden mehrere Ziele **einer** Installation (eine gemeinsame Datenbank) nicht doppelt gezählt. Mehrere unabhängige Installationen in einer Prometheus-/Grafana-Instanz zu kombinieren ergibt falsche Summen und wird nicht unterstützt.
+- Die Zähler nutzen einen Index auf `attractap_crash_report.createdAt`, der per Datenbank-Migration angelegt wird.
 
 ### Beispiel-PromQL-Abfragen
 
 ```promql
-# Lesegerät-Abstürze der letzten Stunde, nach Reset-Ursache
+# Reset-Berichte der Lesegeräte in der letzten Stunde, nach Reset-Ursache (alle Ursachen)
 sum by (reset_reason) (increase(attraccess_attractap_crash_reports_total[1h]))
+
+# Exakte Crash-/Watchdog-Berichte der letzten Stunde (Grundlage der Crash-Warnung)
+max(attraccess_attractap_reset_reports_last_hour{category="crash_watchdog"})
 
 # Alarmsignal: alle Lesegeräte offline (waren aber kürzlich verbunden)
 sum(

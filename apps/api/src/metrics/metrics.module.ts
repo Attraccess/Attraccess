@@ -1,9 +1,10 @@
 import { Global, Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session } from '@attraccess/database-entities';
+import { User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session, AttractapCrashReport } from '@attraccess/database-entities';
 import { MetricsService } from './metrics.service';
 import { MetricsController } from './metrics.controller';
+import { ResetReportMetricsCollector } from './reset-report-metrics.collector';
 import { MetricsGuard } from './metrics.guard';
 import { SettingsModule } from '../settings/settings.module';
 import { METRICS_TOGGLE_INVALIDATOR } from '../settings/metrics-toggle-invalidator.token';
@@ -49,12 +50,13 @@ const definitionProviders = [
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session]),
+    TypeOrmModule.forFeature([User, Resource, Project, ResourceGroup, MqttServer, ResourceUsage, Session, AttractapCrashReport]),
     SettingsModule,
   ],
   controllers: [MetricsController],
   providers: [
     MetricsService,
+    ResetReportMetricsCollector,
     MetricsGuard,
     MetricsToggleService,
     CronTimer,

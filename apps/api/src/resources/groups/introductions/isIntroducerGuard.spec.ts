@@ -4,8 +4,8 @@ import { type Repository } from 'typeorm';
 import { IsResourceGroupIntroducerGuard } from './isIntroducerGuard';
 const repository = { findOne: jest.fn() };
 const guard = new IsResourceGroupIntroducerGuard(repository as unknown as Repository<ResourceIntroducer>);
-function context(user: unknown, groupId?: string): ExecutionContext {
-  return { switchToHttp: () => ({ getRequest: () => ({ user, params: { groupId } }) }) } as ExecutionContext;
+function context(user: unknown, groupId?: string, method = 'POST'): ExecutionContext {
+  return { switchToHttp: () => ({ getRequest: () => ({ user, method, params: { groupId } }) }) } as ExecutionContext;
 }
 beforeEach(() => {
   repository.findOne.mockReset();
@@ -29,4 +29,11 @@ it('requires a numeric group and checks introductions for exactly that user and 
 it('fails closed when introduction lookup is unavailable', async () => {
   repository.findOne.mockRejectedValueOnce(new Error('Database unavailable'));
   await expect(guard.canActivate(context({ id: 7 }, '3'))).resolves.toBe(false);
+});
+it('lets resource managers read the list and history but not grant or revoke', async () => {
+  const manager = { id: 7, effectivePermissions: new Set(['resources.update']) };
+  await expect(guard.canActivate(context(manager, '3', 'GET'))).resolves.toBe(true);
+  expect(repository.findOne).not.toHaveBeenCalled();
+  repository.findOne.mockResolvedValueOnce(null);
+  await expect(guard.canActivate(context(manager, '3', 'POST'))).resolves.toBe(false);
 });

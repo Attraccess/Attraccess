@@ -155,13 +155,10 @@ describe('ResourceUsageService', () => {
       expect(getSessionDetailsScope.projectsService.findOneById).not.toHaveBeenCalled();
     });
 
-    it('allows resource managers to view another user’s session', async () => {
+    it('skips the project check when the viewer’s activity access covers other users', async () => {
       getSessionDetailsScope.resourceUsageRepository.findOne.mockResolvedValue({ id: 8, userId: 2 } as ResourceUsage);
       expect(
-        await getSessionDetailsScope.service.getSessionDetails(5, 8, {
-          ...getSessionDetailsScope.requester,
-          effectivePermissions: new Set(['resources.update']),
-        }),
+        await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester, true),
       ).toEqual({ id: 8, userId: 2 });
       expect(getSessionDetailsScope.projectsService.findOneById).not.toHaveBeenCalled();
     });

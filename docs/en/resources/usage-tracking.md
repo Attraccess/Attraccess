@@ -1,6 +1,8 @@
 # Usage Tracking
 
-Attraccess tracks who uses which resource and when. Every usage session is recorded and visible in the resource's usage history.
+Attraccess tracks who uses which resource and when. Every usage session is recorded in the resource's usage history.
+
+Who can see whether a resource is in use, and by whom, depends on the [resource activity visibility](settings/overview.md#resource-activity-visibility) setting. You always see your own sessions.
 
 ## What is a Usage Session?
 
@@ -8,14 +10,14 @@ A usage session represents a single period of resource use. It is created when a
 
 Each session contains:
 
-| Field | Description |
-|-------|-------------|
-| **User** | Who used the resource |
-| **Start Time** | When the session started |
-| **End Time** | When the session ended |
-| **Duration** | How long the resource was used |
-| **Notes** | Optional notes about the session |
-| **Project** | Optional associated project |
+| Field          | Description                      |
+| -------------- | -------------------------------- |
+| **User**       | Who used the resource            |
+| **Start Time** | When the session started         |
+| **End Time**   | When the session ended           |
+| **Duration**   | How long the resource was used   |
+| **Notes**      | Optional notes about the session |
+| **Project**    | Optional associated project      |
 
 ## Starting a Session
 
@@ -46,7 +48,9 @@ The usage history is displayed on the resource [detail page](resources/resource-
 
 <!-- TODO: Screenshot of usage history -->
 
-Resource managers and administrators can see sessions from all users. Regular users see the full history as well.
+People with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`), and people introduced to the resource (directly or through a group, including its introducers and maintainers), see the sessions of all users. Everyone else sees only their own sessions, plus any project-linked session of a [project](projects/overview.md) they are a member of.
+
+With **Only people introduced to the resource** selected, people who are not introduced but could use a supervised-use resource see **Available** or **In Use** there instead: the unfiltered history lists the other sessions redacted, with times only and no names or details. Filtering the history by another user is not possible for them.
 
 ## See Also
 

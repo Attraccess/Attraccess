@@ -48,6 +48,13 @@ describe('MetricsService', () => {
     expect(service).toBeDefined();
   });
 
+  it('fails the scrape instead of serving stale or zero values when a refresher fails', async () => {
+    const metrics = jest.spyOn(service.registry, 'metrics');
+    service.registerRefresher(() => Promise.reject(new Error('database unavailable')));
+    await expect(service.getMetrics()).rejects.toThrow('database unavailable');
+    expect(metrics).not.toHaveBeenCalled();
+  });
+
   describe('metric naming (issue #9: attraccess_ prefix)', () => {
     it('all custom metrics use attraccess_ prefix', async () => {
       const metricsOutput = await service.getMetrics();

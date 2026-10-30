@@ -1,4 +1,5 @@
 import { Counter, Gauge, Registry } from 'prom-client';
+import { CRASH_WATCHDOG_REASONS, POWER_ON_REASONS } from '../reset-report-metrics';
 export function createDevicesMetrics(registry: Registry) {
   const attractapDevicesConnected = new Gauge({
     name: 'attraccess_attractap_devices_connected',
@@ -33,7 +34,24 @@ export function createDevicesMetrics(registry: Registry) {
     labelNames: ['reader_id', 'reset_reason'],
     registers: [registry],
   });
+
+  const attractapResetReportsLastHour = new Gauge({
+    name: 'attraccess_attractap_reset_reports_last_hour',
+    help: `Exact number of stored Attractap reset reports received in the last hour, by category (crash_watchdog = ${CRASH_WATCHDOG_REASONS.join('/')}, power_on = ${POWER_ON_REASONS.join('/')}). Counted from the database at each scrape.`,
+    labelNames: ['category'],
+    registers: [registry],
+  });
+
+  const attractapResetReportReadersLastHour = new Gauge({
+    name: 'attraccess_attractap_reset_report_readers_last_hour',
+    help: 'Reader and reset reason text for the reset reports of the last hour, by category. The value is the report count; the readers label is for notification text only.',
+    labelNames: ['category', 'readers'],
+    registers: [registry],
+  });
+
   return {
+    attractapResetReportsLastHour,
+    attractapResetReportReadersLastHour,
     attractapDevicesConnected,
     attractapReaderConnected,
     attractapNfcTapsTotal,

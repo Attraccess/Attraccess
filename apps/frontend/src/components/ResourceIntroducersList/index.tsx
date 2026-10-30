@@ -2,7 +2,7 @@ import { Separator, Spinner } from '@heroui/react';
 import { Users } from 'lucide-react';
 import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import {
-  useAccessControlServiceResourceIntroducersGetMany,
+  useAccessControlServiceResourceIntroducersGetNames,
   ResourceIntroducerType,
 } from '@attraccess/react-query-client';
 
@@ -32,14 +32,13 @@ export function ResourceIntroducersList({
 }: Readonly<ResourceIntroducersListProps>) {
   const { t } = useTranslations({ en, de });
 
-  const { data: introducers, isLoading } = useAccessControlServiceResourceIntroducersGetMany(
-    {
-      resourceId,
-      type,
-    },
+  // The names list is open to everyone who may view resources, so a not-yet-introduced user can see who to ask.
+  const { data: allIntroducers, isLoading } = useAccessControlServiceResourceIntroducersGetNames(
+    { resourceId },
     undefined,
     { refetchInterval: 10000 },
   );
+  const introducers = type ? allIntroducers?.filter((introducer) => introducer.role === type) : allIntroducers;
 
   if (isLoading) {
     return (
@@ -62,7 +61,7 @@ export function ResourceIntroducersList({
       <Separator className="my-2" />
       <div className="space-y-2 mt-2">
         {introducers.map((introducer) => (
-          <AttraccessUser key={introducer.id} user={introducer.user} />
+          <AttraccessUser key={introducer.userId} user={{ id: introducer.userId, username: introducer.username }} />
         ))}
       </div>
     </div>

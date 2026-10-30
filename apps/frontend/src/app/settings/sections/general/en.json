@@ -1,6 +1,6 @@
 {
   "title": "General",
-  "description": "The URLs this instance is reached at, and its license.",
+  "description": "The URLs this instance is reached at, its license, and who can see resource activity.",
   "loading": "Loading settings...",
   "inputs": {
     "url": {
@@ -24,6 +24,14 @@
     },
     "defaultLanguage": {
       "label": "Default system language"
+    },
+    "activityVisibility": {
+      "label": "Who can see resource activity",
+      "description": "Controls who sees which resources are in use and by whom. People always see their own sessions.",
+      "all": "Everyone with Read Resources",
+      "introduced": "Only people introduced to the resource",
+      "introducedHint": "Only people introduced to a resource (directly or through a group), its introducers and maintainers, and users with Update Resources or Manage Resource Access see its activity. On resources that allow or require supervised use, everyone else sees only Available or In Use, without a name.",
+      "loadFailed": "The resource activity setting could not be loaded."
     }
   },
   "success": {

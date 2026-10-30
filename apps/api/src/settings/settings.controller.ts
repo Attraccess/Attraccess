@@ -39,6 +39,10 @@ import { UpdateAuthRateLimitSettingsDto } from './dto/update-auth-rate-limit-set
 
 import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate-limit-settings.dto';
 
+import { ResourceVisibilitySettingsDto } from './dto/resource-visibility-settings.dto';
+
+import { UpdateResourceVisibilitySettingsDto } from './dto/update-resource-visibility-settings.dto';
+
 export function systemSettingChanges(
   before: SystemSettingsDto,
   after: SystemSettingsDto,
@@ -320,6 +324,31 @@ export class SettingsController {
     const before = await this.settingsService.getMessagingRateLimitSettings();
     const after = await this.settingsService.updateMessagingRateLimitSettings(body);
     await this.recordChanges(req, 'messaging.rateLimit', before, after);
+    return after;
+  }
+
+  @Get('resources/visibility')
+  @Auth('system.settings.manage')
+  @ApiOperation({ summary: 'Get resource activity visibility settings', operationId: 'getResourceVisibilitySettings' })
+  @ApiResponse({ status: 200, description: 'Current visibility settings.', type: ResourceVisibilitySettingsDto })
+  async getResourceVisibilitySettings(): Promise<ResourceVisibilitySettingsDto> {
+    return this.settingsService.getResourceVisibilitySettings();
+  }
+
+  @Patch('resources/visibility')
+  @Auth('system.settings.manage')
+  @ApiOperation({
+    summary: 'Update resource activity visibility settings',
+    operationId: 'updateResourceVisibilitySettings',
+  })
+  @ApiResponse({ status: 200, description: 'Visibility settings updated.', type: ResourceVisibilitySettingsDto })
+  async updateResourceVisibilitySettings(
+    @Body() body: UpdateResourceVisibilitySettingsDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceVisibilitySettingsDto> {
+    const before = await this.settingsService.getResourceVisibilitySettings();
+    const after = await this.settingsService.updateResourceVisibilitySettings(body);
+    await this.recordChanges(req, 'resources', before, after);
     return after;
   }
 }
