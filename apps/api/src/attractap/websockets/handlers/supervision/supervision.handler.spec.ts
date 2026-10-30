@@ -66,6 +66,12 @@ describe('AttractapSupervisionHandler', () => {
       await expect(fixture.arm()).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it('refuses a reader on firmware that cannot relay card commands', async () => {
+      fixture.websocketService.sockets.set('a', fixture.makeSocket({ cardRelay: false }));
+
+      await expect(fixture.arm()).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('refuses a reader with no display', async () => {
       fixture.websocketService.sockets.set('a', fixture.makeSocket());
       fixture.attractapService.findReaderById.mockResolvedValueOnce({

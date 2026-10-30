@@ -150,6 +150,11 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
       throw new BadRequestException('The selected reader is offline');
     }
 
+    // Readers on firmware before 2.0.0 cannot relay card commands, so they cannot check a card.
+    if (sockets.some((socket) => !socket.state.cardRelay)) {
+      throw new BadRequestException('This reader needs a firmware update before it can check cards');
+    }
+
     // Checked before the socket state below: an await between the busy check and the claim would
     // let two concurrent arms both pass (see the supervision handler).
     for (const linkedResource of reader.resources ?? []) {

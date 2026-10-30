@@ -24,6 +24,7 @@ describe('AttractapMassIntroductionHandler', () => {
       sendMessage: jest.fn().mockResolvedValue(true),
       state: {
         verifiedUserId: null,
+        cardRelay: true,
         enrollment: null,
         resetNfcCardData: null,
         supervisionFlow: null,
@@ -120,6 +121,12 @@ describe('AttractapMassIntroductionHandler', () => {
     it('rejects readers whose firmware lacks the capability', async () => {
       attractapService.findReaderById.mockResolvedValue({ id: READER_ID, firmware: { capabilities: {} } });
       websocketService.sockets.set('a', makeSocket());
+
+      await expect(arm()).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects readers on firmware that cannot relay card commands', async () => {
+      websocketService.sockets.set('a', makeSocket({ cardRelay: false }));
 
       await expect(arm()).rejects.toBeInstanceOf(BadRequestException);
     });

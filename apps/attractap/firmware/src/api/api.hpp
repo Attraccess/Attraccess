@@ -552,8 +552,6 @@ private:
 
     void onEnrollNewCardGetAvailableKeyNo(JsonObject data);
     void onEnrollNewCard(JsonObject data);
-    // Server reuses the ENROLL_NEW_CARD_REQUEST_NFC_KEY event to report errors
-    // back to the reader (e.g. CARD_ALREADY_ENROLLED).
     void onCardApdu(JsonObject data);
     void onCardConversationEnd(JsonObject data);
 

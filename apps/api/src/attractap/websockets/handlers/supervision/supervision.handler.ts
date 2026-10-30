@@ -302,6 +302,11 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       throw new BadRequestException('The selected reader is offline');
     }
 
+    // Readers on firmware before 2.0.0 cannot relay card commands, so they cannot check a card.
+    if (sockets.some((socket) => !socket.state.cardRelay)) {
+      throw new BadRequestException('This reader needs a firmware update before it can check cards');
+    }
+
     // A live session is something a user would notice losing. Asked of the source of truth rather
     // than mirrored into socket state, so it cannot go stale.
     //
