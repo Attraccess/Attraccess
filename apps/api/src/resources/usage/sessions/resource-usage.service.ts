@@ -176,19 +176,35 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     return map;
   }
 
-  async getSessionDetails(resourceId: number, usageId: number, user: AuthenticatedUser): Promise<ResourceUsage> {
+  /**
+   * Opens a session for a viewer. Allowed: their own, any when `canViewAll`, and project-linked ones for members of
+   * that project (as on main, whatever their activity access). Otherwise `redact` gives the view they may have, or
+   * the session does not exist for them: always a 404, so nothing tells a hidden session from a missing one.
+   */
+  async getSessionDetails(
+    resourceId: number,
+    usageId: number,
+    user: AuthenticatedUser,
+    canViewAll = false,
+    redact?: (usage: ResourceUsage) => ResourceUsage,
+  ): Promise<ResourceUsage> {
     const usage = await this.resourceUsageRepository.findOne({
       where: { id: usageId, resourceId, lifecyclePending: false },
       relations: this.DETAIL_RELATIONS,
     });
     if (!usage) throw new NotFoundException('Usage session not found');
+    if (usage.userId === user.id || canViewAll) return usage;
 
-    if (usage.userId !== user.id && !user.effectivePermissions?.has('resources.update')) {
-      if (!usage.projectId) throw new NotFoundException('Usage session not found');
-      await this.projectsService.findOneById(user.id, usage.projectId);
+    if (usage.projectId) {
+      try {
+        await this.projectsService.findOneById(user.id, usage.projectId);
+        return usage;
+      } catch (error) {
+        if (!(error instanceof NotFoundException)) throw error;
+      }
     }
-
-    return usage;
+    if (redact) return redact(usage);
+    throw new NotFoundException('Usage session not found');
   }
 
   async getResourceUsageHistory(

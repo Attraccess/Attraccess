@@ -1,0 +1,52 @@
+import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ResourceActivityAccess,
+  ResourceActivityVisibilityService,
+} from '../usage/authorization/resource-activity-visibility.service';
+import { ResourceActivityVisibleGuard } from './resource-activity-visible.guard';
+
+describe('ResourceActivityVisibleGuard', () => {
+  const user = { id: 3, effectivePermissions: new Set(['resources.read']) };
+  const contextFor = (resourceId: string) =>
+    ({ switchToHttp: () => ({ getRequest: () => ({ user, params: { resourceId } }) }) }) as unknown as ExecutionContext;
+  const guardWith = (access: ResourceActivityAccess, activeUserId: number | null = null) => {
+    const resolve = jest.fn(async () => access);
+    const visibility = new ResourceActivityVisibilityService(
+      {} as never,
+      {} as never,
+      { getActiveSession: jest.fn(async () => (activeUserId === null ? null : { userId: activeUserId })) } as never,
+    );
+    visibility.resolve = resolve;
+    return { guard: new ResourceActivityVisibleGuard(visibility), resolve };
+  };
+
+  it.each<ResourceActivityAccess>(['full', 'anonymous'])('lets %s access open the stream', async (access) => {
+    const { guard, resolve } = guardWith(access);
+    await expect(guard.canActivate(contextFor('7'))).resolves.toBe(true);
+    expect(resolve).toHaveBeenCalledWith(user, 7);
+  });
+
+  it('refuses before the stream opens when activity is hidden', async () => {
+    const { guard } = guardWith('none');
+    await expect(guard.canActivate(contextFor('7'))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets a user with hidden activity open the stream while they run their own session', async () => {
+    await expect(guardWith('none', user.id).guard.canActivate(contextFor('7'))).resolves.toBe(true);
+    await expect(guardWith('none', 99).guard.canActivate(contextFor('7'))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('answers 401, not a crash, if it ever runs before sign-in', async () => {
+    const { guard } = guardWith('full');
+    const signedOut = {
+      switchToHttp: () => ({ getRequest: () => ({ params: { resourceId: '7' } }) }),
+    } as unknown as ExecutionContext;
+    await expect(guard.canActivate(signedOut)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('leaves a malformed id to the route pipe', async () => {
+    const { guard, resolve } = guardWith('none');
+    await expect(guard.canActivate(contextFor('abc'))).resolves.toBe(true);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+});

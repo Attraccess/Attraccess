@@ -9,7 +9,7 @@ import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
 import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
 import {
-  useAccessControlServiceResourceIntroducersGetMany,
+  useAccessControlServiceResourceIntroducersGetNames,
   useResourcesServiceResourceUsageGetActiveSession,
   useResourcesServiceResourceUsageGetActiveSessionKey,
   useResourcesServiceResourceUsageCanControlKey,
@@ -71,7 +71,7 @@ export function ResourceUsageSession({
     undefined,
   );
 
-  const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetMany({
+  const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetNames({
     resourceId,
   });
 

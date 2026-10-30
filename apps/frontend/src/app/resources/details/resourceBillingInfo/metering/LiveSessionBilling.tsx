@@ -26,7 +26,8 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
   const formatValue = useMeterValueFormatter();
 
   const { data: active } = useResourcesServiceResourceUsageGetActiveSession({ resourceId }, undefined);
-  const usage = active?.usage ?? null;
+  // A redacted session (no user) only tells the viewer the resource is in use; its time and cost are not theirs to see.
+  const usage = active?.usage?.user ? active.usage : null;
   const { data: live } = useResourceMeteringServiceGetResourceMeteringLive({ resourceId }, undefined, {
     enabled: !!usage,
     refetchInterval: 10_000,

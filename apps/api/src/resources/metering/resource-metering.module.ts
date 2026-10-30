@@ -12,6 +12,7 @@ import { ResourceFlowsModule } from '../flows/resource-flows.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
 import { ResourceMeteringController } from './resource-metering.controller';
 import { ResourceMeteringService } from './resource-metering.service';
+import { ResourceUsageModule } from '../usage/resourceUsage.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ResourceMeteringService } from './resource-metering.service';
     ]),
     forwardRef(() => ResourceFlowsModule),
     forwardRef(() => BillingModule),
+    forwardRef(() => ResourceUsageModule),
   ],
   controllers: [ResourceMeteringController],
   providers: [ResourceMeteringService],

@@ -1,6 +1,6 @@
 {
   "title": "Allgemein",
-  "description": "Die URLs, unter denen diese Instanz erreichbar ist, und ihre Lizenz.",
+  "description": "Die URLs, unter denen diese Instanz erreichbar ist, ihre Lizenz und wer die Ressourcennutzung sehen darf.",
   "loading": "Einstellungen werden geladen...",
   "inputs": {
     "url": {
@@ -24,6 +24,14 @@
     },
     "defaultLanguage": {
       "label": "Standardsprache des Systems"
+    },
+    "activityVisibility": {
+      "label": "Wer die Ressourcennutzung sehen darf",
+      "description": "Legt fest, wer sieht, welche Ressourcen in Benutzung sind und von wem. Die eigenen Sitzungen sieht jede Person immer.",
+      "all": "Alle mit „Ressourcen lesen“",
+      "introduced": "Nur in die Ressource eingewiesene Personen",
+      "introducedHint": "Nur Personen, die in eine Ressource eingewiesen sind (direkt oder über eine Gruppe), ihre Einweiser und Wartenden sowie Benutzer mit „Ressourcen bearbeiten“ oder „Ressourcen-Zugriff verwalten“ sehen deren Nutzung. Bei Ressourcen, die beaufsichtigte Nutzung erlauben oder erfordern, sehen alle anderen nur „Verfügbar“ oder „In Benutzung“, ohne Namen.",
+      "loadFailed": "Die Einstellung zur Ressourcennutzung konnte nicht geladen werden."
     }
   },
   "success": {

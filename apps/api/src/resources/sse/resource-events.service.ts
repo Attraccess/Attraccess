@@ -129,6 +129,8 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
       eventType: ResourceUsageSessionEndedEvent.EVENT_NAME,
       resourceId,
       inUse: false,
+      // Lets the live-feed filter hand this to the session's owner even when they may not see other activity.
+      ownerUserId: event.usage.userId,
     });
     this.logger.debug(`Emitted ${ResourceUsageSessionEndedEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
@@ -140,6 +142,8 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
       eventType: ResourceUsageSessionTakenOverEvent.EVENT_NAME,
       resourceId,
       inUse: true,
+      // The previous owner learns their session is gone; the new owner's name is never part of the event.
+      ownerUserId: event.previousUser?.id,
     });
     this.logger.debug(`Emitted ${ResourceUsageSessionTakenOverEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
