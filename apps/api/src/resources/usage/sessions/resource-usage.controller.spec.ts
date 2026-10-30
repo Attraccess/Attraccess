@@ -14,7 +14,7 @@ it('passes the authenticated user and both IDs to the usage details lookup', asy
       {
         provide: ResourceActivityVisibilityService,
         useValue: Object.assign(new ResourceActivityVisibilityService({} as never, {} as never, {} as never), {
-          resolve: jest.fn().mockResolvedValue('full'),
+          resolveSessions: jest.fn().mockResolvedValue('full'),
         }),
       },
     ],
@@ -41,7 +41,7 @@ describe('usage history visibility', () => {
         },
       ],
     }).compile();
-    moduleRef.get(ResourceActivityVisibilityService).resolve = jest.fn().mockResolvedValue(access);
+    moduleRef.get(ResourceActivityVisibilityService).resolveSessions = jest.fn().mockResolvedValue(access);
     return { controller: moduleRef.get(ResourceUsageController), getResourceUsageHistory };
   };
   const request = {

@@ -48,7 +48,7 @@ The usage history is displayed on the resource [detail page](resources/resource-
 
 <!-- TODO: Screenshot of usage history -->
 
-Who sees other people's sessions follows the [resource activity visibility](settings/overview.md#resource-activity-visibility) setting. Anyone allowed to see activity on the resource, including people with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`), sees all sessions. Where only free or in use is shown (supervised use), other people's sessions appear without names or details. Everyone else sees only their own sessions.
+People with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`), and people introduced to the resource (including its introducers and maintainers), see the sessions of all users. With **Only people introduced to the resource** selected, others see free or in use on supervised-use resources, without names or details. Everyone else sees only their own sessions.
 
 ## See Also
 

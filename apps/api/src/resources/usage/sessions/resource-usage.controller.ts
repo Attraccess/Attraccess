@@ -136,8 +136,8 @@ export class ResourceUsageController {
     @Query() query: GetResourceHistoryQueryDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<GetResourceHistoryResponseDto> {
-    // The shared visibility rule decides: full sees every session, anonymous sees them redacted, none only their own.
-    const access = await this.activityVisibility.resolve(req.user, resourceId);
+    // The shared visibility rule (session variant) decides: full sees every session, anonymous sees them redacted, none only their own.
+    const access = await this.activityVisibility.resolveSessions(req.user, resourceId);
     const isViewingOwnHistory = query.userId === req.user.id || query.userId === undefined;
 
     // Filtering by another user would link a name to the redacted sessions, so it needs full access.
@@ -332,7 +332,7 @@ export class ResourceUsageController {
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    const access = await this.activityVisibility.resolve(req.user, resourceId);
+    const access = await this.activityVisibility.resolveSessions(req.user, resourceId);
     // Viewers with full or anonymous access need no project membership; with none, only their own session passes.
     const usage = await this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user, access !== 'none');
     const view = this.activityVisibility.viewUsage(usage, access, req.user.id);

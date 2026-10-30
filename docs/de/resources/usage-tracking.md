@@ -10,14 +10,14 @@ Eine Nutzungssitzung stellt einen einzelnen Nutzungszeitraum einer Ressource dar
 
 Jede Sitzung enthält:
 
-| Feld | Beschreibung |
-|------|-------------|
-| **Benutzer** | Wer die Ressource genutzt hat |
-| **Startzeit** | Wann die Sitzung begonnen hat |
-| **Endzeit** | Wann die Sitzung beendet wurde |
-| **Dauer** | Wie lange die Ressource genutzt wurde |
-| **Notizen** | Optionale Notizen zur Sitzung |
-| **Projekt** | Optionales zugehöriges Projekt |
+| Feld          | Beschreibung                          |
+| ------------- | ------------------------------------- |
+| **Benutzer**  | Wer die Ressource genutzt hat         |
+| **Startzeit** | Wann die Sitzung begonnen hat         |
+| **Endzeit**   | Wann die Sitzung beendet wurde        |
+| **Dauer**     | Wie lange die Ressource genutzt wurde |
+| **Notizen**   | Optionale Notizen zur Sitzung         |
+| **Projekt**   | Optionales zugehöriges Projekt        |
 
 ## Sitzung starten
 
@@ -48,7 +48,7 @@ Die Nutzungshistorie wird auf der [Detailseite](resources/resource-details.md) d
 
 <!-- TODO: Screenshot der Nutzungshistorie einfügen -->
 
-Personen mit **Ressourcen bearbeiten** (`resources.update`) sehen die Sitzungen aller Benutzer. Alle anderen sehen nur ihre eigenen Sitzungen.
+Personen mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`) sowie in die Ressource eingewiesene Personen (einschließlich Einweisern und Betreuern) sehen die Sitzungen aller Benutzer. Ist **Nur in die Ressource eingewiesene Personen** gewählt, sehen andere bei Ressourcen mit beaufsichtigter Nutzung nur frei oder in Benutzung, ohne Namen oder Details. Alle anderen sehen nur ihre eigenen Sitzungen.
 
 ## Siehe auch
 

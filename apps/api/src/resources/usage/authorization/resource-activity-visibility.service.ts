@@ -88,6 +88,18 @@ export class ResourceActivityVisibilityService {
   }
 
   /**
+   * Access to other people's past and project-linked sessions (`usage/history`, `usage/:usageId`). Narrower than
+   * {@link resolve} in "all" mode: ordinary readers still see only their own sessions there, as before.
+   */
+  async resolveSessions(user: AuthenticatedUser, resourceId: number): Promise<ResourceActivityAccess> {
+    const access = await this.resolve(user, resourceId);
+    if (access !== 'full' || (await this.settings.getResourceActivityVisibility()) !== 'all') return access;
+    const permissions = user.effectivePermissions;
+    if (permissions?.has('resources.update') || permissions?.has('resources.access.manage')) return 'full';
+    return (await this.usage.canControllResource(resourceId, user)) ? 'full' : 'none';
+  }
+
+  /**
    * How much of the running session the viewer may see: everything with full access, otherwise only their own
    * session (`ownUsageId`), or nothing.
    */

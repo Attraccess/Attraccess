@@ -297,7 +297,12 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       const list = await get('/resources/in-use', user);
       expect(list.body.map((resource: Resource) => resource.id)).toEqual(sees ? [MACHINE, SUPERVISED_MACHINE] : []);
       expect((await get(`/resources/${MACHINE}/usage/active`, user)).status).toBe(sees ? 200 : 403);
-      expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(sees ? 200 : 403);
+      // Other people's sessions stay with managers and introduced people, as before this setting existed.
+      const seesSessions =
+        permissions.includes('resources.update') ||
+        permissions.includes('resources.access.manage') ||
+        PERSONAS[name].canControl === true;
+      expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(seesSessions ? 200 : 403);
       expect((await get(`/resources/${MACHINE}`, user)).body.usages?.length ?? 0).toBe(sees ? 1 : 0);
       const live = await feed(MACHINE, user);
       expect(live.status).toBe(sees ? 200 : 403);
@@ -467,7 +472,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       const full =
         permissions.includes('resources.update') ||
         permissions.includes('resources.access.manage') ||
-        (permissions.includes('resources.read') && (visibility === 'all' || canControl === true));
+        (permissions.includes('resources.read') && canControl === true);
       const status = (await get(`/resources/${MACHINE}/usage/history?userId=${OTHER}`, user)).status;
       expect(status).toBe(full ? 200 : 403);
     });
