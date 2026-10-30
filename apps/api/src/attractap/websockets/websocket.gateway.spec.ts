@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
+import { makeStringLVGLReady, sanitizeForLVGL } from './lvgl-text';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
@@ -10,8 +11,7 @@ describe('AttractapGateway', () => {
   });
 
   describe('LVGL output sanitization', () => {
-    const sanitize = (value: string) =>
-      (fixture.gateway as unknown as { makeStringLVGLReady: (input: string) => string }).makeStringLVGLReady(value);
+    const sanitize = (value: string) => makeStringLVGLReady(value);
 
     it('preserves printable Latin-1 characters', () => {
       expect(sanitize('ÄÖÜ äöü ß \u00A0°®')).toBe('ÄÖÜ äöü ß \u00A0°®');
@@ -43,9 +43,7 @@ describe('AttractapGateway', () => {
           },
         ],
       });
-      const sanitized = (fixture.gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }).sanitizeForLVGL(
-        message,
-      );
+      const sanitized = sanitizeForLVGL(message);
       const field = sanitized.data.payload.fields[0];
 
       expect(field.name).toBe('"Größe"');

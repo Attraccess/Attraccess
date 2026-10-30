@@ -55,6 +55,7 @@ import { ResourceOperatingAttributionModule } from '../resources/operating-inter
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CardConversationService } from './websockets/card-conversation.service';
+import { CardDetectedRouter } from './websockets/card-detected.router';
 import { CardOperationsService } from './websockets/card-operations.service';
 import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
 import { CardWriterSettingsController } from './card-writer-settings.controller';
@@ -90,6 +91,7 @@ import { EncryptionModule } from '../encryption/encryption.module';
     CardAccessService,
     AttractapService,
     CardConversationService,
+    CardDetectedRouter,
     CardOperationsService,
     CardWriterPolicyService,
     WebsocketService,

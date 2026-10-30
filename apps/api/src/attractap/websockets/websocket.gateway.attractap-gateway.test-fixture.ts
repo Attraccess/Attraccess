@@ -29,6 +29,7 @@ import { AttractapFirmwareService } from '../firmware.service';
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
 import { CardConversationService } from './card-conversation.service';
+import { CardDetectedRouter } from './card-detected.router';
 import { CardOperationsService } from './card-operations.service';
 import { CardWriterPolicyService } from './card-writer-policy.service';
 import { AttractapCardHandler } from './handlers/card/card.handler';
@@ -125,6 +126,7 @@ export function registerAttractapGatewayFixture() {
         { provide: RbacService, useValue: {} },
         { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
         CardConversationService,
+        CardDetectedRouter,
         { provide: CardOperationsService, useValue: { verifyCard: jest.fn(), enroll: jest.fn(), reset: jest.fn() } },
         { provide: CardWriterPolicyService, useValue: { assertAllowed: jest.fn() } },
         { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },

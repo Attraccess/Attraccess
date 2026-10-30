@@ -30,6 +30,8 @@ import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { CardConversationService } from './card-conversation.service';
+import { CardDetectedRouter } from './card-detected.router';
+import { sanitizeForLVGL } from './lvgl-text';
 import { WebsocketService } from './websocket.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
@@ -82,6 +84,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(CardConversationService)
   protected cardConversations: CardConversationService;
 
+  @Inject(CardDetectedRouter)
+  protected cardDetectedRouter: CardDetectedRouter;
+
   @Inject(AttractapFormsHandler)
   protected formsHandler: AttractapFormsHandler;
 
@@ -122,7 +127,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.firmwareHandler.handleFirmwareInfo(socket, eventData),
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
       this.crashReportHandler.handleCrashReport(socket, eventData),
-    [AttractapEventType.CARD_DETECTED]: (socket, eventData) => this.onCardDetected(socket, eventData),
+    [AttractapEventType.CARD_DETECTED]: (socket, eventData) => this.cardDetectedRouter.route(socket, eventData),
     [AttractapEventType.CARD_APDU_RESPONSE]: (socket, eventData) =>
       this.cardConversations.handleResponse(socket, eventData.payload),
     [AttractapEventType.CARD_REMOVED]: (socket, eventData) =>
@@ -216,51 +221,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await socket.sendMessage(new AttractapEvent(replyType, { ...extra, error: 'FIRMWARE_UPDATE_REQUIRED' }));
   }
 
-  /** A card is on the reader: route it to the flow that asked for it. The server then talks to the card through the reader. */
-  protected async onCardDetected(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) {
-    const { purpose, uid, resourceId, sessionId } = (eventData.payload ?? {}) as {
-      purpose?: string;
-      uid?: unknown;
-      resourceId?: unknown;
-      sessionId?: unknown;
-    };
-    const replyTypes: Record<string, AttractapEventType> = {
-      tap: AttractapEventType.CARD_AUTHENTICATION_DATA,
-      enroll: AttractapEventType.ENROLL_NEW_CARD,
-      reset: AttractapEventType.RESET_NFC_CARD,
-      supervisor: AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA,
-      'mass-introduction': AttractapEventType.MASS_INTRODUCTION_RESULT,
-    };
-    const replyType = replyTypes[purpose ?? ''];
-    if (!replyType) {
-      this.logger.warn(`Ignoring CARD_DETECTED with unknown purpose from client ${socket.id}`);
-      return;
-    }
-    const fail = (error: string) => socket.sendMessage(new AttractapEvent(replyType, { error }));
-
-    if (!socket.state.cardRelay) return void (await fail('FIRMWARE_UPDATE_REQUIRED'));
-    if (typeof uid !== 'string' || !/^[0-9a-fA-F]{4,32}$/.test(uid)) return void (await fail('INVALID_UID'));
-
-    switch (purpose) {
-      case 'tap':
-        if (!Number.isInteger(resourceId)) return void (await fail('INVALID_PARAMS'));
-        return this.cardHandler.handleCardTap(socket, uid, resourceId as number);
-      case 'enroll':
-        return this.cardHandler.handleEnrollCard(socket, uid);
-      case 'reset':
-        return this.cardHandler.handleResetCard(socket, uid);
-      case 'supervisor':
-        if (!Number.isInteger(resourceId)) return void (await fail('INVALID_PARAMS'));
-        return this.supervisionHandler.handleSupervisorCardDetected(socket, uid, resourceId as number);
-      default:
-        return this.massIntroductionHandler.handleCardDetected(
-          socket,
-          uid,
-          typeof sessionId === 'string' ? sessionId : undefined,
-        );
-    }
-  }
-
   /** The reader's login ended (logout or timeout): forget the verified user and stop what depended on them. */
   protected onReaderSessionEnded(socket: AuthenticatedWebSocket) {
     this.cardConversations.abort(socket, 'READER_SESSION_ENDED');
@@ -326,65 +286,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     apiTokenId?: number;
   }) {
     return this.cardHandler.startResetOfNfcCard(data);
-  }
-
-  protected makeStringLVGLReady(input: string): string {
-    if (!input) return input;
-
-    // Step 1: Explicit replacements for unsupported punctuation and symbols
-    const explicitReplacements: Array<[RegExp, string]> = [
-      // Common symbols and punctuation
-      [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
-      [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
-      [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
-      [/\u2026/g, '...'], // ellipsis
-      [/\u2022/g, '-'], // bullet -> hyphen
-      [/\u2122/g, 'TM'], // trademark
-    ];
-
-    let output = input;
-    for (const [pattern, replacement] of explicitReplacements) {
-      output = output.replace(pattern, replacement);
-    }
-
-    // The reader's Latin-1 fonts cover printable ASCII plus U+00A0-U+00FF.
-    // Normalize only unsupported code points so existing Latin-1 glyphs survive.
-    return Array.from(output)
-      .map((character) => {
-        if (/^[\n\r\t\x20-\x7E\xA0-\xFF]$/.test(character)) {
-          return character;
-        }
-
-        const fallback = character.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        return /^[\x20-\x7E]*$/.test(fallback) ? fallback : '?';
-      })
-      .join('');
-  }
-
-  protected sanitizeForLVGL<T>(value: T): T {
-    const seen = new WeakSet<object>();
-
-    const sanitize = (v: unknown): unknown => {
-      if (typeof v === 'string') return this.makeStringLVGLReady(v);
-      if (v === null || v === undefined) return v;
-      if (Array.isArray(v)) return v.map((item) => sanitize(item));
-      if (typeof v === 'object') {
-        const obj = v as Record<string, unknown>;
-        if (seen.has(obj)) return obj;
-        seen.add(obj);
-        const out: Record<string, unknown> = {};
-        for (const [k, val] of Object.entries(obj)) {
-          // Select options and draft values are protocol values: changing them
-          // prevents the firmware from submitting the value the API validates.
-          // Object-based options contain display metadata such as placeholders.
-          out[k] = (k === 'options' && Array.isArray(val)) || k === 'value' || k === 'answers' ? val : sanitize(val);
-        }
-        return out;
-      }
-      return v;
-    };
-
-    return sanitize(value) as T;
   }
 
   protected async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
@@ -540,7 +441,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         ) {
           message.data.payload.language = this.websocketService.readerLanguage;
         }
-        const stringifiedMessage = JSON.stringify(this.sanitizeForLVGL(message));
+        const stringifiedMessage = JSON.stringify(sanitizeForLVGL(message));
         client.send(stringifiedMessage);
 
         this.logger.debug(
