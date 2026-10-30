@@ -53,6 +53,13 @@ export interface EnrollNfcCardProps {
   userId?: number;
 }
 
+/** The server says why (reader busy, not allowed, firmware too old); the status text alone does not. */
+function describeError(error: unknown): string {
+  const body = (error as { body?: { message?: string | string[] } }).body;
+  const message = Array.isArray(body?.message) ? body?.message[0] : body?.message;
+  return message ?? (error as Error).message;
+}
+
 export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
   const { t } = useTranslations({
     de,
@@ -66,7 +73,7 @@ export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
   const toast = useToastMessage();
   const { mutate: enrollNfcCardMutation, isPending } = useAttractapServiceEnrollNfcCard({
     onSuccess: close,
-    onError: (error) => toast.error({ title: t('errorOperation'), description: (error as Error).message }),
+    onError: (error) => toast.error({ title: t('errorOperation'), description: describeError(error) }),
   });
 
   const enrollNfcCard = useCallback(() => {
@@ -143,7 +150,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
   const toast = useToastMessage();
   const { mutate: resetNfcCard, isPending } = useAttractapServiceResetNfcCard({
     onSuccess: props.close,
-    onError: (error) => toast.error({ title: t('errorOperation'), description: (error as Error).message }),
+    onError: (error) => toast.error({ title: t('errorOperation'), description: describeError(error) }),
   });
 
   const deleteCard = useCallback(() => {

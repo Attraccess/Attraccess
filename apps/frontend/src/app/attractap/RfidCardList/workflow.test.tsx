@@ -9,6 +9,8 @@ const state = vi.hoisted(() => ({
   invalidate: vi.fn(),
   licensed: true,
   cardsQuery: vi.fn(),
+  toastError: vi.fn(),
+  enrollFails: null as unknown,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetAllCards: (params: unknown) => {
@@ -21,10 +23,11 @@ vi.mock('@attraccess/react-query-client', () => ({
     };
   },
   useAttractapServiceResetNfcCard: () => ({ mutate: state.reset }),
-  useAttractapServiceEnrollNfcCard: (options: { onSuccess: () => void }) => ({
+  useAttractapServiceEnrollNfcCard: (options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
     mutate: (data: unknown) => {
       state.enroll(data);
-      options.onSuccess();
+      if (state.enrollFails) options.onError(state.enrollFails);
+      else options.onSuccess();
     },
   }),
   useAttractapServiceToggleCardActive: () => ({ mutate: state.toggle }),
@@ -53,11 +56,12 @@ vi.mock('../AttractapSelect', () => ({
   ),
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
-vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn() }) }));
+vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: state.toastError }) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 beforeEach(() => {
   vi.clearAllMocks();
   state.licensed = true;
+  state.enrollFails = null;
 });
 afterEach(cleanup);
 it('renders card identities and requires a reader before deleting a card', () => {
@@ -127,4 +131,21 @@ it('lists and enrolls cards for the selected user instead of the acting admin', 
   fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
   expect(state.enroll).toHaveBeenCalledWith({ requestBody: { readerId: 4, userId: 23 } });
+});
+
+it('tells the admin why a reader was refused instead of only the status text', () => {
+  state.enrollFails = Object.assign(new Error('Conflict'), {
+    body: { message: 'Reader already has an active card operation: 4' },
+  });
+  render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Enroll RFID Card' }));
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
+  expect(state.toastError).toHaveBeenCalledWith(
+    expect.objectContaining({ description: 'Reader already has an active card operation: 4' }),
+  );
 });
