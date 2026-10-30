@@ -49,7 +49,15 @@ Zum Freigeben benoetigen Sie die Berechtigung, Ressourcen zu aendern (`resources
 
 ### Leser ohne Display (Attractap Lite)
 
-Ein Lite-Leser hat keinen Bildschirm. Nutzen Sie stattdessen den Web-Flasher (**RFID-Leser einrichten**): Nach der seriellen Einrichtung zeigt er **Wartet auf Freigabe** mit dem aktuellen Code und eine Schaltflaeche **Freigeben**. Der Code steht auch auf der USB-Seriell-Konsole des Lesers bereit (`api.status.get`, Feld `enrollmentCode`).
+Ein Lite-Leser hat keinen Bildschirm und zeigt deshalb statt eines Codes ein **Farbmuster** auf seinem LED-Ring: vier gleichmaessige Farbsegmente mit je einer dunklen LED dazwischen. Das Muster wechselt alle 30 Sekunden.
+
+1. Oeffnen Sie **Attractap > Leser**. Die Karte **Wartende Lite-Leser** listet jeden Lite-Leser, der auf Freigabe wartet, mit den vier Farben seines Musters (die Farbnamen stehen neben den Farbfeldern), der Zeit bis zum naechsten Wechsel, seiner Firmware und seiner Wartezeit.
+2. Halten Sie die Liste neben den Leser vor Ihnen und suchen Sie den Eintrag, dessen Farben zum Ring passen. Der Ring kann gedreht verbaut sein: Beginnen Sie an einem beliebigen Segment und lesen Sie den Ring in beliebiger Richtung.
+3. Klicken Sie auf **Freigeben**, pruefen Sie das Muster noch einmal am Ring, geben Sie optional einen Namen ein und bestaetigen Sie.
+
+Der Ring blinkt gruen und der Leser startet normal weiter. Geben Sie nur Leser frei, die Sie vor sich sehen: Jedes Geraet in Ihrem Netzwerk kann behaupten, ein Lite-Leser zu sein. Das Muster zeigt Ihnen, dass das Geraet vor Ihnen das in der Liste ist.
+
+Warten mehr Leser, als Muster frei sind, atmet der Ring weiss und der Leser erscheint nicht in der Liste. Geben Sie ihn dann ueber den Web-Flasher (**RFID-Leser einrichten**) frei: Nach der seriellen Einrichtung zeigt er **Wartet auf Freigabe** mit dem aktuellen Code und eine Schaltflaeche **Freigeben**. Der Code steht auch auf der USB-Seriell-Konsole des Lesers bereit (`api.status.get`, Feld `enrollmentCode`). Lite-Firmware aelter als 1.8.1 muss immer so freigegeben werden.
 
 ### Grenzen und falsche Codes
 

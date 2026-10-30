@@ -3,6 +3,7 @@
 #include <esp_netif.h>
 #include <ArduinoJson.h>
 #include <string>
+#include <vector>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
@@ -118,10 +119,17 @@ public:
         // Server refused the request (limits); retry once retryInMs passed.
         bool rejected;
         uint32_t retryInMs;
+        // Readers without a screen: the server sent a `pattern` field. An empty list means it had no free
+        // pattern, the reader can then only be approved by the web flasher.
+        bool patternExpected;
+        std::vector<std::string> pattern;
     };
     static void setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs);
+    static void setEnrollmentPattern(std::vector<std::string> colors);
     static void setEnrollmentRejected(uint32_t retryAfterMs);
-    static void clearEnrollment();
+    // approved: the registration response arrived, the LED ring flashes green once.
+    static void clearEnrollment(bool approved = false);
+    static bool consumeEnrollmentApproved();
     static EnrollmentState getEnrollmentState();
 
 private:
@@ -169,6 +177,9 @@ private:
     static uint32_t enrollment_rotates_in_ms;
     static uint32_t enrollment_expires_in_ms;
     static uint32_t enrollment_retry_in_ms;
+    static bool enrollment_pattern_expected;
+    static std::vector<std::string> enrollment_pattern;
+    static bool enrollment_approved;
 
     static bool api_authenticated;
     static std::string api_device_name;

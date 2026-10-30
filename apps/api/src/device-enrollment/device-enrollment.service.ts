@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { BadGatewayException, Injectable, Logger, NotFoundException, OnApplicationShutdown } from '@nestjs/common';
 import { FixedWindowCounterStore, WindowCounterEntry } from '../common/rate-limiting/fixed-window-counter';
 import { AuditService } from '../audit/audit.service';
@@ -11,6 +12,7 @@ import {
   ENROLLMENT_MAX_PENDING_TOTAL,
   ENROLLMENT_REQUEST_TTL_MS,
 } from './device-enrollment.constants';
+import { LedPattern, canonicalLedPattern, isValidLedPattern, pickLedPattern, sameLedPattern } from './led-pattern';
 import { formatEnrollmentCode, generateEnrollmentCode, normalizeEnrollmentCode } from './enrollment-code';
 
 export interface ProvisionedDevice {
@@ -26,8 +28,14 @@ export interface ProvisionedDevice {
 export interface EnrollmentConnection {
   id: string;
   address: string;
-  /** Shows a (rotated) code on the waiting device. Relative times only, devices have no synced clock. */
-  sendCode: (code: string, rotatesInMs: number, expiresInMs: number) => void;
+  /** Readers without a screen (Attractap Lite) are approved by a colour pattern on their LED ring. */
+  hasScreen?: boolean;
+  firmware?: { name?: string; variant?: string; version?: string };
+  /**
+   * Shows a (rotated) code on the waiting device. Relative times only, devices have no synced clock.
+   * `pattern` is only passed for readers without a screen; null means no pattern was free.
+   */
+  sendCode: (code: string, rotatesInMs: number, expiresInMs: number, pattern?: LedPattern | null) => void;
   /** Tells the device its request was not accepted, e.g. because of a limit. */
   sendRejected: (reason: EnrollmentRejection, retryAfterMs: number) => void;
   /** Creates the record and credentials. Only called once an approver confirmed the code. */
@@ -43,6 +51,15 @@ export interface EnrollmentPrincipal {
   apiTokenId?: number;
 }
 
+export interface LitePendingReader {
+  pendingId: string;
+  pattern: LedPattern;
+  rotatesInSeconds: number;
+  firmware: { name?: string; variant?: string; version?: string } | null;
+  waitingSince: string;
+  clientAddress: string;
+}
+
 export interface EnrollmentResult {
   kind: 'reader';
   id: number;
@@ -51,6 +68,11 @@ export interface EnrollmentResult {
 
 interface Pending {
   connection: EnrollmentConnection;
+  /** Random handle for the admin UI, unrelated to the code. Only used for readers without a screen. */
+  pendingId: string;
+  since: number;
+  pattern: LedPattern | null;
+  previousPattern: LedPattern | null;
   code: string;
   previousCode: string | null;
   nextRotationAt: number;
@@ -75,6 +97,10 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
   private readonly pending = new Map<string, Pending>();
   /** code (current and previous) -> connection id */
   private readonly codes = new Map<string, string>();
+  /** pendingId -> connection id, only readers without a screen */
+  private readonly litePending = new Map<string, string>();
+  /** canonical pattern (current and previous of every waiting Lite reader) -> connection id */
+  private readonly patterns = new Map<string, string>();
   private readonly connectionAttempts = new FixedWindowCounterStore<string, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly addressAttempts = new FixedWindowCounterStore<string, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly approverFailures = new FixedWindowCounterStore<number, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
@@ -131,6 +157,10 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
 
     const entry: Pending = {
       connection,
+      pendingId: randomUUID(),
+      since: now,
+      pattern: null,
+      previousPattern: null,
       code: generateEnrollmentCode((code) => this.codes.has(code)),
       previousCode: null,
       nextRotationAt: now + ENROLLMENT_CODE_ROTATION_MS,
@@ -142,6 +172,10 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     entry.expiryTimer.unref?.();
     this.pending.set(connection.id, entry);
     this.codes.set(entry.code, connection.id);
+    if (this.isLite(entry)) {
+      this.litePending.set(entry.pendingId, connection.id);
+      entry.pattern = this.assignPattern(connection.id);
+    }
     this.announce(entry, now);
     return true;
   }
@@ -154,6 +188,8 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     clearTimeout(entry.expiryTimer);
     this.codes.delete(entry.code);
     if (entry.previousCode) this.codes.delete(entry.previousCode);
+    this.releasePatterns(entry);
+    this.litePending.delete(entry.pendingId);
     this.pending.delete(connectionId);
     this.connectionAttempts.delete(connectionId);
   }
@@ -163,6 +199,59 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     principal: EnrollmentPrincipal,
     options: { name?: string } = {},
   ): Promise<EnrollmentResult> {
+    const failures = this.checkApproverLimit(principal);
+    const code = normalizeEnrollmentCode(rawCode);
+    const connectionId = code ? this.codes.get(code) : undefined;
+    const entry = connectionId ? this.pending.get(connectionId) : undefined;
+    if (!entry) {
+      this.recordApproverFailure(principal, failures);
+      throw new NotFoundException('EnrollmentCodeNotFound');
+    }
+    return this.complete(entry, principal, options, { source: 'reader-enrollment' });
+  }
+
+  /** Waiting readers without a screen that currently show a pattern, oldest first. */
+  listLitePending(): LitePendingReader[] {
+    const now = Date.now();
+    return [...this.pending.values()]
+      .filter((entry) => this.isLite(entry) && entry.pattern)
+      .sort((a, b) => a.since - b.since)
+      .map((entry) => ({
+        pendingId: entry.pendingId,
+        pattern: [...(entry.pattern as LedPattern)],
+        rotatesInSeconds: Math.max(0, Math.ceil((entry.nextRotationAt - now) / 1000)),
+        firmware: entry.connection.firmware ?? null,
+        waitingSince: new Date(entry.since).toISOString(),
+        clientAddress: entry.connection.address,
+      }));
+  }
+
+  /**
+   * Approves a reader without a screen by the pattern the admin saw on its ring. Unknown IDs, readers
+   * with a screen and wrong patterns are indistinguishable for the caller.
+   */
+  async approveLite(
+    pendingId: string,
+    pattern: readonly string[],
+    principal: EnrollmentPrincipal,
+    options: { name?: string } = {},
+  ): Promise<EnrollmentResult> {
+    const failures = this.checkApproverLimit(principal);
+    const connectionId = this.litePending.get(pendingId);
+    const entry = connectionId ? this.pending.get(connectionId) : undefined;
+    const matches =
+      !!entry &&
+      isValidLedPattern(pattern) &&
+      ((!!entry.pattern && sameLedPattern(entry.pattern, pattern)) ||
+        (!!entry.previousPattern && sameLedPattern(entry.previousPattern, pattern)));
+    if (!entry || !matches) {
+      this.recordApproverFailure(principal, failures);
+      throw new NotFoundException('EnrollmentCodeNotFound');
+    }
+    return this.complete(entry, principal, options, { source: 'reader-enrollment', method: 'led-pattern' });
+  }
+
+  private checkApproverLimit(principal: EnrollmentPrincipal): WindowCounterEntry | undefined {
     const now = Date.now();
     this.approverFailures.evict(isStale(ENROLLMENT_APPROVER_WRONG_CODES.windowMs, now));
     const failures = this.approverFailures.get(principal.userId);
@@ -171,16 +260,20 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
         Math.max(1, Math.ceil((failures.firstAt + ENROLLMENT_APPROVER_WRONG_CODES.windowMs - now) / 1000)),
       );
     }
+    return failures;
+  }
 
-    const code = normalizeEnrollmentCode(rawCode);
-    const connectionId = code ? this.codes.get(code) : undefined;
-    const entry = connectionId ? this.pending.get(connectionId) : undefined;
-    if (!entry) {
-      if (failures) failures.count += 1;
-      else this.approverFailures.set(principal.userId, { count: 1, firstAt: now });
-      throw new NotFoundException('EnrollmentCodeNotFound');
-    }
+  private recordApproverFailure(principal: EnrollmentPrincipal, failures: WindowCounterEntry | undefined): void {
+    if (failures) failures.count += 1;
+    else this.approverFailures.set(principal.userId, { count: 1, firstAt: Date.now() });
+  }
 
+  private async complete(
+    entry: Pending,
+    principal: EnrollmentPrincipal,
+    options: { name?: string },
+    auditDetails: { source: 'reader-enrollment'; method?: 'led-pattern' },
+  ): Promise<EnrollmentResult> {
     // Single use: nobody else can approve the same request while it is being provisioned.
     const { connection } = entry;
     this.release(connection.id);
@@ -213,7 +306,7 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
         authenticationMethod: principal.authenticationMethod,
         ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
         subjectId: device.id,
-        details: { source: 'reader-enrollment' },
+        details: auditDetails,
       })
       .catch(() => undefined);
 
@@ -221,11 +314,29 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     return { kind: device.kind, id: device.id, name: device.name };
   }
 
+  private isLite(entry: Pending): boolean {
+    return entry.connection.hasScreen === false;
+  }
+
+  /** Picks a pattern no waiting Lite reader shows or showed in the last rotation. */
+  private assignPattern(connectionId: string): LedPattern | null {
+    const pattern = pickLedPattern(new Set(this.patterns.keys()));
+    if (pattern) this.patterns.set(canonicalLedPattern(pattern), connectionId);
+    return pattern;
+  }
+
+  private releasePatterns(entry: Pending): void {
+    for (const pattern of [entry.pattern, entry.previousPattern]) {
+      if (pattern) this.patterns.delete(canonicalLedPattern(pattern));
+    }
+  }
+
   private announce(entry: Pending, now: number): void {
     entry.connection.sendCode(
       formatEnrollmentCode(entry.code),
       Math.max(0, entry.nextRotationAt - now),
       Math.max(0, entry.expiresAt - now),
+      ...(this.isLite(entry) ? [entry.pattern] : []),
     );
   }
 
@@ -238,10 +349,18 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     entry.previousCode = entry.code;
     entry.code = generateEnrollmentCode((code) => this.codes.has(code));
     this.codes.set(entry.code, connectionId);
+    if (this.isLite(entry)) this.rotatePattern(entry);
     entry.nextRotationAt = now + ENROLLMENT_CODE_ROTATION_MS;
     entry.rotationTimer = setTimeout(() => this.rotate(connectionId), ENROLLMENT_CODE_ROTATION_MS);
     entry.rotationTimer.unref?.();
     this.announce(entry, now);
+  }
+
+  /** The previous pattern stays valid (and reserved) until the next rotation. */
+  private rotatePattern(entry: Pending): void {
+    if (entry.previousPattern) this.patterns.delete(canonicalLedPattern(entry.previousPattern));
+    entry.previousPattern = entry.pattern;
+    entry.pattern = this.assignPattern(entry.connection.id);
   }
 
   private expire(connectionId: string): void {

@@ -1,0 +1,42 @@
+{
+  "title": "Wartende Lite-Leser",
+  "description": "Lite-Leser haben keinen Bildschirm. Finde den Leser vor dir an den Farben seines LED-Rings und gib ihn frei.",
+  "columns": {
+    "pattern": "Muster auf dem Ring",
+    "rotates": "Wechselt in",
+    "firmware": "Firmware",
+    "waiting": "Wartet",
+    "address": "Adresse",
+    "actions": "Aktionen"
+  },
+  "empty": "Es warten keine Lite-Leser auf Freigabe.",
+  "rotatesIn": "{{seconds}} s",
+  "colors": {
+    "red": "Rot",
+    "green": "Grün",
+    "blue": "Blau",
+    "yellow": "Gelb",
+    "magenta": "Magenta",
+    "white": "Weiß"
+  },
+  "approve": "Freigeben",
+  "dialog": {
+    "title": "Diesen Leser freigeben?",
+    "warning": "Sieh dir den Leser vor dir an. Gib ihn nur frei, wenn die Farben seines LED-Rings genau zu diesem Muster passen: {{pattern}}. Wer ein anderes Gerät freigibt, gibt ihm Zugriff auf dein System.",
+    "nameLabel": "Name (optional)",
+    "submit": "Leser freigeben",
+    "cancel": "Abbrechen"
+  },
+  "success": {
+    "title": "Leser freigegeben",
+    "description": "{{{name}}} ist jetzt registriert und verbindet sich selbstständig.",
+    "openReader": "Leser öffnen",
+    "close": "Fertig"
+  },
+  "error": {
+    "notFound": "Das Muster am Leser hat sich geändert oder der Leser ist weg. Vergleiche das aktuelle Muster in der Liste und versuche es erneut.",
+    "tooManyAttempts": "Zu viele Versuche. Warte eine Minute und versuche es erneut.",
+    "deliveryFailed": "Der Leser hat nicht geantwortet. Es wurde nichts angelegt. Prüfe seine Verbindung und versuche es erneut.",
+    "generic": "Etwas ist schiefgelaufen: {{{error}}}"
+  }
+}

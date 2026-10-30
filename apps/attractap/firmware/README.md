@@ -140,6 +140,20 @@ server closes the socket. A rejection (`READER_UNAUTHORIZED`) still clears the
 stored credentials, so a reader that connects to the wrong server waits for
 approval there instead of creating a record.
 
+### Readers without a screen (1.8.1)
+
+Firmware without a display (Attractap Lite) adds `hasScreen: false` to `enrollment` and
+its `firmware` (`name`, `variant`, `version`) to `READER_REGISTER`. If `hasScreen` is
+missing or `true` the server treats the reader as a screen reader. For readers without a
+screen `READER_ENROLLMENT_CODE` also carries `pattern`: four colour names out of `red`,
+`green`, `blue`, `yellow`, `magenta`, `white` (no two neighbours equal, segment 4 counts as
+neighbour of segment 1), or `null` when all 120 patterns are in use. The pattern changes with
+the code, the previous one stays valid until the next rotation. The reader draws it with
+`LedPattern` (`src/led/led_pattern.hpp`, host tests in `tests/led-pattern`), breathes white
+for `null` and flashes green when the credentials arrive. An administrator approves it in the
+**Waiting Lite readers** card (`GET /api/device-enrollment/lite-pending`,
+`POST /api/device-enrollment/approve-lite`). The code keeps working for the web flasher.
+
 ### Compatibility
 
 | Server | Reader firmware | Behavior |
@@ -273,7 +287,7 @@ hardware setup flow. Log lines have the format `[Module] LEVEL: message`.
 
 ## Attractap Lite LED Animations
 
-The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.
+The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../../docs/en/attractap/led-guide.md) in the docs.
 
 ### LED States (for developers)
 
@@ -284,6 +298,7 @@ The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a use
 | `LED_STATE_WAIT_FOR_CARD`     | Green        | 6 segments breathing in/out of phase            | Ready for card tap          |
 | `LED_STATE_AUTHENTICATE_CARD` | Cyan         | 6-LED fading tail at double speed               | Card being read             |
 | `LED_STATE_NO_RESOURCES`      | Orange       | Full-ring on/off flash every 10 phases          | No resources assigned       |
+| `LED_STATE_ENROLLMENT_PENDING`| Four colours | 4 steady segments (5 lit + 1 dark LED each on the 24 LED ring), white breathing when no pattern is free | Waiting for approval |
 | `LED_STATE_FIRMWARE_UPDATE`   | Blue / White | Static alternating blue/white pixels            | Firmware update in progress |
 
 ### LED Triggers

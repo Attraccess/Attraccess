@@ -2,7 +2,7 @@ import { AttractapAuditEvent } from './domain-events';
 import { dataFields, oneOf, positive } from './projection';
 export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet<string>> = {
   'reader.registered': new Set(['source']),
-  'reader.enrolled': new Set(['source']),
+  'reader.enrolled': new Set(['source', 'method']),
   'reader.deregistered': new Set(['source']),
   'card.linked': new Set(['readerId', 'source']),
   'card.unlinked': new Set(['readerId', 'source']),
@@ -33,6 +33,7 @@ export function validAttractapDetails(
       return false;
     if (key === 'source' && !oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset')(value))
       return false;
+    if (key === 'method' && !oneOf('led-pattern')(value)) return false;
     if (key === 'resetReason' && !attractapResetReasons.has(value as string)) return false;
     if (key === 'hasCoredump' && typeof value !== 'boolean') return false;
     if (key === 'readerId' && !positive(value)) return false;

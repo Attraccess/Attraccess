@@ -52,11 +52,11 @@ void PendingApprovalScreen::loop()
 
    if (enrollment.rejected)
    {
-      setDynamicLabelTextIfChanged(this->codeLabel, "- - -");
+      setDynamicLabelTextIfChanged(this->codeLabel, "- - -") /* i18n-data: Language-neutral placeholder while no code arrived yet. */;
       setLabelTextIfChanged(this->hintLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EnrollmentRetryIn, {FirmwareI18n::Text::literal(seconds(enrollment.retryInMs)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
       return;
    }
-   setDynamicLabelTextIfChanged(this->codeLabel, enrollment.code.c_str());
+   setDynamicLabelTextIfChanged(this->codeLabel, enrollment.code.c_str()) /* i18n-data: Server-issued enrollment code; preserve exact contents. */;
    setLabelTextIfChanged(this->hintLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::EnrollmentCodeChangesIn, {FirmwareI18n::Text::literal(seconds(enrollment.rotatesInMs)) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */}));
 }
 

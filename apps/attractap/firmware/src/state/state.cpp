@@ -6,6 +6,7 @@
 #include "language.hpp"
 #include "../platform.hpp"
 #include <string>
+#include <utility>
 
 
 #include "state_lock.hpp"
@@ -48,6 +49,9 @@ uint32_t State::enrollment_received_at = 0;
 uint32_t State::enrollment_rotates_in_ms = 0;
 uint32_t State::enrollment_expires_in_ms = 0;
 uint32_t State::enrollment_retry_in_ms = 0;
+bool State::enrollment_pattern_expected = false;
+std::vector<std::string> State::enrollment_pattern;
+bool State::enrollment_approved = false;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
 static Language::Session language_session;
@@ -137,6 +141,13 @@ void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t e
     enrollment_expires_in_ms = expiresInMs;
 }
 
+void State::setEnrollmentPattern(std::vector<std::string> colors)
+{
+    StateLock lock(state_mutex);
+    enrollment_pattern_expected = true;
+    enrollment_pattern = std::move(colors);
+}
+
 void State::setEnrollmentRejected(uint32_t retryAfterMs)
 {
     StateLock lock(state_mutex);
@@ -147,12 +158,26 @@ void State::setEnrollmentRejected(uint32_t retryAfterMs)
     enrollment_retry_in_ms = retryAfterMs;
 }
 
-void State::clearEnrollment()
+void State::clearEnrollment(bool approved)
 {
     StateLock lock(state_mutex);
     enrollment_pending = false;
     enrollment_rejected = false;
     enrollment_code = "";
+    enrollment_pattern_expected = false;
+    enrollment_pattern.clear();
+    if (approved)
+    {
+        enrollment_approved = true;
+    }
+}
+
+bool State::consumeEnrollmentApproved()
+{
+    StateLock lock(state_mutex);
+    const bool approved = enrollment_approved;
+    enrollment_approved = false;
+    return approved;
 }
 
 State::EnrollmentState State::getEnrollmentState()
@@ -166,6 +191,8 @@ State::EnrollmentState State::getEnrollmentState()
     state.rotatesInMs = enrollment_rotates_in_ms > elapsed ? enrollment_rotates_in_ms - elapsed : 0;
     state.expiresInMs = enrollment_expires_in_ms > elapsed ? enrollment_expires_in_ms - elapsed : 0;
     state.retryInMs = enrollment_retry_in_ms > elapsed ? enrollment_retry_in_ms - elapsed : 0;
+    state.patternExpected = enrollment_pattern_expected;
+    state.pattern = enrollment_pattern;
     return state;
 }
 

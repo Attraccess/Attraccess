@@ -132,6 +132,50 @@ describe('AttractapAuthHandler', () => {
       );
     });
 
+    it.each([
+      ['missing', {}],
+      ['true', { hasScreen: true }],
+    ])('treats a reader with hasScreen %s as a screen reader without pattern', async (_label, extra) => {
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        { payload: { enrollment: { protocol: 1, ...extra } } } as AttractapEvent['data'],
+      );
+      const connection = mockEnrollment.request.mock.calls[0][0];
+      expect(connection.hasScreen).toBe(true);
+
+      connection.sendCode('K7P-3XQ', 30000, 600000, ['red', 'green', 'blue', 'yellow']);
+
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payload: { code: 'K7P-3XQ', rotatesInMs: 30000, expiresInMs: 600000 },
+          }),
+        }),
+      );
+    });
+
+    it('sends the pattern (or null) to readers without a screen and keeps their firmware', async () => {
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        {
+          payload: {
+            enrollment: { protocol: 1, hasScreen: false },
+            firmware: { name: 'attractap_lite', variant: 'ethernet', version: '1.8.1\n', extra: 'x' },
+          },
+        } as AttractapEvent['data'],
+      );
+      const connection = mockEnrollment.request.mock.calls[0][0];
+      expect(connection.hasScreen).toBe(false);
+      expect(connection.firmware).toEqual({ name: 'attractap_lite', variant: 'ethernet', version: '1.8.1' });
+
+      connection.sendCode('K7P-3XQ', 30000, 600000, ['red', 'green', 'blue', 'yellow']);
+      connection.sendCode('K7P-3XR', 30000, 600000, null);
+
+      const payloads = mockSocket.sendMessage.mock.calls.map(([event]) => event.data.payload);
+      expect(payloads[0].pattern).toEqual(['red', 'green', 'blue', 'yellow']);
+      expect(payloads[1].pattern).toBeNull();
+    });
+
     it('creates the reader only when provisioned and delivers {id, token}', async () => {
       mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 99, name: 'Door' }, token: 'tok-abc' });
       mockAttractapService.deleteReader = jest.fn().mockResolvedValue(true);

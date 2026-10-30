@@ -3,6 +3,9 @@
 #ifdef HAS_WS2812_LED
 
 #include <cstdint>
+#include <string>
+#include <vector>
+#include "led_pattern.hpp"
 #include "ws2812_strip.hpp"
 
 class LedController
@@ -16,6 +19,7 @@ public:
         LED_STATE_AUTHENTICATE_CARD,
         LED_STATE_NO_RESOURCES,
         LED_STATE_FIRMWARE_UPDATE,
+        LED_STATE_ENROLLMENT_PENDING,
     };
 
     LedController() : _strip(WS2812_LED_COUNT, PIN_WS2812_DATA) {}
@@ -24,6 +28,8 @@ public:
 
     void setState(LedState state);
     void setBrightness(uint8_t brightness);
+    // Colours of the pattern to match while LED_STATE_ENROLLMENT_PENDING. Empty or invalid: breathe white.
+    void setEnrollmentPattern(const std::vector<std::string> &colors);
     void triggerSuccess();
     void triggerError();
     void triggerIndicate();
@@ -32,6 +38,7 @@ private:
     void runAnimation();
     void runCircularAnimation();
     void runLinearAnimation();
+    void runEnrollmentPending();
     void setAll(uint32_t color);
     bool isCircularRing() const;
     uint16_t wrapIndex(int16_t i) const;
@@ -53,6 +60,8 @@ private:
     uint32_t _triggerStartMs = 0;
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;
 
+    bool _hasEnrollmentPattern = false;
+    LedPattern::Pattern _enrollmentPattern{};
     bool _firmwarePatternSet = false;
     uint8_t _globalBrightness = 255;
     Ws2812Strip _strip;

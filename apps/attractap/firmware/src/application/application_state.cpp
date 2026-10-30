@@ -36,10 +36,17 @@ void Application::updateLedState() {
     ledState = LedController::LED_STATE_CONFIG_REQUIRED;
     break;
   case APPLICATION_STATE_INIT:
-#ifdef HAS_LVGL_DISPLAY
-  case APPLICATION_STATE_PENDING_APPROVAL:
-#endif
     ledState = LedController::LED_STATE_INIT;
+    break;
+  case APPLICATION_STATE_PENDING_APPROVAL:
+    // Readers without a screen show the pattern the admin has to match; screen readers show a code
+    // on the display and keep the init animation.
+#ifdef HAS_LVGL_DISPLAY
+    ledState = LedController::LED_STATE_INIT;
+#else
+    ledState = LedController::LED_STATE_ENROLLMENT_PENDING;
+    this->led.setEnrollmentPattern(State::getEnrollmentState().pattern);
+#endif
     break;
   case APPLICATION_STATE_AUTHENTICATE_CARD:
     ledState = LedController::LED_STATE_AUTHENTICATE_CARD;
@@ -137,6 +144,12 @@ bool Application::processConfigurationState()
 
 bool Application::processConnectionState()
 {
+#ifdef HAS_WS2812_LED
+  // The server approved this reader: confirm it on the ring while the reader starts up.
+  if (State::consumeEnrollmentApproved()) {
+    this->led.triggerSuccess();
+  }
+#endif
   State::ApiState apiState = State::getApiState();
   State::NetworkState networkState = State::getNetworkState();
   State::WebsocketState websocketState = State::getWebsocketState();
@@ -165,8 +178,7 @@ bool Application::processConnectionState()
     this->supervision.onDisconnect();
     this->massIntroduction.onDisconnect();
 #endif
-#ifdef HAS_LVGL_DISPLAY
-        // A new reader that connected shows the code an admin has to approve.
+        // A new reader that connected waits for an admin to approve the code (screen) or the pattern (LED ring).
         const State::EnrollmentState enrollment = State::getEnrollmentState();
         if (websocketState.connected && (networkState.ethernet_connected || networkState.wifi_connected) &&
             (enrollment.pending || enrollment.rejected))
@@ -174,11 +186,12 @@ bool Application::processConnectionState()
             if (this->state != APPLICATION_STATE_PENDING_APPROVAL)
             {
                 this->state = APPLICATION_STATE_PENDING_APPROVAL;
+#ifdef HAS_LVGL_DISPLAY
                 Display::transitionToScreen(&Display::pendingApprovalScreen);
+#endif
             }
             return true;
         }
-#endif
 
         if (this->state == APPLICATION_STATE_INIT)
         {

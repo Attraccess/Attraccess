@@ -37,6 +37,7 @@ vi.mock('../HardwareSetup', () => ({
 vi.mock('../HardwareSetup/WebSerialConsole', () => ({ WebSerialConsole: () => null }));
 vi.mock('../AttractapEditor/AttractapEditor', () => ({ AttractapEditor: () => null }));
 vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
+vi.mock('./WaitingLiteReaders', () => ({ WaitingLiteReaders: () => <div data-testid="waiting-lite" /> }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
 
 function mockLicense(modules: string[] | undefined) {

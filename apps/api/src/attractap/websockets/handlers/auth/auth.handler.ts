@@ -10,6 +10,18 @@ import { DeviceEnrollmentService } from '../../../../device-enrollment/device-en
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { readerServerTime } from '../../websocket-reader-payloads';
 
+// The firmware info of a waiting reader is shown to admins, so only short plain strings pass.
+function describeFirmware(firmware: unknown): { name?: string; variant?: string; version?: string } | undefined {
+  if (!firmware || typeof firmware !== 'object') return undefined;
+  const result: { name?: string; variant?: string; version?: string } = {};
+  for (const key of ['name', 'variant', 'version'] as const) {
+    const value = (firmware as Record<string, unknown>)[key];
+    // eslint-disable-next-line no-control-regex
+    if (typeof value === 'string') result[key] = value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 64);
+  }
+  return result;
+}
+
 @Injectable()
 export class AttractapAuthHandler {
   private readonly logger = new Logger(AttractapAuthHandler.name);
@@ -44,12 +56,22 @@ export class AttractapAuthHandler {
     }
     this.logger.debug('Received REGISTER event');
 
+    // Only an explicit `hasScreen: false` makes a reader approvable by LED pattern.
+    const hasScreen = data.payload.enrollment.hasScreen !== false;
+
     this.deviceEnrollment.request({
       id: socket.id,
       address: socket.clientAddress,
-      sendCode: (code, rotatesInMs, expiresInMs) => {
+      hasScreen,
+      firmware: describeFirmware(data.payload.firmware),
+      sendCode: (code, rotatesInMs, expiresInMs, pattern) => {
         void socket.sendMessage(
-          new AttractapEvent(AttractapEventType.READER_ENROLLMENT_CODE, { code, rotatesInMs, expiresInMs }),
+          new AttractapEvent(AttractapEventType.READER_ENROLLMENT_CODE, {
+            code,
+            rotatesInMs,
+            expiresInMs,
+            ...(hasScreen ? {} : { pattern: pattern ?? null }),
+          }),
         );
       },
       sendRejected: (reason, retryAfterMs) => {

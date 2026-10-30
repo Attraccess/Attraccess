@@ -9,6 +9,8 @@
 #include <functional>
 #include <limits>
 #include <string>
+#include <utility>
+#include <vector>
 
 void API::onRegistrationData(JsonObject data)
 {
@@ -23,7 +25,7 @@ void API::onRegistrationData(JsonObject data)
             std::string apiKey = payload["token"].as<std::string>();
 
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
-            State::clearEnrollment();
+            State::clearEnrollment(true);
 
             this->logger.infof("Reader registered with ID: %d", readerId);
 
@@ -57,6 +59,14 @@ void API::sendRegistrationRequest()
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["enrollment"]["protocol"] = 1;
+#ifndef HAS_LVGL_DISPLAY
+    // Without a screen the admin matches the colour pattern on the LED ring instead of reading a code.
+    payload["enrollment"]["hasScreen"] = false;
+#endif
+    JsonObject firmware = payload["firmware"].to<JsonObject>();
+    firmware["name"] = FIRMWARE_NAME;
+    firmware["variant"] = FIRMWARE_VARIANT;
+    firmware["version"] = FIRMWARE_VERSION;
     this->sendMessage("READER_REGISTER", payload);
 }
 
@@ -73,6 +83,16 @@ void API::onEnrollmentCode(JsonObject data)
     State::setEnrollmentCode(payload["code"].as<std::string>(),
                              payload["rotatesInMs"] | 30000U,
                              payload["expiresInMs"] | 600000U);
+    // Only readers without a screen get a pattern; null means the server had none left.
+    if (payload.containsKey("pattern"))
+    {
+        std::vector<std::string> colors;
+        for (JsonVariant color : payload["pattern"].as<JsonArray>())
+        {
+            colors.push_back(color.as<std::string>());
+        }
+        State::setEnrollmentPattern(std::move(colors));
+    }
 }
 
 void API::onEnrollmentRejected(JsonObject data)

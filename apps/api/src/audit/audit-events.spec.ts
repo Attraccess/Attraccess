@@ -194,6 +194,30 @@ describe('durable audit SQLite', () => {
     expect((await fixture.service.list({ domain: 'attractap', subjectId: 9, limit: 1 })).items).toHaveLength(0);
   });
 
+  it('records reader enrollment approved by LED pattern and rejects unknown methods', async () => {
+    await fixture.store.setPlainSetting('audit', 'domains', '["attractap"]');
+    const approval = {
+      action: 'reader.enrolled' as const,
+      actorId: 4,
+      authenticationMethod: 'session' as const,
+      subjectId: 12,
+    };
+    await fixture.service.recordAttractap({
+      ...approval,
+      details: { source: 'reader-enrollment', method: 'led-pattern' },
+    });
+    await fixture.service.recordAttractap({
+      ...approval,
+      subjectId: 13,
+      details: { source: 'reader-enrollment', method: 'carrier-pigeon' },
+    });
+
+    const items = (await fixture.service.list({ domain: 'attractap', action: 'attractap.reader.enrolled', limit: 5 }))
+      .items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ subjectId: 12, details: { method: 'led-pattern' } });
+  });
+
   it('persists resource system and device origins, honors suppression, and filters lifecycle actions', async () => {
     await fixture.service.recordResource({
       action: 'health.transition',

@@ -1,0 +1,42 @@
+{
+  "title": "Waiting Lite readers",
+  "description": "Lite readers have no screen. Find the reader in front of you by the colours on its LED ring and approve it.",
+  "columns": {
+    "pattern": "Pattern on the ring",
+    "rotates": "Changes in",
+    "firmware": "Firmware",
+    "waiting": "Waiting",
+    "address": "Address",
+    "actions": "Actions"
+  },
+  "empty": "No Lite readers are waiting for approval.",
+  "rotatesIn": "{{seconds}} s",
+  "colors": {
+    "red": "Red",
+    "green": "Green",
+    "blue": "Blue",
+    "yellow": "Yellow",
+    "magenta": "Magenta",
+    "white": "White"
+  },
+  "approve": "Approve",
+  "dialog": {
+    "title": "Approve this reader?",
+    "warning": "Look at the reader in front of you. Only approve it if the colours on its LED ring match this pattern exactly: {{pattern}}. Approving a different device gives it access to your system.",
+    "nameLabel": "Name (optional)",
+    "submit": "Approve reader",
+    "cancel": "Cancel"
+  },
+  "success": {
+    "title": "Reader approved",
+    "description": "{{{name}}} is now registered and connects on its own.",
+    "openReader": "Open reader",
+    "close": "Done"
+  },
+  "error": {
+    "notFound": "The pattern on the reader changed or the reader is gone. Compare the current pattern in the list and try again.",
+    "tooManyAttempts": "Too many attempts. Wait a minute and try again.",
+    "deliveryFailed": "The reader did not answer. Nothing was created. Check its connection and try again.",
+    "generic": "Something went wrong: {{{error}}}"
+  }
+}

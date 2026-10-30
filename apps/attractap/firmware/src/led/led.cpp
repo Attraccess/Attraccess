@@ -25,6 +25,16 @@ void LedController::setBrightness(uint8_t brightness)
     _strip.setBrightness(_globalBrightness);
 }
 
+void LedController::setEnrollmentPattern(const std::vector<std::string> &colors)
+{
+    LedPattern::Pattern pattern;
+    _hasEnrollmentPattern = LedPattern::parse(colors, pattern);
+    if (_hasEnrollmentPattern)
+    {
+        _enrollmentPattern = pattern;
+    }
+}
+
 void LedController::setState(LedState state)
 {
     if (_trigger != TRIGGER_NONE)
@@ -150,6 +160,27 @@ void LedController::loop()
 
     runAnimation();
     _strip.show();
+}
+
+// Four steady colour segments the admin compares with the list in the web UI. No pattern (none free, or
+// malformed) breathes white, such a reader can only be approved with the web flasher.
+void LedController::runEnrollmentPending()
+{
+    const uint16_t n = _strip.numPixels();
+    if (_hasEnrollmentPattern)
+    {
+        for (uint16_t i = 0; i < n; i++)
+        {
+            const uint32_t rgb = LedPattern::pixelColor(_enrollmentPattern, n, i);
+            _strip.setPixelColor(i, _strip.Color((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb));
+        }
+        return;
+    }
+    uint16_t p = _phase % IDLE_BREATH_CYCLE;
+    uint8_t b = (p < IDLE_BREATH_HALF)
+        ? (IDLE_BRIGHTNESS_MIN + (uint8_t)(IDLE_BRIGHTNESS_RANGE * p / IDLE_BREATH_HALF))
+        : (IDLE_BRIGHTNESS_MAX - (uint8_t)(IDLE_BRIGHTNESS_RANGE * (p - IDLE_BREATH_HALF) / IDLE_BREATH_HALF));
+    setAll(dim(_strip.Color(255, 255, 255), b));
 }
 
 void LedController::runAnimation()
@@ -279,6 +310,10 @@ void LedController::runCircularAnimation()
         break;
     }
 
+    case LED_STATE_ENROLLMENT_PENDING:
+        runEnrollmentPending();
+        break;
+
     case LED_STATE_FIRMWARE_UPDATE:
         break;
     }
@@ -336,6 +371,10 @@ void LedController::runLinearAnimation()
         }
         break;
     }
+
+    case LED_STATE_ENROLLMENT_PENDING:
+        runEnrollmentPending();
+        break;
 
     case LED_STATE_FIRMWARE_UPDATE:
         break;

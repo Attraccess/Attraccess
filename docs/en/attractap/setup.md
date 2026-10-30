@@ -49,7 +49,15 @@ You need the permission to update resources (`resources.update`) to approve a re
 
 ### Readers without a display (Attractap Lite)
 
-A Lite reader has no screen. Use the web flasher (**Setup RFID-Reader**) instead: after the serial setup it shows **Waiting for approval** with the current code and an **Approve** button. The code is also available on the reader's USB serial console (`api.status.get`, field `enrollmentCode`).
+A Lite reader has no screen, so it shows a **colour pattern** on its LED ring instead of a code: four steady colour segments with one dark LED between them. The pattern changes every 30 seconds.
+
+1. Open **Attractap > Readers**. The **Waiting Lite readers** card lists every Lite reader that waits for approval, with the four colours of its pattern (the colour names are written next to the swatches), the time until the pattern changes, its firmware and how long it has been waiting.
+2. Hold the list next to the reader in front of you and find the entry whose colours match the ring. The ring may be turned, so start at any segment and read around the ring in either direction.
+3. Click **Approve**, check the pattern against the ring once more, optionally enter a name and confirm.
+
+The ring flashes green and the reader continues starting up. Only approve a reader you can see: anyone on your network can make a device claim to be a Lite reader, the pattern is what tells you that the device in front of you is the one in the list.
+
+If more readers wait than there are free patterns, the ring breathes white and the reader does not appear in the list. Approve it with the web flasher (**Setup RFID-Reader**) instead: after the serial setup it shows **Waiting for approval** with the current code and an **Approve** button. The code is also available on the reader's USB serial console (`api.status.get`, field `enrollmentCode`). Lite firmware older than 1.8.1 always has to be approved this way.
 
 ### Limits and wrong codes
 

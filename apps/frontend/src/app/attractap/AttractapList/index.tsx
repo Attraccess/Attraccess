@@ -16,6 +16,7 @@ import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
 import { AttractapDeleteModal } from './delete/index';
+import { WaitingLiteReaders } from './WaitingLiteReaders';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -213,6 +214,7 @@ export function AttractapList() {
       />
 
       <div className="flex flex-col gap-4">
+        <WaitingLiteReaders />
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
             <Card.Header>

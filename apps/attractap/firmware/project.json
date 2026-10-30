@@ -75,6 +75,9 @@
           "cmake -S apps/attractap/firmware/tests/ota -B apps/attractap/firmware/tests/ota/build",
           "cmake --build apps/attractap/firmware/tests/ota/build",
           "ctest --test-dir apps/attractap/firmware/tests/ota/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/led-pattern -B apps/attractap/firmware/tests/led-pattern/build",
+          "cmake --build apps/attractap/firmware/tests/led-pattern/build",
+          "ctest --test-dir apps/attractap/firmware/tests/led-pattern/build --output-on-failure",
           "node --test apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
         ],
         "parallel": false,
