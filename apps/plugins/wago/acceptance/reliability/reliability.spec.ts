@@ -85,7 +85,7 @@ type Host = {
   flow: WagoFlowService;
   rotation: WagoCredentialRotationService;
   execute: (config: Record<string, unknown>, id: string) => Promise<void>;
-  diagnostics: (controllerId: number) => { outputs: Record<string, { value: boolean }>; activeStream?: string };
+  diagnostics: (controllerId: number) => { outputs: Record<string, { value: boolean; sourceAt: string | null }>; activeStream?: string };
   destroy: () => void;
 };
 

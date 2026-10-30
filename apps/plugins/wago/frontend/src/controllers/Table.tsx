@@ -20,6 +20,7 @@ import { useState } from 'react';
 import type { CommissioningSession, RuntimeUpdateStatus, WagoCommissioningState, WagoController } from '../api/client';
 import en from '../en.json';
 import { useWagoTranslations } from '../i18n';
+import { ControllerDropCounts } from '../diagnostics/DropCounts';
 import { NetworkChangeDetails } from '../runtime/NetworkChangeDetails';
 import { RuntimeUpdateDetails } from '../runtime/RuntimeUpdateDetails';
 import { RuntimeUpdateSummary } from '../runtime/RuntimeUpdateSummary';
@@ -359,6 +360,7 @@ export function ControllerDetailsDrawer({
             </div>
           )}
         </dl>
+        {controller?.trustState === 'claimed' && <ControllerDropCounts controllerId={controller.id} />}
         {session && (
           <CommissioningStatus session={session} runtimeUpdate={controller?.connectivity === 'runtime_update'} />
         )}
