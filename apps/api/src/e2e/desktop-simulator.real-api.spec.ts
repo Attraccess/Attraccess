@@ -25,6 +25,8 @@ import { WebsocketService } from '../attractap/websockets/websocket.service';
 import { AttractapEventType, AuthenticatedWebSocket } from '../attractap/websockets/websocket.types';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { SupervisionService } from '../resources/supervision/supervision.service';
+import { RbacService } from '../users-and-auth/rbac/rbac.service';
+import { EnrollmentLimitsService } from '../device-enrollment/enrollment-limits.service';
 import { bootstrap } from '../main.bootstrap';
 import { existsSync, readFileSync, realpathSync } from 'fs';
 import { join, relative, isAbsolute } from 'path';
@@ -88,11 +90,57 @@ describe('desktop simulator against an isolated real API', () => {
     return fixture;
   }
 
+  let pairingAdmin: User | undefined;
+
+  /** Approves the code a new reader shows, exactly as an admin does: resolve, then approve. */
+  async function approvePairing(code: string): Promise<boolean> {
+    if (!pairingAdmin) {
+      pairingAdmin = await db.getRepository(User).save({
+        username: 'desktop-pairing-admin',
+        email: 'desktop-pairing-admin@example.invalid',
+        isEmailVerified: true,
+        locale: 'de',
+      });
+      // Approving needs exactly resources.update.
+      const rbac = api().get(RbacService);
+      const granted = new Set(['resources.update']);
+      const role = await rbac.createRole({ name: 'Desktop reader pairing', permissionKeys: [...granted] }, granted);
+      await rbac.assignRole(pairingAdmin.id, role.id, granted);
+    }
+    const token = await api().get(SessionService).createSession(pairingAdmin);
+    desktop().diagnostics.remember(token);
+    desktop().diagnostics.remember(code);
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const resolved = await fetch(`${endpoint}${prefix}/attractap/pairings/resolve`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ code }),
+    });
+    // 404/409: the code already rotated or is ambiguous; the next code is tried.
+    if (!resolved.ok) return false;
+    const pairing = (await resolved.json()) as { id: string; kind: string; state: string };
+    expect(pairing.kind).toBe('touch');
+    expect(pairing.state).toBe('waiting');
+    const approved = await fetch(`${endpoint}${prefix}/attractap/pairings/${pairing.id}/approve`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ code, mode: 'new', name: 'Desktop simulator' }),
+    });
+    return approved.ok;
+  }
+
   async function start(scenario: string, pin = '1234') {
-    fixture = new DesktopFixture(endpoint, scenario);
+    // Every scenario pairs a new reader from 127.0.0.1; the suite needs more than the 10 pairing
+    // attempts one address may make in 10 minutes. Each scenario starts with fresh counters, as a
+    // separate site would (the limits themselves are covered by enrollment-limits.service.spec.ts).
+    Object.assign(api().get(EnrollmentLimitsService), new EnrollmentLimitsService());
+    fixture = new DesktopFixture(endpoint, scenario, approvePairing);
     await fixture.start();
     const observed = await fixture.command('inspect');
     expect(observed.authenticated).toBe(true);
+    // Paired through one approval; everything after runs inside the TLS 1.3 session.
+    expect(observed.paired).toBe(true);
+    expect(observed.secureSession).toBe(true);
     expect(observed.networkAvailable).toBe(true);
     expect(observed.devicePin).toBe('0000');
     await fixture.screen('set-pin');
@@ -207,7 +255,7 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().remove(card);
   }
 
-  it('registers the exact reader, observes ACKs on both connections and preserves its profile', async () => {
+  it('pairs the reader with one approval, observes ACKs on both sessions and preserves its identity', async () => {
     const original = await start('registration-reconnect', '7391');
     const user1 = await user('reader');
     await enroll(user1);
@@ -242,6 +290,42 @@ describe('desktop simulator against an isolated real API', () => {
     for (const line of diagnostics.trim().split('\n')) expect(JSON.parse(line)).not.toHaveProperty('devicePin');
     expect(diagnostics).not.toContain('7391');
   }, 90_000);
+
+  it('removing the pairing ends the session, and the reader pairs again with a new key', async () => {
+    await start('pairing-removed');
+    const removed = reader;
+    const readers = await db.getRepository(Attractap).count();
+    expect((await request(pairingAdmin as User, `/attractap/readers/${removed.id}/revoke`, {})).ok).toBe(true);
+    // The server says so inside the authenticated session; the reader starts over on its own
+    // (after its reconnect back-off).
+    await waitFor(
+      async () => (await desktop().command('inspect')).screen === 'pending-approval',
+      'pairing removed screen',
+      45_000,
+    );
+    await desktop().text('Kopplung entfernt');
+    await desktop().snapshot('pairing-removed');
+    expect((await desktop().command('inspect')).paired).toBe(false);
+
+    let code = '';
+    await waitFor(
+      async () => {
+        code = await desktop().pendingCode(code);
+        return approvePairing(code);
+      },
+      'approval of the new request',
+      60_000,
+    );
+    await waitFor(async () => {
+      const observed = await desktop().command('inspect');
+      return observed.paired && observed.secureSession && observed.authenticated;
+    }, 'second pairing');
+    const repaired = await desktop().command('inspect');
+    // A new key and a new record ("new" mode); the removed record stays revoked.
+    expect(repaired.readerId).not.toBe(removed.id);
+    expect(await db.getRepository(Attractap).count()).toBe(readers + 1);
+    expect((await db.getRepository(Attractap).findOneByOrFail({ id: removed.id })).pairingState).not.toBe('paired');
+  }, 120_000);
 
   it('enrolls cards, rejects unknown and incorrect keys, and recovers from write failure and removal', async () => {
     await start('cards');
