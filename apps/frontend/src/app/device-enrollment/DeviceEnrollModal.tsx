@@ -103,8 +103,10 @@ export function DeviceEnrollModal({ canEnroll }: Readonly<Props>) {
     <StandardModal
       isOpen
       onOpenChange={(next) => {
-        if (!next) close();
+        // Stay open while approving, so a failure is never lost behind a closed dialog.
+        if (!next && !isPending) close();
       }}
+      backdropProps={{ isDismissable: !isPending, isKeyboardDismissDisabled: isPending }}
       size="md"
       data-cy="device-enroll"
     >

@@ -118,6 +118,16 @@ describe('DeviceEnrollModal', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['AttractapServiceGetReaders'] });
   });
 
+  it('cannot be dismissed with Escape while an approval is in flight', async () => {
+    state.isPending = true;
+    const user = userEvent.setup();
+    mount();
+    await openDialog('K7P-3XQ');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog', { name: 'Enroll device' })).toBeInTheDocument();
+    expect(useDeviceEnrollmentStore.getState().isOpen).toBe(true);
+  });
+
   it('submits with Enter', async () => {
     state.results = [approved];
     const user = userEvent.setup();

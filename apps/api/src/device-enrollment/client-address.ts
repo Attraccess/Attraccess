@@ -25,7 +25,8 @@ export function compileTrust(setting: TrustProxySetting): TrustFn {
   const list = new BlockList();
   for (const token of setting.split(',')) {
     const entry = token.trim();
-    const subnets = PRESETS[entry.toLowerCase()] ?? [entry];
+    // Preset names are case-sensitive in Express (proxy-addr); match it exactly.
+    const subnets = Object.hasOwn(PRESETS, entry) ? PRESETS[entry] : [entry];
     for (const subnet of subnets) {
       const [address, prefix] = subnet.split('/');
       const family = isIP(address);

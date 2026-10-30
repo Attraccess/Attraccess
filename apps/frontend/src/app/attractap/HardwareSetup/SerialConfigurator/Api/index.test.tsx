@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttractapSerialConfiguratorApi } from './index';
@@ -203,6 +203,27 @@ describe('AttractapSerialConfiguratorApi', () => {
     await act(async () => answer(pending));
     await advance(3000);
     expect(refreshApiStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps what the user types in the manual form while the status is polled', async () => {
+    vi.useFakeTimers();
+    const stuck: ApiStatusData = { ...disconnected, status: 'connecting_websocket' };
+    reader.apiStatus = stuck;
+    refreshApiStatus.mockImplementation(async () => {
+      // Every poll yields a new object with the same values, like the provider.
+      reader.set({ ...stuck });
+      return reader.apiStatus;
+    });
+    renderApi();
+
+    act(() => fireEvent.click(screen.getByText('Manual server settings')));
+    const hostname = screen.getByLabelText('Hostname');
+    expect(hostname).toHaveValue('old.example.com');
+    act(() => fireEvent.change(hostname, { target: { value: 'typed.example.com' } }));
+
+    await advance(9000);
+    expect(refreshApiStatus).toHaveBeenCalled();
+    expect(screen.getByLabelText('Hostname')).toHaveValue('typed.example.com');
   });
 
   it('keeps polling after a failed poll', async () => {

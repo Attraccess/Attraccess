@@ -25,6 +25,11 @@ describe('resolveClientAddress', () => {
     expect(resolveClientAddress(request('8.8.8.8', '1.2.3.4'), 'uniquelocal')).toBe('8.8.8.8');
   });
 
+  it('matches preset names case-sensitively, like Express', () => {
+    expect(resolveClientAddress(request('127.0.0.1', '1.2.3.4'), 'loopback')).toBe('1.2.3.4');
+    expect(resolveClientAddress(request('127.0.0.1', '1.2.3.4'), 'Loopback')).toBe('127.0.0.1');
+  });
+
   it('does not let a spoofed header past an untrusted peer', () => {
     expect(resolveClientAddress(request('8.8.8.8', '6.6.6.6'), 'loopback')).toBe('8.8.8.8');
   });

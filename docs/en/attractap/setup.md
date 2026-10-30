@@ -59,7 +59,7 @@ A Lite reader has no screen. Use the web flasher (**Setup RFID-Reader**) instead
 - Pending requests are kept in memory only. A restart of Attraccess forgets them and waiting readers simply show a new code.
 
 > [!IMPORTANT]
-> **Behind a reverse proxy, set `TRUST_PROXY`.** Attraccess limits how many enrollment requests a single network address can make (10 attempts per 10 minutes and 20 waiting readers at the same time). Without `TRUST_PROXY` every reader appears to come from the proxy and shares one limit. See [Security](settings/security.md#reverse-proxies-and-the-real-client-ip).
+> **Behind a reverse proxy, set `TRUST_PROXY`.** Attraccess limits how many enrollment requests a single network address can make (10 attempts per 10 minutes and 20 waiting readers at the same time). Without `TRUST_PROXY` every reader appears to come from the proxy and shares one limit. Readers that connect over IPv6 count per /64 network, so all readers on one IPv6 network share these limits. See [Security](settings/security.md#reverse-proxies-and-the-real-client-ip).
 
 > [!NOTE]
 > **Several Attraccess servers:** pending requests live on the server that holds the reader's connection. Approve the reader on that same server (for example by opening it directly or by pinning your load balancer), otherwise the code is reported as unknown.

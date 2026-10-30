@@ -59,7 +59,7 @@ Ein Lite-Leser hat keinen Bildschirm. Nutzen Sie stattdessen den Web-Flasher (**
 - Wartende Anfragen liegen nur im Arbeitsspeicher. Ein Neustart von Attraccess vergisst sie, wartende Leser zeigen einfach einen neuen Code.
 
 > [!IMPORTANT]
-> **Hinter einem Reverse Proxy muss `TRUST_PROXY` gesetzt sein.** Attraccess begrenzt, wie viele Einrichtungsanfragen eine Netzwerkadresse stellen darf (10 Versuche in 10 Minuten und 20 gleichzeitig wartende Leser). Ohne `TRUST_PROXY` scheinen alle Leser vom Proxy zu kommen und teilen sich ein Limit. Siehe [Sicherheit](settings/security.md#reverse-proxies-und-die-echte-client-ip).
+> **Hinter einem Reverse Proxy muss `TRUST_PROXY` gesetzt sein.** Attraccess begrenzt, wie viele Einrichtungsanfragen eine Netzwerkadresse stellen darf (10 Versuche in 10 Minuten und 20 gleichzeitig wartende Leser). Ohne `TRUST_PROXY` scheinen alle Leser vom Proxy zu kommen und teilen sich ein Limit. Leser, die sich ueber IPv6 verbinden, zaehlen pro /64-Netz, teilen sich in einem IPv6-Netz also diese Limits. Siehe [Sicherheit](settings/security.md#reverse-proxies-und-die-echte-client-ip).
 
 > [!NOTE]
 > **Mehrere Attraccess-Server:** Wartende Anfragen liegen auf dem Server, der die Verbindung des Lesers haelt. Geben Sie den Leser auf genau diesem Server frei (z.B. indem Sie ihn direkt aufrufen oder den Load Balancer festlegen), sonst wird der Code als unbekannt gemeldet.

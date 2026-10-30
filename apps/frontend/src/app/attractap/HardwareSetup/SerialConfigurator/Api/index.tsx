@@ -106,15 +106,19 @@ export function useAttractapSerialConfiguratorApiState({
   const [manualPort, setManualPort] = useState(String(apiConnectionData.port));
   const [manualUseSSL, setManualUseSSL] = useState(apiConnectionData.useSSL);
 
-  // Seed the manual form with the reader's current values once they are known.
+  // Seed the manual form with the reader's current values once they are known. Keyed on the values,
+  // not the status object: status polling must not overwrite what the user is typing.
+  const statusHostname = status?.hostname;
+  const statusPort = status?.port;
+  const statusUseSSL = status?.useSSL;
   useEffect(() => {
-    if (!status) {
+    if (statusHostname === undefined || statusPort === undefined || statusUseSSL === undefined) {
       return;
     }
-    setManualHostname(status.hostname);
-    setManualPort(String(status.port));
-    setManualUseSSL(status.useSSL);
-  }, [status]);
+    setManualHostname(statusHostname);
+    setManualPort(String(statusPort));
+    setManualUseSSL(statusUseSSL);
+  }, [statusHostname, statusPort, statusUseSSL]);
 
   const apiDataMatchesServer = useMemo(() => {
     if (!status) {

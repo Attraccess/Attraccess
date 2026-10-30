@@ -610,7 +610,8 @@ describe('desktop simulator against an isolated real API', () => {
       })(),
     ).rejects.toThrow();
     expect(existsSync(ownedRoot)).toBe(false);
-  }, 30_000);
+    // The failed start may use its full 15 s, then a fresh reader still needs approval.
+  }, 45_000);
 
   it('rejects malformed commands, unsafe captures, invalid indices and bounded waits without stopping', async () => {
     await start('control-failures');
