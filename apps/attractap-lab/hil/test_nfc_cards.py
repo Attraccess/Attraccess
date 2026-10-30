@@ -15,6 +15,7 @@ from attractap_lab.reader_screen import ReaderCommandError, find
 # tap "Sign out"; only test_session_times_out waits for the 30 s timeout.
 SESSION_TIMEOUT_SECONDS = 30
 SIGN_OUT = ("Sign out", "Abmelden")
+IDLE_SCREEN = "ResourceListScreen"
 
 
 def present(emulator, profile):
@@ -86,7 +87,24 @@ def sign_out(hooks, timeout=10):
         time.sleep(0.3)
 
 
-def authenticate(reader, emulator, profile, expect, timeout=25):
+def wait_idle(hooks, timeout=20):
+    """Wait for the signed-out resource list.
+
+    The reader ignores a card that arrives on another screen (e.g. the
+    session summary) until it leaves the field.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        listing = hooks.widgets()
+        signed = any(widget["text"] in SIGN_OUT for widget in listing["widgets"])
+        if listing["screen"] == IDLE_SCREEN and not signed:
+            return
+        assert time.monotonic() < deadline, f"reader not idle, still on {listing['screen']}"
+        time.sleep(0.3)
+
+
+def authenticate(reader, emulator, hooks, profile, expect, timeout=25):
+    wait_idle(hooks)
     console = reader["console"]
     mark = console.mark()
     try:
@@ -101,7 +119,7 @@ def login(reader, emulator, hooks, profile="alice"):
     dismiss_popup(hooks)
     if signed_in(hooks):
         sign_out(hooks)
-    authenticate(reader, emulator, profile, "Authentication successful")
+    authenticate(reader, emulator, hooks, profile, "Authentication successful")
     deadline = time.monotonic() + 10
     while not signed_in(hooks):
         assert time.monotonic() < deadline, f"no session on screen {hooks.screen()} after login"
@@ -211,49 +229,50 @@ def wait_for_usage(api, admin, resource_id, done, timeout=20):
         time.sleep(0.5)
 
 
-def test_wrong_key_is_rejected(reader, resource, emulator, state):
+def test_wrong_key_is_rejected(reader, resource, emulator, state, hooks):
     requires(state, "alice-card")
     emulator.command("scenario", {"name": "wrong-key"})
     try:
-        authenticate(reader, emulator, "alice", "Authentication failed")
+        authenticate(reader, emulator, hooks, "alice", "Authentication failed")
     finally:
         emulator.command("behavior.clear")
         time.sleep(8)
 
 
-def test_unknown_uid_is_rejected(reader, resource, emulator):
+def test_unknown_uid_is_rejected(reader, resource, emulator, hooks):
     emulator.command("scenario", {"name": "unknown-uid"})
     try:
-        authenticate(reader, emulator, "alice", "CARD_NOT_FOUND")
+        authenticate(reader, emulator, hooks, "alice", "CARD_NOT_FOUND")
     finally:
         emulator.command("behavior.clear")
         time.sleep(8)
 
 
-def test_deactivated_card_is_rejected(api, admin, reader, resource, emulator, state):
+def test_deactivated_card_is_rejected(api, admin, reader, resource, emulator, state, hooks):
     requires(state, "alice-card")
     card = state["alice-card"]
     status, body = api.call("PATCH", f"/attractap/cards/{card}/active", {"active": False}, token=admin)
     assert status == 200, body
     try:
-        authenticate(reader, emulator, "alice", "CARD_NOT_ACTIVE")
+        authenticate(reader, emulator, hooks, "alice", "CARD_NOT_ACTIVE")
     finally:
         api.call("PATCH", f"/attractap/cards/{card}/active", {"active": True}, token=admin)
         time.sleep(8)
 
 
-def test_authentication_timeout_fails(reader, resource, emulator, state):
+def test_authentication_timeout_fails(reader, resource, emulator, state, hooks):
     requires(state, "alice-card")
     emulator.command("fault.set", {"instruction": 0x71, "outcome": "timeout", "count": 1})
     try:
-        authenticate(reader, emulator, "alice", "authenticate failed|Authentication failed")
+        authenticate(reader, emulator, hooks, "alice", "authenticate failed|Authentication failed")
     finally:
         emulator.command("behavior.clear")
         time.sleep(8)
 
 
-def test_removal_during_authentication(reader, resource, emulator, state):
+def test_removal_during_authentication(reader, resource, emulator, state, hooks):
     requires(state, "alice-card")
+    wait_idle(hooks)
     console = reader["console"]
     mark = console.mark()
     try:
@@ -286,6 +305,11 @@ def test_login_still_works_after_faults(reader, resource, emulator, state, hooks
 
 
 def test_reset_card_to_factory_keys(api, admin, reader, resource, emulator, users, state, screenshot):
+    """Reset still finishes when the reader loses the confirmation of its key change.
+
+    The card leaves right after answering ChangeKey, so the reader cannot check
+    the new key and has to recognise the finished change when the card returns.
+    """
     requires(state, "alice-card")
     console = reader["console"]
     card = state.pop("alice-card")
@@ -295,12 +319,31 @@ def test_reset_card_to_factory_keys(api, admin, reader, resource, emulator, user
     assert status in (200, 201), body
     console.expect(r"Received reset nfc card", mark, 15)
     try:
+        # A garbled radio exchange can end an attempt before ChangeKey, so give
+        # it a few short presentations: the reader's reset screen closes 30 s
+        # after the request.
+        for attempt in range(3):
+            emulator.command("removal.set", {"afterInstruction": 0xC4})
+            present(emulator, "alice")
+            deadline = time.monotonic() + 6
+            while emulator.command("status")["presentRequested"] and time.monotonic() < deadline:
+                time.sleep(0.2)
+            emulator.command("remove")
+            emulator.command("behavior.clear")
+            keys = emulator.command("profiles.get", {"id": "alice"})["keys"]
+            if all(key["version"] == 0 for key in keys):
+                break
+            time.sleep(2)
+        else:
+            pytest.fail("the reader never got ChangeKey through to the card")
+        time.sleep(2)
         present(emulator, "alice")
-        console.expect(r"changeKey successful", mark, 30)
+        console.expect(r"changeKey successful, the card already had the new key", mark, 15)
         console.expect(r"Reset nfc card payload does not contain key material", mark, 15)
         screenshot("reset")
     finally:
         emulator.command("remove")
+        emulator.command("behavior.clear")
     status, cards = api.call("GET", f"/attractap/cards?userId={users['alice']}", token=admin)
     assert all(entry["id"] != card for entry in cards), cards
     keys = emulator.command("profiles.get", {"id": "alice"})["keys"]
