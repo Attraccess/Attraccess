@@ -1,23 +1,17 @@
 import { FrontPanelStatusAlerts } from './working-copy/StatusAlerts';
 // Combines controller configuration and live controls on one responsive page.
 // FEATURE: WAGO front panel exposes physical terminals and device settings.
-import {
-  AlertStatusIcon,
-  Button,
-  PageHeader,
-  StatusAlert,
-  TableDataLoadingIndicator,
-} from '@attraccess/plugins-frontend-ui';
-import { Alert } from '@heroui/react';
-import { ArrowLeft, History, Plus } from 'lucide-react';
+import { Button, PageHeader, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
+import { ArrowLeft, History } from 'lucide-react';
 import { OnboardCard } from './controls/Cards';
 import { DeviceSettings } from './settings/DeviceSettings';
 import { BusSettings, TerminalSettings } from './settings/SettingsDrawer';
-import { addDevice, channelEnabledSupport, type Terminal, type PanelConfiguration } from './model';
+import { channelEnabledSupport, type Terminal, type PanelConfiguration } from './model';
 import { useFrontPanelState } from './working-copy/useFrontPanelState';
 import { FrontPanelModalBackdrop } from './working-copy/ModalBackdrop';
 import { FrontPanelPanelDevices } from './controls/Devices';
 import { FrontPanelLeaveDialog } from './working-copy/LeaveDialog';
+import { AddDeviceButton, ManualOverrideAlert, UnappliedChangesAlert } from './working-copy/ChangeAlerts';
 
 export type Selection =
   | { kind: 'terminal'; terminal: Terminal }
@@ -35,8 +29,6 @@ export function FrontPanel({
 }) {
   const model = useFrontPanelState({ controllerId, onClose, onHistory });
   const support = channelEnabledSupport(model.panel.diagnostics);
-  // A new meter's readings depend on the runtime, so wait until diagnostics report its capabilities.
-  const supportKnown = support === 'supported' || support === 'unsupported';
   const flowChannelIds = new Set(
     (model.panel.diagnostics.data?.references ?? []).map((reference) => reference.channelId),
   );
@@ -64,31 +56,7 @@ export function FrontPanel({
         />
       </header>
       <FrontPanelStatusAlerts model={model} />
-      {model.panel.ready && model.panel.dirty && (
-        <Alert status="warning" className="wg:flex-col wg:items-stretch wg:sm:flex-row wg:sm:items-start">
-          <AlertStatusIcon status="warning" />
-          <Alert.Content>
-            <Alert.Title>{model.t('panel.unapplied')}</Alert.Title>
-            <Alert.Description>{model.t('panel.unappliedHint')}</Alert.Description>
-          </Alert.Content>
-          <div className="wg:flex wg:flex-wrap wg:gap-2">
-            <Button
-              variant="secondary"
-              isDisabled={model.panel.busy || model.panel.pending}
-              onPress={() => void model.panel.discard()}
-            >
-              {model.t('panel.discard')}
-            </Button>
-            <Button
-              isDisabled={model.panel.busy || model.panel.pending || model.panel.conflict}
-              isPending={model.panel.busy}
-              onPress={model.panel.apply}
-            >
-              {model.t('panel.apply')}
-            </Button>
-          </div>
-        </Alert>
-      )}
+      <UnappliedChangesAlert model={model} />
       {model.panel.conflict && (
         <StatusAlert status="warning" title={model.t('panel.conflict')}>
           {model.t('panel.conflictHint')}
@@ -102,22 +70,7 @@ export function FrontPanel({
             .join(', ')}
         </StatusAlert>
       )}
-      {model.manualCount > 0 && (
-        <Alert status="warning" className="wg:flex-col wg:items-stretch wg:sm:flex-row wg:sm:items-start">
-          <AlertStatusIcon status="warning" />
-          <Alert.Content>
-            <Alert.Title>{model.t('panel.manualActive', { count: model.manualCount })}</Alert.Title>
-            <Alert.Description>{model.t('panel.manualHint')}</Alert.Description>
-          </Alert.Content>
-          <Button
-            variant="secondary"
-            isDisabled={model.panel.busy || !model.panel.live.enabled}
-            onPress={model.panel.release}
-          >
-            {model.t('panel.release')}
-          </Button>
-        </Alert>
-      )}
+      <ManualOverrideAlert model={model} />
       {model.panel.ready && !model.panel.live.enabled && (
         <p role="status" className="wg:text-sm wg:text-muted">
           {model.t('panel.liveUnavailable')}
@@ -134,28 +87,7 @@ export function FrontPanel({
             editTerminal={(terminal) => model.setSelection({ kind: 'terminal', terminal })}
           />
           <FrontPanelPanelDevices {...model} />
-          <div className="wg:flex wg:flex-col wg:items-start wg:gap-1">
-            <Button
-              variant="outline"
-              aria-describedby={supportKnown ? undefined : 'wago-add-device-hint'}
-              isDisabled={model.panel.busy || model.panel.pending || !supportKnown}
-              onPress={() => {
-                if (!model.panel.configuration) return;
-                const added = addDevice(model.panel.configuration, model.t('panel.newDevice'), {
-                  disabledChannels: support === 'supported',
-                });
-                model.setSelection({ kind: 'device', id: added.id, provisional: added.configuration });
-              }}
-            >
-              <Plus className="wg:size-4" />
-              {model.t('panel.addDevice')}
-            </Button>
-            {!supportKnown && (
-              <p id="wago-add-device-hint" role="status" className="wg:text-sm wg:text-muted">
-                {model.t(support === 'checking' ? 'panel.readings.checkingAdd' : 'panel.readings.unknownAdd')}
-              </p>
-            )}
-          </div>
+          <AddDeviceButton model={model} support={support} />
           {model.selection?.kind === 'terminal' && (
             <TerminalSettings
               key={model.selection.terminal.label}
