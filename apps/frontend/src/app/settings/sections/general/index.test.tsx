@@ -3,17 +3,22 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  useSettingsServiceGetResourceVisibilitySettings,
   useSettingsServiceGetSystemSettings,
+  useSettingsServiceUpdateResourceVisibilitySettings,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { GeneralSection } from './index';
 
-vi.mock('./ResourceVisibilitySetting', () => ({ ResourceVisibilitySetting: () => null }));
 vi.mock('@attraccess/react-query-client', () => ({
+  ResourceActivityVisibility: { ALL: 'all', INTRODUCED: 'introduced' },
   useSettingsServiceGetSystemSettings: vi.fn(),
   UseSettingsServiceGetSystemSettingsKeyFn: () => ['settings'],
   UseSettingsServiceGetSystemLanguageKeyFn: () => ['system-language'],
   useSettingsServiceUpdateSystemSettings: vi.fn(),
+  useSettingsServiceGetResourceVisibilitySettings: vi.fn(),
+  UseSettingsServiceGetResourceVisibilitySettingsKeyFn: () => ['visibility'],
+  useSettingsServiceUpdateResourceVisibilitySettings: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -21,12 +26,15 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
     useTranslations: () => ({ t: (key: string) => key, tExists: () => false }),
   }))()),
 }));
-const { setQueryData } = vi.hoisted(() => ({ setQueryData: vi.fn() }));
+const { setQueryData, toast } = vi.hoisted(() => ({
+  setQueryData: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn(), apiError: vi.fn() },
+}));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData }),
 }));
 vi.mock('../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: vi.fn(), error: vi.fn(), apiError: vi.fn() }),
+  useToastMessage: () => toast,
 }));
 vi.mock('../../../../components/CommunityLicenseButton', () => ({
   CommunityLicenseButton: ({ isDisabled }: { isDisabled: boolean }) => (
@@ -37,18 +45,38 @@ vi.mock('../../../../components/CommunityLicenseButton', () => ({
 }));
 
 const saveSettings = vi.fn();
+const saveVisibility = vi.fn();
+
+function mockVisibility(state: { data?: { activityVisibility: string }; isLoading?: boolean; isError?: boolean }) {
+  vi.mocked(useSettingsServiceGetResourceVisibilitySettings).mockReturnValue({
+    isLoading: false,
+    isError: false,
+    ...state,
+  } as ReturnType<typeof useSettingsServiceGetResourceVisibilitySettings>);
+}
+
+function mockSaves() {
+  saveSettings.mockResolvedValue({});
+  saveVisibility.mockResolvedValue({});
+  vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+    data: { app: { url: 'https://example.org', publicInternetUrl: '' } },
+    isLoading: false,
+  } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+  vi.mocked(useSettingsServiceUpdateSystemSettings).mockReturnValue({
+    mutateAsync: saveSettings,
+    isPending: false,
+  } as unknown as ReturnType<typeof useSettingsServiceUpdateSystemSettings>);
+  vi.mocked(useSettingsServiceUpdateResourceVisibilitySettings).mockReturnValue({
+    mutateAsync: saveVisibility,
+    isPending: false,
+  } as unknown as ReturnType<typeof useSettingsServiceUpdateResourceVisibilitySettings>);
+  mockVisibility({ data: { activityVisibility: 'all' } });
+}
 
 describe('GeneralSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
-      data: { app: { url: 'https://example.org', publicInternetUrl: '' } },
-      isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
-    vi.mocked(useSettingsServiceUpdateSystemSettings).mockReturnValue({
-      mutate: saveSettings,
-      isPending: false,
-    } as unknown as ReturnType<typeof useSettingsServiceUpdateSystemSettings>);
+    mockSaves();
   });
 
   const urlField = () => screen.getByLabelText('inputs.url.label');
@@ -89,12 +117,17 @@ describe('GeneralSection', () => {
   it('prevents edits during a pending save and preserves the draft after failure', async () => {
     let pending = false;
     let fail: (() => void) | undefined;
-    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation((options) => {
-      fail = () => options?.onError?.(new Error('failed'), {} as never, undefined as never, {} as never);
-      return { mutate: saveSettings, isPending: pending } as unknown as ReturnType<
-        typeof useSettingsServiceUpdateSystemSettings
-      >;
-    });
+    saveSettings.mockReturnValue(
+      new Promise((_, reject) => {
+        fail = () => reject(new Error('failed'));
+      }),
+    );
+    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation(
+      () =>
+        ({ mutateAsync: saveSettings, isPending: pending }) as unknown as ReturnType<
+          typeof useSettingsServiceUpdateSystemSettings
+        >,
+    );
     const view = render(<GeneralSection />);
     await userEvent.type(urlField(), '/submitted');
     await userEvent.type(screen.getByLabelText('inputs.licenseKey.label'), 'submitted-license');
@@ -106,10 +139,13 @@ describe('GeneralSection', () => {
       await userEvent.type(screen.getByLabelText(name), 'unsaved');
     }
     expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /inputs.activityVisibility.label$/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'community license' })).toBeDisabled();
     expect(urlField()).toHaveValue('https://example.org/submitted');
     expect(screen.getByLabelText('inputs.licenseKey.label')).toHaveValue('submitted-license');
-    act(() => fail?.());
+    await act(async () => fail?.());
+    expect(toast.apiError).toHaveBeenCalledWith(expect.objectContaining({ error: new Error('failed') }));
+    expect(toast.success).not.toHaveBeenCalled();
     pending = false;
     view.rerender(<GeneralSection />);
     expect(urlField()).toBeEnabled();
@@ -249,7 +285,7 @@ describe('GeneralSection', () => {
     vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation(
       (options?: { onSuccess?: (data: unknown) => void }) => {
         onSuccess = options?.onSuccess;
-        return { mutate: saveSettings, isPending: false } as unknown as ReturnType<
+        return { mutateAsync: saveSettings, isPending: false } as unknown as ReturnType<
           typeof useSettingsServiceUpdateSystemSettings
         >;
       },
@@ -285,14 +321,7 @@ describe('GeneralSection', () => {
 describe('GeneralSection — Enter key', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
-      data: { app: { url: 'https://example.org', publicInternetUrl: '' } },
-      isLoading: false,
-    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
-    vi.mocked(useSettingsServiceUpdateSystemSettings).mockReturnValue({
-      mutate: saveSettings,
-      isPending: false,
-    } as unknown as ReturnType<typeof useSettingsServiceUpdateSystemSettings>);
+    mockSaves();
   });
 
   it('reports an invalid URL rather than silently doing nothing', async () => {
@@ -322,5 +351,112 @@ describe('GeneralSection — Enter key', () => {
         },
       },
     });
+  });
+});
+
+describe('GeneralSection — activity visibility', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSaves();
+  });
+
+  const visibilitySelect = () => screen.getByRole('button', { name: /inputs.activityVisibility.label$/ });
+  const chooseIntroduced = async () => {
+    await userEvent.click(visibilitySelect());
+    await userEvent.click(await screen.findByRole('option', { name: 'inputs.activityVisibility.introduced' }));
+  };
+  const saveBar = (container: HTMLElement) => container.querySelector('[data-slot="settings-save-bar"]');
+
+  it('keeps a change in the draft and saves only the visibility when only it changed', async () => {
+    const { container } = render(<GeneralSection />);
+    expect(screen.getByText('inputs.activityVisibility.description')).toBeInTheDocument();
+
+    await chooseIntroduced();
+    expect(saveVisibility).not.toHaveBeenCalled();
+    expect(saveBar(container)).toBeInTheDocument();
+    // The hint follows the selected, not yet saved, value.
+    expect(screen.getByText('inputs.activityVisibility.introducedHint')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(saveVisibility).toHaveBeenCalledWith({ requestBody: { activityVisibility: 'introduced' } });
+    expect(saveSettings).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledOnce();
+  });
+
+  it('discards an unsaved visibility change', async () => {
+    const { container } = render(<GeneralSection />);
+    await chooseIntroduced();
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.discard' }));
+    expect(saveBar(container)).toBeNull();
+    expect(screen.getByText('inputs.activityVisibility.description')).toBeInTheDocument();
+  });
+
+  it('saves both stores with one success toast and primes both caches', async () => {
+    const options: { settings?: (data: unknown) => void; visibility?: (data: unknown) => void } = {};
+    vi.mocked(useSettingsServiceUpdateSystemSettings).mockImplementation((hookOptions) => {
+      options.settings = hookOptions?.onSuccess as (data: unknown) => void;
+      return { mutateAsync: saveSettings, isPending: false } as unknown as ReturnType<
+        typeof useSettingsServiceUpdateSystemSettings
+      >;
+    });
+    vi.mocked(useSettingsServiceUpdateResourceVisibilitySettings).mockImplementation((hookOptions) => {
+      options.visibility = hookOptions?.onSuccess as (data: unknown) => void;
+      return { mutateAsync: saveVisibility, isPending: false } as unknown as ReturnType<
+        typeof useSettingsServiceUpdateResourceVisibilitySettings
+      >;
+    });
+    const savedSettings = { app: { url: 'https://example.org/app', publicInternetUrl: '' } };
+    const savedVisibility = { activityVisibility: 'introduced' };
+    saveSettings.mockImplementation(async () => {
+      options.settings?.(savedSettings);
+      return savedSettings;
+    });
+    saveVisibility.mockImplementation(async () => {
+      options.visibility?.(savedVisibility);
+      return savedVisibility;
+    });
+    const { container } = render(<GeneralSection />);
+
+    await userEvent.type(screen.getByLabelText('inputs.url.label'), '/app');
+    await chooseIntroduced();
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+
+    expect(saveSettings).toHaveBeenCalledOnce();
+    expect(saveVisibility).toHaveBeenCalledWith({ requestBody: { activityVisibility: 'introduced' } });
+    expect(setQueryData).toHaveBeenCalledWith(['settings'], savedSettings);
+    expect(setQueryData).toHaveBeenCalledWith(['visibility'], savedVisibility);
+    expect(toast.success).toHaveBeenCalledOnce();
+    expect(saveBar(container)).toBeNull();
+  });
+
+  it('reports a failed visibility save and keeps it in the draft', async () => {
+    saveVisibility.mockRejectedValue(new Error('forbidden'));
+    const { container } = render(<GeneralSection />);
+    await chooseIntroduced();
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(toast.apiError).toHaveBeenCalledWith(expect.objectContaining({ error: new Error('forbidden') }));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(saveBar(container)).toBeInTheDocument();
+    expect(visibilitySelect()).toHaveTextContent('inputs.activityVisibility.introduced');
+  });
+
+  it('explains what "introduced only" hides when it is the saved mode', () => {
+    mockVisibility({ data: { activityVisibility: 'introduced' } });
+    render(<GeneralSection />);
+    expect(screen.getByText('inputs.activityVisibility.introducedHint')).toBeInTheDocument();
+  });
+
+  it('disables only the visibility select while it loads or when it cannot be loaded', () => {
+    mockVisibility({ isLoading: true });
+    const view = render(<GeneralSection />);
+    expect(visibilitySelect()).toBeDisabled();
+    expect(screen.getByLabelText('inputs.url.label')).toBeEnabled();
+    view.unmount();
+
+    mockVisibility({ isError: true });
+    render(<GeneralSection />);
+    expect(screen.getByText('inputs.activityVisibility.loadFailed')).toBeInTheDocument();
+    expect(visibilitySelect()).toBeDisabled();
+    expect(screen.getByLabelText('inputs.url.label')).toBeEnabled();
   });
 });

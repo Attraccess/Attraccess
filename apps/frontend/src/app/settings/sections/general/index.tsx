@@ -5,15 +5,18 @@ import { FieldError, Form, Input, Spinner, TextField } from '@heroui/react';
 import { PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
+  ResourceActivityVisibility,
+  useSettingsServiceGetResourceVisibilitySettings,
+  UseSettingsServiceGetResourceVisibilitySettingsKeyFn,
   useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetSystemSettingsKeyFn,
   UseSettingsServiceGetSystemLanguageKeyFn,
+  useSettingsServiceUpdateResourceVisibilitySettings,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
-import { ResourceVisibilitySetting } from './ResourceVisibilitySetting';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton/index';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -30,6 +33,22 @@ const isAbsoluteUrl = (value: string) => {
   }
 };
 
+const ACTIVITY_VISIBILITY_MODES = [ResourceActivityVisibility.ALL, ResourceActivityVisibility.INTRODUCED];
+
+type Draft = Partial<{
+  url: string;
+  publicInternetUrl: string;
+  licenseKey: string;
+  defaultLanguage: 'en' | 'de';
+  activityVisibility: ResourceActivityVisibility;
+}>;
+
+/** Drops the given keys from the draft, so those fields follow the server again. */
+const withoutKeys =
+  (keys: (keyof Draft)[]) =>
+  (current: Draft): Draft =>
+    Object.fromEntries(Object.entries(current).filter(([key]) => !keys.includes(key as keyof Draft)));
+
 export function GeneralSection() {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
@@ -39,13 +58,18 @@ export function GeneralSection() {
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
+  // Stored and saved separately from the system settings. Its loading or failing must not hold up the rest
+  // of the page, so only its own select waits for it.
+  const {
+    data: visibilitySettings,
+    isLoading: isVisibilityLoading,
+    isError: isVisibilityError,
+  } = useSettingsServiceGetResourceVisibilitySettings();
   // Derived draft, not a seeded one: a key absent from `draft` means "untouched in this session",
   // and the displayed value falls back to the server's. The alternative — an effect that reassigns
   // the whole draft whenever the query object changes — overwrites edits the operator has not saved
   // yet as soon as a background refetch lands (ATT-868).
-  const [draft, setDraft] = useState<
-    Partial<{ url: string; publicInternetUrl: string; licenseKey: string; defaultLanguage: 'en' | 'de' }>
-  >({});
+  const [draft, setDraft] = useState<Draft>({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   // Same query/mutation contract as the old AppSettingsForm — only the presentation changed.
@@ -59,10 +83,11 @@ export function GeneralSection() {
   const licenseKey = draft.licenseKey ?? '';
   const savedLanguage = settings?.app.defaultLanguage ?? 'de';
   const defaultLanguage = draft.defaultLanguage ?? savedLanguage;
+  const savedActivityVisibility = visibilitySettings?.activityVisibility;
+  const activityVisibility = draft.activityVisibility ?? savedActivityVisibility;
 
-  const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
+  const { mutateAsync: saveSettings, isPending: isSavingSettings } = useSettingsServiceUpdateSystemSettings({
     onSuccess(data) {
-      toast.success({ title: t('success.title'), description: t('success.description') });
       // Prime the cache from the response and release the pin in the same tick. Invalidating and
       // then clearing the draft would flash the pre-save value for a frame while the refetch is in
       // flight, and holding the pin past the commit would make the fields ignore the server for the
@@ -70,18 +95,25 @@ export function GeneralSection() {
       // "unsaved changes" bar whose Save reverts them.
       queryClient.setQueryData(UseSettingsServiceGetSystemSettingsKeyFn(), data);
       queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemLanguageKeyFn() });
-      setDraft({});
-    },
-    onError(error: Error) {
-      toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
+      setDraft(withoutKeys(['url', 'publicInternetUrl', 'licenseKey', 'defaultLanguage']));
     },
   });
+  const { mutateAsync: saveVisibility, isPending: isSavingVisibility } =
+    useSettingsServiceUpdateResourceVisibilitySettings({
+      onSuccess(data) {
+        queryClient.setQueryData(UseSettingsServiceGetResourceVisibilitySettingsKeyFn(), data);
+        setDraft(withoutKeys(['activityVisibility']));
+      },
+    });
+  const isSaving = isSavingSettings || isSavingVisibility;
 
-  const isDirty =
+  const isSystemSettingsDirty =
     url !== savedUrl ||
     publicInternetUrl !== savedPublicUrl ||
     licenseKey.trim() !== '' ||
     defaultLanguage !== savedLanguage;
+  const isVisibilityDirty = activityVisibility !== savedActivityVisibility;
+  const isDirty = isSystemSettingsDirty || isVisibilityDirty;
 
   const trimmedUrl = url.trim();
   const trimmedPublicUrl = publicInternetUrl.trim();
@@ -99,27 +131,47 @@ export function GeneralSection() {
   const publicUrlError =
     trimmedPublicUrl && !isAbsoluteUrl(trimmedPublicUrl) ? t('inputs.publicInternetUrl.errors.invalid') : null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isSaving) return;
-    // Errors stay hidden until the first save attempt — flagging a half-typed URL red on every
-    // keystroke is noise, not help.
-    setHasAttemptedSave(true);
-    if (urlError || publicUrlError) return;
+    // Each store is written only when one of its fields changed, so a visibility-only edit is not
+    // blocked by (or re-sends) the URLs.
+    const saves: Promise<unknown>[] = [];
+    if (isSystemSettingsDirty) {
+      // Errors stay hidden until the first save attempt — flagging a half-typed URL red on every
+      // keystroke is noise, not help.
+      setHasAttemptedSave(true);
+      if (urlError || publicUrlError) return;
+      saves.push(
+        saveSettings({
+          requestBody: {
+            app: {
+              url: trimmedUrl,
+              // `null`, not `undefined`: the write is gated on the key being present and
+              // `JSON.stringify` drops undefined, so emptying the field would be a no-op that still
+              // reports success. `licenseKey` is never returned by the API, so empty legitimately
+              // means "unchanged" there and stays undefined.
+              publicInternetUrl: trimmedPublicUrl || null,
+              licenseKey: licenseKey.trim() || undefined,
+              defaultLanguage,
+            },
+          },
+        }),
+      );
+    }
+    if (isVisibilityDirty && activityVisibility) {
+      saves.push(saveVisibility({ requestBody: { activityVisibility } }));
+    }
+    if (saves.length === 0) return;
 
-    saveSettings({
-      requestBody: {
-        app: {
-          url: trimmedUrl,
-          // `null`, not `undefined`: the write is gated on the key being present and
-          // `JSON.stringify` drops undefined, so emptying the field would be a no-op that still
-          // reports success. `licenseKey` is never returned by the API, so empty legitimately
-          // means "unchanged" there and stays undefined.
-          publicInternetUrl: trimmedPublicUrl || null,
-          licenseKey: licenseKey.trim() || undefined,
-          defaultLanguage,
-        },
-      },
-    });
+    // A part that saved has already left the draft (see the mutations' onSuccess); a part that failed
+    // stays in it, so the save bar keeps offering to retry exactly what did not land.
+    const results = await Promise.allSettled(saves);
+    const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (failure) {
+      toast.apiError({ error: failure.reason as ApiError, t, tExists, baseTranslationKey: 'api' });
+      return;
+    }
+    toast.success({ title: t('success.title'), description: t('success.description') });
   };
 
   if (isLoading) {
@@ -148,7 +200,7 @@ export function GeneralSection() {
         className="flex flex-col"
         onSubmit={(event) => {
           event.preventDefault();
-          handleSave();
+          void handleSave();
         }}
       >
         <SettingsRow stacked label={t('inputs.url.label')} hint={t('inputs.url.description')}>
@@ -214,12 +266,42 @@ export function GeneralSection() {
             />
           </div>
         </SettingsRow>
+
+        <SettingsRow
+          stacked
+          label={t('inputs.activityVisibility.label')}
+          hint={
+            isVisibilityError
+              ? t('inputs.activityVisibility.loadFailed')
+              : activityVisibility === ResourceActivityVisibility.INTRODUCED
+                ? t('inputs.activityVisibility.introducedHint')
+                : t('inputs.activityVisibility.description')
+          }
+        >
+          <Select
+            aria-label={t('inputs.activityVisibility.label')}
+            value={activityVisibility}
+            onChange={(next) => {
+              const mode = ACTIVITY_VISIBILITY_MODES.find((candidate) => candidate === next);
+              if (mode) setDraft((current) => ({ ...current, activityVisibility: mode }));
+            }}
+            items={ACTIVITY_VISIBILITY_MODES.map((mode) => ({
+              key: mode,
+              label: t(`inputs.activityVisibility.${mode}`),
+            }))}
+            isDisabled={isSaving || isVisibilityLoading || isVisibilityError}
+            fullWidth
+          />
+        </SettingsRow>
         <input type="submit" hidden />
       </Form>
 
-      <ResourceVisibilitySetting />
-
-      <SettingsSaveBar isDirty={isDirty} isSaving={isSaving} onSave={handleSave} onDiscard={() => setDraft({})} />
+      <SettingsSaveBar
+        isDirty={isDirty}
+        isSaving={isSaving}
+        onSave={() => void handleSave()}
+        onDiscard={() => setDraft({})}
+      />
     </SettingsSection>
   );
 }

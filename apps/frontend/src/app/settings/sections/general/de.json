@@ -1,6 +1,6 @@
 {
   "title": "Allgemein",
-  "description": "Die URLs, unter denen diese Instanz erreichbar ist, und ihre Lizenz.",
+  "description": "Die URLs, unter denen diese Instanz erreichbar ist, ihre Lizenz und wer die Ressourcennutzung sehen darf.",
   "loading": "Einstellungen werden geladen...",
   "inputs": {
     "url": {
@@ -26,13 +26,12 @@
       "label": "Standardsprache des Systems"
     },
     "activityVisibility": {
-      "label": "Wer die Gerätenutzung sehen darf",
-      "description": "Legt fest, wer sieht, welche Geräte in Benutzung sind und von wem. Die eigenen Sitzungen sieht jede Person immer.",
-      "all": "Alle Geräte (alle mit Berechtigung „Ressourcen ansehen“)",
-      "introduced": "Nur eingewiesene Geräte",
-      "introducedHint": "Nur Personen, die ein Gerät benutzen dürfen, seine Einweisenden und Wartenden sowie Verwaltende sehen dessen Nutzung. Bei Geräten mit betreuter Nutzung sehen alle anderen nur „frei“ oder „in Benutzung“.",
-      "saved": "Sichtbarkeit gespeichert",
-      "loadFailed": "Die Einstellung zur Sichtbarkeit konnte nicht geladen werden."
+      "label": "Wer die Ressourcennutzung sehen darf",
+      "description": "Legt fest, wer sieht, welche Ressourcen in Benutzung sind und von wem. Die eigenen Sitzungen sieht jede Person immer.",
+      "all": "Alle mit „Ressourcen lesen“",
+      "introduced": "Nur in die Ressource eingewiesene Personen",
+      "introducedHint": "Nur Personen, die in eine Ressource eingewiesen sind (direkt oder über eine Gruppe), ihre Einweiser und Wartenden sowie Benutzer mit „Ressourcen bearbeiten“ oder „Ressourcen-Zugriff verwalten“ sehen deren Nutzung. Bei Ressourcen, die beaufsichtigte Nutzung erlauben oder erfordern, sehen alle anderen nur „Verfügbar“ oder „In Benutzung“, ohne Namen.",
+      "loadFailed": "Die Einstellung zur Ressourcennutzung konnte nicht geladen werden."
     }
   },
   "success": {

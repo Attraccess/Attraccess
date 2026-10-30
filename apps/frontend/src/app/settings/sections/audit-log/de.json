@@ -357,7 +357,7 @@
     "smtp.userChanged": "E-Mail-Benutzername geändert",
     "smtp.passConfigured": "E-Mail-Passwort hinterlegt",
     "smtp.passwordChanged": "E-Mail-Passwort geändert",
-    "resources.activityVisibility": "Sichtbarkeit der Gerätenutzung",
+    "resources.activityVisibility": "Sichtbarkeit der Ressourcennutzung",
     "metrics.apiKeyConfigured": "API-Schlüssel für die Überwachung",
     "metrics.slowQueryThresholdSeconds": "Schwellenwert für langsame Abfragen",
     "auth.rateLimit.maxAttempts": "Maximale Anmeldeversuche",

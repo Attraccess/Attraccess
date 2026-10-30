@@ -1,7 +1,6 @@
-/**
- * A 403 on a status read means the instance only shows activity for introduced equipment ("introduced only"
- * visibility). It is an answer, not a failure: callers hide the status instead of showing an error.
- */
+import { ApiError } from '@attraccess/react-query-client';
+
+/** Whether an API call was refused with 403 Forbidden. */
 export function isForbiddenError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 403;
+  return error instanceof ApiError && error.status === 403;
 }

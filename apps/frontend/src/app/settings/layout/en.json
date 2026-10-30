@@ -13,7 +13,7 @@
   "sections": {
     "general": {
       "label": "General",
-      "description": "Base URLs and license"
+      "description": "Base URLs, license and resource activity visibility"
     },
     "email": {
       "label": "Email",
