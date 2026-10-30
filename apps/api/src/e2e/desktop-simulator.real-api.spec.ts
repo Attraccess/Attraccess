@@ -264,9 +264,11 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().command('corrupt-key', { card: 0, slot: card.keyNo });
     await authenticate();
     await desktop().click('Abmelden');
-    for (const [index, fault] of [
-      [1, 'write'],
-      [2, 'removeOnWrite'],
+    // The server only records a card after the card proved the new key. A refused write and a card
+    // pulled out mid-write both leave nothing behind and say why.
+    for (const [index, fault, message] of [
+      [1, 'write', 'Karte nicht bestätigt, bitte erneut auflegen'],
+      [2, 'removeOnWrite', 'Karte zu früh entfernt'],
     ] as const) {
       const candidate = await user(`failed-${index}`);
       await desktop().command('faults', { card: index, [fault]: true });
@@ -275,7 +277,7 @@ describe('desktop simulator against an isolated real API', () => {
       );
       await desktop().screen('enrollment');
       await desktop().present(index);
-      await desktop().text('Karte konnte nicht\ngeschrieben werden');
+      await desktop().text(message);
       expect(await db.getRepository(NFCCard).count({ where: { user: { id: candidate.id }, isActive: true } })).toBe(0);
       if (fault === 'removeOnWrite') expect((await desktop().command('inspect')).removedOnWrite).toBe(true);
       await desktop().snapshot(`failed-enrollment-${index}`);

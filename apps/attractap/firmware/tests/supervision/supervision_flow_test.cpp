@@ -102,10 +102,11 @@ void webInitiatedFlowDoesNotUnlockLocally() {
     fixture.flow.onCardDetected(uid, sizeof(uid));
     fixture.flow.tick(102);
     API::SupervisorCardAuthenticationResponse cardAuth;
-    cardAuth.keyLen = 16;
     fixture.flow.onCardAuthentication(cardAuth);
     fixture.flow.tick(103);
-    expect(fixture.api.confirmations == 1, "web flow must confirm card authentication with the API");
+    // The server verified the card and approves the pending web request itself: the reader sends
+    // nothing more and does not start a session.
+    expect(fixture.api.lastCardPurpose == "supervisor", "the reader announces the card for the server to check");
     fixture.flow.onResolved({.success = true});
     fixture.flow.tick(104);
     expect(fixture.flow.tick(1305) == SupervisionFlow::Outcome::ReturnToRouting,
@@ -154,12 +155,12 @@ void readerCardSuccessUnlocksAndResets() {
     const uint8_t uid[] = {1};
     fixture.flow.onCardDetected(uid, sizeof(uid));
     fixture.flow.tick(101);
-    expect(fixture.api.cardAuthRequests == 1, "reader card must request authentication data");
+    expect(fixture.api.cardAuthRequests == 1, "reader card must be announced to the server");
+    expect(fixture.api.lastCardPurpose == "supervisor", "the reader announces a supervisor card");
     expect(fixture.api.lastCardAuthResourceId == 42,
            "reader card authentication must use the reader flow resource");
 
     API::SupervisorCardAuthenticationResponse cardAuth;
-    cardAuth.keyLen = 16;
     fixture.flow.onCardAuthentication(cardAuth);
     expect(fixture.flow.tick(102) == SupervisionFlow::Outcome::UnlockAndStartSession,
            "reader card success must unlock and start a session");
@@ -174,7 +175,6 @@ void resolutionWinsOverCardAuthentication() {
     fixture.flow.tick(101);
 
     API::SupervisorCardAuthenticationResponse cardAuth;
-    cardAuth.keyLen = 16;
     fixture.flow.onCardAuthentication(cardAuth);
     fixture.flow.onResolved({.success = true});
 
