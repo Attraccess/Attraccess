@@ -266,7 +266,7 @@ describe('DeviceEnrollmentService (readers without a screen)', () => {
     const gone = makeLite('gone');
     service.request(gone.connection);
     service.release('gone');
-    jest.advanceTimersByTime(40_000);
+    jest.advanceTimersByTime(45_000);
 
     const readers = Array.from({ length: LED_PATTERN_COUNT }, (_, i) => makeLite(`r-${i}`));
     readers.forEach((reader) => service.request(reader.connection));
@@ -277,7 +277,7 @@ describe('DeviceEnrollmentService (readers without a screen)', () => {
     const lite = makeLite('lite');
     service.request(lite.connection);
     await service.approve(lite.last().code, principal);
-    jest.advanceTimersByTime(40_000);
+    jest.advanceTimersByTime(45_000);
 
     const readers = Array.from({ length: LED_PATTERN_COUNT }, (_, i) => makeLite(`r-${i}`));
     readers.forEach((reader) => service.request(reader.connection));

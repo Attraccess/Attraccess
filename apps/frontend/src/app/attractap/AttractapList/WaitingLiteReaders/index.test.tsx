@@ -158,6 +158,24 @@ describe('WaitingLiteReaders', () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['DeviceEnrollmentServiceListWaitingLiteReaders'] });
   });
 
+  it('shows the approved reader and frees the button for the next one', () => {
+    readers = [reader, { ...reader, pendingId: '2b0c8a4e-1f7d-4b3e-9a51-6c2d8e0f4a77' }];
+    render(<WaitingLiteReaders />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Approve reader' }));
+
+    act(() => mutationOptions.onSuccess?.({ kind: 'reader', id: 12, name: 'Laser room' }));
+
+    expect(screen.queryByRole('button', { name: 'Approve reader' })).not.toBeInTheDocument();
+    expect(screen.getByText('Laser room is now registered and connects on its own.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open reader' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Approve' })[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Approve reader' }));
+    expect(approve).toHaveBeenCalledTimes(2);
+  });
+
   it('allows a new attempt from the refreshed row after a failure', () => {
     readers = [reader];
     render(<WaitingLiteReaders />);

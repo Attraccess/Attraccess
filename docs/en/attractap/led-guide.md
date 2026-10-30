@@ -20,7 +20,7 @@ These animations run continuously while the device is in a given state.
 | **Ready / Wait for Card** | Green | Six alternating segments breathing in and out of phase (circular) or gentle pulsing (linear) | The device is ready. Present an RFID card to authenticate. |
 | **Authenticating** | Cyan | Fast-moving dot with 6-LED fading tail (circular) or quick pulsing (linear) | A card is being read and authenticated. |
 | **No Resources** | Orange | Alternating on/off flash of the entire ring | No resources are assigned to this device. Assign at least one resource in Attraccess. |
-| **Waiting for approval** | Four colours | Four steady colour segments of 5 lit LEDs each, with one dark LED between them (circular), or four segments from left to right (linear). The pattern changes every 30 seconds. Without a pattern (none free, server busy, or connection lost) the whole ring breathes white. | A new reader waits for an administrator to approve it. Compare the colours with the **Waiting Lite readers** list in Attraccess, see [Setup](setup.md). |
+| **Waiting for approval** | Four colours | Four steady colour segments of 5 lit LEDs each, with one dark LED between them (circular), or four segments from left to right (linear). The pattern changes every 30 seconds. Without a pattern (none free, server busy, or a stalled connection) the whole ring breathes white. | A new reader waits for an administrator to approve it. Compare the colours with the **Waiting Lite readers** list in Attraccess, see [Setup](setup.md). |
 | **Firmware Update** | Blue / White | Static alternating blue and white pixels | A firmware update is in progress. Do not power off. |
 
 ## LED Triggers (One-Time Feedback)

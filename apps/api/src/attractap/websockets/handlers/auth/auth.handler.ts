@@ -16,9 +16,10 @@ function describeFirmware(firmware: unknown): { name?: string; variant?: string;
   const result: { name?: string; variant?: string; version?: string } = {};
   for (const key of ['name', 'variant', 'version'] as const) {
     const value = (firmware as Record<string, unknown>)[key];
-    // Control and format characters (bidi overrides, zero-width, line separators) could disguise the text.
+    // Control, format (bidi overrides, zero-width), private-use and unassigned characters and line
+    // separators could disguise the text.
     if (typeof value === 'string') {
-      result[key] = Array.from(value.replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, ''))
+      result[key] = Array.from(value.replace(/[\p{C}\u2028\u2029]/gu, ''))
         .slice(0, 64)
         .join('');
     }

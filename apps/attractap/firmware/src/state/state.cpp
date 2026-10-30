@@ -130,7 +130,8 @@ State::ApiState State::getApiState()
     return state;
 }
 
-void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs)
+void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs, bool hasPattern,
+                              const LedPattern::Pattern &pattern)
 {
     StateLock lock(state_mutex);
     enrollment_pending = true;
@@ -139,11 +140,6 @@ void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t e
     enrollment_received_at = millis();
     enrollment_rotates_in_ms = rotatesInMs;
     enrollment_expires_in_ms = expiresInMs;
-}
-
-void State::setEnrollmentPattern(bool hasPattern, const LedPattern::Pattern &pattern)
-{
-    StateLock lock(state_mutex);
     enrollment_has_pattern = hasPattern;
     enrollment_pattern = pattern;
 }

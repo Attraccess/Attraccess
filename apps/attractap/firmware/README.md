@@ -151,9 +151,10 @@ neighbour of segment 1), or `null` when all 120 patterns are in use. The pattern
 the code, the previous one stays valid until the next rotation. The reader draws it with
 `LedPattern` (`src/led/led_pattern.hpp`, host tests in `tests/led-pattern`) and breathes white
 for `null`, after a rejection, or once the pattern is `LedPattern::STALE_GRACE_MS` (10 s) past its
-rotation without a new one (e.g. a dropped connection). The server keeps the patterns of a reader
-that left reserved for that long (`ENROLLMENT_PATTERN_COOLDOWN_MS`), so a stale ring never matches
-another reader's list entry. The ring lights up green (`triggerSuccess()`) when the credentials arrive. An administrator approves it in the
+rotation without a new one (e.g. a stalled connection). The server keeps the patterns of a reader
+that left reserved for one rotation plus that grace and a 5 s margin (45 s,
+`ENROLLMENT_PATTERN_COOLDOWN_MS`), so a stale ring never matches another reader's list entry. The
+ring lights up green (`triggerSuccess()`) when the credentials arrive. An administrator approves it in the
 **Waiting Lite readers** card (`GET /api/device-enrollment/lite-pending`,
 `POST /api/device-enrollment/approve-lite`). The code keeps working for the web flasher.
 

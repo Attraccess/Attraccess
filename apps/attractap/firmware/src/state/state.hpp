@@ -124,8 +124,8 @@ public:
         bool hasPattern;
         LedPattern::Pattern pattern;
     };
-    static void setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs);
-    static void setEnrollmentPattern(bool hasPattern, const LedPattern::Pattern &pattern);
+    static void setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs, bool hasPattern,
+                                  const LedPattern::Pattern &pattern);
     static void setEnrollmentRejected(uint32_t retryAfterMs);
     // approved: the registration response arrived, the LED ring flashes green once.
     static void clearEnrollment(bool approved = false);

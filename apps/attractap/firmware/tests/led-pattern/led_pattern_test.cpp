@@ -131,13 +131,8 @@ static void tinyStrips()
     CHECK(LedPattern::pixelColor(pattern, 3, 3) == 0);
 }
 
-static void comparingAndStaleness()
+static void coloursAndStaleness()
 {
-    const LedPattern::Pattern a = parsed({"red", "green", "blue", "yellow"});
-    const LedPattern::Pattern b = parsed({"red", "green", "blue", "white"});
-    CHECK(LedPattern::equals(a, a));
-    CHECK(!LedPattern::equals(a, b));
-
     uint32_t rgb = 0;
     CHECK(LedPattern::colorFromName("magenta", rgb) && rgb == 0xFF00FF);
     CHECK(LedPattern::colorFromName("white", rgb) && rgb == 0xFFFFFF);
@@ -156,7 +151,7 @@ int main()
     ringLayout();
     scalesToOtherLedCounts();
     tinyStrips();
-    comparingAndStaleness();
+    coloursAndStaleness();
     if (failures != 0)
     {
         std::printf("%d check(s) failed\n", failures);

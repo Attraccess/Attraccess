@@ -51,13 +51,13 @@ Zum Freigeben benoetigen Sie die Berechtigung, Ressourcen zu aendern (`resources
 
 Ein Lite-Leser hat keinen Bildschirm und zeigt deshalb statt eines Codes ein **Farbmuster** auf seinem LED-Ring: vier gleichbleibend leuchtende Farbsegmente mit je einer dunklen LED dazwischen. Das Muster wechselt alle 30 Sekunden.
 
-1. Oeffnen Sie **Attractap > Lesegeraete**. Die Karte **Wartende Lite-Lesegeraete** listet jeden Lite-Leser, der auf Freigabe wartet, mit den vier Farben seines Musters (die Farbnamen stehen neben den Farbfeldern), der Zeit bis zum naechsten Wechsel, seiner Firmware und seiner Wartezeit.
+1. Oeffnen Sie **Attractap > Lesegeraete**. Die Karte **Wartende Lite-Lesegeraete** listet jedes Lite-Lesegeraet, das auf Freigabe wartet, mit den vier Farben seines Musters (die Farbnamen stehen neben den Farbfeldern), der Zeit bis zum naechsten Wechsel, seiner Firmware und seiner Wartezeit.
 2. Halten Sie die Liste neben den Leser vor Ihnen und suchen Sie den Eintrag, dessen Farben zum Ring passen. Der Ring kann gedreht verbaut sein: Beginnen Sie an einem beliebigen Segment und lesen Sie den Ring in beliebiger Richtung.
 3. Klicken Sie auf **Freigeben**, pruefen Sie das Muster noch einmal am Ring, geben Sie optional einen Namen ein und bestaetigen Sie.
 
 Der Ring leuchtet kurz gruen auf und der Leser startet normal weiter. Geben Sie nur Leser frei, die Sie vor sich sehen: Jedes Geraet in Ihrem Netzwerk kann behaupten, ein Lite-Leser zu sein. Das Muster zeigt Ihnen, dass das Geraet vor Ihnen das in der Liste ist.
 
-Der Ring atmet weiss und der Leser erscheint nicht in der Liste, wenn kein Muster frei ist (viele Leser warten gleichzeitig), wenn der Server ausgelastet ist und der Leser es selbst erneut versucht, oder wenn der Leser die Verbindung zum Server verloren hat. Atmet er dauerhaft weiss, geben Sie ihn ueber den Web-Flasher (**RFID-Leser einrichten**) frei: Nach der seriellen Einrichtung zeigt er **Wartet auf Freigabe** mit dem aktuellen Code und eine Schaltflaeche **Freigeben**. Der Code steht auch auf der USB-Seriell-Konsole des Lesers bereit (`api.status.get`, Feld `enrollmentCode`). Lite-Firmware aelter als 1.8.1 muss immer so freigegeben werden.
+Der Ring atmet weiss und der Leser erscheint nicht in der Liste, wenn kein Muster frei ist (viele Leser warten gleichzeitig), wenn der Server ausgelastet ist und der Leser es selbst erneut versucht, oder wenn seine Verbindung zum Server haengt (bemerkt der Leser einen Verbindungsabbruch, zeigt er stattdessen die blaue Startanimation). Atmet er dauerhaft weiss, geben Sie ihn ueber den Web-Flasher (**RFID-Leser einrichten**) frei: Nach der seriellen Einrichtung zeigt er **Wartet auf Freigabe** mit dem aktuellen Code und eine Schaltflaeche **Freigeben**. Der Code steht auch auf der USB-Seriell-Konsole des Lesers bereit (`api.status.get`, Feld `enrollmentCode`). Lite-Firmware aelter als 1.8.1 muss immer so freigegeben werden.
 
 ### Grenzen und falsche Codes
 

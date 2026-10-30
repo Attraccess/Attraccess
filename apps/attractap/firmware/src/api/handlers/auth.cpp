@@ -80,9 +80,6 @@ void API::onEnrollmentCode(JsonObject data)
     // The lab helper reads this line from the UART to approve readers without a screen reader.
     logger.infof("Enrollment: code=%s rotatesInMs=%u", payload["code"].as<const char *>(),
                  static_cast<unsigned>(payload["rotatesInMs"] | 30000U));
-    State::setEnrollmentCode(payload["code"].as<std::string>(),
-                             payload["rotatesInMs"] | 30000U,
-                             payload["expiresInMs"] | 600000U);
     // Only readers without a screen get a pattern. Missing, null (the server had none left) or malformed: the
     // ring breathes white. Parsed once here, the LED loop only gets the colours.
     LedPattern::Pattern pattern{};
@@ -100,7 +97,12 @@ void API::onEnrollmentCode(JsonObject data)
         }
         hasPattern = LedPattern::parse(colors, pattern);
     }
-    State::setEnrollmentPattern(hasPattern, pattern);
+    // Code, timing and pattern change together, so the LED loop never pairs a new receipt time with an old pattern.
+    State::setEnrollmentCode(payload["code"].as<std::string>(),
+                             payload["rotatesInMs"] | 30000U,
+                             payload["expiresInMs"] | 600000U,
+                             hasPattern,
+                             pattern);
 }
 
 void API::onEnrollmentRejected(JsonObject data)

@@ -57,18 +57,6 @@ namespace LedPattern
         return false;
     }
 
-    inline bool equals(const Pattern &a, const Pattern &b)
-    {
-        for (size_t i = 0; i < SEGMENT_COUNT; i++)
-        {
-            if (a.segments[i] != b.segments[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
     // Whether a pattern received `elapsedMs` ago, that was due to rotate after `rotatesInMs`, may still be shown.
     inline bool isFresh(uint32_t elapsedMs, uint32_t rotatesInMs)
     {
