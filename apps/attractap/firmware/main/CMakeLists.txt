@@ -24,6 +24,15 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
             list(APPEND ATTRACTAP_SRCS ${ATTRACTAP_LATIN1_FONTS})
         endif()
 
+        if(ATTRACTAP_TEST_HOOKS)
+            if(NOT ATTRACTAP_UI)
+                message(FATAL_ERROR "ATTRACTAP_TEST_HOOKS needs a display variant (HAS_LVGL_DISPLAY=1)")
+            endif()
+            list(APPEND ATTRACTAP_DEFINES ATTRACTAP_TEST_HOOKS=1)
+        else()
+            list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "/src/testhooks/")
+        endif()
+
         if(DEFINED ATTRACTAP_EXCLUDE_REGEX AND NOT "${ATTRACTAP_EXCLUDE_REGEX}" STREQUAL "")
             list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "${ATTRACTAP_EXCLUDE_REGEX}")
         endif()
@@ -61,6 +70,7 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     ${ATTRACTAP_DEFINES}
     FIRMWARE_VERSION="${ATTRACTAP_VERSION}"
     LOG_LEVEL=${ATTRACTAP_LOG_LEVEL}
+    ATTRACTAP_BEEPER_DEFAULT=$<BOOL:${ATTRACTAP_BEEPER_DEFAULT}>
 )
 
 # LVGL's canonical selector idiom `LV_PART_MAIN | LV_STATE_DEFAULT` ORs two
