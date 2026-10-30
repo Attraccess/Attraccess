@@ -142,15 +142,11 @@ describe('event stream', () => {
     expect(evicted.messages.find((m) => m.type === 'reconciliation-required')).toMatchObject({ reason: 'evicted' });
 
     clock.now += 5_000;
-    const expired = await WsClient.connect(running.port);
-    expired.send(resume(formatCursor(stream.streamInstanceId, 6)));
-    await expired.until(() => expired.messages.length > 1 || expired.closed !== null);
     // The head cursor itself needs no replay, but anything older has expired.
     const old = await WsClient.connect(running.port);
     old.send(resume(formatCursor(stream.streamInstanceId, 4)));
     await old.until(() => old.closed !== null);
     expect(old.messages.find((m) => m.type === 'reconciliation-required')).toMatchObject({ reason: 'expired' });
-    expired.close();
   });
 
   it('starts a new stream instance after a restart and treats old cursors as foreign', async () => {

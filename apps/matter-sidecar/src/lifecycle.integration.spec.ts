@@ -30,7 +30,7 @@ describe('lifecycle', () => {
 
   // The 503 refusal itself is covered by the versionedRefusal unit tests; a new connection cannot reach a draining
   // server because it stops accepting at once.
-  it('lets an in-flight versioned request finish while draining', async () => {
+  it('lets an in-flight versioned request finish while refusing new connections', async () => {
     let release: () => void = () => undefined;
     const running = await startSidecar(
       {},
@@ -44,11 +44,7 @@ describe('lifecycle', () => {
     const inFlight = http(running.port, 'GET', '/v1/nodes', { headers: validHeaders() });
     await new Promise((resolve) => setTimeout(resolve, 50));
     const stopping = running.stop();
-    const ready = await http(running.port, 'GET', '/health/ready').catch(() => null);
-    if (ready) {
-      expect(ready.status).toBe(503);
-      expect(ready.body.status).toBe('draining');
-    }
+    await expect(http(running.port, 'GET', '/health/ready')).rejects.toThrow();
     release();
     expect((await inFlight).status).toBe(200);
     await stopping;

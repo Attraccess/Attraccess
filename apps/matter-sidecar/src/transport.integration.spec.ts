@@ -142,6 +142,13 @@ describe('transport', () => {
     const declared = await post('/v1/fabric', big);
     expect(declared.status).toBe(413);
     expect(declared.body.error.details).toEqual({ limitBytes: 2_048 });
+    // Node sends a chunked body, with no content length, when the header asks for it.
+    const chunked = await post('/v1/fabric', big, {
+      ...validHeaders(),
+      'content-type': 'application/json',
+      'transfer-encoding': 'chunked',
+    });
+    expect(chunked.status).toBe(413);
   });
 
   it('applies the deadline: a timed-out physical command is uncertain and never retryable', async () => {
