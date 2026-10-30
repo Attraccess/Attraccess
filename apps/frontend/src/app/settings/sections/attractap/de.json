@@ -1,0 +1,29 @@
+{
+  "title": "Kartenleser",
+  "description": "Welche Attractap-Leser NFC-Karten einrichten und zurücksetzen dürfen. Kartenschlüssel werden nur vom Server erzeugt und geprüft; das hier begrenzt, wo Karten beschrieben werden.",
+  "loading": "Einstellungen werden geladen...",
+  "mode": {
+    "label": "Karten einrichten und zurücksetzen an",
+    "description": "Leser, die hier nicht erlaubt sind, lassen Mitglieder sich weiterhin mit ihren Karten anmelden.",
+    "options": {
+      "all": {
+        "label": "Allen Lesern",
+        "description": "Jeder Leser mit aktueller Firmware kann Karten einrichten und zurücksetzen."
+      },
+      "selected": {
+        "label": "Ausgewählten Lesern",
+        "description": "Nur die unten gewählten Leser können Karten einrichten und zurücksetzen."
+      }
+    }
+  },
+  "readers": {
+    "label": "Erlaubte Leser",
+    "description": "Wähle die Leser, die Karten beschreiben dürfen.",
+    "none": "Es gibt noch keine Leser.",
+    "required": "Wähle mindestens einen Leser oder entscheide dich für alle Leser."
+  },
+  "success": {
+    "title": "Einstellungen gespeichert",
+    "description": "Deine Änderungen wurden übernommen."
+  }
+}

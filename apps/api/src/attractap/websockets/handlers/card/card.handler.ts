@@ -2,7 +2,7 @@ import { getSupportedDeviceLanguage } from '@attraccess/shared';
 import { Resource, SupervisionMode } from '@attraccess/database-entities';
 
 import { SettingsService } from '../../../../settings/settings.service';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -155,7 +155,7 @@ export class AttractapCardHandler {
       throw new Error(`Reader not connected: ${data.readerId}`);
     }
     if (!socket.state.cardRelay) {
-      throw new Error(`Reader firmware must be updated to reset cards: ${data.readerId}`);
+      throw new BadRequestException(`Reader firmware must be updated to reset cards: ${data.readerId}`);
     }
     const nfcCard = await this.attractapService.getNFCCardByID(data.cardId);
 
@@ -249,7 +249,7 @@ export class AttractapCardHandler {
       throw new Error(`Reader not connected: ${data.readerId}`);
     }
     if (sockets.some((socket) => !socket.state.cardRelay)) {
-      throw new Error(`Reader firmware must be updated to enroll cards: ${data.readerId}`);
+      throw new BadRequestException(`Reader firmware must be updated to enroll cards: ${data.readerId}`);
     }
     if (
       sockets.some(

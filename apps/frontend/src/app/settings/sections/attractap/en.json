@@ -1,0 +1,29 @@
+{
+  "title": "Card readers",
+  "description": "Which Attractap readers may enroll and reset NFC cards. Card keys are created and checked by the server only; this limits where cards can be written.",
+  "loading": "Loading settings...",
+  "mode": {
+    "label": "Enroll and reset cards on",
+    "description": "Readers that are not allowed here still let members sign in with their cards.",
+    "options": {
+      "all": {
+        "label": "All readers",
+        "description": "Every reader with current firmware can enroll and reset cards."
+      },
+      "selected": {
+        "label": "Selected readers",
+        "description": "Only the readers you pick below can enroll and reset cards."
+      }
+    }
+  },
+  "readers": {
+    "label": "Allowed readers",
+    "description": "Pick the readers that may write cards.",
+    "none": "There are no readers yet.",
+    "required": "Select at least one reader, or choose all readers."
+  },
+  "success": {
+    "title": "Settings saved",
+    "description": "Your changes have been applied."
+  }
+}

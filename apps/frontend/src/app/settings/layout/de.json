@@ -43,6 +43,10 @@
       "label": "Überwachung",
       "description": "Metrik-Endpunkt und Instrumentierung"
     },
+    "attractap": {
+      "label": "Kartenleser",
+      "description": "Welche Leser Karten einrichten und zurücksetzen dürfen"
+    },
     "auditLog": {
       "label": "Auditprotokoll",
       "description": "Administrative Aktivitäten und Aufbewahrung"

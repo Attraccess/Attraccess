@@ -1,4 +1,8 @@
-import { AttractapCapabilities, useAttractapServiceGetReaders } from '@attraccess/react-query-client';
+import {
+  AttractapCapabilities,
+  useAttractapServiceGetCardWriterSettings,
+  useAttractapServiceGetReaders,
+} from '@attraccess/react-query-client';
 import { useEffect, useMemo, useState } from 'react';
 import { Select } from '../../../components/select';
 
@@ -11,10 +15,18 @@ interface Props {
   requiredCapabilities?: Partial<AttractapCapabilities>;
   /** Only offer these readers (e.g. the ones linked to a resource). */
   readerIds?: number[];
+  /**
+   * Offer only readers that may enroll and reset cards: current firmware (card relay) and allowed by
+   * the administrator's card reader setting.
+   */
+  forCardWriting?: boolean;
 }
 
 export function AttractapSelect(props: Props) {
   const { data: readers } = useAttractapServiceGetReaders();
+  const { data: cardWriterSettings } = useAttractapServiceGetCardWriterSettings(undefined, {
+    enabled: !!props.forCardWriting,
+  });
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -30,6 +42,16 @@ export function AttractapSelect(props: Props) {
       ?.filter((r) => r.lastConnection && new Date(r.lastConnection).getTime() > now - 30000)
       .filter((r) => !props.readerIds || props.readerIds.includes(r.id))
       .filter((r) => {
+        if (!props.forCardWriting) {
+          return true;
+        }
+        // Readers on firmware before 2.0.0 cannot take part, whatever the setting says.
+        if (!r.firmware.capabilities.cardRelay || !r.firmware.capabilities.cardEnrollment) {
+          return false;
+        }
+        return !cardWriterSettings || cardWriterSettings.mode === 'all' || cardWriterSettings.readerIds.includes(r.id);
+      })
+      .filter((r) => {
         if (!props.requiredCapabilities) {
           return true;
         }
@@ -37,7 +59,7 @@ export function AttractapSelect(props: Props) {
           ([key, value]) => r.firmware.capabilities[key as keyof AttractapCapabilities] === value,
         );
       });
-  }, [readers, now, props.requiredCapabilities, props.readerIds]);
+  }, [readers, now, props.requiredCapabilities, props.readerIds, props.forCardWriting, cardWriterSettings]);
 
   return (
     <Select

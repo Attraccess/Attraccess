@@ -43,6 +43,10 @@
       "label": "Monitoring",
       "description": "Metrics endpoint and instrumentation"
     },
+    "attractap": {
+      "label": "Card readers",
+      "description": "Which readers may enroll and reset cards"
+    },
     "auditLog": {
       "label": "Audit log",
       "description": "Administrative activity and retention"

@@ -31,13 +31,13 @@ void ReaderWorkflow::testTimeouts()
         std::cout << "PASS action pauses the real 30-second login timeout" << std::endl;
         click("Abmelden");
         nfc.setPresent(0, true); pump(); nfc.setPresent(0, false); pump();
-        // The waiting card-key request also rejects a competing web approval.
+        // The card check waiting for the server also rejects a competing web approval. The server never
+        // answers, so the check expires and the reader recovers.
         server.push("SUPERVISION_START", R"({"resourceId":1,"requesterName":"Robin","timeoutMs":30000})"); pump();
         assert(lv_screen_active() != Display::supervisionScreen.getScreen());
-        server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","hasIntroduction":true})"); pump();
         pump(31050);
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         assert(label(lv_layer_top(), "Anmeldung fehlgeschlagen"));
-        std::cout << "PASS lifted card authentication expires and recovers" << std::endl;
+        std::cout << "PASS an unanswered card check expires and recovers" << std::endl;
     }

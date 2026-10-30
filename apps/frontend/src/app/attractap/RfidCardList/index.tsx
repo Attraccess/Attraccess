@@ -104,6 +104,7 @@ export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
             onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
             data-cy="enroll-nfc-card-modal-reader-select"
             requiredCapabilities={{ cardEnrollment: true }}
+            forCardWriting
           />
         </DrawerBody>
         <DrawerFooter>
@@ -176,6 +177,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
               selection={readerId}
               onSelectionChange={(readerId) => setReaderId(readerId ?? null)}
               data-cy="nfc-card-delete-modal-reader-select"
+              forCardWriting
             />
           </ModalBody>
           <ModalFooter>
