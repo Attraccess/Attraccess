@@ -348,7 +348,8 @@ void Websocket::logHeapStats()
 
 bool Websocket::sendMessage(const std::string &message)
 {
-    this->logger.debug(("sendMessage: " + message).c_str());
+    // Messages carry tokens and card data; log the size only.
+    this->logger.debugf("sendMessage: %u bytes", static_cast<unsigned>(message.length()));
     return enqueueMessage(message.c_str(), message.length());
 }
 

@@ -72,7 +72,8 @@ void SerialCommandHandler::processLine(const std::string &line)
     size_t cmndIndex = trimmed.find("CMND");
     if (cmndIndex == std::string::npos)
     {
-        logger.errorf("Invalid command format (no CMND): %s", trimmed.c_str());
+        // The line can contain secrets (Wi-Fi password, PIN), so only log its length.
+        logger.errorf("Invalid command format (no CMND), %u bytes", static_cast<unsigned>(trimmed.length()));
         return;
     }
 
@@ -83,7 +84,7 @@ void SerialCommandHandler::processLine(const std::string &line)
     size_t firstSpace = trimmed.find(' ');
     if (firstSpace == std::string::npos)
     {
-        logger.errorf("Invalid command format (no space): %s", trimmed.c_str());
+        logger.errorf("Invalid command format (no space), %u bytes", static_cast<unsigned>(trimmed.length()));
         return;
     }
 
@@ -99,11 +100,12 @@ void SerialCommandHandler::processLine(const std::string &line)
 
     if (topic.length() == 0)
     {
-        logger.errorf("Invalid command format (no topic): %s", trimmed.c_str());
+        logger.errorf("Invalid command format (no topic), %u bytes", static_cast<unsigned>(trimmed.length()));
         return;
     }
 
-    logger.infof("Handling command: %s %s", topic.c_str(), payload.c_str());
+    // Payloads carry secrets (Wi-Fi password, PIN); log the topic only.
+    logger.infof("Handling command: %s", topic.c_str());
     handleCommand(topic, payload);
 }
 

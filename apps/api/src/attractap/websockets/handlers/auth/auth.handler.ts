@@ -45,9 +45,7 @@ export class AttractapAuthHandler {
       })
       .catch(() => undefined);
 
-    this.logger.debug(
-      `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`,
-    );
+    this.logger.debug(`Sending REGISTER response to client. Reader ID: ${response.reader.id}`);
 
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.READER_REGISTER, {
@@ -59,7 +57,9 @@ export class AttractapAuthHandler {
 
   public async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     if (socket.readyState !== WebSocket.OPEN) return;
-    this.logger.debug('processing READER_AUTHENTICATE event', data);
+    // Never log the payload: it carries the reader's API token.
+    const readerLabel = `client ${socket.id}, reader ${String(data.payload?.id)}`;
+    this.logger.debug(`processing READER_AUTHENTICATE event (${readerLabel})`);
 
     const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
       message: 'PLEASE_REREGISTER',
@@ -89,7 +89,7 @@ export class AttractapAuthHandler {
     const reader = await this.attractapService.findReaderById(data.payload.id);
     if (!isCurrentAttempt()) return;
     if (!reader) {
-      this.logger.error('No reader-config found for socket, sending UNAUTHORIZED response to client');
+      this.logger.error(`No reader-config found (${readerLabel}), sending UNAUTHORIZED response to client`);
       return await socket.sendMessage(unauthorizedResponse);
     }
 
@@ -97,7 +97,7 @@ export class AttractapAuthHandler {
     const isValidToken = await verifyToken(data.payload.token, reader.apiTokenHash);
     if (!isCurrentAttempt()) return;
     if (!isValidToken) {
-      this.logger.error('Invalid token, sending UNAUTHORIZED response to client');
+      this.logger.error(`Invalid token (${readerLabel}), sending UNAUTHORIZED response to client`);
       return await socket.sendMessage(unauthorizedResponse);
     }
 

@@ -379,7 +379,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
     if (eventData.type.startsWith('ACK_')) {
-      this.logger.debug(`Received ACK response from client ${socket.id}: ${JSON.stringify(eventData)}`);
+      this.logger.debug(`Received ACK response from client ${socket.id}: ${eventData.type}`);
 
       this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
       return;
@@ -395,7 +395,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     await this.clientWasActive(socket);
 
-    this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
+    this.logger.debug(`Received event from client ${socket.id}: ${eventData.type}`);
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);
@@ -448,8 +448,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         )
           return false;
         this.logger.debug(
-          `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-          message.data.payload,
+          `Sending ${message.event} of type ${message.data.type} to client ${socket.id} (attempt ${i + 1}/${RETRY_COUNT})`,
         );
         // An older auth/update retry must not restore a superseded default.
         if (

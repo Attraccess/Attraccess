@@ -343,7 +343,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {
-        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
+        logger.errorf("Missing event type in %u byte message", static_cast<unsigned>(len));
         return;
     }
 

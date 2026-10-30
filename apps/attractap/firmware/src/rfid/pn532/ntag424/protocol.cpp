@@ -167,11 +167,10 @@ uint8_t Adafruit_PN532::ntag424_addpadding(uint8_t inputlength,
 
 uint32_t Adafruit_PN532::ntag424_crc32(uint8_t *data, uint8_t datalength)
 {
-  Adafruit_PN532::PrintHexChar((uint8_t const *)data, datalength);
+  // Never print `data`: ChangeKey passes the new card key here.
   // Standard reflected CRC-32 (zlib polynomial) — matches the old
   // Arduino_CRC32 library bit-for-bit (esp_rom_crc32_le inverts on entry/exit).
   uint32_t const crc32_res = esp_rom_crc32_le(0, (uint8_t const *)data, datalength);
-  Serial.println(crc32_res, HEX);
   return crc32_res;
 }
 

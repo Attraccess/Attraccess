@@ -58,8 +58,6 @@ void NFC::setup()
         this->logger.error("SAMConfig failed");
         return;
     }
-
-    this->logger.infof("Factory key is: %s", hexToString(NFC::FACTORY_KEY, 16).c_str());
 }
 
 void NFC::enableCardDetection()
