@@ -333,10 +333,13 @@ export class ResourceUsageController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     const access = await this.activityVisibility.resolveSessions(req.user, resourceId);
-    // Viewers with full or anonymous access need no project membership; with none, only their own session passes.
-    const usage = await this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user, access !== 'none');
-    const view = this.activityVisibility.viewUsage(usage, access, req.user.id);
-    if (!view) throw new ForbiddenException('You cannot view activity on this resource');
-    return view;
+    // Other people's sessions open for full access or project members; anonymous access gets the redacted view.
+    return this.resourceUsageService.getSessionDetails(
+      resourceId,
+      usageId,
+      req.user,
+      access === 'full',
+      access === 'anonymous' ? (usage) => this.activityVisibility.redactUsage(usage) : undefined,
+    );
   }
 }

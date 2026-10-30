@@ -89,7 +89,10 @@ export class ResourceActivityVisibilityService {
 
   /**
    * Access to other people's past and project-linked sessions (`usage/history`, `usage/:usageId`). Narrower than
-   * {@link resolve} in "all" mode: ordinary readers still see only their own sessions there, as before.
+   * {@link resolve} in "all" mode: ordinary readers see only their own sessions there. Everyone else named by the
+   * requirements sees all sessions: `resources.update`, `resources.access.manage`, and people introduced to the
+   * machine (directly or through a group), its introducers and maintainers. That is intentionally wider than main,
+   * where only `resources.update` could read other people's history.
    */
   async resolveSessions(user: AuthenticatedUser, resourceId: number): Promise<ResourceActivityAccess> {
     const access = await this.resolve(user, resourceId);
@@ -158,7 +161,8 @@ export class ResourceActivityVisibilityService {
     const data = event.data as { usage?: ResourceUsage; keepalive?: unknown; [key: string]: unknown };
     if ('keepalive' in data) return event;
     if (access === 'full' || (data.usage && data.usage.userId === viewerId)) return event;
-    if (access === 'none') return null;
+    // Ended and taken-over events carry no usage, only the session owner's id: that owner still hears the change.
+    if (access === 'none' && data['ownerUserId'] !== viewerId) return null;
     const resourceId = data.usage?.resourceId ?? data['resourceId'];
     return {
       data: Object.fromEntries(

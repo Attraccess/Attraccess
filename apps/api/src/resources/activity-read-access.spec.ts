@@ -1,4 +1,11 @@
-import { CanActivate, ExecutionContext, INestApplication, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  INestApplication,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { firstValueFrom, of, Subject } from 'rxjs';
@@ -111,7 +118,20 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
   const usageService = {
     canControllResource: jest.fn(async () => controllable),
     getActiveSession: jest.fn(async (resourceId: number) => ({ ...usage(), resourceId })),
-    getSessionDetails: jest.fn(async () => usage()),
+    // Mirrors the real service's gate: own or full access opens it, anonymous gets the redacted view, else 404.
+    getSessionDetails: jest.fn(
+      async (
+        _resourceId: number,
+        _usageId: number,
+        user: AuthenticatedUser,
+        canViewAll?: boolean,
+        redact?: (value: ResourceUsage) => ResourceUsage,
+      ) => {
+        if (usage().userId === user.id || canViewAll) return usage();
+        if (redact) return redact(usage());
+        throw new NotFoundException('Usage session not found');
+      },
+    ),
     getResourceUsageHistory: jest.fn(async () => ({ data: [usage()], total: 1 })),
   };
   const introducersService = {
@@ -302,7 +322,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         permissions.includes('resources.update') ||
         permissions.includes('resources.access.manage') ||
         PERSONAS[name].canControl === true;
-      expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(seesSessions ? 200 : 403);
+      expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(seesSessions ? 200 : 404);
       expect((await get(`/resources/${MACHINE}`, user)).body.usages?.length ?? 0).toBe(sees ? 1 : 0);
       const live = await feed(MACHINE, user);
       expect(live.status).toBe(sees ? 200 : 403);
@@ -343,7 +363,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
 
       const active = await get(`/resources/${MACHINE}/usage/active`, user);
       expect(active.status).toBe(sees ? 200 : 403);
-      expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(sees ? 200 : 403);
+      expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(sees ? 200 : 404);
       const detail = await get(`/resources/${MACHINE}`, user);
       expect(detail.body.usages?.length ?? 0).toBe(sees ? 1 : 0);
       // Only the running session is embedded, never past ones.
@@ -415,10 +435,27 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       const seen: object[] = [];
       (await sseController.streamEvents(MACHINE, { user: viewer } as never)).subscribe((event) => seen.push(event));
       events.next({ data: { eventType: 'started', inUse: true, usage: { ...usage(), userId: OTHER } } });
-      events.next({ data: { eventType: 'ended', inUse: false } });
+      // Another user's session ending, or a status change nobody owns, never reaches this viewer.
+      events.next({ data: { eventType: 'ended', inUse: false, ownerUserId: OTHER } });
+      events.next({ data: { eventType: 'status', status: 'unhealthy' } });
       events.next({ data: { eventType: 'started', inUse: true, usage: usage() } });
+      // The end of their own session, and being taken over, do reach them, without the owner id.
+      events.next({ data: { eventType: 'ended', resourceId: MACHINE, inUse: false, ownerUserId: ME } });
+      events.next({ data: { eventType: 'taken_over', resourceId: MACHINE, inUse: true, ownerUserId: ME } });
       await new Promise((resolve) => setImmediate(resolve));
-      expect(seen).toHaveLength(1);
+      expect(seen).toHaveLength(3);
+      expect(seen[1]).toEqual({ data: { eventType: 'ended', resourceId: MACHINE, inUse: false } });
+      expect(seen[2]).toEqual({ data: { eventType: 'taken_over', resourceId: MACHINE, inUse: true } });
+    });
+
+    it('refuses the live topic to someone who may not even read resources', async () => {
+      for (const resourceId of [MACHINE, SUPERVISED_MACHINE]) {
+        const rejected = await topics.authorize([{ topic: 'resource', resourceId }], {
+          id: ME,
+          effectivePermissions: new Set(),
+        } as unknown as AuthenticatedUser);
+        expect(rejected.size).toBe(1);
+      }
     });
 
     it('lets someone eligible for a supervised session subscribe to the live topic there', async () => {
@@ -482,7 +519,7 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       for (const name of ['manage resources', 'manage access']) {
         expect((await get(`/resources/${MACHINE}/usage/5`, as(name))).status).toBe(200);
       }
-      expect(usageService.getSessionDetails).toHaveBeenCalledWith(MACHINE, 5, expect.anything(), true);
+      expect(usageService.getSessionDetails).toHaveBeenCalledWith(MACHINE, 5, expect.anything(), true, undefined);
     });
   });
 

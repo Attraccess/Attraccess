@@ -21,7 +21,7 @@ it('passes the authenticated user and both IDs to the usage details lookup', asy
   }).compile();
   const request = { user: { id: 1, effectivePermissions: new Set(['resources.update']) } } as AuthenticatedRequest;
   expect(await moduleRef.get(ResourceUsageController).getSession(5, 8, request)).toEqual({ id: 8 });
-  expect(getSessionDetails).toHaveBeenCalledWith(5, 8, request.user, true);
+  expect(getSessionDetails).toHaveBeenCalledWith(5, 8, request.user, true, undefined);
 });
 
 describe('usage history visibility', () => {

@@ -180,6 +180,53 @@ describe('ResourceActivityVisibilityService', () => {
     });
   });
 
+  describe('events about a session ending or changing hands', () => {
+    const ended = { data: { eventType: 'ended', resourceId: MACHINE, inUse: false, ownerUserId: 10 } };
+    const takenOver = { data: { eventType: 'taken_over', resourceId: MACHINE, inUse: true, ownerUserId: 10 } };
+
+    it.each([ended, takenOver])('reach the owner who may not see activity, without the owner id', (event) => {
+      const { service } = setup('introduced');
+      expect(service.viewLiveEvent(event, 'none', 10)).toEqual({
+        data: expect.not.objectContaining({ ownerUserId: expect.anything() }),
+      });
+      expect(service.viewLiveEvent(event, 'none', 10)?.data).toMatchObject({
+        resourceId: MACHINE,
+        inUse: event.data.inUse,
+      });
+    });
+
+    it.each([ended, takenOver])('never reach anyone else who may not see activity', (event) => {
+      const { service } = setup('introduced');
+      expect(service.viewLiveEvent(event, 'none', 77)).toBeNull();
+    });
+
+    it('show anonymous viewers only free or in use, never the owner id', () => {
+      const { service } = setup('introduced');
+      expect(service.viewLiveEvent(ended, 'anonymous', 77)).toEqual({
+        data: { eventType: 'ended', resourceId: MACHINE, inUse: false },
+      });
+    });
+  });
+
+  describe('live events in "all equipment" mode', () => {
+    it('carry the names, as they do today', async () => {
+      const { service, user } = setup('all');
+      const viewer = user(PERSONAS['not introduced']);
+      const events = new Subject<{ data: object }>();
+      const seen: object[] = [];
+      service.viewLiveStream(events, viewer, MACHINE).subscribe((event) => seen.push(event.data));
+      const started = {
+        eventType: 'started',
+        inUse: true,
+        usage: { resourceId: MACHINE, userId: 77, user: { username: 'operator' } },
+      };
+      events.next({ data: started });
+      events.next({ data: { keepalive: true } });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(seen).toEqual([started, { keepalive: true }]);
+    });
+  });
+
   describe('open live streams', () => {
     it('apply a changed setting to events that arrive after the change', async () => {
       const { service, user, settings } = setup('all');

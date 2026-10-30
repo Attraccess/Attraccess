@@ -48,7 +48,9 @@ The usage history is displayed on the resource [detail page](resources/resource-
 
 <!-- TODO: Screenshot of usage history -->
 
-People with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`), and people introduced to the resource (including its introducers and maintainers), see the sessions of all users. With **Only people introduced to the resource** selected, others see free or in use on supervised-use resources, without names or details. Everyone else sees only their own sessions.
+People with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`), and people introduced to the resource (directly or through a group, including its introducers and maintainers), see the sessions of all users. Everyone else sees only their own sessions, plus any project-linked session of a [project](projects/overview.md) they are a member of.
+
+With **Only people introduced to the resource** selected, people who are not introduced but could use a supervised-use resource see **Available** or **In Use** there instead: the unfiltered history lists the other sessions redacted, with times only and no names or details. Filtering the history by another user is not possible for them.
 
 ## See Also
 

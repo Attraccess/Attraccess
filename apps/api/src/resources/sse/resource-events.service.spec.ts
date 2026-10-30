@@ -1,7 +1,11 @@
 import { Repository } from 'typeorm';
-import { Resource, ResourceUsage } from '@attraccess/database-entities';
+import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceEventsService } from './resource-events.service';
-import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
+import {
+  ResourceSessionStartedEvent,
+  ResourceUsageSessionEndedEvent,
+  ResourceUsageSessionTakenOverEvent,
+} from '../usage/events/resource-usage.events';
 
 describe('resource initial state and subject cleanup', () => {
   it('delivers initial state only to the new consumer and releases the subject immediately', async () => {
@@ -72,5 +76,49 @@ describe('resource initial state and subject cleanup', () => {
     });
     sub.unsubscribe();
     expect(service['resourceSubjects'].size).toBe(0);
+  });
+});
+
+describe('events that end or hand over a session', () => {
+  const open = async () => {
+    const repository = { findOne: jest.fn(async (query) => (query.relations ? { usages: [] } : { id: 1 })) };
+    const service = new ResourceEventsService(repository as unknown as Repository<Resource>);
+    const callback = jest.fn();
+    const sub = (await service.subscribeResource(1)).subscribe(callback);
+    await new Promise<void>((done) => setImmediate(done));
+    callback.mockClear();
+    return { service, callback, sub };
+  };
+
+  it('names only the id of the ended session owner', async () => {
+    const { service, callback, sub } = await open();
+    service.handleResourceSessionEnded(
+      new ResourceUsageSessionEndedEvent({ id: 3, resourceId: 1, userId: 42 } as ResourceUsage, null),
+    );
+    expect(callback).toHaveBeenCalledWith({
+      data: { eventType: ResourceUsageSessionEndedEvent.EVENT_NAME, resourceId: 1, inUse: false, ownerUserId: 42 },
+    });
+    sub.unsubscribe();
+  });
+
+  it('names only the previous owner on a take-over, never the new one', async () => {
+    const { service, callback, sub } = await open();
+    service.handleResourceUsageTakenOver(
+      new ResourceUsageSessionTakenOverEvent(
+        { id: 1, name: 'Lathe' },
+        new Date(),
+        { id: 7, username: 'newcomer' } as User,
+        { id: 42, username: 'previous' } as User,
+      ),
+    );
+    const { data } = callback.mock.calls[0][0];
+    expect(data).toEqual({
+      eventType: ResourceUsageSessionTakenOverEvent.EVENT_NAME,
+      resourceId: 1,
+      inUse: true,
+      ownerUserId: 42,
+    });
+    expect(JSON.stringify(data)).not.toContain('newcomer');
+    sub.unsubscribe();
   });
 });

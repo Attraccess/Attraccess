@@ -48,7 +48,9 @@ Die Nutzungshistorie wird auf der [Detailseite](resources/resource-details.md) d
 
 <!-- TODO: Screenshot der Nutzungshistorie einfügen -->
 
-Personen mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`) sowie in die Ressource eingewiesene Personen (einschließlich Einweisern und Betreuern) sehen die Sitzungen aller Benutzer. Ist **Nur in die Ressource eingewiesene Personen** gewählt, sehen andere bei Ressourcen mit beaufsichtigter Nutzung nur frei oder in Benutzung, ohne Namen oder Details. Alle anderen sehen nur ihre eigenen Sitzungen.
+Personen mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`) sowie in die Ressource eingewiesene Personen (direkt oder über eine Gruppe, einschließlich Einweisern und Wartenden) sehen die Sitzungen aller Benutzer. Alle anderen sehen nur ihre eigenen Sitzungen sowie projektbezogene Sitzungen eines [Projekts](projects/overview.md), in dem sie Mitglied sind.
+
+Ist **Nur in die Ressource eingewiesene Personen** gewählt, sehen Personen, die nicht eingewiesen sind, aber eine Ressource mit beaufsichtigter Nutzung verwenden könnten, dort nur **Verfügbar** oder **In Benutzung**: Der ungefilterte Verlauf zeigt die übrigen Sitzungen geschwärzt, nur mit Zeiten und ohne Namen oder Details. Den Verlauf nach einer anderen Person zu filtern ist für sie nicht möglich.
 
 ## Siehe auch
 
