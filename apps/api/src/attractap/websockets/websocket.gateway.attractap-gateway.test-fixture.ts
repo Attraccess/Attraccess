@@ -1,5 +1,6 @@
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Provider } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/settings.service';
@@ -36,6 +37,8 @@ import { AttractapProjectsHandler } from './handlers/projects/projects.handler';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
 import { AttractapSessionHandler } from './handlers/session/session.handler';
+import { PairingService } from '../security/pairing.service';
+import { ReaderSessionService } from '../security/reader-session.service';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapGateway } from './websocket.gateway';
 import { WebsocketService } from './websocket.service';
@@ -75,6 +78,57 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     ...overrides,
   } as unknown as AuthenticatedWebSocket;
 }
+export function gatewayProviders(
+  attractapService: unknown,
+  licenseService: unknown,
+  security: Provider[] = [
+    { provide: PairingService, useValue: { handleConnection: jest.fn() } },
+    { provide: ReaderSessionService, useValue: { accept: jest.fn() } },
+  ],
+): Provider[] {
+  return [
+    AttractapGateway,
+    WebsocketService,
+    { provide: AttractapService, useValue: attractapService },
+    { provide: UsersService, useValue: {} },
+    { provide: AttractapFirmwareService, useValue: {} },
+    { provide: SumUpService, useValue: {} },
+    { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
+    { provide: LicenseService, useValue: licenseService },
+    { provide: ResourceUsageService, useValue: {} },
+    { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
+    { provide: ResourceHealthService, useValue: { listForResource: jest.fn().mockResolvedValue([]) } },
+    { provide: ResourceIntroductionsService, useValue: {} },
+    { provide: ResourceIntroducersService, useValue: {} },
+    { provide: ResourceFlowsService, useValue: {} },
+    { provide: ResourceFlowsExecutorService, useValue: {} },
+    { provide: ProjectsService, useValue: {} },
+    { provide: ResourceFormsService, useValue: {} },
+    { provide: MetricsService, useValue: mockMetricsService },
+    { provide: WS_METRICS, useValue: mockWsMetrics },
+    { provide: MetricsToggleService, useValue: mockMetricsToggle },
+    { provide: SupervisionService, useValue: {} },
+    { provide: RbacService, useValue: {} },
+    { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
+    { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
+    { provide: getRepositoryToken(Resource), useValue: {} },
+    ResourceListService,
+    ResourceActionGuard,
+    AttractapAuthHandler,
+    AttractapFirmwareHandler,
+    AttractapCrashReportHandler,
+    AttractapCardHandler,
+    AttractapFormsHandler,
+    AttractapSessionHandler,
+    { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
+    { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
+    AttractapBillingHandler,
+    AttractapProjectsHandler,
+    AttractapSupervisionHandler,
+    ...security,
+  ];
+}
+
 export function registerAttractapGatewayFixture() {
   let gateway: AttractapGateway;
 
@@ -94,46 +148,7 @@ export function registerAttractapGatewayFixture() {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AttractapGateway,
-        WebsocketService,
-        { provide: AttractapService, useValue: attractapService },
-        { provide: UsersService, useValue: {} },
-        { provide: AttractapFirmwareService, useValue: {} },
-        { provide: SumUpService, useValue: {} },
-        { provide: BillingService, useValue: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) } },
-        { provide: LicenseService, useValue: licenseService },
-        { provide: ResourceUsageService, useValue: {} },
-        { provide: ResourceMaintenanceService, useValue: { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } },
-        { provide: ResourceHealthService, useValue: { listForResource: jest.fn().mockResolvedValue([]) } },
-        { provide: ResourceIntroductionsService, useValue: {} },
-        { provide: ResourceIntroducersService, useValue: {} },
-        { provide: ResourceFlowsService, useValue: {} },
-        { provide: ResourceFlowsExecutorService, useValue: {} },
-        { provide: ProjectsService, useValue: {} },
-        { provide: ResourceFormsService, useValue: {} },
-        { provide: MetricsService, useValue: mockMetricsService },
-        { provide: WS_METRICS, useValue: mockWsMetrics },
-        { provide: MetricsToggleService, useValue: mockMetricsToggle },
-        { provide: SupervisionService, useValue: {} },
-        { provide: RbacService, useValue: {} },
-        { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
-        { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
-        { provide: getRepositoryToken(Resource), useValue: {} },
-        ResourceListService,
-        ResourceActionGuard,
-        AttractapAuthHandler,
-        AttractapFirmwareHandler,
-        AttractapCrashReportHandler,
-        AttractapCardHandler,
-        AttractapFormsHandler,
-        AttractapSessionHandler,
-        { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
-        { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
-        AttractapBillingHandler,
-        AttractapProjectsHandler,
-        AttractapSupervisionHandler,
-      ],
+      providers: gatewayProviders(attractapService, licenseService),
     }).compile();
 
     gateway = module.get(AttractapGateway);

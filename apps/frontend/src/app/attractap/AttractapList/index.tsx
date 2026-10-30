@@ -14,6 +14,9 @@ import {
 import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
 import { EmptyState } from '../../../components/emptyState';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
+import { PairingStateChip } from '../pairing/PairingStateChip';
+import { WaitingToPair } from '../pairing/WaitingToPair';
+import { readerIdsWaitingToPair } from '../pairing/pairingUtils';
 import { PageAction, PageHeader } from '../../../components/pageHeader/index';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
@@ -24,6 +27,7 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import {
   Attractap,
   useAttractapServiceGetFirmwares,
+  useAttractapServiceGetPairings,
   useAttractapServiceGetReaders,
   useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
@@ -45,6 +49,10 @@ export function useAttractapListState() {
   const { data: allReaders, error: readersError } = useAttractapServiceGetReaders(undefined, {
     refetchInterval: 5000,
   });
+
+  // Shares the cache with the Waiting to pair card, which keeps it fresh.
+  const { data: pairings } = useAttractapServiceGetPairings();
+  const waitingReaderIds = useMemo(() => readerIdsWaitingToPair(pairings), [pairings]);
 
   const toast = useToastMessage();
   const navigate = useNavigate();
@@ -119,6 +127,7 @@ export function useAttractapListState() {
     staleReaders,
     activeReaders,
     firmwareUpdateChip,
+    waitingReaderIds,
   } as const;
 }
 
@@ -133,6 +142,7 @@ export function AttractapList() {
     staleReaders,
     activeReaders,
     firmwareUpdateChip,
+    waitingReaderIds,
   } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
@@ -183,6 +193,7 @@ export function AttractapList() {
       />
 
       <div className="flex flex-col gap-4">
+        <WaitingToPair />
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
             <Card.Header>
@@ -209,7 +220,10 @@ export function AttractapList() {
                           id={reader.id}
                           className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}
                         >
-                          <TableCell>{reader.name}</TableCell>
+                          <TableCell>
+                            {reader.name}{' '}
+                            <PairingStateChip state={reader.pairingState} waiting={waitingReaderIds.has(reader.id)} />
+                          </TableCell>
                           <TableCell className="whitespace-nowrap">
                             {reader.firmware.name} ({reader.firmware.variant})
                             <br />

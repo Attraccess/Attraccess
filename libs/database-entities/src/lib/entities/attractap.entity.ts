@@ -101,6 +101,30 @@ export class Attractap {
   @Exclude()
   apiTokenHash!: string;
 
+  @Column({ type: 'text', nullable: false, default: 'unpaired' })
+  @ApiProperty({
+    description: 'Pairing state: unpaired (legacy token sign-in), paired (TLS identity) or revoked',
+    enum: ['unpaired', 'paired', 'revoked'],
+    default: 'unpaired',
+  })
+  pairingState!: 'unpaired' | 'paired' | 'revoked';
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'SHA-256 fingerprint of the current reader public key', nullable: true })
+  credentialFingerprint!: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({ description: 'When the reader was paired', nullable: true })
+  pairedAt!: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({ description: 'Expiry of the current reader certificate', nullable: true })
+  certificateNotAfter!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Serial number of the current reader certificate', nullable: true })
+  certificateSerial!: string | null;
+
   @ManyToMany(() => Resource, (resource) => resource.attractapReaders)
   @JoinTable()
   @ApiProperty({ description: 'The resources that the reader has access to', type: () => Resource, isArray: true })

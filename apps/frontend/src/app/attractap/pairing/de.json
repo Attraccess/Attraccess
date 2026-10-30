@@ -1,0 +1,108 @@
+{
+  "state": {
+    "unpaired": "Nicht gekoppelt",
+    "paired": "Gekoppelt",
+    "revoked": "Widerrufen",
+    "waiting": "Wartet auf Kopplung"
+  },
+  "dialog": {
+    "title": "Reader koppeln",
+    "insecureWarning": "Diese Seite wird nicht über HTTPS ausgeliefert. Wer das Netzwerk kontrolliert, könnte dir einen gefälschten Code anzeigen. Nutze HTTPS oder ein vertrauenswürdiges Netz zum Koppeln.",
+    "chooseMode": "Was soll mit diesem Reader passieren?",
+    "mode": {
+      "new": "Als neuen Reader hinzufügen",
+      "repair": "Bestehenden Reader neu koppeln (gleiches Gerät, neuer Schlüssel)",
+      "replace": "Bestehenden Reader ersetzen (neues Gerät übernimmt)"
+    },
+    "targetReader": "Bestehender Reader",
+    "start": "Code anzeigen",
+    "retry": "Erneut versuchen",
+    "waitingForReader": "Warte auf den Reader…",
+    "connectionLost": "Verbindung zum Server verloren. Der angezeigte Status ist möglicherweise veraltet.",
+    "startFailed": "Kopplung konnte nicht gestartet werden",
+    "confirmFailed": "Code konnte nicht bestätigt werden",
+    "cancelFailed": "Kopplung konnte nicht abgebrochen werden",
+    "compare": "Vergleiche diesen Code mit dem Code am Reader",
+    "colourHint": "Segment 1 blinkt am Reader als Startmarke.",
+    "colourItem": "{{index}} {{colour}}",
+    "colour": {
+      "red": "Rot",
+      "green": "Grün",
+      "blue": "Blau",
+      "yellow": "Gelb",
+      "white": "Weiß",
+      "magenta": "Magenta"
+    },
+    "timeLeft": "Verbleibende Zeit: {{time}}",
+    "adminWaiting": "Wartet auf deine Bestätigung",
+    "adminDone": "Du hast bestätigt",
+    "readerWaiting": "Wartet auf Bestätigung am Reader",
+    "readerDone": "Am Reader bestätigt",
+    "confirm": "Codes stimmen überein",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "completed": "Der Reader ist gekoppelt.",
+    "failed": "Kopplung fehlgeschlagen. Starte neu, um einen neuen Code zu erhalten.",
+    "expired": "Zeitüberschreitung. Starte neu, um einen neuen Code zu erhalten.",
+    "cancelled": "Kopplung wurde abgebrochen.",
+    "reason": {
+      "cancelled-at-reader": "Sie wurde am Reader abgebrochen.",
+      "cancelled-by-admin": "Sie wurde in der Verwaltung abgebrochen.",
+      "reader-disconnected": "Der Reader hat die Verbindung getrennt, bevor die Kopplung abgeschlossen war.",
+      "protocol": "Der Reader hat eine ungültige Kopplungsnachricht gesendet.",
+      "expired": "Nicht beide Seiten haben innerhalb von 5 Minuten bestätigt.",
+      "internal": "Auf dem Server ist ein Fehler aufgetreten."
+    }
+  },
+  "waiting": {
+    "title": "Wartet auf Kopplung",
+    "description": "Diese Reader haben sich gemeldet und warten darauf, von einem Admin gekoppelt zu werden.",
+    "kind": {
+      "touch": "Touch",
+      "lite": "Lite"
+    },
+    "key": "Schlüssel {{fingerprint}}",
+    "announcedAt": "Gemeldet {{time}}",
+    "pair": "Koppeln",
+    "resume": "Fortsetzen"
+  },
+  "security": {
+    "title": "Sicherheit",
+    "state": "Status",
+    "immediateHint": "Diese Aktionen wirken sofort. Du musst nicht speichern.",
+    "fingerprint": "Schlüssel-Fingerabdruck",
+    "pairedAt": "Gekoppelt am",
+    "pairedBy": "Gekoppelt von",
+    "certificateExpiry": "Zertifikat gültig bis",
+    "certificateSerial": "Zertifikat {{serial}}",
+    "pair": "Koppeln",
+    "repair": "Neu koppeln",
+    "replace": "Ersetzen",
+    "revoke": "Widerrufen",
+    "requested": "Der Reader wurde aufgefordert, die Kopplung zu starten. Er erscheint gleich.",
+    "requestFailed": "Der Reader konnte nicht zur Kopplung aufgefordert werden",
+    "notConnected": "Der Reader ist gerade nicht verbunden. Zum Koppeln muss er online sein.",
+    "noResponse": "Der Reader hat die Kopplung nicht gestartet. Prüfe, ob er online ist, und versuche es erneut.",
+    "noCandidate": "Es wartet kein Reader auf die Kopplung. Widerrufe die Kopplung des Readers oder setze sie am Gerät zurück und versuche es erneut.",
+    "chooseDevice": {
+      "title": {
+        "repair": "Neu koppeln: Gerät auswählen",
+        "replace": "Ersetzen: Gerät auswählen"
+      },
+      "description": "Wähle das Gerät, das diesen Eintrag übernehmen soll. Zu jedem Gerät siehst du Typ, Schlüssel und wann es sich gemeldet hat.",
+      "use": "Dieses Gerät verwenden"
+    },
+    "revoked": "Kopplung widerrufen",
+    "revokeFailed": "Kopplung konnte nicht widerrufen werden",
+    "history": "Schlüsselverlauf",
+    "historyEmpty": "Noch keine Schlüssel.",
+    "event": {
+      "paired": "Gekoppelt",
+      "revoked": "Widerrufen",
+      "replaced": "Ersetzt"
+    },
+    "unpairedHint": "Dieser Reader meldet sich noch mit seinem Token an. Koppeln gibt ihm einen eigenen Schlüssel und eine verschlüsselte Verbindung.",
+    "revokeTitle": "Kopplung widerrufen?",
+    "revokeMessage": "Der Reader verliert seinen Schlüssel. Die Verbindung endet innerhalb einer Sekunde und er erscheint unter „Wartet auf Kopplung“. Eine Anmeldung per Token ist nicht mehr möglich."
+  }
+}

@@ -6,6 +6,14 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
   'card.linked': new Set(['readerId', 'source']),
   'card.unlinked': new Set(['readerId', 'source']),
   'reader.crash_reported': new Set(['source', 'resetReason', 'hasCoredump']),
+  'reader.pairing_started': new Set(['mode']),
+  'reader.pairing_confirmed': new Set(['mode']),
+  'reader.pairing_failed': new Set(['reason']),
+  'reader.pairing_expired': new Set(['reason']),
+  'reader.revoked': new Set(['reason']),
+  'reader.replaced': new Set(['replacedReaderId']),
+  'reader.token_rejected': new Set(['reason']),
+  'reader.handshake_rejected': new Set(['reason', 'count']),
 };
 export const attractapResetReasons = new Set([
   'POWERON',
@@ -35,6 +43,10 @@ export function validAttractapDetails(
     if (key === 'resetReason' && !attractapResetReasons.has(value as string)) return false;
     if (key === 'hasCoredump' && typeof value !== 'boolean') return false;
     if (key === 'readerId' && !positive(value)) return false;
+    if (key === 'replacedReaderId' && !positive(value)) return false;
+    if (key === 'count' && !positive(value)) return false;
+    if (key === 'mode' && !oneOf('new', 'pair', 'repair', 'replace')(value)) return false;
+    if (key === 'reason' && !(typeof value === 'string' && /^[a-z0-9-]{1,40}$/.test(value))) return false;
   }
   return true;
 }
@@ -60,4 +72,12 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.card.linked',
   'attractap.card.unlinked',
   'attractap.reader.crash_reported',
+  'attractap.reader.pairing_started',
+  'attractap.reader.pairing_confirmed',
+  'attractap.reader.pairing_failed',
+  'attractap.reader.pairing_expired',
+  'attractap.reader.revoked',
+  'attractap.reader.replaced',
+  'attractap.reader.token_rejected',
+  'attractap.reader.handshake_rejected',
 ];

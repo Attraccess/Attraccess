@@ -1,0 +1,108 @@
+{
+  "state": {
+    "unpaired": "Not paired",
+    "paired": "Paired",
+    "revoked": "Revoked",
+    "waiting": "Waiting to pair"
+  },
+  "dialog": {
+    "title": "Pair reader",
+    "insecureWarning": "This page is not served over HTTPS. Someone who controls the network could show you a fake code. Use HTTPS or a trusted network to pair.",
+    "chooseMode": "What should happen with this reader?",
+    "mode": {
+      "new": "Add as a new reader",
+      "repair": "Re-pair an existing reader (same device, new key)",
+      "replace": "Replace an existing reader (new device takes over)"
+    },
+    "targetReader": "Existing reader",
+    "start": "Show code",
+    "retry": "Try again",
+    "waitingForReader": "Waiting for the reader…",
+    "connectionLost": "Connection to the server lost. The status shown here may be out of date.",
+    "startFailed": "Could not start pairing",
+    "confirmFailed": "Could not confirm the code",
+    "cancelFailed": "Could not cancel pairing",
+    "compare": "Compare this code with the code on the reader",
+    "colourHint": "Segment 1 blinks on the reader to mark the start.",
+    "colourItem": "{{index}} {{colour}}",
+    "colour": {
+      "red": "Red",
+      "green": "Green",
+      "blue": "Blue",
+      "yellow": "Yellow",
+      "white": "White",
+      "magenta": "Magenta"
+    },
+    "timeLeft": "Time left: {{time}}",
+    "adminWaiting": "Waiting for you to confirm",
+    "adminDone": "You confirmed",
+    "readerWaiting": "Waiting for confirmation at the reader",
+    "readerDone": "Confirmed at the reader",
+    "confirm": "Codes match",
+    "cancel": "Cancel",
+    "close": "Close",
+    "completed": "The reader is paired.",
+    "failed": "Pairing failed. Start again to get a new code.",
+    "expired": "Pairing timed out. Start again to get a new code.",
+    "cancelled": "Pairing was cancelled.",
+    "reason": {
+      "cancelled-at-reader": "It was cancelled at the reader.",
+      "cancelled-by-admin": "It was cancelled in the admin interface.",
+      "reader-disconnected": "The reader disconnected before pairing finished.",
+      "protocol": "The reader sent an invalid pairing message.",
+      "expired": "Not both sides confirmed within 5 minutes.",
+      "internal": "An error occurred on the server."
+    }
+  },
+  "waiting": {
+    "title": "Waiting to pair",
+    "description": "These readers announced themselves and wait for an admin to pair them.",
+    "kind": {
+      "touch": "Touch",
+      "lite": "Lite"
+    },
+    "key": "Key {{fingerprint}}",
+    "announcedAt": "Announced {{time}}",
+    "pair": "Pair",
+    "resume": "Continue"
+  },
+  "security": {
+    "title": "Security",
+    "state": "Status",
+    "immediateHint": "These actions take effect immediately. You do not need to save.",
+    "fingerprint": "Key fingerprint",
+    "pairedAt": "Paired on",
+    "pairedBy": "Paired by",
+    "certificateExpiry": "Certificate valid until",
+    "certificateSerial": "Certificate {{serial}}",
+    "pair": "Pair",
+    "repair": "Re-pair",
+    "replace": "Replace",
+    "revoke": "Revoke",
+    "requested": "The reader was asked to start pairing. It will show up in a moment.",
+    "requestFailed": "Could not ask the reader to pair",
+    "notConnected": "The reader is not connected right now. Pairing needs the reader to be online.",
+    "noResponse": "The reader did not start pairing. Check that it is online and try again.",
+    "noCandidate": "No reader is waiting to pair. Revoke the reader or reset its pairing on the device, then try again.",
+    "chooseDevice": {
+      "title": {
+        "repair": "Re-pair: choose the device",
+        "replace": "Replace: choose the device"
+      },
+      "description": "Choose the device that should take over this record. Each device shows its type, its key and when it announced itself.",
+      "use": "Use this device"
+    },
+    "revoked": "Pairing revoked",
+    "revokeFailed": "Could not revoke the pairing",
+    "history": "Credential history",
+    "historyEmpty": "No credentials yet.",
+    "event": {
+      "paired": "Paired",
+      "revoked": "Revoked",
+      "replaced": "Replaced"
+    },
+    "unpairedHint": "This reader still signs in with its token. Pair it to give it its own key and an encrypted connection.",
+    "revokeTitle": "Revoke pairing?",
+    "revokeMessage": "The reader loses its key. Its live connection ends within a second and it will show up under Waiting to pair. It cannot sign in with a token any more."
+  }
+}
