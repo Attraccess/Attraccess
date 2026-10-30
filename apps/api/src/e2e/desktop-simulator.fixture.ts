@@ -167,7 +167,8 @@ export class DesktopFixture {
           return existsSync(join(this.control, 'ready'));
         },
         'reader authentication',
-        60_000,
+        // Approval adds a code round trip through the API; without it the original startup bound applies.
+        this.approve ? 60_000 : undefined,
       );
     } catch (error) {
       await withDesktopCleanup(

@@ -9,6 +9,8 @@ import { MetricsService } from '../../../../metrics/metrics.service';
 import { DeviceEnrollmentService } from '../../../../device-enrollment/device-enrollment.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { readerServerTime } from '../../websocket-reader-payloads';
+import { redactTokens } from '../../websocket-log';
+import { AuditService } from '../../../../audit/audit.service';
 
 @Injectable()
 export class AttractapAuthHandler {
@@ -32,13 +34,22 @@ export class AttractapAuthHandler {
   @Inject(WebsocketService)
   private websocketService: WebsocketService;
 
+  @Inject(AuditService)
+  private audit: AuditService;
+
   /**
    * A new reader only asks for a code here. The record and its credentials are created once an
    * admin approved that code, see DeviceEnrollmentService.approve. Firmware without the `enrollment`
    * field cannot show a code, so it gets no reply and nothing is created.
    */
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    if (!data.payload?.enrollment || typeof data.payload.enrollment !== 'object') {
+    // Nest can dispatch messages before the async handleConnection set the socket up (license check).
+    if (socket.readyState !== WebSocket.OPEN || !socket.id || typeof socket.sendMessage !== 'function') return;
+    if (socket.readerId) {
+      this.logger.warn(`Ignoring REGISTER from ${socket.id}: already authenticated as reader ${socket.readerId}`);
+      return;
+    }
+    if (!data?.payload?.enrollment || typeof data.payload.enrollment !== 'object') {
       this.logger.warn(`Ignoring REGISTER from ${socket.id}: firmware does not support enrollment codes`);
       return;
     }
@@ -68,6 +79,15 @@ export class AttractapAuthHandler {
           rollback: async () => {
             await this.attractapService.deleteReader(reader.id);
           },
+          recordEnrolled: (principal) =>
+            this.audit.recordAttractap({
+              action: 'reader.enrolled',
+              actorId: principal.userId,
+              authenticationMethod: principal.authenticationMethod,
+              ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
+              subjectId: reader.id,
+              details: { source: 'enrollment-code' },
+            }),
         };
       },
       close: () => socket.close(),
@@ -80,7 +100,7 @@ export class AttractapAuthHandler {
 
   public async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     if (socket.readyState !== WebSocket.OPEN) return;
-    this.logger.debug('processing READER_AUTHENTICATE event', data);
+    this.logger.debug('processing READER_AUTHENTICATE event', redactTokens(data));
 
     const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
       message: 'PLEASE_REREGISTER',
@@ -129,6 +149,8 @@ export class AttractapAuthHandler {
     const language = this.websocketService.readerLanguage ?? storedLanguage;
     socket.readerId = reader.id;
     socket.readerName = reader.name;
+    // A connection that asked for a code but then authenticated with existing credentials no longer waits.
+    this.deviceEnrollment.release(socket.id);
     this.metricsService.attractapReaderConnected.set({ reader_id: String(reader.id), reader_name: reader.name }, 1);
 
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {

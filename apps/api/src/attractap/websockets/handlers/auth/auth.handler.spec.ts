@@ -69,23 +69,46 @@ describe('AttractapAuthHandler', () => {
     (handler as any).audit = mockAudit;
     (handler as any).settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
     (handler as any).websocketService = new WebsocketService();
+    (handler as any).deviceEnrollment = { request: jest.fn().mockReturnValue(true), release: jest.fn() };
   });
 
   describe('handleReaderRegister', () => {
-    let mockEnrollment: { request: jest.Mock };
+    let mockEnrollment: { request: jest.Mock; release: jest.Mock };
+    const register = { payload: { enrollment: { protocol: 1 } } } as AttractapEvent['data'];
 
     beforeEach(() => {
-      mockEnrollment = { request: jest.fn().mockReturnValue(true) };
-      (handler as any).deviceEnrollment = mockEnrollment;
+      mockEnrollment = (handler as any).deviceEnrollment;
       (mockSocket as any).clientAddress = '10.0.0.5';
     });
 
-    it('creates nothing and sends nothing for firmware without enrollment support', async () => {
-      await handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data']);
+    it.each([
+      ['an empty payload', { payload: {} }],
+      ['a null payload', { payload: null }],
+      ['no payload', {}],
+      ['a non-object enrollment field', { payload: { enrollment: true } }],
+    ])('creates nothing and sends nothing for firmware without enrollment support (%s)', async (_case, data) => {
+      await handler.handleReaderRegister(mockSocket as any, data as AttractapEvent['data']);
 
       expect(mockEnrollment.request).not.toHaveBeenCalled();
       expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
       expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['the socket is closing', () => (mockSocket.readyState = WebSocket.CLOSING)],
+      ['the socket is closed', () => (mockSocket.readyState = WebSocket.CLOSED)],
+      ['the connection is not set up yet (no id)', () => ((mockSocket as any).id = undefined)],
+      ['the connection is not set up yet (no sendMessage)', () => ((mockSocket as any).sendMessage = undefined)],
+      ['the socket is already an authenticated reader', () => (mockSocket.readerId = 42)],
+    ])('ignores REGISTER when %s', async (_case, arrange) => {
+      const sendMessage = mockSocket.sendMessage;
+      arrange();
+
+      await handler.handleReaderRegister(mockSocket as any, register);
+
+      expect(mockEnrollment.request).not.toHaveBeenCalled();
+      expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
+      expect(sendMessage).not.toHaveBeenCalled();
     });
 
     it('queues an enrollment request without creating a reader', async () => {
@@ -159,6 +182,31 @@ describe('AttractapAuthHandler', () => {
 
       await device.rollback();
       expect(mockAttractapService.deleteReader).toHaveBeenCalledWith(99);
+    });
+
+    it('audits the enrollment as reader.enrolled with the approver', async () => {
+      mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 99, name: 'Door' }, token: 'tok-abc' });
+      await handler.handleReaderRegister(mockSocket as any, register);
+      const device = await mockEnrollment.request.mock.calls[0][0].provision({});
+
+      await device.recordEnrolled({ userId: 4, authenticationMethod: 'api-token', apiTokenId: 9 });
+      await device.recordEnrolled({ userId: 5, authenticationMethod: 'session' });
+
+      expect(mockAudit.recordAttractap).toHaveBeenNthCalledWith(1, {
+        action: 'reader.enrolled',
+        actorId: 4,
+        authenticationMethod: 'api-token',
+        apiTokenId: 9,
+        subjectId: 99,
+        details: { source: 'enrollment-code' },
+      });
+      expect(mockAudit.recordAttractap).toHaveBeenNthCalledWith(2, {
+        action: 'reader.enrolled',
+        actorId: 5,
+        authenticationMethod: 'session',
+        subjectId: 99,
+        details: { source: 'enrollment-code' },
+      });
     });
   });
 
@@ -320,6 +368,10 @@ describe('AttractapAuthHandler', () => {
 
       expect(mockVerifyToken).toHaveBeenCalledWith('client-token', 'hashed');
       expect(mockSocket.readerId).toBe(42);
+      // A request for a code from the same connection is dropped once it authenticated.
+      expect((handler as any).deviceEnrollment.release).toHaveBeenCalledWith('socket-1');
+      // The credentials never reach the debug log.
+      expect(JSON.stringify((handler as any).logger.debug.mock.calls)).not.toContain('client-token');
       expect(mockSocket.readerName).toBe('Reader A');
       expect(mockMetricsService.attractapReaderConnected.set).toHaveBeenCalledWith(
         { reader_id: '42', reader_name: 'Reader A' },

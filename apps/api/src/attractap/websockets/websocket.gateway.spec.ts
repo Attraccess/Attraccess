@@ -98,6 +98,45 @@ describe('AttractapGateway', () => {
       // Wait for the promise to settle (connection will be closed due to no ACK)
       await connectionPromise;
     }, 30000);
+
+    it.each(['10.0.0.0/33', 'garbage'])('uses the socket address when TRUST_PROXY is invalid (%s)', async (value) => {
+      const previous = process.env.TRUST_PROXY;
+      process.env.TRUST_PROXY = value;
+      try {
+        // A failing first send ends handleConnection right away instead of waiting for ACK retries.
+        const send = jest.fn(() => {
+          throw new Error('socket closed');
+        });
+        const client = { close: jest.fn(), send, on: jest.fn() } as unknown as WebSocket;
+        const request = { socket: { remoteAddress: '10.0.0.2' }, headers: { 'x-forwarded-for': '1.2.3.4' } };
+
+        await expect(fixture.gateway.handleConnection(client, request as never)).resolves.toBeUndefined();
+
+        expect((client as unknown as AuthenticatedWebSocket).clientAddress).toBe('10.0.0.2');
+        expect(send).toHaveBeenCalled();
+      } finally {
+        if (previous === undefined) delete process.env.TRUST_PROXY;
+        else process.env.TRUST_PROXY = previous;
+      }
+    });
+
+    it('never writes reader tokens to the debug log', async () => {
+      const socket = fixture.createMockSocket({ id: 'log-1' });
+      const debug = jest.spyOn(fixture.gateway['logger'], 'debug').mockImplementation(() => undefined);
+      jest.spyOn(fixture.gateway['authHandler'], 'handleAuthentication').mockResolvedValue(undefined);
+
+      await fixture.gateway.onClientEvent(
+        { type: AttractapEventType.READER_AUTHENTICATE, payload: { id: 1, token: 'client-secret' } } as never,
+        socket,
+      );
+      await fixture.gateway.onClientEvent(
+        { type: 'ACK_READER_REGISTER', payload: { token: 'ack-secret' } } as never,
+        socket,
+      );
+
+      expect(JSON.stringify(debug.mock.calls)).not.toMatch(/client-secret|ack-secret/);
+      expect(JSON.stringify(debug.mock.calls)).toContain('[redacted]');
+    });
   });
 
   describe('handleDisconnect', () => {
@@ -135,6 +174,21 @@ describe('AttractapGateway', () => {
 
       expect(identity).toEqual({ readerId: null, readerName: null });
       expect(invalidated).toBe(true);
+    });
+
+    it('releases a pending enrollment before waiting for cleanup', async () => {
+      const socket = fixture.createMockSocket({ id: 'enrolling' });
+      const enrollment = fixture.gateway['authHandler']['deviceEnrollment'] as unknown as { release: jest.Mock };
+      enrollment.release.mockClear();
+      const release = await fixture.gateway['clientResponseAwaitersMutex'].acquire();
+
+      const disconnect = fixture.gateway.handleDisconnect(socket);
+      const releasedBeforeLock = enrollment.release.mock.calls.length;
+      release();
+      await disconnect;
+
+      expect(releasedBeforeLock).toBe(1);
+      expect(enrollment.release).toHaveBeenCalledWith('enrolling');
     });
 
     it('removes the socket from websocketService', async () => {

@@ -34,7 +34,9 @@ import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
 import { randomBytes } from 'crypto';
 import { closeSync } from 'fs';
+import { IncomingMessage } from 'http';
 import { resolveClientAddress } from '../../device-enrollment/client-address';
+import { redactTokens } from './websocket-log';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 @UseInterceptors(WsMetricsInterceptor)
@@ -382,7 +384,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
     if (eventData.type.startsWith('ACK_')) {
-      this.logger.debug(`Received ACK response from client ${socket.id}: ${JSON.stringify(eventData)}`);
+      this.logger.debug(`Received ACK response from client ${socket.id}: ${JSON.stringify(redactTokens(eventData))}`);
 
       this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
       return;
@@ -398,7 +400,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     await this.clientWasActive(socket);
 
-    this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
+    this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(redactTokens(eventData))}`);
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);
@@ -411,7 +413,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
   }
 
-  public async handleConnection(client: WebSocket, request?: Parameters<typeof resolveClientAddress>[0]) {
+  public async handleConnection(client: WebSocket, request?: IncomingMessage) {
     this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
 
@@ -452,7 +454,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           return false;
         this.logger.debug(
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-          message.data.payload,
+          redactTokens(message.data.payload),
         );
         // An older auth/update retry must not restore a superseded default.
         if (
@@ -535,6 +537,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
+    // A closed connection must never be approved, so its request goes before any await.
+    this.authHandler.releaseEnrollment(socket);
     // Invalidate asynchronous authentication before waiting on cleanup locks.
     const readerId = socket.readerId;
     const readerName = socket.readerName;
@@ -587,7 +591,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         // nothing to do
       }
     }
-    this.authHandler.releaseEnrollment(socket);
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

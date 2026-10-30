@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { DEVICE_KINDS, DeviceKind } from '../device-enrollment.constants';
 
 export class ApproveDeviceEnrollmentDto {
   @ApiProperty({
@@ -20,8 +21,8 @@ export class ApproveDeviceEnrollmentDto {
 }
 
 export class ApproveDeviceEnrollmentResponseDto {
-  @ApiProperty({ enum: ['reader'], example: 'reader' })
-  kind: 'reader';
+  @ApiProperty({ enum: [...DEVICE_KINDS], example: 'reader' })
+  kind: DeviceKind;
 
   @ApiProperty({ description: 'ID of the new device', example: 1 })
   id: number;

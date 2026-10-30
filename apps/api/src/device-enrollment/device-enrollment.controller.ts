@@ -18,7 +18,10 @@ export class DeviceEnrollmentController {
   })
   @ApiResponse({ status: 200, type: ApproveDeviceEnrollmentResponseDto })
   @ApiResponse({ status: 404, description: 'No waiting device shows this code' })
-  @ApiResponse({ status: 429, description: 'Too many wrong codes' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too many wrong codes (EnrollmentRateLimited); retryAfterSeconds says when to try again',
+  })
   @ApiResponse({ status: 502, description: 'The device did not confirm; nothing was created' })
   async approve(
     @Body() body: ApproveDeviceEnrollmentDto,

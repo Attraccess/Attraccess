@@ -1,8 +1,8 @@
 import { BadGatewayException, Injectable, Logger, NotFoundException, OnApplicationShutdown } from '@nestjs/common';
 import { FixedWindowCounterStore, WindowCounterEntry } from '../common/rate-limiting/fixed-window-counter';
-import { AuditService } from '../audit/audit.service';
-import { TooManyAuthAttemptsException } from '../users-and-auth/rate-limiting/exceptions';
+import { addressBucket } from './client-address';
 import {
+  DeviceKind,
   ENROLLMENT_ADDRESS_ATTEMPTS,
   ENROLLMENT_APPROVER_WRONG_CODES,
   ENROLLMENT_CODE_ROTATION_MS,
@@ -11,16 +11,19 @@ import {
   ENROLLMENT_MAX_PENDING_TOTAL,
   ENROLLMENT_REQUEST_TTL_MS,
 } from './device-enrollment.constants';
+import { EnrollmentRateLimitedException } from './enrollment-rate-limited.exception';
 import { formatEnrollmentCode, generateEnrollmentCode, normalizeEnrollmentCode } from './enrollment-code';
 
 export interface ProvisionedDevice {
-  kind: 'reader';
+  kind: DeviceKind;
   id: number;
   name: string;
   /** Hands the credentials to the waiting connection; resolves false when the device never confirmed. */
   deliver: () => Promise<boolean>;
   /** Removes everything provisioned, used when delivery failed. */
   rollback: () => Promise<void>;
+  /** Audits the approval in the device's own domain. Failures are logged, they do not undo the enrollment. */
+  recordEnrolled: (principal: EnrollmentPrincipal) => Promise<void>;
 }
 
 export interface EnrollmentConnection {
@@ -44,13 +47,15 @@ export interface EnrollmentPrincipal {
 }
 
 export interface EnrollmentResult {
-  kind: 'reader';
+  kind: DeviceKind;
   id: number;
   name: string;
 }
 
 interface Pending {
   connection: EnrollmentConnection;
+  /** Key for the per-address limits, see addressBucket. */
+  addressBucket: string;
   code: string;
   previousCode: string | null;
   nextRotationAt: number;
@@ -63,6 +68,22 @@ const MAX_COUNTER_ENTRIES = 10_000;
 
 function isStale(windowMs: number, now: number) {
   return (entry: WindowCounterEntry) => now - entry.firstAt > windowMs;
+}
+
+function countAttempt<K>(
+  store: FixedWindowCounterStore<K, WindowCounterEntry>,
+  key: K,
+  policy: { limit: number; windowMs: number },
+  now: number,
+): { allowed: boolean; retryAfterMs: number } {
+  store.evict(isStale(policy.windowMs, now));
+  const entry = store.get(key);
+  if (!entry) {
+    store.set(key, { count: 1, firstAt: now });
+    return { allowed: true, retryAfterMs: 0 };
+  }
+  entry.count += 1;
+  return { allowed: entry.count <= policy.limit, retryAfterMs: Math.max(0, entry.firstAt + policy.windowMs - now) };
 }
 
 /**
@@ -79,8 +100,6 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
   private readonly addressAttempts = new FixedWindowCounterStore<string, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly approverFailures = new FixedWindowCounterStore<number, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
 
-  constructor(private readonly audit: AuditService) {}
-
   get pendingCount(): number {
     return this.pending.size;
   }
@@ -93,37 +112,27 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
   request(connection: EnrollmentConnection): boolean {
     const now = Date.now();
 
-    const attempt = (
-      store: FixedWindowCounterStore<string, WindowCounterEntry>,
-      key: string,
-      policy: { limit: number; windowMs: number },
-    ) => {
-      store.evict(isStale(policy.windowMs, now));
-      const entry = store.get(key);
-      if (!entry) {
-        store.set(key, { count: 1, firstAt: now });
-        return { allowed: true, retryAfterMs: 0 };
-      }
-      entry.count += 1;
-      return { allowed: entry.count <= policy.limit, retryAfterMs: entry.firstAt + policy.windowMs - now };
-    };
-
-    const perConnection = attempt(this.connectionAttempts, connection.id, ENROLLMENT_CONNECTION_ATTEMPTS);
-    const perAddress = attempt(this.addressAttempts, connection.address, ENROLLMENT_ADDRESS_ATTEMPTS);
-    if (!perConnection.allowed || !perAddress.allowed) {
-      connection.sendRejected('RATE_LIMITED', Math.max(perConnection.retryAfterMs, perAddress.retryAfterMs, 0));
-      return false;
-    }
-
+    // A repeated REGISTER keeps the request (and its code) alive. Over the limit it is ignored rather than
+    // rejected, because a rejection makes the device drop a code that can still be approved.
     const existing = this.pending.get(connection.id);
     if (existing) {
-      this.announce(existing, now);
+      if (countAttempt(this.connectionAttempts, connection.id, ENROLLMENT_CONNECTION_ATTEMPTS, now).allowed) {
+        this.announce(existing, now);
+      }
       return true;
     }
 
-    const fromAddress = [...this.pending.values()].filter(
-      (other) => other.connection.address === connection.address,
-    ).length;
+    const bucket = addressBucket(connection.address);
+    const refused = [
+      countAttempt(this.connectionAttempts, connection.id, ENROLLMENT_CONNECTION_ATTEMPTS, now),
+      countAttempt(this.addressAttempts, bucket, ENROLLMENT_ADDRESS_ATTEMPTS, now),
+    ].filter((result) => !result.allowed);
+    if (refused.length > 0) {
+      connection.sendRejected('RATE_LIMITED', Math.max(...refused.map((result) => result.retryAfterMs)));
+      return false;
+    }
+
+    const fromAddress = [...this.pending.values()].filter((other) => other.addressBucket === bucket).length;
     if (fromAddress >= ENROLLMENT_MAX_PENDING_PER_ADDRESS || this.pending.size >= ENROLLMENT_MAX_PENDING_TOTAL) {
       connection.sendRejected('BUSY', ENROLLMENT_CODE_ROTATION_MS);
       return false;
@@ -131,6 +140,7 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
 
     const entry: Pending = {
       connection,
+      addressBucket: bucket,
       code: generateEnrollmentCode((code) => this.codes.has(code)),
       previousCode: null,
       nextRotationAt: now + ENROLLMENT_CODE_ROTATION_MS,
@@ -167,7 +177,7 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     this.approverFailures.evict(isStale(ENROLLMENT_APPROVER_WRONG_CODES.windowMs, now));
     const failures = this.approverFailures.get(principal.userId);
     if (failures && failures.count >= ENROLLMENT_APPROVER_WRONG_CODES.limit) {
-      throw new TooManyAuthAttemptsException(
+      throw new EnrollmentRateLimitedException(
         Math.max(1, Math.ceil((failures.firstAt + ENROLLMENT_APPROVER_WRONG_CODES.windowMs - now) / 1000)),
       );
     }
@@ -206,16 +216,11 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
       throw new BadGatewayException('EnrollmentDeliveryFailed');
     }
 
-    await this.audit
-      .recordAttractap({
-        action: 'reader.enrolled',
-        actorId: principal.userId,
-        authenticationMethod: principal.authenticationMethod,
-        ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
-        subjectId: device.id,
-        details: { source: 'reader-enrollment' },
-      })
-      .catch(() => undefined);
+    try {
+      await device.recordEnrolled(principal);
+    } catch (error) {
+      this.logger.error(`Auditing the enrollment of ${device.kind} ${device.id} failed: ${(error as Error).message}`);
+    }
 
     this.approverFailures.delete(principal.userId);
     return { kind: device.kind, id: device.id, name: device.name };

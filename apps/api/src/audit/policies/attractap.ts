@@ -31,7 +31,10 @@ export function validAttractapDetails(
       (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
     )
       return false;
-    if (key === 'source' && !oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset')(value))
+    if (
+      key === 'source' &&
+      !oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'enrollment-code', 'reader-reset')(value)
+    )
       return false;
     if (key === 'resetReason' && !attractapResetReasons.has(value as string)) return false;
     if (key === 'hasCoredump' && typeof value !== 'boolean') return false;

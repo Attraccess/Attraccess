@@ -74,6 +74,19 @@ describe('audit storage safe snapshot', () => {
     ).toBeNull();
   });
 
+  it('keeps the approver and the enrollment-code source of reader enrollments', () => {
+    const enrolled = {
+      action: 'reader.enrolled' as const,
+      actorId: 4,
+      authenticationMethod: 'api-token' as const,
+      apiTokenId: 9,
+      subjectId: 5,
+      details: { source: 'enrollment-code' },
+    };
+    expect(projectAttractapAuditEvent(enrolled)).toEqual(enrolled);
+    expect(projectAttractapAuditEvent({ ...enrolled, details: { source: 'somewhere-else' } })).toBeNull();
+  });
+
   it('allows system-origin lifecycle events but rejects mixed origins', () => {
     const resourceEvent = {
       action: 'usage_session.ended' as const,
