@@ -80,6 +80,12 @@ class SecureProfileChecks(unittest.TestCase):
         resolved = PROFILE + "CONFIG_SECURE_BOOT_ALLOW_JTAG=y\n"
         self.assertEqual(len(c.check_profile(PROFILE, resolved)), 1)
 
+    def test_lab_overlay_never_passes_the_gate(self):
+        lab = open(os.path.join(FIRMWARE_DIR, "sdkconfig.secure-lab")).read()
+        errors = c.check_profile(PROFILE, PROFILE + lab)
+        for key in ("SECURE_FLASH_ENCRYPTION_MODE_RELEASE", "SECURE_ENABLE_SECURE_ROM_DL_MODE", "ESP_CONSOLE_NONE"):
+            self.assertTrue(any(e.startswith(f"CONFIG_{key}:") for e in errors), f"gate must reject lab CONFIG_{key}")
+
     def test_bootloader_size_limit(self):
         self.assertEqual(c.check_bootloader_size(0x7000), [])  # 0x7000 + 0x1000 signature sector
         self.assertEqual(len(c.check_bootloader_size(0x7001)), 1)
