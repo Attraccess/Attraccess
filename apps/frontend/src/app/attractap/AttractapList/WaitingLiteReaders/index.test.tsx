@@ -71,4 +71,16 @@ describe('WaitingLiteReaders', () => {
       requestBody: { pendingId: reader.pendingId, pattern: reader.pattern, name: 'Laser room' },
     });
   });
+
+  it('sends the approval once when the confirm button is pressed twice in a row', () => {
+    readers = [reader];
+    render(<WaitingLiteReaders />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    const confirm = screen.getByRole('button', { name: 'Approve reader' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    expect(approve).toHaveBeenCalledTimes(1);
+  });
 });

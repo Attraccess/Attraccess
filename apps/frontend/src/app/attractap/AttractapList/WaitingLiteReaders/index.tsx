@@ -1,6 +1,6 @@
 // Lists Attractap Lite readers that wait for approval and approves one by the colour pattern on its LED ring
 // FEATURE: ATT-1171 Lite colour pattern approval
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -95,13 +95,19 @@ function WaitingLiteReadersCard() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ApproveDeviceEnrollmentResponseDto | null>(null);
 
+  // isPending only flips after the next render, so a double click would send the request twice and the second
+  // one would fail (and count as a wrong attempt) because the reader is already approved.
+  const submitting = useRef(false);
+
   const { mutate: approve, isPending } = useDeviceEnrollmentServiceApproveLiteEnrollment({
     onSuccess: (approved) => {
+      submitting.current = false;
       setSelected(null);
       setResult(approved);
       void queryClient.invalidateQueries();
     },
     onError: (failure) => {
+      submitting.current = false;
       const status = (failure as ApiError)?.status;
       if (status === 404) setError(t('error.notFound'));
       else if (status === 429) setError(t('error.tooManyAttempts'));
@@ -117,7 +123,8 @@ function WaitingLiteReadersCard() {
   }, []);
 
   const submit = useCallback(() => {
-    if (!selected || isPending) return;
+    if (!selected || isPending || submitting.current) return;
+    submitting.current = true;
     setError(null);
     approve({
       requestBody: {
