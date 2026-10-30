@@ -29,28 +29,29 @@ Before you begin, make sure:
 > [!NOTE]
 > The reader's display shows its connection status and IP address once connected.
 
-## Step 2: Register the Reader in Attraccess
+## Step 2: Pair the Reader with Attraccess
 
-1. Open Attraccess in your browser
-2. Open the **Devices** group in the sidebar
-3. Click on **Attractap Readers**
-4. Click **Add Reader**
-5. Enter the reader details:
+A reader cannot register itself. It shows a rotating code and an admin approves it once.
 
-| Field | Description |
-|-------|-------------|
-| **Name** | A descriptive name (e.g. "Laser Cutter Reader") |
-| **Description** | Optional description of the reader's location or purpose |
+1. Make sure the reader knows your server address. A reader without credentials then goes straight
+   to pairing and shows a code (Touch: on the screen and as a QR code; Lite: as a colour pattern
+   on the LED ring and in the web flasher).
+2. Scan the QR code with your phone, or open the readers page in Attraccess (**Devices** >
+   **Attractap Readers**), choose to pair a reader and enter the code.
+3. Optionally enter a name (for example "Laser Cutter Reader") and approve.
 
-6. Click **Save**
+The reader connects and is ready. See [Reader Pairing](attractap/pairing.md) for details, the Lite
+LED pattern, security notes and what to do with readers that were registered before.
 
-<!-- TODO: Screenshot of the Add Reader dialog -->
+> [!NOTE]
+> You need the `resources.update` permission to approve a reader. Readers running firmware older
+> than 1.8.0 cannot pair a new reader; update them with the web flasher first.
 
 ## Step 3: Assign Resources to the Reader
 
-After registering the reader, you need to assign which resource(s) it controls:
+After pairing the reader, you need to assign which resource(s) it controls:
 
-1. Open the reader you just created
+1. Open the reader you just paired
 2. In the **Resources** section, click **Add Resource**
 3. Select the resource (machine or door) that this reader should control
 4. Click **Save**
@@ -74,7 +75,7 @@ The reader communicates with the Attraccess backend via WebSocket. The connectio
 |--------|-------------|
 | **Protocol** | WebSocket (WS/WSS) |
 | **Connection** | Persistent, auto-reconnect on disconnection |
-| **Authentication** | Reader authenticates with the backend using its registered credentials |
+| **Authentication** | Mutually authenticated TLS 1.3 inside the WebSocket, using the key and certificate issued when the reader was paired |
 
 > [!NOTE]
 > If your Attraccess server uses HTTPS, the reader will connect via secure WebSocket (WSS). Make sure your SSL certificate is valid.
@@ -84,12 +85,15 @@ The reader communicates with the Attraccess backend via WebSocket. The connectio
 | Problem | Solution |
 |---------|----------|
 | Reader display shows "No connection" | Check network connectivity and verify the Attraccess server URL |
-| Reader not appearing in Attraccess | Ensure the reader is on the same network and can reach the backend |
+| Reader not appearing in Attraccess | Ensure the reader is on the same network and can reach the backend. A reverse proxy must pass the `Sec-WebSocket-Protocol` header |
+| Code is rejected | The code changes every 30 seconds; enter the one currently shown. If a correctly read code keeps failing, check your network |
+| Settings of a reader are locked | The reader is not paired yet; use **Pair** on its row |
 | Card scan has no response | Verify the RFID card is registered and the reader has an assigned resource |
 
 ## See Also
 
 - [Overview](attractap/overview.md) -- What is Attractap?
+- [Reader Pairing](attractap/pairing.md) -- Approve readers, security and operations
 - [Hardware](attractap/hardware.md) -- Hardware variants and components
 - [RFID Cards](attractap/rfid-cards.md) -- Register and manage RFID cards
 - [Resources](resources/overview.md) -- Manage machines and doors

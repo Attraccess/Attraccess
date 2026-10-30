@@ -26,6 +26,8 @@ All configuration options for Attraccess that can be set via environment variabl
 
 > [!NOTE]
 > `TRUST_PROXY` is **off by default**. Behind a reverse proxy, every request otherwise appears to come from the proxy IP, so auth rate limiting throttles all users together instead of the real attacker. Set it to match your proxy chain (usually `1`). Trusting more hops than actually exist lets clients spoof their IP — see [Security](settings/security.md#reverse-proxies-and-the-real-client-ip). Takes effect after a restart.
+>
+> It also matters for [reader pairing](attractap/pairing.md): the limits on pairing requests per address use the same client IP. Without `TRUST_PROXY`, all readers behind the proxy share one limit.
 
 ## API application logs
 

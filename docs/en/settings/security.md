@@ -84,6 +84,8 @@ Set the `TRUST_PROXY` environment variable to the number of trusted proxy hops b
 > [!WARNING]
 > Trust only as many hops as actually exist in your deployment. If `TRUST_PROXY` trusts more hops than your real proxy chain, clients can forge `X-Forwarded-For` to rotate their apparent IP and evade rate limiting entirely. When unset, Attraccess trusts no forwarding headers (safe default). Changes take effect after a restart.
 
+The same client IP is used for the limits on [Attractap reader pairing](attractap/pairing.md) requests (per address). Also make sure the proxy passes the `Sec-WebSocket-Protocol` header, which readers use to select their encrypted connection.
+
 ## Approved websites
 
 Only approved websites may use a signed-in browser session. Other websites cannot read API responses, and their data-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) are refused with `403`. This also applies to websites under the same parent domain, for example `help.customer.com` next to `attraccess.customer.com`.

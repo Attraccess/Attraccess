@@ -10,12 +10,14 @@ import os
 from pathlib import Path
 import socket
 import time
+import urllib.error
 
 import pytest
 
 from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
 )
+from attractap_lab.enrollment import approve, latest_code
 from attractap_lab.reader_screen import ReaderTestHooks
 from attractap_lab.workflow import claim, send_reader_wifi
 
@@ -113,9 +115,31 @@ def admin(api):
     return api.login("admin")
 
 
+def approve_pairing(console, url, token, timeout=180):
+    """Approve the newest pairing code on the reader's UART as a new reader; return its id."""
+    deadline = time.monotonic() + timeout
+    tried = set()
+    while time.monotonic() < deadline:
+        with console.lock:
+            code = latest_code(console.data)
+        if code and code not in tried:
+            try:
+                return approve(url, token, code, name="Lab Reader")["targetReaderId"]
+            except urllib.error.HTTPError as error:
+                if error.code not in (404, 409):  # rotated away, or ambiguous: wait for the next code
+                    raise
+                tried.add(code)
+        time.sleep(0.5)
+    raise AssertionError("reader never showed a pairing code the API accepted")
+
+
 @pytest.fixture(scope="session")
 def reader(target, api, admin, artifacts):
-    """A freshly flashed reader on the lab Wi-Fi, registered with the test API."""
+    """A freshly flashed reader on the lab Wi-Fi, paired with the test API.
+
+    The janitor erases readers between sessions, so the reader starts unpaired
+    and is approved with the admin session of the API this run started.
+    """
     flash = target.get_driver(ESPToolDriver)
     flash.flash(os.environ["READER_IMAGE"])
     target.deactivate(flash)
@@ -143,11 +167,10 @@ def reader(target, api, admin, artifacts):
     target.deactivate(flash)
     open_console(target, driver)
     console.start()
-    # Registration can finish before the reboot; the reader then authenticates.
+    # The erased reader shows a rotating code; approve it as admin on the API
+    # this run started (a code that rotated away is retried with the next one).
+    reader_id = approve_pairing(console, api.base[:-len("/api")], admin)
     console.expect(r"Reader Authentication successful", 0, 120)
-    status, readers = api.call("GET", "/attractap/readers", token=admin)
-    assert status == 200, readers
-    reader_id = max(readers, key=lambda reader: reader["firstConnection"] or "")["id"]
     yield {"id": reader_id, "console": console}
     console.stop()
 
