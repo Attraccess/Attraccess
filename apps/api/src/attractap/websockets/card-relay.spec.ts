@@ -334,7 +334,9 @@ describe('conversation limits', () => {
         for (;;) {
           const pending = channel.exchange(Buffer.from([0x90, 0x60, 0, 0, 0]));
           await jest.advanceTimersByTimeAsync(0);
-          const { conversationId, seq } = reader.apdus().at(-1)!.payload;
+          const { conversationId, seq } = (
+            reader.apdus().at(-1) as { payload: { conversationId: string; seq: number } }
+          ).payload;
           setTimeout(
             () => conversations.handleResponse(reader.socket, { conversationId, seq, response: '9100' }),
             CARD_CONVERSATION_LIMITS.exchangeTimeoutMs - 500,

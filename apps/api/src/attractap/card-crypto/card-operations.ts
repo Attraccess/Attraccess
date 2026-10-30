@@ -61,6 +61,24 @@ async function selectAttraccessApp(channel: CardChannel, createIfMissing: boolea
   return parsePlainOk(await channel.exchange(desfireSelectApplication())) !== null;
 }
 
+/** The AuthenticateEV2First handshake alone (ntag424_AuthenticateEV2First): the application must already be selected. */
+async function authenticateEv2First(
+  channel: CardChannel,
+  keyNo: number,
+  key: Buffer,
+  random?: (size: number) => Buffer,
+): Promise<Ev2Session | null> {
+  const session = new Ev2Session(random);
+  try {
+    const second = session.continueAuthentication(await channel.exchange(session.beginAuthentication(keyNo, key)));
+    session.finishAuthentication(await channel.exchange(second));
+    return session;
+  } catch (error) {
+    if (error instanceof CardProtocolError) return null;
+    throw error;
+  }
+}
+
 /**
  * NFC::authenticateInternal. Resolves with the authenticated session, or null
  * when the card refused or failed to prove the key. A card that misbehaves on
@@ -79,15 +97,7 @@ export async function authenticate(
     const selected = await channel.exchange(ntagIsoSelectApplication());
     if (selected.length !== 2 || ((selected[0] << 8) | selected[1]) !== STATUS_ISO_OK) return null;
   }
-  const session = new Ev2Session(random);
-  try {
-    const second = session.continueAuthentication(await channel.exchange(session.beginAuthentication(keyNo, key)));
-    session.finishAuthentication(await channel.exchange(second));
-    return session;
-  } catch (error) {
-    if (error instanceof CardProtocolError) return null;
-    throw error;
-  }
+  return authenticateEv2First(channel, keyNo, key, random);
 }
 
 /**
@@ -96,7 +106,11 @@ export async function authenticate(
  * must be the factory key). NTAG 424: the first slot that accepts the factory key.
  * Resolves with the slot, or null when none is available.
  */
-export async function findFreeKeyNo(channel: CardChannel, kind: CardKind): Promise<number | null> {
+export async function findFreeKeyNo(
+  channel: CardChannel,
+  kind: CardKind,
+  random?: (size: number) => Buffer,
+): Promise<number | null> {
   if (kind === 'desfire') {
     if (!(await selectAttraccessApp(channel, true))) return null;
     for (let keyNo = FIRST_DATA_KEY_NO; keyNo <= LAST_DATA_KEY_NO; keyNo++) {
@@ -104,13 +118,14 @@ export async function findFreeKeyNo(channel: CardChannel, kind: CardKind): Promi
       const version = parsePlainOk(answer, 1);
       if (!version) return null;
       if (version[0] === KEY_VERSION_FREE) {
-        return (await authenticate(channel, kind, 0, FACTORY_KEY)) ? keyNo : null;
+        // As in the firmware: the application is still selected from above, so no second select.
+        return (await authenticateEv2First(channel, 0, FACTORY_KEY, random)) ? keyNo : null;
       }
     }
     return null;
   }
   for (let keyNo = FIRST_DATA_KEY_NO; keyNo <= LAST_DATA_KEY_NO; keyNo++) {
-    if (await authenticate(channel, kind, keyNo, FACTORY_KEY)) return keyNo;
+    if (await authenticate(channel, kind, keyNo, FACTORY_KEY, random)) return keyNo;
   }
   return null;
 }

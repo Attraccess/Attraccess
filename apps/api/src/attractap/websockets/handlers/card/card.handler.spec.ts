@@ -2,7 +2,7 @@
 
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 
-import { AttractapEvent, AttractapEventType } from '../../websocket.types';
+import { AttractapEventType } from '../../websocket.types';
 
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 

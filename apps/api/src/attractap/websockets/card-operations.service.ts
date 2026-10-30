@@ -111,7 +111,7 @@ export class CardOperationsService {
           return { ok: false, error: 'CARD_AUTHENTICATION_FAILED' };
         }
 
-        const recovered = await this.finishPendingEnroll(channel, kind, pendingEnroll!);
+        const recovered = pendingEnroll ? await this.finishPendingEnroll(channel, kind, pendingEnroll) : null;
         return recovered ? { ok: true, card: recovered } : { ok: false, error: 'CARD_NOT_FOUND' };
       },
     );

@@ -52,7 +52,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card operations (%s)', (kind) =
     const keyNo = await findFreeKeyNo(channel, kind);
     expect(keyNo).toBe(1);
     expect(
-      await changeKeyAndVerify(channel, kind, keyNo!, FACTORY_KEY, FACTORY_KEY, key(7), KEY_VERSION_ENROLLED),
+      await changeKeyAndVerify(channel, kind, keyNo as number, FACTORY_KEY, FACTORY_KEY, key(7), KEY_VERSION_ENROLLED),
     ).toBe('done');
     expect(await authenticate(channel, kind, 1, key(7))).not.toBeNull();
     expect(await authenticate(channel, kind, 1, key(8))).toBeNull();

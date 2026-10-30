@@ -33,7 +33,7 @@ function logCalls(source: string, pattern: RegExp): string[] {
   const calls: string[] = [];
   for (const match of source.matchAll(pattern)) {
     let depth = 0;
-    let index = match.index! + match[0].length - 1;
+    let index = (match.index ?? 0) + match[0].length - 1;
     const start = index;
     for (; index < source.length; index++) {
       if (source[index] === '(') depth++;

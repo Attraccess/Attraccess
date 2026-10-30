@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { performance } from 'node:perf_hooks';
 import { EmulatedCard } from '../card-crypto/card-emulator.test-fixture';
 import { CARD_CONVERSATION_LIMITS } from './card-conversation.service';
@@ -52,7 +51,7 @@ describe('load: 1,000 readers', () => {
     // eslint-disable-next-line no-console
     console.log(
       `250 simultaneous taps (${2 * LATENCY_MS} ms round trip): p50 ${percentile(latencies, 50).toFixed(0)} ms, ` +
-        `p95 ${percentile(latencies, 95).toFixed(0)} ms, max ${latencies.at(-1)!.toFixed(0)} ms, ` +
+        `p95 ${percentile(latencies, 95).toFixed(0)} ms, max ${(latencies.at(-1) ?? 0).toFixed(0)} ms, ` +
         `all done in ${wall.toFixed(0)} ms, ${Math.max(...results.map((r) => r.exchanges))} exchanges per tap`,
     );
     expect(results.filter((r) => r.outcome.ok)).toHaveLength(250);
