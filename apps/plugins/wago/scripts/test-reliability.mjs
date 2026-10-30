@@ -31,7 +31,13 @@ const context =
     ({ stdout }) => stdout.trim(),
     () => 'default',
   ));
-const docker = (...args) => exec('docker', ['--context', context, ...args], { timeout: 120_000 });
+// The broker password reaches `docker run -e RABBITMQ_DEFAULT_PASS` through the environment, never the argument
+// list: execFile errors quote the full command line into CI logs.
+const docker = (...args) =>
+  exec('docker', ['--context', context, ...args], {
+    timeout: 120_000,
+    env: { ...process.env, RABBITMQ_DEFAULT_PASS: password },
+  });
 
 async function freePort() {
   const server = createServer();
@@ -108,7 +114,7 @@ try {
     '-e',
     'RABBITMQ_DEFAULT_USER=fixture',
     '-e',
-    `RABBITMQ_DEFAULT_PASS=${password}`,
+    'RABBITMQ_DEFAULT_PASS',
     'rabbitmq:4-management',
     'sh',
     '-c',

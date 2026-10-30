@@ -1,7 +1,10 @@
 /**
  * Reliability harness. The real WagoService and WagoFlowService run on the host's real MqttClientService and
- * PluginMqttService against a runner-owned RabbitMQ 4 broker. Only the server record (QoS 0 defaults),
- * encryption, metrics and the timer are stubbed. Simulated controllers live in a separate process.
+ * PluginMqttService against a runner-owned RabbitMQ 4 broker. The host's server record (QoS 0 defaults),
+ * encryption, metrics and timer are stubbed, and so are the plugin context parts that need the rest of the host:
+ * audit records, secret encryption, MQTT credential provisioning, the flow trigger, and the flow-node query (no
+ * saved flows). Commands enter through the plugin's real flow command node. Simulated controllers live in a
+ * separate process.
  *
  * SIMULATOR MEASUREMENT: nothing here is evidence about physical CC100 hardware.
  */
@@ -10,9 +13,10 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { type ChildProcess, execFile, fork } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createReadStream, rmSync, writeFileSync } from 'node:fs';
 import { arch, cpus, platform, release, totalmem } from 'node:os';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import 'reflect-metadata';
 import { connectAsync, type MqttClient } from 'mqtt';
@@ -25,18 +29,24 @@ import { WagoService } from '../../backend/controllers/service';
 import { WagoSettings } from '../../backend/controllers/settings.entity';
 import { WagoCredentialRotationService } from '../../backend/credentials/service';
 import { WagoFlowService } from '../../backend/flow/service';
+import { WAGO_COMMAND_NODE_TYPE, createWagoCommandNode } from '../../backend/flow/command-node';
 import plugin from '../../backend/plugin';
 import { WagoCommandError } from '../../backend/commands/handler';
 import { hash, type Snapshot } from '../../cc100-runtime/src/runtime';
 import type { CommandRecord, ControllerSnapshot, FarmRequest } from './controller-farm';
 import {
   BROKER_OUTAGE_MS,
+  CREDENTIAL_EPOCH,
   SHORT_MODE,
   SWEEP_STEPS,
   SWEEP_STEP_MS,
+  acceptableValues,
+  hardwareId,
+  harnessErrors,
   percentile,
   publishedLimits,
   shortModeFailures,
+  shortModeNotes,
   stepPasses,
   totalsFromResults,
   type CommandResult,
@@ -75,7 +85,6 @@ const snapshot: Snapshot = {
   })),
 };
 const CHANNELS = snapshot.logicalChannels.map((channel) => channel.id);
-const CREDENTIAL_EPOCH = '6b6b0b0e-3d0c-4d2a-9b7b-5f0f0b0b0b0b';
 
 type Host = {
   database: DataSource;
@@ -84,8 +93,11 @@ type Host = {
   wago: WagoService;
   flow: WagoFlowService;
   rotation: WagoCredentialRotationService;
-  execute: (config: Record<string, unknown>, id: string) => Promise<void>;
-  diagnostics: (controllerId: number) => { outputs: Record<string, { value: boolean; sourceAt: string | null }>; activeStream?: string };
+  execute: (config: Record<string, unknown>) => Promise<void>;
+  diagnostics: (controllerId: number) => {
+    outputs: Record<string, { value: boolean; sourceAt: string | null }>;
+    activeStream?: string;
+  };
   destroy: () => void;
 };
 
@@ -100,14 +112,17 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
   const pendingRequests = new Map<number, (value: Record<string, unknown>) => void>();
   const results: CommandResult[] = [];
   const failures: FailureResult[] = [];
-  let hostQueueDrops = 0;
+  let hostQueueOverflows = 0;
   let failureActive = false;
   let paused = false;
+  /** Commands sent by the driver that have not settled yet. */
+  let inFlight = 0;
+  /** Commands the injectors published directly, with their outcome read from the controller records. */
+  const injectedCommands: CommandResult[] = [];
   let driver: NodeJS.Timeout[] = [];
   const toggles: boolean[] = [];
   const reported: Array<{ topic: string; body: { revision: number; errors: Array<{ code: string }> } }> = [];
 
-  const hardwareId = (index: number) => `rel-${index}`;
   const topic = (index: number, suffix: string) => `${prefix}/v1/controllers/${hardwareId(index)}/${suffix}`;
 
   // --- host ---------------------------------------------------------------------------------------
@@ -140,7 +155,8 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       verbose: () => undefined,
       error: () => undefined,
       warn: (message: string) => {
-        if (/dropping new messages/.test(message)) hostQueueDrops += 1;
+        // The host logs once per overflow episode, not once per dropped message.
+        if (/dropping new messages/.test(message)) hostQueueOverflows += 1;
       },
     };
     const flowQuery = {
@@ -178,9 +194,8 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     await wago.onApplicationBootstrap();
     await flow.onModuleInit();
     const rotation = new WagoCredentialRotationService(context);
-    const commands = Reflect.get(wago, 'commands') as {
-      execute: (config: Record<string, unknown>, id: string) => Promise<void>;
-    };
+    // The node a saved flow runs; the plugin registers the same definition bound to the same WagoService.
+    const commandNode = createWagoCommandNode(() => wago);
     const diagnostics = Reflect.get(wago, 'diagnostics') as { read: Host['diagnostics'] };
     return {
       database,
@@ -189,7 +204,13 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       wago,
       flow,
       rotation,
-      execute: (config, id) => commands.execute(config, id),
+      execute: async (config) => {
+        await commandNode.execute(
+          { id: 'reliability', type: WAGO_COMMAND_NODE_TYPE, data: config },
+          {},
+          { compileTemplate: (template) => template },
+        );
+      },
       diagnostics: (controllerId) => diagnostics.read(controllerId),
       destroy: () => {
         flow.onModuleDestroy();
@@ -252,7 +273,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       farm = fork(env('WAGO_RELIABILITY_FARM'), [], {
         env: {
           PATH: process.env.PATH,
-          WAGO_RELIABILITY_MQTT_URL: env('WAGO_RELIABILITY_MQTT_URL').replace('mqtt://', 'mqtt://'),
+          WAGO_RELIABILITY_MQTT_URL: env('WAGO_RELIABILITY_MQTT_URL'),
           WAGO_RELIABILITY_MQTT_PASSWORD: password,
           WAGO_RELIABILITY_PREFIX: prefix,
           WAGO_RELIABILITY_DIRECTORY: directory,
@@ -287,39 +308,46 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
   }
 
   const snapshots = async () => (await ask<{ controllers: ControllerSnapshot[] }>({ op: 'snapshot' })).controllers;
-  const records = (): CommandRecord[] => {
+  /** Streams the farm's per-command records after flushing them; the file grows to millions of lines in the sweep. */
+  async function forEachRecord(visit: (record: CommandRecord) => void): Promise<void> {
+    await ask({ op: 'flush-records' });
+    const file = join(directory, 'command-records.jsonl');
+    const lines = createInterface({ input: createReadStream(file), crlfDelay: Infinity });
     try {
-      return readFileSync(join(directory, 'command-records.jsonl'), 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line));
-    } catch {
-      return [];
+      for await (const line of lines) if (line) visit(JSON.parse(line));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-  };
+  }
+  async function acceptedCounts(): Promise<Map<string, number>> {
+    const accepted = new Map<string, number>();
+    await forEachRecord((record) => {
+      if (record.kind === 'acknowledged' && record.status === 'accepted')
+        accepted.set(record.commandId, (accepted.get(record.commandId) ?? 0) + 1);
+    });
+    return accepted;
+  }
 
   // --- load ---------------------------------------------------------------------------------------
   async function send(index: number): Promise<void> {
     const current = host;
     if (paused || !current) return;
-    const id = randomUUID();
     const sentAt = Date.now();
     const duringFailure = failureActive;
-    toggles[index] = !toggles[index];
+    const channelId = CHANNELS[index % CHANNELS.length];
+    const value = (toggles[index] = !toggles[index]);
     let outcome: CommandResult['outcome'] = 'acknowledged';
+    inFlight += 1;
     try {
-      await current.execute(
-        {
-          controllerId: index + 1,
-          channelId: CHANNELS[index % CHANNELS.length],
-          action: 'set',
-          value: toggles[index],
-          expectedConfigurationRevision: 1,
-          completionBehavior: 'acknowledged',
-          acknowledgementTimeoutSeconds: 5,
-        },
-        id,
-      );
+      await current.execute({
+        controllerId: index + 1,
+        channelId,
+        action: 'set',
+        value,
+        expectedConfigurationRevision: 1,
+        completionBehavior: 'acknowledged',
+        acknowledgementTimeoutSeconds: 5,
+      });
     } catch (error) {
       const kind = error instanceof WagoCommandError ? error.kind : 'transport-dispatch';
       outcome =
@@ -328,10 +356,13 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
           : kind === 'controller-rejection'
             ? 'rejected'
             : 'dispatch-failed';
+    } finally {
+      inFlight -= 1;
     }
     results.push({
       controller: index,
-      commandId: id,
+      channelId,
+      value,
       sentAt,
       settledAt: Date.now(),
       outcome,
@@ -360,23 +391,40 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     return null;
   }
 
-  /** The host's picture of every controller output must match what the controller actually holds. */
-  async function stateMatches(): Promise<boolean> {
+  /** Why a controller output is wrong, or undefined when every output is right. */
+  function stateMismatch(actual: ControllerSnapshot[], current: Host): string | undefined {
+    const commanded = [...results, ...injectedCommands];
+    for (const controller of actual) {
+      const seen = current.diagnostics(controller.index + 1).outputs;
+      for (const [channel, value] of Object.entries(controller.outputs)) {
+        if (seen[channel]?.value !== value)
+          return `controller ${controller.index} ${channel}: controller holds ${value}, host shows ${seen[channel]?.value}`;
+        const acceptable = acceptableValues(
+          commanded.filter((command) => command.controller === controller.index && command.channelId === channel),
+        );
+        if (acceptable && !acceptable.has(value))
+          return `controller ${controller.index} ${channel}: controller holds ${value}, last acknowledged command set ${!value}`;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * After the driver's commands settled, every controller output must equal both the host's picture of it and the
+   * last acknowledged command (a later command with an unknown outcome makes either value acceptable). The second
+   * comparison catches a runtime that resets its outputs on restart and publishes the reset state.
+   */
+  async function stateMatches(): Promise<{ matches: boolean; detail?: string }> {
     paused = true;
     try {
-      await delay(2_500);
+      // Commands settle within their 5 s acknowledgement timeout; the host's view then follows the next state message.
+      for (const deadline = Date.now() + 15_000; inFlight > 0 && Date.now() < deadline;) await delay(100);
       const deadline = Date.now() + 30_000;
       for (;;) {
-        const actual = await snapshots();
         const current = host;
-        const mismatch =
-          !current ||
-          actual.some((controller) => {
-            const seen = current.diagnostics(controller.index + 1).outputs;
-            return Object.entries(controller.outputs).some(([channel, value]) => seen[channel]?.value !== value);
-          });
-        if (!mismatch) return true;
-        if (Date.now() >= deadline) return false;
+        const detail = current ? stateMismatch(await snapshots(), current) : 'host is not running';
+        if (!detail) return { matches: true };
+        if (Date.now() >= deadline) return { matches: false, detail };
         await delay(500);
       }
     } finally {
@@ -397,12 +445,15 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       expectedConfigurationRevision: 1,
     });
 
+  /** An injector throws only when it could not inject its failure; `verify` is the failure-specific check. */
   const injectors: Record<Failure, () => Promise<{ detail?: string; verify?: () => Promise<boolean> }>> = {
     async 'broker-outage'() {
       await docker('stop', container);
       await delay(BROKER_OUTAGE_MS);
       await docker('start', container);
-      for (const deadline = Date.now() + 120_000; ;) {
+      // The broker's own start time is not product recovery, so recovery is measured from here. A broker that does
+      // not come back within the runner's startup allowance is a harness error, not a verdict.
+      for (const deadline = Date.now() + 300_000; ;) {
         try {
           await docker('exec', container, 'rabbitmq-diagnostics', '-q', 'check_running');
           break;
@@ -432,17 +483,26 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     },
     async 'duplicate-command'() {
       const id = randomUUID();
+      const sentAt = Date.now();
       const payload = commandMessage(id, true);
       await publishRaw(topic(1, 'commands'), payload);
       await publishRaw(topic(1, 'commands'), payload);
       await publishRaw(topic(1, 'commands'), payload);
       await delay(2_000);
+      const accepted = async () => (await acceptedCounts()).get(id) ?? 0;
+      // Part of controller 1's commanded state from now on, so the lost-state check expects it.
+      injectedCommands.push({
+        controller: 1,
+        channelId: CHANNELS[0],
+        value: true,
+        sentAt,
+        settledAt: Date.now(),
+        outcome: (await accepted()) > 0 ? 'acknowledged' : 'timeout',
+        duringFailure: true,
+      });
       return {
         detail: 'one command id delivered three times',
-        verify: async () => {
-          const acks = records().filter((r) => r.kind === 'acknowledged' && r.commandId === id);
-          return acks.filter((r) => r.kind === 'acknowledged' && r.status === 'accepted').length === 1;
-        },
+        verify: async () => (await accepted()) === 1,
       };
     },
     async 'out-of-order'() {
@@ -532,19 +592,36 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
   async function inject(failure: Failure): Promise<FailureResult> {
     const injectedAt = Date.now();
     failureActive = true;
-    let detail: string | undefined;
-    let verify: (() => Promise<boolean>) | undefined;
+    let injected: Awaited<ReturnType<(typeof injectors)[Failure]>> = {};
+    let harnessError: string | undefined;
     try {
-      ({ detail, verify } = await injectors[failure]());
+      injected = await injectors[failure]();
     } catch (error) {
-      detail = `injection failed: ${String(error)}`;
-      verify = async () => false;
+      harnessError = `harness could not inject ${failure}: ${String(error)}`;
     }
     const since = Date.now();
     const recoveryMs = await waitRecovered(since);
     failureActive = false;
-    const matches = (await stateMatches()) && (verify ? await verify() : true);
-    return { failure, injectedAt, recoveryMs, stateMatches: matches, detail };
+    const state = await stateMatches();
+    let injectionVerified: boolean | null = null;
+    let detail = injected.detail;
+    if (injected.verify)
+      try {
+        injectionVerified = await injected.verify();
+      } catch (error) {
+        injectionVerified = false;
+        detail = `${detail}; check failed: ${String(error)}`;
+      }
+    return {
+      failure,
+      injectedAt,
+      recoveryMs,
+      stateMatches: state.matches,
+      ...(state.detail ? { stateDetail: state.detail } : {}),
+      injectionVerified,
+      detail,
+      ...(harnessError ? { harnessError } : {}),
+    };
   }
 
   // --- lifecycle ----------------------------------------------------------------------------------
@@ -553,6 +630,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     rate = commandsPerSecond;
     prefix = `reliability/${randomUUID()}`;
     toggles.length = 0;
+    injectedCommands.length = 0;
     const database = await openDatabase(join(directory, `host-${randomUUID()}.sqlite`));
     await seedDatabase(database);
     for (let index = 0; index < count; index += 1)
@@ -616,7 +694,14 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     const database = await bringUp(SHORT_MODE.controllers, SHORT_MODE.commandsPerSecond);
     const startedAt = Date.now();
     startDriver();
-    await waitRecovered(startedAt, 120_000);
+    // Failures are injected into a healthy fleet only; a fleet that never got healthy is a broken harness, not a verdict.
+    if ((await waitRecovered(startedAt, 120_000)) === null) {
+      const healthy = new Set(results.filter((r) => r.outcome === 'acknowledged').map((r) => r.controller));
+      const unhealthy = Array.from({ length: count }, (_, index) => index).filter((index) => !healthy.has(index));
+      throw new Error(
+        `Harness error: controllers never became healthy within 120 s (never acknowledged: ${unhealthy.map(hardwareId).join(', ')})`,
+      );
+    }
     await delay(SHORT_MODE.settleMs);
     for (const failure of SHORT_MODE.failures) {
       failures.push(await inject(failure));
@@ -624,17 +709,14 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     }
     stopDriver();
     await delay(7_000);
-    const accepted = new Map<string, number>();
-    for (const record of records())
-      if (record.kind === 'acknowledged' && record.status === 'accepted')
-        accepted.set(record.commandId, (accepted.get(record.commandId) ?? 0) + 1);
+    const accepted = await acceptedCounts();
     const drops: Record<string, number> = {};
     for (const controller of await snapshots())
       for (const [reason, value] of Object.entries(controller.dropCounts)) drops[reason] = (drops[reason] ?? 0) + value;
     const totals = totalsFromResults(
       results,
       accepted,
-      hostQueueDrops,
+      hostQueueOverflows,
       drops,
       failures.filter((failure) => !failure.stateMatches).length,
     );
@@ -646,17 +728,14 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     const steps: StepResult[] = [];
     for (const target of SWEEP_STEPS) {
       results.length = 0;
-      hostQueueDrops = 0;
+      hostQueueOverflows = 0;
       const database = await bringUp(target.controllers, target.commandsPerSecond);
       const startedAt = Date.now();
       startDriver();
       await delay(SWEEP_STEP_MS);
       stopDriver();
       await delay(7_000);
-      const accepted = new Map<string, number>();
-      for (const record of records())
-        if (record.kind === 'acknowledged' && record.status === 'accepted')
-          accepted.set(record.commandId, (accepted.get(record.commandId) ?? 0) + 1);
+      const accepted = await acceptedCounts();
       const drops: Record<string, number> = {};
       for (const controller of await snapshots())
         for (const [reason, value] of Object.entries(controller.dropCounts))
@@ -666,9 +745,8 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
         controllers: target.controllers,
         commandsPerSecond: target.commandsPerSecond,
         durationMs: Date.now() - startedAt,
-        totals: totalsFromResults(results, accepted, hostQueueDrops, drops, 0),
+        totals: totalsFromResults(results, accepted, hostQueueOverflows, drops, 0),
         p95AcknowledgementMs: percentile(latencies, 0.95),
-        recoveryMs: null,
       };
       steps.push(step);
       process.stdout.write(
@@ -685,10 +763,12 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     let steps: StepResult[] | undefined;
     if (mode === 'sweep') steps = await runSweep();
     results.length = 0;
-    hostQueueDrops = 0;
+    hostQueueOverflows = 0;
     failures.length = 0;
     const suite = await runFailureSuite();
     const reasons = shortModeFailures(suite.totals, failures);
+    const invalid = harnessErrors(failures);
+    const notes = shortModeNotes(suite.totals, failures);
     const summary = {
       label: 'simulator measurement',
       mode,
@@ -701,7 +781,12 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       commandsPerSecond: SHORT_MODE.commandsPerSecond,
       failures,
       totals: suite.totals,
+      // `verdict` is the product gate: lost commands, lost state, host queue overflows, recovery over 180 s.
+      // `harness` lists failures that could not be injected; any entry makes the run invalid regardless of verdict.
+      // `notes` are non-gating checks (duplicates, injection checks, healthy rejections or dispatch failures).
       verdict: { pass: reasons.length === 0, reasons },
+      harness: { valid: invalid.length === 0, errors: invalid },
+      notes,
       ...(steps
         ? {
             steps,
@@ -715,7 +800,8 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     const json = JSON.stringify(summary, null, 2);
     if (summaryPath) writeFileSync(summaryPath, json);
     process.stdout.write(`${json}\n`);
-    if (mode === 'short') expect(reasons).toEqual([]);
+    expect({ harnessErrors: invalid }).toEqual({ harnessErrors: [] });
+    if (mode === 'short') expect({ productFailures: reasons }).toEqual({ productFailures: [] });
     else expect(summary.published?.singleControllerDefect).toBe(false);
   });
 });

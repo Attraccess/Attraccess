@@ -26,9 +26,7 @@
       "executor": "nx:run-commands",
       "cache": false,
       "dependsOn": ["typecheck-acceptance", "test-reliability-plan"],
-      "options": {
-        "command": "node apps/plugins/wago/scripts/test-reliability.mjs"
-      },
+      "defaultConfiguration": "short",
       "configurations": {
         "short": {
           "command": "node apps/plugins/wago/scripts/test-reliability.mjs --mode=short"

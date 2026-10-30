@@ -4,16 +4,18 @@
  * Each controller is the production runtime on the production MQTT transport with an in-memory device.
  */
 import { connect, type MqttClient } from 'mqtt';
-import { appendFileSync } from 'node:fs';
+import { createWriteStream } from 'node:fs';
 import { join } from 'node:path';
 import { MemoryDeviceAdapter } from '../../cc100-runtime/src/io/adapters';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from '../../cc100-runtime/src/runtime';
 import { MqttTransport } from '../../cc100-runtime/src/transport/mqtt';
+import { CREDENTIAL_EPOCH, hardwareId } from './plan';
 
 export type FarmRequest =
   | { id: number; op: 'restart-runtime'; index: number }
   | { id: number; op: 'drop-connections' }
   | { id: number; op: 'snapshot' }
+  | { id: number; op: 'flush-records' }
   | { id: number; op: 'shutdown' };
 
 export type ControllerSnapshot = {
@@ -38,9 +40,12 @@ const password = required('WAGO_RELIABILITY_MQTT_PASSWORD');
 const prefix = required('WAGO_RELIABILITY_PREFIX');
 const directory = required('WAGO_RELIABILITY_DIRECTORY');
 const count = Number(required('WAGO_RELIABILITY_CONTROLLERS'));
-const records = join(directory, 'command-records.jsonl');
-const EPOCH = '6b6b0b0e-3d0c-4d2a-9b7b-5f0f0b0b0b0b';
-const record = (entry: CommandRecord) => appendFileSync(records, `${JSON.stringify(entry)}\n`);
+// Buffered: a synchronous append per command would make the sweep measure this process's disk writes.
+const records = createWriteStream(join(directory, 'command-records.jsonl'), { flags: 'a' });
+const record = (entry: CommandRecord) => void records.write(`${JSON.stringify(entry)}\n`);
+/** Resolves once everything recorded so far is on disk; writes complete in order. */
+const flushRecords = () =>
+  new Promise<void>((resolve, reject) => records.write('', (error) => (error ? reject(error) : resolve())));
 const report = (error: unknown) => process.stderr.write(`farm callback failed: ${String(error)}\n`);
 
 class Controller {
@@ -51,14 +56,31 @@ class Controller {
   credentials?: DiscoveryClaim;
   private timers: NodeJS.Timeout[] = [];
   private starting = false;
+  private started = false;
 
   constructor(readonly index: number) {}
 
   get hardwareId() {
-    return `rel-${this.index}`;
+    return hardwareId(this.index);
   }
 
   async boot(): Promise<void> {
+    this.started = false;
+    const store = new JsonStateStore(join(directory, `${this.hardwareId}.json`));
+    const saved = await store.load();
+    // A claimed controller: it carries the registration epoch that credential rotation echoes back.
+    if (!saved.credentials)
+      await store.save({
+        ...saved,
+        credentials: {
+          username: `wago-controller-${this.hardwareId}`,
+          password: 'initial',
+          credentialEpoch: CREDENTIAL_EPOCH,
+        },
+      });
+    this.credentials = (await store.load()).credentials;
+    // Nothing may be awaited from here until the 'connect' handler is installed: a CONNACK that arrives during an
+    // await is missed, so the runtime would never start and the heartbeat timer would publish from an unloaded one.
     this.client = connect(url, {
       clientId: `farm-${this.hardwareId}-${Date.now()}`,
       username: 'fixture',
@@ -101,15 +123,6 @@ class Controller {
         ),
       dropCounts: () => this.transport.dropCounts(),
     };
-    const store = new JsonStateStore(join(directory, `${this.hardwareId}.json`));
-    const saved = await store.load();
-    // A claimed controller: it carries the registration epoch that credential rotation echoes back.
-    if (!saved.credentials)
-      await store.save({
-        ...saved,
-        credentials: { username: `wago-controller-${this.hardwareId}`, password: 'initial', credentialEpoch: EPOCH },
-      });
-    this.credentials = (await store.load()).credentials;
     this.runtime = new WagoRuntime({
       hardwareId: this.hardwareId,
       prefix,
@@ -133,8 +146,10 @@ class Controller {
       void this.runtime.setConnected(false).catch(report);
     });
     this.timers.push(
-      setInterval(() => void this.runtime.publishHeartbeat().catch(() => undefined), 5000),
-      setInterval(() => void this.runtime.pollInputs().catch(() => undefined), 500),
+      // As in the production entrypoint, only a started runtime publishes: an unloaded one would persist its empty
+      // state over the saved credentials when it reserves heartbeat sequence numbers.
+      setInterval(() => void (this.started && this.runtime.publishHeartbeat().catch(() => undefined)), 5000),
+      setInterval(() => void (this.started && this.runtime.pollInputs().catch(() => undefined)), 500),
     );
   }
 
@@ -143,6 +158,7 @@ class Controller {
     this.starting = true;
     try {
       await this.runtime.start();
+      this.started = true;
       await this.runtime.setConnected(true);
       if (this.credentials) await this.runtime.acknowledgeCredentialRotation(this.credentials);
     } catch (error) {
@@ -190,8 +206,12 @@ async function handle(request: FarmRequest): Promise<unknown> {
       return {};
     case 'snapshot':
       return { controllers: controllers.map((controller) => controller.snapshot()) };
+    case 'flush-records':
+      await flushRecords();
+      return {};
     case 'shutdown':
       await Promise.all(controllers.map((controller) => controller.stop()));
+      await new Promise<void>((resolve) => records.end(resolve));
       return {};
   }
 }
