@@ -247,6 +247,13 @@
         "command": "node scripts/crap-score/run.mjs apps/api"
       }
     },
+    "reencrypt-card-keys": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node apps/api/scripts/reencrypt-card-keys.mjs"
+      }
+    },
     "seed-dev": {
       "executor": "nx:run-commands",
       "cache": false,

@@ -40,8 +40,11 @@ describe('AttractapSupervisionHandler', () => {
     });
 
     it.each([
-      ['enrollment', { enrollNewCardData: { key: 'k', keyNo: 1, cardUID: 'uid' } }],
-      ['a card reset', { resetNfcCardData: { cardId: 1, key: 'k', keyNo: 1 } }],
+      ['enrollment', { enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'session' } } }],
+      [
+        'a card reset',
+        { resetNfcCardData: { cardId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'session' } } },
+      ],
       [
         'another supervision flow',
         { supervisionFlow: { resourceId: 1, requesterUserId: 1, requestId: 'other', approvedSupervisorUserId: null } },
@@ -184,121 +187,117 @@ describe('AttractapSupervisionHandler', () => {
     });
   });
 
-  describe('handleSupervisorCardAuthConfirmed', () => {
-    const confirm = (socket: AuthenticatedWebSocket, payload: Record<string, unknown> = {}) =>
-      fixture.handler.handleSupervisorCardAuthConfirmed(socket, {
-        type: AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED,
-        payload,
-      });
+  describe('handleSupervisorCardDetected', () => {
+    const present = (socket: AuthenticatedWebSocket, resourceId = fixture.RESOURCE_ID) =>
+      fixture.handler.handleSupervisorCardDetected(socket, '04aabbcc', resourceId);
 
-    const armedSocket = () =>
-      fixture.makeSocket({
-        supervisionFlow: {
-          resourceId: fixture.RESOURCE_ID,
-          requesterUserId: fixture.requester.id,
-          requestId: 'req-1',
-          approvedSupervisorUserId: 2,
-          webInitiated: true,
-        },
-      });
-
-    it('approves the pending request and leaves the reply to the armer callbacks', async () => {
-      const socket = armedSocket();
-
-      await confirm(socket, { resourceId: fixture.RESOURCE_ID });
-
-      expect(fixture.supervisionService.approve).toHaveBeenCalledWith(
-        'req-1',
-        expect.objectContaining({ id: 2 }),
-        null,
-      );
-      expect(socket.sendMessage).not.toHaveBeenCalled();
-    });
-
-    it('refuses a confirmation for a different resource than the flow', async () => {
-      const socket = armedSocket();
-
-      await confirm(socket, { resourceId: 999 });
-
-      expect(fixture.supervisionService.approve).not.toHaveBeenCalled();
-      expect(socket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ payload: expect.objectContaining({ error: 'RESOURCE_MISMATCH' }) }),
-        }),
-      );
-    });
-
-    // Otherwise the requester waits out the whole TTL for a generic timeout, and the one-arm-per
-    // -requester guard keeps them from retrying until it expires.
-    it('cancels the pending request when the confirmation cannot be honoured', async () => {
-      const socket = armedSocket();
-      fixture.usersService.findOne.mockResolvedValueOnce(null);
-
-      await confirm(socket, { resourceId: fixture.RESOURCE_ID });
-
-      expect(fixture.supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1', expect.any(String));
-      expect(socket.state.supervisionFlow).toBeNull();
-    });
-
-    it('cancels the pending request when approval throws', async () => {
-      const socket = armedSocket();
-      fixture.supervisionService.approve.mockRejectedValueOnce(new NotFoundException('gone'));
-
-      await confirm(socket, { resourceId: fixture.RESOURCE_ID });
-
-      expect(fixture.supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1', expect.any(String));
-    });
-  });
-
-  describe('handleSupervisorCardAuthRequest', () => {
-    const authenticate = (socket: AuthenticatedWebSocket) =>
-      fixture.handler.handleSupervisorCardAuthRequest(socket, {
-        type: AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA,
-        payload: { uid: 'supervisor-card', resourceId: fixture.RESOURCE_ID },
-      });
-
-    const armedSocket = () =>
+    const armedSocket = (webInitiated = false) =>
       fixture.makeSocket({
         supervisionFlow: {
           resourceId: fixture.RESOURCE_ID,
           requesterUserId: fixture.requester.id,
           requestId: 'req-1',
           approvedSupervisorUserId: null,
+          ...(webInitiated ? { webInitiated: true } : {}),
         },
       });
 
-    it('accepts an introducer card, including an applicable Resource Group introducer', async () => {
+    const lastPayload = (socket: AuthenticatedWebSocket) =>
+      (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0].data.payload;
+
+    beforeEach(() => {
+      fixture.usersService.findOne.mockResolvedValue(fixture.requester);
+    });
+
+    it('accepts a server-verified introducer card, including an applicable Resource Group introducer', async () => {
       const socket = armedSocket();
-      fixture.usersService.findOne.mockResolvedValueOnce(fixture.requester);
 
-      await authenticate(socket);
+      await present(socket);
 
+      expect(fixture.cardOperations.verifyCard).toHaveBeenCalledWith(socket, 'supervisor', '04aabbcc');
       expect(fixture.resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(
         fixture.RESOURCE_ID,
         fixture.requester,
         2,
       );
       expect(socket.state.supervisionFlow).toMatchObject({ approvedSupervisorUserId: 2 });
-      expect(socket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ payload: expect.objectContaining({ keyNo: 1 }) }) }),
-      );
+      expect(lastPayload(socket)).toEqual({ username: 'supervisor' });
+    });
+
+    it('never hands a key to the reader', async () => {
+      const socket = armedSocket();
+
+      await present(socket);
+
+      expect(JSON.stringify((socket.sendMessage as jest.Mock).mock.calls)).not.toMatch(/"key"/);
+    });
+
+    it('approves nobody when the server could not verify the card', async () => {
+      const socket = armedSocket();
+      fixture.cardOperations.verifyCard.mockResolvedValueOnce({ ok: false, error: 'CARD_AUTHENTICATION_FAILED' });
+
+      await present(socket);
+
+      expect(socket.state.supervisionFlow).toMatchObject({ approvedSupervisorUserId: null });
+      expect(fixture.resourceUsageService.validateSupervisedStart).not.toHaveBeenCalled();
+      expect(lastPayload(socket)).toEqual({ error: 'CARD_AUTHENTICATION_FAILED' });
     });
 
     it('rejects a maintainer-only or resource-manager-only card', async () => {
       const socket = armedSocket();
-      fixture.usersService.findOne.mockResolvedValueOnce(fixture.requester);
       fixture.resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(
         new BadRequestException('not an introducer'),
       );
 
-      await authenticate(socket);
+      await present(socket);
 
       expect(socket.state.supervisionFlow).toMatchObject({ approvedSupervisorUserId: null });
-      expect(socket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ payload: expect.objectContaining({ error: 'SUPERVISOR_NOT_AUTHORIZED' }) }),
-        }),
-      );
+      expect(lastPayload(socket)).toEqual({ error: 'SUPERVISOR_NOT_AUTHORIZED' });
+    });
+
+    it('refuses a card for a different resource than the flow', async () => {
+      const socket = armedSocket();
+
+      await present(socket, 999);
+
+      expect(fixture.cardOperations.verifyCard).not.toHaveBeenCalled();
+      expect(lastPayload(socket)).toEqual({ error: 'NO_SUPERVISION_IN_PROGRESS' });
+    });
+
+    describe('for a flow started on the web', () => {
+      it('approves the pending request and leaves the reply to the armer callbacks', async () => {
+        const socket = armedSocket(true);
+
+        await present(socket);
+
+        expect(fixture.supervisionService.approve).toHaveBeenCalledWith(
+          'req-1',
+          expect.objectContaining({ id: 2 }),
+          null,
+        );
+        expect(socket.sendMessage).not.toHaveBeenCalled();
+      });
+
+      // Otherwise the requester waits out the whole TTL for a generic timeout, and the one-arm-per
+      // -requester guard keeps them from retrying until it expires.
+      it('cancels the pending request when approval throws', async () => {
+        const socket = armedSocket(true);
+        fixture.supervisionService.approve.mockRejectedValueOnce(new NotFoundException('gone'));
+
+        await present(socket);
+
+        expect(fixture.supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1', expect.any(String));
+        expect(socket.state.supervisionFlow).toBeNull();
+      });
+
+      it('approves nothing on a card the server could not verify', async () => {
+        const socket = armedSocket(true);
+        fixture.cardOperations.verifyCard.mockResolvedValueOnce({ ok: false, error: 'CARD_AUTHENTICATION_FAILED' });
+
+        await present(socket);
+
+        expect(fixture.supervisionService.approve).not.toHaveBeenCalled();
+      });
     });
   });
 });

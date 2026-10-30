@@ -22,6 +22,8 @@ export function registerAttractapSupervisionHandlerFixture() {
 
   let usersService: { findOne: jest.Mock };
 
+  let cardOperations: { verifyCard: jest.Mock };
+
   let resourceRepository: { findOne: jest.Mock };
 
   const requester = { id: 1, username: 'requester' } as User;
@@ -37,7 +39,7 @@ export function registerAttractapSupervisionHandlerFixture() {
       sendMessage: jest.fn().mockResolvedValue(true),
       state: {
         verifiedUserId: null,
-        enrollNewCardData: null,
+        enrollment: null,
         resetNfcCardData: null,
         supervisionFlow: null,
         ...state,
@@ -60,12 +62,7 @@ export function registerAttractapSupervisionHandlerFixture() {
         firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: RESOURCE_ID }],
       }),
-      getNFCCardByUID: jest.fn().mockResolvedValue({
-        isActive: true,
-        keyNo: 1,
-        key: 'secret',
-        user: { id: 2, username: 'supervisor' },
-      }),
+      getNFCCardByUID: jest.fn(),
     };
     websocketService = { sockets: new Map() };
     resourceUsageService = {
@@ -80,6 +77,13 @@ export function registerAttractapSupervisionHandlerFixture() {
       createReaderRequest: jest.fn().mockReturnValue({ requestId: 'req-1', expiresAt: new Date(0) }),
     };
     usersService = { findOne: jest.fn().mockResolvedValue({ id: 2, username: 'supervisor' }) };
+    // The card proof is covered by card-operations.service.spec.ts; here it either passes or fails.
+    cardOperations = {
+      verifyCard: jest.fn().mockResolvedValue({
+        ok: true,
+        card: { isActive: true, keyNo: 1, user: { id: 2, username: 'supervisor' } },
+      }),
+    };
     resourceRepository = {
       findOne: jest.fn().mockResolvedValue({ id: RESOURCE_ID, supervisionMode: SupervisionMode.SUPERVISION_REQUIRED }),
     };
@@ -91,6 +95,7 @@ export function registerAttractapSupervisionHandlerFixture() {
       resourceUsageService,
       supervisionService,
       usersService,
+      cardOperations,
       resourceRepository,
     });
   });
@@ -109,6 +114,9 @@ export function registerAttractapSupervisionHandlerFixture() {
     },
     get supervisionService() {
       return supervisionService;
+    },
+    get cardOperations() {
+      return cardOperations;
     },
     get usersService() {
       return usersService;

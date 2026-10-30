@@ -43,7 +43,6 @@ describe('AttractapCardHandler', () => {
           data: expect.objectContaining({
             type: AttractapEventType.CARD_AUTHENTICATION_DATA,
             payload: expect.objectContaining({
-              key: handleCardAuthenticationRequestScope.activeCard.key,
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
               language: 'en',
             }),
@@ -66,21 +65,40 @@ describe('AttractapCardHandler', () => {
       expect(handleCardAuthenticationRequestScope.metricsService.attractapNfcTapsTotal.inc).toHaveBeenCalledTimes(1);
     });
 
-    it('sends INVALID_UID when uid is invalid', async () => {
+    it('does not log anyone in when the server could not verify the card', async () => {
       const socket = handleCardAuthenticationRequestScope.createMockSocket();
-      const data = { payload: { uid: '', resourceId: 10 } } as AttractapEvent['data'];
+      handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID.mockResolvedValueOnce(
+        handleCardAuthenticationRequestScope.activeCard,
+      );
+      (handleCardAuthenticationRequestScope.handler as any).cardOperations.verifyCard.mockResolvedValueOnce({
+        ok: false,
+        error: 'CARD_AUTHENTICATION_FAILED',
+      });
 
-      await handleCardAuthenticationRequestScope.handler.handleCardAuthenticationRequest(socket, data);
+      await handleCardAuthenticationRequestScope.handler.handleCardAuthenticationRequest(socket, {
+        payload: { uid: 'abc', resourceId: 10 },
+      } as AttractapEvent['data']);
 
+      expect(socket.state.verifiedUserId).toBeNull();
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: AttractapEventType.CARD_AUTHENTICATION_DATA,
-            payload: { error: 'INVALID_UID' },
+            payload: { error: 'CARD_AUTHENTICATION_FAILED' },
           }),
         }),
       );
-      expect(handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID).not.toHaveBeenCalled();
+    });
+
+    it('forgets the verified user when the reader session ends', () => {
+      const socket = handleCardAuthenticationRequestScope.createMockSocket({
+        state: { verifiedUserId: 5, verifiedCardUid: 'abc' },
+      });
+
+      handleCardAuthenticationRequestScope.handler.onReaderSessionEnded(socket);
+
+      expect(socket.state.verifiedUserId).toBeNull();
+      expect(socket.state.verifiedCardUid).toBeNull();
     });
 
     it('sends CARD_NOT_FOUND when the card does not exist', async () => {
@@ -204,8 +222,6 @@ describe('AttractapCardHandler', () => {
           data: expect.objectContaining({
             type: AttractapEventType.CARD_AUTHENTICATION_DATA,
             payload: {
-              keyNo: handleCardAuthenticationRequestScope.activeCard.keyNo,
-              key: handleCardAuthenticationRequestScope.activeCard.key,
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
               language: 'en',
               languageFallback: true,

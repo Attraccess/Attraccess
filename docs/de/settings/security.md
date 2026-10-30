@@ -42,6 +42,22 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 > [!TIP]
 > Wenn Sie den `AUTH_SESSION_SECRET` aendern, werden alle bestehenden Benutzersitzungen ungueltig und die Benutzer muessen sich erneut anmelden.
 
+## Kartenschlüssel und `AUTH_SESSION_SECRET`
+
+Die Schlüssel der Attractap-Karten werden nur vom Server erzeugt und geprüft; ein Leser sieht sie nie. Der Server speichert jeden Schlüssel verschlüsselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schlüssel.
+
+> [!WARNING]
+> **Sichere `AUTH_SESSION_SECRET` zusammen mit den Datenbank-Backups.** Ohne das Secret lassen sich die gespeicherten Kartenschlüssel nicht lesen. Bereits eingerichtete Karten können dann weder genutzt noch von Attraccess zurückgesetzt werden und müssen mit anderen Werkzeugen gelöscht werden.
+
+Wird das Secret geändert, sind die gespeicherten Kartenschlüssel unlesbar, bis sie neu verschlüsselt wurden. So tauschst du das Secret gezielt aus:
+
+1. API stoppen und `storage/attraccess.sqlite` kopieren.
+2. `OLD_AUTH_SESSION_SECRET=<alt> NEW_AUTH_SESSION_SECRET=<neu> pnpm nx run api:reencrypt-card-keys -- --dry-run` ausführen. Es liest alle Kartenschlüssel und schreibt nichts.
+3. Denselben Befehl ohne `--dry-run` ausführen. Alle Schlüssel werden in einer Transaktion umgestellt; lässt sich einer mit dem alten Secret nicht lesen, bleibt alles unverändert.
+4. `AUTH_SESSION_SECRET` auf den neuen Wert setzen und die API starten.
+
+Der Befehl stellt nur Kartenschlüssel um. Andere verschlüsselte Daten (z. B. gespeicherte Zugangsdaten von Integrationen) sind nicht abgedeckt.
+
 ## Best Practices
 
 - Verwenden Sie in Produktionsumgebungen immer **HTTPS**. Siehe [SSL einrichten](installation/ssl-setup.md).

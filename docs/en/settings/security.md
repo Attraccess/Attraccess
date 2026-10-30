@@ -42,6 +42,22 @@ Session security is controlled via environment variables:
 > [!TIP]
 > If you change the `AUTH_SESSION_SECRET`, all existing user sessions are invalidated and users must log in again.
 
+## Card keys and `AUTH_SESSION_SECRET`
+
+Attractap card keys are created and checked by the server only; a reader never sees them. The server stores each key encrypted with a key derived from `AUTH_SESSION_SECRET`.
+
+> [!WARNING]
+> **Back up `AUTH_SESSION_SECRET` together with your database backups.** Without it the stored card keys cannot be read. Cards that were enrolled can then neither be used nor reset by Attraccess, and have to be erased with other tools.
+
+Changing the secret makes the stored card keys unreadable until they are re-encrypted. To rotate the secret deliberately:
+
+1. Stop the API and copy `storage/attraccess.sqlite`.
+2. Run `OLD_AUTH_SESSION_SECRET=<old> NEW_AUTH_SESSION_SECRET=<new> pnpm nx run api:reencrypt-card-keys -- --dry-run`. It reads every stored card key and writes nothing.
+3. Run the same command without `--dry-run`. All keys are converted in one transaction; if one cannot be read with the old secret nothing is changed.
+4. Set `AUTH_SESSION_SECRET` to the new value and start the API.
+
+The command only converts card keys. Other encrypted data (for example saved integration credentials) is not covered by it.
+
 ## Best Practices
 
 - Always use **HTTPS** in production. See [SSL Setup](installation/ssl-setup.md).
