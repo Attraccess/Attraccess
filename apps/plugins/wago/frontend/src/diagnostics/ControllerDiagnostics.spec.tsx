@@ -38,6 +38,7 @@ function fixture(): WagoDiagnostics {
     capabilities: [],
     incompatible: false,
     sequenceGaps: 0,
+    dropCounts: null,
     sequenceExplanation: 'Per category',
     activeStream: 'boot',
     trackingExhausted: false,
@@ -136,6 +137,51 @@ describe('diagnostics isolation', () => {
     expect(screen.getByText(/Latest input: true/)).toBeTruthy();
     expect(screen.getByText(/Hardware readiness: unknown/)).toBeTruthy();
     expect(screen.queryByText(/Latest output/)).toBeNull();
+  });
+  it.each([
+    ['en', 'fresh', true, null, 'Dropped messages: no current report from the controller.'],
+    ['de', 'fresh', true, null, 'Verworfene Nachrichten: Die Steuerung hat aktuell nichts gemeldet.'],
+    ['en', 'stale', true, { oversized: 3, overload: 1 }, 'Dropped messages: no current report from the controller.'],
+    ['en', 'stale', false, { oversized: 3, overload: 1 }, 'Dropped messages: not reported by this runtime version.'],
+  ] as const)(
+    'does not present missing or stale drop counters as current (%s, heartbeat %s, bounded %s)',
+    (language, freshness, bounded, dropCounts, summary) => {
+      useTranslationState.getState().setLanguage(language);
+      vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
+        isError: false,
+        isPending: false,
+        data: {
+          ...fixture(),
+          heartbeatFreshness: freshness,
+          capabilities: bounded ? ['bounded-messages-v1'] : [],
+          dropCounts,
+        },
+        dataUpdatedAt: Date.now(),
+        refetch: vi.fn(),
+      });
+      render(<ControllerDiagnostics controllerId={1} />);
+      expect(screen.getByText(summary)).toBeTruthy();
+      expect(screen.queryByRole('status')).toBeNull();
+    },
+  );
+  it.each([
+    ['en', { oversized: 3, overload: 1 }, 'Dropped messages: 3 too large, 1 while overloaded.', 'times out like'],
+    ['de', { oversized: 3, overload: 1 }, 'Verworfene Nachrichten: 3 zu groß, 1 bei Überlastung.', 'Zeitüberschreitung'],
+    ['en', null, 'Dropped messages: not reported by this runtime version.', null],
+    ['de', null, 'Verworfene Nachrichten: Diese Laufzeitversion meldet sie nicht.', null],
+  ] as const)('shows the drop counters in %s: %j', (language, dropCounts, summary, explanation) => {
+    useTranslationState.getState().setLanguage(language);
+    vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
+      isError: false,
+      isPending: false,
+      data: { ...fixture(), dropCounts },
+      dataUpdatedAt: Date.now(),
+      refetch: vi.fn(),
+    });
+    render(<ControllerDiagnostics controllerId={1} />);
+    expect(screen.getByText(summary)).toBeTruthy();
+    if (explanation) expect(screen.getByRole('status').textContent).toContain(explanation);
+    else expect(screen.queryByRole('status')).toBeNull();
   });
   it('hides cached online status when successful polling stalls, without another query update', () => {
     vi.useFakeTimers();

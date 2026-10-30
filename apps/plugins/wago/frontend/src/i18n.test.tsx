@@ -16,6 +16,7 @@ import shellyEn from './../../../shelly/frontend/src/en.json';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { useShellyTranslations } from './../../../shelly/frontend/src/i18n';
 import { pulseBehaviorError } from './../../channel-behavior';
+import { CONFIGURATION_LIMIT_MESSAGES } from './../../shared/configuration-limits';
 import type { Freshness, WagoDiagnostics } from './../../diagnostics-types';
 import type { ModbusConnection, ModbusProfile, RegisterFormat } from '../../modbus/model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
@@ -89,6 +90,20 @@ function leaves(record: Record<string, unknown>, prefix = ''): Record<string, st
     expect(result.current.wago.t('controllers.title')).toBe('WAGO controllers');
     expect(result.current.shelly.t('devices.title')).toBe('Shelly Devices');
     expect(result.current.rabbitmq.t('users.title')).toBe('RabbitMQ users');
+  });
+}
+
+{
+  it('shows every configuration limit refusal in English and German', () => {
+    const { result } = renderHook(() => useWagoTranslations());
+    const messages = Object.values(CONFIGURATION_LIMIT_MESSAGES);
+    for (const message of messages) expect(result.current.tBackendMessage(message)).toBe(message);
+    act(() => useTranslationState.getState().setLanguage('de'));
+    for (const message of messages) {
+      const german = result.current.tBackendMessage(message);
+      expect(german).not.toBe(message);
+      expect(german.length).toBeGreaterThan(10);
+    }
   });
 }
 

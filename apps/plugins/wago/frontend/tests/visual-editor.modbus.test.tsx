@@ -8,12 +8,20 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { validateEditorSnapshot } from '../../backend/configuration/editor';
+import { validateEditorSnapshot as validateEditorSnapshotWithLimits } from '../../backend/configuration/editor';
+import { CONFIGURATION_LIMIT_CODE } from '../../shared/configuration-limits';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import type { WagoConfigurationSnapshot } from '../src/api/client';
 import { ConfigurationEditor } from '../src/configuration/ConfigurationEditor';
 import { diagnosticsFixture, resetTestFixture } from './visual-editor.setup.test-fixture.helpers';
 import { external, section } from './visual-editor.test.external.helpers';
+
+/**
+ * These tests exercise the editor model, not the publish limits: every built-in 879-3020 meter adds 131
+ * points and channels, so two meters exceed the 256 item limit (see front-panel-model.test.tsx).
+ */
+const validateEditorSnapshot = (snapshot: unknown) =>
+  validateEditorSnapshotWithLimits(snapshot).filter((error) => error.code !== CONFIGURATION_LIMIT_CODE);
 
 let client: QueryClient;
 

@@ -1,4 +1,4 @@
-import { hash, validateDesired } from './validation';
+import { hash, validateConfigurationLimits, validateDesired } from './validation';
 import { OutputRoutingBusyError } from '../../outputs/controller';
 import { RuntimeDiscovery } from '../identity/discovery';
 import { type Snapshot } from '../types';
@@ -32,6 +32,11 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
     if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
     await this.runConfigurationUpdate(async () => {
       if (this.runtimeUpdateRequired || this.runtimeFailsafePending) return;
+      const redelivered =
+        this.state.accepted?.revision === desired?.revision && this.state.accepted?.contentHash === desired?.contentHash;
+      // Limits guard new revisions and rollbacks; what is already running is never refused for them.
+      const limitErrors = redelivered ? [] : validateConfigurationLimits(desired);
+      if (limitErrors.length) return this.reportRejected(desired.revision, desired.contentHash, limitErrors);
       const errors = validateDesired(desired);
       if (!errors.length && desired.contentHash !== hash(desired.snapshot))
         errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });

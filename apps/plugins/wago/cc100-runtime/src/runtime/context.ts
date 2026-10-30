@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { OutputController } from '../outputs/controller';
 import { DiscoveryClaim } from './identity/protocol';
-import { type DeviceAdapter, type RuntimeState, type StateStore, type Transport, type ValidationError } from './types';
+import { type DeviceAdapter, type MessageSlot, type RuntimeState, type StateStore, type Transport, type ValidationError } from './types';
 export abstract class RuntimeContext {
   protected state: RuntimeState = { outputs: {}, commandIds: [], commandExpiries: {} };
 
@@ -108,7 +108,7 @@ export abstract class RuntimeContext {
   abstract publishDiscoveryAnnouncement(sequence?: number): Promise<void>;
   abstract discoveryClaimTopic(): string;
   abstract receiveDesired(payload: Buffer): Promise<void>;
-  abstract receiveCommand(payload: Buffer): Promise<void>;
+  abstract receiveCommand(payload: Buffer, slot?: MessageSlot): Promise<void>;
   abstract setConnected(connected: boolean): Promise<void>;
   abstract publishHeartbeat(ignoreStatePublicationFailure?: boolean): Promise<void>;
   abstract publishMeasurements(): Promise<void>;

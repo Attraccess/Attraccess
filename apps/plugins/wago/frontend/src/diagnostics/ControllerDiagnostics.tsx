@@ -4,6 +4,7 @@ import { Component, useEffect, useState, type ReactNode } from 'react';
 import { presetDisplayName } from '../configuration/model';
 import { useWagoDiagnostics, type WagoDiagnostics } from './diagnostics';
 import { useWagoTranslations } from '../i18n';
+import { BOUNDED_MESSAGES_CAPABILITY } from '../../../shared/capabilities';
 
 export function DiagnosticsFailure() {
   const { t } = useWagoTranslations();
@@ -37,6 +38,8 @@ export function WagoStatus({
   const { t, tBackendMessage } = useWagoTranslations();
   const now = useDiagnosticsClock();
   const c = d.configuration;
+  // Counters come from the last heartbeat, so a stale one is not shown as the controller's current state.
+  const currentDropCounts = d.heartbeatFreshness === 'fresh' ? d.dropCounts : null;
   if (pollingFailed || (pollingUpdatedAt !== undefined && !pollFresh(pollingUpdatedAt, now)))
     return <p role="alert">{t('diagnostics.unknownStatus')}</p>;
   return (
@@ -107,6 +110,21 @@ export function WagoStatus({
             boot: d.activeStream ?? t('diagnostics.legacy'),
           })}
         </p>
+        <p>
+          {currentDropCounts
+            ? t('diagnostics.dropCounts', {
+                oversized: currentDropCounts.oversized,
+                overload: currentDropCounts.overload,
+              })
+            : t(
+                d.capabilities.includes(BOUNDED_MESSAGES_CAPABILITY)
+                  ? 'diagnostics.dropCountsUnavailable'
+                  : 'diagnostics.dropCountsUnsupported',
+              )}
+        </p>
+        {currentDropCounts && Object.values(currentDropCounts).some((count) => count > 0) && (
+          <p role="status">{t('diagnostics.dropExplanation')}</p>
+        )}
         {d.trackingExhausted && <p role="alert">{t('diagnostics.trackingLimit')}</p>}
         <p>
           {t('diagnostics.versions', { runtime: d.runtimeVersion, protocol: d.protocolVersion })}

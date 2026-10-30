@@ -28,6 +28,7 @@ import {
   compatibilityError,
   configurationDesiredTopic,
   discoveryTopic,
+  parseControllerJson,
 } from '../protocol/index';
 
 import { parseConfigurationReport } from '../configuration/model';
@@ -319,7 +320,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   protected async onConfigurationReported(controllerId: number, payload: Buffer): Promise<void> {
     let report: ReturnType<typeof parseConfigurationReport>;
     try {
-      report = parseConfigurationReport(JSON.parse(payload.toString('utf8')));
+      report = parseConfigurationReport(parseControllerJson(payload, 'configuration report'));
     } catch {
       this.context.logger.warn(`Ignoring invalid WAGO configuration report for controller ${controllerId}`);
       return;

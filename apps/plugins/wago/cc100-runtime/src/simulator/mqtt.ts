@@ -1,4 +1,6 @@
 import { type MqttClient } from 'mqtt';
+import type { MessageSlot } from '../runtime/types';
+import type { SubscriptionAdmission } from '../transport/admission';
 
 export function publish(mqtt: MqttClient, topic: string, payload: unknown, retain = false): Promise<void> {
   return new Promise((resolve, reject) =>
@@ -9,13 +11,16 @@ export function publish(mqtt: MqttClient, topic: string, payload: unknown, retai
 export function subscribe(
   mqtt: MqttClient,
   topic: string,
-  listener: (payload: Buffer) => void | Promise<void>,
+  listener: (payload: Buffer, slot: MessageSlot) => void | Promise<void>,
+  admission?: SubscriptionAdmission,
 ): Promise<void> {
   return new Promise((resolve, reject) =>
     mqtt.subscribe(topic, { qos: 1 }, (error) => {
       if (error) return reject(error);
       mqtt.on('message', (receivedTopic, payload) => {
-        if (receivedTopic === topic) void handleAsync(() => listener(payload));
+        if (receivedTopic !== topic) return;
+        if (admission) admission.admit(payload, async (body, slot) => listener(body, slot));
+        else void handleAsync(() => listener(payload, { release: () => undefined }));
       });
       resolve();
     }),

@@ -1,6 +1,6 @@
 import { supportsOutputAction } from '../../../../channel-behavior';
 import { RuntimeConfiguration } from '../configuration/configuration';
-import { WriteAdmissionError } from '../types';
+import { type MessageSlot, WriteAdmissionError } from '../types';
 
 type OutputCommand = {
   id: string;
@@ -59,7 +59,7 @@ function interruptedCommandFailure(error: unknown): CommandFailure {
 }
 
 export abstract class RuntimeCommands extends RuntimeConfiguration {
-  async receiveCommand(payload: Buffer): Promise<void> {
+  async receiveCommand(payload: Buffer, slot?: MessageSlot): Promise<void> {
     const command = parseCommand(payload);
     if (!command) return;
     const formatFailure = commandFormatFailure(command);
@@ -97,6 +97,8 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
       this.state.commandIds = [...this.state.commandIds, command.id];
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
       await this.saveState();
+      // The command is about to join its channel queue; one slow output must not hold a handling slot.
+      slot?.release();
       const failure = await this.outputs.runForCommand(channel.id, async () => {
         if (this.runtimeUpdateRequired || this.runtimeFailsafePending) {
           await this.releaseCommand(command.id);

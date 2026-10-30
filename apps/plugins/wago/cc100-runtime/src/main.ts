@@ -1,3 +1,4 @@
+import { MAX_CLAIM_BYTES } from './runtime/limits';
 import { connect, type MqttClient } from 'mqtt';
 import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } from '../../shared/hardware-profile';
 import { Cc100OnboardIoAdapter } from './io/adapters';
@@ -125,11 +126,15 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       if (!credentials) {
         runLed.set('pairing');
         if (!discoverySubscribed) {
-          await transport.subscribe(runtime.discoveryClaimTopic(), async (payload) => {
-            const claim = await runtime.receiveDiscoveryClaim(payload);
-            if (!claim || activeClient !== client) return;
-            activeClient.end(true, () => connectRuntime(claim));
-          });
+          await transport.subscribe(
+            runtime.discoveryClaimTopic(),
+            async (payload) => {
+              const claim = await runtime.receiveDiscoveryClaim(payload);
+              if (!claim || activeClient !== client) return;
+              activeClient.end(true, () => connectRuntime(claim));
+            },
+            { maxBytes: MAX_CLAIM_BYTES },
+          );
           discoverySubscribed = true;
         }
         await runtime.publishDiscoveryAnnouncement();

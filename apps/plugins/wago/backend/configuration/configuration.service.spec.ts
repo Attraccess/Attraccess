@@ -320,6 +320,20 @@ describe('WagoService configuration and commands', () => {
     );
   });
 
+  it('ignores oversized and over-nested configuration reports before parsing them', async () => {
+    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const report = { revision: 2, contentHash: 'a'.repeat(64), errors: [] };
+    const onConfigurationReported = (
+      Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
+    ).bind(service);
+    await onConfigurationReported(1, Buffer.from(JSON.stringify({ ...report, pad: 'x'.repeat(64 * 1024) })));
+    await onConfigurationReported(
+      1,
+      Buffer.from(JSON.stringify({ ...report, nested: JSON.parse('{"a":'.repeat(8) + '1' + '}'.repeat(8)) })),
+    );
+    expect(revisionRepository.findOneBy).not.toHaveBeenCalled();
+  });
+
   it.each(['applied', 'rejected'] as const)('ignores reports for a terminal %s revision state', async (state) => {
     const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
     const revision = {

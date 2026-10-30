@@ -22,6 +22,28 @@
         "command": "node apps/plugins/wago/scripts/test-production-fleet.mjs"
       }
     },
+    "reliability": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance", "test-reliability-plan"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/test-reliability.mjs"
+      },
+      "configurations": {
+        "short": {
+          "command": "node apps/plugins/wago/scripts/test-reliability.mjs --mode=short"
+        },
+        "sweep": {
+          "command": "node apps/plugins/wago/scripts/test-reliability.mjs --mode=sweep"
+        }
+      }
+    },
+    "test-reliability-plan": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.reliability-plan.config.cjs"
+      }
+    },
     "typecheck-acceptance": {
       "executor": "nx:run-commands",
       "options": {

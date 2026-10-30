@@ -11,7 +11,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { randomBytes } from 'node:crypto';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 import { sourceTime } from '../diagnostics/envelope';
-import { normalizeOperationalPrefix } from '../protocol/index';
+import { normalizeOperationalPrefix, parseControllerJson } from '../protocol/index';
 import { WagoAudit } from '../audit/index';
 import { WagoController } from '../controllers/entity';
 import { type CommissioningOperationGuard } from '../runtime/operation-guard';
@@ -126,12 +126,11 @@ export class WagoCredentialRotationService {
               closed ||
               guard.signal.aborted ||
               message.serverId !== row.mqttServerId ||
-              message.topic !== `${topic}/ack` ||
-              message.payload.length > 1024
+              message.topic !== `${topic}/ack`
             )
               return;
             try {
-              const ack = JSON.parse(message.payload.toString('utf8'));
+              const ack = parseControllerJson(message.payload, 'rotation acknowledgement') as Record<string, unknown> | null;
               if (
                 ack?.credentialEpoch === row.credentialEpoch &&
                 ack?.revision === row.revision &&

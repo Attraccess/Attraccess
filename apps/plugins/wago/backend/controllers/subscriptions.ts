@@ -1,6 +1,7 @@
 import {
   compatibilityError,
   parseHeartbeat,
+  parseObject,
   type WagoHeartbeat,
   DISCOVERY_ROOT,
   parseAnnouncement,
@@ -79,7 +80,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     }
     if (heartbeat.hardwareId !== hardwareId) return undefined;
     try {
-      return { heartbeat, rawHeartbeat: JSON.parse(payload.toString('utf8')) };
+      return { heartbeat, rawHeartbeat: parseObject(payload, 'heartbeat') };
     } catch {
       return undefined;
     }

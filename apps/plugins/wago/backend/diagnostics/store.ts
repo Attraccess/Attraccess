@@ -1,4 +1,6 @@
+import { BOUNDED_MESSAGES_CAPABILITY, DROP_REASONS } from '../../shared/capabilities';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
+import { parseControllerJson } from '../protocol/index';
 import type { DiagnosticStream } from './envelope';
 import {
   admitEnvelope,
@@ -31,6 +33,8 @@ export interface DiagnosticSample {
 export interface RuntimeDiagnostics extends DiagnosticStream {
   touched: number;
   heartbeatAt?: string;
+  /** Messages the controller dropped by reason; only from runtimes that advertise bounded messages. */
+  dropCounts?: Record<string, number>;
   legacyHeartbeatSequence?: number;
   connected?: boolean;
   hardwareAvailable?: boolean;
@@ -52,6 +56,26 @@ export interface RuntimeDiagnostics extends DiagnosticStream {
   faults: Record<string, { code: string; receivedAt: string; sourceAt: string | null }>;
   acknowledgements: Record<string, DiagnosticAcknowledgement>;
   events: Array<{ kind: string; receivedAt: string }>;
+}
+
+/** Drop counters are read only from a runtime that advertises the capability, and only known reasons. */
+export function heartbeatDropCounts(data: Record<string, unknown>): Record<string, number> | undefined {
+  const counts = data.dropCounts;
+  if (
+    !Array.isArray(data.capabilities) ||
+    !data.capabilities.includes(BOUNDED_MESSAGES_CAPABILITY) ||
+    !counts ||
+    typeof counts !== 'object' ||
+    Array.isArray(counts)
+  )
+    return undefined;
+  const result: Record<string, number> = {};
+  for (const reason of DROP_REASONS) {
+    const value = (counts as Record<string, unknown>)[reason];
+    if (!Number.isSafeInteger(value) || (value as number) < 0) return undefined;
+    result[reason] = value as number;
+  }
+  return result;
 }
 
 export type SampleMetadata = Pick<DiagnosticSample, 'sourceAt' | 'receivedAt' | 'streamId' | 'sequence'>;
@@ -341,10 +365,9 @@ export class WagoDiagnosticsStore {
 
   ingest(id: number, kind: string, payload: Buffer): boolean {
     this.prune();
-    if (payload.length > 65_536) return false;
     let data: Record<string, unknown>;
     try {
-      data = JSON.parse(payload.toString('utf8'));
+      data = parseControllerJson(payload, 'diagnostic message') as Record<string, unknown>;
     } catch {
       return false;
     }
@@ -368,7 +391,10 @@ export class WagoDiagnosticsStore {
       streamId: canonical ? (state.activeStream as string) : null,
       sequence: canonical ? (data.sequence as number) : null,
     };
-    if (kind === 'heartbeat') state.heartbeatAt = canonical ? (data.timestamp as string) : receivedAt;
+    if (kind === 'heartbeat') {
+      state.heartbeatAt = canonical ? (data.timestamp as string) : receivedAt;
+      state.dropCounts = heartbeatDropCounts(data);
+    }
     if (kind === 'state') this.applyState(state, data, canonical, metadata);
     this.applyEvents(id, state, kind, data, canonical, metadata);
     for (const collection of [

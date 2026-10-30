@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { pulseBehaviorError } from '../../../../channel-behavior';
 import { ENGINEERING_UNITS } from '../../../../measurement-contract';
 import { validateModbus, validateModbusBindings } from '../../../../modbus/model';
+import { configurationLimitErrors } from '../../../../shared/configuration-limits';
 import { type Snapshot, type ValidationError } from '../types';
 
 export function sort(value: unknown): unknown {
@@ -307,6 +308,14 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     validateChannelMeasurements(channel, capabilities, path, errors);
   });
   return errors;
+}
+
+/**
+ * Refusals for a new revision or rollback that exceeds the shared configuration limits. A running or
+ * redelivered configuration is never checked against these.
+ */
+export function validateConfigurationLimits(desired: { snapshot?: unknown } | null | undefined): ValidationError[] {
+  return configurationLimitErrors(desired?.snapshot);
 }
 
 export function validateDesired(value: unknown): ValidationError[] {

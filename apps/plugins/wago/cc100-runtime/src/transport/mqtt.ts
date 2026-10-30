@@ -1,9 +1,13 @@
 import { MqttClient } from 'mqtt';
 import { Transport } from '../runtime';
+import type { MessageSlot, SubscribeOptions } from '../runtime/types';
+import { DEFAULT_MAX_MESSAGE_BYTES, DropCounters, SubscriptionAdmission } from './admission';
+
 
 export class MqttTransport implements Transport {
   private readonly pending = new Set<(error: Error) => void>();
   private recovering = false;
+  private readonly drops = new DropCounters();
 
   constructor(
     private readonly client: MqttClient,
@@ -24,12 +28,22 @@ export class MqttTransport implements Transport {
     );
   }
 
-  async subscribe(topic: string, listener: (payload: Buffer) => void | Promise<void>): Promise<void> {
+  dropCounts(): Record<string, number> {
+    return this.drops.snapshot();
+  }
+
+  async subscribe(
+    topic: string,
+    listener: (payload: Buffer, slot: MessageSlot) => void | Promise<void>,
+    options?: SubscribeOptions,
+  ): Promise<void> {
+    const admission = new SubscriptionAdmission(
+      options?.maxBytes ?? DEFAULT_MAX_MESSAGE_BYTES,
+      this.drops,
+      this.onError,
+    );
     const receive = (receivedTopic: string, payload: Buffer) => {
-      if (receivedTopic === topic)
-        void Promise.resolve()
-          .then(() => listener(payload))
-          .catch(this.onError);
+      if (receivedTopic === topic) admission.admit(payload, async (body, slot) => listener(body, slot));
     };
     // Install before SUBACK so a retained message in the same socket read is
     // delivered too. Failed attempts must not leave duplicate listeners behind.

@@ -1,3 +1,8 @@
+import { BOUNDED_MESSAGES_CAPABILITY } from '../../shared/capabilities';
+import manifest from '../../cc100-runtime/manifest.json';
+import { CAPABILITIES } from '../../cc100-runtime/src/runtime/identity/protocol';
+import { parseConfigurationReport } from '../configuration/model';
+import { parseHeartbeat } from '../protocol/index';
 import { freshness, WagoDiagnosticsStore } from './store';
 
 describe('WAGO bounded diagnostics', () => {
@@ -27,6 +32,70 @@ describe('WAGO bounded diagnostics', () => {
       sourceAt: null,
     });
     expect(store.read(1).outputs.invalid).toBeUndefined();
+  });
+  describe('mixed runtime and server versions', () => {
+    const heartbeat = (extra: Record<string, unknown>) => ({
+      hardwareId: 'cc100-1',
+      protocolVersion: '1.0.0',
+      runtimeVersion: '0.2.10',
+      timestamp: '2026-09-05T12:00:00.000Z',
+      streamId: '6b6b0b0e-3d0c-4d2a-9b7b-5f0f0b0b0b0b',
+      sequence: 1,
+      ...extra,
+    });
+    const counts = { oversized: 2, overload: 1 };
+
+    it('reads drop counters only from a runtime that advertises bounded messages', () => {
+      send('heartbeat', heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts: counts }));
+      expect(store.read(1).dropCounts).toEqual(counts);
+    });
+
+    it('ignores drop counters from a runtime without the capability', () => {
+      send('heartbeat', heartbeat({ capabilities: ['claim'], dropCounts: counts }));
+      expect(store.read(1).dropCounts).toBeUndefined();
+    });
+
+    it('treats an older runtime heartbeat without counters as unsupported', () => {
+      send('heartbeat', heartbeat({ capabilities: ['claim', 'heartbeat'] }));
+      expect(store.read(1).dropCounts).toBeUndefined();
+    });
+
+    it.each([{ oversized: -1, overload: 0 }, { oversized: 1.5, overload: 0 }, { oversized: 1 }, [1, 2], 'many'])(
+      'ignores malformed counters %j',
+      (dropCounts) => {
+        send('heartbeat', heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts }));
+        expect(store.read(1).dropCounts).toBeUndefined();
+      },
+    );
+
+    it('drops counters again when a later heartbeat no longer reports them', () => {
+      send('heartbeat', heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts: counts }));
+      send('heartbeat', heartbeat({ capabilities: ['claim'], sequence: 2 }));
+      expect(store.read(1).dropCounts).toBeUndefined();
+    });
+
+    it('lets an older server keep parsing heartbeats and reports that carry the new fields', () => {
+      const payload = Buffer.from(
+        JSON.stringify(heartbeat({ capabilities: [BOUNDED_MESSAGES_CAPABILITY], dropCounts: counts })),
+      );
+      expect(parseHeartbeat(payload).capabilities).toContain(BOUNDED_MESSAGES_CAPABILITY);
+      expect(
+        parseConfigurationReport({
+          revision: 2,
+          contentHash: 'a'.repeat(64),
+          errors: [{ path: 'snapshot', code: 'configuration_limit_exceeded', message: 'too big' }],
+          omittedErrors: 12,
+        }),
+      ).toEqual({
+        revision: 2,
+        contentHash: 'a'.repeat(64),
+        errors: [{ path: 'snapshot', code: 'configuration_limit_exceeded', message: 'too big' }],
+      });
+    });
+
+    it('keeps the same runtime capability list in the manifest and the code', () => {
+      expect(manifest.capabilities).toEqual(CAPABILITIES);
+    });
   });
   it('excludes secrets and safely stores own prototype-named channels', () => {
     send('heartbeat', { pairingCode: 'SECRET', enrollmentSecret: 'SECRET', password: 'SECRET' });

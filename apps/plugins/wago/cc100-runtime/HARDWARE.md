@@ -16,7 +16,7 @@ permissions, stop PLC software, or mount hardware itself.
   and permanently disable CODESYS, then verify its process and boot state before
   granting I/O access. Failure must block runtime launch.
 - Verify model `751-9301` and firmware `31` before selecting
-  `WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1`.
+  `WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-rtu-v1`, the profile named in `manifest.json`.
 - Mount only the two files listed in `manifest.json` at their exact container
   destinations. DIN is read-only; DOUT is read-write. Missing sources must fail
   installation, not become directories. No manual `WAGO_IO_PATHS` is supported.

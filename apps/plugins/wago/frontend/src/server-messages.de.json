@@ -485,5 +485,12 @@
   "Standard": "Standard",
   "Rotated 180°": "Um 180° gedreht",
   "Off": "Aus",
-  "On": "Ein"
+  "On": "Ein",
+  "The configuration is larger than 1 MiB.": "Die Konfiguration ist größer als 1 MiB.",
+  "The configuration is nested deeper than 16 levels.": "Die Konfiguration ist tiefer als 16 Ebenen verschachtelt.",
+  "An ID is longer than 256 characters.": "Eine ID ist länger als 256 Zeichen.",
+  "An ID contains control characters.": "Eine ID enthält Steuerzeichen.",
+  "The configuration has more than 256 physical points.": "Die Konfiguration hat mehr als 256 physische Punkte.",
+  "The configuration has more than 256 channels.": "Die Konfiguration hat mehr als 256 Kanäle.",
+  "The controller status report could exceed 64 KiB with these channel IDs. Shorten IDs or remove channels.": "Der Statusbericht der Steuerung könnte mit diesen Kanal-IDs 64 KiB überschreiten. Kürze die IDs oder entferne Kanäle."
 }

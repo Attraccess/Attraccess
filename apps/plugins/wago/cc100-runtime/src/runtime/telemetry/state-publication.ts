@@ -1,3 +1,5 @@
+import { boundErrors } from '../bounded';
+import { MAX_READINESS_ERROR_BYTES } from '../limits';
 import { RuntimeModbusOutputPolling } from './modbus-output-polling';
 import { type RuntimeState, type Snapshot, type ValidationError } from '../types';
 
@@ -117,7 +119,10 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
           Boolean(accepted) &&
           !errors.some((error) => error.code !== 'modbus_read_failed') &&
           this.connected,
-        errors,
+        ...(() => {
+          const bounded = boundErrors(errors, Infinity, MAX_READINESS_ERROR_BYTES);
+          return { errors: bounded.errors, ...(bounded.omitted ? { omittedErrors: bounded.omitted } : {}) };
+        })(),
       },
     };
   }

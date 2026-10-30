@@ -2,7 +2,8 @@
 // FEATURE: WAGO front panel configuration preserves routing and profile contracts.
 import { describe, expect, it } from 'vitest';
 import { DIGITAL_TERMINALS } from '../../backend/configuration/digital';
-import { validateEditorSnapshot } from '../../backend/configuration/editor';
+import { validateEditorSnapshot as validateEditorSnapshotWithLimits } from '../../backend/configuration/editor';
+import { CONFIGURATION_LIMIT_CODE } from '../../shared/configuration-limits';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import {
   addDevice,
@@ -14,6 +15,13 @@ import {
   updateTerminal,
   type PanelConfiguration,
 } from '../src/front-panel/model';
+
+/**
+ * These tests exercise the editor model, not the publish limits: every built-in 879-3020 meter adds 131
+ * points and channels, so two meters exceed the 256 item limit (covered by its own test below).
+ */
+const validateEditorSnapshot = (snapshot: unknown) =>
+  validateEditorSnapshotWithLimits(snapshot).filter((error) => error.code !== CONFIGURATION_LIMIT_CODE);
 
 const empty = (): PanelConfiguration => ({
   snapshot: { version: 1, physicalPoints: [], logicalChannels: [] },
@@ -98,6 +106,16 @@ describe('front panel configuration', () => {
     expect(configuration.snapshot.physicalPoints).toEqual([]);
     expect(configuration.snapshot.logicalChannels).toEqual([]);
     expect(configuration.metadata.names).toEqual({});
+  });
+
+  it('refuses to publish two built-in 879-3020 meters because each adds 131 points and channels', () => {
+    let configuration = addDevice(empty(), 'Laser meter').configuration;
+    configuration = addDevice(configuration, 'CNC meter').configuration;
+    expect(configuration.snapshot.logicalChannels.length).toBeGreaterThan(256);
+    expect(validateEditorSnapshotWithLimits(configuration.snapshot).map((error) => error.message)).toEqual([
+      'The configuration has more than 256 physical points.',
+      'The configuration has more than 256 channels.',
+    ]);
   });
 
   it('creates profile bindings automatically and shares one serial bus across devices', () => {

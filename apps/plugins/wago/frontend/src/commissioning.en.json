@@ -82,7 +82,7 @@
   "recoveryUsername": "Recovery SSH username",
   "recoveryPassword": "Recovery SSH password",
   "destructive": "Before installing",
-  "destructiveDescription": "Installation replaces the controller software on {{host}} and disables CODESYS. Back up existing applications and make connected equipment safe before selecting Install runtime.",
+  "destructiveDescription": "Installation replaces the controller software on {{host}} and disables CODESYS. Attraccess does not back up or restore existing applications. Save anything you need yourself and put connected equipment in a safe state before selecting Install runtime.",
   "approveInstall": "I approve this destructive installation, including synchronization of controller system and hardware clocks to application UTC, permanent CODESYS disablement and possible loss of existing applications and data, without preservation, backup, or restoration by Attraccess.",
   "attemptApproval": "Each attempt needs your approval. Custom passwords are cleared after use.",
   "enrollmentComplete": "Runtime enrollment complete",

@@ -9,6 +9,7 @@ import {
   type ConfigurationValidationError,
 } from './model';
 import { DIGITAL_TERMINALS } from './digital';
+import { configurationLimitErrors } from '../../shared/configuration-limits';
 
 /** Editor-only metadata, stored alongside provenance; never sent to a controller. */
 export interface ConfigurationEditorMetadata {
@@ -42,6 +43,10 @@ export function editorMetadata(value: unknown): ConfigurationEditorMetadata {
 
 /** Additional editor safeguards; the version 1 wire model remains unchanged. */
 export function validateEditorSnapshot(snapshot: unknown): ConfigurationValidationError[] {
+  // The same limits the runtime enforces on a new revision or rollback; checked first so an
+  // oversized document is never walked by the detailed validation.
+  const limits = configurationLimitErrors(snapshot, '$');
+  if (limits.length) return limits;
   const errors = validateSnapshot(snapshot);
   if (errors.length) return errors;
   const value = snapshot as WagoConfigurationSnapshot;

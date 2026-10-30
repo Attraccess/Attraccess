@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 // The standalone runtime bundles the plugin-owned measurement contract.
 // The API and standalone runtime enforce the same configured output behavior.
 import { validateDesired } from './runtime/configuration/validation';
+import { MAX_COMMAND_BYTES, MAX_DESIRED_BYTES } from './runtime/limits';
 import { RuntimeTelemetry } from './runtime/telemetry/telemetry';
 
 export { hash, PROTOCOL_VERSION, validateDesired, validateSnapshot } from './runtime/configuration/validation';
@@ -23,6 +24,7 @@ export class WagoRuntime extends RuntimeTelemetry {
         // desired configurations reject invalid measurement metadata, but a persisted
         // legacy transform is handled by the measurement fault path instead of making
         // the controller unavailable after a restart.
+        // Limits only gate new revisions, so they are not part of this check.
         const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted }).filter(
           ({ code }) => code !== 'invalid_measurement',
         );
@@ -35,11 +37,15 @@ export class WagoRuntime extends RuntimeTelemetry {
     if (this.runtimeUpdateRequired || this.runtimeFailsafePending) await this.applyRuntimeUpdateFailsafe();
     else await this.outputs.applyDisconnectPolicies(this.connected);
     if (!this.desiredSubscribed) {
-      await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
+      await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload), {
+        maxBytes: MAX_DESIRED_BYTES,
+      });
       this.desiredSubscribed = true;
     }
     if (!this.commandsSubscribed) {
-      await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
+      await this.options.transport.subscribe(this.commandTopic(), (payload, slot) => this.receiveCommand(payload, slot), {
+        maxBytes: MAX_COMMAND_BYTES,
+      });
       this.commandsSubscribed = true;
     }
     await this.retryCredentialRotationSubscription();

@@ -1,0 +1,114 @@
+# WAGO recovery runbooks
+
+Six scenarios for operating the WAGO CC100 integration. They link the existing procedures instead of repeating
+them. The last column of every step names the automated test that exercises it, or says **not covered**. A test
+shows the software behaves as described; it is not evidence about a physical controller
+([safety boundary](wago-safety-boundary.md)).
+
+Tests are in `apps/plugins/wago/` unless noted. **Reliability** means the
+[reliability harness](wago-production-support.md#measured-limits) scenario of that name, a simulator measurement.
+
+**Commissioning is destructive and there is no workload backup.** Installing the runtime replaces what is on the
+controller and disables CODESYS permanently. No runbook here, and nothing in Attraccess, backs up or restores a
+controller's previous applications or data. Save what you need yourself before commissioning.
+
+## 1. Recover the Attraccess configuration and the runtime
+
+**When:** the Attraccess server was restored from a backup, moved, or reinstalled, and controllers should keep working.
+
+**Before you start:** the server restore needs the **same `AUTH_SESSION_SECRET`** as the original. The plugin encrypts
+its stored secrets (managed SSH access, network-change payloads, credential-rotation recovery copies) with a key
+derived from that value and the plugin ID (`apps/api/src/encryption/encryption.service.ts`,
+`getPluginEncryptionKey`). With a different secret those rows cannot be decrypted and the affected controllers need
+re-enrolment. Other server secrets are not needed to read WAGO data.
+
+| Step | Covered by |
+| --- | --- |
+| Restore the Attraccess database and files, and start the server with the original `AUTH_SESSION_SECRET`. | Plugin secret round trip: `apps/api/src/encryption/encryption.service.spec.ts`. Restoring a backup: **not covered** |
+| Keep the MQTT server record unchanged. Controllers reconnect to the same broker with their saved credentials. | **Not covered** |
+| Wait for heartbeats. The server rebuilds its picture from heartbeats and retained state; controllers keep their accepted configuration while the server is down. | `backend/diagnostics/store.spec.ts`; Reliability: `server-restart` |
+| Compare each controller's applied revision with the published one under **Configuration**. Publish nothing unless they differ. | `backend/wago-configuration.service.spec.ts` |
+| A controller whose managed access cannot be decrypted: remove it and commission it again, see [scenario 4](#4-replace-a-controller). | **Not covered** |
+| After the restore, check [diagnostics](wago-diagnostics.md) for stale controllers and for the dropped-message counters. | `frontend/src/diagnostics/ControllerDiagnostics.spec.tsx` |
+
+Existing procedure: [runtime recovery](wago-cc100-runtime.md#recovery) (container crash, reboot, invalid configuration).
+
+## 2. Credential compromise
+
+**When:** a controller's broker password, its enrollment secret or its SSH key may have leaked.
+
+| Step | Covered by |
+| --- | --- |
+| Rotate the controller's broker credential under **Details**. The runtime must advertise `credential-rotation-v1`. Details: [credential rotation](wago-credential-rotation.md). | `backend/credentials/service.spec.ts`; `acceptance/credential-rotation-mqtt.spec.ts`; `cc100-runtime/src/runtime/identity/rotation.spec.ts`; Reliability: `credential-rotation` |
+| If the rotation times out, retry it: the saved credential and token are reused, the broker is not rotated again. | `backend/credentials/service.spec.ts` |
+| If the runtime does not advertise the capability, update it first (scenario 5) or remove and re-enrol the controller. | `backend/credentials/service.spec.ts` (older runtimes fail admission) |
+| Revoke a compromised unclaimed enrollment by cancelling the session. The enrollment credential also expires after 15 minutes. | **Not covered** |
+| For a leaked SSH key, replace the management key through the controller's recovery options. See [commissioning recovery](wago-cc100-commissioning.md#recovery). | **Not covered** |
+| Rotate the broker administrator credentials yourself. Attraccess cannot do that. | **Not covered** |
+| Review the audit trail: [audit integration](wago-audit-integration.md). | `backend/audit/audit.spec.ts` |
+
+The threat model lists what an attacker with a controller credential can and cannot do:
+[threat model](wago-threat-model.md#2-mqtt-authorization).
+
+## 3. Broker outage
+
+**When:** the MQTT broker is down, unreachable, or was replaced.
+
+| Step | Covered by |
+| --- | --- |
+| Expect commands to time out as for an offline controller, and expect each output to follow its disconnect policy (`hold`, `immediate`, `watchdog`). These are operational controls, not safety controls. | `cc100-runtime/src/runtime/commands/disconnect.spec.ts`; Reliability: `broker-outage` (30 s) |
+| Restore the broker with the **same accounts and topic policies**. Controllers and the server reconnect on their own. | Reliability: `broker-outage`, `connection-loss` |
+| Verify the physical outputs before resuming normal operation. | **Not covered** (a person must check) |
+| Check retained state and the latest heartbeat in [diagnostics](wago-diagnostics.md). | `frontend/src/diagnostics/ControllerDiagnostics.spec.tsx` |
+| If the broker was replaced and its accounts are gone, controllers cannot authenticate. Re-enrol each one (scenario 4). | **Not covered** |
+| Set the broker's maximum message size to 2 MiB. See [production support](wago-production-support.md#broker-settings). | Reliability: `oversized-messages` |
+
+Existing procedure: [broker loss](wago-cc100-runtime.md#broker-loss).
+
+## 4. Replace a controller
+
+**When:** a CC100 failed, or is being swapped for another unit.
+
+| Step | Covered by |
+| --- | --- |
+| Note the old controller's name and channel mapping. Keep its configuration revision history; revisions stay in Attraccess. | `backend/wago-configuration.service.spec.ts` |
+| Make connected equipment safe, then remove the old controller from Attraccess. Removal revokes its MQTT access. It does not uninstall anything on the old unit. | `backend/wago-claim-ownership.spec.ts` (revocation on removal) |
+| Commission the new CC100 with the guided workflow. This is **destructive**: it replaces the software and disables CODESYS, and nothing on the unit is backed up. | `acceptance/commissioning/commissioning.spec.ts`; guide: [commissioning](wago-cc100-commissioning.md) |
+| Copy the previous channel configuration to the new controller and publish it as a new revision. Review flow impact first. | `backend/wago-configuration.service.spec.ts` |
+| Update flows that reference the old controller. | `backend/flow/service.spec.ts` |
+| Verify the physical outputs before putting the controller back to work. Physical use is unqualified until ATT-984. | **Not covered** |
+
+## 5. Runtime upgrade and rollback
+
+**When:** a new runtime version is released, or a controller reports a software mismatch.
+
+**After a release containing this change:** managed CC100s update once, automatically, and keep their outputs off until
+the server confirms the running image (`runtime-update-gate-v1`). **Unmanaged CC100s** (installed by hand, or enrolled
+before managed updates) are not updated; they stay in failsafe with outputs off and refuse commands until someone
+updates them by hand.
+
+| Step | Covered by |
+| --- | --- |
+| Managed controller: let reconciliation run, or watch the **Software update** status. At most two updates run at once. | `backend/runtime/update/coordinator.spec.ts`; `backend/runtime/managed/service.spec.ts` |
+| A failed update rolls back to the retained predecessor. Check the **Details** drawer for the classified reason. | `backend/runtime/update/coordinator.spec.ts`; `backend/runtime/lifecycle-interruption.spec.ts` |
+| Outputs stay off and commands are refused until the server confirms the image; failed shutdowns keep readiness false and are retried. | `cc100-runtime/src/runtime/startup.spec.ts` |
+| Unmanaged controller: remove it and commission it again with the guided workflow (it is not migrated automatically), or follow the manual image steps in [runtime: roll back an image](wago-cc100-runtime.md#roll-back-an-image-or-configuration) with the new digest. Keep the previous digest and state volume until the new image is accepted. | **Not covered** |
+| Roll back a configuration by publishing the previous snapshot as a new revision. Never edit `state.json`. | `backend/wago-configuration.service.spec.ts` |
+| Mixed versions: an older runtime keeps working with a newer server, and the other way round; drop counters appear only for runtimes advertising `bounded-messages-v1`. | `backend/diagnostics/store.spec.ts` |
+
+## 6. Disaster recovery
+
+**When:** the server, the broker and possibly controllers are lost together.
+
+| Step | Covered by |
+| --- | --- |
+| Rebuild in this order: broker, Attraccess server (restore the database and the original `AUTH_SESSION_SECRET`), then controllers. | **Not covered** |
+| Recreate the broker accounts and topic policies. Without them controllers cannot authenticate; recreate them through credential rotation if the controller is reachable, otherwise re-enrol. | `backend/credentials/service.spec.ts` (rotation); re-enrolment: **not covered** |
+| Controllers that still run keep their accepted configuration and apply their disconnect policy while the broker is missing. | `cc100-runtime/src/runtime/commands/disconnect.spec.ts` |
+| For a controller that was lost, replace it (scenario 4). Its previous workload cannot be restored. | **Not covered**, by design |
+| Before putting anything back to work, run the checks in the [acceptance evidence guide](wago-acceptance-evidence.md). | **Not covered** (hardware) |
+
+## What the lab exercises cover
+
+The scenarios above are exercised on a real CC100 in the ATT-988 lab phase. Results are recorded on the
+[production support](wago-production-support.md#lab-exercises) page.

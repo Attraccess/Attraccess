@@ -108,6 +108,7 @@ export function diagnosticReferences(
 export function runtimeStreamSummary(runtime: ReturnType<WagoService['diagnostics']['read']>) {
   return {
     sequenceGaps: runtime.activeStream ? runtime.sequenceGaps : null,
+    dropCounts: runtime.dropCounts ?? null,
     activeStream: runtime.activeStream ?? null,
     trackingExhausted: runtime.trackingExhausted,
     stateConnected: runtime.connected ?? null,

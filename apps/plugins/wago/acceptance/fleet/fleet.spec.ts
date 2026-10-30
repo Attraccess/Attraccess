@@ -191,7 +191,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
       },
       subscribe: async (topic, listener) => {
         state.deviceClient.on('message', (received, payload) => {
-          if (received === topic) Promise.resolve(listener(payload)).catch((error) => state.errors.push(error));
+          if (received === topic) Promise.resolve(listener(payload, { release: () => undefined })).catch((error) => state.errors.push(error));
         });
         await state.deviceClient.subscribeAsync(topic, { qos: 1 });
       },

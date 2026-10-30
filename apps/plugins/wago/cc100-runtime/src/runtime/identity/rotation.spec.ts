@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MemoryDeviceAdapter } from '../../io/adapters';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from '../../runtime';
+import type { MessageSlot } from '../types';
 
 describe('runtime credential rotation persistence and reconnect acknowledgement', () => {
   let directory: string;
   let store: JsonStateStore;
   let runtime: WagoRuntime;
-  const listeners = new Map<string, (payload: Buffer) => void | Promise<void>>();
+  const listeners = new Map<string, (payload: Buffer, slot: MessageSlot) => void | Promise<void>>();
   const publish = jest.fn();
   const reconnect = jest.fn();
   const credentialEpoch = '11111111-1111-4111-8111-111111111111';
@@ -45,7 +46,7 @@ describe('runtime credential rotation persistence and reconnect acknowledgement'
       reconnectCredentials: reconnect,
     });
   const send = async (value: unknown) => {
-    await listeners.get(topic)?.(Buffer.from(JSON.stringify(value)));
+    await listeners.get(topic)?.(Buffer.from(JSON.stringify(value)), { release: () => undefined });
   };
 
   beforeEach(async () => {

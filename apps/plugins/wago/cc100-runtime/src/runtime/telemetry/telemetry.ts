@@ -1,3 +1,4 @@
+import { boundFaultText, boundReport } from '../bounded';
 import { CAPABILITIES } from '../identity/protocol';
 import { RuntimeStatePublication } from './state-publication';
 import { type ValidationError } from '../types';
@@ -21,6 +22,7 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
             runtimeVersion,
             ...(this.options.runtimeImageId ? { runtimeImageId: this.options.runtimeImageId } : {}),
             runtimePolicyToken: this.runtimePolicyToken,
+            ...(this.options.transport.dropCounts ? { dropCounts: this.options.transport.dropCounts() } : {}),
             capabilities:
               this.credentialRotationSubscribed && this.state.credentials?.credentialEpoch
                 ? CAPABILITIES
@@ -46,7 +48,7 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
   protected publishReport(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
     return this.options.transport.publish(
       this.topic('configuration/reported'),
-      { revision, contentHash, errors },
+      boundReport(revision, contentHash, errors),
       { retain: true },
     );
   }
@@ -56,13 +58,14 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
   }
 
   protected publishFault(channelId: string, error: unknown): Promise<void> {
-    const fault =
+    let fault =
       error && typeof error === 'object' && 'code' in error && 'message' in error
         ? (error as { code: string; message: string })
         : {
             code: 'device_write_failed',
             message: error instanceof Error ? error.message : String(error),
           };
+    fault = { code: boundFaultText(String(fault.code)), message: boundFaultText(String(fault.message)) };
     const key = JSON.stringify([channelId, fault.code]);
     // Repeated failed reads/shutoff retries must not accumulate pending MQTT
     // publications. Retained readiness still carries every current read error.

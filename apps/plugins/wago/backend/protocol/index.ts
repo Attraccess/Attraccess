@@ -161,19 +161,56 @@ export function operationalWildcardTopic(prefix: string): string {
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/+/#`;
 }
 
-export function parseObject(payload: Buffer, label: string): Record<string, unknown> {
-  let value: unknown;
+/** Largest controller-originated payload any server entry point decodes. */
+export const CONTROLLER_PAYLOAD_MAX_BYTES = 64 * 1024;
+
+/** Deepest object/array nesting accepted in a controller-originated payload. */
+export const CONTROLLER_PAYLOAD_MAX_DEPTH = 8;
+
+/** Whether `text` nests objects/arrays deeper than `maxDepth`, without parsing it. */
+export function exceedsJsonDepth(text: string, maxDepth: number): boolean {
+  let depth = 0;
+  let inString = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (char === '\\') index += 1;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === '{' || char === '[') {
+      depth += 1;
+      if (depth > maxDepth) return true;
+    } else if (char === '}' || char === ']') depth -= 1;
+  }
+  return false;
+}
+
+/**
+ * Decode one controller-originated JSON payload. The size and depth are checked before
+ * `toString`/`JSON.parse` so an oversized or deeply nested message costs no allocation.
+ */
+export function parseControllerJson(payload: Buffer, label: string): unknown {
+  if (payload.byteLength > CONTROLLER_PAYLOAD_MAX_BYTES) throw new Error(`${label} is too large`);
+  const text = payload.toString('utf8');
+  if (exceedsJsonDepth(text, CONTROLLER_PAYLOAD_MAX_DEPTH)) throw new Error(`${label} is nested too deeply`);
   try {
-    value = JSON.parse(payload.toString('utf8'));
+    return JSON.parse(text);
   } catch {
     throw new Error(`${label} is not valid JSON`);
   }
+}
+
+export function parseObject(payload: Buffer, label: string): Record<string, unknown> {
+  const value = parseControllerJson(payload, label);
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   return value as Record<string, unknown>;
 }
 
 export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
-  const input = parseObject(payload, 'announcement');
+  return heartbeatFromObject(parseObject(payload, 'announcement'));
+}
+
+function heartbeatFromObject(input: Record<string, unknown>): WagoHeartbeat {
   const required = ['hardwareId', 'protocolVersion', 'runtimeVersion'];
   for (const key of required)
     if (typeof input[key] !== 'string' || !input[key].trim()) throw new Error(`announcement ${key} is required`);
@@ -205,8 +242,8 @@ export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
 }
 
 export function parseAnnouncement(payload: Buffer): WagoAnnouncement {
-  const heartbeat = parseHeartbeat(payload);
-  const input = JSON.parse(payload.toString('utf8')) as Record<string, unknown>;
+  const input = parseObject(payload, 'announcement');
+  const heartbeat = heartbeatFromObject(input);
   if (typeof input.pairingCode !== 'string' || !input.pairingCode.trim())
     throw new Error('announcement pairingCode is required');
   return { ...heartbeat, pairingCode: input.pairingCode.trim() };

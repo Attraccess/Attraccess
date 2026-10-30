@@ -26,6 +26,8 @@ export interface WagoDiagnostics {
   capabilities: string[];
   incompatible: boolean;
   sequenceGaps: number | null;
+  /** Messages the controller dropped unanswered, by reason; null for runtimes without bounded messages. */
+  dropCounts: Record<string, number> | null;
   activeStream: string | null;
   trackingExhausted: boolean;
   stateConnected: boolean | null;
