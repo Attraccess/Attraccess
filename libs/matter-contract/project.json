@@ -67,8 +67,8 @@
       "inputs": [
         "default",
         "{workspaceRoot}/jest.preset.js",
-        "{workspaceRoot}/dist/contracts/matter/**/*",
-        { "externalDependencies": ["jest", "ajv", "ajv-formats"] }
+        { "dependentTasksOutputFiles": "**/*.json" },
+        { "externalDependencies": ["jest", "ajv", "ajv-formats", "zod"] }
       ],
       "options": {
         "command": "jest --config libs/matter-contract/jest.artifacts.config.ts"

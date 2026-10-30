@@ -96,7 +96,8 @@
       "dependsOn": ["build"],
       "inputs": [
         "jestShared",
-        "{workspaceRoot}/dist/apps/matter-sidecar/**/*",
+        "contractSources",
+        { "dependentTasksOutputFiles": "**/*", "transitive": true },
         {
           "externalDependencies": ["jest", "ws"]
         },

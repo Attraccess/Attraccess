@@ -18,7 +18,7 @@ const NAMED_SCHEMAS: Record<string, z.ZodType> = {
   ServerMessage: serverMessageSchema,
 };
 
-function operationSchemaName(operation: OperationDefinition, part: 'Params' | 'Request' | 'Response'): string {
+function operationSchemaName(operation: { id: string }, part: 'Params' | 'Request' | 'Response'): string {
   const base = operation.id
     .split(/[.]/)
     .map((word) => word[0].toUpperCase() + word.slice(1))
@@ -57,14 +57,28 @@ export function buildSchemaDefinitions(refPrefix: string): Record<string, JsonOb
 }
 
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
-const errorResponses = (operation: OperationDefinition): JsonObject => {
-  const codes = new Set([400, 404, 409, 426, 501, 503, 504]);
+const errorBody = { description: 'Error', content: { 'application/json': { schema: ref('ErrorEnvelope') } } };
+
+type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params' | 'body'> & { id: string };
+
+/** The error statuses a route can actually answer with, so generated clients do not expect impossible ones. */
+const errorResponses = (operation: ResponseShape): JsonObject => {
+  // Any route can refuse a browser origin, miss the path or fail internally.
+  const codes = new Set([403, 404, 500]);
+  // Release headers are checked, and draining refused, only on versioned routes.
+  if (operation.versioned) for (const status of [409, 426, 503]) codes.add(status);
+  if (operation.params || operation.body) codes.add(400);
   if (operation.body) codes.add(413);
+  // Only feature operations can be unimplemented or run into their deadline.
+  if (operation.family !== 'health' && operation.id !== 'events.stream')
+    for (const status of [501, 504]) codes.add(status);
   const responses: JsonObject = {};
-  for (const status of [...codes].sort()) {
-    responses[String(status)] = {
-      description: 'Error',
-      content: { 'application/json': { schema: ref('ErrorEnvelope') } },
+  for (const status of [...codes].sort()) responses[String(status)] = errorBody;
+  // Readiness answers 503 with its own body (starting or draining), not with an error envelope.
+  if (operation.id === 'health.ready') {
+    responses['503'] = {
+      description: 'Not ready',
+      content: { 'application/json': { schema: ref(operationSchemaName(operation, 'Response')) } },
     };
   }
   return responses;
@@ -126,7 +140,7 @@ export function buildOpenApiDocument(): JsonObject {
       parameters: COMPAT_PARAMETERS,
       responses: {
         '101': { description: 'Switching protocols' },
-        ...errorResponses({ body: undefined } as OperationDefinition),
+        ...errorResponses({ id: 'events.stream', family: 'subscriptions', versioned: true }),
       },
     },
   };

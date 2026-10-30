@@ -32,14 +32,6 @@ export const COMPATIBILITY_TABLE: readonly SupportedCombination[] = [
   },
 ];
 
-export const receivedCombinationSchema = z.strictObject({
-  wireVersion: z.number().int().nullable(),
-  attraccess: z.string().nullable(),
-  plugin: z.string().nullable(),
-  sidecar: z.string().nullable(),
-});
-export type ReceivedCombination = z.infer<typeof receivedCombinationSchema>;
-
 /** Minimum Attraccess version implied by the table's range (`^1.11.0` -> `1.11.0`). */
 export function minimumAttraccessVersion(combination: SupportedCombination = COMPATIBILITY_TABLE[0]): string {
   const minimum = validRange(combination.attraccess) ? minVersion(combination.attraccess) : null;
