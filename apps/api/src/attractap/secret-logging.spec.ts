@@ -7,7 +7,7 @@ import { join, relative } from 'node:path';
  * *arguments* (not their fixed text) mention such values.
  */
 const REPOSITORY_ROOT = join(__dirname, '..', '..', '..', '..');
-const FORBIDDEN = /\b(payload|eventData|key|keys|token|secret|password|apdu|apdus)\b/i;
+const FORBIDDEN = /\b(payload|eventData|key|keys|token|secret|password|apdu|apdus|resourceListResponse)\b/i;
 
 function sourceFiles(directory: string, extensions: string[]): string[] {
   return readdirSync(directory).flatMap((name) => {

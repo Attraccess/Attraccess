@@ -406,9 +406,9 @@ describe('ResourceListService', () => {
 
       await fixture.service.sendResourceListToSocket(socket);
 
+      // Only the socket and counts: the payload names the logged-in user and every resource.
       expect((fixture.service as any).logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Sending resource list to socket sock-debug'),
-        expect.any(AttractapEvent),
+        expect.stringMatching(/^Sending resource list to socket sock-debug \(revision \d+, \d+ resources\)$/),
       );
     });
 

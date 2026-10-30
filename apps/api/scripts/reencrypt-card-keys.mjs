@@ -61,7 +61,16 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
       counts[table] = 0;
       for (const row of rows) {
         // Unencrypted legacy values are encrypted with the new secret as they are.
-        const plain = row.value.startsWith(`${VERSION}.`) ? decrypt(oldKey, row.value) : row.value;
+        let plain = row.value;
+        if (row.value.startsWith(`${VERSION}.`)) {
+          try {
+            plain = decrypt(oldKey, row.value);
+          } catch {
+            throw new Error(
+              `${table} row ${row.id} cannot be read with OLD_AUTH_SESSION_SECRET. Is it the secret the data was written with? Nothing was changed.`,
+            );
+          }
+        }
         await call(db, 'run', `UPDATE "${table}" SET "${column}" = ? WHERE id = ?`, [encrypt(newKey, plain), row.id]);
         counts[table]++;
       }

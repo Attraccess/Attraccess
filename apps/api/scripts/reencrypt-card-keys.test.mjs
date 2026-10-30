@@ -41,7 +41,10 @@ test('writes nothing for a dry run or when a value does not decrypt', async () =
   assert.equal((await all(db, 'SELECT key FROM nfc_card'))[0].key, stored);
 
   await run(db, 'INSERT INTO nfc_card (id, key) VALUES (2, ?)', [encrypt(deriveKey('somebody-else'), 'bb')]);
-  await assert.rejects(() => reencryptCardKeys(db, 'old-secret', 'new-secret'));
+  await assert.rejects(
+    () => reencryptCardKeys(db, 'old-secret', 'new-secret'),
+    /nfc_card row 2 cannot be read with OLD_AUTH_SESSION_SECRET/,
+  );
   assert.equal((await all(db, 'SELECT key FROM nfc_card WHERE id = 1'))[0].key, stored);
 });
 

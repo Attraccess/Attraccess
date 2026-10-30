@@ -130,7 +130,11 @@ export async function sendResourceListToSockets(
       // A different card may have been presented while the queries were pending.
       if (socket.state.verifiedUserId !== userId) return;
       const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, payload);
-      context.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
+      // Counts only: the payload names the logged-in user and every resource.
+      const { revision, resources } = payload;
+      context.logger.debug(
+        `Sending resource list to socket ${socket.id} (revision ${revision}, ${resources.length} resources)`,
+      );
       await socket.sendMessage(resourceListResponse);
     }),
   );
