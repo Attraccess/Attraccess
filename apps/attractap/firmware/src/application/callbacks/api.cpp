@@ -75,19 +75,6 @@ void Application::setupApiCallbacks()
           return;
         }
 
-        if (response.keyLen != 16) {
-          State::setUserLanguage(false);
-          this->logger.error("Invalid key bytes provided");
-          this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
-#else
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-#endif
-          return;
-        }
-
         this->cardAuthenticationData = response;
 #ifdef HAS_LVGL_DISPLAY
         if (this->currentProjectsUser != response.username) {
@@ -274,8 +261,11 @@ void Application::setupActionCallbacks()
     this->enrollPhase = ENROLL_PHASE_NONE;
     this->resetPhase = RESET_PHASE_NONE;
     this->cardAuthenticationPending = false;
-    this->enrollKeyMaterialReady = false;
+    this->enrollSucceeded = false;
     this->enrollErrorPending = false;
+    this->resetSucceeded = false;
+    this->resetErrorPending = false;
+    this->cardRelay.cancel();
 #endif
     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
     this->availableFirmwareVersion = availableVersion;

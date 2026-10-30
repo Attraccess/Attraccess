@@ -246,11 +246,10 @@ struct ResourceUsageFormPageResult
 
 struct ApiCards : public ApiForms
 {
+// The server verified the card before it sends this: it ran the card crypto through the relay.
+// There is no key material on the reader.
 struct CardAuthenticationDetailsResponse
     {
-        uint8_t keyNo;
-        uint8_t keyBytes[16];
-        uint8_t keyLen;
         std::string error;
         std::string username;
         std::string language;
@@ -275,9 +274,6 @@ struct SupervisionRequestResult
 
 struct SupervisorCardAuthenticationResponse
     {
-        uint8_t keyNo = 0;
-        uint8_t keyBytes[16] = {0};
-        uint8_t keyLen = 0;
         std::string error;
         std::string username;
     };
@@ -315,7 +311,6 @@ protected:
     std::function<void(SupervisorCardAuthenticationResponse)> supervisorCardAuthenticationResponseCallback;
     std::function<void(SupervisionResolvedResult)> supervisionResolvedCallback;
     std::function<void(const MassIntroductionStartCommand &)> massIntroductionStartCallback;
-    std::function<void(const MassIntroductionCardAuthenticationResponse &)> massIntroductionCardAuthenticationCallback;
     std::function<void(const MassIntroductionResult &)> massIntroductionResultCallback;
     std::function<void(const MassIntroductionEnd &)> massIntroductionEndCallback;
     std::function<void(std::string)> deviceNameCallback;
@@ -348,9 +343,13 @@ protected:
     bool crashReportAwaitingAck = false;
     bool crashReportSentCoredump = false;
     std::function<void(std::string username)> enrollNewCardGetAvailableKeyNoCallback;
-    std::function<void(uint8_t keyNo, std::string key)> enrollNewCardCallback;
+    std::function<void()> enrollNewCardSucceededCallback;
     std::function<void(std::string error)> enrollNewCardErrorCallback;
-    std::function<void(std::string username, uint8_t keyNo, std::string key)> resetNfcCardCallback;
+    std::function<void(std::string username)> resetNfcCardCallback;
+    std::function<void(bool success, std::string error)> resetNfcCardResultCallback;
+    std::function<void(const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)> cardApduCallback;
+    std::function<void(const char *conversationId)> cardConversationEndCallback;
+    std::function<void()> cardConversationStartCallback;
     std::function<void(const char *title, const char *message)> errorCallback;
     std::function<void(const ActionResult &)> actionResultCallback;
     std::function<void(bool)> insufficientBalanceCallback;
@@ -394,7 +393,21 @@ public:
     void cancelResourceAction() { activeActionRequestId = 0; }
     bool isCurrentResourceAction(uint32_t requestId) const { return !requestId || requestId == activeActionRequestId.load(); }
 
-    void requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
+    // --- Card relay ---------------------------------------------------------------------------
+    // The server runs all card crypto. The reader announces a card and then relays one complete
+    // APDU at a time: CARD_APDU in, CARD_APDU_RESPONSE out, until CARD_CONVERSATION_END.
+    // purpose: "tap", "enroll", "reset", "supervisor" or "mass-introduction".
+    void sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId = 0,
+                          const char *sessionId = nullptr);
+    void sendCardApduResponse(const char *conversationId, uint32_t seq, const uint8_t *response, uint8_t length);
+    void sendCardRemoved(const char *conversationId);
+    // The reader's login ended (logout or timeout): the server forgets the verified user.
+    void sendReaderSessionEnded();
+    void setCardApduCallback(
+        std::function<void(const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)> callback);
+    // Called right before CARD_DETECTED goes out: the card relay opens before the first command can arrive.
+    void setCardConversationStartCallback(std::function<void()> callback);
+    void setCardConversationEndCallback(std::function<void(const char *conversationId)> callback);
 
     void setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback);
 
@@ -408,8 +421,6 @@ public:
     // must not start the session itself — it confirms the card auth and the server does the rest.
 
     void requestSupervision(uint32_t resourceId);
-    void requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
-    void confirmSupervisorCardAuth(uint32_t resourceId);
     void cancelSupervision();
     void setSupervisionStartCallback(std::function<void(SupervisionStartCommand)> callback);
     void setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback);
@@ -419,27 +430,21 @@ public:
     // --- Mass introduction (ATT-1151) ----------------------------------------------------------
     // Server-armed like ATT-816 supervision. Every message carries the sessionId so the flow can
     // ignore replies for a session it has already left.
-    void requestMassIntroductionCardAuthenticationData(const char *sessionId, const uint8_t *uid, uint8_t uidLength);
-    void confirmMassIntroductionCardAuth(const char *sessionId, const uint8_t *uid, uint8_t uidLength);
     void cancelMassIntroduction(const char *sessionId);
     void setMassIntroductionStartCallback(std::function<void(const MassIntroductionStartCommand &)> callback);
-    void setMassIntroductionCardAuthenticationCallback(std::function<void(const MassIntroductionCardAuthenticationResponse &)> callback);
     void setMassIntroductionResultCallback(std::function<void(const MassIntroductionResult &)> callback);
     void setMassIntroductionEndCallback(std::function<void(const MassIntroductionEnd &)> callback);
 
     void setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::string username)> callback);
-    void setEnrollNewCardCallback(std::function<void(uint8_t keyNo, std::string key)> callback);
+    void setEnrollNewCardSucceededCallback(std::function<void()> callback);
     void setEnrollNewCardErrorCallback(std::function<void(std::string error)> callback);
 
-    void sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo);
-    void sendEnrollNewCard(bool success);
     void sendEnrollNewCardCancel();
 
-    // Card reset/deletion. The server already knows the card's stored key + slot
-    // (it is being deleted from the DB), so it hands them to the reader in a
-    // single RESET_NFC_CARD event — no key round-trip like enrollment.
-    void setResetNfcCardCallback(std::function<void(std::string username, uint8_t keyNo, std::string key)> callback);
-    void sendResetNfcCard(bool success);
+    // Card reset. RESET_NFC_CARD arms the reader (username only); the server then resets the card
+    // through the relay and reports the outcome with a second RESET_NFC_CARD.
+    void setResetNfcCardCallback(std::function<void(std::string username)> callback);
+    void setResetNfcCardResultCallback(std::function<void(bool success, std::string error)> callback);
     void sendResetNfcCardCancel();
 
     void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false);
@@ -499,7 +504,6 @@ private:
     void onSupervisionResolved(JsonObject data);
 
     void onMassIntroductionStart(JsonObject data);
-    void onMassIntroductionCardAuthenticationData(JsonObject data);
     void onMassIntroductionResult(JsonObject data);
     void onMassIntroductionEnd(JsonObject data);
 
@@ -550,7 +554,8 @@ private:
     void onEnrollNewCard(JsonObject data);
     // Server reuses the ENROLL_NEW_CARD_REQUEST_NFC_KEY event to report errors
     // back to the reader (e.g. CARD_ALREADY_ENROLLED).
-    void onEnrollNewCardRequestNFCKeyError(JsonObject data);
+    void onCardApdu(JsonObject data);
+    void onCardConversationEnd(JsonObject data);
 
     void onResetNfcCard(JsonObject data);
 

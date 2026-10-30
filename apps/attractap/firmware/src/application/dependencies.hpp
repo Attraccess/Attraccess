@@ -14,6 +14,7 @@
 #include "../api/api.hpp"
 #include "../utils.hpp"
 #include "../beeper/beeper.hpp"
+#include "card_relay.hpp"
 
 #ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"

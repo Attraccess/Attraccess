@@ -13,26 +13,6 @@ std::string stringField(JsonObject payload, const char *key)
 }
 }
 
-void API::requestMassIntroductionCardAuthenticationData(const char *sessionId, const uint8_t *uid, uint8_t uidLength)
-{
-    this->logger.info("Requesting mass introduction card authentication data");
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["sessionId"] = sessionId;
-    payload["uid"] = hexToString(uid, uidLength);
-    this->sendMessage("REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", payload);
-}
-
-void API::confirmMassIntroductionCardAuth(const char *sessionId, const uint8_t *uid, uint8_t uidLength)
-{
-    this->logger.info("Confirming mass introduction card authentication");
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["sessionId"] = sessionId;
-    payload["uid"] = hexToString(uid, uidLength);
-    this->sendMessage("MASS_INTRODUCTION_CARD_AUTH_CONFIRMED", payload);
-}
-
 void API::cancelMassIntroduction(const char *sessionId)
 {
     JsonDocument doc;
@@ -44,12 +24,6 @@ void API::cancelMassIntroduction(const char *sessionId)
 void API::setMassIntroductionStartCallback(std::function<void(const MassIntroductionStartCommand &)> callback)
 {
     this->massIntroductionStartCallback = callback;
-}
-
-void API::setMassIntroductionCardAuthenticationCallback(
-    std::function<void(const MassIntroductionCardAuthenticationResponse &)> callback)
-{
-    this->massIntroductionCardAuthenticationCallback = callback;
 }
 
 void API::setMassIntroductionResultCallback(std::function<void(const MassIntroductionResult &)> callback)
@@ -75,32 +49,6 @@ void API::onMassIntroductionStart(JsonObject data)
     command.introducerUsername = stringField(payload, "introducerUsername");
     command.remainingMs = payload["remainingMs"].is<uint32_t>() ? payload["remainingMs"].as<uint32_t>() : 0;
     this->massIntroductionStartCallback(command);
-}
-
-void API::onMassIntroductionCardAuthenticationData(JsonObject data)
-{
-    if (this->massIntroductionCardAuthenticationCallback == nullptr)
-    {
-        return;
-    }
-    JsonObject payload = data["payload"].as<JsonObject>();
-    MassIntroductionCardAuthenticationResponse response;
-    response.sessionId = stringField(payload, "sessionId");
-    response.error = stringField(payload, "error");
-    response.username = stringField(payload, "username");
-    response.keyNo = payload["keyNo"].is<uint8_t>() ? payload["keyNo"].as<uint8_t>() : 0;
-
-    // Same key encoding as the supervisor card flow: 16 bytes as 32 hex characters.
-    const std::string keyHex = stringField(payload, "key");
-    if (keyHex.length() == 32 && stringToHexArray(keyHex, response.keyBytes, 16))
-    {
-        response.keyLen = 16;
-    }
-    else if (response.error.empty())
-    {
-        response.error = keyHex.empty() ? "KEY_NOT_SET" : "Invalid key";
-    }
-    this->massIntroductionCardAuthenticationCallback(response);
 }
 
 void API::onMassIntroductionResult(JsonObject data)

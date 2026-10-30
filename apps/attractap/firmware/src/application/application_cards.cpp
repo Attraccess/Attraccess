@@ -1,56 +1,17 @@
-// NFC card authentication: verify key, beep/LED feedback, unlock on success
+// NFC card authentication result: the server checked the card, the reader shows the outcome
 // FEATURE: application-card-flow
 
 #include "application.hpp"
 #include "../state/state.hpp"
 
+// Runs once the server verified the card (it ran the card crypto through the relay and only then
+// sent the user's details). The reader does no card check of its own.
 void Application::processCardAuthenticationData() {
-  // A card that fails NFC verification must not inherit the language of the
-  // previous cardholder while its error screen is shown.
-  State::setUserLanguage(false);
-  this->logger.infof("Trying to authenticate with keyNo: %u",
-                     this->cardAuthenticationData.keyNo);
-  if (this->cardAuthenticationData.keyLen != 16) {
-    this->logger.error("Invalid key bytes provided");
-    this->beeper.errorBeep();
-#ifdef HAS_WS2812_LED
-    this->led.triggerError();
-#endif
-    this->nfc.enableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-    this->finishCardAuthentication(false);
-    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-#else
-    this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-#endif
-    return;
-  }
-
-  bool authenticated =
-      this->nfc.authenticate(this->cardAuthenticationData.keyNo,
-                             this->cardAuthenticationData.keyBytes);
-
-  if (!authenticated) {
-    this->logger.error("Authentication failed");
-    this->beeper.errorBeep();
-#ifdef HAS_WS2812_LED
-    this->led.triggerError();
-#endif
-    this->nfc.enableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-    this->finishCardAuthentication(false);
-    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-#else
-    this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-#endif
-    return;
-  }
-
   this->beeper.successBeep();
 #ifdef HAS_WS2812_LED
   this->led.triggerSuccess();
 #endif
-  this->logger.info("Authentication successful");
+  this->logger.info("Card verified by the server");
 
   this->externalState = EXTERNAL_STATE_NONE;
 

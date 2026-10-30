@@ -6,14 +6,108 @@
 #include <cstring>
 #include <string>
 
-void API::requestCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId)
+void API::sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId,
+                           const char *sessionId)
 {
-    this->logger.info("Requesting card authentication data");
+    if (this->cardConversationStartCallback != nullptr)
+    {
+        this->cardConversationStartCallback();
+    }
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
-    payload["uid"] = hexToString(uid, uidLength);
-    payload["resourceId"] = resourceId;
-    this->sendMessage("REQUEST_CARD_AUTHENTICATION_DATA", payload);
+    payload["purpose"] = purpose;
+    payload["uid"] = hexToString(const_cast<uint8_t *>(uid), uidLength);
+    if (resourceId != 0)
+    {
+        payload["resourceId"] = resourceId;
+    }
+    if (sessionId != nullptr)
+    {
+        payload["sessionId"] = sessionId;
+    }
+    this->sendMessage("CARD_DETECTED", payload);
+}
+
+void API::sendCardApduResponse(const char *conversationId, uint32_t seq, const uint8_t *response, uint8_t length)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["conversationId"] = conversationId;
+    payload["seq"] = seq;
+    payload["response"] = hexToString(const_cast<uint8_t *>(response), length);
+    this->sendMessage("CARD_APDU_RESPONSE", payload);
+}
+
+void API::sendCardRemoved(const char *conversationId)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["conversationId"] = conversationId;
+    this->sendMessage("CARD_REMOVED", payload);
+}
+
+void API::sendReaderSessionEnded()
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    this->sendMessage("READER_SESSION_ENDED", payload);
+}
+
+void API::setCardApduCallback(
+    std::function<void(const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)> callback)
+{
+    this->cardApduCallback = callback;
+}
+
+void API::setCardConversationStartCallback(std::function<void()> callback)
+{
+    this->cardConversationStartCallback = callback;
+}
+
+void API::setCardConversationEndCallback(std::function<void(const char *conversationId)> callback)
+{
+    this->cardConversationEndCallback = callback;
+}
+
+// Runs on the websocket task and is not ACKed: the server does not wait for one, and an extra
+// message per APDU would only add latency to the tap.
+void API::onCardApdu(JsonObject data)
+{
+    if (this->cardApduCallback == nullptr)
+    {
+        return;
+    }
+    JsonObject payload = data["payload"].as<JsonObject>();
+    const char *conversationId = payload["conversationId"].is<const char *>() ? payload["conversationId"].as<const char *>() : nullptr;
+    const char *apduHex = payload["apdu"].is<const char *>() ? payload["apdu"].as<const char *>() : nullptr;
+    if (conversationId == nullptr || apduHex == nullptr || !payload["seq"].is<uint32_t>())
+    {
+        return;
+    }
+    const size_t hexLength = strlen(apduHex);
+    if (hexLength == 0 || hexLength % 2 != 0 || hexLength > 2 * 62)
+    {
+        return;
+    }
+    uint8_t apdu[62];
+    if (!stringToHexArray(std::string(apduHex), apdu, hexLength / 2))
+    {
+        return;
+    }
+    this->cardApduCallback(conversationId, payload["seq"].as<uint32_t>(), apdu, static_cast<uint8_t>(hexLength / 2));
+}
+
+void API::onCardConversationEnd(JsonObject data)
+{
+    if (this->cardConversationEndCallback == nullptr)
+    {
+        return;
+    }
+    JsonObject payload = data["payload"].as<JsonObject>();
+    if (payload["conversationId"].is<const char *>())
+    {
+        this->cardConversationEndCallback(payload["conversationId"].as<const char *>());
+    }
 }
 
 void API::onCardAuthenticationDetailsResponse(JsonObject data)
@@ -28,38 +122,8 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     JsonObject payload = data["payload"].as<JsonObject>();
     std::string error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
     std::string username = payload["username"].is<const char *>() ? payload["username"].as<std::string>() : std::string("");
-    uint8_t keyNo = payload["keyNo"].is<uint8_t>() ? payload["keyNo"].as<uint8_t>() : 0;
-    std::string keyHex = payload["key"].is<const char *>() ? payload["key"].as<std::string>() : std::string("");
-
-    uint8_t keyBytes[16];
-    uint8_t keyLen = 0;
-    if (keyHex.length() == 32)
-    {
-        if (stringToHexArray(keyHex, keyBytes, 16))
-        {
-            keyLen = 16;
-        }
-        else
-        {
-            error = "Invalid hex key";
-        }
-    }
-    else if (keyHex.length() > 0)
-    {
-        error = "Invalid key length";
-    }
 
     CardAuthenticationDetailsResponse response;
-    response.keyNo = keyNo;
-    if (keyLen == 16)
-    {
-        memcpy(response.keyBytes, keyBytes, 16);
-    }
-    else
-    {
-        memset(response.keyBytes, 0, 16);
-    }
-    response.keyLen = keyLen;
     response.error = error;
     response.username = username;
     response.language = payload["language"].is<const char *>() ? payload["language"].as<std::string>() : "en";
@@ -86,27 +150,9 @@ void API::setEnrollNewCardGetAvailableKeyNoCallback(std::function<void(std::stri
     this->enrollNewCardGetAvailableKeyNoCallback = callback;
 }
 
-void API::setEnrollNewCardCallback(std::function<void(uint8_t keyNo, std::string key)> callback)
+void API::setEnrollNewCardSucceededCallback(std::function<void()> callback)
 {
-    this->enrollNewCardCallback = callback;
-}
-
-void API::sendEnrollNewCardAvailableKeyNo(uint8_t *uid, uint8_t uidLength, uint8_t keyNo)
-{
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["keyNo"] = keyNo;
-    payload["uid"] = hexToString(uid, uidLength);
-    // Respond with the client-to-server request event so the server can generate the key
-    this->sendMessage("ENROLL_NEW_CARD_REQUEST_NFC_KEY", payload);
-}
-
-void API::sendEnrollNewCard(bool success)
-{
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["success"] = success;
-    this->sendMessage("ENROLL_NEW_CARD", payload);
+    this->enrollNewCardSucceededCallback = callback;
 }
 
 void API::sendEnrollNewCardCancel()
@@ -121,17 +167,14 @@ void API::setEnrollNewCardErrorCallback(std::function<void(std::string error)> c
     this->enrollNewCardErrorCallback = callback;
 }
 
-void API::setResetNfcCardCallback(std::function<void(std::string username, uint8_t keyNo, std::string key)> callback)
+void API::setResetNfcCardCallback(std::function<void(std::string username)> callback)
 {
     this->resetNfcCardCallback = callback;
 }
 
-void API::sendResetNfcCard(bool success)
+void API::setResetNfcCardResultCallback(std::function<void(bool success, std::string error)> callback)
 {
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["success"] = success;
-    this->sendMessage("RESET_NFC_CARD", payload);
+    this->resetNfcCardResultCallback = callback;
 }
 
 void API::sendResetNfcCardCancel()
@@ -143,48 +186,31 @@ void API::sendResetNfcCardCancel()
 
 void API::onResetNfcCard(JsonObject data)
 {
-    this->logger.info("Received reset nfc card");
+    JsonObject payload = data["payload"].as<JsonObject>();
+    std::string error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
+    if (error.length() > 0 || (payload["success"].is<bool>() && payload["success"].as<bool>()))
+    {
+        // The server's verdict after it reset (or failed to reset) the card through the relay.
+        const bool success = error.length() == 0;
+        if (!success)
+        {
+            this->logger.error(("Reset nfc card error from server: " + error).c_str());
+        }
+        if (this->resetNfcCardResultCallback != nullptr)
+        {
+            this->resetNfcCardResultCallback(success, error);
+        }
+        return;
+    }
+
+    // Arms the reset screen: the next card is reset by the server.
     if (this->resetNfcCardCallback == nullptr)
     {
         this->logger.error("Reset nfc card callback is not set");
         return;
     }
-
-    JsonObject payload = data["payload"].as<JsonObject>();
-    if (payload["error"].is<const char *>() && payload["error"].as<std::string>().length() > 0)
-    {
-        this->logger.error(("Reset nfc card error from server: " + payload["error"].as<std::string>()).c_str());
-        return;
-    }
-
-    // The server hands over the card's stored key material so the reader can
-    // authenticate the card and write the factory key back.
-    if (!(payload["key"].is<const char *>() && payload["key"].as<std::string>().length() == 32 && payload["keyNo"].is<uint8_t>()))
-    {
-        this->logger.info("Reset nfc card payload does not contain key material; ignoring.");
-        return;
-    }
-
     std::string username = payload["username"].is<const char *>() ? payload["username"].as<std::string>() : std::string("");
-    uint8_t keyNo = payload["keyNo"].as<uint8_t>();
-    std::string key = payload["key"].as<std::string>();
-
-    this->resetNfcCardCallback(username, keyNo, key);
-}
-
-void API::onEnrollNewCardRequestNFCKeyError(JsonObject data)
-{
-    JsonObject payload = data["payload"].as<JsonObject>();
-    std::string error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
-    if (error.length() == 0)
-    {
-        return;
-    }
-    this->logger.error(("Enroll new card request key error from server: " + error).c_str());
-    if (this->enrollNewCardErrorCallback != nullptr)
-    {
-        this->enrollNewCardErrorCallback(error);
-    }
+    this->resetNfcCardCallback(username);
 }
 
 void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
@@ -203,31 +229,20 @@ void API::onEnrollNewCardGetAvailableKeyNo(JsonObject data)
 
 void API::onEnrollNewCard(JsonObject data)
 {
-    this->logger.info("Received enroll new card");
-    if (this->enrollNewCardCallback == nullptr)
-    {
-        this->logger.error("Enroll new card callback is not set");
-        return;
-    }
-
     JsonObject payload = data["payload"].as<JsonObject>();
-    if (payload["error"].is<const char *>() && payload["error"].as<std::string>().length() > 0)
+    std::string error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
+    if (error.length() > 0)
     {
-        // TODO: handle enrollment errors (surface to UI, retry flow, etc.)
-        this->logger.error(("Enroll new card error from server: " + payload["error"].as<std::string>()).c_str());
+        // The server could not confirm the card (not enrolled, nothing was recorded).
+        this->logger.error(("Enroll new card error from server: " + error).c_str());
+        if (this->enrollNewCardErrorCallback != nullptr)
+        {
+            this->enrollNewCardErrorCallback(error);
+        }
         return;
     }
-
-    // Only proceed when command payload contains the key material
-    if (!(payload["key"].is<const char *>() && payload["key"].as<std::string>().length() == 32 && payload["keyNo"].is<uint8_t>()))
+    if (payload["success"].is<bool>() && payload["success"].as<bool>() && this->enrollNewCardSucceededCallback != nullptr)
     {
-        // TODO: handle server-side completion notifications (payload.success) if needed
-        this->logger.info("Enroll new card payload does not contain key material; ignoring.");
-        return;
+        this->enrollNewCardSucceededCallback();
     }
-
-    uint8_t keyNo = payload["keyNo"].as<uint8_t>();
-    std::string key = payload["key"].as<std::string>();
-
-    this->enrollNewCardCallback(keyNo, key);
 }

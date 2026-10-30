@@ -344,7 +344,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     await new Promise(setImmediate);
     conversations.handleRemoved(reader.socket, { conversationId: reader.apdus()[0].payload.conversationId });
 
-    expect(await pending).toEqual({ ok: false, error: 'CARD_CARD_REMOVED' });
+    expect(await pending).toEqual({ ok: false, error: 'CARD_REMOVED' });
   });
 });
 

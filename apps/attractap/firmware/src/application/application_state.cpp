@@ -364,15 +364,9 @@ bool Application::processAuthenticationState()
     this->processCardAuthenticationData();
 #else
     this->nfc.enableCardDetection();
-    // The card that triggered the auth-data request is still on the reader.
-    // handleCardDetection() only emits a detection event on an absent->present
-    // transition, so it will not re-fire while the card stays put. Authenticate
-    // immediately instead of forcing the user to remove and re-present the card
-    // (the double-tap bug). If the card was already lifted, fall back to the
-    // detection callback on the next presentation.
-    if (this->nfc.isCardPresent()) {
-      this->processCardAuthenticationData();
-    }
+    // The server already verified the card through the relay, so there is nothing left to do with
+    // the card itself: show the outcome right away.
+    this->processCardAuthenticationData();
 #endif
     return true;
   }
@@ -453,6 +447,11 @@ void Application::renderResourceState()
   }
 #else
 
+  if (this->sessionEndNotifyAtMs != 0 && static_cast<int32_t>(millis() - this->sessionEndNotifyAtMs) >= 0) {
+    this->sessionEndNotifyAtMs = 0;
+    this->api.sendReaderSessionEnded();
+  }
+
   // Process unlocked card actions for non-display mode
   if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
     if (!this->cardDetected) {
@@ -487,6 +486,9 @@ void Application::renderResourceState()
         this->api.startResourceUsageSession(this->selectedResourceId);
       }
     }
+
+    // The card action is done: the server forgets the user once the action request is behind it.
+    this->sessionEndNotifyAtMs = millis() + 1500;
 
     // Reset state back to waiting for card
     this->state = APPLICATION_STATE_WAIT_FOR_CARD;

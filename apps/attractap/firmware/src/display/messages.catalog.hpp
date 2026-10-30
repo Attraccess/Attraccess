@@ -259,6 +259,17 @@ enum class Message {
     ErrorCardMismatch,
     ErrorNoMassIntroductionInProgress,
     ErrorMassIntroductionFailed,
+    ErrorCardAuthenticationFailed,
+    ErrorCardNotSupported,
+    ErrorServerBusy,
+    ErrorCardRemoved,
+    ErrorCardTimeout,
+    ErrorEnrollNotConfirmed,
+    ErrorNoFreeKeySlot,
+    ErrorCardNotFactory,
+    ErrorResetNotConfirmed,
+    ErrorWrongCard,
+    ErrorCardKeyUnavailable,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -540,6 +551,17 @@ inline constexpr Entry catalog[] = {
     {Message::ErrorCardMismatch, "Karte stimmt nicht überein", "Card does not match"},
     {Message::ErrorNoMassIntroductionInProgress, "Keine Sammeleinweisung aktiv", "No mass introduction in progress"},
     {Message::ErrorMassIntroductionFailed, "Einweisung fehlgeschlagen", "Introduction failed"},
+    {Message::ErrorCardAuthenticationFailed, "Karte konnte nicht bestätigt werden", "Card could not be verified"},
+    {Message::ErrorCardNotSupported, "Karte wird nicht unterstützt", "Card is not supported"},
+    {Message::ErrorServerBusy, "Server ausgelastet, bitte erneut versuchen", "Server busy, please try again"},
+    {Message::ErrorCardRemoved, "Karte zu früh entfernt", "Card removed too early"},
+    {Message::ErrorCardTimeout, "Keine Antwort von der Karte", "No response from the card"},
+    {Message::ErrorEnrollNotConfirmed, "Karte nicht bestätigt, bitte erneut auflegen", "Card not confirmed, please tap it again"},
+    {Message::ErrorNoFreeKeySlot, "Kein freier Schlüsselplatz auf der Karte", "No free key slot on the card"},
+    {Message::ErrorCardNotFactory, "Karte ist bereits anderweitig eingerichtet", "Card is already set up elsewhere"},
+    {Message::ErrorResetNotConfirmed, "Zurücksetzen nicht bestätigt, bitte erneut auflegen", "Reset not confirmed, please tap the card again"},
+    {Message::ErrorWrongCard, "Das ist nicht die ausgewählte Karte", "This is not the selected card"},
+    {Message::ErrorCardKeyUnavailable, "Kartenschlüssel nicht verfügbar", "Card key unavailable"},
 };
 
 } // namespace FirmwareI18n

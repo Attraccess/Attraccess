@@ -25,7 +25,15 @@ export type AuditPrincipal = { userId: number; authenticationMethod: 'session' |
 export type CardOutcome<T = unknown> = { ok: boolean; error?: string } & Partial<T>;
 
 /** Error codes the reader shows; conversation failures keep their own name. */
-const conversationError = (reason: CardConversationFailure) => (reason === 'BUSY' ? 'BUSY' : `CARD_${reason}`);
+const conversationError = (reason: CardConversationFailure): string =>
+  ({
+    BUSY: 'BUSY',
+    CARD_REMOVED: 'CARD_REMOVED',
+    TIMEOUT: 'CARD_TIMEOUT',
+    TOO_MANY_EXCHANGES: 'CARD_TIMEOUT',
+    READER_UNREACHABLE: 'CARD_REMOVED',
+    READER_SESSION_ENDED: 'CARD_REMOVED',
+  })[reason];
 
 /**
  * Every card check of the system. The reader relays APDUs; keys, session state and the decision

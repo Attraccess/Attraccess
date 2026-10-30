@@ -14,13 +14,6 @@
 class NFC : public INfc
 {
 public:
-    // Card technology detected at tap time (GetVersion HWType). Routing:
-    // NTAG424 keeps the proven ISOSelectFile+EV2First path; DESFire EV2/EV3
-    // run the same EV2First handshake inside the Attraccess application
-    // (selected/created via the DESFire native commands). Unknown cards fall
-    // back to the legacy NTAG424 path (pre-DESFire behavior).
-    using CardType = INfc::CardType;
-
     NFC() : logger("NFC"), pn532(PN532_I2C_ADDRESS)
     {
     }
@@ -37,8 +30,8 @@ public:
      */
     void loop() override;
 
-    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey, uint8_t keyVersion = 0x01) override;
-    bool authenticate(uint8_t keyNumber, uint8_t *key) override;
+    bool transceive(const uint8_t *apdu, uint8_t apduLength, uint8_t *response, uint8_t *responseLength) override;
+    void setConversationActive(bool active) override;
     void enableCardDetection() override;
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback) override;
     void setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback) override;
@@ -50,29 +43,10 @@ public:
     // assuming the previously held card is still present.
     void resetCardPresence() override;
 
-    bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo) override;
-
-    // Card type of the currently tracked card (valid while isCardPresent()).
-    CardType getDetectedCardType();
-
-    static uint8_t FACTORY_KEY[16];
-
-    // Attraccess DESFire application (AID 0xACCE55, bytes LSB first) and the
-    // PICC-level master application (AID 0x000000).
-    static const uint8_t DESFIRE_AID_ATTRACCESS[3];
-    static const uint8_t DESFIRE_AID_MASTER[3];
-
-    // Application master key settings (0x0F = factory default: master key
-    // changeable, free directory access, free create/delete, settings
-    // changeable; ChangeKey requires app master key) and key config
-    // (0x80 = AES | 6 keys, mirroring the NTAG424 key slots 0-5).
-    static const uint8_t DESFIRE_APP_KEY_SETTINGS_1 = 0x0F;
-    static const uint8_t DESFIRE_APP_KEY_SETTINGS_2 = 0x86;
     bool isCardDetectionEnabled();
 
     // True while a card is physically on the reader (tracked by handleCardDetection).
     bool isCardPresent() override;
-    uint8_t *getFactoryKey() override { return FACTORY_KEY; }
 
 private:
     Logger logger;
@@ -82,37 +56,18 @@ private:
     uint8_t cardDetectedUid[7] = {0};
     uint8_t cardDetectedUidLength = 0;
 
-    // Set by detectCardType() right after a successful detection poll.
-    CardType detectedCardType = CARD_TYPE_UNKNOWN;
-
-    // Probe the freshly detected card via GetVersion (works unauthenticated on
-    // both NTAG424 and DESFire). Caller must hold the I2C bus guard.
-    void detectCardType();
-
-    // Authenticate the tracked card with the routing described at CardType.
-    // Caller must hold opMutex and the I2C bus guard.
-    bool authenticateInternal(uint8_t keyNumber, uint8_t *key);
-
-    // Select the Attraccess application on a DESFire card, optionally creating
-    // it first (enrollment of factory cards). Caller must hold the bus guard.
-    bool desfireSelectAttraccessApp(bool createIfMissing);
-
     // Written by the NFC task, read from the main loop.
     volatile bool foundCard = false;
     uint32_t foundCardTimeMs = 0;
-    // Presence-auth throttle: while a card is held, the full AES handshake
-    // (~150 ms on the bus) used to run on every loop pass. Gate it to every
-    // 250 ms — still well under the ~1 s removal-detection budget, but cuts
-    // bus time ~6x while a card is parked on the reader
-    // (PERFORMANCE_ANALYSIS.md M2).
+    // Presence probe throttle: a card parked on the reader is probed with one keyless command
+    // every 250 ms, well under the ~1 s removal-detection budget.
     uint32_t lastPresenceCheckMs = 0;
     static const uint32_t presenceCheckIntervalMs = 250;
 
-    // TODO: remove this
-    void demo();
-
     // Toggled from main loop / callbacks, read by the NFC task.
     volatile bool cardDetectionEnabled = false;
+    // A server-driven card conversation is running: no presence probes in between (see INfc).
+    volatile bool conversationActive = false;
     bool suspended = false;
     bool rfFieldOff = false;
     std::function<void(uint8_t *, uint8_t)> cardDetectionCallback;

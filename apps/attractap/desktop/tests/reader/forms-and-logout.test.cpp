@@ -96,10 +96,10 @@ void ReaderWorkflow::testFormsAndLogout()
     pump(300);
     assert(lv_screen_active() == Display::sessionSummaryScreen.getScreen());
     display.touch.pressed = false; nfc.setPresent(0, false); pump();
-    const auto authBeforeSummaryCard = server.count("REQUEST_CARD_AUTHENTICATION_DATA");
+    const auto authBeforeSummaryCard = server.count("CARD_DETECTED");
     nfc.setPresent(0, true); pump(); nfc.setPresent(0, false);
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(server.count("REQUEST_CARD_AUTHENTICATION_DATA") == authBeforeSummaryCard);
+    assert(server.count("CARD_DETECTED") == authBeforeSummaryCard);
     assert(!lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
     setQuality(State::NETWORK_QUALITY_GOOD); pump();
     assert(!label(lv_screen_active(), "Alex") || !lv_obj_is_visible(label(lv_screen_active(), "Alex")));

@@ -214,10 +214,6 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     {
         this->onMassIntroductionStart(inboundDoc["data"].as<JsonObject>());
     }
-    else if (strcmp(eventType, "MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA") == 0)
-    {
-        this->onMassIntroductionCardAuthenticationData(inboundDoc["data"].as<JsonObject>());
-    }
     else if (strcmp(eventType, "MASS_INTRODUCTION_RESULT") == 0)
     {
         this->onMassIntroductionResult(inboundDoc["data"].as<JsonObject>());
@@ -233,12 +229,6 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     else if (strcmp(eventType, "ENROLL_NEW_CARD") == 0)
     {
         this->onEnrollNewCard(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0)
-    {
-        // The server only sends us this event to report an error; the happy
-        // path responds with ENROLL_NEW_CARD instead.
-        this->onEnrollNewCardRequestNFCKeyError(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "RESET_NFC_CARD") == 0)
     {
@@ -347,6 +337,18 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
 
+    // Card APDUs are the latency-critical path of a tap: handled before anything else, never ACKed.
+    if (strcmp(eventType, "CARD_APDU") == 0)
+    {
+        this->onCardApdu(inboundDoc["data"].as<JsonObject>());
+        return;
+    }
+    if (strcmp(eventType, "CARD_CONVERSATION_END") == 0)
+    {
+        this->onCardConversationEnd(inboundDoc["data"].as<JsonObject>());
+        return;
+    }
+
     const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
@@ -364,12 +366,11 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // that must not surface as a user-facing error dialog; route them to the handler.
     bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
 
-    // Enrollment key-request errors (e.g. CARD_ALREADY_ENROLLED) must reach the
-    // enrollment handler so it can show the in-screen message and re-arm card
-    // detection. The generic interceptor would otherwise pop a generic dialog
-    // and return before recovery runs, wedging the reader with detection off
-    // until enrollment times out (ATT-503).
-    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
+    // Enrollment and reset errors (e.g. CARD_ALREADY_ENROLLED, WRONG_CARD) must reach their
+    // handlers so they can show the in-screen message and re-arm card detection. The generic
+    // interceptor would otherwise pop a generic dialog and return before recovery runs, wedging
+    // the reader with detection off until the flow times out (ATT-503).
+    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD") == 0 || strcmp(eventType, "RESET_NFC_CARD") == 0;
 
     // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
     // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
@@ -382,7 +383,6 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // Mass introduction errors (e.g. CARD_NOT_FOUND, CARD_MISMATCH) concern one tapped card; the
     // scan screen shows them and keeps waiting for the next card (ATT-1151).
     bool isMassIntroductionEvent = strcmp(eventType, "MASS_INTRODUCTION_START") == 0 ||
-                                   strcmp(eventType, "MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA") == 0 ||
                                    strcmp(eventType, "MASS_INTRODUCTION_RESULT") == 0 ||
                                    strcmp(eventType, "MASS_INTRODUCTION_END") == 0;
 

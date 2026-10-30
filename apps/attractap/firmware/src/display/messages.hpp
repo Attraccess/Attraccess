@@ -86,6 +86,18 @@ inline Text readerError(const std::string &code) {
     if (code == "CARD_MISMATCH") return Message::ErrorCardMismatch;
     if (code == "NO_MASS_INTRODUCTION_IN_PROGRESS") return Message::ErrorNoMassIntroductionInProgress;
     if (code == "MASS_INTRODUCTION_FAILED") return Message::ErrorMassIntroductionFailed;
+    if (code == "CARD_AUTHENTICATION_FAILED") return Message::ErrorCardAuthenticationFailed;
+    if (code == "CARD_NOT_SUPPORTED") return Message::ErrorCardNotSupported;
+    if (code == "BUSY") return Message::ErrorServerBusy;
+    if (code == "CARD_REMOVED") return Message::ErrorCardRemoved;
+    if (code == "CARD_TIMEOUT") return Message::ErrorCardTimeout;
+    if (code == "ENROLL_NOT_CONFIRMED") return Message::ErrorEnrollNotConfirmed;
+    if (code == "NO_FREE_KEY_SLOT") return Message::ErrorNoFreeKeySlot;
+    if (code == "CARD_NOT_FACTORY") return Message::ErrorCardNotFactory;
+    if (code == "RESET_NOT_CONFIRMED") return Message::ErrorResetNotConfirmed;
+    if (code == "WRONG_CARD") return Message::ErrorWrongCard;
+    if (code == "CARD_KEY_UNAVAILABLE") return Message::ErrorCardKeyUnavailable;
+    if (code == "CARD_MASTER_KEY_UNKNOWN") return Message::ErrorCardKeyUnavailable;
     std::fprintf(stderr, "Unknown reader error: %s\n", code.c_str());
     // Unknown server errors have no reliable language; preserve English fallback.
     return Text::literal("Something went wrong. Please try again.");

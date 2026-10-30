@@ -119,11 +119,18 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
         return;
     }
 
-    if (strcmp(type, "REQUEST_CARD_AUTHENTICATION_DATA") == 0)
+    if (strcmp(type, "CARD_DETECTED") == 0)
     {
-        const char *uid = doc["data"]["payload"]["uid"] | "";
-        uint32_t resourceId = doc["data"]["payload"]["resourceId"] | 0u;
-        respondCardAuth(std::string(uid), resourceId);
+        // The demo has no card crypto: it ends the conversation at once (the reader's relay must not
+        // wait for commands) and answers like a server that verified the card.
+        enqueue(R"({"event":"EVENT","data":{"type":"CARD_CONVERSATION_END","payload":{"conversationId":"demo"}}})");
+        const char *purpose = doc["data"]["payload"]["purpose"] | "";
+        if (strcmp(purpose, "tap") == 0)
+        {
+            const char *uid = doc["data"]["payload"]["uid"] | "";
+            uint32_t resourceId = doc["data"]["payload"]["resourceId"] | 0u;
+            respondCardAuth(std::string(uid), resourceId);
+        }
         return;
     }
 
@@ -314,9 +321,6 @@ void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resource
     // Demo cardholders use English; publish examples in that locale before the API applies it.
     respondResourceList(0, "en");
 
-    // Always return the factory key (all zeros) — demo cards are never physically enrolled.
-    doc["data"]["payload"]["keyNo"] = 0;
-    doc["data"]["payload"]["key"] = "00000000000000000000000000000000";
     doc["data"]["payload"]["username"] = DemoStore::displayName(card);
     // Demo cards represent an English-speaking cardholder so the localized
     // fixture form is reachable in the normal demo card-authentication flow.

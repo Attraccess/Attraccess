@@ -31,6 +31,20 @@ private:
     bool firmwareUpdateActive = false;
     Beeper beeper;
 
+    // Runs card commands for the server (the reader holds no card keys or session).
+    CardRelay cardRelay{CardRelay::Hooks{
+        [this](const uint8_t *apdu, uint8_t length, uint8_t *response, uint8_t *responseLength) {
+          return this->nfc.transceive(apdu, length, response, responseLength);
+        },
+        [this](const char *id, uint32_t seq, const uint8_t *response, uint8_t length) {
+          this->api.sendCardApduResponse(id, seq, response, length);
+        },
+        [this](const char *id) { this->api.sendCardRemoved(id); },
+        [this](bool active) { this->nfc.setConversationActive(active); }}};
+    // Non-display readers log out after each card action; the server is told shortly afterwards,
+    // unless a new tap starts first (that tap replaces the verified user anyway).
+    uint32_t sessionEndNotifyAtMs = 0;
+
 #ifdef HAS_LVGL_DISPLAY
     SupervisionFlow supervision{api, nfc, beeper, logger, Display::supervisionScreen};
     MassIntroductionFlow massIntroduction{api, nfc, beeper, logger, Display::massIntroductionScreen};

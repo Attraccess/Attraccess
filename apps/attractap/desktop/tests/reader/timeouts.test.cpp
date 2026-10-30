@@ -34,7 +34,7 @@ void ReaderWorkflow::testTimeouts()
         // The waiting card-key request also rejects a competing web approval.
         server.push("SUPERVISION_START", R"({"resourceId":1,"requesterName":"Robin","timeoutMs":30000})"); pump();
         assert(lv_screen_active() != Display::supervisionScreen.getScreen());
-        server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})"); pump();
+        server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","hasIntroduction":true})"); pump();
         pump(31050);
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
