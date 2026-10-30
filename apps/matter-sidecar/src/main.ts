@@ -30,7 +30,13 @@ async function main(): Promise<void> {
   };
   process.on('SIGTERM', onSignal);
   process.on('SIGINT', onSignal);
-  await sidecar.start();
+  try {
+    await sidecar.start();
+  } catch (error) {
+    // A stop signal makes a pending start bail out; that is a normal stop, and onSignal owns the exit.
+    if (signalled) return;
+    throw error;
+  }
 }
 
 main().catch((error) => fatal(startupFailure(error), error));

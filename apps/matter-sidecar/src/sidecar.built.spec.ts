@@ -18,8 +18,8 @@ type Started = {
 };
 
 // Only PATH is passed on: no Attraccess API, database, fabric or Matter storage configuration exists.
-function start(env: Record<string, string>, cwd: string): Started {
-  const child = spawn(process.execPath, [entry], { cwd, env: { PATH: process.env.PATH ?? '', ...env } });
+function start(env: Record<string, string>, cwd: string, nodeArgs: string[] = []): Started {
+  const child = spawn(process.execPath, [...nodeArgs, entry], { cwd, env: { PATH: process.env.PATH ?? '', ...env } });
   const stdout: string[] = [];
   const stderr: string[] = [];
   child.stdout.on('data', (chunk) => stdout.push(String(chunk)));
@@ -49,8 +49,8 @@ describe('built sidecar process', () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
-  const launch = (env: Record<string, string> = { MATTER_SIDECAR_PORT: '0' }) => {
-    const started = start(env, cwd);
+  const launch = (env: Record<string, string> = { MATTER_SIDECAR_PORT: '0' }, nodeArgs: string[] = []) => {
+    const started = start(env, cwd, nodeArgs);
     children.push(started.child);
     return started;
   };
@@ -86,6 +86,19 @@ describe('built sidecar process', () => {
       expect(Date.now() - began).toBeLessThan(5_000);
     },
   );
+
+  it('treats a stop signal during startup as a normal stop, not a startup failure', async () => {
+    const started = launch({ MATTER_SIDECAR_PORT: '0' }, ['--require', join(__dirname, 'testing/delay-listen.cjs')]);
+    const deadline = Date.now() + 45_000;
+    while (!started.stderr.join('').includes('listen delayed') && Date.now() < deadline) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+    }
+    expect(started.stderr.join('')).toContain('listen delayed');
+    started.child.kill('SIGTERM');
+    expect(await started.exited).toBe(0);
+    expect(started.stderr.join('')).not.toContain('could not start');
+    expect(started.stdout.join('')).not.toContain('listening');
+  });
 
   it('fails fast with an actionable message on invalid configuration', async () => {
     const started = launch({ MATTER_SIDECAR_PORT: 'banana' });
