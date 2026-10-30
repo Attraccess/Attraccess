@@ -1,3 +1,4 @@
+import { AllowCrossSiteWrite } from '../../../common/security/cross-site-write.guard';
 import {
   Controller,
   Logger,
@@ -475,6 +476,7 @@ export class SSOController extends SsoUserProvisioning {
     return HttpStatus.OK;
   }
 
+  @AllowCrossSiteWrite()
   @Post(`/${SSOProviderType.SAML}/:providerId/callback`)
   @ApiOperation({ summary: 'Callback for SAML login', operationId: 'samlLoginCallback' })
   @ApiResponse({

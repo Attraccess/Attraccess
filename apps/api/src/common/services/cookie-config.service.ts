@@ -4,6 +4,8 @@ import { Response } from 'express';
 import { SessionConfigType } from '../../config/session.config';
 import { SettingsService } from '../../settings/settings.service';
 
+export const AUTH_COOKIE_NAME = 'auth-session';
+
 export type CookieConfigType = {
   name: string;
   httpOnly: boolean;
@@ -15,7 +17,7 @@ export type CookieConfigType = {
 
 @Injectable()
 export class CookieConfigService {
-  private readonly cookieName: string = 'auth-session';
+  private readonly cookieName: string = AUTH_COOKIE_NAME;
   private readonly cookieStaticOptions: Omit<CookieConfigType, 'secure'>;
 
   constructor(

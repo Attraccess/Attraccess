@@ -39,6 +39,7 @@ export const AppEnvSchema = z
     ATTRACCESS_URL: z.string().url().optional(),
     ATTRACCESS_FRONTEND_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
+    ATTRACCESS_TRUSTED_ORIGINS: z.string().optional(),
     VERSION: z.string().default(resolveAppVersion()),
     COMMIT_SHA: z.string().optional(),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),

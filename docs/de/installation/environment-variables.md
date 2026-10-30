@@ -15,6 +15,8 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 |----------|----------|-------------|
 | `ATTRACCESS_URL` | `http://localhost:3000` | Haupt-URL der Anwendung |
 | `ATTRACCESS_PUBLIC_INTERNET_URL` | – | Öffentliche URL für externe Callbacks (z.B. SumUp-Zahlungen). Nur nötig, wenn sich diese von `ATTRACCESS_URL` unterscheidet. |
+| `ATTRACCESS_FRONTEND_URL` | – | Adresse eines separat ausgelieferten Frontends. Sie ist eine [freigegebene Website](settings/security.md#freigegebene-websites) und wird für Rücksprünge nach dem SSO-Logout verwendet. |
+| `ATTRACCESS_TRUSTED_ORIGINS` | – | Kommagetrennte Liste zusätzlicher [freigegebener Websites](settings/security.md#freigegebene-websites) als exakte Origins, z.B. `https://portal.example.com`. Keine Wildcards, keine Pfade. Ungültige Einträge werden protokolliert und übersprungen. |
 | `LOG_LEVELS` | `error,warn,log` | Kommagetrennte Protokollebenen: `error`, `warn`, `log`, `debug`, `verbose` |
 | `LOG_DESTINATIONS` | `console` | Kommagetrennte registrierte Treiber für API-Logs: zunächst `console`, `file`. Namen werden getrimmt, kleingeschrieben und dedupliziert. |
 | `LOG_FILE_PATH` | `<STORAGE_ROOT>/api.log` | Optionale Pfadüberschreibung für `file`; standardmäßig `api.log` direkt im Speicherverzeichnis (`./storage`, wenn `STORAGE_ROOT` nicht gesetzt ist). Explizite Pfade dürfen nicht leer sein; andernfalls ignoriert. Relative Pfade beziehen sich auf das Arbeitsverzeichnis des API-Prozesses; absolute Pfade sind erlaubt. |

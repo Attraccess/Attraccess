@@ -15,6 +15,8 @@ All configuration options for Attraccess that can be set via environment variabl
 |----------|---------|-------------|
 | `ATTRACCESS_URL` | `http://localhost:3000` | Main application URL |
 | `ATTRACCESS_PUBLIC_INTERNET_URL` | – | Public URL for external callbacks (e.g. SumUp payments). Only needed if different from `ATTRACCESS_URL`. |
+| `ATTRACCESS_FRONTEND_URL` | – | Address of a separately served frontend. It is an [approved website](settings/security.md#approved-websites) and is used for SSO logout returns. |
+| `ATTRACCESS_TRUSTED_ORIGINS` | – | Comma-separated list of additional [approved websites](settings/security.md#approved-websites), as exact origins such as `https://portal.example.com`. No wildcards, no paths. Invalid entries are logged and skipped. |
 | `LOG_LEVELS` | `error,warn,log` | Comma-separated log levels: `error`, `warn`, `log`, `debug`, `verbose` |
 | `LOG_DESTINATIONS` | `console` | Comma-separated registered API log drivers: initially `console`, `file`. Names are trimmed, lowercased and deduplicated. |
 | `LOG_FILE_PATH` | `<STORAGE_ROOT>/api.log` | Optional override when selecting `file`; defaults to `api.log` at the storage root (`./storage` when `STORAGE_ROOT` is unset). Explicit overrides must be non-blank; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |

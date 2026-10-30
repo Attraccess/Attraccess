@@ -1,5 +1,7 @@
 import { SsoLogoutService } from './sso/sso-logout.service';
 import { SettingsService } from '../../settings/settings.service';
+import { ConfigService } from '@nestjs/config';
+import { ApprovedOriginsService } from '../../common/security/approved-origins.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
@@ -77,7 +79,16 @@ export function registerAuthControllerFixture() {
             returnURL: async () => 'https://app.example/',
           },
         },
-        { provide: SettingsService, useValue: { getUrl: async () => 'https://app.example' } },
+        {
+          provide: ApprovedOriginsService,
+          useValue: new ApprovedOriginsService(
+            { get: () => ({}) } as unknown as ConfigService,
+            {
+              getUrl: async () => 'https://app.example',
+              getPublicInternetUrl: async () => null,
+            } as unknown as SettingsService,
+          ),
+        },
         { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },
         { provide: SessionPermissionSync, useValue: { syncIfDue: jest.fn().mockResolvedValue('skipped') } },

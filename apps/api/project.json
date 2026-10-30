@@ -153,7 +153,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/api"],
       "options": {
         "jestConfig": "apps/api/jest.config.ts",
-        "testMatch": ["**/*.spec.ts", "!**/*.e2e.spec.ts", "!**/*.real-api.spec.ts"],
+        "testMatch": ["**/*.spec.ts", "!**/*.e2e.spec.ts", "!**/*.real-api.spec.ts", "!**/*.browser.spec.ts"],
         "passWithNoTests": true
       },
       "dependsOn": ["test-scripts"]
@@ -167,6 +167,16 @@
         "jestConfig": "apps/api/jest.e2e.config.ts",
         "testMatch": ["**/*.e2e.spec.ts"],
         "passWithNoTests": true
+      }
+    },
+    "browser-e2e": {
+      "executor": "@nx/jest:jest",
+      "cache": false,
+      "outputs": [],
+      "options": {
+        "jestConfig": "apps/api/jest.browser.config.ts",
+        "passWithNoTests": false,
+        "runInBand": true
       }
     },
     "start-services": {

@@ -96,4 +96,20 @@ describe('getTranslationKeyForApiError', () => {
     expect(result.key).toBe(key);
     expect(result.errorMessage).toBe(errorMessage);
   });
+
+  it.each([
+    ['English', API_ERROR_TRANSLATIONS_EN, 'Website not approved'],
+    ['German', API_ERROR_TRANSLATIONS_DE, 'Website nicht freigegeben'],
+  ])('explains a refused cross-site write in %s', (_locale, translations, expectedTitle) => {
+    const result = getTranslationKeyForApiError({
+      error: { body: { message: 'This website is not approved to make changes' } } as unknown as Error,
+      t: (key: string) => key,
+      tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+      baseTranslationKey: 'api',
+      fallbackKey: 'generic',
+    });
+
+    expect(result.key).toBe('api.This website is not approved to make changes');
+    expect(getTranslation(translations, 'This website is not approved to make changes.title')).toBe(expectedTitle);
+  });
 });

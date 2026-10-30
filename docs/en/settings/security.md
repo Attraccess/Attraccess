@@ -84,6 +84,38 @@ Set the `TRUST_PROXY` environment variable to the number of trusted proxy hops b
 > [!WARNING]
 > Trust only as many hops as actually exist in your deployment. If `TRUST_PROXY` trusts more hops than your real proxy chain, clients can forge `X-Forwarded-For` to rotate their apparent IP and evade rate limiting entirely. When unset, Attraccess trusts no forwarding headers (safe default). Changes take effect after a restart.
 
+## Approved websites
+
+Only approved websites may use a signed-in browser session. Other websites cannot read API responses, and their data-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) are refused with `403`. This also applies to websites under the same parent domain, for example `help.customer.com` next to `attraccess.customer.com`.
+
+These addresses are approved automatically:
+
+- the address Attraccess is served from (the `Host` of the request)
+- the application URL and the public internet URL from **Settings** (a change takes up to 60 seconds to apply)
+- `ATTRACCESS_URL`, `ATTRACCESS_FRONTEND_URL` and `ATTRACCESS_PUBLIC_INTERNET_URL`
+- every entry in `ATTRACCESS_TRUSTED_ORIGINS`, an optional comma-separated list of exact origins (scheme, host and optional port; no wildcards, no paths), e.g. `ATTRACCESS_TRUSTED_ORIGINS=https://portal.example.com,https://kiosk.example.com`
+
+The literal origin `null` is never approved. Refused requests are logged without cookie or token values.
+
+Not affected:
+
+- requests with a bearer token or an API key
+- sign-in with plain `curl` and no browser headers
+- the routes other systems call on purpose: SAML assertion and logout, OIDC back-channel logout, SSO provisioning and the SumUp callback. They authenticate the caller themselves.
+
+> [!NOTE]
+> **Scripts that use the browser cookie** must send an approved `Origin` header on writes. Prefer an API key or a bearer token instead.
+
+> [!WARNING]
+> **Reverse proxies:** if your proxy rewrites the host name and no application URL is set in Settings, writes from the browser are refused with `403`. Set the application URL in Settings (or `ATTRACCESS_URL`), or set `TRUST_PROXY` so the original host is used.
+
+### Renewing a sign-in
+
+`GET /api/auth/session/refresh` no longer exists, so opening a link cannot renew a session. Use `POST /api/auth/session/refresh`:
+
+- Callers using the browser cookie get a new cookie and **no token** in the response.
+- Callers sending a bearer token get a new token.
+
 ## Auth Audit Log Format
 
 Every auth attempt produces a single-line, space-separated log record under the `AuthAudit` logger context. Field names and order are stable so the log is fail2ban-friendly.
