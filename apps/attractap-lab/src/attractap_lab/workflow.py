@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
+import subprocess
 import time
 import socket
 import uuid
@@ -131,6 +132,19 @@ def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, e
     if expect is not None and expect.encode() not in (output / "serial.log").read_bytes():
         raise AssertionError(f"UART log did not contain expected marker: {expect!r}")
     return output
+
+
+def send_reader_wifi(target, auth_code, place=None, timeout=60):
+    """Have the lab host send its Wi-Fi credentials to the place's reader.
+
+    The secret never leaves the host (NixOS option ``readerWifi``). The reader
+    must already have ``auth_code`` as its serial PIN; its RESP reply arrives
+    on the session's own reader console.
+    """
+    device = target.get_driver(ESPToolDriver, activate=False).device
+    command = device.wrap_command(["attractap-lab-reader-wifi", "--place", place or os.environ["LG_PLACE"],
+                                   "--auth-code", auth_code])
+    subprocess.run(command, check=True, stdin=subprocess.DEVNULL, timeout=timeout)
 
 
 PARKED_MARKER = b"ATTRACTAP_PARKED"

@@ -8,8 +8,14 @@ targets:
       RemotePlace:
         name: reader-1
     drivers:
-      ESPToolDriver: {}
-      SerialDriver: {}
+      # Explicit bindings keep these on the reader when the place also exports
+      # an NFC emulator (see example-emulator-env.yaml).
+      ESPToolDriver:
+        bindings:
+          device: USBFlashableDevice
+      SerialDriver:
+        bindings:
+          port: USBSerialPort
       # Captures the place's HTTPVideoStream as served. If that is the whole
       # camera frame, add crop: "width:height:x:y" in camera pixels.
       ScreenCaptureDriver: {}

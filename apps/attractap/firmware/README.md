@@ -238,6 +238,99 @@ The firmware speaks a line protocol on the USB console (115200 8N1):
 `CMND <topic> <json>` in, `RESP <topic> <json>` out — used by the frontend's
 hardware setup flow. Log lines have the format `[Module] LEVEL: message`.
 
+### Test hooks (lab builds only)
+
+Hardware-in-the-loop tests can drive the touchscreen and capture what it
+shows over the same console. These topics exist only in firmware built with
+`-DATTRACTAP_TEST_HOOKS=ON` (display variants; configuring a headless variant
+with it fails). Release builds never contain them: the option defaults to
+`OFF` and `build_firmwares.py` passes `-DATTRACTAP_TEST_HOOKS=OFF`. Like all
+topics except `auth.*`, each command needs the serial PIN in `authCode`.
+
+`-DATTRACTAP_BEEPER_DEFAULT=OFF` turns the beeper off on readers without a
+saved beeper setting (new or erased readers). The setting itself still works;
+the default is `ON` and release builds pass `ON`. Lab images use both:
+
+```bash
+python3 tools/build_individual_ca_certs.py
+idf.py -B build/tv2-hooks -DSDKCONFIG=$PWD/build/tv2-hooks/sdkconfig \
+       -DATTRACTAP_VARIANT=attractap-touch-v2 -DATTRACTAP_LOG_LEVEL=DEBUG \
+       -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF build
+(cd build/tv2-hooks && esptool --chip esp32s3 merge-bin -o tv2-hooks-merged.bin @flash_args)
+```
+
+Injected touches go through the real LVGL touch input device: while a gesture
+runs it replaces the GT911 panel, so clicks, long presses, scrolling, the
+maintenance drawer and touch timeouts behave as with a finger. Touch commands
+reply after LVGL has processed the whole gesture. Coordinates are display
+pixels (480 x 480, origin top left as shown on screen).
+
+| Topic | Payload (besides `authCode`) | Reply |
+| --- | --- | --- |
+| `ui.widgets.get` | — | `{"screen","width","height","widgets":[...]}` |
+| `ui.widgets.tap` | `text`, optional `match` (`exact`/`contains`), `index` (default 0), `holdMs` (default 60) | `{"success":true,"widget":{...}}` |
+| `ui.touch.tap` | `x`, `y`, optional `holdMs` (1-60000, default 60) | `{"success":true}` |
+| `ui.touch.press` | `x`, `y`, optional `holdMs`; without it the finger stays down until `ui.touch.release` (at most 60 s) | `{"success":true}` once pressed or, with `holdMs`, released |
+| `ui.touch.release` | — | `{"success":true}` |
+| `ui.touch.swipe` | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300) | `{"success":true}` |
+| `ui.screenshot.get` | — | header, data lines and end line (below) |
+
+`ui.widgets.get` lists the visible touchable widgets front to back, in the
+order LVGL hit-tests them: system layer, top layer (popups, dialogs), then the
+active screen, later children first. `screen` is the router's current screen
+name (`Display::transitionToScreen`). A widget is a clickable object that is a
+button, switch, checkbox, slider, dropdown, textarea, roller or arc, or has an
+event handler; each key of a keyboard or button matrix is its own entry with
+type `key` and its `key` index. Example entry:
+
+```json
+{"type":"lv_button","text":"End session","texts":["End","session"],"x":40,"y":380,"w":400,"h":60,
+ "cx":239,"cy":409,"hittable":true,"disabled":false,"checked":false}
+```
+
+`texts` holds the visible label texts inside the widget (labels of nested
+touchable widgets belong to those), whitespace collapsed; `text` joins them
+with spaces. `x`/`y`/`w`/`h` is the whole widget, `cx`/`cy` the center of its
+part not clipped by scrolling parents or the screen edge. `hittable` is true
+when a touch at `cx`/`cy` reaches the widget, false when something such as a
+popup covers it. `ui.widgets.tap` taps `cx`/`cy` of the `index`-th hittable
+widget whose text matches: `exact` (default) means one label text or the joined
+text equals `text`, also after removing LVGL symbol icons (Unicode private-use
+glyphs, so `Reboot` matches `"\uf011 Reboot"`; icon-only keys such as backspace
+`"\uf55a"` match their glyph); `contains` searches the joined text.
+
+```text
+CMND ui.widgets.tap {"authCode":"4711","text":"Start"}
+RESP ui.widgets.tap {"success":true,"widget":{"type":"lv_button","text":"Start",...}}
+CMND ui.touch.swipe {"authCode":"4711","x1":240,"y1":400,"x2":240,"y2":100}
+RESP ui.touch.swipe {"success":true}
+```
+
+`ui.screenshot.get` renders pending changes, then sends the panel's
+framebuffer: little-endian RGB565 pixels, row by row, compressed with
+PackBits over pixels (control byte `c < 128`: `c + 1` literal pixels follow;
+`c >= 128`: one pixel follows, repeated `c - 126` times):
+
+```text
+RESP ui.screenshot.get {"width":480,"height":480,"format":"rgb565-rle","size":30117,"crc32":2860241123,"chunks":40}
+RESP ui.screenshot.data {"seq":0,"data":"<base64 of up to 768 bytes>"}
+...
+RESP ui.screenshot.end {"chunks":40,"crc32":2860241123}
+```
+
+`crc32` (zlib) covers the concatenated decoded chunks of `size` bytes. Log
+lines of other tasks may appear between the lines; drop the capture and retry
+if a sequence number is missing or the checksum differs.
+`apps/attractap-lab/src/attractap_lab/reader_screen.py` does that and writes
+PNG files.
+
+Errors: `INVALID_PAYLOAD` (missing or out-of-range value), `WIDGET_NOT_FOUND`,
+`TOUCH_BUSY` (an open-ended press is still held), `NOT_PRESSED`,
+`TOUCH_TIMEOUT`, `SCREENSHOT_UNAVAILABLE`, `OUT_OF_MEMORY`, plus the PIN errors.
+The lookup reads LVGL objects only: text drawn without a label (images, canvas
+content, button-matrix keys without text) cannot be matched, and keys are
+reported without separate hit-testing of overlapping keys.
+
 ## Attractap Lite LED Animations
 
 The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.

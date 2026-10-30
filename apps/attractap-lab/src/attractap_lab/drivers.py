@@ -1,23 +1,30 @@
-"""Only the missing labgrid operations: ESP flashing/eFuse reads and screen snapshots.
+"""Only the missing labgrid operations: ESP flashing/eFuse reads, screen snapshots
+and NFC card emulator commands.
 
 Resources, USB discovery, SSH transport, locking and serial access use labgrid.
 """
 
+import json
 import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import ProxyHandler, build_opener
 
+from collections import deque
+
 import attr
-from labgrid.driver import Driver
+import serial
+from labgrid.driver import Driver, SerialDriver
 from labgrid.factory import target_factory
-from labgrid.protocol import ResetProtocol
+from labgrid.protocol import ConsoleProtocol, ResetProtocol
 from labgrid.resource.common import NetworkResource
 from labgrid.util.managedfile import ManagedFile
 from labgrid.util.proxy import proxymanager
+from pexpect import TIMEOUT
 
 
 @target_factory.reg_driver
@@ -132,3 +139,134 @@ class ScreenCaptureDriver(Driver):
         if self.crop:
             command += ["-vf", f"crop={self.crop}"]
         subprocess.run(command + [str(output)], input=snapshot, check=True, timeout=self.timeout + 5)
+
+
+class NfcEmulatorError(RuntimeError):
+    """The emulator rejected a command; ``code`` is its stable error code."""
+
+    def __init__(self, code, message):
+        super().__init__(f"{code}: {message}")
+        self.code = code
+
+
+@target_factory.reg_driver
+@attr.s(eq=False)
+class NfcEmulatorDriver(SerialDriver):
+    """Commands for the NFC card emulator mounted in front of a reader.
+
+    Bind ``port`` to the emulator's serial resource by name. The lower
+    priorities keep plain SerialDriver/ConsoleProtocol lookups on the reader.
+    The protocol is documented in apps/attractap/nfc-emulator/README.md.
+    """
+    priorities = {SerialDriver: -10, ConsoleProtocol: -10}
+    command_timeout = attr.ib(default=10.0, converter=float)
+    ready_timeout = attr.ib(default=15.0, converter=float)
+
+    PREFIX = b"@nfc "
+
+    def __attrs_post_init__(self):
+        super().__attrs_post_init__()
+        self._buffer = b""
+        self._log = deque(maxlen=5000)
+
+    @Driver.check_active
+    def read_log(self, seconds=0.0):
+        """Return and clear the emulator's log lines (ESP-IDF output), reading for ``seconds`` first."""
+        deadline = time.monotonic() + seconds
+        while True:
+            try:
+                self._buffer += self._read(timeout=0.1, max_size=4096)
+            except TIMEOUT:
+                if time.monotonic() >= deadline:
+                    break
+            while b"\n" in self._buffer:
+                raw, self._buffer = self._buffer.split(b"\n", 1)
+                if self._parse(raw) is None:
+                    self._log.append(raw.decode(errors="replace").rstrip("\r"))
+        lines = list(self._log)
+        self._log.clear()
+        return lines
+
+    def on_activate(self):
+        deadline = time.monotonic() + self.ready_timeout
+        # The first RFC2217 negotiation through the exporter occasionally times out.
+        while True:
+            try:
+                super().on_activate()
+                break
+            except serial.SerialException:
+                self.close()
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(1)
+        self._buffer = b""
+        # Opening the port can reset the ESP32-S3. Wait until it answers.
+        while True:
+            try:
+                self._exchange("health", None, 1.0)
+                return
+            except (TimeoutError, NfcEmulatorError):
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("NFC emulator did not answer after connecting") from None
+
+    @Driver.check_active
+    def command(self, name, arguments=None, *, timeout=None):
+        """Run one emulator command and return its result.
+
+        Raises NfcEmulatorError when the emulator reports an error.
+        """
+        return self._exchange(name, arguments, self.command_timeout if timeout is None else timeout)
+
+    def _exchange(self, name, arguments, timeout):
+        # The leading newline ends any stray partial line the emulator buffered.
+        line = b"\n" + name.encode()
+        if arguments is not None:
+            line += b" " + json.dumps(arguments, separators=(",", ":")).encode()
+        # A reply that arrived after an earlier timeout must not answer this
+        # command; complete log lines are kept.
+        while b"\n" in self._buffer:
+            raw, self._buffer = self._buffer.split(b"\n", 1)
+            if self._parse(raw) is None:
+                self._log.append(raw.decode(errors="replace").rstrip("\r"))
+        self._buffer = b""
+        # The raw transport also works from on_activate, before the driver is active.
+        self._write(line + b"\n")
+        deadline = time.monotonic() + timeout
+        while True:
+            while b"\n" in self._buffer:
+                raw, self._buffer = self._buffer.split(b"\n", 1)
+                reply = self._parse(raw)
+                if reply is None:
+                    self._log.append(raw.decode(errors="replace").rstrip("\r"))
+                    continue
+                # Replies name their command; skip ones answering stray input.
+                if reply.get("command") != name:
+                    continue
+                if reply["ok"]:
+                    return reply["result"]
+                raise NfcEmulatorError(reply["error"], reply["message"])
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(f"NFC emulator did not answer {name!r} within {timeout}s")
+            try:
+                self._buffer += self._read(timeout=min(0.25, remaining), max_size=4096)
+            except TIMEOUT:
+                pass
+
+    def _parse(self, raw):
+        """Return a reply object, or None for log output and event lines."""
+        start = raw.find(self.PREFIX)
+        if start < 0:
+            return None
+        try:
+            reply = json.loads(raw[start + len(self.PREFIX):])
+        except ValueError:
+            return None
+        return reply if isinstance(reply, dict) and "ok" in reply else None
+
+
+@target_factory.reg_driver
+@attr.s(eq=False)
+class NfcEmulatorFlashDriver(ESPToolDriver):
+    """ESPToolDriver for the emulator; plain ESPToolDriver lookups stay on the reader."""
+    priorities = {ESPToolDriver: -10, ResetProtocol: -10}
