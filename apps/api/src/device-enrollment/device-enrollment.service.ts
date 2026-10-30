@@ -10,6 +10,7 @@ import {
   ENROLLMENT_CONNECTION_ATTEMPTS,
   ENROLLMENT_MAX_PENDING_PER_ADDRESS,
   ENROLLMENT_MAX_PENDING_TOTAL,
+  ENROLLMENT_PATTERN_COOLDOWN_MS,
   ENROLLMENT_REQUEST_TTL_MS,
 } from './device-enrollment.constants';
 import { LedPattern, canonicalLedPattern, isValidLedPattern, pickLedPattern, sameLedPattern } from './led-pattern';
@@ -99,8 +100,10 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
   private readonly codes = new Map<string, string>();
   /** pendingId -> connection id, only readers without a screen */
   private readonly litePending = new Map<string, string>();
-  /** canonical pattern (current and previous of every waiting Lite reader) -> connection id */
-  private readonly patterns = new Map<string, string>();
+  /** canonical patterns (current and previous) of every waiting Lite reader */
+  private readonly patterns = new Set<string>();
+  /** canonical pattern -> time until which it stays reserved after its reader left */
+  private readonly patternCooldown = new Map<string, number>();
   private readonly connectionAttempts = new FixedWindowCounterStore<string, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly addressAttempts = new FixedWindowCounterStore<string, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
   private readonly approverFailures = new FixedWindowCounterStore<number, WindowCounterEntry>(MAX_COUNTER_ENTRIES);
@@ -174,7 +177,7 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     this.codes.set(entry.code, connection.id);
     if (this.isLite(entry)) {
       this.litePending.set(entry.pendingId, connection.id);
-      entry.pattern = this.assignPattern(connection.id);
+      entry.pattern = this.assignPattern();
     }
     this.announce(entry, now);
     return true;
@@ -318,16 +321,25 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     return entry.connection.hasScreen === false;
   }
 
-  /** Picks a pattern no waiting Lite reader shows or showed in the last rotation. */
-  private assignPattern(connectionId: string): LedPattern | null {
-    const pattern = pickLedPattern(new Set(this.patterns.keys()));
-    if (pattern) this.patterns.set(canonicalLedPattern(pattern), connectionId);
+  /**
+   * Picks a pattern no waiting Lite reader shows or showed in the last rotation, and none whose reader
+   * left so recently that its ring may still show it.
+   */
+  private assignPattern(): LedPattern | null {
+    const now = Date.now();
+    for (const [key, until] of this.patternCooldown) if (until <= now) this.patternCooldown.delete(key);
+    const pattern = pickLedPattern({ has: (key) => this.patterns.has(key) || this.patternCooldown.has(key) });
+    if (pattern) this.patterns.add(canonicalLedPattern(pattern));
     return pattern;
   }
 
   private releasePatterns(entry: Pending): void {
+    const until = Date.now() + ENROLLMENT_PATTERN_COOLDOWN_MS;
     for (const pattern of [entry.pattern, entry.previousPattern]) {
-      if (pattern) this.patterns.delete(canonicalLedPattern(pattern));
+      if (!pattern) continue;
+      const key = canonicalLedPattern(pattern);
+      this.patterns.delete(key);
+      this.patternCooldown.set(key, until);
     }
   }
 
@@ -356,11 +368,15 @@ export class DeviceEnrollmentService implements OnApplicationShutdown {
     this.announce(entry, now);
   }
 
-  /** The previous pattern stays valid (and reserved) until the next rotation. */
+  /**
+   * The previous pattern stays valid (and reserved) until the next rotation. The outgoing one is freed
+   * only after the pick, so a reader never gets back the pattern it showed two rotations ago.
+   */
   private rotatePattern(entry: Pending): void {
-    if (entry.previousPattern) this.patterns.delete(canonicalLedPattern(entry.previousPattern));
+    const outgoing = entry.previousPattern;
     entry.previousPattern = entry.pattern;
-    entry.pattern = this.assignPattern(entry.connection.id);
+    entry.pattern = this.assignPattern();
+    if (outgoing) this.patterns.delete(canonicalLedPattern(outgoing));
   }
 
   private expire(connectionId: string): void {

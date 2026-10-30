@@ -176,6 +176,28 @@ describe('AttractapAuthHandler', () => {
       expect(payloads[1].pattern).toBeNull();
     });
 
+    it('strips hidden characters from the firmware info and caps it at 64 characters', async () => {
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        {
+          payload: {
+            enrollment: { protocol: 1, hasScreen: false },
+            firmware: { name: 'atl\u202Eetil\u200B', variant: 7, version: `${'9'.repeat(63)}\u{1F600}x` },
+          },
+        } as unknown as AttractapEvent['data'],
+      );
+      const { firmware } = mockEnrollment.request.mock.calls[0][0];
+      expect(firmware).toEqual({ name: 'atletil', version: `${'9'.repeat(63)}\u{1F600}` });
+    });
+
+    it('treats a non-boolean hasScreen as a screen reader', async () => {
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        { payload: { enrollment: { protocol: 1, hasScreen: 'false' } } } as unknown as AttractapEvent['data'],
+      );
+      expect(mockEnrollment.request.mock.calls[0][0].hasScreen).toBe(true);
+    });
+
     it('creates the reader only when provisioned and delivers {id, token}', async () => {
       mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 99, name: 'Door' }, token: 'tok-abc' });
       mockAttractapService.deleteReader = jest.fn().mockResolvedValue(true);

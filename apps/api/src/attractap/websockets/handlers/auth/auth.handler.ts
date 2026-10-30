@@ -16,8 +16,12 @@ function describeFirmware(firmware: unknown): { name?: string; variant?: string;
   const result: { name?: string; variant?: string; version?: string } = {};
   for (const key of ['name', 'variant', 'version'] as const) {
     const value = (firmware as Record<string, unknown>)[key];
-    // eslint-disable-next-line no-control-regex
-    if (typeof value === 'string') result[key] = value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 64);
+    // Control and format characters (bidi overrides, zero-width, line separators) could disguise the text.
+    if (typeof value === 'string') {
+      result[key] = Array.from(value.replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, ''))
+        .slice(0, 64)
+        .join('');
+    }
   }
   return result;
 }

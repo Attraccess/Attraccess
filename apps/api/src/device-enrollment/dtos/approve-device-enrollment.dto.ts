@@ -49,6 +49,7 @@ export class ApproveLiteEnrollmentDto {
   @ApiProperty({
     description: 'The four colours shown on the reader, in the order of the list entry',
     enum: LED_PATTERN_COLORS,
+    enumName: 'LedPatternColor',
     isArray: true,
     example: ['red', 'green', 'blue', 'yellow'],
   })
@@ -76,7 +77,12 @@ export class WaitingLiteReaderDto {
   @ApiProperty({ format: 'uuid', description: 'Random handle of this waiting request' })
   pendingId: string;
 
-  @ApiProperty({ enum: LED_PATTERN_COLORS, isArray: true, description: 'Colours of the four segments on the ring' })
+  @ApiProperty({
+    enum: LED_PATTERN_COLORS,
+    enumName: 'LedPatternColor',
+    isArray: true,
+    description: 'Colours of the four segments on the ring',
+  })
   pattern: LedPatternColor[];
 
   @ApiProperty({ description: 'Seconds until the reader shows a new pattern', example: 21 })

@@ -32,8 +32,8 @@ export function sameLedPattern(a: readonly string[], b: readonly string[]): bool
   return a.length === b.length && a.every((color, index) => color === b[index]);
 }
 
-/** Every distinct pattern, one representative per rotation/mirror class. */
-function allCanonicalPatterns(): LedPattern[] {
+/** Every distinct pattern, one representative per rotation/mirror class, with its canonical key. */
+function allCanonicalPatterns(): { key: string; pattern: LedPattern }[] {
   const seen = new Map<string, LedPattern>();
   const walk = (current: LedPatternColor[]) => {
     if (current.length === LED_PATTERN_SEGMENTS) {
@@ -43,20 +43,23 @@ function allCanonicalPatterns(): LedPattern[] {
     for (const color of LED_PATTERN_COLORS) walk([...current, color]);
   };
   walk([]);
-  return [...seen.values()];
+  return [...seen].map(([key, pattern]) => ({ key, pattern }));
 }
 
-export const LED_PATTERN_COUNT = allCanonicalPatterns().length;
+// Computed once: a pick runs on every request and rotation of a waiting Lite reader.
+const CANONICAL_PATTERNS = allCanonicalPatterns();
+
+export const LED_PATTERN_COUNT = CANONICAL_PATTERNS.length;
 
 /**
  * Picks a random pattern that is not equivalent to any in `taken` (canonical keys), or null when
  * all of them are in use. Rotation and mirroring of the pick is randomised so the ring is not
  * biased towards one orientation.
  */
-export function pickLedPattern(taken: ReadonlySet<string>): LedPattern | null {
-  const free = allCanonicalPatterns().filter((pattern) => !taken.has(canonicalLedPattern(pattern)));
+export function pickLedPattern(taken: { has(key: string): boolean }): LedPattern | null {
+  const free = CANONICAL_PATTERNS.filter((entry) => !taken.has(entry.key));
   if (free.length === 0) return null;
-  const pick = [...free[randomInt(free.length)]];
+  const pick = [...free[randomInt(free.length)].pattern];
   if (randomInt(2) === 1) pick.reverse();
   const shift = randomInt(LED_PATTERN_SEGMENTS);
   return [...pick.slice(shift), ...pick.slice(0, shift)];
