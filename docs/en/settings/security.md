@@ -56,7 +56,8 @@ Changing the secret makes the stored card keys unreadable until they are re-encr
 3. Run the same command without `--dry-run`. All keys are converted in one transaction; if one cannot be read with the old secret nothing is changed.
 4. Set `AUTH_SESSION_SECRET` to the new value and start the API.
 
-The command only converts card keys. Other encrypted data (for example saved integration credentials) is not covered by it.
+> [!WARNING]
+> The command converts card keys only. `AUTH_SESSION_SECRET` protects everything Attraccess stores encrypted: the license key, SSO provider secrets, two-factor secrets, MQTT and payment credentials. After you change it these values cannot be read any more. The API may then refuse to start because the license key is unreadable, and they have to be entered again. Only rotate the secret when you must, for example after it leaked.
 
 ## Best Practices
 

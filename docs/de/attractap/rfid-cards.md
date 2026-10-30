@@ -13,7 +13,7 @@ Wenn ein Benutzer eine RFID-Karte an einen Attractap-Leser haelt, sendet der Les
 
 Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt. Der Leser reicht nur Nachrichten zwischen Backend und Karte durch: **Kartenschluessel werden vom Server erzeugt und geprueft und erreichen nie einen Leser**. Ein Leser ohne Verbindung gewaehrt nichts.
 
-Kartenschluessel sind zufaellig, je 16 Byte lang, und werden verschluesselt gespeichert. Wie du das Secret sicherst, das sie schuetzt, steht unter [Sicherheitseinstellungen](settings/security.md).
+Kartenschluessel sind zufaellig, je 16 Byte lang, und werden verschluesselt gespeichert. Wie Sie das Secret sichern, das sie schuetzt, steht unter [Sicherheitseinstellungen](settings/security.md).
 
 ## RFID-Karten verwalten
 
@@ -25,7 +25,7 @@ Kartenschluessel sind zufaellig, je 16 Byte lang, und werden verschluesselt gesp
 2. Wählen Sie einen verbundenen Attractap, der die Registrierung von Karten unterstützt
 3. Klicken Sie auf **Registrieren** und folgen Sie den Anweisungen auf dem Leser
 
-Eine Karte wird erst registriert, nachdem der Server geprueft hat, dass die Karte ihren neuen Schluessel angenommen hat. Wird die Karte weggezogen oder schlaegt das Schreiben fehl, wird nichts gespeichert; halte dieselbe Karte erneut an den Leser, dann wird die Registrierung abgeschlossen.
+Eine Karte wird erst registriert, nachdem der Server geprueft hat, dass die Karte ihren neuen Schluessel angenommen hat. Wird die Karte weggezogen oder schlaegt das Schreiben fehl, wird nichts gespeichert; halten Sie dieselbe Karte erneut an den Leser, dann wird die Registrierung abgeschlossen.
 
 > [!NOTE]
 > Nur Leser mit Firmware 2.0.0 oder neuer koennen Karten registrieren und zuruecksetzen. Aeltere Leser werden beim naechsten Verbindungsaufbau automatisch aktualisiert (siehe [Firmware-Updates](attractap/firmware-updates.md)); bis dahin bieten sie keine Kartenfunktionen und zeigen, dass ein Update noetig ist. Bereits eingerichtete Karten funktionieren weiter.
