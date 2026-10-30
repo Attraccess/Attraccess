@@ -1,0 +1,36 @@
+{
+  "name": "@attraccess/plugin-matter",
+  "version": "0.1.0-alpha.0",
+  "description": "Official Attraccess integration for Matter devices. Foundation only: no sidecar connection yet.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "apps/plugins/matter"
+  },
+  "homepage": "https://attraccess.org",
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "matter"
+  ],
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.9.0"
+  },
+  "attraccess": {
+    "displayName": "Matter",
+    "description": "Matter device support for Attraccess. Foundation release without device features.",
+    "host": "^1.11.0",
+    "backend": "dist/index.js",
+    "permissions": [],
+    "sdk": {
+      "backend": "^1.9.0"
+    }
+  }
+}

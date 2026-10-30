@@ -64,7 +64,7 @@ importers:
         version: 3.2.6(tailwind-merge@3.6.0)(tailwindcss@4.3.3)
       '@hookform/resolvers':
         specifier: ^5.4.0
-        version: 5.9.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)
+        version: 5.9.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)
       '@icons-pack/react-simple-icons':
         specifier: ^13.13.0
         version: 13.15.1(react@19.2.8)
@@ -77,6 +77,12 @@ importers:
       '@licenso/client':
         specifier: ^1.2.0
         version: 1.2.0
+      '@matter/main':
+        specifier: 0.18.0
+        version: 0.18.0
+      '@matter/nodejs':
+        specifier: 0.18.0
+        version: 0.18.0
       '@million/lint':
         specifier: ^1.0.14
         version: 1.0.14(encoding@0.1.13)(rollup@4.64.0)
@@ -645,6 +651,12 @@ importers:
       '@vitest/ui':
         specifier: ^4.1.10
         version: 4.1.11(vitest@4.1.11)
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.20.0)
       autoprefixer:
         specifier: 10.6.1
         version: 10.6.1(postcss@8.5.28)
@@ -3774,6 +3786,28 @@ packages:
     resolution: {integrity: sha512-9QOtNffcOF/c1seMCDnjckb3R9WHcG34tky+FHpNKKCW0wc/scYLwMtO+ptyGUfMW0/b/n4qRiALlaFHc9Oj7Q==}
     engines: {node: '>= 10.0.0'}
 
+  '@matter/general@0.18.0':
+    resolution: {integrity: sha512-/gk5qFk1+O5LT5XdqLidehh9nZE1QuTSzmeDxE4J5ZgbK3/nLXjI4+81Q8PYLSwxbkLjPgOLUj1H1sB7ATu40Q==}
+
+  '@matter/main@0.18.0':
+    resolution: {integrity: sha512-4L/SzEJUqquePcxxrLxO+7AD6443YHHlf/eDIIJGGCngYx4Z7x/hiVFPxoPBdF2KpxgCquPmqb4Nyho8ABsNjw==}
+
+  '@matter/model@0.18.0':
+    resolution: {integrity: sha512-tk07q2fU6A0hkPh+BCMteiePiSeXk3Jj+xAukU4QHBBPv8LoEEpfMQOpubnBlkvwP4h/ArKWSFxMP6TJaLPVQg==}
+
+  '@matter/node@0.18.0':
+    resolution: {integrity: sha512-ZDpvkUH/0KnXgb/bnaTzUjlfynVEmStZMDEOVXFyZyCeaUSy06P1KCIyU39vuCvlR8WRLQ8z3Jf+eHxoW2+HNw==}
+
+  '@matter/nodejs@0.18.0':
+    resolution: {integrity: sha512-4du5G6hF5e81aHSc6mfWN7+feWAw3gGCNG4ZsL/xeuO27klTvvLGiIddL9E7mxVxacctjsFUnIBaAPXnnsFQkQ==}
+    engines: {node: '>=20.19.0 <21.0.0 || >=22.13.0'}
+
+  '@matter/protocol@0.18.0':
+    resolution: {integrity: sha512-jRN4mgWBq741JKu9/XqYtPW0Arw3gQorp/HKyuwdJx/oAUls6FX2dvJis3t+2qm5EzSr4xyYle4onl6Z46pV9Q==}
+
+  '@matter/types@0.18.0':
+    resolution: {integrity: sha512-SQqMxT5wCRMOaH1JU5Pk1/fotaMDxPVPcPapdCwhoAtIwAIv1aqiyHVqe3N2jkcxbZPmHihztJ876JbRpPo8dw==}
+
   '@microsoft/api-extractor-model@7.30.6':
     resolution: {integrity: sha512-znmFn69wf/AIrwHya3fxX6uB5etSIn6vg4Q4RB/tb5VDDs1rqREc+AvMC/p19MUN13CZ7+V/8pkYPTj7q8tftg==}
 
@@ -4314,6 +4348,14 @@ packages:
       '@nestjs/platform-socket.io':
         optional: true
 
+  '@noble/ciphers@2.4.0':
+    resolution: {integrity: sha512-AnjFn0Jv92laAkvMrghlFZq4qQCIN/4DxFV/eooqtC2YTjB7kBeLMS2T9KJX4Dn+ZVXLOwK0lSgqDtx9gvxtiw==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/curves@2.4.0':
+    resolution: {integrity: sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew==}
+    engines: {node: '>= 20.19.0'}
+
   '@noble/ed25519@2.3.0':
     resolution: {integrity: sha512-M7dvXL2B92/M7dw9+gzuydL8qn/jiqNHaoR3Q+cb1q1GHV7uwE17WCyFMG+Y+TZb5izcaXk5TdJRrDUxHXL78A==}
 
@@ -4327,6 +4369,10 @@ packages:
 
   '@noble/hashes@2.4.0':
     resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/post-quantum@0.7.1':
+    resolution: {integrity: sha512-+P9981IiAnVh+rmcubozzVwrEy3XsN/tMhTnvsjV9VDaYpOnNCqWqKo2FLWxbu92YHfjGIlE5XnW175UK+ln+Q==}
     engines: {node: '>= 20.19.0'}
 
   '@nodable/entities@2.2.0':
@@ -21725,7 +21771,7 @@ snapshots:
     dependencies:
       hono: 4.12.21
 
-  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)':
+  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.34.48)(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.15.1)(effect@3.22.2)(react-hook-form@7.56.4(react@19.2.8))(typanion@3.14.0)(zod@4.4.3)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.56.4(react@19.2.8)
@@ -21734,7 +21780,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       ajv: 8.20.0
       ajv-errors: 3.0.0(ajv@8.20.0)
-      ajv-formats: 2.1.1(ajv@8.20.0)
+      ajv-formats: 3.0.1(ajv@8.20.0)
       class-transformer: 0.5.1
       class-validator: 0.15.1
       effect: 3.22.2
@@ -22410,6 +22456,51 @@ snapshots:
       tmp-promise: 3.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@matter/general@0.18.0':
+    dependencies:
+      '@noble/curves': 2.4.0
+      '@noble/hashes': 2.4.0
+      '@noble/post-quantum': 0.7.1
+
+  '@matter/main@0.18.0':
+    dependencies:
+      '@matter/general': 0.18.0
+      '@matter/model': 0.18.0
+      '@matter/node': 0.18.0
+      '@matter/protocol': 0.18.0
+      '@matter/types': 0.18.0
+    optionalDependencies:
+      '@matter/nodejs': 0.18.0
+
+  '@matter/model@0.18.0':
+    dependencies:
+      '@matter/general': 0.18.0
+
+  '@matter/node@0.18.0':
+    dependencies:
+      '@matter/general': 0.18.0
+      '@matter/model': 0.18.0
+      '@matter/protocol': 0.18.0
+      '@matter/types': 0.18.0
+
+  '@matter/nodejs@0.18.0':
+    dependencies:
+      '@matter/general': 0.18.0
+      '@matter/node': 0.18.0
+      '@matter/protocol': 0.18.0
+      '@matter/types': 0.18.0
+
+  '@matter/protocol@0.18.0':
+    dependencies:
+      '@matter/general': 0.18.0
+      '@matter/model': 0.18.0
+      '@matter/types': 0.18.0
+
+  '@matter/types@0.18.0':
+    dependencies:
+      '@matter/general': 0.18.0
+      '@matter/model': 0.18.0
 
   '@microsoft/api-extractor-model@7.30.6(@types/node@25.9.9)':
     dependencies:
@@ -23114,6 +23205,12 @@ snapshots:
     optionalDependencies:
       '@nestjs/platform-socket.io': 11.0.20(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/websockets@11.1.28)(rxjs@7.8.2)
 
+  '@noble/ciphers@2.4.0': {}
+
+  '@noble/curves@2.4.0':
+    dependencies:
+      '@noble/hashes': 2.4.0
+
   '@noble/ed25519@2.3.0': {}
 
   '@noble/hashes@1.4.0': {}
@@ -23121,6 +23218,12 @@ snapshots:
   '@noble/hashes@1.8.0': {}
 
   '@noble/hashes@2.4.0': {}
+
+  '@noble/post-quantum@0.7.1':
+    dependencies:
+      '@noble/ciphers': 2.4.0
+      '@noble/curves': 2.4.0
+      '@noble/hashes': 2.4.0
 
   '@nodable/entities@2.2.0': {}
 

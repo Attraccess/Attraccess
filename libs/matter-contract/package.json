@@ -1,0 +1,11 @@
+{
+  "name": "@attraccess/matter-contract",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Versioned REST and WebSocket contract between the Attraccess Matter plugin and the Matter sidecar.",
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "semver": "^7.8.5",
+    "zod": "^4.4.3"
+  }
+}
