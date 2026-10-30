@@ -89,6 +89,14 @@ bool writeExpander(uint8_t reg, uint8_t value)
     return i2c_master_transmit(expander, buffer, sizeof(buffer), kI2cTimeoutMs) == ESP_OK;
 }
 
+#if defined(IO_EXPANDER_16BIT)
+bool backlightOff()
+{
+    delayMs(IOEXP_CH32_WRITE_GAP_MS);
+    return writeExpander(IOEXP_REG_BACKLIGHT_PWM, IOEXP_BACKLIGHT_PWM_OFF);
+}
+#endif
+
 // Same pin map as src/ioexpander: hold touch controller and panel in reset,
 // backlight and beeper off. Outputs are written before switching the pins to
 // outputs so they never glitch high.
@@ -107,10 +115,13 @@ bool parkExpander()
 #if defined(IO_EXPANDER_16BIT)
     // Unrelated port 0 lines and all of port 1 keep the reader defaults. Port 1
     // includes SYS_EN: a battery-backed board must stay powered and reachable.
+    // The backlight is the CH32 PWM register, not a port line (see
+    // ioexpander.hpp); the reader firmware turns it back on in setup().
     return writeExpander(IOEXP_REG_OUTPUT, IOEXP_PORT0_DEFAULT & ~activeLines) &&
            writeExpander(IOEXP_REG_OUTPUT_1, IOEXP_PORT1_DEFAULT) &&
            writeExpander(IOEXP_REG_CONFIG, 0x00) &&
-           writeExpander(IOEXP_REG_CONFIG_1, 0x00);
+           writeExpander(IOEXP_REG_CONFIG_1, 0x00) &&
+           backlightOff();
 #else
     // The 8-bit expander has no other lines; every active line is high-active.
     static_assert((0x00 & activeLines) == 0, "all parked lines low");
@@ -226,6 +237,10 @@ extern "C" void app_main(void)
         }
         else
         {
+#if defined(IO_EXPANDER_16BIT)
+            // Repeat in case the CH32 dropped the acknowledged write.
+            backlightOff();
+#endif
             printf("ATTRACTAP_PARKED hardware=%s nfc=%s\n", ATTRACTAP_PARK_HARDWARE, nfcOff ? "off" : "unknown");
         }
         fflush(stdout);
