@@ -21,6 +21,7 @@ export const cursorSchema = z.string().regex(/^[0-9a-f-]{36}\.[0-9]{1,15}$/);
 export const sequenceSchema = z.int().min(1);
 
 export const lifecyclePayloadSchema = z.strictObject({
+  // 'stopped' is reserved: the stream closes with the process, so no client can receive it in this release.
   phase: z.enum(['started', 'draining', 'stopped']),
 });
 /** Payload of events whose feature is not implemented yet. Defines only the envelope slot. */

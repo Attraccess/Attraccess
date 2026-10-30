@@ -40,7 +40,12 @@
     "export-contracts": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/src/**/*", "{projectRoot}/scripts/**/*", "{workspaceRoot}/tsconfig.base.json"],
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/tsconfig.base.json",
+        { "externalDependencies": ["zod", "esbuild"] }
+      ],
       "outputs": ["{workspaceRoot}/dist/contracts/matter"],
       "options": {
         "command": "node libs/matter-contract/scripts/export-contracts.mjs dist/contracts/matter"

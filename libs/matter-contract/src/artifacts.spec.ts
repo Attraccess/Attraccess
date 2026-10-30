@@ -10,10 +10,19 @@ describe('OpenAPI error responses', () => {
     });
   });
 
-  it('lists release refusals only on versioned routes, and origin and internal errors everywhere', () => {
-    expect(Object.keys(responses('/health/live'))).toEqual(['200', '403', '404', '500']);
-    expect(Object.keys(responses('/v1/capabilities'))).toEqual(['200', '403', '404', '409', '426', '500', '503']);
-    expect(Object.keys(responses('/v1/events'))).toEqual(['101', '403', '404', '409', '426', '500', '503']);
+  it('lists release refusals only on versioned routes, and origin, method and internal errors everywhere', () => {
+    expect(Object.keys(responses('/health/live'))).toEqual(['200', '403', '404', '405', '500']);
+    expect(Object.keys(responses('/v1/capabilities'))).toEqual([
+      '200',
+      '403',
+      '404',
+      '405',
+      '409',
+      '426',
+      '500',
+      '503',
+    ]);
+    expect(Object.keys(responses('/v1/events'))).toEqual(['101', '403', '404', '405', '409', '426', '500', '503']);
     expect(responses('/v1/fabric', 'post')).toEqual(
       expect.objectContaining({ '400': expect.anything(), '413': expect.anything(), '501': expect.anything() }),
     );

@@ -63,8 +63,8 @@ type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params'
 
 /** The error statuses a route can actually answer with, so generated clients do not expect impossible ones. */
 function errorStatuses(operation: ResponseShape): number[] {
-  // Any route can refuse a browser origin, miss the path or fail internally.
-  const codes = [403, 404, 500];
+  // Any route can refuse a browser origin, miss the path, get the wrong method or fail internally.
+  const codes = [403, 404, 405, 500];
   // Release headers are checked, and draining refused, only on versioned routes.
   if (operation.versioned) codes.push(409, 426, 503);
   if (operation.params || operation.body) codes.push(400);
