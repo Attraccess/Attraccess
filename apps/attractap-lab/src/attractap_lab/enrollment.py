@@ -11,8 +11,9 @@ import urllib.error
 import urllib.request
 
 ENROLLMENT_CODE = re.compile(rb"Enrollment: code=([2-9A-HJKMNP-Z]{3}-[2-9A-HJKMNP-Z]{3})")
-# A code is short; searching only the recent output keeps long recordings cheap.
-_TAIL = 512
+# Each call rescans only the output added since the last one, plus enough of the previous
+# output to catch a code line that was split across two chunks.
+_OVERLAP = 64
 
 
 def approve(url, token, code, *, name=None, timeout=30):
@@ -41,9 +42,15 @@ def approver(url, token, *, name=None, on_approved=None):
     rotated away before the request arrived is skipped; the next rotation logs a new one.
     """
     tried = set()
+    scanned = 0
 
     def check(data):
-        for match in ENROLLMENT_CODE.finditer(data[-_TAIL:]):
+        nonlocal scanned
+        if len(data) < scanned:  # a new recording started over
+            scanned = 0
+        start = max(0, scanned - _OVERLAP)
+        scanned = len(data)
+        for match in ENROLLMENT_CODE.finditer(data, start):
             code = match.group(1).decode()
             if code in tried:
                 continue
