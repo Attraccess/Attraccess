@@ -40,13 +40,13 @@ export class ResourceActionGuard {
       return false;
     }
 
-    const lastAuthenticatedUserId = socket.state.lastAuthenticatedUserId;
-    if (lastAuthenticatedUserId == null) {
+    const verifiedUserId = socket.state.verifiedUserId;
+    if (verifiedUserId == null) {
       await socket.sendMessage(new AttractapEvent(eventType, { ...correlation, error: 'USER_NOT_AUTHENTICATED' }));
       return false;
     }
 
-    const user = await this.usersService.findOne({ id: lastAuthenticatedUserId });
+    const user = await this.usersService.findOne({ id: verifiedUserId });
     if (!user) {
       await socket.sendMessage(new AttractapEvent(eventType, { ...correlation, error: 'USER_NOT_FOUND' }));
       return false;

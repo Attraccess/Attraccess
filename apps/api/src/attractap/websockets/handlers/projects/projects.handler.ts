@@ -10,7 +10,7 @@ export class AttractapProjectsHandler {
   private projectsService: ProjectsService;
 
   public async handleProjectsOfUserRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const userId = socket.state.lastAuthenticatedUserId;
+    const userId = socket.state.verifiedUserId;
     if (!userId) {
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.PROJECTS_OF_USER, { error: 'USER_NOT_AUTHENTICATED' }),

@@ -22,7 +22,7 @@ describe('AttractapMassIntroductionHandler', () => {
       readerId: READER_ID,
       sendMessage: jest.fn().mockResolvedValue(true),
       state: {
-        lastAuthenticatedUserId: null,
+        verifiedUserId: null,
         enrollment: null,
         enrollNewCardData: null,
         resetNfcCardData: null,

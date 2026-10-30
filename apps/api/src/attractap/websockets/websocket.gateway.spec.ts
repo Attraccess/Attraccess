@@ -83,7 +83,7 @@ describe('AttractapGateway', () => {
       expect(fixture.websocketService.sockets.size).toBe(1);
       const registeredSocket = Array.from(fixture.websocketService.sockets.values())[0];
       expect(registeredSocket.readerId).toBeNull();
-      expect(registeredSocket.state.lastAuthenticatedUserId).toBeNull();
+      expect(registeredSocket.state.verifiedUserId).toBeNull();
 
       expect(mockClient.send).toHaveBeenCalled();
       const sendMock = mockClient.send as jest.Mock;
@@ -158,7 +158,7 @@ describe('AttractapGateway', () => {
       const socket = fixture.createMockSocket({
         id: 'disc-ota',
         state: {
-          lastAuthenticatedUserId: null,
+          verifiedUserId: null,
           enrollNewCardData: null,
           resetNfcCardData: null,
           ota: { path: '/tmp/test', size: 1024, fd: 999 },

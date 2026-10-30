@@ -110,7 +110,7 @@ describe('persisted resource introducer aggregation', () => {
     const sendMessage = jest.fn().mockResolvedValue(undefined);
     const socket = {
       readerId: 1,
-      state: { lastAuthenticatedUserId: 99 },
+      state: { verifiedUserId: 99 },
       sendMessage,
     } as unknown as AuthenticatedWebSocket;
     await list.sendResourceListToSocket(socket);

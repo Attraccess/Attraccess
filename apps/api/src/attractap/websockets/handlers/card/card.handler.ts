@@ -6,8 +6,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { AuditService } from '../../../../audit/audit.service';
-
 import { MetricsService } from '../../../../metrics/metrics.service';
 
 import { ResourceIntroducersService } from '../../../../resources/introducers/resourceIntroducers.service';
@@ -20,6 +18,8 @@ import { UsersService } from '../../../../users-and-auth/users/users.service';
 
 import { AttractapService } from '../../../attractap.service';
 
+import { CardOperationsService } from '../../card-operations.service';
+import { CardWriterPolicyService } from '../../card-writer-policy.service';
 import { WebsocketService } from '../../websocket.service';
 
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
@@ -57,51 +57,33 @@ export class AttractapCardHandler {
   @InjectRepository(Resource)
   protected resourceRepository: Repository<Resource>;
 
-  @Inject(AuditService)
-  protected audit: AuditService;
+  @Inject(CardOperationsService)
+  protected cardOperations: CardOperationsService;
+
+  @Inject(CardWriterPolicyService)
+  protected cardWriterPolicy: CardWriterPolicyService;
 
   @Inject(ResourceListService)
   protected resourceListService: ResourceListService;
 
-  // Reader actively cancelled (user pressed cancel) or the enrollment timed out.
-  // Clear all enrollment state so a stale key/user can't leak into a later flow.
-  // Reader actively cancelled (user pressed cancel) or the reset timed out.
-  // Clear the reset state so a stale cardId can't leak into a later flow.
-
-  public async handleCardAuthenticationRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+  /**
+   * A card was tapped for a login. The user becomes the connection's verified user only after the
+   * server authenticated the card with the stored key; a UID alone gets nothing.
+   */
+  public async handleCardTap(socket: AuthenticatedWebSocket, uid: string, resourceId: number) {
     this.metricsService.attractapNfcTapsTotal.inc({ reader_id: String(socket.readerId) });
-    const { uid, resourceId } = data.payload as { uid: string; resourceId: number };
+    const reply = (payload: Record<string, unknown>) =>
+      socket.sendMessage(new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, payload));
 
-    if (!uid || typeof uid !== 'string') {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
-          error: 'INVALID_UID',
-        }),
-      );
+    const verified = await this.cardOperations.verifyCard(socket, 'tap', uid);
+    if (!verified.ok) {
+      await reply({ error: verified.error });
       return;
     }
+    const nfcCard = verified.card;
 
-    const nfcCard = await this.attractapService.getNFCCardByUID(uid);
-
-    if (!nfcCard) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
-          error: 'CARD_NOT_FOUND',
-        }),
-      );
-      return;
-    }
-
-    if (!nfcCard.isActive) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
-          error: 'CARD_NOT_ACTIVE',
-        }),
-      );
-      return;
-    }
-
-    socket.state.lastAuthenticatedUserId = nfcCard.user.id;
+    socket.state.verifiedUserId = nfcCard.user.id;
+    socket.state.verifiedCardUid = uid;
 
     const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
@@ -118,20 +100,16 @@ export class AttractapCardHandler {
       supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
       (supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction);
 
-    await socket.sendMessage(
-      new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {
-        keyNo: nfcCard.keyNo,
-        key: nfcCard.key,
-        username: nfcCard.user.username,
-        language: await this.settingsService.resolveLanguage(nfcCard.user.locale),
-        languageFallback: !getSupportedDeviceLanguage(nfcCard.user.locale),
-        canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
-        hasIntroduction,
-        isIntroducer,
-        supervisionMode,
-        requiresSupervisor,
-      }),
-    );
+    await reply({
+      username: nfcCard.user.username,
+      language: await this.settingsService.resolveLanguage(nfcCard.user.locale),
+      languageFallback: !getSupportedDeviceLanguage(nfcCard.user.locale),
+      canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
+      hasIntroduction,
+      isIntroducer,
+      supervisionMode,
+      requiresSupervisor,
+    });
     // Supplemental list queries must neither delay nor prevent physical card
     // verification. The reader keeps actions disabled until access arrives.
     void this.resourceListService.sendResourceListToSocket(socket).catch((error) => {
@@ -139,8 +117,15 @@ export class AttractapCardHandler {
     });
   }
 
-  // Reader actively cancelled (user pressed cancel) or the enrollment timed out.
-  // Clear all enrollment state so a stale key/user can't leak into a later flow.
+  /** The reader's login ended (logout or timeout): the server forgets who was logged in. */
+  public onReaderSessionEnded(socket: AuthenticatedWebSocket) {
+    this.clearVerifiedUser(socket);
+  }
+
+  public clearVerifiedUser(socket: AuthenticatedWebSocket) {
+    socket.state.verifiedUserId = null;
+    socket.state.verifiedCardUid = null;
+  }
 
   public async startResetOfNfcCard(data: {
     readerId: number;
@@ -154,6 +139,7 @@ export class AttractapCardHandler {
     if (!reader) {
       throw new Error(`Reader not found: ${data.readerId}`);
     }
+    await this.cardWriterPolicy.assertAllowed(data.readerId);
 
     const user = await this.usersService.findOne({ id: data.userId });
 
@@ -168,6 +154,9 @@ export class AttractapCardHandler {
     if (!socket) {
       throw new Error(`Reader not connected: ${data.readerId}`);
     }
+    if (!socket.state.cardRelay) {
+      throw new Error(`Reader firmware must be updated to reset cards: ${data.readerId}`);
+    }
     const nfcCard = await this.attractapService.getNFCCardByID(data.cardId);
 
     if (!nfcCard) {
@@ -177,15 +166,10 @@ export class AttractapCardHandler {
       throw new Error(`Reader already has an active card operation: ${data.readerId}`);
     }
 
-    // Hand the reader everything it needs to reset the card in one go: the
-    // stored key + slot let it authenticate the card and write the factory key
-    // back, so — unlike enrollment — no extra key round-trip is required. The
-    // cardId is kept in socket state so we know which DB record to delete once
-    // the reader confirms the on-card reset succeeded.
+    // The reader only learns who the card belongs to. The key stays on the server: the next card
+    // presented here is reset by the server, and the record is dropped once the card confirmed it.
     socket.state.resetNfcCardData = {
       cardId: nfcCard.id,
-      key: nfcCard.key,
-      keyNo: nfcCard.keyNo,
       auditPrincipal: {
         userId: user.id,
         authenticationMethod: data.authenticationMethod ?? 'session',
@@ -196,11 +180,7 @@ export class AttractapCardHandler {
 
     try {
       await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.RESET_NFC_CARD, {
-          username: nfcCard.user.username,
-          keyNo: nfcCard.keyNo,
-          key: nfcCard.key,
-        }),
+        new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { username: nfcCard.user.username }),
       );
     } catch (error) {
       if (socket.state.resetNfcCardData === reset) socket.state.resetNfcCardData = null;
@@ -209,49 +189,29 @@ export class AttractapCardHandler {
     }
   }
 
-  public async onResetNfcCard(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    if (!socket.state.resetNfcCardData) {
+  /** A card was presented to a reader that is waiting to reset one. */
+  public async handleResetCard(socket: AuthenticatedWebSocket, uid: string) {
+    const reset = socket.state.resetNfcCardData;
+    if (!reset) {
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { error: 'RESET_NFC_CARD_DATA_NOT_SET' }),
       );
       return;
     }
 
-    const { success } = data.payload as { success: boolean };
-    if (!success) {
-      this.logger.error('Reset of NFC card failed on reader');
-      // Keep the reset data: the reader stays on its screen and may retry the
-      // write with the same card within the timeout.
+    const outcome = await this.cardOperations.reset(socket, uid, reset);
+    if (socket.state.resetNfcCardData !== reset) return;
+    if (!outcome.ok) {
+      // The reader stays on its screen and may retry with the same card within the timeout.
+      this.logger.warn(`Reset of NFC card failed: ${outcome.error}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { error: outcome.error }));
       return;
     }
-
-    const reset = socket.state.resetNfcCardData;
-    const { cardId, auditPrincipal } = reset;
-
-    // The card was wiped back to the factory key on the reader; drop the DB
-    // record so the (now blank) card is no longer recognised.
-    const result = await this.attractapService.deleteNFCCard(cardId);
-    if (result.affected && socket.readerId && auditPrincipal) {
-      await this.audit
-        .recordAttractap({
-          action: 'card.unlinked',
-          actorId: auditPrincipal.userId,
-          authenticationMethod: auditPrincipal.authenticationMethod,
-          ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-          subjectId: cardId,
-          details: { readerId: socket.readerId, source: 'reader-reset' },
-        })
-        .catch(() => undefined);
-    }
-
-    if (socket.state.resetNfcCardData === reset) {
-      socket.state.resetNfcCardData = null;
-      socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { success: true }));
-    }
+    socket.state.resetNfcCardData = null;
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { success: true }));
   }
 
   // Reader actively cancelled (user pressed cancel) or the reset timed out.
-  // Clear the reset state so a stale cardId can't leak into a later flow.
   public async onResetNfcCardCancel(socket: AuthenticatedWebSocket) {
     this.logger.log('Reset of NFC card cancelled by reader');
     socket.state.resetNfcCardData = null;
@@ -273,6 +233,7 @@ export class AttractapCardHandler {
     if (!reader.firmware.capabilities.cardEnrollment) {
       throw new Error(`Reader does not support card enrollment: ${data.readerId}`);
     }
+    await this.cardWriterPolicy.assertAllowed(data.readerId);
 
     const user = await this.usersService.findOne({ id: data.userId });
 
@@ -286,6 +247,9 @@ export class AttractapCardHandler {
 
     if (sockets.length === 0) {
       throw new Error(`Reader not connected: ${data.readerId}`);
+    }
+    if (sockets.some((socket) => !socket.state.cardRelay)) {
+      throw new Error(`Reader firmware must be updated to enroll cards: ${data.readerId}`);
     }
     if (
       sockets.some(
@@ -326,115 +290,29 @@ export class AttractapCardHandler {
     await Promise.allSettled(tasks);
   }
 
-  public async onEnrollNewCardRequestNFCKey(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { uid, keyNo } = data.payload as { uid: string; keyNo: number };
-
+  /** A card was presented to a reader that is waiting to enroll one. The server writes and proves the key. */
+  public async handleEnrollCard(socket: AuthenticatedWebSocket, uid: string) {
     const enrollment = socket.state.enrollment;
     if (!enrollment) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'USER_NOT_SET' }),
-      );
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'USER_NOT_SET' }));
       return;
     }
 
-    if (!uid || typeof uid !== 'string' || !keyNo || typeof keyNo !== 'number') {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'INVALID_PARAMS' }),
-      );
-      return;
-    }
-
-    const existingCard = await this.attractapService.getNFCCardByUID(uid);
+    const outcome = await this.cardOperations.enroll(socket, uid, enrollment);
     if (socket.state.enrollment !== enrollment) return;
-    if (existingCard) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'CARD_ALREADY_ENROLLED' }),
-      );
+    if (!outcome.ok) {
+      // The enrollment stays armed: the reader may present the card again within the same session.
+      this.logger.warn(`Enroll new card failed: ${outcome.error}`);
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: outcome.error }));
       return;
     }
-
-    const key = await this.attractapService.generateNTAG424Key({
-      userId: enrollment.userId,
-      keyNo,
-      cardUID: uid,
-    });
-    if (socket.state.enrollment !== enrollment) return;
-
-    const keyString = this.attractapService.uint8ArrayToHexString(key);
-
-    socket.state.enrollNewCardData = {
-      userId: enrollment.userId,
-      keyNo,
-      key: keyString,
-      cardUID: uid,
-      auditPrincipal: enrollment.auditPrincipal,
-    };
-    await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { key: keyString, keyNo }));
-  }
-
-  public async onEnrollNewCard(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    if (!socket.state.enrollNewCardData) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'ENROLL_NEW_CARD_DATA_NOT_SET' }),
-      );
-      return;
-    }
-
-    const { success } = data.payload as { success: boolean };
-    if (!success) {
-      // The card write failed on the reader. Drop the stale key material so a
-      // retry requests a fresh key, but keep the enrollment snapshot so the
-      // reader can re-attempt within the same enrollment session.
-      this.logger.error('Enroll new card failed');
-      socket.state.enrollNewCardData = null;
-      return;
-    }
-
-    const cardData = socket.state.enrollNewCardData;
-    const enrollment = socket.state.enrollment;
-    const { key, keyNo, cardUID, auditPrincipal } = cardData;
-
-    if (!key || typeof key !== 'string' || !keyNo || typeof keyNo !== 'number') {
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'KEY_NOT_SET' }));
-      return;
-    }
-
-    const user = await this.usersService.findOne({ id: cardData.userId });
-    if (!user) {
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'USER_NOT_FOUND' }));
-      return;
-    }
-
-    const card = await this.attractapService.createNFCCard(user, {
-      key,
-      keyNo,
-      uid: cardUID,
-    });
-    if (socket.readerId) {
-      await this.audit
-        .recordAttractap({
-          action: 'card.linked',
-          actorId: auditPrincipal.userId,
-          authenticationMethod: auditPrincipal.authenticationMethod,
-          ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-          subjectId: card.id,
-          details: { readerId: socket.readerId, source: 'reader-enrollment' },
-        })
-        .catch(() => undefined);
-    }
-
-    if (socket.state.enrollNewCardData === cardData) {
-      socket.state.enrollNewCardData = null;
-      if (socket.state.enrollment === enrollment) socket.state.enrollment = null;
-      socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
-    }
+    socket.state.enrollment = null;
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
   }
 
   // Reader actively cancelled (user pressed cancel) or the enrollment timed out.
-  // Clear all enrollment state so a stale key/user can't leak into a later flow.
   public async onEnrollNewCardCancel(socket: AuthenticatedWebSocket) {
     this.logger.log('Enroll new card cancelled by reader');
-    socket.state.enrollNewCardData = null;
     socket.state.enrollment = null;
   }
 }

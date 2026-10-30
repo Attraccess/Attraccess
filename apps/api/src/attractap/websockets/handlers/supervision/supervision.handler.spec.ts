@@ -28,11 +28,11 @@ describe('AttractapSupervisionHandler', () => {
       );
     });
 
-    // Regression: lastAuthenticatedUserId is a sticky record of the last card ever tapped, cleared
+    // Regression: verifiedUserId is a sticky record of the last card ever tapped, cleared
     // only by the enrollment paths. Keying "busy" on it made every reader in real use permanently
     // unavailable, which took the whole feature offline.
     it('arms a reader that has been tapped before but is otherwise idle', async () => {
-      const socket = fixture.makeSocket({ lastAuthenticatedUserId: 99 });
+      const socket = fixture.makeSocket({ verifiedUserId: 99 });
       fixture.websocketService.sockets.set('a', socket);
 
       await expect(fixture.arm()).resolves.toBeDefined();
@@ -126,7 +126,7 @@ describe('AttractapSupervisionHandler', () => {
       });
 
     const tappedSocket = () => {
-      const socket = fixture.makeSocket({ lastAuthenticatedUserId: fixture.requester.id });
+      const socket = fixture.makeSocket({ verifiedUserId: fixture.requester.id });
       fixture.usersService.findOne.mockResolvedValue(fixture.requester);
       return socket;
     };

@@ -98,9 +98,14 @@ export class EmulatedCard {
       case 0x64:
         if (!this.appSelected || data[0] >= this.keys.length) return this.error(0x40);
         return Buffer.from([this.keyVersions[data[0]], 0x91, 0x00]);
+      case 0x60:
+        this.session = null;
+        this.versionFrame = 1;
+        return Buffer.concat([this.version(1), Buffer.from([0x91, 0xaf])]);
       case 0x71:
         return this.authFirst(data[0]);
       case 0xaf:
+        if (this.versionFrame > 0) return this.nextVersionFrame();
         return this.authSecond(data);
       case 0xc4:
         return this.changeKey(data, apdu);
@@ -109,7 +114,35 @@ export class EmulatedCard {
     }
   }
 
+  /** GetVersion: vendor, type, subtype, major, minor, storage, protocol (NTAG 424: type 04; DESFire EV2: 01, major 0x12). */
+  hardwareMajor = 0x12;
+  private versionFrame = 0;
+
+  private version(frame: number): Buffer {
+    if (frame === 1) {
+      return this.kind === 'ntag424'
+        ? Buffer.from([0x04, 0x04, 0x02, 0x30, 0x00, 0x11, 0x05])
+        : Buffer.from([0x04, 0x01, 0x01, this.hardwareMajor, 0x00, 0x1a, 0x05]);
+    }
+    if (frame === 2) return Buffer.from([0x04, 0x04, 0x02, 0x01, 0x02, 0x11, 0x05]);
+    return Buffer.concat([
+      Buffer.from([0x04, 0x6a, 0x15, 0x2b, 0x4c, 0x80]),
+      Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05]),
+    ]).subarray(0, 14);
+  }
+
+  private nextVersionFrame(): Buffer {
+    this.versionFrame += 1;
+    const frame = this.version(this.versionFrame);
+    if (this.versionFrame >= 3) {
+      this.versionFrame = 0;
+      return Buffer.concat([frame, Buffer.from([0x91, 0x00])]);
+    }
+    return Buffer.concat([frame, Buffer.from([0x91, 0xaf])]);
+  }
+
   private authFirst(keyNo: number): Buffer {
+    this.versionFrame = 0;
     this.session = null;
     if (!this.appSelected || keyNo >= this.keys.length) return this.error(0x40);
     const rndB = this.random(16);

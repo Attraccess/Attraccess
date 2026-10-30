@@ -42,7 +42,7 @@ export function createAttractapCardHandlerFixture() {
       id: 'socket-1',
       readerId: 42,
       state: {
-        lastAuthenticatedUserId: null,
+        verifiedUserId: null,
         enrollment: null,
         enrollNewCardData: null,
         resetNfcCardData: null,

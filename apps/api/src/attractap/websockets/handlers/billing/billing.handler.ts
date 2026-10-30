@@ -20,7 +20,7 @@ export class AttractapBillingHandler {
         return;
       }
 
-      const userId = socket.state.lastAuthenticatedUserId;
+      const userId = socket.state.verifiedUserId;
       if (!userId) {
         this.logger.warn('BILLING_REQUEST_TOPUP received but no authenticated user is set on socket');
         await socket.sendMessage(

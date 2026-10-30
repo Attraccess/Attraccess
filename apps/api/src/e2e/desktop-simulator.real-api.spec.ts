@@ -237,7 +237,7 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().screen('resources');
     await desktop().click(resource.name);
     await authenticate();
-    expect(socket().state.lastAuthenticatedUserId).toBe(user1.id);
+    expect(socket().state.verifiedUserId).toBe(user1.id);
     const diagnostics = readFileSync(join(desktop().screenshots, 'observations.ndjson'), 'utf8');
     for (const line of diagnostics.trim().split('\n')) expect(JSON.parse(line)).not.toHaveProperty('devicePin');
     expect(diagnostics).not.toContain('7391');
@@ -358,7 +358,7 @@ describe('desktop simulator against an isolated real API', () => {
     );
     const usage = await db.getRepository(ResourceUsage).findOneByOrFail({ resourceId: resource.id, userId: owner.id });
     expect(usage.endTime).toBeNull();
-    expect(socket().state.lastAuthenticatedUserId).toBe(owner.id);
+    expect(socket().state.verifiedUserId).toBe(owner.id);
     const persistedReader = await db
       .getRepository(Attractap)
       .findOneOrFail({ where: { id: reader.id }, relations: ['resources'] });

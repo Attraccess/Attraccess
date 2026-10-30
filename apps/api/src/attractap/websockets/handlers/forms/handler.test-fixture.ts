@@ -22,7 +22,7 @@ export function registerAttractapFormsHandlerFixture() {
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
       state: {
-        lastAuthenticatedUserId: 1,
+        verifiedUserId: 1,
         ...overrides.state,
       },
       ...overrides,

@@ -36,7 +36,7 @@ export function registerAttractapSupervisionHandlerFixture() {
       readerId: READER_ID,
       sendMessage: jest.fn().mockResolvedValue(true),
       state: {
-        lastAuthenticatedUserId: null,
+        verifiedUserId: null,
         enrollNewCardData: null,
         resetNfcCardData: null,
         supervisionFlow: null,

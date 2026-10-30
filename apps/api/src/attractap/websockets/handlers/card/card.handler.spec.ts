@@ -464,7 +464,7 @@ describe('AttractapCardHandler', () => {
     it('logs error and returns without a message when payload.success is false', async () => {
       const socket = onEnrollNewCardScope.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
           enrollNewCardData: {
             userId: 1,
@@ -486,7 +486,7 @@ describe('AttractapCardHandler', () => {
     it('sends KEY_NOT_SET when stored data has no key', async () => {
       const socket = onEnrollNewCardScope.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           enrollNewCardData: { userId: 1, key: '', keyNo: 1, cardUID: 'abc' },
         },
       });
@@ -507,7 +507,7 @@ describe('AttractapCardHandler', () => {
     it('sends KEY_NOT_SET when stored data has no keyNo', async () => {
       const socket = onEnrollNewCardScope.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           enrollNewCardData: { userId: 1, key: 'deadbeef', keyNo: 0, cardUID: 'abc' },
         },
       });
@@ -529,7 +529,7 @@ describe('AttractapCardHandler', () => {
       onEnrollNewCardScope.usersService.findOne.mockResolvedValueOnce(null);
       const socket = onEnrollNewCardScope.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
           enrollNewCardData: {
             userId: 1,
@@ -558,7 +558,7 @@ describe('AttractapCardHandler', () => {
     it('creates the card, clears state and sends success', async () => {
       const socket = onEnrollNewCardScope.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           enrollment: { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 } },
           enrollNewCardData: {
             userId: 1,

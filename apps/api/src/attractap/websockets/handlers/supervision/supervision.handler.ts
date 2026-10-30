@@ -22,6 +22,7 @@ import { UsersService } from '../../../../users-and-auth/users/users.service';
 
 import { AttractapService } from '../../../attractap.service';
 
+import { CardOperationsService } from '../../card-operations.service';
 import { WebsocketService } from '../../websocket.service';
 
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
@@ -42,6 +43,9 @@ export class AttractapSupervisionHandler implements OnModuleInit {
   @Inject(ResourceUsageService)
   protected resourceUsageService: ResourceUsageService;
 
+  @Inject(CardOperationsService)
+  protected cardOperations: CardOperationsService;
+
   @Inject(SupervisionService)
   protected supervisionService: SupervisionService;
 
@@ -55,57 +59,6 @@ export class AttractapSupervisionHandler implements OnModuleInit {
    */
   public onModuleInit(): void {
     this.supervisionService.setReaderArmer({ arm: (params) => this.armReader(params) });
-  }
-
-  /**
-   * Reader confirms it crypto-authenticated the supervisor's card for a web-initiated flow. The
-   * requester is not here, so the reader must not start the session — approving the pending web
-   * request does it, and resolves the requester's blocked call.
-   */
-  public async handleSupervisorCardAuthConfirmed(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId } = (data.payload ?? {}) as { resourceId?: number };
-
-    const flow = socket.state.supervisionFlow;
-    const fail = async (error: string) => {
-      // Tear the server-side request down alongside the socket state — the two belong together (see
-      // cancelForSocket). Leaving it pending would make the requester wait out the full TTL for a
-      // generic timeout instead of this reason, and block them from arming any reader until it
-      // expired. Safe no-op when approve() already settled the request itself.
-      if (flow?.requestId) {
-        this.supervisionService.cancelReaderRequest(flow.requestId, `Supervision failed at the reader: ${error}`);
-      }
-      socket.state.supervisionFlow = null;
-      await socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, { success: false, error }));
-    };
-
-    if (!flow?.requestId || !flow.approvedSupervisorUserId) {
-      await fail('NO_SUPERVISION_IN_PROGRESS');
-      return;
-    }
-
-    // The reader states which resource it authenticated for; refuse a confirmation that has drifted
-    // from the flow this socket is actually running.
-    if (resourceId != null && resourceId !== flow.resourceId) {
-      await fail('RESOURCE_MISMATCH');
-      return;
-    }
-
-    const supervisor = await this.usersService.findOne({ id: flow.approvedSupervisorUserId });
-    if (!supervisor) {
-      await fail('USER_NOT_FOUND');
-      return;
-    }
-
-    try {
-      // On success the armer's callbacks report SUPERVISION_RESOLVED, so nothing to send here.
-      await this.supervisionService.approve(flow.requestId, supervisor, null);
-    } catch (error) {
-      // approve() only invokes the callbacks for failures raised *inside* it — an authorization or
-      // not-found throw happens before that, and would leave the reader sitting in its "starting"
-      // phase until its own timeout with no explanation. Tell it directly.
-      this.logger.debug(`Web-initiated supervision approval failed: ${(error as Error).message}`);
-      await fail((error as Error).message ?? 'SUPERVISION_FAILED');
-    }
   }
 
   /** Reader aborted (cancel button / its own 30s timeout). Tear down the pending web request. */
@@ -123,50 +76,36 @@ export class AttractapSupervisionHandler implements OnModuleInit {
   }
 
   /**
-   * Reader presents a supervisor card. Validate the supervisor against the resource and (on success)
-   * hand back the card's key material so the reader can crypto-authenticate the physical card. The
-   * session itself starts only after the reader confirms the auth via START_RESOURCE_USAGE_SESSION.
+   * Reader presents a supervisor card. The server authenticates the physical card with the stored
+   * key, validates the supervisor against the resource and only then records the approval. For a
+   * reader-started flow the reader goes on to start the session (the approval is consumed by the
+   * session-start handler); for a web-started flow the pending web request is approved right here.
    */
-  public async handleSupervisorCardAuthRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { uid, resourceId } = data.payload as { uid: string; resourceId: number };
+  public async handleSupervisorCardDetected(socket: AuthenticatedWebSocket, uid: string, resourceId: number) {
+    const reply = (payload: Record<string, unknown>) =>
+      socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, payload));
 
     const flow = socket.state.supervisionFlow;
     if (!flow || flow.resourceId !== resourceId) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, {
-          error: 'NO_SUPERVISION_IN_PROGRESS',
-        }),
-      );
-      return;
-    }
-
-    if (!uid || typeof uid !== 'string') {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, { error: 'INVALID_UID' }),
-      );
-      return;
-    }
-
-    const nfcCard = await this.attractapService.getNFCCardByUID(uid);
-    if (!nfcCard) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, { error: 'CARD_NOT_FOUND' }),
-      );
-      return;
-    }
-
-    if (!nfcCard.isActive) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, { error: 'CARD_NOT_ACTIVE' }),
-      );
+      await reply({ error: 'NO_SUPERVISION_IN_PROGRESS' });
       return;
     }
 
     const requester = await this.usersService.findOne({ id: flow.requesterUserId });
     if (!requester) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, { error: 'USER_NOT_FOUND' }),
-      );
+      await reply({ error: 'USER_NOT_FOUND' });
+      return;
+    }
+
+    const verified = await this.cardOperations.verifyCard(socket, 'supervisor', uid);
+    if (!verified.ok) {
+      await reply({ error: verified.error });
+      return;
+    }
+    const nfcCard = verified.card;
+    // The flow may have ended or been replaced while the card was checked.
+    if (socket.state.supervisionFlow !== flow) {
+      await reply({ error: 'NO_SUPERVISION_IN_PROGRESS' });
       return;
     }
 
@@ -176,23 +115,53 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       await this.resourceUsageService.validateSupervisedStart(resourceId, requester, nfcCard.user.id);
     } catch (error) {
       this.logger.debug(`Supervisor card rejected for resource ${resourceId}: ${(error as Error).message}`);
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, {
-          error: 'SUPERVISOR_NOT_AUTHORIZED',
-        }),
-      );
+      await reply({ error: 'SUPERVISOR_NOT_AUTHORIZED' });
       return;
     }
 
     socket.state.supervisionFlow = { ...flow, approvedSupervisorUserId: nfcCard.user.id };
 
-    await socket.sendMessage(
-      new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, {
-        keyNo: nfcCard.keyNo,
-        key: nfcCard.key,
-        username: nfcCard.user.username,
-      }),
-    );
+    if (flow.webInitiated) {
+      await this.approveWebRequest(socket, socket.state.supervisionFlow, nfcCard.user);
+      return;
+    }
+    await reply({ username: nfcCard.user.username });
+  }
+
+  /**
+   * The requester is not at the reader (web-started flow), so the reader must not start the session
+   * — approving the pending web request does it, and resolves the requester's blocked call.
+   */
+  private async approveWebRequest(
+    socket: AuthenticatedWebSocket,
+    flow: NonNullable<AuthenticatedWebSocket['state']['supervisionFlow']>,
+    supervisor: User,
+  ) {
+    const fail = async (error: string) => {
+      // Tear the server-side request down alongside the socket state — the two belong together (see
+      // cancelForSocket). Leaving it pending would make the requester wait out the full TTL for a
+      // generic timeout instead of this reason. Safe no-op when approve() already settled the request.
+      if (flow.requestId) {
+        this.supervisionService.cancelReaderRequest(flow.requestId, `Supervision failed at the reader: ${error}`);
+      }
+      socket.state.supervisionFlow = null;
+      await socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISION_RESOLVED, { success: false, error }));
+    };
+
+    if (!flow.requestId) {
+      await fail('NO_SUPERVISION_IN_PROGRESS');
+      return;
+    }
+    try {
+      // On success the armer's callbacks report SUPERVISION_RESOLVED, so nothing to send here.
+      await this.supervisionService.approve(flow.requestId, supervisor, null);
+    } catch (error) {
+      // approve() only invokes the callbacks for failures raised *inside* it — an authorization or
+      // not-found throw happens before that, and would leave the reader sitting in its "starting"
+      // phase until its own timeout with no explanation. Tell it directly.
+      this.logger.debug(`Web-initiated supervision approval failed: ${(error as Error).message}`);
+      await fail((error as Error).message ?? 'SUPERVISION_FAILED');
+    }
   }
 
   /**
@@ -202,7 +171,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
   public async handleSupervisionRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId } = data.payload as { resourceId: number };
 
-    const requesterUserId = socket.state.lastAuthenticatedUserId;
+    const requesterUserId = socket.state.verifiedUserId;
     if (!requesterUserId) {
       await socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISION_REQUEST, { error: 'USER_NOT_SET' }));
       return;
@@ -348,14 +317,14 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     // --- no awaits from here to the assignment, so check-and-claim stays atomic ---
 
     // "Busy" also means a sub-flow that owns the screen. Deliberately NOT keyed on
-    // `lastAuthenticatedUserId`: that records the last card ever tapped on this socket and is only
+    // `verifiedUserId`: that records the last card ever tapped on this socket and is only
     // cleared by the enrollment paths, so it survives for the life of the websocket. Using it would
     // make every reader that has been touched once permanently "busy".
     if (
       sockets.some(
         (socket) =>
           socket.state.supervisionFlow ||
-          socket.state.enrollNewCardData ||
+          socket.state.enrollment ||
           socket.state.resetNfcCardData ||
           socket.state.massIntroductionFlow,
       )

@@ -185,3 +185,4 @@ export * from './1791400000000-sso-central-logout';
 export * from './1791400000000-user-date-time-preferences';
 export * from './1791500000000-user-date-time-locale';
 export * from './1791600000000-sso-permission-sync-ttl';
+export * from './1791700000000-nfc-card-pending-change';

@@ -79,7 +79,7 @@ export class AttractapSessionHandler {
 
   public async handleResourceUsageStats(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId } = data.payload ?? {};
-    const userId = socket.state.lastAuthenticatedUserId;
+    const userId = socket.state.verifiedUserId;
     if (
       !(await this.resourceActionGuard.validateResourceAction(
         socket,
@@ -103,7 +103,7 @@ export class AttractapSessionHandler {
         this.operatingAttributionService.getForResource(resourceId, asOf, usage.startTime),
         this.billingService.getConfiguration(),
       ]);
-      if (socket.state.lastAuthenticatedUserId !== userId) return;
+      if (socket.state.verifiedUserId !== userId) return;
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, {
         resourceId,
         usage: {
@@ -177,7 +177,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
     if (!user) {
       await this.reply(socket, data, AttractapEventType.LOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -207,7 +207,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
     if (!user) {
       await this.reply(socket, data, AttractapEventType.UNLOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -237,7 +237,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
     if (!user) {
       await this.reply(socket, data, AttractapEventType.UNLATCH_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -268,7 +268,7 @@ export class AttractapSessionHandler {
     }
 
     try {
-      await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, socket.state.lastAuthenticatedUserId);
+      await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, socket.state.verifiedUserId);
       await this.reply(socket, data, AttractapEventType.TRIGGER_FLOW_BUTTON, { success: true });
     } catch (error) {
       this.logger.error(`Failed to trigger flow button: ${error.message}`);
@@ -305,14 +305,14 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
     if (!user) {
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;
     }
 
     // Two-card supervision (ATT-493): if a supervisor card was validated for this socket, attribute
-    // the session to that supervisor. The requester stays as `user` (lastAuthenticatedUserId).
+    // the session to that supervisor. The requester stays as `user` (verifiedUserId).
     const flow = socket.state.supervisionFlow;
     const supervisorUserId =
       flow && flow.resourceId === resourceId ? (flow.approvedSupervisorUserId ?? undefined) : undefined;
@@ -380,7 +380,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
     if (!user) {
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;

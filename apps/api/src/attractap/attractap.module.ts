@@ -22,7 +22,14 @@ import { AttractapBillingHandler } from './websockets/handlers/billing/billing.h
 import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
 import { AttractapSupervisionHandler } from './websockets/handlers/supervision/supervision.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
+import {
+  Attractap,
+  AttractapCrashReport,
+  NFCCard,
+  NFCCardPendingChange,
+  Resource,
+  User,
+} from '@attraccess/database-entities';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -47,11 +54,16 @@ import { ResourceMeteringModule } from '../resources/metering/resource-metering.
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
+import { CardConversationService } from './websockets/card-conversation.service';
+import { CardOperationsService } from './websockets/card-operations.service';
+import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
+import { CardWriterSettingsController } from './card-writer-settings.controller';
+import { EncryptionModule } from '../encryption/encryption.module';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    TypeOrmModule.forFeature([Attractap, AttractapCrashReport, NFCCard, Resource, User]),
+    TypeOrmModule.forFeature([Attractap, AttractapCrashReport, NFCCard, NFCCardPendingChange, Resource, User]),
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,
@@ -70,12 +82,16 @@ import { SettingsModule } from '../settings/settings.module';
     NotificationsModule,
     AuditModule,
     SettingsModule,
+    EncryptionModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
   ],
   providers: [
     CardAccessService,
     AttractapService,
+    CardConversationService,
+    CardOperationsService,
+    CardWriterPolicyService,
     WebsocketService,
     AttractapGateway,
     WebSocketEventService,
@@ -97,6 +113,7 @@ import { SettingsModule } from '../settings/settings.module';
   controllers: [
     AttractapController,
     AttractapNfcCardsController,
+    CardWriterSettingsController,
     AttractapFirmwareController,
     ResourceAttractapsController,
   ],

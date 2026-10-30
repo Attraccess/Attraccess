@@ -175,7 +175,7 @@ describe('AttractapCardHandler', () => {
       expect(languages).toEqual(['de', 'en']);
       expect(handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID).toHaveBeenCalledTimes(2);
     });
-    it('sets lastAuthenticatedUserId and sends CARD_AUTHENTICATION_DATA on success', async () => {
+    it('sets verifiedUserId and sends CARD_AUTHENTICATION_DATA on success', async () => {
       const socket = handleCardAuthenticationRequestScope.createMockSocket();
       handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID.mockResolvedValueOnce(
         handleCardAuthenticationRequestScope.activeCard,
@@ -189,7 +189,7 @@ describe('AttractapCardHandler', () => {
 
       await handleCardAuthenticationRequestScope.handler.handleCardAuthenticationRequest(socket, data);
 
-      expect(socket.state.lastAuthenticatedUserId).toBe(handleCardAuthenticationRequestScope.activeCard.user.id);
+      expect(socket.state.verifiedUserId).toBe(handleCardAuthenticationRequestScope.activeCard.user.id);
       expect(handleCardAuthenticationRequestScope.resourceUsageService.canControllResource).toHaveBeenCalledWith(
         10,
         handleCardAuthenticationRequestScope.activeCard.user,
