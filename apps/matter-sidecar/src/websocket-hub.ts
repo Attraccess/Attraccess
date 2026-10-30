@@ -21,7 +21,7 @@ import type { EventStream } from './event-stream';
 class Client {
   private unsubscribe: (() => void) | null = null;
   private resumed = false;
-  /** Bytes handed to ws whose write has not completed yet. This already includes everything in `bufferedAmount`. */
+  /** Payload bytes handed to ws whose write has not completed yet; covers `bufferedAmount` apart from frame headers. */
   private pendingBytes = 0;
 
   constructor(

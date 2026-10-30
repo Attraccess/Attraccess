@@ -123,7 +123,7 @@ export function createSidecar(options: SidecarOptions): Sidecar {
   async function startUnsafe() {
     const loaded = await (options.loadPlatform ?? loadMatterPlatform)();
     if (state.draining) {
-      // stop() already finished without seeing this platform, so nobody else will close it.
+      // stop() ran while this platform was loading and never saw it; it waits for this start, so close it here.
       await loaded.close();
       assertNotStopping();
     }
