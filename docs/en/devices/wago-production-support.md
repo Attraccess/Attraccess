@@ -70,7 +70,11 @@ running image. An unmanaged runtime stays in failsafe until it is updated by han
 | Worst-case status report | 64 KiB | Refused |
 
 A dropped command gets no reply, so it times out like a command to an offline controller. The drop counts by reason
-(`oversized`, `overload`) are shown in the controller diagnostics.
+(`oversized`, `overload`) are shown in the controller details.
+
+Each built-in 879-3020 meter that you add in the editor creates 131 physical points and 131 channels. Two of them on one
+controller therefore exceed the 256-item limit and cannot be published. Open: the limit or the number of channels a
+meter creates by default has to change before such a controller can be used.
 
 ## Measured limits
 
