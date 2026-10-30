@@ -1,4 +1,4 @@
-import { redactTokens } from './websocket-log';
+import { redactTokens } from './websocket-reader-payloads';
 
 describe('redactTokens', () => {
   it('replaces token keys at any depth and keeps everything else', () => {

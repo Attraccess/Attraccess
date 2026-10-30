@@ -30,13 +30,11 @@ import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { WebsocketService } from './websocket.service';
-import { readerHeartbeat } from './websocket-reader-payloads';
+import { readerHeartbeat, redactTokens } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
 import { randomBytes } from 'crypto';
 import { closeSync } from 'fs';
-import { IncomingMessage } from 'http';
 import { resolveClientAddress } from '../../device-enrollment/client-address';
-import { redactTokens } from './websocket-log';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 @UseInterceptors(WsMetricsInterceptor)
@@ -413,7 +411,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
   }
 
-  public async handleConnection(client: WebSocket, request?: IncomingMessage) {
+  public async handleConnection(client: WebSocket, request?: Parameters<typeof resolveClientAddress>[0]) {
     this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
 
@@ -537,9 +535,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async handleDisconnect(socket: AuthenticatedWebSocket) {
-    // A closed connection must never be approved, so its request goes before any await.
+    // Before any await: a closed connection must never be approved, and pending authentication is invalidated.
     this.authHandler.releaseEnrollment(socket);
-    // Invalidate asynchronous authentication before waiting on cleanup locks.
     const readerId = socket.readerId;
     const readerName = socket.readerName;
     if (socket.state) socket.state.readerAuthenticationAttempt = Symbol('reader-disconnected');

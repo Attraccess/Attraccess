@@ -8,8 +8,7 @@ import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { DeviceEnrollmentService } from '../../../../device-enrollment/device-enrollment.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
-import { readerServerTime } from '../../websocket-reader-payloads';
-import { redactTokens } from '../../websocket-log';
+import { readerServerTime, redactTokens } from '../../websocket-reader-payloads';
 import { AuditService } from '../../../../audit/audit.service';
 
 @Injectable()
