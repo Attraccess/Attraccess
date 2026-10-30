@@ -7,7 +7,7 @@ Applied configuration is not proof of physical I/O readiness. Diagnostics consum
 ## Reusable integration contracts
 
 - `GET /api/wago/controllers/:id/diagnostics`: requires `resources.update`; missing controllers return 404. Registered through `WagoDiagnosticsController` in `backend/plugin.ts`, independently of the main controller.
-- `WagoDiagnostics` in `apps/plugins/wago/diagnostics-types.ts`: shared response contract for connectivity, draft/publication/application, runtime metadata, channels, faults, correlated acknowledgements, flow references and recent events.
+- `WagoDiagnostics` in `apps/plugins/wago/diagnostics-types.ts`: shared response contract for connectivity, draft/publication/application, runtime metadata, channels, disabled channels, faults, correlated acknowledgements, flow references, recent events and `dropCounts` (messages the controller dropped unanswered, by reason; `null` for runtimes without `bounded-messages-v1`).
 - `useWagoDiagnostics(controllerId: number | null)` in `frontend/src/diagnostics/diagnostics.ts`: TanStack query result; null disables requests; key `['wago', 'diagnostics', controllerId]`; five-second polling; one retry. Hosts must provide the existing QueryClient context.
 - `WagoStatus({ diagnostics: WagoDiagnostics })`: pure status view for embedding in commissioning/configuration screens; it does not fetch.
 - `ControllerDiagnostics({ controllerId: number, onConfigure?: () => void })`: complete polling view with its own render-error boundary and request-error presentation.
@@ -16,11 +16,23 @@ Applied configuration is not proof of physical I/O readiness. Diagnostics consum
 
 ## Bounds and protocol behavior
 
+Diagnostics list the enabled channels of the applied configuration (at most 256, the same limit the controller enforces). Channels with `enabled: false` are listed separately under `disabledChannels` with `availability: 'disabled'` and no samples, because the controller neither polls nor publishes them; the view shows how many are configured, and the front panel shows such readings as **Disabled**. Servers before this change do not send `disabledChannels`; the front panel then still shows disabled readings from the applied configuration.
+
 The store retains at most 256 controllers, 256 entries per channel collection (input, output, live measurement, cumulative measurement), 1,024 command correlations, and 50 events per controller for 15 minutes. Individual messages above 64 KiB are ignored. It stores no raw payloads, device error messages, pairing codes, enrollment secrets or MQTT credentials. Known fault codes are allowlisted; unknown codes become `runtime_fault`. The store creates no telemetry database writes or asynchronous message queue. Existing heartbeat persistence is checkpointed at 30 seconds using the receipt checkpoint, with immediate writes for metadata changes. Canonical heartbeat source time is persisted unchanged; legacy ordering has an independent process-local watermark between checkpoints.
 
 Legacy producer shapes remain supported: `state` with `connected`, `revision`, `contentHash`, and boolean `outputs`; `measurements` with `channelId`, numeric `value`, and `unit`; `faults` with `channelId`, `code`, and `message`; and `acknowledgements` with `id` and `status`. Canonical consumer support additionally validates source timestamp, boot UUID and category sequence, boolean inputs, and integer live/cumulative measurements with their transmitted units. Fresh heartbeats establish liveness independently of channel state. Boot tracking retains 16 retired UUIDs and six category counters and fails closed when exhausted. Samples still require fresh, connected state and matching configuration. Acknowledgements must match both the controller and a locally issued command. Legacy wall-clock heartbeat sequences do not support contiguous gap counting. In-memory rejection summaries match both revision and hash and expire after 15 minutes; persisted revision rejection records remain configuration history.
 
 Flow references are derived from existing `plugin.wago.*` nodes and validated against the applied mapping and revision. Publication divergence is a separate warning. Only `plugin.wago.command` nodes on different resources generate control-conflict warnings. Missing channels and command revision mismatches are flagged. Each reference links to the actual `/resources/:id/flows` route and displays its node ID; the host does not currently support selecting a node via URL. Results are capped at 1,000 references with explicit truncation. These warnings never block resource usage.
+
+## Dropped messages
+
+The controller counts the messages it drops without handling them, by reason: `oversized` (over its byte cap) and
+`overload` (arriving while its subscription already had 100 messages waiting). The counts shown are those from the
+latest fresh heartbeat; with a stale or missing heartbeat the view says there is no current report instead of showing
+old numbers. They are shown only for runtimes that advertise `bounded-messages-v1`; for older runtimes the view says
+the runtime version does not report them. The same counts appear in the controller details. A dropped message gets no
+reply: a dropped command times out like a command to an offline controller. Limits:
+[production support](wago-production-support.md#limits-the-integration-enforces).
 
 ## Explicit remaining scope
 

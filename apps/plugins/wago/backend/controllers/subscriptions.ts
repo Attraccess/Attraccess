@@ -1,6 +1,7 @@
 import {
   compatibilityError,
-  parseHeartbeat,
+  parseObject,
+  heartbeatFromObject,
   type WagoHeartbeat,
   DISCOVERY_ROOT,
   parseAnnouncement,
@@ -45,7 +46,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     // Rejected legacy packets must not refresh checkpoints or overwrite runtime metadata either.
     if (canTrackDiagnostics && !admitted) return;
     const heartbeatAt = admitted
-      ? this.diagnostics.read(controller.id).heartbeatAt
+      ? this.diagnostics.heartbeatAt(controller.id)
       : typeof rawHeartbeat.timestamp === 'string'
         ? rawHeartbeat.timestamp
         : undefined;
@@ -68,9 +69,11 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     hardwareId: string,
     payload: Buffer,
   ): { heartbeat: WagoHeartbeat; rawHeartbeat: Record<string, unknown> } | undefined {
-    let heartbeat: WagoHeartbeat;
+    let heartbeat: WagoHeartbeat, rawHeartbeat: Record<string, unknown>;
     try {
-      heartbeat = parseHeartbeat(payload);
+      // Decode once; the same bounded object feeds both the heartbeat and the raw envelope fields.
+      rawHeartbeat = parseObject(payload, 'announcement');
+      heartbeat = heartbeatFromObject(rawHeartbeat);
     } catch (error) {
       this.context.logger.warn(
         `Ignoring invalid WAGO heartbeat: ${error instanceof Error ? error.message : String(error)}`,
@@ -78,11 +81,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       return undefined;
     }
     if (heartbeat.hardwareId !== hardwareId) return undefined;
-    try {
-      return { heartbeat, rawHeartbeat: JSON.parse(payload.toString('utf8')) };
-    } catch {
-      return undefined;
-    }
+    return { heartbeat, rawHeartbeat };
   }
 
   protected reportRuntimeStatus(

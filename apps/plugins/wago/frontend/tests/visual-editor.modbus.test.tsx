@@ -8,7 +8,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { validateEditorSnapshot } from '../../backend/configuration/editor';
+import { validateEditorModel } from '../../backend/configuration/editor';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import type { WagoConfigurationSnapshot } from '../src/api/client';
 import { ConfigurationEditor } from '../src/configuration/ConfigurationEditor';
@@ -94,7 +94,7 @@ describe('mounted Modbus configuration', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     const [, first] = state.save.mock.calls[0];
-    expect(validateEditorSnapshot(first)).toEqual([]);
+    expect(validateEditorModel(first)).toEqual([]);
     expect(first.modbus.devices[0]).toMatchObject({
       name: 'Workshop meter',
       profileId: 'wago-879-3020',
@@ -236,7 +236,7 @@ describe('Modbus output and serial composition', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     const [, saved] = state.save.mock.calls[0];
-    expect(validateEditorSnapshot(saved)).toEqual([]);
+    expect(validateEditorModel(saved)).toEqual([]);
     expect(saved.modbus).toEqual(snapshot.modbus);
     expect(saved.physicalPoints[1].modbus).toEqual({
       deviceId: 'meter',
@@ -271,7 +271,7 @@ describe('Modbus output and serial composition', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     const [, saved] = state.save.mock.calls[0];
-    expect(validateEditorSnapshot(saved)).toEqual([]);
+    expect(validateEditorModel(saved)).toEqual([]);
     expect(saved.modbus.connections[0]).toMatchObject({
       transport: 'rtu',
       path: '/dev/serial',
@@ -361,7 +361,7 @@ describe('Modbus review regressions', () => {
     state.getDraft.mockResolvedValue(draftRecord(snapshot));
     // Exercise the full backend validator as a read-only oracle for the submitted candidate.
     state.validate.mockImplementation(async (_id, candidate) => {
-      const errors = validateEditorSnapshot(candidate);
+      const errors = validateEditorModel(candidate);
       return { valid: errors.length === 0, errors };
     });
     mount();
@@ -398,7 +398,7 @@ describe('Modbus review regressions', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     const saved = state.save.mock.calls[0][1];
-    expect(validateEditorSnapshot(saved)).toEqual([]);
+    expect(validateEditorModel(saved)).toEqual([]);
     expect(saved.logicalChannels[0]).toMatchObject({
       id: 'reading',
       physicalPointId: 'meter-point',

@@ -9,7 +9,9 @@
     "pulse": "Impuls",
     "guard": "Freigabe",
     "feedback": "Rückmeldung",
-    "measurement": "Messung"
+    "measurement": "Messung",
+    "enabled": "Ja",
+    "disabled": "Nein"
   },
   "physicalPointId": "Physische Klemme",
   "channel": "Physische Klemme",
@@ -62,5 +64,6 @@
   "configuration": "Konfiguration",
   "channelTitle": "Kanal {{index}}",
   "pointTitle": "Physischer Punkt {{index}}",
-  "externalAssignment": "{{name}} · externe Zuordnung ({{profile}})"
+  "externalAssignment": "{{name}} · externe Zuordnung ({{profile}})",
+  "enabled": "Kanal aktiviert"
 }

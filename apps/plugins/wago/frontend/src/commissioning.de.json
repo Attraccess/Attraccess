@@ -82,7 +82,7 @@
   "recoveryUsername": "SSH-Benutzername zur Wiederherstellung",
   "recoveryPassword": "SSH-Passwort zur Wiederherstellung",
   "destructive": "Vor der Installation",
-  "destructiveDescription": "Die Installation ersetzt die Steuerungssoftware auf {{host}} und deaktiviert CODESYS. Sichere vorhandene Anwendungen und angeschlossene Geräte, bevor du Laufzeitumgebung installieren wählst.",
+  "destructiveDescription": "Die Installation ersetzt die Steuerungssoftware auf {{host}} und deaktiviert CODESYS. Attraccess erstellt keine Sicherungskopie vorhandener Anwendungen und stellt sie nicht wieder her. Speichere alles, was du noch brauchst, selbst und versetze angeschlossene Geräte in einen sicheren Zustand, bevor du „Laufzeitumgebung installieren“ wählst.",
   "approveInstall": "Ich genehmige diese destruktive Installation einschließlich der Synchronisierung von System- und Hardware-Uhr der Steuerung mit der UTC-Zeit der Anwendung, der dauerhaften Deaktivierung von CODESYS und des möglichen Verlusts vorhandener Anwendungen und Daten ohne Erhaltung, Sicherung oder Wiederherstellung durch Attraccess.",
   "attemptApproval": "Jeder Versuch benötigt deine Genehmigung. Eigene Passwörter werden nach der Verwendung gelöscht.",
   "enrollmentComplete": "Registrierung der Laufzeitumgebung abgeschlossen",

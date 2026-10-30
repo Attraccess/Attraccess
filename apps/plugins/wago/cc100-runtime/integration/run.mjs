@@ -73,6 +73,14 @@ try {
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, await readFile(join(root, runtime, 'src', file)));
     }
+    // The simulator's transport uses the runtime's admission control. Older revisions predate it, so
+    // supply it only where it is missing; a revision that has it keeps its own exact blob.
+    for (const file of ['transport/admission.ts']) {
+      const target = join(stagedRoot, runtime, 'src', file);
+      if (existsSync(target)) continue;
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, await readFile(join(root, runtime, 'src', file)));
+    }
     const config = join(stagedRoot, 'tsconfig.simulator.json');
     await writeFile(
       config,

@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PLUGIN_CONTEXT, PluginContext, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 import { admitEnvelope, emptyStream, type DiagnosticStream } from '../../diagnostics/envelope';
-import { normalizeOperationalPrefix, parseOperationalMessage } from '../../protocol';
+import { normalizeOperationalPrefix, parseObject, parseOperationalMessage } from '../../protocol';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../../shared/clock';
 
 export interface CommissioningRuntimeState {
@@ -69,10 +69,6 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
       void this.context.mqtt
         .subscribe(serverId, topic, (message) => {
           if (message.serverId !== serverId || message.topic !== topic) return;
-          if (message.payload.length > 65_536) {
-            current.state = undefined;
-            return;
-          }
           try {
             const parsed = parseOperationalMessage(prefix, topic, message.payload);
             if (!parsed || parsed.hardwareId !== hardwareId || parsed.message.category !== 'state') {
@@ -84,7 +80,7 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
             const now = Date.now();
             // The operational decoder deliberately projects readiness to hardware availability.
             // Validate the additional commissioning fields from the already decoded payload.
-            const value = JSON.parse(message.payload.toString('utf8')) as Record<string, unknown>;
+            const value = parseObject(message.payload, 'readiness state');
             const readiness = value.readiness;
             if (
               timestamp > now + CONTROLLER_CLOCK_TOLERANCE_MS ||

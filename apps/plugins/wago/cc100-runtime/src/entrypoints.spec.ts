@@ -168,6 +168,26 @@ test('does not acknowledge or reconnect when a claim is invalid', async () => {
   expect(mockClients[0].end).not.toHaveBeenCalled();
 });
 
+test('drops a claim over 64 KiB before decoding it', async () => {
+  await boot();
+  mockClients[0].emit('connect');
+  await flush();
+  mockClients[0].emit(
+    'message',
+    'attraccess/wago/discovery/test-device/claim',
+    Buffer.from(
+      JSON.stringify({
+        username: 'permanent',
+        password: 'p'.repeat(64 * 1024),
+        configuration: { namespace: '/local/wago/' },
+      }),
+    ),
+  );
+  await flush();
+  expect(mockState.credentials).toBeUndefined();
+  expect(mockClients[0].end).not.toHaveBeenCalled();
+});
+
 test('restores persisted identity and rejects a conflicting hardware ID', async () => {
   mockState = { simulatorHardwareId: 'other-device', credentials: { username: 'u', password: 'p' } };
   await boot();

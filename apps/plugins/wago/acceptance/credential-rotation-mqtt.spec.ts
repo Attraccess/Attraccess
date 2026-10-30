@@ -135,7 +135,7 @@ describe('credential reconnect against an owned OrbStack RabbitMQ fixture', () =
       },
       subscribe: async (topic, listener) => {
         client.on('message', (received, payload) => {
-          if (received === topic) void listener(payload);
+          if (received === topic) void listener(payload, { release: () => undefined });
         });
         await client.subscribeAsync(topic, { qos: 1 });
       },

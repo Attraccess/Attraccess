@@ -1,9 +1,36 @@
 import { randomUUID } from '../identity';
 import { findProfile, type ModbusConfiguration, type ModbusPoint } from '../../../../modbus/model';
+import { canDisableChannel as canDisableModbusChannel } from '../../../../modbus/channel-enabled';
+import { WAGO_879_3020_DEFAULT_ENABLED } from '../../../../modbus/wago-879-3020';
 import type { Channel, PhysicalPoint } from '../model';
 import type { WagoConfigurationSnapshot } from '../../api/client';
 
 export const emptyModbus: ModbusConfiguration = { connections: [], devices: [], profiles: [] };
+
+const RECOMMENDED_READINGS: Record<string, ReadonlySet<string>> = {
+  'wago-879-3020': new Set(WAGO_879_3020_DEFAULT_ENABLED),
+};
+
+/**
+ * Measurement IDs a new meter of this built-in profile enables; every other register is added disabled.
+ * Undefined for profiles without a recommended set, including custom copies: they enable every register.
+ */
+export function recommendedReadings(profileId: string | undefined): ReadonlySet<string> | undefined {
+  return profileId && Object.hasOwn(RECOMMENDED_READINGS, profileId) ? RECOMMENDED_READINGS[profileId] : undefined;
+}
+
+/** The rule the server applies (`modbus/channel-enabled`): only a Modbus measurement channel without an action. */
+export function canDisableChannel(channel: Pick<Channel, 'capabilities'>, point: PhysicalPoint | undefined): boolean {
+  return canDisableModbusChannel(channel.capabilities, point);
+}
+
+/** Store `enabled: false` on disabled channels and omit the field otherwise; `true` is never stored. */
+export function withEnabled<T extends { enabled?: false }>(channel: T, enabled: boolean): T {
+  const next = { ...channel };
+  if (enabled) delete next.enabled;
+  else next.enabled = false;
+  return next;
+}
 
 export function boundMeasurement(configuration: ModbusConfiguration, binding?: ModbusPoint) {
   const device = configuration.devices.find((item) => item.id === binding?.deviceId);
@@ -50,12 +77,23 @@ export function bindModbusPoint(snapshot: WagoConfigurationSnapshot, pointId: st
         ...channel.capabilities.filter((capability) => next.capabilities.includes(capability)),
         ...next.capabilities.filter((capability) => !channel.capabilities.includes(capability)),
       ];
+      // A channel rebound to an action or away from a measurement can no longer be disabled.
+      if (
+        !canDisableChannel(next, { id: pointId, hardwareProfile: 'modbus', channel: 0, modbus: binding }) ||
+        !measurement
+      )
+        delete next.enabled;
       return next;
     }),
   };
 }
 
-export function addModbusChannel(snapshot: WagoConfigurationSnapshot, binding: ModbusPoint) {
+/** Adds a point and channel for the binding; `enabled: false` only applies to a measurement without an action. */
+export function addModbusChannel(
+  snapshot: WagoConfigurationSnapshot,
+  binding: ModbusPoint,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   const point: PhysicalPoint = {
     id: `point-${randomUUID()}`,
     hardwareProfile: 'modbus',
@@ -69,17 +107,35 @@ export function addModbusChannel(snapshot: WagoConfigurationSnapshot, binding: M
     capabilities: ['input'],
     disconnectPolicy: { mode: 'hold' },
   };
+  const bound = bindModbusPoint(
+    {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, point],
+      logicalChannels: [...snapshot.logicalChannels, channel],
+    },
+    point.id,
+    binding,
+  );
+  const last = bound.logicalChannels.length - 1;
+  const added = bound.logicalChannels[last];
+  if (!enabled && canDisableChannel(added, point))
+    bound.logicalChannels = [...bound.logicalChannels.slice(0, last), withEnabled(added, false)];
+  return { point, channel: bound.logicalChannels[last], snapshot: bound };
+}
+
+/** Enables or disables the given channels, leaving channels that cannot be disabled enabled. */
+export function setChannelsEnabled(
+  snapshot: WagoConfigurationSnapshot,
+  channelIds: ReadonlySet<string>,
+  enabled: boolean,
+): WagoConfigurationSnapshot {
+  const points = new Map(snapshot.physicalPoints.map((point) => [point.id, point] as const));
   return {
-    point,
-    channel,
-    snapshot: bindModbusPoint(
-      {
-        ...snapshot,
-        physicalPoints: [...snapshot.physicalPoints, point],
-        logicalChannels: [...snapshot.logicalChannels, channel],
-      },
-      point.id,
-      binding,
+    ...snapshot,
+    logicalChannels: snapshot.logicalChannels.map((channel) =>
+      !channelIds.has(channel.id) || (channel.enabled !== false) === enabled
+        ? channel
+        : withEnabled(channel, enabled || !canDisableChannel(channel, points.get(channel.physicalPointId))),
     ),
   };
 }

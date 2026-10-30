@@ -1,5 +1,7 @@
 import { applyPreset, validateSnapshot, WAGO_PRESETS, type WagoConfigurationSnapshot } from './model';
 import {
+  CHANNEL_DISABLED_IMPACT_CODE,
+  CHANNEL_DISABLED_IMPACT_MESSAGE,
   configurationImpacts,
   editorMetadata,
   previewConfigurationPreset,
@@ -136,6 +138,31 @@ describe('visual configuration editing', () => {
         physicalPoints: base.physicalPoints.map((point) => ({ ...point, channel: point.channel + 2 })),
       }),
     ).toHaveLength(1);
+  });
+
+  it('names a newly disabled channel with its own impact code, and nothing for an unchanged disabled one', () => {
+    const meter: WagoConfigurationSnapshot = {
+      version: 1,
+      physicalPoints: [
+        { id: 'meter', hardwareProfile: 'modbus', channel: 0, modbus: { deviceId: 'd', measurementId: 'm' } },
+      ],
+      logicalChannels: [
+        {
+          id: 'power',
+          physicalPointId: 'meter',
+          profile: 'generic-monitored-input',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+      ],
+    };
+    const disabled = { ...meter, logicalChannels: [{ ...meter.logicalChannels[0], enabled: false as const }] };
+    expect(configurationImpacts(meter, disabled)).toEqual([
+      { channelId: 'power', code: CHANNEL_DISABLED_IMPACT_CODE, message: CHANNEL_DISABLED_IMPACT_MESSAGE },
+    ]);
+    expect(CHANNEL_DISABLED_IMPACT_CODE).toBe('channel_disabled');
+    expect(configurationImpacts(disabled, disabled)).toEqual([]);
+    expect(configurationImpacts(disabled, meter)).toEqual([expect.not.objectContaining({ code: expect.anything() })]);
   });
 
   it('requires distinct guard inputs and capability settings', () => {

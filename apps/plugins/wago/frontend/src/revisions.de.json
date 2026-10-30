@@ -39,5 +39,6 @@
   "restore": "Version {{revision}} als neue Version wiederherstellen",
   "restoreDescription": "Dies ersetzt den gespeicherten Entwurf und veröffentlicht eine neue Version. Die historische Version bleibt erhalten.",
   "publishRollback": "Zurücksetzen als neue Version veröffentlichen",
-  "cancelRollback": "Zurücksetzen abbrechen"
+  "cancelRollback": "Zurücksetzen abbrechen",
+  "rollbackInvalid": "Diese Version kann nicht erneut veröffentlicht werden. Korrigiere diese Felder stattdessen in einem neuen Entwurf."
 }

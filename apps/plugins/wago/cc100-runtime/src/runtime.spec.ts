@@ -42,6 +42,37 @@ describe('WagoRuntime startup and connection policy', () => {
     );
   });
 
+  it('skips a configuration queued behind a slow apply once a runtime update is required', async () => {
+    const store = (Reflect.get(runtime, 'options') as { store: JsonStateStore }).store;
+    const save = store.save.bind(store);
+    let release!: () => void;
+    let saving!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const reachedSave = new Promise<void>((resolve) => (saving = resolve));
+    jest.spyOn(store, 'save').mockImplementationOnce(async (state) => {
+      saving();
+      await gate;
+      return save(state);
+    });
+    const queuedSnapshot = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' as const } }],
+    };
+    const slow = transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await reachedSave;
+    const queued = transport.send(desired, {
+      protocolVersion: 1,
+      revision: 2,
+      contentHash: hash(queuedSnapshot),
+      snapshot: queuedSnapshot,
+    });
+    const update = transport.send(desired, { runtimeImageId: `sha256:${'b'.repeat(64)}` });
+    release();
+    await Promise.all([slow, queued, update]);
+    expect(Reflect.get(runtime, 'state').accepted?.revision).toBe(1);
+    expect(Reflect.get(runtime, 'runtimeUpdateRequired')).toBe(true);
+  });
+
   it('requires fresh server confirmation at startup and after reconnect, rejecting retained confirmations', async () => {
     const imageId = `sha256:${'a'.repeat(64)}`;
     const store = new JsonStateStore(`/tmp/wago-policy-${Date.now()}-${Math.random()}.json`);

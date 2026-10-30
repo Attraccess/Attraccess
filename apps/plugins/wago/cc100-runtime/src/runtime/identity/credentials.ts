@@ -1,4 +1,5 @@
 import { RuntimeContext } from '../context';
+import { MAX_ROTATION_BYTES } from '../limits';
 import { DiscoveryClaim } from './protocol';
 
 export abstract class RuntimeCredentials extends RuntimeContext {
@@ -11,8 +12,10 @@ export abstract class RuntimeCredentials extends RuntimeContext {
   async retryCredentialRotationSubscription(): Promise<void> {
     if (!this.options.reconnectCredentials || this.credentialRotationSubscribed) return;
     try {
-      await this.options.transport.subscribe(this.credentialRotationTopic(), (payload) =>
-        this.receiveCredentialRotation(payload),
+      await this.options.transport.subscribe(
+        this.credentialRotationTopic(),
+        (payload) => this.receiveCredentialRotation(payload),
+        { maxBytes: MAX_ROTATION_BYTES },
       );
       this.credentialRotationSubscribed = true;
     } catch {

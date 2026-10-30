@@ -1,6 +1,7 @@
 import { MemoryDeviceAdapter } from '../io/adapters';
 import { JsonStateStore, WagoRuntime, hash, type Snapshot } from '../runtime';
 import { TestTransport, snapshot, desired, commands, validCommand, createRuntimeFixture } from '../runtime.test-utils';
+import { SEQUENCE_RESERVATION_BLOCK } from './telemetry/telemetry';
 
 describe('WagoRuntime', () => {
   let transport: TestTransport;
@@ -198,8 +199,55 @@ describe('WagoRuntime', () => {
     await expect(store.load()).resolves.toEqual(
       expect.objectContaining({
         credentials: { username: 'controller', password: 'secret' },
-        sequence: 200,
+        sequence: 100 + SEQUENCE_RESERVATION_BLOCK,
       }),
     );
+  });
+
+  it('writes the state file once per sequence block, not once per hundred messages', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    const save = jest.spyOn(store, 'save');
+    const create = () =>
+      new WagoRuntime({
+        pairingCode: 'fixture',
+        hardwareId: 'cc100-1',
+        prefix: 'attraccess/wago',
+        store,
+        transport,
+        device,
+      });
+    const sequences = (category: string) =>
+      transport.published
+        .filter((message) => message.topic.endsWith(`/${category}`))
+        .map((message) => (message.payload as { sequence: number }).sequence);
+    const publish = async (target: WagoRuntime, count: number) => {
+      for (let index = 0; index < count; index++)
+        await target['publishOperational'](index % 3 ? 'measurements' : 'faults', { channelId: 'meter', index });
+    };
+    transport.published.length = 0;
+    runtime = create();
+    await runtime.start();
+    await publish(runtime, 3000);
+
+    // The first allocation reserves a whole block; 3000 further messages write nothing.
+    expect(save).toHaveBeenCalledTimes(1);
+    expect((await store.load()).sequence).toBe(SEQUENCE_RESERVATION_BLOCK);
+
+    runtime['categorySequences'].set('measurements', SEQUENCE_RESERVATION_BLOCK - 2);
+    for (let index = 0; index < 4; index++) await runtime['publishOperational']('measurements', { index });
+    expect(save).toHaveBeenCalledTimes(2);
+    expect((await store.load()).sequence).toBe(2 * SEQUENCE_RESERVATION_BLOCK);
+    expect(sequences('measurements').slice(-4)).toEqual([-1, 0, 1, 2].map((step) => SEQUENCE_RESERVATION_BLOCK + step));
+
+    // A restart opens a new stream and keeps the persisted high-water mark, so it neither writes nor lowers it.
+    const previousStream = runtime['streamId'];
+    transport.published.length = 0;
+    const restarted = create();
+    await restarted.start();
+    await publish(restarted, 3000);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(restarted['streamId']).not.toBe(previousStream);
+    expect(sequences('measurements').slice(0, 2)).toEqual([1, 2]);
+    expect((await store.load()).sequence).toBe(2 * SEQUENCE_RESERVATION_BLOCK);
   });
 });

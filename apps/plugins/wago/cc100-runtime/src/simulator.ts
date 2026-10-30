@@ -19,6 +19,7 @@ import { publish } from './simulator/mqtt';
 import { subscribe } from './simulator/mqtt';
 import { handleAsync } from './simulator/mqtt';
 import { logConnectionError } from './simulator/mqtt';
+import { DEFAULT_MAX_MESSAGE_BYTES, DropCounters, SubscriptionAdmission } from './transport/admission';
 
 let hardwareId: string;
 let pairingCode: string;
@@ -59,48 +60,59 @@ function connectEnrollment(): void {
       void handleAsync(async () => {
         const discovery = `attraccess/wago/discovery/${hardwareId}`;
         if (!subscribed) {
-          await subscribe(enrollmentClient, `${discovery}/claim`, async (payload) => {
-            if (claiming) return;
-            const claim = JSON.parse(payload.toString('utf8')) as {
-              username: string;
-              password: string;
-              configuration?: { namespace?: string };
-              acknowledgementToken?: string;
-            };
-            if (
-              typeof claim?.username !== 'string' ||
-              !claim.username ||
-              typeof claim.password !== 'string' ||
-              !claim.password ||
-              typeof claim.configuration?.namespace !== 'string'
-            )
-              throw new Error('claim does not include permanent MQTT credentials and configuration namespace');
-            const operationalPrefix = normalizeOperationalPrefix(claim.configuration.namespace);
-            if (
-              claim.acknowledgementToken !== undefined &&
-              (typeof claim.acknowledgementToken !== 'string' || !claim.acknowledgementToken)
-            )
-              throw new Error('claim acknowledgementToken must be a non-empty string');
-            claiming = true;
-            try {
-              const claimedState: SimulatorState = {
-                ...(await store.load()),
-                credentials: { username: claim.username, password: claim.password },
-                operationalPrefix,
+          await subscribe(
+            enrollmentClient,
+            `${discovery}/claim`,
+            async (payload) => {
+              if (claiming) return;
+              const claim = JSON.parse(payload.toString('utf8')) as {
+                username: string;
+                password: string;
+                configuration?: { namespace?: string };
+                acknowledgementToken?: string;
               };
-              await store.save(claimedState);
-              // Never acknowledge delivery until permanent credentials are durable.
-              // Wait for MQTT PUBACK before ending the enrollment connection.
-              if (claim.acknowledgementToken)
-                await publish(enrollmentClient, `${discovery}/claim/ack`, {
-                  acknowledgementToken: claim.acknowledgementToken,
-                });
-            } catch (error) {
-              claiming = false;
-              throw error;
-            }
-            enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
-          });
+              if (
+                typeof claim?.username !== 'string' ||
+                !claim.username ||
+                typeof claim.password !== 'string' ||
+                !claim.password ||
+                typeof claim.configuration?.namespace !== 'string'
+              )
+                throw new Error('claim does not include permanent MQTT credentials and configuration namespace');
+              const operationalPrefix = normalizeOperationalPrefix(claim.configuration.namespace);
+              if (
+                claim.acknowledgementToken !== undefined &&
+                (typeof claim.acknowledgementToken !== 'string' || !claim.acknowledgementToken)
+              )
+                throw new Error('claim acknowledgementToken must be a non-empty string');
+              claiming = true;
+              try {
+                const claimedState: SimulatorState = {
+                  ...(await store.load()),
+                  credentials: { username: claim.username, password: claim.password },
+                  operationalPrefix,
+                };
+                await store.save(claimedState);
+                // Never acknowledge delivery until permanent credentials are durable.
+                // Wait for MQTT PUBACK before ending the enrollment connection.
+                if (claim.acknowledgementToken)
+                  await publish(enrollmentClient, `${discovery}/claim/ack`, {
+                    acknowledgementToken: claim.acknowledgementToken,
+                  });
+              } catch (error) {
+                claiming = false;
+                throw error;
+              }
+              enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
+            },
+            // Claims are capped at 64 KiB like the production runtime's (MAX_CLAIM_BYTES): larger ones are
+            // dropped before decoding. The default cap is used so the simulator also builds on older runtimes.
+            new SubscriptionAdmission(DEFAULT_MAX_MESSAGE_BYTES, new DropCounters(), (error) =>
+              process.stderr.write(
+                `WAGO simulator callback failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+              ),
+            ),
+          );
           subscribed = true;
         }
         await publish(

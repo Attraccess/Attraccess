@@ -204,7 +204,7 @@ class CommissioningDesktop(unittest.TestCase):
         expect(self.page.get_by_text("running", exact=True)).to_be_visible()
         expect(self.page.get_by_label("Preflight SSH password", exact=True)).to_have_count(0)
         expect(self.page.get_by_text("Before installing", exact=True)).to_be_visible()
-        expect(self.page.get_by_text(re.compile("Back up existing applications"))).to_be_visible()
+        expect(self.page.get_by_text(re.compile("Attraccess does not back up or restore existing applications"))).to_be_visible()
         expect(self.page.get_by_role("checkbox")).to_have_count(0)
         expect(self.button("Install runtime")).to_be_enabled()
         self.credentials("Temporary SSH")

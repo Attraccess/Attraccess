@@ -481,8 +481,8 @@ describe('explicit install action', () => {
       });
       mount();
       expect(screen.getByText('Before installing')).toBeTruthy();
-      expect(screen.getByText(/Back up existing applications/)).toBeTruthy();
-      expect(screen.getByText(/make connected equipment safe/)).toBeTruthy();
+      expect(screen.getByText(/Attraccess does not back up or restore existing applications/)).toBeTruthy();
+      expect(screen.getByText(/put connected equipment in a safe state/)).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Recover saved runtime' })).toBeNull();
       fillCredentials();
       const install = screen.getByRole('button', { name: 'Install runtime' });

@@ -239,6 +239,20 @@ jobs:
       - name: Run cross-project UI guard for plugin changes
         if: steps.plugin-affected.outputs.count != '0'
         run: pnpm nx run generators:test
+      # The reliability harness runs the real server plugin on the host's real MQTT services against a
+      # RabbitMQ 4 container, so it also depends on host code. It fails only on a lost command, lost
+      # state, a host queue drop or a recovery over 180 s. Simulator measurement, not hardware evidence.
+      - name: Detect whether WAGO reliability applies
+        id: wago-reliability
+        run: |
+          if pnpm nx show projects --affected --base=${{ env.NX_AFFECTED_BASE }} | grep -Eqx 'plugin-wago|api'; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "affected=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run WAGO reliability (short mode)
+        if: steps.wago-reliability.outputs.affected == 'true'
+        run: pnpm nx run plugin-wago:reliability:short
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
 

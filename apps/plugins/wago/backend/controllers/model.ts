@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { WagoConfigurationSnapshot } from '../configuration/model';
 import { configurationDiff } from '../configuration/model';
+import { parseObject } from '../protocol/index';
 import { WagoController } from './entity';
 
 export const ENROLLMENT_RETRY_MS = 60_000;
@@ -68,7 +69,7 @@ export function safeEqual(left: string, right: string): boolean {
 
 export function isClaimAcknowledgement(payload: Buffer, token: string): boolean {
   try {
-    const value = JSON.parse(payload.toString('utf8')) as { acknowledgementToken?: unknown };
+    const value = parseObject(payload, 'claim acknowledgement') as { acknowledgementToken?: unknown };
     return typeof value.acknowledgementToken === 'string' && safeEqual(value.acknowledgementToken, token);
   } catch {
     return false;
