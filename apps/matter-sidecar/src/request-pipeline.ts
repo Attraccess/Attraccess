@@ -15,6 +15,7 @@ import {
   checkLocalAccess,
   correlationIdFrom,
   readBody,
+  requestPath,
   safeIssues,
   sendError,
   sendJson,
@@ -42,6 +43,8 @@ export type PipelineDeps = {
 };
 
 class DeadlineError extends Error {}
+
+const invalidResponse: ErrorReply = { code: 'internal_error', message: 'The sidecar produced an invalid response.' };
 
 function parseDeadline(req: IncomingMessage, body: unknown, fallback: number): number {
   const header = req.headers[HEADER_REQUEST_DEADLINE];
@@ -119,8 +122,8 @@ async function runFeature(
     );
     const checked = operation.response.safeParse(value);
     if (!checked.success) {
-      deps.logger('error', 'handler returned an invalid response', { operation: operation.id });
-      return { error: { code: 'internal_error', message: 'The sidecar produced an invalid response.' } };
+      deps.logger('error', 'handler returned an invalid response', { operation: operation.id, correlationId });
+      return { error: invalidResponse };
     }
     return { status: 200, body: checked.data };
   } catch (error) {
@@ -135,7 +138,7 @@ async function runFeature(
         },
       };
     }
-    deps.logger('error', 'handler failed', { operation: operation.id });
+    deps.logger('error', 'handler failed', { operation: operation.id, correlationId });
     return { error: { code: 'internal_error', message: 'The request failed.' } };
   }
 }
@@ -156,7 +159,13 @@ async function respond(
   deps: PipelineDeps,
 ) {
   const builtIn = deps.builtIns[operation.id];
-  if (builtIn) return builtIn(correlationId);
+  if (builtIn) {
+    // Built-in answers are held to the same contract as feature handlers, so they cannot drift from it unnoticed.
+    const result = builtIn(correlationId);
+    if (operation.response.safeParse(result.body).success) return result;
+    deps.logger('error', 'built-in returned an invalid response', { operation: operation.id, correlationId });
+    return { error: invalidResponse };
+  }
   const input = await parseInput(req, operation, params, deps.config.maxMessageBytes);
   if ('error' in input && input.error) return { error: input.error };
   const handler = deps.features[operation.id];
@@ -175,8 +184,8 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, d
   const correlationId = correlationIdFrom(req.headers);
   const denied = checkLocalAccess(req.headers);
   if (denied) return sendError(res, { code: 'forbidden_origin', message: denied }, correlationId, true);
-  const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-  const route = findOperation(req.method ?? 'GET', path);
+  const path = requestPath(req.url);
+  const route = path === null ? ({ kind: 'not-found' } as const) : findOperation(req.method ?? 'GET', path);
   if (route.kind === 'not-found') return sendError(res, { code: 'not_found', message: 'Unknown path.' }, correlationId);
   if (route.kind === 'method-not-allowed') {
     return sendError(res, { code: 'method_not_allowed', message: 'Method not allowed.' }, correlationId);
@@ -201,7 +210,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, d
         true,
       );
     }
-    deps.logger('error', 'request failed', { operation: operation.id });
+    deps.logger('error', 'request failed', { operation: operation.id, correlationId });
     sendError(res, { code: 'internal_error', message: 'The request failed.' }, correlationId);
   }
 }

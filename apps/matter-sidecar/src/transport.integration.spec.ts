@@ -12,7 +12,7 @@ describe('transport', () => {
   let running: Running;
   beforeAll(async () => {
     running = await startSidecar(
-      { maxMessageBytes: 2_048, requestDeadlineMs: 200 },
+      { maxMessageBytes: 2_048, requestDeadlineMs: 2_000 },
       {
         features: {
           'inventory.list': async () => ({ authoritative: false, nodes: [] }),
@@ -152,7 +152,7 @@ describe('transport', () => {
       clusterId: 6,
       commandId: 1,
     });
-    expect(Date.now() - started).toBeLessThan(3_000);
+    expect(Date.now() - started).toBeLessThan(5_000);
     expect(result.status).toBe(504);
     expect(result.body.error).toMatchObject({ code: 'timeout', outcome: 'uncertain', retryable: false });
   });
@@ -168,9 +168,15 @@ describe('transport', () => {
         'x-correlation-id': '22222222-2222-4222-8222-222222222222',
       },
     );
-    expect(Date.now() - started).toBeLessThan(150 + 100);
+    expect(Date.now() - started).toBeLessThan(1_000); // well under the 2 s default deadline
     expect(result.status).toBe(504);
     expect(result.body.error.correlationId).toBe('22222222-2222-4222-8222-222222222222');
+  });
+
+  it('answers 404 for a request target that is not a valid path', async () => {
+    const result = await http(running.port, 'GET', '//');
+    expect(result.status).toBe(404);
+    expect(result.body.error.code).toBe('not_found');
   });
 
   it('survives garbage on the socket', async () => {

@@ -25,6 +25,15 @@ export function checkLocalAccess(headers: IncomingHttpHeaders): string | null {
   return null;
 }
 
+/** The request path, or null when the request target is not a valid URL path (such as `//`). Never throws. */
+export function requestPath(url: string | undefined): string | null {
+  try {
+    return new URL(url ?? '/', 'http://localhost').pathname;
+  } catch {
+    return null;
+  }
+}
+
 export type ErrorReply = { code: ErrorCode; message: string; details?: Record<string, unknown>; outcome?: 'uncertain' };
 
 export function errorBody(reply: ErrorReply, correlationId: string) {
@@ -54,14 +63,20 @@ export function sendError(res: ServerResponse, reply: ErrorReply, correlationId:
   sendJson(res, ERROR_STATUS[reply.code], errorBody(reply, correlationId), correlationId, close);
 }
 
-/** Writes a raw HTTP error on a socket whose WebSocket upgrade is refused. Never throws. */
+/**
+ * Writes a raw HTTP error on a socket whose WebSocket upgrade is refused, then destroys it once flushed. A socket that
+ * went through the upgrade event is no longer tracked by the HTTP server, so a peer that keeps its half open would
+ * otherwise hold it forever and stall shutdown. Never throws.
+ */
 export function rejectUpgrade(socket: Duplex, reply: ErrorReply, correlationId: string): void {
   const payload = JSON.stringify(errorBody(reply, correlationId));
   const status = ERROR_STATUS[reply.code];
+  socket.once('finish', () => socket.destroy());
   try {
     socket.end(
-      `HTTP/1.1 ${status} ${reply.code}\r\ncontent-type: application/json\r\ncontent-length: ${Buffer.byteLength(payload)}\r\n` +
-        `${HEADER_CORRELATION_ID}: ${correlationId}\r\nconnection: close\r\n\r\n${payload}`,
+      `HTTP/1.1 ${status} ${reply.code}\r\ncontent-type: application/json; charset=utf-8\r\n` +
+        `content-length: ${Buffer.byteLength(payload)}\r\n${HEADER_CORRELATION_ID}: ${correlationId}\r\n` +
+        `cache-control: no-store\r\nconnection: close\r\n\r\n${payload}`,
     );
   } catch {
     socket.destroy();

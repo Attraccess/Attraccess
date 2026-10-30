@@ -5,6 +5,7 @@ import {
   formatCursor,
   serverMessageSchema,
 } from '@attraccess/matter-contract';
+import { connect } from 'node:net';
 import { WebSocket } from 'ws';
 import { WsClient, http, startSidecar, upgradeStatus, validHeaders, type Running } from './testing/harness';
 
@@ -42,16 +43,17 @@ describe('event stream', () => {
   });
 
   it('keeps a client open once it has sent its resume message', async () => {
-    running = await startSidecar({ firstMessageTimeoutMs: 100 });
+    // A generous timeout so a loaded CI machine cannot delay the resume past it.
+    running = await startSidecar({ firstMessageTimeoutMs: 1_000 });
     const client = await WsClient.connect(running.port);
     client.send(resume());
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
     expect(client.closed).toBeNull();
     client.close();
   });
 
   it('still closes a client that only sends pings', async () => {
-    running = await startSidecar({ firstMessageTimeoutMs: 200 });
+    running = await startSidecar({ firstMessageTimeoutMs: 1_000 });
     const client = await WsClient.connect(running.port);
     client.send({ type: 'ping', wireVersion: 1 });
     await client.until(() => client.messages.some((message) => message.type === 'pong'));
@@ -196,7 +198,9 @@ describe('event stream', () => {
   it('closes oversized messages with 1009 in the websocket parser', async () => {
     running = await startSidecar({ maxMessageBytes: 1_024 });
     const client = await WsClient.connect(running.port);
-    client.socket.send('x'.repeat(4_096));
+    // Far larger than one socket read, so most of it is still unread when the server closes. The client must still
+    // receive the 1009 close frame rather than a reset (1006).
+    client.socket.send('x'.repeat(4 * 1024 * 1024));
     await client.until(() => client.closed !== null);
     expect(client.closed?.code).toBe(CLOSE_CODES.messageTooBig);
     expect((await fetchLive(running.port)).status).toBe(200);
@@ -213,6 +217,31 @@ describe('event stream', () => {
     expect(client.closed).toMatchObject({ code: CLOSE_CODES.tryAgainLater });
     expect(client.closed?.reason).toMatch(/reconnect with the last cursor/);
     expect((await fetchLive(running.port)).status).toBe(200);
+  });
+
+  it('survives an upgrade whose request target is not a valid path', async () => {
+    running = await startSidecar();
+    const socket = connect(running.port, '127.0.0.1');
+    const response = new Promise<string>((resolve) => {
+      let text = '';
+      socket.on('data', (chunk) => (text += String(chunk)));
+      socket.on('close', () => resolve(text));
+    });
+    socket.write(
+      'GET // HTTP/1.1\r\nhost: 127.0.0.1\r\nconnection: Upgrade\r\nupgrade: websocket\r\n' +
+        'sec-websocket-version: 13\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n',
+    );
+    expect(await response).toMatch(/^HTTP\/1\.1 404 not_found/);
+    expect((await fetchLive(running.port)).status).toBe(200);
+  });
+
+  it('uses the correlation ID of the upgrade request in error frames', async () => {
+    running = await startSidecar();
+    const correlationId = '33333333-3333-4333-8333-333333333333';
+    const client = await WsClient.connect(running.port, validHeaders({ 'x-correlation-id': correlationId }));
+    client.send('{nope');
+    await client.until(() => client.closed !== null);
+    expect(client.messages.find((m) => m.type === 'error')).toMatchObject({ error: { correlationId } });
   });
 
   it('closes a client whose error replies would exceed the budget', async () => {

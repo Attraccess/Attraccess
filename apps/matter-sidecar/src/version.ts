@@ -1,4 +1,5 @@
-import { STORAGE_SCHEMA_VERSION, WIRE_VERSION } from '@attraccess/matter-contract';
+import { STORAGE_SCHEMA_VERSION, WIRE_VERSION, type versionResponseSchema } from '@attraccess/matter-contract';
+import type { z } from 'zod';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import pkg from '../package.json';
@@ -29,13 +30,7 @@ export function loadedMatterJsVersion(resolveEntry: () => string = () => require
   throw new Error('Could not determine the loaded matter.js version');
 }
 
-export type VersionInfo = {
-  build: { version: string; commit: string };
-  sidecar: string;
-  matterJs: string;
-  storageSchemaVersion: typeof STORAGE_SCHEMA_VERSION;
-  wireVersion: typeof WIRE_VERSION;
-};
+export type VersionInfo = z.infer<typeof versionResponseSchema>;
 
 export function versionInfo(matterJs: string, commit = buildCommit()): VersionInfo {
   return {

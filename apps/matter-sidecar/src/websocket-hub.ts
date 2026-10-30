@@ -10,11 +10,10 @@ import {
 } from '@attraccess/matter-contract';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
-import { randomUUID } from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
 import { versionedRefusal, type RunningReleases } from './admission';
 import type { SidecarConfig } from './config';
-import { checkLocalAccess, correlationIdFrom, rejectUpgrade, type ErrorReply } from './http-utils';
+import { checkLocalAccess, correlationIdFrom, rejectUpgrade, requestPath, type ErrorReply } from './http-utils';
 import type { Logger } from './logger';
 import type { EventStream } from './event-stream';
 
@@ -22,15 +21,19 @@ import type { EventStream } from './event-stream';
 class Client {
   private unsubscribe: (() => void) | null = null;
   private resumed = false;
+  /** Bytes handed to ws whose write has not completed yet. This already includes everything in `bufferedAmount`. */
   private pendingBytes = 0;
 
   constructor(
     private readonly socket: WebSocket,
     private readonly stream: EventStream,
     private readonly queueBudgetBytes: number,
+    private readonly correlationId: string,
     private readonly onResume: () => void,
   ) {
-    socket.on('error', () => socket.terminate());
+    // ws closes the connection itself on errors (1009 for oversized messages, 1002/1007 for protocol errors) and
+    // destroys it on socket errors. Terminating here would reset the socket before the close frame reaches the client.
+    socket.on('error', () => undefined);
     socket.on('close', () => this.unsubscribe?.());
     socket.on('message', (data, isBinary) => this.onMessage(data, isBinary));
     this.send({
@@ -46,7 +49,7 @@ class Client {
     if (this.socket.readyState !== WebSocket.OPEN) return false;
     const text = JSON.stringify(message);
     const size = Buffer.byteLength(text);
-    if (this.pendingBytes + this.socket.bufferedAmount + size > this.queueBudgetBytes) {
+    if (this.pendingBytes + size > this.queueBudgetBytes) {
       this.unsubscribe?.();
       this.socket.close(CLOSE_CODES.tryAgainLater, 'client too slow; reconnect with the last cursor');
       return false;
@@ -59,7 +62,7 @@ class Client {
   }
 
   private fail(code: ErrorCode, message: string): void {
-    const envelope = buildError(code, message, randomUUID());
+    const envelope = buildError(code, message, this.correlationId);
     if (this.send({ type: 'error', ...envelope })) this.socket.close(CLOSE_CODES.policyViolation, code);
   }
 
@@ -131,10 +134,6 @@ export class WebSocketHub {
     this.server = new WebSocketServer({ noServer: true, maxPayload: config.maxMessageBytes });
   }
 
-  get clientCount(): number {
-    return this.clients.size;
-  }
-
   /** Every refusal happens before the upgrade is accepted. Socket errors are handled first so a reset cannot crash us. */
   handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     socket.on('error', () => socket.destroy());
@@ -148,7 +147,7 @@ export class WebSocketHub {
         this.config.firstMessageTimeoutMs,
       );
       idle.unref();
-      const client = new Client(ws, this.stream, this.config.clientQueueBytes, () => clearTimeout(idle));
+      const client = new Client(ws, this.stream, this.config.clientQueueBytes, correlationId, () => clearTimeout(idle));
       this.clients.add(client);
       ws.on('close', () => {
         clearTimeout(idle);
@@ -160,7 +159,7 @@ export class WebSocketHub {
   private refusal(req: IncomingMessage): ErrorReply | null {
     const denied = checkLocalAccess(req.headers);
     if (denied) return { code: 'forbidden_origin', message: denied };
-    if (new URL(req.url ?? '/', 'http://localhost').pathname !== EVENTS_PATH) {
+    if (requestPath(req.url) !== EVENTS_PATH) {
       return { code: 'not_found', message: 'Unknown path.' };
     }
     const refused = versionedRefusal(req.headers, this.running, this.isDraining);

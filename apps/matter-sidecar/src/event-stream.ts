@@ -42,10 +42,6 @@ export class EventStream {
     this.now = options.now ?? Date.now;
   }
 
-  get headSequence(): number {
-    return this.sequence;
-  }
-
   get headCursor(): string | null {
     return this.sequence === 0 ? null : formatCursor(this.streamInstanceId, this.sequence);
   }
