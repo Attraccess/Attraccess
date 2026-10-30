@@ -20,7 +20,7 @@ import { useState } from 'react';
 import type { CommissioningSession, RuntimeUpdateStatus, WagoCommissioningState, WagoController } from '../api/client';
 import en from '../en.json';
 import { useWagoTranslations } from '../i18n';
-import { ControllerDropCounts } from '../diagnostics/DropCounts';
+import { ControllerDropCountsRow, ControllerDropCountsWarning } from '../diagnostics/DropCounts';
 import { NetworkChangeDetails } from '../runtime/NetworkChangeDetails';
 import { RuntimeUpdateDetails } from '../runtime/RuntimeUpdateDetails';
 import { RuntimeUpdateSummary } from '../runtime/RuntimeUpdateSummary';
@@ -359,14 +359,15 @@ export function ControllerDetailsDrawer({
               <dd>{session.firmwareBaseline}</dd>
             </div>
           )}
+          {controller?.trustState === 'claimed' && <ControllerDropCountsRow controllerId={controller.id} />}
         </dl>
-        {controller?.trustState === 'claimed' && <ControllerDropCounts controllerId={controller.id} />}
         {session && (
           <CommissioningStatus session={session} runtimeUpdate={controller?.connectivity === 'runtime_update'} />
         )}
         {controller?.compatibilityError && (
           <StatusAlert status="warning">{tBackendMessage(controller.compatibilityError)}</StatusAlert>
         )}
+        {controller?.trustState === 'claimed' && <ControllerDropCountsWarning controllerId={controller.id} />}
         {target && <RuntimeUpdateDetails target={target} />}
         {controller?.trustState === 'claimed' && <NetworkChangeDetails controllerId={controller.id} />}
         {session?.failureReason && <p role="alert">{tBackendMessage(session.failureReason)}</p>}

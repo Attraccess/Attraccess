@@ -64,8 +64,9 @@
   "invalidControllers": "Bei {{count}} Ablaufknoten ist keine gültige Steuerung ausgewählt.",
   "openFlow": "Ablauf öffnen",
   "tooMany": "Zu viele WAGO-Knoten, um alle zu prüfen. Weitere Probleme sind möglich.",
-  "dropCounts": "Verworfene Nachrichten: {{oversized}} zu groß, {{overload}} bei Überlastung.",
-  "dropCountsUnsupported": "Verworfene Nachrichten: Diese Laufzeitversion meldet sie nicht.",
-  "dropCountsUnavailable": "Verworfene Nachrichten: Die Steuerung hat aktuell nichts gemeldet.",
-  "dropExplanation": "Die Steuerung verwirft diese Nachrichten ohne Antwort. Ein verworfener Befehl läuft in die Zeitüberschreitung wie ein Befehl an eine Steuerung, die offline ist."
+  "dropCountsLabel": "Verworfene Nachrichten",
+  "dropCounts": "{{oversized}} zu groß · {{overload}} bei Überlastung",
+  "dropCountsUnsupported": "Diese Version der Laufzeitumgebung meldet sie nicht",
+  "dropCountsUnavailable": "Kein aktueller Bericht der Steuerung",
+  "dropExplanation": "Die Steuerung verwirft diese Nachrichten ohne Antwort. Für einen verworfenen Befehl tritt eine Zeitüberschreitung ein, wie bei einer Steuerung, die offline ist."
 }

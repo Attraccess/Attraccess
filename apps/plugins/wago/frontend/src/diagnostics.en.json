@@ -64,8 +64,9 @@
   "invalidControllers": "{{count}} flow node(s) have no valid controller selected.",
   "openFlow": "Open flow",
   "tooMany": "Too many WAGO nodes to check all of them; more issues may exist.",
-  "dropCounts": "Dropped messages: {{oversized}} too large, {{overload}} while overloaded.",
-  "dropCountsUnsupported": "Dropped messages: not reported by this runtime version.",
-  "dropCountsUnavailable": "Dropped messages: no current report from the controller.",
+  "dropCountsLabel": "Dropped messages",
+  "dropCounts": "{{oversized}} too large · {{overload}} while overloaded",
+  "dropCountsUnsupported": "Not reported by this runtime version",
+  "dropCountsUnavailable": "No current report from the controller",
   "dropExplanation": "The controller drops these messages without a reply. A dropped command times out like a command to an offline controller."
 }

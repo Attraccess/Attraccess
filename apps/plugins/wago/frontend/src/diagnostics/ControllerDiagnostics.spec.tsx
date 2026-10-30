@@ -15,6 +15,11 @@ vi.mock('@heroui/react', () => {
       <button>{typeof children === 'function' ? children({}) : children}</button>
     ),
     Card: Object.assign(part, { Header: part, Title: part, Description: part, Content: part }),
+    Alert: part,
+    AlertContent: part,
+    AlertDescription: part,
+    AlertIndicator: part,
+    AlertTitle: part,
   };
 });
 
@@ -139,10 +144,10 @@ describe('diagnostics isolation', () => {
     expect(screen.queryByText(/Latest output/)).toBeNull();
   });
   it.each([
-    ['en', 'fresh', true, null, 'Dropped messages: no current report from the controller.'],
-    ['de', 'fresh', true, null, 'Verworfene Nachrichten: Die Steuerung hat aktuell nichts gemeldet.'],
-    ['en', 'stale', true, { oversized: 3, overload: 1 }, 'Dropped messages: no current report from the controller.'],
-    ['en', 'stale', false, { oversized: 3, overload: 1 }, 'Dropped messages: not reported by this runtime version.'],
+    ['en', 'fresh', true, null, 'No current report from the controller'],
+    ['de', 'fresh', true, null, 'Kein aktueller Bericht der Steuerung'],
+    ['en', 'stale', true, { oversized: 3, overload: 1 }, 'No current report from the controller'],
+    ['en', 'stale', false, { oversized: 3, overload: 1 }, 'Not reported by this runtime version'],
   ] as const)(
     'does not present missing or stale drop counters as current (%s, heartbeat %s, bounded %s)',
     (language, freshness, bounded, dropCounts, summary) => {
@@ -160,16 +165,22 @@ describe('diagnostics isolation', () => {
         refetch: vi.fn(),
       });
       render(<ControllerDiagnostics controllerId={1} />);
-      expect(screen.getByText(summary)).toBeTruthy();
-      expect(screen.queryByRole('status')).toBeNull();
+      expect(screen.getByText(summary).tagName).toBe('DD');
+      expect(screen.queryByText(/times out like|Zeitüberschreitung/)).toBeNull();
     },
   );
   it.each([
-    ['en', { oversized: 3, overload: 1 }, 'Dropped messages: 3 too large, 1 while overloaded.', 'times out like'],
-    ['de', { oversized: 3, overload: 1 }, 'Verworfene Nachrichten: 3 zu groß, 1 bei Überlastung.', 'Zeitüberschreitung'],
-    ['en', null, 'Dropped messages: not reported by this runtime version.', null],
-    ['de', null, 'Verworfene Nachrichten: Diese Laufzeitversion meldet sie nicht.', null],
-  ] as const)('shows the drop counters in %s: %j', (language, dropCounts, summary, explanation) => {
+    ['en', { oversized: 3, overload: 1 }, 'Dropped messages', '3 too large · 1 while overloaded', /times out like/],
+    [
+      'de',
+      { oversized: 3, overload: 1 },
+      'Verworfene Nachrichten',
+      '3 zu groß · 1 bei Überlastung',
+      /Zeitüberschreitung/,
+    ],
+    ['en', null, 'Dropped messages', 'Not reported by this runtime version', null],
+    ['de', null, 'Verworfene Nachrichten', 'Diese Version der Laufzeitumgebung meldet sie nicht', null],
+  ] as const)('shows the drop counters in %s: %j', (language, dropCounts, label, value, explanation) => {
     useTranslationState.getState().setLanguage(language);
     vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
       isError: false,
@@ -179,9 +190,9 @@ describe('diagnostics isolation', () => {
       refetch: vi.fn(),
     });
     render(<ControllerDiagnostics controllerId={1} />);
-    expect(screen.getByText(summary)).toBeTruthy();
-    if (explanation) expect(screen.getByRole('status').textContent).toContain(explanation);
-    else expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByText(label).nextElementSibling?.textContent).toBe(value);
+    if (explanation) expect(screen.getByText(explanation)).toBeTruthy();
+    else expect(screen.queryByText(/times out like|Zeitüberschreitung/)).toBeNull();
   });
   it('hides cached online status when successful polling stalls, without another query update', () => {
     vi.useFakeTimers();
