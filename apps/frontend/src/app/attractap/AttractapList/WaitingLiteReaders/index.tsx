@@ -47,11 +47,13 @@ const SWATCH: Record<LedColor, string> = {
 };
 
 const POLL_INTERVAL_MS = 3000;
+// Same limit as ApproveLiteEnrollmentDto.name
+const NAME_MAX_LENGTH = 64;
 
-function PatternSwatches({ pattern }: Readonly<{ pattern: LedColor[] }>) {
+function PatternSwatches({ pattern, wrap = false }: Readonly<{ pattern: LedColor[]; wrap?: boolean }>) {
   const { t } = useTranslations({ en, de });
   return (
-    <ul className="flex flex-row flex-wrap gap-3" data-cy="lite-pattern">
+    <ul className={wrap ? 'flex flex-row flex-wrap gap-3' : 'grid min-w-44 grid-cols-2 gap-x-3 gap-y-1'} data-cy="lite-pattern">
       {pattern.map((color, index) => (
         <li key={`${color}-${index}`} className="flex flex-row items-center gap-1">
           <span
@@ -135,7 +137,8 @@ function WaitingLiteReadersCard() {
     });
   }, [selected, name, isPending, approve]);
 
-  const secondsSinceFetch = Math.floor((now.getTime() - dataUpdatedAt) / 1000);
+  // useNow ticks once a second, so right after a poll `now` can be older than the fetch.
+  const secondsSinceFetch = Math.max(0, Math.floor((now.getTime() - dataUpdatedAt) / 1000));
 
   return (
     <>
@@ -155,7 +158,7 @@ function WaitingLiteReadersCard() {
                   <TableColumn>{t('columns.address')}</TableColumn>
                   <TableColumn>{t('columns.actions')}</TableColumn>
                 </TableHeader>
-                <TableBody items={readers} renderEmptyState={() => <EmptyState message={t('empty')} />}>
+                <TableBody items={readers} dependencies={[now]} renderEmptyState={() => <EmptyState message={t('empty')} />}>
                   {(reader) => (
                     <TableRow key={reader.pendingId} id={reader.pendingId}>
                       <TableCell>
@@ -201,10 +204,10 @@ function WaitingLiteReadersCard() {
                 pattern: selected.pattern.map((color) => t(`colors.${color}`)).join(', '),
               })}
             </Description>
-            <PatternSwatches pattern={selected.pattern} />
+            <PatternSwatches pattern={selected.pattern} wrap />
             <TextField value={name} onChange={setName} isDisabled={isPending}>
               <Label>{t('dialog.nameLabel')}</Label>
-              <Input autoComplete="off" data-cy="lite-approve-name" />
+              <Input autoComplete="off" maxLength={NAME_MAX_LENGTH} data-cy="lite-approve-name" />
             </TextField>
             {error && (
               <Description className="text-danger" role="alert">

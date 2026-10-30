@@ -6,9 +6,10 @@ import { WaitingLiteReaders } from './index';
 const approve = vi.fn();
 let hasPermission = true;
 let readers: unknown[] = [];
+let fetchedInTheFuture = 0;
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useDeviceEnrollmentServiceListWaitingLiteReaders: () => ({ data: readers, dataUpdatedAt: Date.now() }),
+  useDeviceEnrollmentServiceListWaitingLiteReaders: () => ({ data: readers, dataUpdatedAt: Date.now() + fetchedInTheFuture }),
   useDeviceEnrollmentServiceApproveLiteEnrollment: () => ({ mutate: approve, isPending: false }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
@@ -31,6 +32,7 @@ describe('WaitingLiteReaders', () => {
     approve.mockReset();
     hasPermission = true;
     readers = [];
+    fetchedInTheFuture = 0;
   });
 
   it('renders nothing without the resources.update permission', () => {
@@ -82,5 +84,13 @@ describe('WaitingLiteReaders', () => {
     fireEvent.click(confirm);
 
     expect(approve).toHaveBeenCalledTimes(1);
+  });
+
+  it('never counts down from more than the seconds the server reported', () => {
+    readers = [reader];
+    fetchedInTheFuture = 1500; // the clock tick that renders the row is older than the poll that delivered it
+    render(<WaitingLiteReaders />);
+
+    expect(screen.getByText('20 s')).toBeInTheDocument();
   });
 });
