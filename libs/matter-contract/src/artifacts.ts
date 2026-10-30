@@ -62,18 +62,22 @@ const errorBody = { description: 'Error', content: { 'application/json': { schem
 type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params' | 'body'> & { id: string };
 
 /** The error statuses a route can actually answer with, so generated clients do not expect impossible ones. */
-const errorResponses = (operation: ResponseShape): JsonObject => {
+function errorStatuses(operation: ResponseShape): number[] {
   // Any route can refuse a browser origin, miss the path or fail internally.
-  const codes = new Set([403, 404, 500]);
+  const codes = [403, 404, 500];
   // Release headers are checked, and draining refused, only on versioned routes.
-  if (operation.versioned) for (const status of [409, 426, 503]) codes.add(status);
-  if (operation.params || operation.body) codes.add(400);
-  if (operation.body) codes.add(413);
+  if (operation.versioned) codes.push(409, 426, 503);
+  if (operation.params || operation.body) codes.push(400);
+  if (operation.body) codes.push(413);
   // Only feature operations can be unimplemented or run into their deadline.
-  if (operation.family !== 'health' && operation.id !== 'events.stream')
-    for (const status of [501, 504]) codes.add(status);
+  const isFeature = operation.family !== 'health' && operation.id !== 'events.stream';
+  if (isFeature) codes.push(501, 504);
+  return codes.sort((left, right) => left - right);
+}
+
+const errorResponses = (operation: ResponseShape): JsonObject => {
   const responses: JsonObject = {};
-  for (const status of [...codes].sort()) responses[String(status)] = errorBody;
+  for (const status of errorStatuses(operation)) responses[String(status)] = errorBody;
   // Readiness answers 503 with its own body (starting or draining), not with an error envelope.
   if (operation.id === 'health.ready') {
     responses['503'] = {
