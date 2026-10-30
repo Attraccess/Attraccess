@@ -1,17 +1,29 @@
 import { MemoryDeviceAdapter } from './io/adapters';
 import { JsonStateStore, WagoRuntime, type Snapshot, type Transport } from './runtime';
+import type { MessageSlot, SubscribeOptions } from './runtime/types';
 
 export class TestTransport implements Transport {
   readonly published: Array<{ topic: string; payload: unknown; retain?: boolean }> = [];
-  readonly listeners = new Map<string, (payload: Buffer) => void | Promise<void>>();
+  readonly listeners = new Map<string, (payload: Buffer, slot: MessageSlot) => void | Promise<void>>();
+  /** Options each topic was subscribed with, so tests can check the admission limits are wired. */
+  readonly subscriptions = new Map<string, SubscribeOptions | undefined>();
+  dropCounts?: () => Record<string, number>;
+  /** Like MqttTransport, a publish while disconnected is refused instead of being silently dropped. */
+  connected = true;
   async publish(topic: string, payload: unknown, options?: { retain?: boolean }): Promise<void> {
+    if (!this.connected) throw new Error('MQTT connection unavailable');
     this.published.push({ topic, payload, retain: options?.retain });
   }
-  async subscribe(topic: string, listener: (payload: Buffer) => void | Promise<void>): Promise<void> {
+  async subscribe(
+    topic: string,
+    listener: (payload: Buffer, slot: MessageSlot) => void | Promise<void>,
+    options?: SubscribeOptions,
+  ): Promise<void> {
     this.listeners.set(topic, listener);
+    this.subscriptions.set(topic, options);
   }
   async send(topic: string, value: unknown): Promise<void> {
-    await this.listeners.get(topic)?.(Buffer.from(JSON.stringify(value)));
+    await this.listeners.get(topic)?.(Buffer.from(JSON.stringify(value)), { release: () => undefined });
   }
 }
 

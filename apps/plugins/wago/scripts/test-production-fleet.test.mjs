@@ -2,12 +2,44 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
-const runner = resolve(import.meta.dirname, 'test-production-fleet.mjs');
+// Both runners own a labelled RabbitMQ container and share the same cleanup contract.
+const runners = [
+  {
+    label: 'production fleet',
+    script: resolve(import.meta.dirname, 'test-production-fleet.mjs'),
+    contextVariable: 'WAGO_FLEET_DOCKER_CONTEXT',
+    // The fleet runner's tools are all faked, so nothing but the fake Docker is on its PATH.
+    path: (directory) => directory,
+    scenarios: [
+      'startup-fails',
+      'foreign-owner',
+      'foreign-name',
+      'absent-container',
+      'recovered-container-removal-fails',
+      'known-container-removal-fails',
+    ],
+  },
+  {
+    label: 'reliability',
+    script: resolve(import.meta.dirname, 'test-reliability.mjs'),
+    contextVariable: 'WAGO_RELIABILITY_DOCKER_CONTEXT',
+    // The reliability runner bundles its controller farm with esbuild first, which needs node and a shell.
+    path: (directory) => [directory, dirname(process.execPath), '/usr/bin', '/bin'].join(':'),
+    // A successful `docker run` would make it wait for broker readiness, so only startup failures apply.
+    scenarios: [
+      'startup-fails',
+      'foreign-owner',
+      'foreign-name',
+      'absent-container',
+      'recovered-container-removal-fails',
+    ],
+  },
+];
 
 // Run the actual CLI with a fake Docker executable. No daemon or broker is used.
 const fakeDocker = `#!${process.execPath}
@@ -43,47 +75,43 @@ if (args[0] === 'run') {
 writeFileSync(file, JSON.stringify(state));
 `;
 
-for (const scenario of [
-  'startup-fails',
-  'foreign-owner',
-  'foreign-name',
-  'absent-container',
-  'recovered-container-removal-fails',
-  'known-container-removal-fails',
-]) {
-  test(`production fleet cleanup: ${scenario}`, async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'wago-fleet-cleanup-test-'));
-    const temporary = join(directory, 'temporary');
-    const stateFile = join(directory, 'state.json');
-    try {
-      await mkdir(temporary);
-      await writeFile(join(directory, 'docker'), fakeDocker, { mode: 0o700 });
-      await writeFile(stateFile, JSON.stringify({ scenario, calls: [] }));
-      await assert.rejects(
-        exec(process.execPath, [runner], {
-          // CRAP coverage loads an instrumenting hook into every child, so allow it time.
-          timeout: 30_000,
-          env: {
-            ...(process.env.CRAP_NODE_MANIFEST ? {
-              CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,
-              NODE_OPTIONS: process.env.NODE_OPTIONS,
-            } : {}),
-            PATH: directory,
-            TMPDIR: temporary,
-            FIXTURE_STATE: stateFile,
-            WAGO_FLEET_DOCKER_CONTEXT: 'fixture-only',
-          },
-        }),
-        (error) => error.code === 1 && /Fixture|ownership|No such object/.test(error.stderr),
-      );
-      const state = JSON.parse(await readFile(stateFile, 'utf8'));
-      const removals = state.calls.filter(([command]) => command === 'rm');
-      const mayRemove = !['foreign-owner', 'foreign-name', 'absent-container'].includes(scenario);
-      assert.deepEqual(removals, mayRemove ? [['rm', '-f', '-v', 'owned-container-id']] : []);
-      if (scenario === 'startup-fails') assert.equal(state.removed, 'owned-container-id');
-      assert.deepEqual(await readdir(temporary), [], 'Runner must remove its temp directory even if Docker fails');
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
-  });
-}
+for (const runner of runners)
+  for (const scenario of runner.scenarios) {
+    test(`${runner.label} cleanup: ${scenario}`, async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'wago-fleet-cleanup-test-'));
+      const temporary = join(directory, 'temporary');
+      const stateFile = join(directory, 'state.json');
+      try {
+        await mkdir(temporary);
+        await writeFile(join(directory, 'docker'), fakeDocker, { mode: 0o700 });
+        await writeFile(stateFile, JSON.stringify({ scenario, calls: [] }));
+        await assert.rejects(
+          exec(process.execPath, [runner.script], {
+            // CRAP coverage loads an instrumenting hook into every child, so allow it time.
+            timeout: 60_000,
+            env: {
+              ...(process.env.CRAP_NODE_MANIFEST
+                ? {
+                    CRAP_NODE_MANIFEST: process.env.CRAP_NODE_MANIFEST,
+                    NODE_OPTIONS: process.env.NODE_OPTIONS,
+                  }
+                : {}),
+              PATH: runner.path(directory),
+              TMPDIR: temporary,
+              FIXTURE_STATE: stateFile,
+              [runner.contextVariable]: 'fixture-only',
+            },
+          }),
+          (error) => error.code === 1 && /Fixture|ownership|No such object/.test(error.stderr),
+        );
+        const state = JSON.parse(await readFile(stateFile, 'utf8'));
+        const removals = state.calls.filter(([command]) => command === 'rm');
+        const mayRemove = !['foreign-owner', 'foreign-name', 'absent-container'].includes(scenario);
+        assert.deepEqual(removals, mayRemove ? [['rm', '-f', '-v', 'owned-container-id']] : []);
+        if (scenario === 'startup-fails') assert.equal(state.removed, 'owned-container-id');
+        assert.deepEqual(await readdir(temporary), [], 'Runner must remove its temp directory even if Docker fails');
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+  }

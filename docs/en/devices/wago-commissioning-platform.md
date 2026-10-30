@@ -59,7 +59,7 @@ and deploys with:
 ```text
 --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges
 --network host --restart no
---env WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1
+--env WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-rtu-v1
 --mount type=bind,src=/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din,dst=/run/attraccess-wago/io/din,readonly
 --mount type=bind,src=/sys/kernel/dout_drv/DOUT_DATA,dst=/run/attraccess-wago/io/dout
 --mount type=bind,src=/sys/devices/platform/led/leds/run-green/brightness,dst=/run/attraccess-wago/io/led-run-green

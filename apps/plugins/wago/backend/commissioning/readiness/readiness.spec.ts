@@ -55,6 +55,15 @@ describe('bounded commissioning runtime readiness', () => {
     expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
   });
 
+  it('refuses oversized or over-nested state before decoding it', () => {
+    send(payload);
+    receive({ serverId: 1, topic, payload: Buffer.from(JSON.stringify({ ...payload, pad: 'x'.repeat(65_536) })) });
+    expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
+    send(payload);
+    send({ ...payload, sequence: 2, extra: JSON.parse('{"a":'.repeat(8) + '1' + '}'.repeat(8)) });
+    expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
+  });
+
   it('uses the commissioning clock tolerance for runtime readiness', () => {
     send({ ...payload, timestamp: new Date(time + 5000).toISOString() });
     expect(service.observe(1, 'fixture', 'attraccess/wago')?.ready).toBe(true);

@@ -177,7 +177,9 @@ export function suites(root) {
   if (root === 'apps/plugins/wago') {
     result.push(
       jestSuite(`${root}/cc100-runtime/jest.config.ts`),
-      ...['audit-hooks', 'commissioning'].map((name) => jestSuite(`${root}/scripts/jest.${name}.config.cjs`)),
+      ...['audit-hooks', 'commissioning', 'reliability-plan'].map((name) =>
+        jestSuite(`${root}/scripts/jest.${name}.config.cjs`),
+      ),
     );
   }
   return result;
@@ -374,7 +376,9 @@ export function enforceScores(project, report, limit = CRAP_SCORE_LIMIT) {
     }
   }
   if (violations.length)
-    throw new Error(`CRAP score limit ${limit} exceeded by ${violations.length} function(s):\n${violations.join('\n')}`);
+    throw new Error(
+      `CRAP score limit ${limit} exceeded by ${violations.length} function(s):\n${violations.join('\n')}`,
+    );
 }
 
 export function sourceFunctionCount(file) {

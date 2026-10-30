@@ -131,6 +131,8 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected readCategories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] {
+    // A disabled channel is never polled or published, so it has nothing to read, wait for or react to.
+    if (channel?.enabled === false) return [];
     return [
       ...(channel?.capabilities.some((capability) => capability === 'input' || capability === 'output')
         ? ['state']
@@ -140,6 +142,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected categories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] {
+    if (channel?.enabled === false) return [];
     return [
       ...(channel?.capabilities.some((capability) => capability === 'input' || capability === 'output')
         ? ['state']
@@ -167,9 +170,14 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
         contentHash: revision.contentHash,
       });
       this.channelCache.set(revision.controllerId, channels);
+      const disabled = new Set(channels.filter((channel) => channel.enabled === false).map((channel) => channel.id));
+      this.disabledChannelCache.set(revision.controllerId, disabled);
+      for (const [key, state] of this.cache)
+        if (state.controllerId === revision.controllerId && disabled.has(state.channelId)) this.cache.delete(key);
       return channels;
     } catch {
       this.channelCache.set(revision.controllerId, []);
+      this.disabledChannelCache.delete(revision.controllerId);
       return [];
     }
   }
@@ -205,6 +213,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
     });
     if (!revision) {
       this.channelCache.set(controllerId, []);
+      this.disabledChannelCache.delete(controllerId);
       return [];
     }
     return this.cacheChannels(revision);
@@ -278,6 +287,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
       if (invalidateSamples || state.category === 'state') state.invalidated = true;
     }
     for (const channel of channels) {
+      if (channel.enabled === false) continue;
       const value =
         channel.capabilities.includes('input') && Object.hasOwn(event.inputs ?? {}, channel.id)
           ? event.inputs[channel.id]
@@ -365,7 +375,12 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
       this.applyState(controller, event, eventTime, stream, channels);
     } else if ('channelId' in event) {
       const channel = channels.find((channel) => channel.id === event.channelId);
-      if (!channel || (event.category === 'measurement' && !channel.capabilities.includes('measurement'))) return;
+      if (
+        !channel ||
+        channel.enabled === false ||
+        (event.category === 'measurement' && !channel.capabilities.includes('measurement'))
+      )
+        return;
       this.store(controller, event.channelId, event, event.category === 'measurement' ? event.value : event);
     }
   }

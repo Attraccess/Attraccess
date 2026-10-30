@@ -504,6 +504,176 @@ describe('WagoFlowService schemas and dispatch', () => {
     }
   });
 
+  describe('disabled channels', () => {
+    const disabledRevision = {
+      ...revision,
+      snapshot: JSON.stringify({
+        logicalChannels: [
+          { id: 'door', capabilities: ['output'] },
+          { id: 'power', capabilities: ['measurement'], enabled: false },
+          { id: 'energy', capabilities: ['measurement'] },
+        ],
+      }),
+    } as WagoConfigurationRevision;
+    const measurementTopic = 'attraccess/wago/v1/controllers/cc100-01/measurements';
+    async function prepared() {
+      const setup = createService();
+      setup.revisionRepository.find.mockResolvedValue([disabledRevision]);
+      setup.revisionQuery.getMany.mockResolvedValue([disabledRevision]);
+      await setup.service.refresh();
+      const message = (topic: string, body: Record<string, unknown>) =>
+        setup.service['onMessage'](
+          2,
+          'attraccess/wago',
+          topic,
+          Buffer.from(JSON.stringify({ streamId: STREAM_A, timestamp: new Date().toISOString(), ...body })),
+        );
+      await message('attraccess/wago/v1/controllers/cc100-01/state', {
+        sequence: 1,
+        connected: true,
+        revision: 1,
+        contentHash: 'hash',
+        outputs: { door: true },
+      });
+      return { ...setup, message };
+    }
+
+    it.each(['event', 'read', 'wait'] as const)(
+      'offers no categories for a disabled channel in the %s editor',
+      async (kind) => {
+        const { service } = await prepared();
+        const schema = await service.resolveConfigSchema({ controllerId: 1, channelId: 'power' }, kind);
+        const properties = schema.properties as Record<string, { oneOf: Array<{ const: string; title: string }> }>;
+        expect(properties.category.oneOf).toEqual([]);
+        expect(properties.channelId.oneOf).toContainEqual({ const: 'power', title: 'power (disabled)' });
+        await expect(
+          service.validateConfig({ controllerId: 1, channelId: 'power', category: 'measurement' }, kind),
+        ).resolves.toContainEqual(expect.objectContaining({ field: 'category' }));
+      },
+    );
+
+    it('never stores, dispatches or reads a disabled channel, even if a runtime publishes it', async () => {
+      const { service, trigger, message } = await prepared();
+      trigger.mockClear();
+      await message(measurementTopic, {
+        sequence: 1,
+        channelId: 'power',
+        value: 1000,
+        unit: 'milliwatt',
+        kind: 'live',
+      });
+      expect(trigger).not.toHaveBeenCalled();
+      const config = { controllerId: 1, channelId: 'power', category: 'measurement' };
+      expect(service.read(config)).toBeNull();
+      await expect(service.wait({ ...config, timeoutMs: 60_000 })).resolves.toBeNull();
+      await message(measurementTopic, { sequence: 2, channelId: 'energy', value: 7, unit: 'milliwatt', kind: 'live' });
+      expect(service.read({ controllerId: 1, channelId: 'energy', category: 'measurement' })).toMatchObject({
+        value: 7,
+      });
+    });
+
+    it('drops samples cached before a channel was disabled', async () => {
+      const { service, revisionRepository, revisionQuery } = createService();
+      const message = (topic: string, body: Record<string, unknown>) =>
+        service['onMessage'](
+          2,
+          'attraccess/wago',
+          topic,
+          Buffer.from(JSON.stringify({ streamId: STREAM_A, timestamp: new Date().toISOString(), ...body })),
+        );
+      const enabledRevision = {
+        ...disabledRevision,
+        snapshot: disabledRevision.snapshot.replace(',"enabled":false', ''),
+      } as WagoConfigurationRevision;
+      revisionRepository.find.mockResolvedValue([enabledRevision]);
+      revisionQuery.getMany.mockResolvedValue([enabledRevision]);
+      await service.refresh();
+      await message('attraccess/wago/v1/controllers/cc100-01/state', {
+        sequence: 1,
+        connected: true,
+        revision: 1,
+        contentHash: 'hash',
+        outputs: {},
+      });
+      await message(measurementTopic, {
+        sequence: 1,
+        channelId: 'power',
+        value: 1000,
+        unit: 'milliwatt',
+        kind: 'live',
+      });
+      const config = { controllerId: 1, channelId: 'power', category: 'measurement' };
+      expect(service.read(config)).toMatchObject({ value: 1000 });
+      revisionRepository.find.mockResolvedValue([{ ...disabledRevision, revision: 2 }]);
+      revisionQuery.getMany.mockResolvedValue([{ ...disabledRevision, revision: 2 }]);
+      await service.refresh();
+      expect(service.read(config)).toBeNull();
+      expect(service['cache'].size).toBe(0);
+    });
+
+    it('reads a channel again once a later revision enables it, from a per-controller set of disabled IDs', async () => {
+      const { service, revisionRepository, revisionQuery, message } = await prepared();
+      const config = { controllerId: 1, channelId: 'power', category: 'measurement' };
+      expect(service['disabledChannelCache'].get(1)).toEqual(new Set(['power']));
+      const enabledRevision = {
+        ...disabledRevision,
+        revision: 2,
+        snapshot: disabledRevision.snapshot.replace(',"enabled":false', ''),
+      } as WagoConfigurationRevision;
+      revisionRepository.find.mockResolvedValue([enabledRevision]);
+      revisionQuery.getMany.mockResolvedValue([enabledRevision]);
+      await service.refresh();
+      expect(service['disabledChannelCache'].get(1)).toEqual(new Set());
+      await message('attraccess/wago/v1/controllers/cc100-01/state', {
+        sequence: 2,
+        connected: true,
+        revision: 2,
+        contentHash: 'hash',
+        outputs: {},
+      });
+      await message(measurementTopic, { sequence: 1, channelId: 'power', value: 5, unit: 'milliwatt', kind: 'live' });
+      expect(service.read(config)).toMatchObject({ value: 5 });
+    });
+  });
+
+  it('keeps an on-change measurement available across 30 s keepalive gaps', async () => {
+    const { service, revisionRepository, revisionQuery } = createService();
+    const meterRevision = {
+      ...revision,
+      snapshot: JSON.stringify({ logicalChannels: [{ id: 'energy', capabilities: ['measurement'] }] }),
+    } as WagoConfigurationRevision;
+    revisionRepository.find.mockResolvedValue([meterRevision]);
+    revisionQuery.getMany.mockResolvedValue([meterRevision]);
+    await service.refresh();
+    const sequences: Record<string, number> = {};
+    const send = (category: string, body: Record<string, unknown>) =>
+      service['onMessage'](
+        2,
+        'attraccess/wago',
+        `attraccess/wago/v1/controllers/cc100-01/${category}`,
+        Buffer.from(
+          JSON.stringify({
+            streamId: STREAM_A,
+            sequence: (sequences[category] = (sequences[category] ?? 0) + 1),
+            timestamp: new Date().toISOString(),
+            ...body,
+          }),
+        ),
+      );
+    const state = () => send('state', { connected: true, revision: 1, contentHash: 'hash', outputs: {} });
+    const measurement = () => send('measurements', { channelId: 'energy', value: 42, unit: 'milliwatt', kind: 'live' });
+    await state();
+    await measurement();
+    const start = Date.now();
+    for (let second = 10; second <= 120; second += 10) {
+      jest.setSystemTime(start + second * 1000);
+      await state();
+      if (second % 30 === 0) await measurement();
+      const reading = service.read({ controllerId: 1, channelId: 'energy', category: 'measurement' });
+      expect(reading && service.payload(reading)).toMatchObject({ available: true, value: 42 });
+    }
+  });
+
   it('resets minimum-change comparisons when units, kinds or boot streams change', () => {
     const { service } = createService();
     const config = { controllerId: 1, channelId: 'power', category: 'measurement', minimumChange: 10 };

@@ -1,8 +1,8 @@
 import { Button, Modal } from '@heroui/react';
 import { DIGITAL_TERMINALS } from '../../../../backend/configuration/digital';
 import { useFrontPanelState } from './useFrontPanelState';
-type Props = Pick<ReturnType<typeof useFrontPanelState>, 'panel' | 't'>;
-export function FrontPanelModalBackdrop({ panel, t }: Props) {
+type Props = Pick<ReturnType<typeof useFrontPanelState>, 'panel' | 't' | 'tBackendMessage'>;
+export function FrontPanelModalBackdrop({ panel, t, tBackendMessage }: Props) {
   return (
     <Modal.Backdrop isOpen={Boolean(panel.review)} onOpenChange={(open) => !open && panel.cancelReview()}>
       <Modal.Container>
@@ -50,6 +50,7 @@ export function FrontPanelModalBackdrop({ panel, t }: Props) {
                     <li key={impact.channelId}>
                       {panel.configuration?.metadata.names[impact.channelId] ?? impact.channelId} ·{' '}
                       {t('panel.flowReferences', { count: impact.references.length })}
+                      {impact.code === 'channel_disabled' && ` · ${tBackendMessage(impact.message)}`}
                     </li>
                   ))}
                 </ul>

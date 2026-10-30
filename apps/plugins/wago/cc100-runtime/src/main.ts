@@ -3,6 +3,7 @@ import { CC100_MODBUS_PROFILE_ID, CC100_SERIAL_PATH, isCc100HardwareProfile } fr
 import { Cc100OnboardIoAdapter } from './io/adapters';
 import { ModbusDeviceRouter } from './modbus/routing/adapter';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim } from './runtime';
+import { MAX_CLAIM_BYTES } from './runtime/limits';
 import { RunLed } from './io/status-led';
 import { MqttTransport } from './transport/mqtt';
 
@@ -125,11 +126,15 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       if (!credentials) {
         runLed.set('pairing');
         if (!discoverySubscribed) {
-          await transport.subscribe(runtime.discoveryClaimTopic(), async (payload) => {
-            const claim = await runtime.receiveDiscoveryClaim(payload);
-            if (!claim || activeClient !== client) return;
-            activeClient.end(true, () => connectRuntime(claim));
-          });
+          await transport.subscribe(
+            runtime.discoveryClaimTopic(),
+            async (payload) => {
+              const claim = await runtime.receiveDiscoveryClaim(payload);
+              if (!claim || activeClient !== client) return;
+              activeClient.end(true, () => connectRuntime(claim));
+            },
+            { maxBytes: MAX_CLAIM_BYTES },
+          );
           discoverySubscribed = true;
         }
         await runtime.publishDiscoveryAnnouncement();

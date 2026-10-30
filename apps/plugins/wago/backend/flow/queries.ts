@@ -19,7 +19,8 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
     if (
       typeof config.controllerId !== 'number' ||
       typeof config.channelId !== 'string' ||
-      typeof config.category !== 'string'
+      typeof config.category !== 'string' ||
+      this.disabled(config.controllerId, config.channelId)
     )
       return null;
     const current = this.read(config);
@@ -53,8 +54,18 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
     });
   }
 
+  /** True when the applied configuration disables this channel; its readings are then unavailable. */
+  protected disabled(controllerId: number, channelId: string): boolean {
+    return this.disabledChannelCache.get(controllerId)?.has(channelId) ?? false;
+  }
+
   read(config: Record<string, unknown>): CachedState | null {
-    if (typeof config.controllerId !== 'number' || typeof config.channelId !== 'string') return null;
+    if (
+      typeof config.controllerId !== 'number' ||
+      typeof config.channelId !== 'string' ||
+      this.disabled(config.controllerId, config.channelId)
+    )
+      return null;
     if (typeof config.category === 'string')
       return this.cache.get(this.cacheKey(config.controllerId, config.channelId, config.category)) ?? null;
     const entries = [...this.cache.values()].filter(
@@ -171,10 +182,10 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
         type: 'string',
         title: 'Logical Channel',
         refreshesSchema: true,
-        oneOf: channels.map((channel) => ({
-          const: channel.id,
-          title: typeof names[channel.id] === 'string' ? names[channel.id] : channel.id,
-        })),
+        oneOf: channels.map((channel) => {
+          const title = typeof names[channel.id] === 'string' ? names[channel.id] : channel.id;
+          return { const: channel.id, title: channel.enabled === false ? `${title} (disabled)` : title };
+        }),
       },
     };
     if (kind === 'event') {
@@ -229,6 +240,7 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
       if (!controllerIds.has(id)) this.appliedConfigurations.delete(id);
     for (const id of this.streams.keys()) if (!controllerIds.has(id)) this.streams.delete(id);
     this.channelCache.clear();
+    this.disabledChannelCache.clear();
     const revisions = await this.loadLatestAppliedRevisions(controllers.map((controller) => controller.id));
     for (const revision of revisions) this.cacheChannels(revision);
     for (const controller of controllers)

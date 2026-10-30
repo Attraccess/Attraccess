@@ -555,6 +555,70 @@ describe('controller diagnostics', () => {
     expect(JSON.stringify(result)).not.toContain('SECRET');
   });
 
+  it('lists disabled channels separately, without samples, and before the 256-channel cut', async () => {
+    const { service, latest, revision, snapshot, diagnostics } = setup();
+    const channel = { ...snapshot.logicalChannels[0], capabilities: ['measurement'] };
+    const channels = [
+      ...Array.from({ length: 300 }, (_, index) => ({ ...channel, id: `off-${index}`, enabled: false })),
+      ...Array.from({ length: 256 }, (_, index) => ({ ...channel, id: `on-${index}` })),
+    ];
+    revision.snapshot = latest.snapshot = JSON.stringify({ ...snapshot, logicalChannels: channels });
+    // A stray sample for a disabled channel, e.g. from before it was disabled, is never shown.
+    diagnostics.ingest(1, 'measurements', Buffer.from(JSON.stringify({ channelId: 'off-0', value: 1, unit: 'watt' })));
+    const result = await service.get(1);
+    expect(result.channels).toHaveLength(256);
+    expect(result.channels.every((item) => item.id.startsWith('on-'))).toBe(true);
+    // Exactly these keys for every entry: no samples, fault or other diagnostics leak in.
+    expect(result.disabledChannels).toStrictEqual(
+      Array.from({ length: 300 }, (_, index) => ({
+        id: `off-${index}`,
+        profile: 'generic-monitored-input',
+        capabilities: ['measurement'],
+        availability: 'disabled',
+      })),
+    );
+  });
+
+  it('keeps an on-change measurement current across a 30 s keepalive gap', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
+    try {
+      const { service, diagnostics } = setup();
+      const streamId = '00000000-0000-4000-8000-000000000001';
+      const sequences: Record<string, number> = {};
+      const send = (kind: string, extra: Record<string, unknown>) =>
+        diagnostics.ingest(
+          1,
+          kind,
+          Buffer.from(
+            JSON.stringify({
+              timestamp: new Date().toISOString(),
+              streamId,
+              sequence: (sequences[kind] = (sequences[kind] ?? 0) + 1),
+              ...extra,
+            }),
+          ),
+        );
+      const tick = () => {
+        send('heartbeat', {});
+        send('state', { connected: true, revision: 2, contentHash: 'a'.repeat(64), inputs: {}, outputs: {} });
+      };
+      const measurement = () => send('measurements', { channelId: 'io', unit: 'milliwatt', value: 5000, kind: 'live' });
+      const current = async () =>
+        (await service.get(1)).channels[0].samples.find((sample) => sample.kind === 'measurement');
+      tick();
+      measurement();
+      // Heartbeats and state keep coming every 10 s; the unchanged measurement only every 30 s.
+      for (let second = 10; second <= 120; second += 10) {
+        jest.setSystemTime(Date.parse('2026-09-05T12:00:00Z') + second * 1000);
+        tick();
+        if (second % 30 === 0) measurement();
+        expect(await current()).toMatchObject({ current: true, availabilityReason: 'current', value: 5000 });
+      }
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('never calls legacy samples current even with an applied revision and recent heartbeat', async () => {
     const { service, diagnostics } = setup();
     diagnostics.ingest(1, 'heartbeat', Buffer.from('{}'));

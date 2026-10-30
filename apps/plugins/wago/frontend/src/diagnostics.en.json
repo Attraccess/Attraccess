@@ -63,5 +63,14 @@
   "alsoSwitched": "channel is also switched by",
   "invalidControllers": "{{count}} flow node(s) have no valid controller selected.",
   "openFlow": "Open flow",
-  "tooMany": "Too many WAGO nodes to check all of them; more issues may exist."
+  "tooMany": "Too many WAGO nodes to check all of them; more issues may exist.",
+  "dropCountsLabel": "Dropped messages",
+  "dropCounts": "{{oversized}} too large · {{overload}} while overloaded",
+  "dropCountsUnsupported": "Not reported by this runtime version",
+  "dropCountsUnavailable": "No current report from the controller",
+  "dropExplanation": "The controller drops these messages without a reply. A dropped command times out like a command to an offline controller.",
+  "disabledChannels": {
+    "one": "{{count}} disabled channel is configured. The controller neither polls nor publishes it, so it has no samples.",
+    "many": "{{count}} disabled channels are configured. The controller neither polls nor publishes them, so they have no samples."
+  }
 }

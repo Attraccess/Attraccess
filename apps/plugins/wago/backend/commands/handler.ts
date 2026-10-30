@@ -3,7 +3,7 @@ import { ResourceFlowNode } from '@attraccess/plugins-backend-sdk';
 import { randomUUID } from 'node:crypto';
 import { outputBehavior, supportsOutputAction } from '../../channel-behavior';
 import { type WagoConfigurationSnapshot } from '../configuration/model';
-import { commandTopic } from '../protocol/index';
+import { commandTopic, parseControllerJson } from '../protocol/index';
 import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
 import { WagoController } from '../controllers/entity';
@@ -214,7 +214,7 @@ export class WagoCommandHandler {
   acknowledge(controllerId: number, payload: Buffer): void {
     let acknowledgement: { id?: unknown; status?: unknown; error?: unknown; message?: unknown };
     try {
-      acknowledgement = JSON.parse(payload.toString('utf8'));
+      acknowledgement = parseControllerJson(payload, 'command acknowledgement') as typeof acknowledgement;
     } catch {
       return;
     }

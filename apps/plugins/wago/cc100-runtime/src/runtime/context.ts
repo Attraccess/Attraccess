@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { OutputController } from '../outputs/controller';
 import { DiscoveryClaim } from './identity/protocol';
-import { type DeviceAdapter, type RuntimeState, type StateStore, type Transport, type ValidationError } from './types';
+import {
+  type DeviceAdapter,
+  type MessageSlot,
+  type RuntimeState,
+  type StateStore,
+  type Transport,
+  type ValidationError,
+} from './types';
 export abstract class RuntimeContext {
   protected state: RuntimeState = { outputs: {}, commandIds: [], commandExpiries: {} };
 
@@ -63,6 +70,30 @@ export abstract class RuntimeContext {
 
   protected readonly pendingFaults = new Set<string>();
 
+  /** Last measurement the broker accepted per channel; reportedAt is that sample's acquisition time (ms). */
+  protected readonly measurementRecords = new Map<
+    string,
+    { value: number; unit: string; kind: string; reportedAt: number }
+  >();
+
+  /** Last measurement fault published per channel, suppressing identical repeats. */
+  protected readonly measurementFaultRecords = new Map<string, { code: string; reportedAt: number }>();
+
+  /** Bumped on every resync so a publish that was in flight cannot restore a cleared record. */
+  protected measurementGeneration = 0;
+
+  /** Accepted revision/hash the measurement records belong to. */
+  protected measurementConfigurationKey?: string;
+
+  /** connected/revision/contentHash/hardwareAvailable of the last published state message. */
+  protected lastStateResyncKey?: string;
+
+  /**
+   * Timestamp (ms) of the last state message that triggered a resync. The server refuses samples taken
+   * at or before it, so only later samples may suppress their successors.
+   */
+  protected measurementsAcquiredAfter = -Infinity;
+
   protected readonly modbusOutputSamples = new Map<
     string,
     { revision: number; value?: boolean; error?: string; acquiredAt: number; commanded: boolean | undefined }
@@ -97,6 +128,17 @@ export abstract class RuntimeContext {
       feedbackEnabled: () => !this.runtimeUpdateRequired && !this.runtimeFailsafePending,
     });
   }
+  /**
+   * Full resync: the next fresh acquisition of every channel is published, and faults are reported again.
+   * `acquiredAfter` is the timestamp of the state message that caused it, when there is one.
+   */
+  protected resyncMeasurements(acquiredAfter?: number): void {
+    this.measurementRecords.clear();
+    this.measurementFaultRecords.clear();
+    this.measurementGeneration++;
+    if (acquiredAfter !== undefined) this.measurementsAcquiredAfter = acquiredAfter;
+  }
+
   abstract start(activateConnectionHandling?: () => Promise<void>): Promise<void>;
   abstract receiveClaim(credentials: DiscoveryClaim): Promise<void>;
   abstract retryCredentialRotationSubscription(): Promise<void>;
@@ -108,7 +150,7 @@ export abstract class RuntimeContext {
   abstract publishDiscoveryAnnouncement(sequence?: number): Promise<void>;
   abstract discoveryClaimTopic(): string;
   abstract receiveDesired(payload: Buffer): Promise<void>;
-  abstract receiveCommand(payload: Buffer): Promise<void>;
+  abstract receiveCommand(payload: Buffer, slot?: MessageSlot): Promise<void>;
   abstract setConnected(connected: boolean): Promise<void>;
   abstract publishHeartbeat(ignoreStatePublicationFailure?: boolean): Promise<void>;
   abstract publishMeasurements(): Promise<void>;

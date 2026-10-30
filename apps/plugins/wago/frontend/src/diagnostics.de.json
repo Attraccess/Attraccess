@@ -63,5 +63,14 @@
   "alsoSwitched": "Kanal wird auch geschaltet von",
   "invalidControllers": "Bei {{count}} Ablaufknoten ist keine gültige Steuerung ausgewählt.",
   "openFlow": "Ablauf öffnen",
-  "tooMany": "Zu viele WAGO-Knoten, um alle zu prüfen. Weitere Probleme sind möglich."
+  "tooMany": "Zu viele WAGO-Knoten, um alle zu prüfen. Weitere Probleme sind möglich.",
+  "dropCountsLabel": "Verworfene Nachrichten",
+  "dropCounts": "{{oversized}} zu groß · {{overload}} bei Überlastung",
+  "dropCountsUnsupported": "Diese Version der Laufzeitumgebung meldet sie nicht",
+  "dropCountsUnavailable": "Kein aktueller Bericht der Steuerung",
+  "dropExplanation": "Die Steuerung verwirft diese Nachrichten ohne Antwort. Für einen verworfenen Befehl tritt eine Zeitüberschreitung ein, wie bei einer Steuerung, die offline ist.",
+  "disabledChannels": {
+    "one": "{{count}} deaktivierter Kanal ist konfiguriert. Der Controller fragt ihn weder ab noch veröffentlicht er ihn, daher hat er keine Werte.",
+    "many": "{{count}} deaktivierte Kanäle sind konfiguriert. Der Controller fragt sie weder ab noch veröffentlicht er sie, daher haben sie keine Werte."
+  }
 }

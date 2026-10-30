@@ -9,8 +9,11 @@ type Source = { point: Snapshot['physicalPoints'][number]; channels: Snapshot['l
 /** Sweep-local fanout, never a cache of past samples. Encoders receive actual read completion time. */
 export async function* acquireMeasurements(snapshot: Snapshot, device: DeviceAdapter): AsyncGenerator<Acquisition> {
   const sources = new Map<string, Source>();
-  for (const channel of snapshot.logicalChannels.filter((c) => c.capabilities.includes('measurement'))) {
-    const point = snapshot.physicalPoints.find((p) => p.id === channel.physicalPointId);
+  const points = new Map(snapshot.physicalPoints.map((point) => [point.id, point]));
+  for (const channel of snapshot.logicalChannels) {
+    // A disabled channel causes no bus traffic, measurement or fault; a source only it uses is never read.
+    if (channel.enabled === false || !channel.capabilities.includes('measurement')) continue;
+    const point = points.get(channel.physicalPointId);
     if (!point) continue;
     let key: string;
     try {

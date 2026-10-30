@@ -9,6 +9,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateEditorSnapshot } from '../../backend/configuration/editor';
+import { CONFIGURATION_LIMIT_CODE, CONFIGURATION_LIMIT_MESSAGES } from '../../shared/configuration-limits';
 import type { WagoConfigurationSnapshot } from '../src/api/client';
 import { ConfigurationEditor } from '../src/configuration/ConfigurationEditor';
 import { ConfigurationMetadataChanges } from '../src/configuration/ConfigurationChanges';
@@ -373,6 +374,39 @@ describe('visual configuration workflow', () => {
       expect(state.save).not.toHaveBeenCalled();
     },
   );
+
+  it('refuses to publish a rollback the server reports as over the configuration limits', async () => {
+    const revision = {
+      revision: 1,
+      contentHash: 'historical',
+      state: 'applied',
+      publishedAt: '2026-09-05',
+      reportedAt: '2026-09-05',
+      rejectionErrors: null,
+      snapshot: JSON.stringify(state.snapshot),
+    };
+    state.history.mockResolvedValue({ revisions: [revision], offset: 0, limit: 20 });
+    state.revisionPreview.mockResolvedValue({
+      revision,
+      current: revision,
+      draftHash: 'snapshot-and-metadata',
+      diff: [],
+      impacts: [],
+      errors: [{ path: '$', code: CONFIGURATION_LIMIT_CODE, message: CONFIGURATION_LIMIT_MESSAGES.channels }],
+    });
+    mount();
+    const user = userEvent.setup();
+    await screen.findByRole('textbox', { name: 'Channel name' });
+    await section(user, 'History');
+    await user.click(await screen.findByRole('button', { name: 'Preview rollback to revision 1' }));
+    expect(await screen.findByText(/This revision cannot be published again/)).toBeInTheDocument();
+    expect(screen.getByText(`Configuration: ${CONFIGURATION_LIMIT_MESSAGES.channels}`)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish rollback as new revision' })).toBeDisabled();
+    act(() => useTranslationState.setState({ language: 'de' }));
+    expect(await screen.findByText(/Die Konfiguration hat mehr als 2048 Kanäle\. Entferne Kanäle/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zurücksetzen als neue Version veröffentlichen' })).toBeDisabled();
+    expect(state.rollback).not.toHaveBeenCalled();
+  });
 
   it('can save after clearing and then removing a channel name', async () => {
     mount();
