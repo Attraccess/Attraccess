@@ -54,18 +54,6 @@
       "internal": "Auf dem Server ist ein Fehler aufgetreten."
     }
   },
-  "waiting": {
-    "title": "Wartet auf Kopplung",
-    "description": "Diese Reader haben sich gemeldet und warten darauf, von einem Admin gekoppelt zu werden.",
-    "kind": {
-      "touch": "Touch",
-      "lite": "Lite"
-    },
-    "key": "Schlüssel {{fingerprint}}",
-    "announcedAt": "Gemeldet {{time}}",
-    "pair": "Koppeln",
-    "resume": "Fortsetzen"
-  },
   "security": {
     "title": "Sicherheit",
     "state": "Status",
@@ -75,15 +63,10 @@
     "pairedBy": "Gekoppelt von",
     "certificateExpiry": "Zertifikat gültig bis",
     "certificateSerial": "Zertifikat {{serial}}",
-    "pair": "Koppeln",
     "repair": "Neu koppeln",
     "replace": "Ersetzen",
     "revoke": "Widerrufen",
-    "requested": "Der Reader wurde aufgefordert, die Kopplung zu starten. Er erscheint gleich.",
-    "requestFailed": "Der Reader konnte nicht zur Kopplung aufgefordert werden",
-    "notConnected": "Der Reader ist gerade nicht verbunden. Zum Koppeln muss er online sein.",
-    "noResponse": "Der Reader hat die Kopplung nicht gestartet. Prüfe, ob er online ist, und versuche es erneut.",
-    "noCandidate": "Es wartet kein Reader auf die Kopplung. Widerrufe die Kopplung des Readers oder setze sie am Gerät zurück und versuche es erneut.",
+    "noCandidate": "Es wartet kein Gerät auf die Kopplung. Setze die Kopplung am Gerät zurück (oder widerrufe sie zuerst) und warte, bis es in der Reader-Liste unter „Nicht gekoppelt“ erscheint. Versuche es dann erneut.",
     "chooseDevice": {
       "title": {
         "repair": "Neu koppeln: Gerät auswählen",
@@ -101,8 +84,30 @@
       "revoked": "Widerrufen",
       "replaced": "Ersetzt"
     },
-    "unpairedHint": "Dieser Reader meldet sich noch mit seinem Token an. Koppeln gibt ihm einen eigenen Schlüssel und eine verschlüsselte Verbindung.",
+    "unpairedHint": "Dieser Reader meldet sich noch mit seinem Token an. Kopple ihn in der Reader-Liste, damit er einen eigenen Schlüssel und eine verschlüsselte Verbindung bekommt.",
     "revokeTitle": "Kopplung widerrufen?",
-    "revokeMessage": "Der Reader verliert seinen Schlüssel. Die Verbindung endet innerhalb einer Sekunde und er erscheint unter „Wartet auf Kopplung“. Eine Anmeldung per Token ist nicht mehr möglich."
+    "revokeMessage": "Der Reader verliert seinen Schlüssel. Die Verbindung endet innerhalb einer Sekunde und er erscheint in der Reader-Liste unter „Nicht gekoppelt“. Eine Anmeldung per Token ist nicht mehr möglich.",
+    "actions": "Aktionen",
+    "repairDescription": "Gleiches Gerät, neuer Schlüssel. Nutze das, nachdem die Kopplung am Gerät zurückgesetzt wurde. Der bisherige Schlüssel funktioniert dann nicht mehr.",
+    "replaceDescription": "Ein anderes Gerät übernimmt Name, Ressourcen und Einstellungen dieses Readers, zum Beispiel nach dem Tausch defekter Hardware. Das alte Gerät wird ausgesperrt.",
+    "revokeDescription": "Sperrt diesen Reader sofort aus. Er bleibt in der Liste und kann später wieder gekoppelt werden."
+  },
+  "toPair": {
+    "title": "Nicht gekoppelt",
+    "description": "Diese Reader haben noch keinen eigenen Schlüssel. Kopple sie, um ihre Verbindung zu verschlüsseln. Der Reader muss online sein.",
+    "signsInWithToken": "Meldet sich mit Token an",
+    "pair": "Koppeln",
+    "resume": "Fortsetzen",
+    "requestFailed": "Der Reader konnte nicht zur Kopplung aufgefordert werden",
+    "notConnected": "Der Reader ist gerade nicht verbunden. Zum Koppeln muss er online sein.",
+    "noResponse": "Der Reader hat die Kopplung nicht gestartet. Prüfe, ob er online ist und eine Firmware mit Kopplung hat, und versuche es erneut."
+  },
+  "device": {
+    "kind": {
+      "touch": "Touch",
+      "lite": "Lite"
+    },
+    "key": "Schlüssel {{fingerprint}}",
+    "announcedAt": "Gemeldet {{time}}"
   }
 }

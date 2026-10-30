@@ -5,7 +5,6 @@ import {
   AttractapCredentialEvent,
   useAttractapServiceGetPairings,
   useAttractapServiceGetReaderCredentialHistory,
-  useAttractapServiceRequestReaderPairing,
   useAttractapServiceRevokeReader,
   useAttractapServiceGetReadersKey,
   useAttractapServiceGetReaderCredentialHistoryKey,
@@ -19,11 +18,9 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { PairingDialog } from './PairingDialog';
 import { PairingStateChip } from './PairingStateChip';
 import { WaitingDeviceSummary } from './WaitingDeviceSummary';
-import { apiErrorMessage, readerIdsWaitingToPair } from './pairingUtils';
+import { apiErrorMessage, isPairingRunning, readerIdsWaitingToPair } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
-
-const PAIRING_REQUEST_TIMEOUT_MS = 30_000;
 
 type TakeOverMode = 'repair' | 'replace';
 
@@ -37,6 +34,25 @@ function EventActor(props: Readonly<{ actorId: number | null }>) {
   if (isError) return <span>#{actorId}</span>;
   if (!user) return <Spinner size="sm" />;
   return <AttraccessUser user={user} interactive={false} />;
+}
+
+/** One action with a sentence that says what it does, so the buttons make sense on first sight. */
+function SecurityAction(
+  props: Readonly<{ label: string; description: string; onPress: () => void; dataCy: string; danger?: boolean }>,
+) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <p className="text-sm text-default-500">{props.description}</p>
+      <Button
+        className="shrink-0"
+        variant={props.danger ? 'danger' : 'secondary'}
+        onPress={props.onPress}
+        data-cy={props.dataCy}
+      >
+        {props.label}
+      </Button>
+    </div>
+  );
 }
 
 /** The credential the reader uses now, or the latest one when the current key is not in the history. */
@@ -53,31 +69,19 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const [awaitingReader, setAwaitingReader] = useState(false);
   const [pairingId, setPairingId] = useState<string | null>(null);
-  const [pairingMode, setPairingMode] = useState<'pair' | TakeOverMode | null>(null);
+  const [pairingMode, setPairingMode] = useState<TakeOverMode | null>(null);
   const [pickerMode, setPickerMode] = useState<TakeOverMode | null>(null);
   const [revokeOpen, setRevokeOpen] = useState(false);
 
   const { data: history } = useAttractapServiceGetReaderCredentialHistory({ readerId: reader.id });
   const { data: pairings } = useAttractapServiceGetPairings(undefined, {
-    refetchInterval: awaitingReader || pickerMode ? 1000 : false,
+    refetchInterval: pickerMode ? 1000 : false,
   });
 
   const showError = (titleKey: string) => (error: unknown) =>
     toast.error({ title: t(titleKey), description: apiErrorMessage(error) });
 
-  const requestPairing = useAttractapServiceRequestReaderPairing({
-    onSuccess: (result) => {
-      if (result.requested) {
-        setAwaitingReader(true);
-        toast.success({ title: t('security.requested') });
-      } else {
-        toast.error({ title: t('security.notConnected') });
-      }
-    },
-    onError: showError('security.requestFailed'),
-  });
   const revoke = useAttractapServiceRevokeReader({
     onSuccess: () => {
       setRevokeOpen(false);
@@ -89,38 +93,19 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
     onError: showError('security.revokeFailed'),
   });
 
-  // Give up waiting when the reader never opens a pairing connection.
-  const onNoResponse = useRef(() => undefined as void);
-  onNoResponse.current = () => {
-    setAwaitingReader(false);
-    toast.error({ title: t('security.noResponse') });
-  };
-  useEffect(() => {
-    if (!awaitingReader) return;
-    const timer = setTimeout(() => onNoResponse.current(), PAIRING_REQUEST_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [awaitingReader]);
-
-  // A reader that was asked to pair connects to the pairing endpoint; pick up its request.
-  useEffect(() => {
-    if (!awaitingReader) return;
-    const found = pairings?.find((p) => p.boundReaderId === reader.id && !p.mode);
-    if (found) {
-      setAwaitingReader(false);
-      setPairingId(found.id);
-      setPairingMode('pair');
-    }
-  }, [awaitingReader, pairings, reader.id]);
-
-  // After a page reload an already running pairing of this reader would be orphaned; pick it up once.
+  // After a page reload a running re-pair or replace of this reader would be orphaned; pick it up once.
+  // First pairings of readers that still use their token continue from the reader list.
   const resumeChecked = useRef(false);
   useEffect(() => {
     if (resumeChecked.current || !pairings) return;
     resumeChecked.current = true;
-    const running = pairings.find((p) => p.boundReaderId === reader.id && p.mode);
-    if (running) {
+    const running = pairings.find(
+      (p) =>
+        p.targetReaderId === reader.id && (p.mode === 'repair' || p.mode === 'replace') && isPairingRunning(p.state),
+    );
+    if (running?.mode === 'repair' || running?.mode === 'replace') {
       setPairingId(running.id);
-      setPairingMode(running.mode === 'new' ? 'pair' : running.mode);
+      setPairingMode(running.mode);
     }
   }, [pairings, reader.id]);
 
@@ -171,32 +156,32 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
         </dl>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {reader.pairingState === 'unpaired' && (
-          <Button
-            isPending={requestPairing.isPending || awaitingReader}
-            onPress={() => requestPairing.mutate({ readerId: reader.id })}
-            data-cy="attractap-security-pair"
-          >
-            {t('security.pair')}
-          </Button>
-        )}
-        {reader.pairingState !== 'unpaired' && (
-          <>
-            <Button variant="secondary" onPress={() => openPicker('repair')} data-cy="attractap-security-repair">
-              {t('security.repair')}
-            </Button>
-            <Button variant="secondary" onPress={() => openPicker('replace')} data-cy="attractap-security-replace">
-              {t('security.replace')}
-            </Button>
-          </>
-        )}
-        {reader.pairingState === 'paired' && (
-          <Button variant="danger" onPress={() => setRevokeOpen(true)} data-cy="attractap-security-revoke">
-            {t('security.revoke')}
-          </Button>
-        )}
-      </div>
+      {reader.pairingState !== 'unpaired' && (
+        <div className="flex flex-col gap-3">
+          <h3 className="font-semibold">{t('security.actions')}</h3>
+          <SecurityAction
+            label={t('security.repair')}
+            description={t('security.repairDescription')}
+            onPress={() => openPicker('repair')}
+            dataCy="attractap-security-repair"
+          />
+          <SecurityAction
+            label={t('security.replace')}
+            description={t('security.replaceDescription')}
+            onPress={() => openPicker('replace')}
+            dataCy="attractap-security-replace"
+          />
+          {reader.pairingState === 'paired' && (
+            <SecurityAction
+              label={t('security.revoke')}
+              description={t('security.revokeDescription')}
+              onPress={() => setRevokeOpen(true)}
+              dataCy="attractap-security-revoke"
+              danger
+            />
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <h3 className="font-semibold">{t('security.history')}</h3>
@@ -225,7 +210,7 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
       <PairingDialog
         pairingId={pairingId}
         autoStartMode={pairingMode ?? undefined}
-        presetTargetReaderId={pairingMode === 'pair' ? undefined : reader.id}
+        presetTargetReaderId={reader.id}
         onClose={() => {
           setPairingId(null);
           setPairingMode(null);

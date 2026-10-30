@@ -19,7 +19,6 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQue
 vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
   useAttractapServiceGetReaderCredentialHistory: () => ({ data: mocks.history.current }),
-  useAttractapServiceRequestReaderPairing: () => ({ mutate: vi.fn(), isPending: false }),
   useAttractapServiceRevokeReader: (options: { onSuccess?: () => void }) => {
     mocks.revokeOptions.current = options;
     return { mutate: mocks.revoke, isPending: false };
@@ -112,8 +111,8 @@ describe('ReaderSecurity', () => {
 
     await user.click(screen.getByRole('button', { name: 'security.repair' }));
     const picker = document.querySelector('[data-cy="attractap-security-device-picker"]') as HTMLElement;
-    expect(within(picker).getByText('waiting.kind.touch')).toBeInTheDocument();
-    expect(within(picker).getByText('waiting.kind.lite')).toBeInTheDocument();
+    expect(within(picker).getByText('device.kind.touch')).toBeInTheDocument();
+    expect(within(picker).getByText('device.kind.lite')).toBeInTheDocument();
     expect(mocks.pairingDialog).toHaveBeenLastCalledWith(expect.objectContaining({ pairingId: null }));
 
     await user.click(within(picker).getAllByRole('button', { name: 'security.chooseDevice.use' })[1]);
@@ -160,5 +159,19 @@ describe('ReaderSecurity', () => {
     ];
     render(<ReaderSecurity reader={reader} />);
     expect(document.querySelector('[data-cy="attractap-pairing-state-paired"]')).not.toBeNull();
+  });
+
+  it('explains every action next to its button', () => {
+    render(<ReaderSecurity reader={reader} />);
+    for (const key of ['repair', 'replace', 'revoke']) {
+      expect(screen.getByRole('button', { name: `security.${key}` })).toBeInTheDocument();
+      expect(screen.getByText(`security.${key}Description`)).toBeInTheDocument();
+    }
+  });
+
+  it('offers no actions for a reader that still signs in with its token; it is paired from the list', () => {
+    render(<ReaderSecurity reader={{ ...reader, pairingState: 'unpaired' } as Attractap} />);
+    expect(screen.getByText('security.unpairedHint')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });

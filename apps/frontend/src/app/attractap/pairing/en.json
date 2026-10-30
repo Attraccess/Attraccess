@@ -54,18 +54,6 @@
       "internal": "An error occurred on the server."
     }
   },
-  "waiting": {
-    "title": "Waiting to pair",
-    "description": "These readers announced themselves and wait for an admin to pair them.",
-    "kind": {
-      "touch": "Touch",
-      "lite": "Lite"
-    },
-    "key": "Key {{fingerprint}}",
-    "announcedAt": "Announced {{time}}",
-    "pair": "Pair",
-    "resume": "Continue"
-  },
   "security": {
     "title": "Security",
     "state": "Status",
@@ -75,15 +63,10 @@
     "pairedBy": "Paired by",
     "certificateExpiry": "Certificate valid until",
     "certificateSerial": "Certificate {{serial}}",
-    "pair": "Pair",
     "repair": "Re-pair",
     "replace": "Replace",
     "revoke": "Revoke",
-    "requested": "The reader was asked to start pairing. It will show up in a moment.",
-    "requestFailed": "Could not ask the reader to pair",
-    "notConnected": "The reader is not connected right now. Pairing needs the reader to be online.",
-    "noResponse": "The reader did not start pairing. Check that it is online and try again.",
-    "noCandidate": "No reader is waiting to pair. Revoke the reader or reset its pairing on the device, then try again.",
+    "noCandidate": "No device is waiting to pair. Reset the pairing on the device (or revoke it first) and wait until it appears under Not paired in the reader list, then try again.",
     "chooseDevice": {
       "title": {
         "repair": "Re-pair: choose the device",
@@ -101,8 +84,30 @@
       "revoked": "Revoked",
       "replaced": "Replaced"
     },
-    "unpairedHint": "This reader still signs in with its token. Pair it to give it its own key and an encrypted connection.",
+    "unpairedHint": "This reader still signs in with its token. Pair it from the reader list to give it its own key and an encrypted connection.",
     "revokeTitle": "Revoke pairing?",
-    "revokeMessage": "The reader loses its key. Its live connection ends within a second and it will show up under Waiting to pair. It cannot sign in with a token any more."
+    "revokeMessage": "The reader loses its key. Its live connection ends within a second and it will show up under Not paired in the reader list. It cannot sign in with a token any more.",
+    "actions": "Actions",
+    "repairDescription": "Same device, new key. Use this after the pairing was reset on the device. The current key stops working.",
+    "replaceDescription": "A different device takes over this reader's name, resources and settings, for example after swapping broken hardware. The old device is locked out.",
+    "revokeDescription": "Locks this reader out right away. It stays in the list and can be paired again later."
+  },
+  "toPair": {
+    "title": "Not paired",
+    "description": "These readers do not have their own key yet. Pair them to encrypt their connection. The reader must be online.",
+    "signsInWithToken": "Signs in with its token",
+    "pair": "Pair",
+    "resume": "Continue",
+    "requestFailed": "Could not ask the reader to pair",
+    "notConnected": "The reader is not connected right now. Pairing needs the reader to be online.",
+    "noResponse": "The reader did not start pairing. Check that it is online and runs firmware that supports pairing, then try again."
+  },
+  "device": {
+    "kind": {
+      "touch": "Touch",
+      "lite": "Lite"
+    },
+    "key": "Key {{fingerprint}}",
+    "announcedAt": "Announced {{time}}"
   }
 }

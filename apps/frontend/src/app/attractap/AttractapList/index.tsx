@@ -15,7 +15,7 @@ import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon
 import { EmptyState } from '../../../components/emptyState';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { PairingStateChip } from '../pairing/PairingStateChip';
-import { WaitingToPair } from '../pairing/WaitingToPair';
+import { ReadersToPair } from '../pairing/ReadersToPair';
 import { readerIdsWaitingToPair } from '../pairing/pairingUtils';
 import { PageAction, PageHeader } from '../../../components/pageHeader/index';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
@@ -50,7 +50,7 @@ export function useAttractapListState() {
     refetchInterval: 5000,
   });
 
-  // Shares the cache with the Waiting to pair card, which keeps it fresh.
+  // Shares the cache with the Not paired card, which keeps it fresh.
   const { data: pairings } = useAttractapServiceGetPairings();
   const waitingReaderIds = useMemo(() => readerIdsWaitingToPair(pairings), [pairings]);
 
@@ -128,6 +128,7 @@ export function useAttractapListState() {
     activeReaders,
     firmwareUpdateChip,
     waitingReaderIds,
+    allReaders,
   } as const;
 }
 
@@ -143,6 +144,7 @@ export function AttractapList() {
     activeReaders,
     firmwareUpdateChip,
     waitingReaderIds,
+    allReaders,
   } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
@@ -193,7 +195,7 @@ export function AttractapList() {
       />
 
       <div className="flex flex-col gap-4">
-        <WaitingToPair />
+        <ReadersToPair readers={allReaders ?? []} />
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
             <Card.Header>

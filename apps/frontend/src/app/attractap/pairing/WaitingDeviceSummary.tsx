@@ -12,10 +12,10 @@ export function WaitingDeviceSummary(props: Readonly<{ pairing: PairingDto }>) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <Chip>{t(`waiting.kind.${pairing.kind}`)}</Chip>
-        <span className="font-mono text-sm">{t('waiting.key', { fingerprint: pairing.keyFingerprint })}</span>
+        <Chip>{t(`device.kind.${pairing.kind}`)}</Chip>
+        <span className="font-mono text-sm">{t('device.key', { fingerprint: pairing.keyFingerprint })}</span>
       </div>
-      <span className="text-xs text-default-500">{t('waiting.announcedAt', { time: format(pairing.createdAt) })}</span>
+      <span className="text-xs text-default-500">{t('device.announcedAt', { time: format(pairing.createdAt) })}</span>
     </div>
   );
 }

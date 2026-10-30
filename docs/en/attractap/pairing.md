@@ -9,25 +9,30 @@ with older firmware. Both kinds can use the same server at the same time.
 
 ## Reader states
 
-| State               | Meaning                                                                                                                                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Not paired**      | The reader signs in with its token. This is the state of every reader after an update of the server.                                                                                                  |
-| **Waiting to pair** | The reader has no valid pairing (it was revoked or its pairing was cleared) and announced itself. It is listed on the readers page. A reader also shows this state while a pairing for it is running. |
-| **Paired**          | The reader has its own key and certificate. Token sign-in is no longer possible for it.                                                                                                               |
-| **Revoked**         | An admin removed the pairing. The live connection ends within a second and the reader moves to **Waiting to pair**.                                                                                   |
+| State               | Meaning                                                                                                                                |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Not paired**      | The reader signs in with its token. This is the state of every reader after an update of the server.                                   |
+| **Waiting to pair** | A pairing for the reader is running.                                                                                                   |
+| **Paired**          | The reader has its own key and certificate. Token sign-in is no longer possible for it.                                                |
+| **Revoked**         | An admin removed the pairing. The live connection ends within a second and the device appears under **Not paired** in the reader list. |
 
 ## Pairing a reader
 
 You need the `resources.update` permission (shown as **Update Resources** in the role editor).
 Pairing actions take effect immediately; you do not need to save the reader afterwards.
 
-1. Open the reader in the editor, go to the **Security** tab and choose **Pair** (for readers
-   that are connected with their token), or pick a reader under **Waiting to pair** on the
-   readers page. For a waiting reader you choose whether it is a new reader, a re-pair of an
-   existing record, or the replacement of an existing record.
-   When you choose **Pair**, the server asks the reader through its existing token connection to
-   start pairing and hands it a one-time pairing ticket, which ties the pairing to this record.
-   The token itself is never sent in pairing messages.
+1. On the readers page, the **Not paired** card above the reader tables lists everything that
+   still needs pairing, each with a single **Pair** button:
+   - readers that sign in with their token, and
+   - devices that announced themselves without a valid pairing (revoked, reset on the device or
+     new). For these you choose whether it is a new reader, a re-pair of an existing record, or
+     the replacement of an existing record.
+
+   The reader must be online. For a token reader, the server asks it through its existing token
+   connection to start pairing and hands it a one-time pairing ticket, which ties the pairing to
+   this record. The token itself is never sent in pairing messages. A pairing that is already
+   running shows **Continue** instead.
+
 2. The dialog shows a code and a five minute countdown.
    - **Touch readers** show six digits, for example `471 903`.
    - **Lite readers** show eight coloured LED segments. Segment 1 blinks on the reader to mark
@@ -49,16 +54,18 @@ trust when pairing. Pairing is not blocked.
 
 ## Re-pair, replace and revoke
 
-All three actions are in the **Security** tab of the reader editor.
+These actions are in the **Security** tab of the reader editor of a paired or revoked reader.
+Each one is explained next to its button.
 
-- **Re-pair** gives the same device a new key. The old credential is revoked.
-- **Replace** lets a new device take over an existing reader record (name, resources and
-  settings). The old credential is marked as replaced.
-- **Revoke** asks for confirmation, then ends the session and the reader shows "Pairing removed
-  – ask an admin to pair this reader". It never falls back to token sign-in and moves to
-  **Waiting to pair**.
+- **Re-pair**: same device, new key. Use it after the pairing was reset on the device. The old
+  credential is revoked.
+- **Replace**: a different device takes over the reader's name, resources and settings, for
+  example after swapping broken hardware. The old credential is marked as replaced.
+- **Revoke**: locks the reader out right away. It asks for confirmation, then ends the session and
+  the reader shows "Pairing removed – ask an admin to pair this reader". It never falls back to
+  token sign-in, stays in the list, and the device appears under **Not paired**.
 
-Re-pair and Replace need the device to appear under **Waiting to pair** first: revoke the old
+Re-pair and Replace need the device to appear under **Not paired** first: revoke the old
 pairing or reset the pairing on the device, wait until it is listed, then choose **Re-pair** or
 **Replace**. The dialog lists every waiting device with its type, key and the time it announced
 itself, so you can pick the right one.

@@ -10,12 +10,12 @@ Nicht gekoppelte Reader funktionieren unverändert (Anmeldung per Token), ebenso
 
 ## Reader-Status
 
-| Status                  | Bedeutung                                                                                                                                                                                            |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Nicht gekoppelt**     | Der Reader meldet sich mit seinem Token an. Diesen Status hat jeder Reader nach einem Update des Servers.                                                                                            |
-| **Wartet auf Kopplung** | Der Reader hat keine gültige Kopplung (widerrufen oder gelöscht) und hat sich gemeldet. Er erscheint auf der Reader-Seite. Ein Reader zeigt diesen Status auch, solange eine Kopplung für ihn läuft. |
-| **Gekoppelt**           | Der Reader hat einen eigenen Schlüssel und ein Zertifikat. Die Anmeldung per Token ist für ihn nicht mehr möglich.                                                                                   |
-| **Widerrufen**          | Ein Admin hat die Kopplung widerrufen. Die Verbindung endet innerhalb einer Sekunde und der Reader wechselt zu **Wartet auf Kopplung**.                                                              |
+| Status                  | Bedeutung                                                                                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Nicht gekoppelt**     | Der Reader meldet sich mit seinem Token an. Diesen Status hat jeder Reader nach einem Update des Servers.                                                  |
+| **Wartet auf Kopplung** | Für den Reader läuft eine Kopplung.                                                                                                                        |
+| **Gekoppelt**           | Der Reader hat einen eigenen Schlüssel und ein Zertifikat. Die Anmeldung per Token ist für ihn nicht mehr möglich.                                         |
+| **Widerrufen**          | Ein Admin hat die Kopplung widerrufen. Die Verbindung endet innerhalb einer Sekunde und das Gerät erscheint in der Reader-Liste unter **Nicht gekoppelt**. |
 
 ## Reader koppeln
 
@@ -23,14 +23,18 @@ Dafür brauchst du die Berechtigung `resources.update` (im Rollen-Editor als **R
 bearbeiten** angezeigt). Kopplungsaktionen wirken sofort; du musst den Reader danach nicht
 speichern.
 
-1. Öffne den Reader im Editor, wechsle in den Tab **Sicherheit** und wähle **Koppeln** (für
-   Reader, die per Token verbunden sind), oder wähle auf der Reader-Seite einen Reader unter
-   **Wartet auf Kopplung**. Bei wartenden Readern legst du fest, ob er neu ist, ein bestehender
-   Eintrag neu gekoppelt oder ersetzt wird.
-   Wenn du **Koppeln** wählst, fordert der Server den Reader über seine bestehende
-   Token-Verbindung auf, die Kopplung zu starten, und gibt ihm dafür ein einmaliges
+1. Auf der Reader-Seite listet die Karte **Nicht gekoppelt** über den Reader-Tabellen alles, was
+   noch gekoppelt werden muss, jeweils mit nur einem Button **Koppeln**:
+   - Reader, die sich mit ihrem Token anmelden, und
+   - Geräte, die sich ohne gültige Kopplung gemeldet haben (widerrufen, am Gerät zurückgesetzt
+     oder neu). Hier legst du fest, ob es ein neuer Reader ist, ein bestehender Eintrag neu
+     gekoppelt oder ersetzt wird.
+
+   Der Reader muss online sein. Bei einem Token-Reader fordert der Server ihn über seine
+   bestehende Token-Verbindung auf, die Kopplung zu starten, und gibt ihm dafür ein einmaliges
    Kopplungsticket, das die Kopplung an diesen Eintrag bindet. Der Token selbst wird nie in
-   Kopplungsnachrichten gesendet.
+   Kopplungsnachrichten gesendet. Läuft schon eine Kopplung, steht dort **Fortsetzen**.
+
 2. Der Dialog zeigt einen Code und einen Countdown von fünf Minuten.
    - **Touch-Reader** zeigen sechs Ziffern, z. B. `471 903`.
    - **Lite-Reader** zeigen acht farbige LED-Segmente. Segment 1 blinkt am Reader als
@@ -53,16 +57,19 @@ oder ein vertrauenswürdiges Netz. Die Kopplung wird nicht blockiert.
 
 ## Neu koppeln, ersetzen, widerrufen
 
-Alle drei Aktionen findest du im Tab **Sicherheit** des Reader-Editors.
+Diese Aktionen findest du im Tab **Sicherheit** des Reader-Editors eines gekoppelten oder
+widerrufenen Readers. Jede ist direkt neben ihrem Button erklärt.
 
-- **Neu koppeln**: dasselbe Gerät bekommt einen neuen Schlüssel, der alte wird widerrufen.
-- **Ersetzen**: ein neues Gerät übernimmt einen bestehenden Reader-Eintrag (Name, Ressourcen,
-  Einstellungen). Der alte Schlüssel wird als ersetzt markiert.
-- **Widerrufen**: fragt zuerst nach einer Bestätigung und beendet dann die Sitzung. Der Reader
-  zeigt „Kopplung entfernt – bitte einen Admin um erneutes Koppeln“, fällt nie auf die
-  Token-Anmeldung zurück und wechselt zu **Wartet auf Kopplung**.
+- **Neu koppeln**: gleiches Gerät, neuer Schlüssel. Nutze das, nachdem die Kopplung am Gerät
+  zurückgesetzt wurde. Der alte Schlüssel wird widerrufen.
+- **Ersetzen**: ein anderes Gerät übernimmt Name, Ressourcen und Einstellungen des Readers, zum
+  Beispiel nach dem Tausch defekter Hardware. Der alte Schlüssel wird als ersetzt markiert.
+- **Widerrufen**: sperrt den Reader sofort aus. Fragt zuerst nach einer Bestätigung und beendet
+  dann die Sitzung. Der Reader zeigt „Kopplung entfernt – bitte einen Admin um erneutes
+  Koppeln“, fällt nie auf die Token-Anmeldung zurück, bleibt in der Liste, und das Gerät erscheint
+  unter **Nicht gekoppelt**.
 
-Für **Neu koppeln** und **Ersetzen** muss das Gerät zuerst unter **Wartet auf Kopplung**
+Für **Neu koppeln** und **Ersetzen** muss das Gerät zuerst unter **Nicht gekoppelt**
 erscheinen: Widerrufe die alte Kopplung oder setze die Kopplung am Gerät zurück, warte, bis es
 aufgelistet ist, und wähle dann **Neu koppeln** oder **Ersetzen**. Der Dialog zeigt jedes
 wartende Gerät mit Typ, Schlüssel und dem Zeitpunkt, zu dem es sich gemeldet hat, damit du das

@@ -30,7 +30,7 @@ vi.mock('../HardwareSetup', () => ({
 }));
 vi.mock('../HardwareSetup/WebSerialConsole', () => ({ WebSerialConsole: () => null }));
 vi.mock('../AttractapEditor/AttractapEditor', () => ({ AttractapEditor: () => null }));
-vi.mock('../pairing/WaitingToPair', () => ({ WaitingToPair: () => null }));
+vi.mock('../pairing/ReadersToPair', () => ({ ReadersToPair: () => null }));
 vi.mock('../pairing/PairingStateChip', () => ({
   PairingStateChip: ({ state, waiting }: { state: string; waiting?: boolean }) => (
     <span data-testid={`state-${waiting ? 'waiting' : state}`} />
