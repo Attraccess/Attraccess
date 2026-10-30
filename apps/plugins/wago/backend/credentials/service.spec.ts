@@ -391,7 +391,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       device: new MemoryDeviceAdapter(),
       transport: {
         subscribe: async (topic, handler) => {
-          listeners.set(topic, handler);
+          listeners.set(topic, (payload) => handler(payload, { release: () => undefined }));
         },
         publish: async (topic, payload) => {
           if (topic.endsWith('/credentials/rotate/ack')) {

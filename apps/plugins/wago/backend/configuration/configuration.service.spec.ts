@@ -537,6 +537,58 @@ describe('WagoService configuration and commands', () => {
     expect(context.logger.warn).toHaveBeenCalledWith('Dropping excess WAGO configuration report for controller 1');
   });
 
+  it('drops oversized and over-nested reports for a busy controller without decoding or queueing them', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed]);
+    let releaseFirst!: () => void;
+    const processed: Buffer[] = [];
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
+
+    await service.onApplicationBootstrap();
+
+    const reportSubscription = (context.mqtt.subscribe as jest.Mock).mock.calls.find(([, topic]) =>
+      topic.endsWith('/configuration/reported'),
+    );
+    const handler = reportSubscription?.[2] as (message: { topic: string; payload: Buffer }) => void;
+    const topic = 'attraccess/wago/v1/controllers/cc100-01/configuration/reported';
+    handler({ topic, payload: Buffer.from('{"revision":1}') });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const oversized = Buffer.alloc(64 * 1024 + 1, 0x20);
+    const toString = jest.spyOn(oversized, 'toString');
+    const parse = jest.spyOn(JSON, 'parse');
+    try {
+      handler({ topic, payload: oversized });
+      expect(toString).not.toHaveBeenCalled();
+      expect(parse).not.toHaveBeenCalled();
+      handler({ topic, payload: Buffer.from(`{"revision":2,"nested":${'['.repeat(8)}${']'.repeat(8)}}`) });
+      expect(parse).not.toHaveBeenCalled();
+    } finally {
+      parse.mockRestore();
+    }
+    const valid = Buffer.from('{"revision":3}');
+    handler({ topic, payload: valid });
+
+    releaseFirst();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(processed).toEqual([Buffer.from('{"revision":1}'), valid]);
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      'Dropping invalid WAGO configuration report for controller 1: configuration report is too large',
+    );
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      'Dropping invalid WAGO configuration report for controller 1: configuration report is nested too deeply',
+    );
+  });
+
   it('returns bounded revision metadata pages without snapshots', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, revisionRepository } = createService([claimed]);

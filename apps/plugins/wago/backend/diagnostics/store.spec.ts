@@ -1,4 +1,5 @@
 import { BOUNDED_MESSAGES_CAPABILITY } from '../../shared/capabilities';
+import { CONFIGURATION_LIMIT_CODE, CONFIGURATION_LIMIT_MESSAGES } from '../../shared/configuration-limits';
 import manifest from '../../cc100-runtime/manifest.json';
 import { CAPABILITIES } from '../../cc100-runtime/src/runtime/identity/protocol';
 import { parseConfigurationReport } from '../configuration/model';
@@ -12,6 +13,20 @@ describe('WAGO bounded diagnostics', () => {
   beforeEach(() => {
     now = Date.parse('2026-09-05T12:00:00Z');
     store = new WagoDiagnosticsStore(() => now);
+  });
+  it('keeps the configuration limit code of a runtime rejection and hides unknown codes', () => {
+    send('configuration/reported', {
+      revision: 3,
+      contentHash: 'a'.repeat(64),
+      errors: [
+        { path: 'snapshot', code: CONFIGURATION_LIMIT_CODE, message: CONFIGURATION_LIMIT_MESSAGES.channels },
+        { path: 'snapshot', code: 'made_up_code', message: 'anything' },
+      ],
+    });
+    expect(store.read(1).rejection?.errors).toEqual([
+      { path: 'snapshot', code: CONFIGURATION_LIMIT_CODE },
+      { path: 'snapshot', code: 'validation_error' },
+    ]);
   });
   it('distinguishes missing, invalid, stale and future source times', () => {
     expect(freshness(null, now)).toBe('missing');

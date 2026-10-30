@@ -262,15 +262,11 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
     return this.revisions.save(revision);
   }
 
+  /** Revision a queued report acknowledges; throws for a report outside the controller payload limits. */
   protected configurationReportRevision(payload: Buffer): number | null {
-    try {
-      const report = JSON.parse(payload.toString('utf8')) as { revision?: unknown };
-      return Number.isSafeInteger(report.revision) && (report.revision as number) >= 1
-        ? (report.revision as number)
-        : null;
-    } catch {
-      return null;
-    }
+    const report = parseControllerJson(payload, 'configuration report');
+    const revision = report && typeof report === 'object' ? (report as { revision?: unknown }).revision : undefined;
+    return Number.isSafeInteger(revision) && (revision as number) >= 1 ? (revision as number) : null;
   }
 
   protected async processConfigurationReports(
@@ -301,8 +297,17 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
     const queue = this.configurationReportQueues.get(controllerId) ?? { pending: new Map(), processing: false };
     this.configurationReportQueues.set(controllerId, queue);
     if (queue.processing) {
-      // Preserve acknowledgements for distinct immutable revisions in arrival order.
-      const revision = this.configurationReportRevision(payload);
+      // Preserve acknowledgements for distinct immutable revisions in arrival order. A report that is
+      // too large, too deep or not JSON is dropped here, so the pending queue only holds bounded payloads.
+      let revision: number | null;
+      try {
+        revision = this.configurationReportRevision(payload);
+      } catch (error) {
+        this.context.logger.warn(
+          `Dropping invalid WAGO configuration report for controller ${controllerId}: ${(error as Error).message}`,
+        );
+        return;
+      }
       const key = revision ?? Number.NaN;
       if (queue.pending.has(key) || queue.pending.size < MAX_PENDING_CONFIGURATION_REPORTS)
         queue.pending.set(key, payload);

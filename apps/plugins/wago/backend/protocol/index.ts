@@ -186,8 +186,10 @@ export function exceedsJsonDepth(text: string, maxDepth: number): boolean {
 }
 
 /**
- * Decode one controller-originated JSON payload. The size and depth are checked before
- * `toString`/`JSON.parse` so an oversized or deeply nested message costs no allocation.
+ * Decode one controller-originated JSON payload. The host MQTT layer has already allocated the
+ * received Buffer; the byte length is checked before `toString`, so an oversized message is never
+ * decoded or parsed. The nesting depth is scanned on the decoded text before `JSON.parse`, so a
+ * deeply nested message is never parsed.
  */
 export function parseControllerJson(payload: Buffer, label: string): unknown {
   if (payload.byteLength > CONTROLLER_PAYLOAD_MAX_BYTES) throw new Error(`${label} is too large`);
@@ -210,7 +212,7 @@ export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
   return heartbeatFromObject(parseObject(payload, 'announcement'));
 }
 
-function heartbeatFromObject(input: Record<string, unknown>): WagoHeartbeat {
+export function heartbeatFromObject(input: Record<string, unknown>): WagoHeartbeat {
   const required = ['hardwareId', 'protocolVersion', 'runtimeVersion'];
   for (const key of required)
     if (typeof input[key] !== 'string' || !input[key].trim()) throw new Error(`announcement ${key} is required`);

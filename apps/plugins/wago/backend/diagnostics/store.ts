@@ -1,4 +1,4 @@
-import { BOUNDED_MESSAGES_CAPABILITY, DROP_REASONS } from '../../shared/capabilities';
+import { BOUNDED_MESSAGES_CAPABILITY, DROP_REASONS, type DropReason } from '../../shared/capabilities';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 import { parseControllerJson } from '../protocol/index';
 import type { DiagnosticStream } from './envelope';
@@ -34,7 +34,7 @@ export interface RuntimeDiagnostics extends DiagnosticStream {
   touched: number;
   heartbeatAt?: string;
   /** Messages the controller dropped by reason; only from runtimes that advertise bounded messages. */
-  dropCounts?: Record<string, number>;
+  dropCounts?: Record<DropReason, number>;
   legacyHeartbeatSequence?: number;
   connected?: boolean;
   hardwareAvailable?: boolean;
@@ -59,7 +59,7 @@ export interface RuntimeDiagnostics extends DiagnosticStream {
 }
 
 /** Drop counters are read only from a runtime that advertises the capability, and only known reasons. */
-export function heartbeatDropCounts(data: Record<string, unknown>): Record<string, number> | undefined {
+export function heartbeatDropCounts(data: Record<string, unknown>): Record<DropReason, number> | undefined {
   const counts = data.dropCounts;
   if (
     !Array.isArray(data.capabilities) ||
@@ -69,7 +69,7 @@ export function heartbeatDropCounts(data: Record<string, unknown>): Record<strin
     Array.isArray(counts)
   )
     return undefined;
-  const result: Record<string, number> = {};
+  const result = {} as Record<DropReason, number>;
   for (const reason of DROP_REASONS) {
     const value = (counts as Record<string, unknown>)[reason];
     if (!Number.isSafeInteger(value) || (value as number) < 0) return undefined;

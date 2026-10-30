@@ -1,3 +1,5 @@
+import type { DropReason } from './shared/capabilities';
+
 export type Freshness = 'missing' | 'invalid' | 'future' | 'stale' | 'fresh';
 export interface DiagnosticValue {
   kind: 'input' | 'output' | 'measurement';
@@ -27,7 +29,7 @@ export interface WagoDiagnostics {
   incompatible: boolean;
   sequenceGaps: number | null;
   /** Messages the controller dropped unanswered, by reason; null for runtimes without bounded messages. */
-  dropCounts: Record<string, number> | null;
+  dropCounts: Record<DropReason, number> | null;
   activeStream: string | null;
   trackingExhausted: boolean;
   stateConnected: boolean | null;

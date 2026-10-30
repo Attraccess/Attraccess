@@ -130,7 +130,10 @@ export class WagoCredentialRotationService {
             )
               return;
             try {
-              const ack = parseControllerJson(message.payload, 'rotation acknowledgement') as Record<string, unknown> | null;
+              const ack = parseControllerJson(message.payload, 'rotation acknowledgement') as Record<
+                string,
+                unknown
+              > | null;
               if (
                 ack?.credentialEpoch === row.credentialEpoch &&
                 ack?.revision === row.revision &&

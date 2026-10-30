@@ -76,6 +76,7 @@ export function diagnosticsFixture(controllerId = 1): WagoDiagnostics {
     capabilities: [],
     incompatible: false,
     sequenceGaps: null,
+    dropCounts: null,
     sequenceExplanation: 'Fixture source',
     activeStream: null,
     trackingExhausted: false,
