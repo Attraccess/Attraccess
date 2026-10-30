@@ -200,6 +200,8 @@ describe('PairingService', () => {
 
     const reader = readers.get(1) as Record<string, unknown>;
     expect(reader).toMatchObject({ pairingState: 'paired', apiTokenHash: '' });
+    // The admin interface opens the new record from the finished pairing.
+    expect(service.get(pending.id)).toMatchObject({ state: 'completed', targetReaderId: 1 });
     expect(reader['credentialFingerprint']).toBe(spkiFingerprint(publicKey));
     expect(credentialEvents).toEqual([expect.objectContaining({ state: 'paired', readerId: 1 })]);
     const peer = { spkiFingerprint: spkiFingerprint(publicKey), spki: publicKey };
@@ -291,14 +293,27 @@ describe('PairingService', () => {
     expect(emitted).toContain(7);
   });
 
-  it('does not bind with an unknown or already used ticket', async () => {
+  it('refuses an unknown or already used ticket instead of listing a new reader', async () => {
     readers.set(8, { id: 8, name: 'x', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
     const ticket = service.issueBindingTicket(8);
-    await announce({ ticket: 'made-up' });
     await announce({ ticket });
-    await announce({ ticket }); // second use
-    await waitFor(() => service.list().length === 3);
-    expect(service.list().map((p) => p.boundReaderId)).toEqual([null, 8, null]);
+    await waitFor(() => service.list().length === 1);
+
+    for (const reused of ['made-up', ticket]) {
+      const client = new PairingClient(url);
+      clients.push(client);
+      await client.opened();
+      const closed = new Promise<number>((resolve) => client.ws.once('close', (code) => resolve(code)));
+      client.send({
+        type: 'hello',
+        v: 1,
+        kind: 'touch',
+        publicKey: (await readerKey()).toString('base64'),
+        ticket: reused,
+      });
+      expect(await closed).toBe(1008);
+    }
+    expect(service.list().map((p) => p.boundReaderId)).toEqual([8]);
   });
 
   it('creates exactly one request when hello is sent several times in a burst', async () => {

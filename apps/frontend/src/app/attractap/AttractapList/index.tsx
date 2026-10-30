@@ -14,9 +14,7 @@ import {
 import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
 import { EmptyState } from '../../../components/emptyState';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
-import { PairingStateChip } from '../pairing/PairingStateChip';
 import { ReadersToPair } from '../pairing/ReadersToPair';
-import { readerIdsWaitingToPair } from '../pairing/pairingUtils';
 import { PageAction, PageHeader } from '../../../components/pageHeader/index';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
@@ -27,7 +25,6 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import {
   Attractap,
   useAttractapServiceGetFirmwares,
-  useAttractapServiceGetPairings,
   useAttractapServiceGetReaders,
   useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
@@ -50,10 +47,6 @@ export function useAttractapListState() {
     refetchInterval: 5000,
   });
 
-  // Shares the cache with the Not paired card, which keeps it fresh.
-  const { data: pairings } = useAttractapServiceGetPairings();
-  const waitingReaderIds = useMemo(() => readerIdsWaitingToPair(pairings), [pairings]);
-
   const toast = useToastMessage();
   const navigate = useNavigate();
 
@@ -75,7 +68,8 @@ export function useAttractapListState() {
   const { stale: staleReaders, active: activeReaders } = useMemo(() => {
     const stale = [];
     const active = [];
-    for (const reader of allReaders ?? []) {
+    // Readers that are not paired are only listed in the Not paired card until they are paired.
+    for (const reader of (allReaders ?? []).filter((r) => r.pairingState === 'paired')) {
       const lastConnection = new Date(reader.lastConnection);
       const isStale = lastConnection.getTime() < now.getTime() - 24 * 60 * 60 * 1000;
       if (isStale) {
@@ -127,8 +121,8 @@ export function useAttractapListState() {
     staleReaders,
     activeReaders,
     firmwareUpdateChip,
-    waitingReaderIds,
     allReaders,
+    toast,
   } as const;
 }
 
@@ -143,8 +137,8 @@ export function AttractapList() {
     staleReaders,
     activeReaders,
     firmwareUpdateChip,
-    waitingReaderIds,
     allReaders,
+    toast,
   } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
@@ -155,7 +149,10 @@ export function AttractapList() {
     <>
       <AttractapHardwareSetup
         openDeviceSettings={(deviceId) => {
-          setOpenedReaderEditor(Number(deviceId));
+          // A reader can only be edited once it is paired.
+          const reader = allReaders?.find((r) => r.id === Number(deviceId));
+          if (reader?.pairingState === 'paired') setOpenedReaderEditor(reader.id);
+          else toast.info({ title: t('pairFirst') });
         }}
       >
         {(onOpenHardwareSetup) => (
@@ -195,7 +192,13 @@ export function AttractapList() {
       />
 
       <div className="flex flex-col gap-4">
-        <ReadersToPair readers={allReaders ?? []} />
+        <ReadersToPair
+          readers={allReaders ?? []}
+          onPaired={(readerId) => {
+            toast.success({ title: t('paired'), duration: 2500 });
+            setOpenedReaderEditor(readerId);
+          }}
+        />
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
             <Card.Header>
@@ -222,10 +225,7 @@ export function AttractapList() {
                           id={reader.id}
                           className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}
                         >
-                          <TableCell>
-                            {reader.name}{' '}
-                            <PairingStateChip state={reader.pairingState} waiting={waitingReaderIds.has(reader.id)} />
-                          </TableCell>
+                          <TableCell>{reader.name}</TableCell>
                           <TableCell className="whitespace-nowrap">
                             {reader.firmware.name} ({reader.firmware.variant})
                             <br />

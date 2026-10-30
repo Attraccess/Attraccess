@@ -22,7 +22,7 @@ import {
   useAttractapServiceStartPairing,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
 import { Select } from '../../../components/select';
 import { StandardModal } from '../../../components/standardModal';
@@ -32,7 +32,8 @@ import { apiErrorMessage, TERMINAL_PAIRING_STATES } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
 
-type Mode = 'new' | 'pair' | 'repair' | 'replace';
+// 'replace' exists on the server too; it only labels the history differently, so the UI offers 'repair'.
+type Mode = 'new' | 'pair' | 'repair';
 
 interface Props {
   pairingId: string | null;
@@ -40,6 +41,8 @@ interface Props {
   autoStartMode?: Mode;
   presetTargetReaderId?: number;
   onClose: () => void;
+  /** Called once when the pairing completed, with the paired reader; the caller closes the dialog. */
+  onPaired?: (readerId: number) => void;
 }
 
 const POLL_INTERVAL_MS = 1000;
@@ -102,12 +105,26 @@ export function PairingDialog(props: Readonly<Props>) {
     }
   }, [pairing?.state, queryClient]);
 
+  const onPaired = useRef(props.onPaired);
+  onPaired.current = props.onPaired;
+  const reportedPairing = useRef<string | null>(null);
+  const pairedReaderId = pairing?.state === 'completed' ? (pairing.targetReaderId ?? pairing.boundReaderId) : null;
+  useEffect(() => {
+    if (pairedReaderId === null || !pairing || reportedPairing.current === pairing.id) return;
+    reportedPairing.current = pairing.id;
+    onPaired.current?.(pairedReaderId);
+  }, [pairedReaderId, pairing]);
+
   const insecure = typeof window !== 'undefined' && !window.isSecureContext;
   const state = pairing?.state;
   const finished = state !== undefined && TERMINAL_PAIRING_STATES.includes(state);
 
   const readerOptions = useMemo(
-    () => (readers ?? []).map((reader) => ({ key: reader.id.toString(), label: reader.name })),
+    // Only readers that were paired before can be paired again.
+    () =>
+      (readers ?? [])
+        .filter((reader) => reader.pairingState !== 'unpaired')
+        .map((reader) => ({ key: reader.id.toString(), label: reader.name })),
     [readers],
   );
 
@@ -161,7 +178,7 @@ export function PairingDialog(props: Readonly<Props>) {
               <div className="flex flex-col gap-3">
                 <p>{t('dialog.chooseMode')}</p>
                 <Select
-                  items={(['new', 'repair', 'replace'] as const).map((m) => ({ key: m, label: t(`dialog.mode.${m}`) }))}
+                  items={(['new', 'repair'] as const).map((m) => ({ key: m, label: t(`dialog.mode.${m}`) }))}
                   aria-label={t('dialog.chooseMode')}
                   value={mode}
                   onChange={(key) => setMode(key as Mode)}

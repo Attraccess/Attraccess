@@ -2,19 +2,18 @@
   "state": {
     "unpaired": "Not paired",
     "paired": "Paired",
-    "revoked": "Revoked",
-    "waiting": "Waiting to pair"
+    "revoked": "Pairing removed",
+    "waiting": "Pairing…"
   },
   "dialog": {
     "title": "Pair reader",
-    "insecureWarning": "This page is not served over HTTPS. Someone who controls the network could show you a fake code. Use HTTPS or a trusted network to pair.",
-    "chooseMode": "What should happen with this reader?",
+    "insecureWarning": "This page does not use a secure connection. Someone on your network could show you a fake code. Pair only on a network you trust.",
+    "chooseMode": "What is this reader?",
     "mode": {
-      "new": "Add as a new reader",
-      "repair": "Re-pair an existing reader (same device, new key)",
-      "replace": "Replace an existing reader (new device takes over)"
+      "new": "A new reader",
+      "repair": "A reader that takes over one I already have (after a reset or as a replacement)"
     },
-    "targetReader": "Existing reader",
+    "targetReader": "Which reader?",
     "start": "Show code",
     "retry": "Try again",
     "waitingForReader": "Waiting for the reader…",
@@ -49,65 +48,57 @@
       "cancelled-at-reader": "It was cancelled at the reader.",
       "cancelled-by-admin": "It was cancelled in the admin interface.",
       "reader-disconnected": "The reader disconnected before pairing finished.",
-      "protocol": "The reader sent an invalid pairing message.",
+      "protocol": "Something went wrong on the reader. Try again.",
       "expired": "Not both sides confirmed within 5 minutes.",
       "internal": "An error occurred on the server."
     }
   },
   "security": {
-    "title": "Security",
+    "title": "Pairing",
     "state": "Status",
-    "immediateHint": "These actions take effect immediately. You do not need to save.",
-    "fingerprint": "Key fingerprint",
+    "immediateHint": "These actions take effect right away. You do not need to save.",
     "pairedAt": "Paired on",
     "pairedBy": "Paired by",
-    "certificateExpiry": "Certificate valid until",
-    "certificateSerial": "Certificate {{serial}}",
-    "repair": "Re-pair",
-    "replace": "Replace",
-    "revoke": "Revoke",
-    "noCandidate": "No device is waiting to pair. Reset the pairing on the device (or revoke it first) and wait until it appears under Not paired in the reader list, then try again.",
-    "chooseDevice": {
-      "title": {
-        "repair": "Re-pair: choose the device",
-        "replace": "Replace: choose the device"
-      },
-      "description": "Choose the device that should take over this record. Each device shows its type, its key and when it announced itself.",
-      "use": "Use this device"
-    },
-    "revoked": "Pairing revoked",
-    "revokeFailed": "Could not revoke the pairing",
-    "history": "Credential history",
-    "historyEmpty": "No credentials yet.",
+    "actions": "Actions",
+    "repair": "Pair again",
+    "repairDescription": "Use this after the pairing was reset on the reader, or when you swap in a different reader, for example after a defect. Name, machines and settings stay. The old pairing stops working right away.",
+    "revoke": "Remove pairing",
+    "revokeDescription": "Disconnects this reader right away. It cannot be used until you pair it again.",
+    "noCandidate": "No reader is waiting yet. Reset the pairing on the reader itself and wait until it shows up, then try again.",
+    "revoked": "Pairing removed",
+    "revokeFailed": "Could not remove the pairing",
+    "revokeTitle": "Remove pairing?",
+    "revokeMessage": "The reader disconnects within a second and can no longer be used. It moves to Not paired in the reader list, where you can pair it again.",
+    "pairedAgain": "Reader paired again",
+    "history": "History",
     "event": {
       "paired": "Paired",
-      "revoked": "Revoked",
+      "revoked": "Pairing removed",
       "replaced": "Replaced"
-    },
-    "unpairedHint": "This reader still signs in with its token. Pair it from the reader list to give it its own key and an encrypted connection.",
-    "revokeTitle": "Revoke pairing?",
-    "revokeMessage": "The reader loses its key. Its live connection ends within a second and it will show up under Not paired in the reader list. It cannot sign in with a token any more.",
-    "actions": "Actions",
-    "repairDescription": "Same device, new key. Use this after the pairing was reset on the device. The current key stops working.",
-    "replaceDescription": "A different device takes over this reader's name, resources and settings, for example after swapping broken hardware. The old device is locked out.",
-    "revokeDescription": "Locks this reader out right away. It stays in the list and can be paired again later."
+    }
   },
   "toPair": {
     "title": "Not paired",
-    "description": "These readers do not have their own key yet. Pair them to encrypt their connection. The reader must be online.",
-    "signsInWithToken": "Signs in with its token",
+    "description": "Pair these readers before you can use or set them up. The reader must be switched on and connected.",
+    "neverPaired": "Not paired yet",
+    "pairingRemoved": "Pairing was removed",
+    "newReader": "New reader",
+    "waitingSince": "Waiting since {{time}}",
     "pair": "Pair",
     "resume": "Continue",
-    "requestFailed": "Could not ask the reader to pair",
-    "notConnected": "The reader is not connected right now. Pairing needs the reader to be online.",
-    "noResponse": "The reader did not start pairing. Check that it is online and runs firmware that supports pairing, then try again."
+    "requestFailed": "Could not start pairing",
+    "notConnected": "The reader is not connected right now. Switch it on and try again.",
+    "noResponse": "The reader did not respond. Check that it is switched on and has the latest software, then try again."
   },
-  "device": {
-    "kind": {
-      "touch": "Touch",
-      "lite": "Lite"
-    },
-    "key": "Key {{fingerprint}}",
-    "announcedAt": "Announced {{time}}"
+  "kind": {
+    "touch": "Touch",
+    "lite": "Lite"
+  },
+  "picker": {
+    "title": "Pair {{name}}",
+    "description": "Choose the reader to use. It must show up here first: reset its pairing on the reader itself and wait a moment.",
+    "empty": "No reader is waiting yet. Reset the pairing on the reader itself and wait until it shows up here.",
+    "use": "Use this one",
+    "repair": "Pair again: choose the reader"
   }
 }

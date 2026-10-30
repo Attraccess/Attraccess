@@ -5,13 +5,12 @@ import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-
 import { describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
 
-const data = vi.hoisted(() => ({ readers: [] as unknown[], pairings: [] as unknown[] }));
+const data = vi.hoisted(() => ({ readers: [] as unknown[] }));
 
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
   useAttractapServiceGetFirmwares: () => ({ data: [] }),
   useAttractapServiceGetReaders: () => ({ data: data.readers, error: null }),
-  useAttractapServiceGetPairings: () => ({ data: data.pairings }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({ t: (k: string) => k.split('.').pop() ?? k }),
@@ -31,11 +30,6 @@ vi.mock('../HardwareSetup', () => ({
 vi.mock('../HardwareSetup/WebSerialConsole', () => ({ WebSerialConsole: () => null }));
 vi.mock('../AttractapEditor/AttractapEditor', () => ({ AttractapEditor: () => null }));
 vi.mock('../pairing/ReadersToPair', () => ({ ReadersToPair: () => null }));
-vi.mock('../pairing/PairingStateChip', () => ({
-  PairingStateChip: ({ state, waiting }: { state: string; waiting?: boolean }) => (
-    <span data-testid={`state-${waiting ? 'waiting' : state}`} />
-  ),
-}));
 vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
 vi.mock('../../../components/AlertStatusIcon', () => ({ AlertStatusIcon: () => null }));
@@ -67,25 +61,25 @@ describe('AttractapList license gate', () => {
   });
 });
 
-describe('AttractapList pairing state', () => {
-  const reader = (id: number, name: string) => ({
+describe('AttractapList pairing', () => {
+  const reader = (id: number, name: string, pairingState: string) => ({
     id,
     name,
-    pairingState: 'unpaired',
+    pairingState,
     lastConnection: new Date().toISOString(),
     firmware: { name: 'attractap', variant: 'touch', version: '1.0.0' },
   });
 
-  it('shows Waiting to pair for a reader with a running pairing bound or targeted to it', () => {
+  it('lists only paired readers in the tables; the others wait in the Not paired card', () => {
     mockLicense(['attractap']);
-    data.readers = [reader(1, 'Bound'), reader(2, 'Targeted'), reader(3, 'Idle'), reader(4, 'Ended')];
-    data.pairings = [
-      { state: 'announced', boundReaderId: 1, targetReaderId: null },
-      { state: 'awaiting-confirmation', boundReaderId: null, targetReaderId: 2 },
-      { state: 'failed', boundReaderId: 4, targetReaderId: null },
+    data.readers = [
+      reader(1, 'Paired door', 'paired'),
+      reader(2, 'New lathe', 'unpaired'),
+      reader(3, 'Old', 'revoked'),
     ];
     render(<AttractapList />);
-    expect(screen.getAllByTestId('state-waiting')).toHaveLength(2);
-    expect(screen.getAllByTestId('state-unpaired')).toHaveLength(2);
+    expect(screen.getByText('Paired door')).toBeInTheDocument();
+    expect(screen.queryByText('New lathe')).toBeNull();
+    expect(screen.queryByText('Old')).toBeNull();
   });
 });

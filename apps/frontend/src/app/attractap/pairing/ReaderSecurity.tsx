@@ -1,4 +1,4 @@
-import { AlertDialog, Button, Chip, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
+import { AlertDialog, Button, Chip, Spinner } from '@heroui/react';
 import { AttraccessUser, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
@@ -12,17 +12,14 @@ import {
   useUsersServiceGetOneUserById,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { StandardModal } from '../../../components/standardModal';
+import { useEffect, useRef, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PairingDialog } from './PairingDialog';
 import { PairingStateChip } from './PairingStateChip';
-import { WaitingDeviceSummary } from './WaitingDeviceSummary';
+import { DevicePicker, devicesWaiting } from './DevicePicker';
 import { apiErrorMessage, isPairingRunning, readerIdsWaitingToPair } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
-
-type TakeOverMode = 'repair' | 'replace';
 
 /** The user behind a credential event; events without a user were caused by the reader or the system. */
 function EventActor(props: Readonly<{ actorId: number | null }>) {
@@ -62,21 +59,21 @@ function currentPairedEvent(history: AttractapCredentialEvent[] | undefined, fin
   return latestFirst.find((event) => event.keyFingerprint === fingerprint) ?? latestFirst[0];
 }
 
-export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
-  const { reader } = props;
+/** Shown for paired readers only; readers that are not paired can only be paired from the reader list. */
+export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRemoved: () => void }>) {
+  const { reader, onPairingRemoved } = props;
   const { t } = useTranslations({ de, en });
   const format = useDateTimeFormatter();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
   const [pairingId, setPairingId] = useState<string | null>(null);
-  const [pairingMode, setPairingMode] = useState<TakeOverMode | null>(null);
-  const [pickerMode, setPickerMode] = useState<TakeOverMode | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
 
   const { data: history } = useAttractapServiceGetReaderCredentialHistory({ readerId: reader.id });
   const { data: pairings } = useAttractapServiceGetPairings(undefined, {
-    refetchInterval: pickerMode ? 1000 : false,
+    refetchInterval: pickerOpen ? 1000 : false,
   });
 
   const showError = (titleKey: string) => (error: unknown) =>
@@ -89,11 +86,13 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReaderCredentialHistoryKey] });
       queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetReaderByIdKeyFn({ readerId: reader.id }) });
+      // A reader without pairing cannot be edited any more.
+      onPairingRemoved();
     },
     onError: showError('security.revokeFailed'),
   });
 
-  // After a page reload a running re-pair or replace of this reader would be orphaned; pick it up once.
+  // After a page reload a running re-pair of this reader would be orphaned; pick it up once.
   // First pairings of readers that still use their token continue from the reader list.
   const resumeChecked = useRef(false);
   useEffect(() => {
@@ -103,28 +102,22 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
       (p) =>
         p.targetReaderId === reader.id && (p.mode === 'repair' || p.mode === 'replace') && isPairingRunning(p.state),
     );
-    if (running?.mode === 'repair' || running?.mode === 'replace') {
-      setPairingId(running.id);
-      setPairingMode(running.mode);
-    }
+    if (running) setPairingId(running.id);
   }, [pairings, reader.id]);
 
-  // A device waiting to pair can also take over this record (replace) or renew its key (re-pair).
-  const candidates = useMemo(
-    () => (pairings ?? []).filter((p) => p.boundReaderId === null && p.state === 'announced' && !p.mode),
-    [pairings],
-  );
-  const openPicker = (mode: TakeOverMode) => {
+  // A reader waiting to pair takes over this record: the same reader after a reset, or a different one.
+  // The server cannot tell the two apart, so there is one action for both.
+  const candidates = devicesWaiting(pairings);
+  const openPicker = () => {
     if (candidates.length === 0) {
       toast.warning({ title: t('security.noCandidate') });
       return;
     }
-    setPickerMode(mode);
+    setPickerOpen(true);
   };
   const startWith = (candidateId: string) => {
     setPairingId(candidateId);
-    setPairingMode(pickerMode);
-    setPickerMode(null);
+    setPickerOpen(false);
   };
 
   const waitingToPair = readerIdsWaitingToPair(pairings).has(reader.id);
@@ -139,66 +132,37 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
         <PairingStateChip state={reader.pairingState} waiting={waitingToPair} />
       </div>
 
-      {reader.pairingState === 'unpaired' && <p className="text-sm text-default-500">{t('security.unpairedHint')}</p>}
+      <dl className="grid grid-cols-2 items-center gap-1 text-sm">
+        <dt>{t('security.pairedAt')}</dt>
+        <dd>{reader.pairedAt ? format(reader.pairedAt) : '-'}</dd>
+        <dt>{t('security.pairedBy')}</dt>
+        <dd data-cy="attractap-security-paired-by">
+          <EventActor actorId={pairedEvent?.actorId ?? null} />
+        </dd>
+      </dl>
 
-      {reader.pairingState === 'paired' && (
-        <dl className="grid grid-cols-2 items-center gap-1 text-sm">
-          <dt>{t('security.fingerprint')}</dt>
-          <dd className="font-mono">{reader.credentialFingerprint?.slice(0, 16)}</dd>
-          <dt>{t('security.pairedAt')}</dt>
-          <dd>{reader.pairedAt ? format(reader.pairedAt) : '-'}</dd>
-          <dt>{t('security.pairedBy')}</dt>
-          <dd data-cy="attractap-security-paired-by">
-            <EventActor actorId={pairedEvent?.actorId ?? null} />
-          </dd>
-          <dt>{t('security.certificateExpiry')}</dt>
-          <dd>{reader.certificateNotAfter ? format(reader.certificateNotAfter) : '-'}</dd>
-        </dl>
-      )}
-
-      {reader.pairingState !== 'unpaired' && (
-        <div className="flex flex-col gap-3">
-          <h3 className="font-semibold">{t('security.actions')}</h3>
-          <SecurityAction
-            label={t('security.repair')}
-            description={t('security.repairDescription')}
-            onPress={() => openPicker('repair')}
-            dataCy="attractap-security-repair"
-          />
-          <SecurityAction
-            label={t('security.replace')}
-            description={t('security.replaceDescription')}
-            onPress={() => openPicker('replace')}
-            dataCy="attractap-security-replace"
-          />
-          {reader.pairingState === 'paired' && (
-            <SecurityAction
-              label={t('security.revoke')}
-              description={t('security.revokeDescription')}
-              onPress={() => setRevokeOpen(true)}
-              dataCy="attractap-security-revoke"
-              danger
-            />
-          )}
-        </div>
-      )}
+      <div className="flex flex-col gap-3">
+        <h3 className="font-semibold">{t('security.actions')}</h3>
+        <SecurityAction
+          label={t('security.repair')}
+          description={t('security.repairDescription')}
+          onPress={openPicker}
+          dataCy="attractap-security-repair"
+        />
+        <SecurityAction
+          label={t('security.revoke')}
+          description={t('security.revokeDescription')}
+          onPress={() => setRevokeOpen(true)}
+          dataCy="attractap-security-revoke"
+          danger
+        />
+      </div>
 
       <div className="flex flex-col gap-2">
         <h3 className="font-semibold">{t('security.history')}</h3>
-        {history?.length === 0 && <p className="text-sm text-default-500">{t('security.historyEmpty')}</p>}
         {(history ?? []).map((event) => (
           <div key={event.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <div className="flex flex-col gap-1">
-              <span className="flex items-center gap-2">
-                <Chip size="sm">{t(`security.event.${event.state}`)}</Chip>
-                <span className="font-mono">{event.keyFingerprint.slice(0, 16)}</span>
-              </span>
-              {event.certificateSerial && (
-                <span className="font-mono text-xs text-default-500">
-                  {t('security.certificateSerial', { serial: event.certificateSerial })}
-                </span>
-              )}
-            </div>
+            <Chip size="sm">{t(`security.event.${event.state}`)}</Chip>
             <div className="flex items-center gap-3">
               <EventActor actorId={event.actorId} />
               <span>{format(event.createdAt)}</span>
@@ -209,44 +173,21 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap }>) {
 
       <PairingDialog
         pairingId={pairingId}
-        autoStartMode={pairingMode ?? undefined}
+        autoStartMode="repair"
         presetTargetReaderId={reader.id}
-        onClose={() => {
+        onClose={() => setPairingId(null)}
+        onPaired={() => {
+          toast.success({ title: t('security.pairedAgain'), duration: 2500 });
           setPairingId(null);
-          setPairingMode(null);
         }}
       />
 
-      <StandardModal isOpen={pickerMode !== null} onOpenChange={(open) => !open && setPickerMode(null)} size="md">
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>{pickerMode && t(`security.chooseDevice.title.${pickerMode}`)}</ModalHeading>
-            </ModalHeader>
-            <ModalBody className="flex flex-col gap-3" data-cy="attractap-security-device-picker">
-              <p className="text-sm text-default-500">{t('security.chooseDevice.description')}</p>
-              {candidates.length === 0 && <p>{t('security.noCandidate')}</p>}
-              {candidates.map((candidate) => (
-                <div key={candidate.id} className="flex items-center justify-between gap-2">
-                  <WaitingDeviceSummary pairing={candidate} />
-                  <Button
-                    size="sm"
-                    onPress={() => startWith(candidate.id)}
-                    data-cy={`attractap-security-use-device-${candidate.id}`}
-                  >
-                    {t('security.chooseDevice.use')}
-                  </Button>
-                </div>
-              ))}
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close}>
-                {t('dialog.cancel')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+      <DevicePicker
+        title={pickerOpen ? t('picker.repair') : null}
+        devices={candidates}
+        onPick={startWith}
+        onClose={() => setPickerOpen(false)}
+      />
 
       <AlertDialog isOpen={revokeOpen} onOpenChange={setRevokeOpen}>
         <AlertDialog.Backdrop>

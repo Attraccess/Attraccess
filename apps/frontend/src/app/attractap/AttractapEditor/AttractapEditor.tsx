@@ -170,7 +170,7 @@ export function AttractapEditor(props: Readonly<Props>) {
               </TabPanel>
               {reader && (
                 <TabPanel id="security" className="pt-4">
-                  <ReaderSecurity reader={reader} />
+                  <ReaderSecurity reader={reader} onPairingRemoved={props.onCancel} />
                 </TabPanel>
               )}
             </Tabs>

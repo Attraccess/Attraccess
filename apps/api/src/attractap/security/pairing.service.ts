@@ -186,7 +186,10 @@ export class PairingService {
     if (typeof message['ticket'] === 'string') {
       const readerId = this.consumeTicket(message['ticket']);
       const reader = readerId ? await this.attractap.findReaderById(readerId) : null;
-      if (reader && reader.pairingState === 'unpaired') boundReaderId = reader.id;
+      // An unknown or already used ticket is refused rather than treated as a new reader, so a
+      // resent pairing request cannot leave stray "new reader" entries behind.
+      if (!reader || reader.pairingState !== 'unpaired') throw new Error('invalid ticket');
+      boundReaderId = reader.id;
     }
 
     const serverPublicKey = await this.identity.getCaPublicKeySpki();
@@ -412,6 +415,8 @@ export class PairingService {
         previousCredentialBecomes: mode === 'replace' ? 'replaced' : 'revoked',
       });
       created = null; // committed: nothing to roll back any more
+      // Tells the admin interface which record was paired, also for a reader created just now.
+      request.targetReaderId = reader.id;
       this.dropGrantsFor(reader.id);
       this.grants.set(fingerprint, {
         readerId: reader.id,

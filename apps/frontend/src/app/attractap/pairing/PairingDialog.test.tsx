@@ -194,4 +194,13 @@ describe('PairingDialog', () => {
     expect(screen.queryByText('Waiting for the reader…')).toBeNull();
     expect(document.querySelector('[data-cy="attractap-pairing-retry"]')).not.toBeNull();
   });
+
+  it('reports the paired reader once when the pairing completed', () => {
+    const onPaired = vi.fn();
+    mocks.pairing.current = { ...freshPairing(), state: 'completed', targetReaderId: 9 };
+    const { rerender } = render(<PairingDialog pairingId="p1" onClose={vi.fn()} onPaired={onPaired} />);
+    rerender(<PairingDialog pairingId="p1" onClose={vi.fn()} onPaired={onPaired} />);
+    expect(onPaired).toHaveBeenCalledTimes(1);
+    expect(onPaired).toHaveBeenCalledWith(9);
+  });
 });

@@ -9,29 +9,31 @@ with older firmware. Both kinds can use the same server at the same time.
 
 ## Reader states
 
-| State               | Meaning                                                                                                                                |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Not paired**      | The reader signs in with its token. This is the state of every reader after an update of the server.                                   |
-| **Waiting to pair** | A pairing for the reader is running.                                                                                                   |
-| **Paired**          | The reader has its own key and certificate. Token sign-in is no longer possible for it.                                                |
-| **Revoked**         | An admin removed the pairing. The live connection ends within a second and the device appears under **Not paired** in the reader list. |
+| State               | Meaning                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Not paired**      | The reader was never paired. This is the state of every reader after an update of the server. It keeps working as before. |
+| **Pairing removed** | An admin removed the pairing. The reader disconnects within a second and cannot be used until it is paired again.         |
+| **Paired**          | The reader is paired and can be used and set up.                                                                          |
+
+Only paired readers are listed in the **Active** and **Stale** tables and can be edited. Every
+other reader is listed in the **Not paired** card above the tables until it is paired.
 
 ## Pairing a reader
 
 You need the `resources.update` permission (shown as **Update Resources** in the role editor).
 Pairing actions take effect immediately; you do not need to save the reader afterwards.
 
-1. On the readers page, the **Not paired** card above the reader tables lists everything that
-   still needs pairing, each with a single **Pair** button:
-   - readers that sign in with their token, and
-   - devices that announced themselves without a valid pairing (revoked, reset on the device or
-     new). For these you choose whether it is a new reader, a re-pair of an existing record, or
-     the replacement of an existing record.
+1. On the readers page, the **Not paired** card lists every reader that must be paired, each with
+   its type (Touch or Lite), its name and a single **Pair** button:
+   - readers that were never paired,
+   - readers whose pairing was removed (you pick which waiting reader takes the record back), and
+   - **New reader** entries: readers that were reset or are new. For these you choose whether it
+     is a new reader or one that takes over a reader you already have.
 
-   The reader must be online. For a token reader, the server asks it through its existing token
-   connection to start pairing and hands it a one-time pairing ticket, which ties the pairing to
-   this record. The token itself is never sent in pairing messages. A pairing that is already
-   running shows **Continue** instead.
+   The reader must be switched on and connected. A pairing that is already running shows
+   **Continue** instead. Technically, the server asks a never-paired reader through its existing
+   token connection to start pairing and hands it a one-time ticket that ties the pairing to the
+   record; the token itself is never sent in pairing messages.
 
 2. The dialog shows a code and a five minute countdown.
    - **Touch readers** show six digits, for example `471 903`.
@@ -41,7 +43,8 @@ Pairing actions take effect immediately; you do not need to save the reader afte
 3. Compare the code with the code on the reader. If it matches, confirm in the dialog **and** at
    the reader (Touch: **Codes match**; Lite: hold any NFC card to the reader within two minutes —
    the card is not looked up and nothing about it is sent).
-4. Pairing finishes only when both sides confirm within five minutes. Cancel, timeout or a
+4. Pairing finishes only when both sides confirm within five minutes. When it succeeds, a short
+   message confirms it and the reader's settings open so you can set it up. Cancel, timeout or a
    mismatch aborts it; a new attempt always uses a new code. When a pairing ends without
    success, the dialog tells you why (for example cancelled at the reader, reader disconnected
    or timed out).
@@ -52,27 +55,24 @@ If the admin page is opened over plain HTTP (not HTTPS and not localhost), the d
 warning: someone who controls the network could show you a fake code. Use HTTPS or a network you
 trust when pairing. Pairing is not blocked.
 
-## Re-pair, replace and revoke
+## Pair again, remove pairing
 
-These actions are in the **Security** tab of the reader editor of a paired or revoked reader.
-Each one is explained next to its button.
+These actions are in the **Pairing** tab of a paired reader's settings. Each one is explained
+next to its button.
 
-- **Re-pair**: same device, new key. Use it after the pairing was reset on the device. The old
-  credential is revoked.
-- **Replace**: a different device takes over the reader's name, resources and settings, for
-  example after swapping broken hardware. The old credential is marked as replaced.
-- **Revoke**: locks the reader out right away. It asks for confirmation, then ends the session and
-  the reader shows "Pairing removed – ask an admin to pair this reader". It never falls back to
-  token sign-in, stays in the list, and the device appears under **Not paired**.
+- **Pair again**: use it after the pairing was reset on the reader itself, or when you swap in a
+  different reader, for example after a defect. Name, machines and settings stay; the old pairing
+  stops working right away.
+- **Remove pairing**: asks for confirmation, then disconnects the reader within a second. The
+  reader shows "Pairing removed – ask an admin to pair this reader", the settings close, and the
+  reader moves to the **Not paired** card. It never falls back to its old sign-in.
 
-Re-pair and Replace need the device to appear under **Not paired** first: revoke the old
-pairing or reset the pairing on the device, wait until it is listed, then choose **Re-pair** or
-**Replace**. The dialog lists every waiting device with its type, key and the time it announced
-itself, so you can pick the right one.
+Pair again needs the reader to show up as **New reader** first: reset the
+pairing on the reader itself and wait a moment. The dialog lists every waiting reader with its
+type and since when it is waiting, so you can pick the right one.
 
-Every credential is kept in the **credential history** of the reader, also after the reader is
-deleted. Each entry shows the key, the certificate serial and the user who caused it; the
-Security tab also shows who paired the reader.
+The **History** in the Pairing tab lists every pairing and removal with the user who
+did it and when. It is kept even after the reader is deleted.
 
 ## Backup
 

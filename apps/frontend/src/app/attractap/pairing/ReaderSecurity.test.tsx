@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   revokeOptions: { current: undefined as undefined | { onSuccess?: () => void } },
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
   pairingDialog: vi.fn(),
+  pairingRemoved: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
@@ -86,7 +87,7 @@ describe('ReaderSecurity', () => {
 
   it('asks for confirmation in a danger dialog before revoking', async () => {
     const user = userEvent.setup();
-    render(<ReaderSecurity reader={reader} />);
+    render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
 
     await user.click(screen.getByRole('button', { name: 'security.revoke' }));
     const dialog = await screen.findByRole('alertdialog');
@@ -98,6 +99,8 @@ describe('ReaderSecurity', () => {
 
     act(() => mocks.revokeOptions.current?.onSuccess?.());
     expect(mocks.toast.success).toHaveBeenCalledWith({ title: 'security.revoked' });
+    // A reader without pairing cannot be edited, so the editor closes.
+    expect(mocks.pairingRemoved).toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   });
 
@@ -107,21 +110,21 @@ describe('ReaderSecurity', () => {
       waitingDevice('a', 'touch', '2026-10-30T07:00:00.000Z'),
       waitingDevice('b', 'lite', '2026-10-30T07:05:00.000Z'),
     ];
-    render(<ReaderSecurity reader={reader} />);
+    render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
 
     await user.click(screen.getByRole('button', { name: 'security.repair' }));
-    const picker = document.querySelector('[data-cy="attractap-security-device-picker"]') as HTMLElement;
-    expect(within(picker).getByText('device.kind.touch')).toBeInTheDocument();
-    expect(within(picker).getByText('device.kind.lite')).toBeInTheDocument();
+    const picker = document.querySelector('[data-cy="attractap-device-picker"]') as HTMLElement;
+    expect(within(picker).getByText('kind.touch')).toBeInTheDocument();
+    expect(within(picker).getByText('kind.lite')).toBeInTheDocument();
     expect(mocks.pairingDialog).toHaveBeenLastCalledWith(expect.objectContaining({ pairingId: null }));
 
-    await user.click(within(picker).getAllByRole('button', { name: 'security.chooseDevice.use' })[1]);
+    await user.click(within(picker).getAllByRole('button', { name: 'picker.use' })[1]);
     expect(mocks.pairingDialog).toHaveBeenLastCalledWith(
       expect.objectContaining({ pairingId: 'b', autoStartMode: 'repair', presetTargetReaderId: 7 }),
     );
   });
 
-  it('shows who paired the reader and the actor and certificate of every history entry', () => {
+  it('shows who paired the reader and the history in plain words, without technical identifiers', () => {
     mocks.history.current = [
       {
         id: 2,
@@ -140,16 +143,19 @@ describe('ReaderSecurity', () => {
         createdAt: '2026-09-01T10:00:00.000Z',
       },
     ];
-    render(<ReaderSecurity reader={reader} />);
+    render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
     const pairedBy = document.querySelector('[data-cy="attractap-security-paired-by"]') as HTMLElement;
     expect(pairedBy).toHaveTextContent('user-3');
     expect(screen.getAllByText('user-3')).toHaveLength(2);
-    expect(screen.getByText('security.certificateSerial')).toBeInTheDocument();
+    expect(screen.getByText('security.event.revoked')).toBeInTheDocument();
+    const text = document.body.textContent ?? '';
+    expect(text).not.toContain('ffff');
+    expect(text).not.toContain('ab12');
   });
 
   it('shows Waiting to pair while a pairing for this reader runs', () => {
     mocks.pairings.current = [{ ...waitingDevice('c', 'touch', '2026-10-30T07:00:00.000Z'), targetReaderId: 7 }];
-    render(<ReaderSecurity reader={reader} />);
+    render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
     expect(document.querySelector('[data-cy="attractap-pairing-state-waiting"]')).not.toBeNull();
   });
 
@@ -157,21 +163,17 @@ describe('ReaderSecurity', () => {
     mocks.pairings.current = [
       { ...waitingDevice('c', 'touch', '2026-10-30T07:00:00.000Z'), boundReaderId: 7, state: 'failed' },
     ];
-    render(<ReaderSecurity reader={reader} />);
+    render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
     expect(document.querySelector('[data-cy="attractap-pairing-state-paired"]')).not.toBeNull();
   });
 
   it('explains every action next to its button', () => {
-    render(<ReaderSecurity reader={reader} />);
-    for (const key of ['repair', 'replace', 'revoke']) {
+    render(<ReaderSecurity reader={reader} onPairingRemoved={mocks.pairingRemoved} />);
+    for (const key of ['repair', 'revoke']) {
       expect(screen.getByRole('button', { name: `security.${key}` })).toBeInTheDocument();
       expect(screen.getByText(`security.${key}Description`)).toBeInTheDocument();
     }
-  });
-
-  it('offers no actions for a reader that still signs in with its token; it is paired from the list', () => {
-    render(<ReaderSecurity reader={{ ...reader, pairingState: 'unpaired' } as Attractap} />);
-    expect(screen.getByText('security.unpairedHint')).toBeInTheDocument();
-    expect(screen.queryByRole('button')).toBeNull();
+    // A reset reader and a swapped-in reader are paired the same way, so there is one action for both.
+    expect(screen.getAllByRole('button')).toHaveLength(2);
   });
 });
