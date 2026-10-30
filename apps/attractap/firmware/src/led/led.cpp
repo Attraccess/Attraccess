@@ -25,14 +25,15 @@ void LedController::setBrightness(uint8_t brightness)
     _strip.setBrightness(_globalBrightness);
 }
 
-void LedController::setEnrollmentPattern(const std::vector<std::string> &colors)
+void LedController::setEnrollmentPattern(bool hasPattern, const LedPattern::Pattern &pattern)
 {
-    LedPattern::Pattern pattern;
-    _hasEnrollmentPattern = LedPattern::parse(colors, pattern);
-    if (_hasEnrollmentPattern)
+    portENTER_CRITICAL(&_enrollmentPatternLock);
+    _hasEnrollmentPattern = hasPattern;
+    if (hasPattern)
     {
         _enrollmentPattern = pattern;
     }
+    portEXIT_CRITICAL(&_enrollmentPatternLock);
 }
 
 void LedController::setState(LedState state)
@@ -167,20 +168,29 @@ void LedController::loop()
 void LedController::runEnrollmentPending()
 {
     const uint16_t n = _strip.numPixels();
-    if (_hasEnrollmentPattern)
+    portENTER_CRITICAL(&_enrollmentPatternLock);
+    const bool hasPattern = _hasEnrollmentPattern;
+    const LedPattern::Pattern pattern = _enrollmentPattern;
+    portEXIT_CRITICAL(&_enrollmentPatternLock);
+    if (hasPattern)
     {
         for (uint16_t i = 0; i < n; i++)
         {
-            const uint32_t rgb = LedPattern::pixelColor(_enrollmentPattern, n, i);
+            const uint32_t rgb = LedPattern::pixelColor(pattern, n, i);
             _strip.setPixelColor(i, _strip.Color((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb));
         }
         return;
     }
+    setAll(dim(_strip.Color(255, 255, 255), idleBreathBrightness()));
+}
+
+// Brightness of the slow idle breathing at the current animation phase.
+uint8_t LedController::idleBreathBrightness() const
+{
     uint16_t p = _phase % IDLE_BREATH_CYCLE;
-    uint8_t b = (p < IDLE_BREATH_HALF)
+    return (p < IDLE_BREATH_HALF)
         ? (IDLE_BRIGHTNESS_MIN + (uint8_t)(IDLE_BRIGHTNESS_RANGE * p / IDLE_BREATH_HALF))
         : (IDLE_BRIGHTNESS_MAX - (uint8_t)(IDLE_BRIGHTNESS_RANGE * (p - IDLE_BREATH_HALF) / IDLE_BREATH_HALF));
-    setAll(dim(_strip.Color(255, 255, 255), b));
 }
 
 void LedController::runAnimation()
@@ -269,10 +279,7 @@ void LedController::runCircularAnimation()
 
     case LED_STATE_WAIT_FOR_CARD:
     {
-        uint16_t p = _phase % IDLE_BREATH_CYCLE;
-        uint8_t b = (p < IDLE_BREATH_HALF)
-            ? (IDLE_BRIGHTNESS_MIN + (uint8_t)(IDLE_BRIGHTNESS_RANGE * p / IDLE_BREATH_HALF))
-            : (IDLE_BRIGHTNESS_MAX - (uint8_t)(IDLE_BRIGHTNESS_RANGE * (p - IDLE_BREATH_HALF) / IDLE_BREATH_HALF));
+        uint8_t b = idleBreathBrightness();
         uint8_t bInv = IDLE_BRIGHTNESS_MIN + IDLE_BRIGHTNESS_MAX - b;
         uint32_t c = _strip.Color(0, 255, 0);
         uint16_t pieceSize = n / IDLE_SEGMENT_COUNT;

@@ -49,8 +49,8 @@ uint32_t State::enrollment_received_at = 0;
 uint32_t State::enrollment_rotates_in_ms = 0;
 uint32_t State::enrollment_expires_in_ms = 0;
 uint32_t State::enrollment_retry_in_ms = 0;
-bool State::enrollment_pattern_expected = false;
-std::vector<std::string> State::enrollment_pattern;
+bool State::enrollment_has_pattern = false;
+LedPattern::Pattern State::enrollment_pattern{};
 bool State::enrollment_approved = false;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
@@ -141,11 +141,11 @@ void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t e
     enrollment_expires_in_ms = expiresInMs;
 }
 
-void State::setEnrollmentPattern(std::vector<std::string> colors)
+void State::setEnrollmentPattern(bool hasPattern, const LedPattern::Pattern &pattern)
 {
     StateLock lock(state_mutex);
-    enrollment_pattern_expected = true;
-    enrollment_pattern = std::move(colors);
+    enrollment_has_pattern = hasPattern;
+    enrollment_pattern = pattern;
 }
 
 void State::setEnrollmentRejected(uint32_t retryAfterMs)
@@ -154,6 +154,7 @@ void State::setEnrollmentRejected(uint32_t retryAfterMs)
     enrollment_pending = false;
     enrollment_rejected = true;
     enrollment_code = "";
+    enrollment_has_pattern = false;
     enrollment_received_at = millis();
     enrollment_retry_in_ms = retryAfterMs;
 }
@@ -164,8 +165,7 @@ void State::clearEnrollment(bool approved)
     enrollment_pending = false;
     enrollment_rejected = false;
     enrollment_code = "";
-    enrollment_pattern_expected = false;
-    enrollment_pattern.clear();
+    enrollment_has_pattern = false;
     if (approved)
     {
         enrollment_approved = true;
@@ -191,7 +191,8 @@ State::EnrollmentState State::getEnrollmentState()
     state.rotatesInMs = enrollment_rotates_in_ms > elapsed ? enrollment_rotates_in_ms - elapsed : 0;
     state.expiresInMs = enrollment_expires_in_ms > elapsed ? enrollment_expires_in_ms - elapsed : 0;
     state.retryInMs = enrollment_retry_in_ms > elapsed ? enrollment_retry_in_ms - elapsed : 0;
-    state.patternExpected = enrollment_pattern_expected;
+    state.hasPattern = enrollment_pending && enrollment_has_pattern &&
+                       LedPattern::isFresh(elapsed, enrollment_rotates_in_ms);
     state.pattern = enrollment_pattern;
     return state;
 }

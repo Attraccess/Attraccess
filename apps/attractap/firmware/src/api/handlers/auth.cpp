@@ -9,8 +9,8 @@
 #include <functional>
 #include <limits>
 #include <string>
-#include <utility>
 #include <vector>
+#include "../../led/led_pattern.hpp"
 
 void API::onRegistrationData(JsonObject data)
 {
@@ -59,7 +59,7 @@ void API::sendRegistrationRequest()
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["enrollment"]["protocol"] = 1;
-#ifndef HAS_LVGL_DISPLAY
+#if !defined(HAS_LVGL_DISPLAY) && defined(HAS_WS2812_LED)
     // Without a screen the admin matches the colour pattern on the LED ring instead of reading a code.
     payload["enrollment"]["hasScreen"] = false;
 #endif
@@ -83,16 +83,24 @@ void API::onEnrollmentCode(JsonObject data)
     State::setEnrollmentCode(payload["code"].as<std::string>(),
                              payload["rotatesInMs"] | 30000U,
                              payload["expiresInMs"] | 600000U);
-    // Only readers without a screen get a pattern; null means the server had none left.
-    if (payload.containsKey("pattern"))
+    // Only readers without a screen get a pattern. Missing, null (the server had none left) or malformed: the
+    // ring breathes white. Parsed once here, the LED loop only gets the colours.
+    LedPattern::Pattern pattern{};
+    bool hasPattern = false;
+    if (payload["pattern"].is<JsonArray>())
     {
         std::vector<std::string> colors;
         for (JsonVariant color : payload["pattern"].as<JsonArray>())
         {
-            colors.push_back(color.as<std::string>());
+            if (colors.size() > LedPattern::SEGMENT_COUNT)
+            {
+                break;
+            }
+            colors.push_back(color.is<const char *>() ? color.as<std::string>() : std::string());
         }
-        State::setEnrollmentPattern(std::move(colors));
+        hasPattern = LedPattern::parse(colors, pattern);
     }
+    State::setEnrollmentPattern(hasPattern, pattern);
 }
 
 void API::onEnrollmentRejected(JsonObject data)

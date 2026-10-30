@@ -3,8 +3,7 @@
 #ifdef HAS_WS2812_LED
 
 #include <cstdint>
-#include <string>
-#include <vector>
+#include "freertos/FreeRTOS.h"
 #include "led_pattern.hpp"
 #include "ws2812_strip.hpp"
 
@@ -28,8 +27,8 @@ public:
 
     void setState(LedState state);
     void setBrightness(uint8_t brightness);
-    // Colours of the pattern to match while LED_STATE_ENROLLMENT_PENDING. Empty or invalid: breathe white.
-    void setEnrollmentPattern(const std::vector<std::string> &colors);
+    // Colours of the pattern to match while LED_STATE_ENROLLMENT_PENDING. hasPattern false: breathe white.
+    void setEnrollmentPattern(bool hasPattern, const LedPattern::Pattern &pattern);
     void triggerSuccess();
     void triggerError();
     void triggerIndicate();
@@ -39,6 +38,7 @@ private:
     void runCircularAnimation();
     void runLinearAnimation();
     void runEnrollmentPending();
+    uint8_t idleBreathBrightness() const;
     void setAll(uint32_t color);
     bool isCircularRing() const;
     uint16_t wrapIndex(int16_t i) const;
@@ -60,6 +60,8 @@ private:
     uint32_t _triggerStartMs = 0;
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;
 
+    // Written by the application task, read by the LED task.
+    portMUX_TYPE _enrollmentPatternLock = portMUX_INITIALIZER_UNLOCKED;
     bool _hasEnrollmentPattern = false;
     LedPattern::Pattern _enrollmentPattern{};
     bool _firmwarePatternSet = false;

@@ -45,7 +45,10 @@ void Application::updateLedState() {
     ledState = LedController::LED_STATE_INIT;
 #else
     ledState = LedController::LED_STATE_ENROLLMENT_PENDING;
-    this->led.setEnrollmentPattern(State::getEnrollmentState().pattern);
+    {
+      const State::EnrollmentState enrollment = State::getEnrollmentState();
+      this->led.setEnrollmentPattern(enrollment.hasPattern, enrollment.pattern);
+    }
 #endif
     break;
   case APPLICATION_STATE_AUTHENTICATE_CARD:

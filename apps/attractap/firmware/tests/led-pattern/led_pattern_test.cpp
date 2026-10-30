@@ -125,10 +125,28 @@ static void tinyStrips()
     CHECK(LedPattern::pixelColor(pattern, 7, 2) == 0);
     // fewer LEDs than segments never reads out of range
     CHECK(LedPattern::pixelColor(pattern, 0, 0) == 0);
-    for (size_t i = 0; i < 3; i++)
-    {
-        (void)LedPattern::pixelColor(pattern, 3, i);
-    }
+    // three LEDs: the first segment is empty, the other three show one LED each
+    CHECK(LedPattern::pixelColor(pattern, 3, 0) == 0x00FF00);
+    CHECK(LedPattern::pixelColor(pattern, 3, 2) == 0xFFC800);
+    CHECK(LedPattern::pixelColor(pattern, 3, 3) == 0);
+}
+
+static void comparingAndStaleness()
+{
+    const LedPattern::Pattern a = parsed({"red", "green", "blue", "yellow"});
+    const LedPattern::Pattern b = parsed({"red", "green", "blue", "white"});
+    CHECK(LedPattern::equals(a, a));
+    CHECK(!LedPattern::equals(a, b));
+
+    uint32_t rgb = 0;
+    CHECK(LedPattern::colorFromName("magenta", rgb) && rgb == 0xFF00FF);
+    CHECK(LedPattern::colorFromName("white", rgb) && rgb == 0xFFFFFF);
+
+    // shown until the rotation was due plus the grace, then the ring breathes white
+    CHECK(LedPattern::isFresh(0, 30000));
+    CHECK(LedPattern::isFresh(30000 + LedPattern::STALE_GRACE_MS - 1, 30000));
+    CHECK(!LedPattern::isFresh(30000 + LedPattern::STALE_GRACE_MS, 30000));
+    CHECK(LedPattern::isFresh(0xFFFFFFFFu, 0xFFFFFFFFu));
 }
 
 int main()
@@ -138,6 +156,7 @@ int main()
     ringLayout();
     scalesToOtherLedCounts();
     tinyStrips();
+    comparingAndStaleness();
     if (failures != 0)
     {
         std::printf("%d check(s) failed\n", failures);

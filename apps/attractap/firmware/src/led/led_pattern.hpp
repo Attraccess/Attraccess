@@ -13,6 +13,12 @@ namespace LedPattern
 {
     constexpr size_t SEGMENT_COUNT = 4;
 
+    // How long past its due rotation the reader keeps showing a pattern without a new one. After that it
+    // breathes white, so a dropped connection can not leave an old pattern that matches someone else's
+    // list entry. The server keeps the patterns of a reader that left reserved for rotation + this grace
+    // (ENROLLMENT_PATTERN_COOLDOWN_MS).
+    constexpr uint32_t STALE_GRACE_MS = 10000;
+
     struct Pattern
     {
         // 0xRRGGBB per segment
@@ -49,6 +55,24 @@ namespace LedPattern
             }
         }
         return false;
+    }
+
+    inline bool equals(const Pattern &a, const Pattern &b)
+    {
+        for (size_t i = 0; i < SEGMENT_COUNT; i++)
+        {
+            if (a.segments[i] != b.segments[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether a pattern received `elapsedMs` ago, that was due to rotate after `rotatesInMs`, may still be shown.
+    inline bool isFresh(uint32_t elapsedMs, uint32_t rotatesInMs)
+    {
+        return static_cast<uint64_t>(elapsedMs) < static_cast<uint64_t>(rotatesInMs) + STALE_GRACE_MS;
     }
 
     // Accepts exactly four known colours. Anything else (wrong length, unknown colour) is rejected, so
