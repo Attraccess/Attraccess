@@ -215,6 +215,8 @@ export class CardOperationsService {
         KEY_VERSION_ENROLLED,
       );
       if (outcome !== 'done') {
+        // A refused login means no byte of the key was written: there is nothing to recover later.
+        if (outcome === 'master-refused') await this.pendingRepository.delete(pending.id);
         return { ok: false, error: outcome === 'master-refused' ? 'CARD_NOT_FACTORY' : 'ENROLL_NOT_CONFIRMED' };
       }
       await this.recordEnrollment(user, uid, pending, keyHex, 'reader-enrollment', enrollment.auditPrincipal);
@@ -243,7 +245,7 @@ export class CardOperationsService {
 
       // Already at the factory key: an earlier attempt got through. Nothing left to write.
       if (!(await authenticate(channel, kind, card.keyNo, FACTORY_KEY))) {
-        await this.pendingRepository.save({
+        const pending = await this.pendingRepository.save({
           uid,
           kind: 'reset',
           userId: null,
@@ -262,6 +264,8 @@ export class CardOperationsService {
           KEY_VERSION_FREE,
         );
         if (outcome !== 'done') {
+          // A refused login means no byte of the key was written: there is nothing to recover later.
+          if (outcome === 'master-refused') await this.pendingRepository.delete(pending.id);
           return { ok: false, error: outcome === 'master-refused' ? 'CARD_MASTER_KEY_UNKNOWN' : 'RESET_NOT_CONFIRMED' };
         }
       }

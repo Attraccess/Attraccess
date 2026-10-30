@@ -208,6 +208,38 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     expect(pending).toHaveLength(0);
   });
 
+  it('leaves no recovery record when a reset is refused before anything was written', async () => {
+    const { operations, cards, conversations, pending } = await enrolled();
+    // A copied UID on a card that does not hold the stored key: the login is refused, nothing is written.
+    const copy = new EmulatedCard(kind);
+    copy.keys[0] = Buffer.alloc(16, 7);
+    copy.keys[1] = Buffer.alloc(16, 9);
+    const reader = createRelayReader(copy, conversations);
+
+    const result = await operations.reset(reader.socket, UID, {
+      cardId: cards[0].id,
+      auditPrincipal: { userId: 1, authenticationMethod: 'session' },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(cards).toHaveLength(1);
+    expect(pending).toHaveLength(0);
+  });
+
+  it('leaves no recovery record when an enrollment is refused before anything was written', async () => {
+    const services = createServices();
+    const card = new EmulatedCard(kind);
+    // Not a factory card: its first key is already someone else's.
+    card.keys[0] = Buffer.alloc(16, 7);
+    const reader = createRelayReader(card, services.conversations);
+
+    const result = await services.operations.enroll(reader.socket, UID, enrollmentFor(services.user));
+
+    expect(result.ok).toBe(false);
+    expect(services.cards).toHaveLength(0);
+    expect(services.pending).toHaveLength(0);
+  });
+
   it('refuses to reset a different card than the one selected', async () => {
     const { operations, cards, conversations } = await enrolled();
     const reader = createRelayReader(new EmulatedCard(kind), conversations);

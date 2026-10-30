@@ -2,7 +2,7 @@ import { getSupportedDeviceLanguage } from '@attraccess/shared';
 import { Resource, SupervisionMode } from '@attraccess/database-entities';
 
 import { SettingsService } from '../../../../settings/settings.service';
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -137,14 +137,14 @@ export class AttractapCardHandler {
     const reader = await this.attractapService.findReaderById(data.readerId);
 
     if (!reader) {
-      throw new Error(`Reader not found: ${data.readerId}`);
+      throw new NotFoundException(`Reader not found: ${data.readerId}`);
     }
     await this.cardWriterPolicy.assertAllowed(data.readerId);
 
     const user = await this.usersService.findOne({ id: data.userId });
 
     if (!user) {
-      throw new Error(`User not found: ${data.userId}`);
+      throw new NotFoundException(`User not found: ${data.userId}`);
     }
 
     const socket = Array.from(this.websocketService.sockets.values()).find(
@@ -152,7 +152,7 @@ export class AttractapCardHandler {
     );
 
     if (!socket) {
-      throw new Error(`Reader not connected: ${data.readerId}`);
+      throw new ConflictException(`Reader not connected: ${data.readerId}`);
     }
     if (!socket.state.cardRelay) {
       throw new BadRequestException(`Reader firmware must be updated to reset cards: ${data.readerId}`);
@@ -160,10 +160,10 @@ export class AttractapCardHandler {
     const nfcCard = await this.attractapService.getNFCCardByID(data.cardId);
 
     if (!nfcCard) {
-      throw new Error(`NFC card not found: ${data.cardId}`);
+      throw new NotFoundException(`NFC card not found: ${data.cardId}`);
     }
     if (socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow) {
-      throw new Error(`Reader already has an active card operation: ${data.readerId}`);
+      throw new ConflictException(`Reader already has an active card operation: ${data.readerId}`);
     }
 
     // The reader only learns who the card belongs to. The key stays on the server: the next card
@@ -227,18 +227,18 @@ export class AttractapCardHandler {
     const reader = await this.attractapService.findReaderById(data.readerId);
 
     if (!reader) {
-      throw new Error(`Reader not found: ${data.readerId}`);
+      throw new NotFoundException(`Reader not found: ${data.readerId}`);
     }
 
     if (!reader.firmware.capabilities.cardEnrollment) {
-      throw new Error(`Reader does not support card enrollment: ${data.readerId}`);
+      throw new BadRequestException(`Reader does not support card enrollment: ${data.readerId}`);
     }
     await this.cardWriterPolicy.assertAllowed(data.readerId);
 
     const user = await this.usersService.findOne({ id: data.userId });
 
     if (!user) {
-      throw new Error(`User not found: ${data.userId}`);
+      throw new NotFoundException(`User not found: ${data.userId}`);
     }
 
     const sockets = Array.from(this.websocketService.sockets.values()).filter(
@@ -246,7 +246,7 @@ export class AttractapCardHandler {
     );
 
     if (sockets.length === 0) {
-      throw new Error(`Reader not connected: ${data.readerId}`);
+      throw new ConflictException(`Reader not connected: ${data.readerId}`);
     }
     if (sockets.some((socket) => !socket.state.cardRelay)) {
       throw new BadRequestException(`Reader firmware must be updated to enroll cards: ${data.readerId}`);
@@ -256,7 +256,7 @@ export class AttractapCardHandler {
         (socket) => socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow,
       )
     ) {
-      throw new Error(`Reader already has an active card operation: ${data.readerId}`);
+      throw new ConflictException(`Reader already has an active card operation: ${data.readerId}`);
     }
 
     // Send to all active sockets for this reader to avoid targeting a stale/disconnecting socket

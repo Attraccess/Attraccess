@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 
 import { AttractapEventType } from '../../websocket.types';
@@ -63,7 +64,7 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startEnrollOfNewNfcCardScope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 }),
-      ).rejects.toThrow('Reader not found: 42');
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws when the reader does not support card enrollment', async () => {
@@ -91,7 +92,7 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startEnrollOfNewNfcCardScope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 }),
-      ).rejects.toThrow('Reader not connected: 42');
+      ).rejects.toThrow(ConflictException);
     });
 
     it('stores the enrollment principal and sends ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO', async () => {
@@ -414,7 +415,7 @@ describe('AttractapCardHandler', () => {
       expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 7 }));
       await expect(
         startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
-      ).rejects.toThrow('Reader already has an active card operation: 42');
+      ).rejects.toThrow(ConflictException);
 
       expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 7 }));
     });
