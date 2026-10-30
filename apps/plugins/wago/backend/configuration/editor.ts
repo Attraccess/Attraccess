@@ -173,8 +173,22 @@ export function selectPresetChanges(
   return candidate;
 }
 
-export function configurationImpacts(previous: WagoConfigurationSnapshot | null, current: WagoConfigurationSnapshot) {
-  return (previous?.logicalChannels ?? []).flatMap((channel) => {
+/** Stable code of the impact a newly disabled channel has on flows that read it. */
+export const CHANNEL_DISABLED_IMPACT_CODE = 'channel_disabled';
+export const CHANNEL_DISABLED_IMPACT_MESSAGE = 'Channel disabled. Flows reading it will see it as unavailable.';
+
+export interface ConfigurationImpact {
+  channelId: string;
+  message: string;
+  /** Set only for impacts with a dedicated meaning, such as `channel_disabled`. */
+  code?: typeof CHANNEL_DISABLED_IMPACT_CODE;
+}
+
+export function configurationImpacts(
+  previous: WagoConfigurationSnapshot | null,
+  current: WagoConfigurationSnapshot,
+): ConfigurationImpact[] {
+  return (previous?.logicalChannels ?? []).flatMap((channel): ConfigurationImpact[] => {
     const next = current.logicalChannels.find((item) => item.id === channel.id);
     const oldPoint = previous?.physicalPoints.find((point) => point.id === channel.physicalPointId);
     const newPoint = current.physicalPoints.find((point) => point.id === next?.physicalPointId);
@@ -183,6 +197,8 @@ export function configurationImpacts(previous: WagoConfigurationSnapshot | null,
       configurationHash({ channel, point: oldPoint }) === configurationHash({ channel: next, point: newPoint })
     )
       return [];
+    if (next && next.enabled === false && channel.enabled !== false)
+      return [{ channelId: channel.id, code: CHANNEL_DISABLED_IMPACT_CODE, message: CHANNEL_DISABLED_IMPACT_MESSAGE }];
     return [
       {
         channelId: channel.id,

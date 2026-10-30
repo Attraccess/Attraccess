@@ -32,6 +32,16 @@ export function channelSample(live: LiveControls, id: string | undefined, kind: 
     ?.samples.find((sample) => sample.kind === kind && sample.current);
 }
 
+/** The applied configuration disables the channel, or diagnostics report it as disabled. */
+export function readingDisabled(live: LiveControls, channel: Channel): boolean {
+  return (
+    channel.enabled === false ||
+    Boolean(
+      live.diagnostics?.disabledChannels?.some((item) => item.id === channel.id && item.availability === 'disabled'),
+    )
+  );
+}
+
 export function OutputControl({ live, channel, label }: { live: LiveControls; channel?: Channel; label: string }) {
   const { t } = useWagoTranslations();
   const sample = channelSample(live, channel?.id, 'output');
@@ -102,19 +112,32 @@ export function DeviceCard({
         ? registerChannel(live.applied.snapshot, device.id, register.id, 'measurementId')
         : undefined;
     const sample = channelSample(live, channel?.id, 'measurement');
+    // An applied reading without an enabled channel is neither polled nor published: either it has no
+    // channel at all, or its channel is disabled.
+    let notPolled: 'notConfigured' | 'disabled' | undefined;
+    if (appliedProfile && !channel) notPolled = 'notConfigured';
+    else if (appliedProfile && channel && readingDisabled(live, channel)) notPolled = 'disabled';
     return (
       <div key={register.id} className="wg:flex wg:items-baseline wg:justify-between wg:gap-3">
         <span className="wg:min-w-0 wg:break-words wg:text-sm wg:text-muted">
           {shownBuiltin ? tBackendMessage(register.name) : register.name}
         </span>
-        <span className="wg:shrink-0 wg:text-lg wg:font-semibold wg:tabular-nums">
-          {formatMeterMeasurement(
-            register,
-            typeof sample?.value === 'number' ? { value: sample.value, unit: sample.unit ?? register.unit } : undefined,
-            language,
-            shownBuiltin ? tBackendMessage : undefined,
-          )}
-        </span>
+        {notPolled ? (
+          <span className="wg:shrink-0 wg:text-sm wg:text-muted">
+            {t(notPolled === 'disabled' ? 'panel.readingDisabled' : 'panel.readingNotConfigured')}
+          </span>
+        ) : (
+          <span className="wg:shrink-0 wg:text-lg wg:font-semibold wg:tabular-nums">
+            {formatMeterMeasurement(
+              register,
+              typeof sample?.value === 'number'
+                ? { value: sample.value, unit: sample.unit ?? register.unit }
+                : undefined,
+              language,
+              shownBuiltin ? tBackendMessage : undefined,
+            )}
+          </span>
+        )}
       </div>
     );
   };

@@ -15,10 +15,13 @@ export function SettingsDrawer({
   onSave,
   children,
   remove,
+  isSaveDisabled = false,
 }: {
   title: string;
   onClose: () => void;
   onSave: () => void;
+  /** The settings cannot be saved as they are; the body explains why. */
+  isSaveDisabled?: boolean;
   children: ReactNode;
   remove?: ReactNode;
 }) {
@@ -47,7 +50,9 @@ export function SettingsDrawer({
           <Button variant="secondary" onPress={onClose}>
             {t('panel.cancel')}
           </Button>
-          <Button type="submit">{t('panel.done')}</Button>
+          <Button type="submit" isDisabled={isSaveDisabled}>
+            {t('panel.done')}
+          </Button>
         </Drawer.Footer>
       </Form>
     </StandardDrawer>

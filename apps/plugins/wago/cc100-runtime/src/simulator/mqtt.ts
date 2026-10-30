@@ -1,6 +1,5 @@
 import { type MqttClient } from 'mqtt';
-import type { MessageSlot } from '../runtime/types';
-import type { SubscriptionAdmission } from '../transport/admission';
+import type { MessageSlot, SubscriptionAdmission } from '../transport/admission';
 
 export function publish(mqtt: MqttClient, topic: string, payload: unknown, retain = false): Promise<void> {
   return new Promise((resolve, reject) =>

@@ -170,6 +170,43 @@ describe('diagnostics isolation', () => {
     },
   );
   it.each([
+    ['en', 1, '1 disabled channel is configured. The controller neither polls nor publishes it, so it has no samples.'],
+    [
+      'en',
+      2,
+      '2 disabled channels are configured. The controller neither polls nor publishes them, so they have no samples.',
+    ],
+    [
+      'de',
+      1,
+      '1 deaktivierter Kanal ist konfiguriert. Der Controller fragt ihn weder ab noch veröffentlicht er ihn, daher hat er keine Werte.',
+    ],
+    [
+      'de',
+      2,
+      '2 deaktivierte Kanäle sind konfiguriert. Der Controller fragt sie weder ab noch veröffentlicht er sie, daher haben sie keine Werte.',
+    ],
+  ] as const)('counts disabled channels with singular and plural wording (%s, %i)', (language, count, text) => {
+    useTranslationState.getState().setLanguage(language);
+    vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
+      isError: false,
+      isPending: false,
+      data: {
+        ...fixture(),
+        disabledChannels: Array.from({ length: count }, (_, index) => ({
+          id: `reading-${index}`,
+          profile: 'generic-monitored-input',
+          capabilities: ['input', 'measurement'],
+          availability: 'disabled' as const,
+        })),
+      },
+      dataUpdatedAt: Date.now(),
+      refetch: vi.fn(),
+    });
+    render(<ControllerDiagnostics controllerId={1} />);
+    expect(screen.getByText(text)).toBeTruthy();
+  });
+  it.each([
     ['en', { oversized: 3, overload: 1 }, 'Dropped messages', '3 too large · 1 while overloaded', /times out like/],
     [
       'de',

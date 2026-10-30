@@ -17,6 +17,7 @@ import shellyEn from './../../../shelly/frontend/src/en.json';
 import { useShellyTranslations } from './../../../shelly/frontend/src/i18n';
 import { pulseBehaviorError } from './../../channel-behavior';
 import { CONFIGURATION_LIMIT_MESSAGES } from './../../shared/configuration-limits';
+import { CHANNEL_DISABLED_IMPACT_MESSAGE } from '../../backend/configuration/editor';
 import type { Freshness, WagoDiagnostics } from './../../diagnostics-types';
 import type { ModbusConnection, ModbusProfile, RegisterFormat } from '../../modbus/model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
@@ -96,7 +97,12 @@ function leaves(record: Record<string, unknown>, prefix = ''): Record<string, st
 {
   it('shows every configuration limit refusal in English and German', () => {
     const { result } = renderHook(() => useWagoTranslations());
-    const messages = Object.values(CONFIGURATION_LIMIT_MESSAGES);
+    const messages = [
+      ...Object.values(CONFIGURATION_LIMIT_MESSAGES),
+      // Disabled-channel gating and flow impact, by the server's exact text.
+      'This configuration disables channels, but the CC100 runtime on this controller cannot disable channels. Update the CC100 runtime, or enable every channel before publishing.',
+      CHANNEL_DISABLED_IMPACT_MESSAGE,
+    ];
     for (const message of messages) expect(result.current.tBackendMessage(message)).toBe(message);
     act(() => useTranslationState.getState().setLanguage('de'));
     for (const message of messages) {
@@ -179,6 +185,61 @@ function leaves(record: Record<string, unknown>, prefix = ''): Record<string, st
     for (const button of screen.getAllByRole('button', { name: 'Active power von Meter 1 hinzufügen' }))
       await user.click(button);
     expect(onAdd).toHaveBeenLastCalledWith({ deviceId: 'meter-1', actionId: 'relay' }, 'Meter 1: Active power');
+  });
+}
+
+{
+  it('marks Modbus readings whose channel is disabled in both languages', () => {
+    const builtin = BUILTIN_MODBUS_PROFILES[0];
+    const configuration = {
+      connections: [],
+      profiles: [],
+      devices: [
+        { id: 'meter', name: 'Meter', connectionId: 'bus', unitId: 1, profileId: builtin.id, profileVersion: 1 },
+      ],
+    };
+    const snapshot = {
+      physicalPoints: [
+        {
+          id: 'p1',
+          hardwareProfile: 'modbus' as const,
+          channel: 0,
+          modbus: { deviceId: 'meter', measurementId: 'tariff' },
+        },
+        {
+          id: 'p2',
+          hardwareProfile: 'modbus' as const,
+          channel: 0,
+          modbus: { deviceId: 'meter', measurementId: 'frequency' },
+        },
+      ],
+      logicalChannels: [
+        {
+          id: 'c1',
+          physicalPointId: 'p1',
+          profile: 'generic-monitored-input' as const,
+          capabilities: ['input' as const, 'measurement' as const],
+          disconnectPolicy: { mode: 'hold' as const },
+          enabled: false as const,
+        },
+        {
+          id: 'c2',
+          physicalPointId: 'p2',
+          profile: 'generic-monitored-input' as const,
+          capabilities: ['input' as const, 'measurement' as const],
+          disconnectPolicy: { mode: 'hold' as const },
+        },
+      ],
+    };
+    act(() => useTranslationState.getState().setLanguage('en'));
+    render(<ModbusChannels configuration={configuration} snapshot={snapshot} onAdd={vi.fn()} />);
+    const hint = screen.getByText(/^Disabled: this reading already has a channel/);
+    // No second channel for the disabled reading; the enabled one can still be added again.
+    const blocked = screen.getAllByRole('button').filter((button) => button.hasAttribute('disabled'));
+    expect(blocked).toHaveLength(1);
+    expect(blocked[0].getAttribute('aria-describedby')).toBe(hint.id);
+    act(() => useTranslationState.getState().setLanguage('de'));
+    expect(screen.getAllByText(/^Deaktiviert: Dieser Messwert hat bereits einen Kanal/)).toHaveLength(1);
   });
 }
 
@@ -546,6 +607,17 @@ function leaves(record: Record<string, unknown>, prefix = ''): Record<string, st
       ).toContain(result.current.t(`fields.measurement_${field}`));
     }
     expect(renderValue('$.logicalChannels[0].capabilities', ['input', 'feedback'])).toBe('Eingang, Rückmeldung');
+    expect(renderValue('$.logicalChannels[0].enabled', false)).toBe('Nein');
+    expect(renderValue('$.logicalChannels[0].enabled', undefined)).toBe('Ja');
+    expect(
+      changeLabel(
+        { path: '$.logicalChannels[0].enabled', previous: undefined, current: false },
+        null,
+        emptyConfiguration,
+        {},
+        result.current.t,
+      ),
+    ).toContain('Kanal aktiviert');
     expect(renderValue('$.logicalChannels[0].name', 'on')).toBe('on');
     expect(renderValue('$.logicalChannels[0].id', 'immediate')).toBe('immediate');
   });

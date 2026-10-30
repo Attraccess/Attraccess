@@ -2,6 +2,8 @@ import { configurationHash } from './model';
 import { WagoEnrollment } from '../controllers/enrollment.entity';
 import { controller, createWagoServiceFixture } from '../wago-service.test-fixture';
 import { WagoService } from '../controllers/service';
+import { CHANNEL_ENABLED_CAPABILITY } from '../../shared/capabilities';
+import { CHANNEL_ENABLED_UNSUPPORTED_MESSAGE } from './channel-enabled';
 
 describe('WagoService configuration and commands', () => {
   const services: WagoService[] = [];
@@ -28,6 +30,33 @@ describe('WagoService configuration and commands', () => {
       expect(context.mqtt.publish).toHaveBeenCalledTimes(['published', 'applied'].includes(state) ? 2 : 1);
     },
   );
+
+  it.each([
+    ['without', '["claim","heartbeat","configuration-v1"]', 1],
+    ['with', `["claim","heartbeat","configuration-v1","${CHANNEL_ENABLED_CAPABILITY}"]`, 2],
+  ])('replays disabled channels only to a runtime %s channel-enabled-v1', async (_name, capabilities, publishes) => {
+    const { service, context, revisionRepository } = createService([
+      { ...controller(), trustState: 'claimed', capabilities },
+    ]);
+    revisionRepository.find.mockResolvedValue([
+      {
+        revision: 4,
+        state: 'applied',
+        contentHash: 'a'.repeat(64),
+        snapshot: JSON.stringify({ logicalChannels: [{ id: 'power', enabled: false }] }),
+      },
+    ]);
+    const image = `sha256:${'a'.repeat(64)}`;
+    await service.setRuntimePolicy(1, image, image, 'boot-token');
+    expect(context.mqtt.publish).toHaveBeenCalledTimes(publishes);
+    if (publishes === 1)
+      expect(context.logger.warn).toHaveBeenCalledWith(
+        `Not replaying WAGO configuration revision 4 to controller 1: ${CHANNEL_ENABLED_UNSUPPORTED_MESSAGE}`,
+      );
+    else expect(context.logger.warn).not.toHaveBeenCalled();
+    // The policy is still recorded, so the controller is not held in a runtime update.
+    expect(service.isRuntimeUpdateRequired(1)).toBe(false);
+  });
 
   it('publishes a configured command without waiting when dispatch completion is selected', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };

@@ -8,6 +8,7 @@ import {
   validCommand,
   createRuntimeFixture,
 } from '../../runtime.test-utils';
+import { meterFleet } from '../../../../shared/configuration-limits.test-utils';
 
 describe('WagoRuntime', () => {
   let transport: TestTransport;
@@ -175,5 +176,110 @@ describe('WagoRuntime', () => {
         }),
       }),
     );
+  });
+});
+
+/** `hash(snapshot)` of the shared runtime fixture, recorded before channels could be disabled. */
+const STORED_SNAPSHOT_HASH = '6c006161095c1d3477e3bcbd87030fe9dd4f6e8b834614dabcc8abddd9a5610e';
+
+describe('disabled channels', () => {
+  /** Two meters with three readings each, the last one disabled, plus a digital input and output. */
+  const fleet = (): Snapshot => {
+    const meters = meterFleet(2, 2);
+    meters.logicalChannels = meters.logicalChannels.filter((_, index) => index % 131 < 3);
+    meters.physicalPoints = meters.physicalPoints.filter((_, index) => index % 131 < 3);
+    return {
+      ...meters,
+      physicalPoints: [
+        ...meters.physicalPoints,
+        ...snapshot.physicalPoints,
+        { id: 'input-1', hardwareProfile: '751-9301', channel: 1 },
+      ],
+      logicalChannels: [
+        ...meters.logicalChannels,
+        ...snapshot.logicalChannels,
+        {
+          id: 'door',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+      ],
+    };
+  };
+  const disabledId = meterFleet(1, 0).logicalChannels[2].id;
+  const codes = (value: unknown) => validateSnapshot(value).map((error) => error.code);
+  const withChannel = (index: number, change: Record<string, unknown>) => {
+    const value = fleet();
+    value.logicalChannels[index] = { ...value.logicalChannels[index], ...change };
+    return value;
+  };
+  const loadIndex = 6;
+  const doorIndex = 7;
+
+  it('accepts enabled: false on a Modbus measurement channel', () => {
+    expect(fleet().logicalChannels[2]).toMatchObject({ id: disabledId, enabled: false });
+    expect(validateSnapshot(fleet())).toEqual([]);
+    expect(validateSnapshot(withChannel(2, { capabilities: ['input', 'measurement'] }))).toEqual([]);
+  });
+
+  it.each([true, 'false', 0, null])('rejects enabled: %p', (enabled) => {
+    expect(validateSnapshot(withChannel(0, { enabled }))).toContainEqual({
+      path: 'snapshot.logicalChannels[0].enabled',
+      code: 'invalid_enabled',
+      message: 'enabled must be false or omitted',
+    });
+  });
+
+  it.each([
+    ['a digital output', loadIndex, {}],
+    ['a digital input', doorIndex, {}],
+    ['a Modbus channel with output capability', 2, { capabilities: ['measurement', 'output'] }],
+  ])('rejects enabled: false on %s', (_name, index, change) => {
+    expect(validateSnapshot(withChannel(index, { ...change, enabled: false }))).toContainEqual({
+      path: `snapshot.logicalChannels[${index}].enabled`,
+      code: 'invalid_enabled',
+      message: 'only Modbus measurement channels without an action can be disabled',
+    });
+  });
+
+  it('rejects enabled: false on a channel whose Modbus point is bound to an action', () => {
+    const value = fleet();
+    value.physicalPoints[2] = { ...value.physicalPoints[2], modbus: { deviceId: 'meter-0', actionId: 'relay' } };
+    expect(codes(value)).toContain('invalid_enabled');
+  });
+
+  it.each([
+    ['guard', { capabilities: ['output', 'guard'], guard: { channelId: disabledId, when: 'on' } }],
+    [
+      'feedback',
+      { capabilities: ['output', 'feedback'], feedback: { channelId: disabledId, expected: 'match', timeoutMs: 100 } },
+    ],
+  ])('rejects a %s that refers to a disabled channel', (key, change) => {
+    // The disabled reading is otherwise a valid guard or feedback input.
+    const value = withChannel(loadIndex, change);
+    value.logicalChannels[2] = { ...value.logicalChannels[2], capabilities: ['input', 'measurement'] };
+    expect(validateSnapshot(value)).toEqual([
+      {
+        path: `snapshot.logicalChannels[${loadIndex}].${key}`,
+        code: 'disabled_reference',
+        message: 'a guard or feedback cannot use a disabled channel',
+      },
+    ]);
+    // The same reference to the enabled reading is valid.
+    delete value.logicalChannels[2].enabled;
+    expect(validateSnapshot(value)).toEqual([]);
+  });
+
+  it('still rejects unknown channel fields', () => {
+    expect(validateSnapshot(withChannel(2, { disabled: true }))).toContainEqual(
+      expect.objectContaining({ path: 'snapshot.logicalChannels[2].disabled', code: 'unknown_field' }),
+    );
+  });
+
+  it('keeps the content hash of a snapshot without the flag unchanged', () => {
+    // Recorded before `enabled` existed; an unchanged stored snapshot must keep its hash.
+    expect(hash(snapshot)).toBe(STORED_SNAPSHOT_HASH);
   });
 });

@@ -2,9 +2,13 @@ import { duplicateProfile, BUILTIN_MODBUS_PROFILES } from '../../../modbus/model
 import {
   CONFIGURATION_LIMIT_CODE,
   MAX_CONFIGURATION_ITEMS,
+  MAX_ENABLED_CHANNELS,
+  MAX_STATUS_REPORT_BYTES,
   configurationLimitViolations,
   worstCaseStatusReportBytes,
 } from '../../../shared/configuration-limits';
+import { meterFleet } from '../../../shared/configuration-limits.test-utils';
+import { validateSnapshot } from './configuration/validation';
 import { boundErrors, boundFaultText, boundReport, clip, truncateUtf8 } from './bounded';
 import {
   MAX_COMMAND_BYTES,
@@ -51,6 +55,15 @@ const channels = (count: number, id = (index: number) => `ch-${index}`): Snapsho
     disconnectPolicy: { mode: 'immediate' as const },
   })),
 });
+
+/** `count` channels of which only the first 256 are enabled; the rest say `enabled: false`. */
+const disabledChannels = (count: number): Snapshot => {
+  const value = channels(count);
+  value.logicalChannels = value.logicalChannels.map((channel, index) =>
+    index < MAX_ENABLED_CHANNELS ? channel : { ...channel, enabled: false },
+  );
+  return value;
+};
 
 describe('bounded runtime messages', () => {
   it('keeps a rejection report within 50 errors and 64 KiB with worst-case text', () => {
@@ -130,13 +143,14 @@ describe('configuration limits', () => {
   });
 
   it.each([
-    ['more than 256 channels', channels(MAX_CONFIGURATION_ITEMS + 1), 'channels'],
+    ['more than 256 enabled channels', channels(MAX_ENABLED_CHANNELS + 1), 'enabled-channels'],
+    ['more than 2048 channels, even when disabled', disabledChannels(MAX_CONFIGURATION_ITEMS + 1), 'channels'],
     ['an ID over 256 characters', channels(1, () => 'x'.repeat(257)), 'identifier'],
     ['an ID with a control character', channels(1, () => 'bad\nid'), 'identifier'],
     ['an ID with DEL', channels(1, () => 'bad\u007fid'), 'identifier'],
     ['an ID with a C1 control character', channels(1, () => 'bad\u0085id'), 'identifier'],
     [
-      'more than 256 points with few channels',
+      'more than 2048 points with few channels',
       {
         ...channels(1),
         physicalPoints: Array.from({ length: MAX_CONFIGURATION_ITEMS + 1 }, (_, index) => ({
@@ -159,14 +173,55 @@ describe('configuration limits', () => {
     expect(configurationLimitViolations(value).map((item) => item.limit)).toContain(limit);
   });
 
-  it('accepts exactly 256 channels, a 256-character ID and 16 levels of nesting', () => {
-    expect(configurationLimitViolations(channels(MAX_CONFIGURATION_ITEMS))).toEqual([]);
+  it('accepts exactly 256 enabled channels, 2048 channels in all, a 256-character ID and 16 levels of nesting', () => {
+    expect(configurationLimitViolations(channels(MAX_ENABLED_CHANNELS))).toEqual([]);
+    expect(configurationLimitViolations(disabledChannels(MAX_CONFIGURATION_ITEMS))).toEqual([]);
     expect(configurationLimitViolations(nestedTo(16))).toEqual([]);
     expect(configurationLimitViolations(channels(1, () => 'x'.repeat(256)))).toEqual([]);
   });
 
-  it('estimates the status report from every channel ID', () => {
+  it('accepts ten built-in 879-3020 meters with 131 channels each and 11 enabled', () => {
+    const fleet = meterFleet(10, 11);
+    expect(fleet.logicalChannels).toHaveLength(10 * 131);
+    expect(fleet.logicalChannels.filter((channel) => !('enabled' in channel))).toHaveLength(110);
+    expect(validateSnapshot(fleet)).toEqual([]);
+    expect(configurationLimitViolations(fleet)).toEqual([]);
+  });
+
+  it('refuses ten meters with all channels enabled only for the enabled-channel limit', () => {
+    expect(configurationLimitViolations(meterFleet(10, 131))).toEqual([
+      { limit: 'enabled-channels', actual: 1310, max: MAX_ENABLED_CHANNELS },
+    ]);
+  });
+
+  it('estimates the status report from digital and output channel IDs only', () => {
     expect(worstCaseStatusReportBytes(channels(10))).toBeLessThan(worstCaseStatusReportBytes(channels(11)));
+    // Modbus measurement channels never appear in the state message, enabled or not, whatever their IDs.
+    const base = worstCaseStatusReportBytes({});
+    expect(worstCaseStatusReportBytes(meterFleet(10, 131))).toBe(base);
+    const longMeterIds = meterFleet(2, 128);
+    longMeterIds.logicalChannels = longMeterIds.logicalChannels.map((channel, index) => ({
+      ...channel,
+      id: `${index}`.padEnd(256, 'x'),
+    }));
+    expect(worstCaseStatusReportBytes(longMeterIds)).toBe(base);
+    expect(configurationLimitViolations(longMeterIds)).toEqual([]);
+    // A digital input counts once, an output three times.
+    const input = { ...channels(1), logicalChannels: [{ ...channels(1).logicalChannels[0], capabilities: ['input'] }] };
+    expect(worstCaseStatusReportBytes(input)).toBe(base + Buffer.byteLength('"ch-0":false,'));
+    expect(worstCaseStatusReportBytes(channels(1))).toBe(base + 2 * Buffer.byteLength('"ch-0":false,') + 7);
+    // A Modbus input or output channel only counts when it can be commanded.
+    const modbusPoint = { ...channels(1).physicalPoints[0], hardwareProfile: 'modbus' as const };
+    const modbusOutput = {
+      ...channels(1),
+      physicalPoints: [{ ...modbusPoint, modbus: { deviceId: 'relay', actionId: 'coil' } }],
+    };
+    expect(worstCaseStatusReportBytes(modbusOutput)).toBe(worstCaseStatusReportBytes(channels(1)));
+    const modbusInput = {
+      ...input,
+      physicalPoints: [{ ...modbusPoint, modbus: { deviceId: 'meter', measurementId: 'power' } }],
+    };
+    expect(worstCaseStatusReportBytes(modbusInput)).toBe(base);
   });
 });
 
@@ -289,6 +344,67 @@ describe('runtime configuration limits', () => {
     expect(state.readiness.errors.length).toBeGreaterThan(0);
     expect(bytes(state.readiness.errors)).toBeLessThanOrEqual(MAX_READINESS_ERROR_BYTES);
     expect(state.readiness.omittedErrors).toBe(20 - state.readiness.errors.length);
+  });
+
+  it('publishes a state message within the estimate when digital and output IDs are as long as the limits allow', async () => {
+    class WorstCaseDevice extends MemoryDeviceAdapter {
+      async checkAvailability(): Promise<void> {
+        throw new Error('😀'.repeat(20_000));
+      }
+    }
+    const meters = meterFleet(10, 11);
+    const digital = (count: number, length: number, kind: 'input' | 'output'): Snapshot => {
+      const value = channels(count, (index) => `${kind}-${index}-`.padEnd(length, '😀'));
+      value.physicalPoints = value.physicalPoints.map((point) => ({ ...point, id: `${kind}-${point.id}` }));
+      value.logicalChannels = value.logicalChannels.map((channel) => ({
+        ...channel,
+        physicalPointId: `${kind}-${channel.physicalPointId}`,
+        capabilities: [kind],
+        profile: kind === 'input' ? 'generic-monitored-input' : 'generic-digital-output',
+        disconnectPolicy: { mode: kind === 'input' ? ('hold' as const) : ('immediate' as const) },
+      }));
+      return value;
+    };
+    const build = (length: number): Snapshot => {
+      const outputs = digital(100, length, 'output');
+      const inputs = digital(MAX_ENABLED_CHANNELS - 110 - 100, length, 'input');
+      return {
+        ...meters,
+        physicalPoints: [...meters.physicalPoints, ...outputs.physicalPoints, ...inputs.physicalPoints],
+        logicalChannels: [...meters.logicalChannels, ...outputs.logicalChannels, ...inputs.logicalChannels],
+      };
+    };
+    // The longest IDs (in UTF-16 units of 4-byte characters) that still pass the status-report limit.
+    let length = 16;
+    while (length < 256 && worstCaseStatusReportBytes(build(length + 1)) <= MAX_STATUS_REPORT_BYTES) length += 1;
+    const configuration = build(length);
+    expect(worstCaseStatusReportBytes(build(length + 1))).toBeGreaterThan(MAX_STATUS_REPORT_BYTES);
+    expect(configurationLimitViolations(configuration)).toEqual([]);
+
+    const { transport, instance } = await runtime(undefined, new WorstCaseDevice());
+    await send(transport, 1, configuration);
+    expect(lastReport(transport)).toMatchObject({ revision: 1, errors: [] });
+    const outputIds = configuration.logicalChannels
+      .filter((channel) => channel.capabilities.includes('output'))
+      .map((channel) => channel.id);
+    const state = Reflect.get(instance, 'state');
+    for (const id of outputIds) state.outputs[id] = true;
+    state.manualOutputChannelIds = outputIds;
+    await Reflect.get(instance, 'publishState').call(instance);
+    const published = transport.published.filter((item) => item.topic.endsWith('/state')).at(-1)?.payload as {
+      inputs: Record<string, boolean>;
+      outputs: Record<string, boolean>;
+      commandedOutputs: Record<string, boolean>;
+      manualOutputChannelIds: string[];
+    };
+    expect(Object.keys(published.outputs)).toHaveLength(100);
+    expect(Object.keys(published.commandedOutputs)).toHaveLength(100);
+    expect(published.manualOutputChannelIds).toHaveLength(100);
+    expect(Object.keys(published.inputs)).toHaveLength(MAX_ENABLED_CHANNELS - 110 - 100);
+    // Meter readings never appear in the state message.
+    expect(JSON.stringify(published)).not.toContain('meter-');
+    expect(bytes(published)).toBeLessThanOrEqual(worstCaseStatusReportBytes(configuration));
+    expect(bytes(published)).toBeLessThanOrEqual(MAX_STATUS_REPORT_BYTES);
   });
 
   it('caps the text of a measurement fault', async () => {

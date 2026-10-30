@@ -144,6 +144,7 @@ export abstract class RuntimeConfiguration extends RuntimeDiscovery {
 
   protected async applyRuntimeUpdateFailsafe(): Promise<void> {
     this.runtimeFailsafePending = true;
+    this.resyncMeasurements();
     try {
       await this.runConfigurationUpdate(() => this.outputs.applyRuntimeUpdateFailsafe());
       this.runtimeFailsafePending = false;

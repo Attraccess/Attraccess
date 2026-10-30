@@ -52,6 +52,17 @@ export function validateChannelInterlocks(
   channelsById: Map<string, Snapshot['logicalChannels'][number]>,
 ): void {
   const guardChannel = channel.guard ? channelsById.get(channel.guard.channelId) : undefined;
+  const feedbackChannel = channel.feedback ? channelsById.get(channel.feedback.channelId) : undefined;
+  for (const [key, referenced] of [
+    ['guard', guardChannel],
+    ['feedback', feedbackChannel],
+  ] as const)
+    if (referenced?.enabled === false)
+      errors.push({
+        path: `${path}.${key}`,
+        code: 'disabled_reference',
+        message: 'a guard or feedback cannot use a disabled channel',
+      });
   if (
     channel?.guard &&
     (!capabilities.includes('guard') ||
@@ -69,7 +80,6 @@ export function validateChannelInterlocks(
   if (channel.guard) {
     validateKeys(channel.guard as Record<string, unknown>, `${path}.guard`, ['channelId', 'when'], errors);
   }
-  const feedbackChannel = channel.feedback ? channelsById.get(channel.feedback.channelId) : undefined;
   if (
     channel.feedback &&
     (!capabilities.includes('feedback') ||
@@ -168,6 +178,44 @@ export function validateDisconnectAndPulse(
   }
 }
 
+const DISABLEABLE_CAPABILITIES = ['input', 'measurement'];
+
+/** `enabled` is either absent or `false`, and only a Modbus measurement channel without an action may be disabled. */
+export function validateChannelEnabled(
+  channel: Snapshot['logicalChannels'][number],
+  capabilities: Snapshot['logicalChannels'][number]['capabilities'],
+  path: string,
+  errors: ValidationError[],
+  pointsById: Map<string, Snapshot['physicalPoints'][number]>,
+): void {
+  const enabled: unknown = channel.enabled;
+  if (enabled === undefined) return;
+  if (enabled !== false) {
+    errors.push({ path: `${path}.enabled`, code: 'invalid_enabled', message: 'enabled must be false or omitted' });
+    return;
+  }
+  const point = pointsById.get(channel.physicalPointId);
+  const binding: unknown = point?.modbus;
+  const record =
+    binding && typeof binding === 'object' && !Array.isArray(binding)
+      ? (binding as Record<string, unknown>)
+      : undefined;
+  if (
+    point?.hardwareProfile !== 'modbus' ||
+    !record ||
+    typeof record.measurementId !== 'string' ||
+    !record.measurementId ||
+    record.actionId !== undefined ||
+    !capabilities.length ||
+    capabilities.some((capability) => !DISABLEABLE_CAPABILITIES.includes(capability))
+  )
+    errors.push({
+      path: `${path}.enabled`,
+      code: 'invalid_enabled',
+      message: 'only Modbus measurement channels without an action can be disabled',
+    });
+}
+
 export function validateSnapshot(value: unknown): ValidationError[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return [{ path: 'snapshot', code: 'invalid_snapshot', message: 'snapshot must be an object' }];
@@ -192,6 +240,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     ];
   }
   const pointIds = new Set<string>();
+  const pointsById = new Map<string, Snapshot['physicalPoints'][number]>();
   snapshot.physicalPoints.forEach((point, index) => {
     if (!point || typeof point !== 'object' || Array.isArray(point)) {
       errors.push({
@@ -215,6 +264,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
     pointIds.add(point?.id);
+    if (typeof point.id === 'string' && !pointsById.has(point.id)) pointsById.set(point.id, point);
     if (!['751-9301', '879-3000', '879-1300', 'modbus'].includes(point?.hardwareProfile ?? '')) {
       errors.push({
         path: `snapshot.physicalPoints[${index}].hardwareProfile`,
@@ -253,6 +303,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         'physicalPointId',
         'profile',
         'capabilities',
+        'enabled',
         'invert',
         'disconnectPolicy',
         'range',
@@ -303,6 +354,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         message: 'logical channel profile must be a non-empty string',
       });
     }
+    validateChannelEnabled(channel, capabilities, path, errors, pointsById);
     validateDisconnectAndPulse(channel, capabilities, path, errors);
     validateChannelInterlocks(channel, capabilities, path, errors, channelsById);
     validateChannelMeasurements(channel, capabilities, path, errors);

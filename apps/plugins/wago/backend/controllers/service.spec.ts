@@ -261,6 +261,16 @@ describe('WagoService connection monitoring', () => {
     },
   );
 
+  it('lists heartbeat times and connectivity without deep-copying each controller diagnostics', async () => {
+    const { service } = createService([{ ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: null }]);
+    const read = jest.spyOn(service.diagnostics, 'read');
+    jest.spyOn(service.diagnostics, 'heartbeatAt').mockReturnValue(new Date().toISOString());
+    const [listed] = await service.list();
+    expect(listed.connectivity).toBe('online');
+    expect(listed.lastHeartbeatAt).toEqual(expect.any(String));
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it('does not expose physical-verification secrets in controller listings', async () => {
     const { service } = createService();
 

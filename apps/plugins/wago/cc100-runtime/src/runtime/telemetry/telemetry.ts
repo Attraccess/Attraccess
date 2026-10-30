@@ -4,6 +4,13 @@ import { RuntimeStatePublication } from './state-publication';
 import { type ValidationError } from '../types';
 import { runtimeVersion } from '../../../manifest.json';
 
+/**
+ * Sequence numbers reserved per state-file write. Every write rewrites the whole state file, accepted
+ * snapshot included, so a small block wears the controller's flash. Published sequences are scoped to a
+ * stream that is new for every process, so a large block never makes a restarted runtime reuse one.
+ */
+export const SEQUENCE_RESERVATION_BLOCK = 1_000_000;
+
 export abstract class RuntimeTelemetry extends RuntimeStatePublication {
   public async publishHeartbeat(ignoreStatePublicationFailure = false): Promise<void> {
     if (this.heartbeatPublication) {
@@ -97,7 +104,7 @@ export abstract class RuntimeTelemetry extends RuntimeStatePublication {
       // restart skips unused reservations rather than replaying sequence numbers.
       const nextSequence = (this.categorySequences.get(suffix) ?? this.initialSequence) + 1;
       if (nextSequence > this.reservedSequence) {
-        const reserved = this.sequence + 100;
+        const reserved = this.sequence + SEQUENCE_RESERVATION_BLOCK;
         await this.queueStateUpdate(async () => {
           await this.options.store.save({ ...this.state, sequence: reserved });
           this.state.sequence = reserved;

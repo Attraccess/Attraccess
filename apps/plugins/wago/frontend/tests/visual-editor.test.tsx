@@ -403,7 +403,7 @@ describe('visual configuration workflow', () => {
     expect(screen.getByText(`Configuration: ${CONFIGURATION_LIMIT_MESSAGES.channels}`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Publish rollback as new revision' })).toBeDisabled();
     act(() => useTranslationState.setState({ language: 'de' }));
-    expect(await screen.findByText(/Die Konfiguration hat mehr als 256 Kanäle\. Entferne Kanäle/)).toBeInTheDocument();
+    expect(await screen.findByText(/Die Konfiguration hat mehr als 2048 Kanäle\. Entferne Kanäle/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zurücksetzen als neue Version veröffentlichen' })).toBeDisabled();
     expect(state.rollback).not.toHaveBeenCalled();
   });

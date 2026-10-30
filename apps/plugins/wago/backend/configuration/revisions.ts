@@ -20,6 +20,8 @@ import { WagoController } from '../controllers/entity';
 
 import { WagoDrafts } from './drafts';
 
+import { runtimeSupportErrors, requireRuntimeSupport } from './channel-enabled';
+
 export abstract class WagoRevisions extends WagoDrafts {
   protected async latestRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
     const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
@@ -57,6 +59,7 @@ export abstract class WagoRevisions extends WagoDrafts {
     const validation = validateEditorSnapshot(JSON.parse(draft.snapshot));
     if (validation.length)
       throw new ConflictException({ message: 'configuration draft is invalid', errors: validation });
+    requireRuntimeSupport(JSON.parse(draft.snapshot), controller.capabilities);
     const contentHash = configurationHash(JSON.parse(draft.snapshot));
     const previous = await this.latestRevision(controllerId);
     const impacts = await configurationFlowImpacts(
@@ -249,7 +252,7 @@ export abstract class WagoRevisions extends WagoDrafts {
     errors: ConfigurationValidationError[];
   }> {
     return this.withConfigurationLock(controllerId, async () => {
-      await this.claimedController(controllerId);
+      const controller = await this.claimedController(controllerId);
       const selected = await this.revisions.findOneBy({ controllerId, revision });
       if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
       const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
@@ -271,8 +274,8 @@ export abstract class WagoRevisions extends WagoDrafts {
           this.metadataFromProvenance(current?.presetProvenance),
           this.metadataFromProvenance(selected.presetProvenance),
         ),
-        // The same check `rollback` runs, so the editor can refuse the rollback before publishing.
-        errors: validateEditorSnapshot(snapshot),
+        // The same checks `rollback` runs, so the editor can refuse the rollback before publishing.
+        errors: [...validateEditorSnapshot(snapshot), ...runtimeSupportErrors(snapshot, controller.capabilities)],
       };
     });
   }
@@ -330,6 +333,7 @@ export abstract class WagoRevisions extends WagoDrafts {
       const snapshot = JSON.parse(source.snapshot);
       const errors = validateEditorSnapshot(snapshot);
       if (errors.length) throw new ConflictException({ message: 'rollback configuration is invalid', errors });
+      requireRuntimeSupport(snapshot, controller.capabilities);
       const approvedImpacts = await configurationFlowImpacts(
         this.context,
         controllerId,

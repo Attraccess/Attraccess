@@ -1,5 +1,11 @@
-import { type DropReason } from '../../../shared/capabilities';
-import type { MessageSlot } from '../runtime/types';
+// Self-contained on purpose: the simulator integration overlays this module onto older runtime
+// revisions that predate it, so it must not import types those revisions lack.
+
+/** Why a message was dropped; kept equal to `DropReason` in shared/capabilities by admission.spec. */
+export type DropReason = 'oversized' | 'overload';
+
+/** Frees a message's admission slot early, e.g. once a command has joined its channel queue. */
+export type MessageSlot = { release(): void };
 
 /** Default cap for subscriptions that do not declare one. */
 export const DEFAULT_MAX_MESSAGE_BYTES = 64 * 1024;

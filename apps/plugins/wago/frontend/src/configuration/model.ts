@@ -283,6 +283,15 @@ export function readableValue(
   field = '',
   context?: ValueContext,
 ): string {
+  // `enabled` is stored only as `false`; an absent value means the channel is enabled.
+  if (field === 'enabled' && (value === undefined || typeof value === 'boolean'))
+    return value === false
+      ? t
+        ? t('fields.values.disabled')
+        : englishFields.values.disabled
+      : t
+        ? t('fields.values.enabled')
+        : englishFields.values.enabled;
   if (value === undefined || value === null) return t ? t('fields.notConfigured') : 'Not configured';
   if (Array.isArray(value))
     return (

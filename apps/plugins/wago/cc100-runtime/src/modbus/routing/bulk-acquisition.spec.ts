@@ -3,6 +3,8 @@ import { ModbusDeviceRouter } from './adapter';
 import { acquireMeasurements } from './acquisition';
 import type { Snapshot } from '../../runtime';
 import { ModbusException } from '../protocol/protocol';
+import { meterFleet } from '../../../../shared/configuration-limits.test-utils';
+import { WAGO_879_3020_DEFAULT_ENABLED } from '../../../../modbus/wago-879-3020';
 
 describe('complete meter acquisition over the shared serial bus', () => {
   const meter = BUILTIN_MODBUS_PROFILES[0];
@@ -161,5 +163,71 @@ describe('complete meter acquisition over the shared serial bus', () => {
     const readings = [];
     for await (const reading of router.readMeasurements(phasePoints)) readings.push(reading);
     expect(readings.every((r) => !r.ok)).toBe(true);
+  });
+});
+
+describe('acquisition of a meter fleet with disabled readings', () => {
+  const sweep = async (snapshot: Snapshot) => {
+    const request = jest.fn(async (_unit: number, pdu: Buffer) => Buffer.alloc(pdu.readUInt16BE(3) * 2));
+    const router = new ModbusDeviceRouter({ read: async () => 0, write: async () => undefined }, () => ({ request }));
+    router.configure(snapshot);
+    const readings = [];
+    for await (const reading of acquireMeasurements(snapshot, router)) readings.push(reading);
+    const ranges = request.mock.calls.map(([unit, pdu]) => ({
+      unit,
+      start: pdu.readUInt16BE(1),
+      end: pdu.readUInt16BE(1) + pdu.readUInt16BE(3),
+    }));
+    return { readings, ranges };
+  };
+
+  it('never requests a register only disabled channels use', async () => {
+    const snapshot: Snapshot = meterFleet(1);
+    const profile = BUILTIN_MODBUS_PROFILES.find((item) => item.id === 'wago-879-3020');
+    if (!profile) throw new Error('missing 879-3020 profile');
+    const enabled = snapshot.logicalChannels.filter((channel) => channel.enabled !== false);
+    const registers = new Set(
+      enabled.flatMap((channel) => {
+        const measurement = profile.measurements.find((item) => channel.id.endsWith(`.${item.id}`));
+        if (!measurement) throw new Error(`unknown measurement for ${channel.id}`);
+        const width = ['float32', 'uint32', 'int32'].includes(measurement.dataType) ? 2 : 1;
+        return Array.from({ length: width }, (_, index) => measurement.address + index);
+      }),
+    );
+
+    const { readings, ranges } = await sweep(snapshot);
+
+    expect(enabled).toHaveLength(11);
+    expect(readings.flatMap((reading) => reading.channels.map((channel) => channel.id)).sort()).toEqual(
+      enabled.map((channel) => channel.id).sort(),
+    );
+    for (const { start, end } of ranges)
+      for (let register = start; register < end; register++) expect(registers).toContain(register);
+  });
+
+  it('builds the fleet fixture from the editor default-enabled 879-3020 readings', () => {
+    const enabled = meterFleet(1)
+      .logicalChannels.filter((channel) => channel.enabled !== false)
+      .map((channel) => channel.id.replace(/^meter-0\./, ''));
+    expect(enabled.sort()).toEqual([...WAGO_879_3020_DEFAULT_ENABLED].sort());
+  });
+
+  it('reads the default eleven 879-3020 readings in three requests per meter', async () => {
+    // 0x5002-0x5013 (phase voltages, frequency, current, phase currents and active power are contiguous),
+    // import energy 0x600c and export energy 0x6018. Blocks only merge contiguous registers.
+    expect((await sweep(meterFleet(1))).ranges).toEqual([
+      { unit: 1, start: 0x5002, end: 0x5014 },
+      { unit: 1, start: 0x600c, end: 0x600e },
+      { unit: 1, start: 0x6018, end: 0x601a },
+    ]);
+    const fleet = await sweep(meterFleet(10));
+    expect(fleet.ranges).toHaveLength(30);
+    expect(new Set(fleet.ranges.map(({ unit }) => unit)).size).toBe(10);
+  });
+
+  it('sends nothing on the bus for a meter whose readings are all disabled', async () => {
+    const { readings, ranges } = await sweep(meterFleet(1, 0));
+    expect(readings).toEqual([]);
+    expect(ranges).toEqual([]);
   });
 });

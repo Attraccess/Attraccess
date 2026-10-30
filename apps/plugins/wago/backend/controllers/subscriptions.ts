@@ -46,7 +46,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     // Rejected legacy packets must not refresh checkpoints or overwrite runtime metadata either.
     if (canTrackDiagnostics && !admitted) return;
     const heartbeatAt = admitted
-      ? this.diagnostics.read(controller.id).heartbeatAt
+      ? this.diagnostics.heartbeatAt(controller.id)
       : typeof rawHeartbeat.timestamp === 'string'
         ? rawHeartbeat.timestamp
         : undefined;

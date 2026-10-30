@@ -26,12 +26,14 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
       });
     }
     if (accepted && supported && !this.runtimeUpdateRequired && !this.runtimeFailsafePending) {
+      const points = new Map(accepted.snapshot.physicalPoints.map((point) => [point.id, point]));
       for (const channel of accepted.snapshot.logicalChannels) {
+        if (channel.enabled === false) continue;
         const output = channel.capabilities.includes('output');
         if (!output && !channel.capabilities.includes('input')) continue;
         if (output && typeof this.state.outputs[channel.id] === 'boolean')
           commandedOutputs[channel.id] = this.state.outputs[channel.id];
-        const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
+        const point = points.get(channel.physicalPointId);
         if (!point) continue;
         if (point.modbus) {
           this.collectModbusOutputSample(accepted, channel, point, outputs, errors);
@@ -57,8 +59,29 @@ export abstract class RuntimeStatePublication extends RuntimeModbusOutputPolling
     const signature = JSON.stringify(payload);
     if (!force && signature === this.lastPublishedState) return;
     this.publishReadFaults(errors);
-    await this.publishOperational('state', payload, { retain: true }, () => accepted === this.state.accepted);
-    if (accepted === this.state.accepted) this.lastPublishedState = signature;
+    let sent = false;
+    // Stamped here so a resync knows exactly which samples the server will treat as older than this state.
+    const stateAt = Date.now();
+    await this.publishOperational(
+      'state',
+      payload,
+      { retain: true },
+      () => (sent = accepted === this.state.accepted),
+      new Date(stateAt).toISOString(),
+    );
+    if (accepted !== this.state.accepted) return;
+    this.lastPublishedState = signature;
+    // The server re-evaluates a controller on these transitions; follow them with full measurement keyframes.
+    const resyncKey = JSON.stringify([
+      payload.connected,
+      payload.revision,
+      payload.contentHash,
+      payload.readiness.hardwareAvailable,
+    ]);
+    if (sent && resyncKey !== this.lastStateResyncKey) {
+      this.lastStateResyncKey = resyncKey;
+      this.resyncMeasurements(stateAt);
+    }
   }
 
   protected pruneModbusOutputSamples(accepted: AcceptedConfiguration | undefined): void {

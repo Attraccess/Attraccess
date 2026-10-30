@@ -68,6 +68,11 @@ export interface WagoDiagnostics {
       receivedAt: string;
     } | null;
   }>;
+  /**
+   * Channels configured with `enabled: false`. The runtime never polls or publishes them, so they have
+   * no samples and are not counted in `channels`. Always sent by this server; optional for older ones.
+   */
+  disabledChannels?: Array<{ id: string; profile: string; capabilities: string[]; availability: 'disabled' }>;
   faults: Array<{ channelId: string; code: string; receivedAt: string }>;
   references: Array<{
     nodeId: string;

@@ -8,7 +8,10 @@ export class TestTransport implements Transport {
   /** Options each topic was subscribed with, so tests can check the admission limits are wired. */
   readonly subscriptions = new Map<string, SubscribeOptions | undefined>();
   dropCounts?: () => Record<string, number>;
+  /** Like MqttTransport, a publish while disconnected is refused instead of being silently dropped. */
+  connected = true;
   async publish(topic: string, payload: unknown, options?: { retain?: boolean }): Promise<void> {
+    if (!this.connected) throw new Error('MQTT connection unavailable');
     this.published.push({ topic, payload, retain: options?.retain });
   }
   async subscribe(

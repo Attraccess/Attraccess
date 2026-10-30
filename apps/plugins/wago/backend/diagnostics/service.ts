@@ -9,6 +9,8 @@ import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
 import { WagoController } from '../controllers/entity';
 import { WagoService } from '../controllers/service';
+import { channelEnabled, MAX_CONFIGURATION_ITEMS } from '../../shared/configuration-limits';
+import { MAX_CHANNELS } from './store';
 
 export function configurationRejections(
   latest: WagoConfigurationRevision | null,
@@ -162,6 +164,19 @@ export class WagoDiagnosticsService {
       runtime.connected === false
         ? false
         : heartbeatFreshness === 'fresh' || freshness(runtime.stateSourceAt) === 'fresh';
+    // Disabled channels are never polled or published; filter them out before the channel cut so the
+    // enabled ones, which the runtime bounds to the same 256, are always all listed.
+    const configuredChannels = (appliedSnapshot ?? snapshot)?.logicalChannels ?? [];
+    const enabledChannels = configuredChannels.filter(channelEnabled);
+    const disabledChannels = configuredChannels
+      .filter((channel) => !channelEnabled(channel))
+      .slice(0, MAX_CONFIGURATION_ITEMS)
+      .map((channel) => ({
+        id: channel.id,
+        profile: channel.profile,
+        capabilities: channel.capabilities,
+        availability: 'disabled' as const,
+      }));
     const references = diagnosticReferences(
       nodes.slice(0, 1000),
       appliedSnapshot?.logicalChannels.map((channel) => channel.id) ?? [],
@@ -201,7 +216,7 @@ export class WagoDiagnosticsService {
       hardwareReadiness: 'unknown' as const,
       hardwareReadinessReason:
         'Reported hardware availability is shown when supplied; it does not prove physical I/O readiness. Applied configuration and cached output state are not physical proof.',
-      channels: ((appliedSnapshot ?? snapshot)?.logicalChannels ?? []).slice(0, 256).map((channel) => {
+      channels: enabledChannels.slice(0, MAX_CHANNELS).map((channel) => {
         const values = [
           channel.capabilities.includes('input') ? own(runtime.inputs, channel.id) : undefined,
           channel.capabilities.includes('output') ? own(runtime.outputs, channel.id) : undefined,
@@ -248,13 +263,14 @@ export class WagoDiagnosticsService {
           acknowledgement: own(runtime.acknowledgements, channel.id) ?? null,
         };
       }),
+      disabledChannels,
       faults: Object.entries(runtime.faults).map(([channelId, fault]) => ({ channelId, ...fault })),
       references,
       referencesTruncated: nodes.length > 1000,
       events: runtime.events,
       limitations: [
         'Hardware readiness remains unknown. Legacy samples have no source time and are never current.',
-        'Diagnostics retain at most 256 channels, 50 recent events and 15 minutes in this process.',
+        'Diagnostics retain at most 256 enabled channels, 50 recent events and 15 minutes in this process. Disabled channels are listed without samples.',
         'Flow links select the affected node. Diagnostics warnings do not block resource usage; required flow nodes determine gating.',
         'The MQTT SDK exposes neither retained-message flags nor broker connection events. Source age is bounded to 90 seconds; immediate broker-disconnect detection is unavailable.',
         'Stream tracking keeps at most 16 retired boot stream IDs per controller and six category counters, and fails closed when exhausted. Replayed source times never become receipt times.',

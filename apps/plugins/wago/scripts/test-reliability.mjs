@@ -87,7 +87,7 @@ try {
   await exec(
     join(root, 'node_modules/.bin/esbuild'),
     [
-      join(root, 'apps/plugins/wago/acceptance/reliability/controller-farm.ts'),
+      join(root, 'apps/plugins/wago/acceptance/reliability/controller-farm.test-utils.ts'),
       '--bundle',
       '--platform=node',
       '--format=cjs',

@@ -68,7 +68,8 @@ is updated by hand
 | Configuration size                                  | 1 MiB (whole desired message)         | Refused at publish, rollback and on the controller |
 | Configuration nesting                               | 16 levels                             | Refused                                            |
 | ID length                                           | 256 characters, no control characters | Refused                                            |
-| Channels or physical points                         | 256 each                              | Refused                                            |
+| Channels or physical points                         | 2048 each, enabled or not             | Refused                                            |
+| Enabled channels                                    | 256                                   | Refused                                            |
 | Worst-case status report                            | 64 KiB                                | Refused                                            |
 
 A dropped command gets no reply, so it times out like a command to an offline controller. The drop counts by reason
@@ -84,9 +85,21 @@ Runtimes older than `0.3.0` publish rejection reports of any size. The server ig
 published with no rejection. Update the runtime first
 ([runbook 5](wago-recovery-runbooks.md#5-runtime-upgrade-and-rollback)).
 
-Each built-in 879-3020 meter that you add in the editor creates 131 physical points and 131 channels. Two of them on one
-controller therefore exceed the 256-item limit and cannot be published. Open: the limit or the number of channels a
-meter creates by default has to change before such a controller can be used.
+Each built-in 879-3020 meter added on the **Inputs & outputs** page creates 131 physical points and 131 channels, of
+which 11 recommended readings are enabled ([default readings](wago-879-3020-modbus-rtu.md#default-readings-and-enabling-more)).
+Ten such meters on one CC100 make 1,310 points and channels with 110 enabled, within both limits; a configuration
+with all 131 readings enabled on two meters is refused. Disabled channels need a runtime that advertises
+`channel-enabled-v1`; the server does not publish a configuration with disabled channels to an older runtime.
+
+The 10-meter statement is **calculated and checked in automated tests only, not on hardware**: tests show that the
+editor, the server and the runtime accept that configuration and that the runtime reads only enabled channels, and the
+[calculated bus time](wago-879-3020-modbus-rtu.md#bus-time-for-ten-meters) at 9600 baud is about 2 s per poll round
+with the recommended readings. That figure covers only wire time plus an assumed 25 ms meter turnaround per request.
+The largest cost is unmeasured: the runtime starts a Python process and opens the serial port for every RTU request,
+which is 30 process starts per poll round for ten meters with the recommended readings. On the CC100 this may make a
+round longer than the default 5 s poll interval, so the poll interval may need raising. Not verified: the process
+start time on the CC100, the RS-485 unit load of ten meters on one CC100 segment, the meter's response turnaround, and
+which baud rates the CC100 RS-485 port supports beyond the 9600 baud used on the development device.
 
 ## Measured limits
 

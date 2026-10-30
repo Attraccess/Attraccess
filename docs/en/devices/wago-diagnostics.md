@@ -7,7 +7,7 @@ Applied configuration is not proof of physical I/O readiness. Diagnostics consum
 ## Reusable integration contracts
 
 - `GET /api/wago/controllers/:id/diagnostics`: requires `resources.update`; missing controllers return 404. Registered through `WagoDiagnosticsController` in `backend/plugin.ts`, independently of the main controller.
-- `WagoDiagnostics` in `apps/plugins/wago/diagnostics-types.ts`: shared response contract for connectivity, draft/publication/application, runtime metadata, channels, faults, correlated acknowledgements, flow references, recent events and `dropCounts` (messages the controller dropped unanswered, by reason; `null` for runtimes without `bounded-messages-v1`).
+- `WagoDiagnostics` in `apps/plugins/wago/diagnostics-types.ts`: shared response contract for connectivity, draft/publication/application, runtime metadata, channels, disabled channels, faults, correlated acknowledgements, flow references, recent events and `dropCounts` (messages the controller dropped unanswered, by reason; `null` for runtimes without `bounded-messages-v1`).
 - `useWagoDiagnostics(controllerId: number | null)` in `frontend/src/diagnostics/diagnostics.ts`: TanStack query result; null disables requests; key `['wago', 'diagnostics', controllerId]`; five-second polling; one retry. Hosts must provide the existing QueryClient context.
 - `WagoStatus({ diagnostics: WagoDiagnostics })`: pure status view for embedding in commissioning/configuration screens; it does not fetch.
 - `ControllerDiagnostics({ controllerId: number, onConfigure?: () => void })`: complete polling view with its own render-error boundary and request-error presentation.
@@ -15,6 +15,8 @@ Applied configuration is not proof of physical I/O readiness. Diagnostics consum
 - `WagoService.diagnostics`: process-local store. `ingest(controllerId, suffix, Buffer)` accepts only the existing runtime topic suffixes; `command(controllerId, channelId, commandId)` registers outbound correlation; `read(controllerId)` returns a detached snapshot. The command-handler callback `onCommand` runs before MQTT publication, allowing even immediate acknowledgements and publish-only commands to be correlated.
 
 ## Bounds and protocol behavior
+
+Diagnostics list the enabled channels of the applied configuration (at most 256, the same limit the controller enforces). Channels with `enabled: false` are listed separately under `disabledChannels` with `availability: 'disabled'` and no samples, because the controller neither polls nor publishes them; the view shows how many are configured, and the front panel shows such readings as **Disabled**. Servers before this change do not send `disabledChannels`; the front panel then still shows disabled readings from the applied configuration.
 
 The store retains at most 256 controllers, 256 entries per channel collection (input, output, live measurement, cumulative measurement), 1,024 command correlations, and 50 events per controller for 15 minutes. Individual messages above 64 KiB are ignored. It stores no raw payloads, device error messages, pairing codes, enrollment secrets or MQTT credentials. Known fault codes are allowlisted; unknown codes become `runtime_fault`. The store creates no telemetry database writes or asynchronous message queue. Existing heartbeat persistence is checkpointed at 30 seconds using the receipt checkpoint, with immediate writes for metadata changes. Canonical heartbeat source time is persisted unchanged; legacy ordering has an independent process-local watermark between checkpoints.
 

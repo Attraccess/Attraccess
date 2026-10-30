@@ -33,7 +33,7 @@ import { WAGO_COMMAND_NODE_TYPE, createWagoCommandNode } from '../../backend/flo
 import plugin from '../../backend/plugin';
 import { WagoCommandError } from '../../backend/commands/handler';
 import { hash, type Snapshot } from '../../cc100-runtime/src/runtime';
-import type { CommandRecord, ControllerSnapshot, FarmRequest } from './controller-farm';
+import type { CommandRecord, ControllerSnapshot, FarmRequest } from './controller-farm.test-utils';
 import {
   BROKER_OUTAGE_MS,
   CREDENTIAL_EPOCH,

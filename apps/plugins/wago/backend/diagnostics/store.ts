@@ -381,7 +381,7 @@ export class WagoDiagnosticsStore {
     if (!this.controllers.has(id) && this.controllers.size >= MAX_CONTROLLERS && oldest === undefined) return false;
     if (!this.controllers.has(id) && this.controllers.size >= MAX_CONTROLLERS && oldest !== undefined)
       this.controllers.delete(oldest);
-    const state = this.read(id);
+    const state = this.working(id);
     if (!this.admitIncoming(id, state, kind, data, canonical)) return false;
     state.touched = this.now();
     const receivedAt = new Date(this.now()).toISOString();
@@ -447,22 +447,47 @@ export class WagoDiagnosticsStore {
     this.commands.set(id, { controllerId, channelId, at: this.now() });
   }
 
+  /** The last heartbeat time without copying the whole diagnostics state, as `read(id).heartbeatAt`. */
+  heartbeatAt(id: number): string | undefined {
+    this.prune();
+    return this.controllers.get(id)?.heartbeatAt;
+  }
+
   read(id: number): RuntimeDiagnostics {
     this.prune();
     const state = this.controllers.get(id);
-    const copy: RuntimeDiagnostics = state
-      ? JSON.parse(JSON.stringify(state))
-      : {
-          touched: 0,
-          inputs: {},
-          outputs: {},
-          measurements: {},
-          cumulativeMeasurements: {},
-          faults: {},
-          acknowledgements: {},
-          events: [],
-          ...emptyStream(),
-        };
+    return this.retained(state ? JSON.parse(JSON.stringify(state)) : this.empty());
+  }
+
+  protected empty(): RuntimeDiagnostics {
+    return {
+      touched: 0,
+      inputs: {},
+      outputs: {},
+      measurements: {},
+      cumulativeMeasurements: {},
+      faults: {},
+      acknowledgements: {},
+      events: [],
+      ...emptyStream(),
+    };
+  }
+
+  /**
+   * The copy `ingest` mutates and stores only once the message is admitted. It shares the immutable
+   * sample, fault and acknowledgement records with the stored state instead of deep-copying them on
+   * every message: those records are only ever replaced or deleted, never changed in place. Only the
+   * containers a message can change are copied, so a rejected message still leaves no trace.
+   */
+  protected working(id: number): RuntimeDiagnostics {
+    const state = this.controllers.get(id);
+    if (!state) return this.retained(this.empty());
+    // Stream admission mutates these two in place; `retained` copies the collections and events.
+    return this.retained({ ...state, retiredStreams: [...state.retiredStreams], watermarks: { ...state.watermarks } });
+  }
+
+  /** Copies the per-channel collections (shallowly) and drops everything past the retention window. */
+  protected retained(copy: RuntimeDiagnostics): RuntimeDiagnostics {
     const cutoff = this.now() - RETENTION_MS;
     for (const field of [
       'inputs',

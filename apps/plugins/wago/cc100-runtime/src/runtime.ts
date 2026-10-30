@@ -61,6 +61,11 @@ export class WagoRuntime extends RuntimeTelemetry {
   }
 
   async setConnected(connected: boolean): Promise<void> {
+    // Measurements the broker accepted before a connection change may not have reached the server.
+    this.resyncMeasurements();
+    // The server invalidates samples on the first state after an outage. A disconnected state never
+    // reaches it, so that state can carry an unchanged resync key; it must still be followed by keyframes.
+    this.lastStateResyncKey = undefined;
     if (!connected && this.options.runtimeImageId) {
       this.runtimePolicyToken = randomUUID();
       this.runtimeUpdateRequired = true;

@@ -13,7 +13,7 @@ import { ArrowLeft, History, Plus } from 'lucide-react';
 import { OnboardCard } from './controls/Cards';
 import { DeviceSettings } from './settings/DeviceSettings';
 import { BusSettings, TerminalSettings } from './settings/SettingsDrawer';
-import { addDevice, type Terminal, type PanelConfiguration } from './model';
+import { addDevice, channelEnabledSupport, type Terminal, type PanelConfiguration } from './model';
 import { useFrontPanelState } from './working-copy/useFrontPanelState';
 import { FrontPanelModalBackdrop } from './working-copy/ModalBackdrop';
 import { FrontPanelPanelDevices } from './controls/Devices';
@@ -34,6 +34,12 @@ export function FrontPanel({
   onHistory: () => void;
 }) {
   const model = useFrontPanelState({ controllerId, onClose, onHistory });
+  const support = channelEnabledSupport(model.panel.diagnostics);
+  // A new meter's readings depend on the runtime, so wait until diagnostics report its capabilities.
+  const supportKnown = support === 'supported' || support === 'unsupported';
+  const flowChannelIds = new Set(
+    (model.panel.diagnostics.data?.references ?? []).map((reference) => reference.channelId),
+  );
 
   return (
     <main
@@ -128,19 +134,28 @@ export function FrontPanel({
             editTerminal={(terminal) => model.setSelection({ kind: 'terminal', terminal })}
           />
           <FrontPanelPanelDevices {...model} />
-          <Button
-            variant="outline"
-            className="wg:self-start"
-            isDisabled={model.panel.busy || model.panel.pending}
-            onPress={() => {
-              if (!model.panel.configuration) return;
-              const added = addDevice(model.panel.configuration, model.t('panel.newDevice'));
-              model.setSelection({ kind: 'device', id: added.id, provisional: added.configuration });
-            }}
-          >
-            <Plus className="wg:size-4" />
-            {model.t('panel.addDevice')}
-          </Button>
+          <div className="wg:flex wg:flex-col wg:items-start wg:gap-1">
+            <Button
+              variant="outline"
+              aria-describedby={supportKnown ? undefined : 'wago-add-device-hint'}
+              isDisabled={model.panel.busy || model.panel.pending || !supportKnown}
+              onPress={() => {
+                if (!model.panel.configuration) return;
+                const added = addDevice(model.panel.configuration, model.t('panel.newDevice'), {
+                  disabledChannels: support === 'supported',
+                });
+                model.setSelection({ kind: 'device', id: added.id, provisional: added.configuration });
+              }}
+            >
+              <Plus className="wg:size-4" />
+              {model.t('panel.addDevice')}
+            </Button>
+            {!supportKnown && (
+              <p id="wago-add-device-hint" role="status" className="wg:text-sm wg:text-muted">
+                {model.t(support === 'checking' ? 'panel.readings.checkingAdd' : 'panel.readings.unknownAdd')}
+              </p>
+            )}
+          </div>
           {model.selection?.kind === 'terminal' && (
             <TerminalSettings
               key={model.selection.terminal.label}
@@ -161,6 +176,8 @@ export function FrontPanel({
             <DeviceSettings
               key={model.device.id}
               isNew={model.selection?.kind === 'device' && Boolean(model.selection.provisional)}
+              support={support}
+              flowChannelIds={flowChannelIds}
               configuration={
                 model.selection?.kind === 'device'
                   ? (model.selection.provisional ?? model.panel.configuration)

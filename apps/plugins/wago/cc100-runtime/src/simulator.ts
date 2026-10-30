@@ -19,8 +19,7 @@ import { publish } from './simulator/mqtt';
 import { subscribe } from './simulator/mqtt';
 import { handleAsync } from './simulator/mqtt';
 import { logConnectionError } from './simulator/mqtt';
-import { MAX_CLAIM_BYTES } from './runtime/limits';
-import { DropCounters, SubscriptionAdmission } from './transport/admission';
+import { DEFAULT_MAX_MESSAGE_BYTES, DropCounters, SubscriptionAdmission } from './transport/admission';
 
 let hardwareId: string;
 let pairingCode: string;
@@ -106,8 +105,9 @@ function connectEnrollment(): void {
               }
               enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
             },
-            // Claims are capped like the production runtime's: larger ones are dropped before decoding.
-            new SubscriptionAdmission(MAX_CLAIM_BYTES, new DropCounters(), (error) =>
+            // Claims are capped at 64 KiB like the production runtime's (MAX_CLAIM_BYTES): larger ones are
+            // dropped before decoding. The default cap is used so the simulator also builds on older runtimes.
+            new SubscriptionAdmission(DEFAULT_MAX_MESSAGE_BYTES, new DropCounters(), (error) =>
               process.stderr.write(
                 `WAGO simulator callback failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
               ),

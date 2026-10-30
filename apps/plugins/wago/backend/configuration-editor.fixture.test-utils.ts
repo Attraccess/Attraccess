@@ -3,6 +3,10 @@ import type { WagoConfigurationSnapshot } from './configuration/model';
 import type { WagoConfigurationDraft } from './configuration/draft.entity';
 import type { WagoConfigurationRevision } from './configuration/revision.entity';
 import { WagoService } from './controllers/service';
+import { CHANNEL_ENABLED_CAPABILITY } from '../shared/capabilities';
+
+/** Capabilities the fixture controller advertises: a current runtime that can disable channels. */
+export const FIXTURE_CAPABILITIES = ['claim', 'heartbeat', 'configuration-v1', CHANNEL_ENABLED_CAPABILITY];
 
 /** Shared in-memory editor service fixture for the configuration editor specs. */
 export const snapshot: WagoConfigurationSnapshot = {
@@ -18,7 +22,7 @@ export const snapshot: WagoConfigurationSnapshot = {
     },
   ],
 };
-export function fixture() {
+export function fixture({ capabilities = FIXTURE_CAPABILITIES }: { capabilities?: string[] } = {}) {
   let draft: WagoConfigurationDraft | null = null;
   const revisions: WagoConfigurationRevision[] = [];
   const drafts = {
@@ -66,7 +70,7 @@ export function fixture() {
         trustState: 'claimed',
         mqttServerId: 1,
         protocolVersion: '1.0.0',
-        capabilities: '["claim","heartbeat","configuration-v1"]',
+        capabilities: JSON.stringify(capabilities),
       })),
     },
     drafts,

@@ -1,4 +1,5 @@
 import type { ModbusConfiguration, ModbusPoint } from '../../../modbus/model';
+import type { MessageSlot } from '../transport/admission';
 export type DisconnectPolicy = { mode: 'hold' | 'immediate' | 'watchdog'; timeoutMs?: number };
 
 export type Snapshot = {
@@ -15,6 +16,8 @@ export type Snapshot = {
     physicalPointId: string;
     profile: string;
     capabilities: string[];
+    /** Only Modbus measurement channels may be disabled; absent means enabled. */
+    enabled?: false;
     invert?: boolean;
     disconnectPolicy: DisconnectPolicy;
     range?: { minimum: number; maximum: number };
@@ -50,7 +53,7 @@ export type RuntimeState = {
 };
 
 /** Frees the subscription's handling slot early, for handlers that hand their work to a queue. */
-export type MessageSlot = { release(): void };
+export type { MessageSlot };
 
 export type SubscribeOptions = {
   /** Larger payloads are dropped, counted and never decoded. */

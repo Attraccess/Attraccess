@@ -9,7 +9,9 @@
     "pulse": "Pulse",
     "guard": "Guard",
     "feedback": "Feedback",
-    "measurement": "Measurement"
+    "measurement": "Measurement",
+    "enabled": "Yes",
+    "disabled": "No"
   },
   "physicalPointId": "Physical terminal",
   "channel": "Physical terminal",
@@ -62,5 +64,6 @@
   "configuration": "Configuration",
   "channelTitle": "Channel {{index}}",
   "pointTitle": "Physical point {{index}}",
-  "externalAssignment": "{{name}} · external assignment ({{profile}})"
+  "externalAssignment": "{{name}} · external assignment ({{profile}})",
+  "enabled": "Channel enabled"
 }

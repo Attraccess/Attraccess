@@ -218,6 +218,9 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
               </Card.Content>
             </Card>
           ))}
+          {Boolean(d.disabledChannels?.length) && (
+            <p>{t('diagnostics.disabledChannels', { count: d.disabledChannels?.length ?? 0 })}</p>
+          )}
           <Card>
             <Card.Header>
               <Card.Title>{t('diagnostics.references')}</Card.Title>

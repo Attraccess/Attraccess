@@ -1,6 +1,13 @@
 import { EventEmitter } from 'node:events';
 import type { MqttClient } from 'mqtt';
-import { DropCounters, MAX_CONCURRENT_MESSAGES, MAX_WAITING_MESSAGES, SubscriptionAdmission } from './admission';
+import { DROP_REASONS, type DropReason as SharedDropReason } from '../../../shared/capabilities';
+import {
+  DropCounters,
+  type DropReason,
+  MAX_CONCURRENT_MESSAGES,
+  MAX_WAITING_MESSAGES,
+  SubscriptionAdmission,
+} from './admission';
 import { MqttTransport } from './mqtt';
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -18,6 +25,9 @@ function blocking() {
   const handler = () => new Promise<void>((resolve) => gates.push(resolve));
   return { gates, handler };
 }
+
+// Compile-time guard: the self-contained reason type must stay equal to the shared one.
+const sameReasons: [DropReason, SharedDropReason] extends [SharedDropReason, DropReason] ? true : never = true;
 
 describe('subscription admission', () => {
   it('drops an oversized message before the handler sees it and counts it', async () => {
@@ -127,4 +137,9 @@ describe('MQTT transport admission', () => {
     expect(listener).not.toHaveBeenCalled();
     expect(transport.dropCounts().oversized).toBe(1);
   });
+});
+
+it('counts exactly the shared drop reasons', () => {
+  expect(sameReasons).toBe(true);
+  expect(Object.keys(new DropCounters().snapshot()).sort()).toEqual([...DROP_REASONS].sort());
 });

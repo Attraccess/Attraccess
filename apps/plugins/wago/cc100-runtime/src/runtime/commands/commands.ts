@@ -82,7 +82,8 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
       if (configurationFailure)
         return this.acknowledge(command.id, 'rejected', configurationFailure.error, configurationFailure.code);
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
-      if (!channel || !channel.capabilities.includes('output'))
+      // Validation never lets a disabled channel act; refuse one defensively anyway.
+      if (!channel || channel.enabled === false || !channel.capabilities.includes('output'))
         return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
       if (command.action !== 'release' && !supportsOutputAction(channel, command.action))
         return this.acknowledge(
@@ -109,7 +110,8 @@ export abstract class RuntimeCommands extends RuntimeConfiguration {
         );
         if (
           this.state.accepted?.revision !== expectedConfigurationRevision ||
-          !currentChannel?.capabilities.includes('output')
+          !currentChannel?.capabilities.includes('output') ||
+          currentChannel.enabled === false
         ) {
           await this.releaseCommand(command.id);
           return { error: 'controller configuration revision is stale', code: 'stale_revision' };

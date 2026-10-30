@@ -130,7 +130,7 @@ dangerous mapping.
 - Configurations are versioned, canonicalised and hashed; the controller rejects a hash mismatch, an unknown field, a stale revision, or an invalid guard, feedback, pulse, disconnect policy or measurement (`cc100-runtime/src/runtime/configuration/validation.ts`, `cc100-runtime/src/runtime/configuration/configuration.ts`).
 - Output routing cannot change while an output is on (`cc100-runtime/src/outputs/controller.ts` `assertConfigurationSafe`).
 - The editor validates the same rules before publishing (`backend/configuration/editor.ts` `validateEditorSnapshot`).
-- New limits refuse configurations over 1 MiB, nested deeper than 16 levels, with IDs over 256 characters or control characters, more than 256 channels or points, or a worst-case status report over 64 KiB (`shared/configuration-limits.ts`). They apply to new revisions and rollbacks in the editor, the API and the runtime. The runtime skips them only when the incoming revision and hash equal its saved accepted configuration, so a running or redelivered configuration is never rejected for them (`cc100-runtime/src/runtime/configuration/configuration.ts`).
+- New limits refuse configurations over 1 MiB, nested deeper than 16 levels, with IDs over 256 characters or control characters, more than 2048 channels or points, more than 256 enabled channels, or a worst-case status report over 64 KiB (`shared/configuration-limits.ts`). They apply to new revisions and rollbacks in the editor, the API and the runtime. The runtime skips them only when the incoming revision and hash equal its saved accepted configuration, so a running or redelivered configuration is never rejected for them (`cc100-runtime/src/runtime/configuration/configuration.ts`).
 
 **Gaps**
 

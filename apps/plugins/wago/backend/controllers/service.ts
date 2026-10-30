@@ -33,6 +33,8 @@ import {
 
 import { parseConfigurationReport } from '../configuration/model';
 
+import { requireRuntimeSupport } from '../configuration/channel-enabled';
+
 import { WagoSubscriptions } from './subscriptions';
 
 export { WagoCredentialOperationUncertainError } from './model';
@@ -220,7 +222,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
 
   protected connectivity(controller: WagoController): WagoControllerSummary['connectivity'] {
     if (controller.trustState === 'untrusted') return 'untrusted';
-    const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt;
+    const heartbeatAt = this.diagnostics.heartbeatAt(controller.id) ?? controller.lastHeartbeatAt;
     if (freshness(heartbeatAt, Date.now(), STALE_AFTER_MS) !== 'fresh') return 'stale';
     if (this.isRuntimeUpdateRequired(controller.id)) {
       const policy = this.runtimePolicies.get(controller.id);
@@ -239,6 +241,9 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
       capabilities: JSON.parse(controller.capabilities) as string[],
     });
     if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
+    // Rechecks publications and rollbacks at dispatch; the snapshot is never altered. The runtime policy
+    // replay in `setRuntimePolicy` publishes without this method and applies the same gate itself.
+    requireRuntimeSupport(JSON.parse(revision.snapshot), controller.capabilities);
     const settings = await this.getSettings();
     const runtimePolicy = this.runtimePolicies.get(controller.id);
     await this.context.mqtt.publish(

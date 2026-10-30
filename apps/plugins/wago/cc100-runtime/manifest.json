@@ -22,7 +22,9 @@
     "credential-rotation-v1",
     "front-panel-v1",
     "runtime-update-gate-v1",
-    "bounded-messages-v1"
+    "bounded-messages-v1",
+    "channel-enabled-v1",
+    "measurement-on-change-v1"
   ],
   "security": {
     "arbitraryCodeUpload": false,
