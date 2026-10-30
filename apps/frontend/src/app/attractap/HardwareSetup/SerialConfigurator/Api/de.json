@@ -6,11 +6,15 @@
   "updating": {
     "label": "Daten werden aktualisiert..."
   },
-
   "status": {
     "connected": {
       "title": "Attraccess verbunden",
       "description": "-> Versuche authentifizierung..."
+    },
+    "pending_approval": {
+      "title": "Wartet auf Freigabe — {{code}}",
+      "description": "Klicken Sie auf „Freigeben“, um dieses Lesegerät zu Attraccess hinzuzufügen.",
+      "approve": "Freigeben"
     },
     "authenticated": {
       "title": "Verbunden & authentifiziert",

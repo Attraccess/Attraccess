@@ -2,9 +2,28 @@ import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, TextFi
 import { AlertStatusIcon, Button, LabeledSwitch, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBaseUrl } from '../../../../../api/index';
-import { useAttractapSerialComm } from '../Auth/index';
+import { PairingDialog } from '../../../pairing/PairingDialog';
+import { useAttractapSerialComm, type ApiStatusData } from '../Auth/index';
 import de from './de.json';
 import en from './en.json';
+
+/** While the reader is on its way to being connected, follow its status without a manual refresh. */
+const TRANSIENT_STATUSES: ReadonlySet<ApiStatusData['status']> = new Set([
+  'connecting_tcp',
+  'connecting_websocket',
+  'connected',
+  'authenticating',
+  'pending_approval',
+]);
+const STATUS_POLL_INTERVAL_MS = 3000;
+const MIN_STATUS_POLL_INTERVAL_MS = 500;
+
+/** Poll sooner when the code is about to rotate, so the code on screen stays current. */
+function nextPollDelay(status: ApiStatusData): number {
+  const rotatesIn = status.status === 'pending_approval' ? status.enrollmentRotatesInMs : undefined;
+  if (typeof rotatesIn !== 'number') return STATUS_POLL_INTERVAL_MS;
+  return Math.min(STATUS_POLL_INTERVAL_MS, Math.max(MIN_STATUS_POLL_INTERVAL_MS, rotatesIn + 250));
+}
 
 export function useAttractapSerialConfiguratorApiState({
   openDeviceSettings,
@@ -17,11 +36,47 @@ export function useAttractapSerialConfiguratorApiState({
     de,
     en,
   });
-  const { configuration, fetchConfiguration, isFetchingConfiguration, sendAuthedCommand } = useAttractapSerialComm();
+  const { configuration, fetchConfiguration, refreshApiStatus, isFetchingConfiguration, sendAuthedCommand } =
+    useAttractapSerialComm();
   const [isUpdatingApi, setIsUpdatingApi] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
 
   const status = configuration?.apiStatus ?? null;
+  const pendingCode = status?.status === 'pending_approval' ? (status.enrollmentCode ?? null) : null;
+
+  // Follow the reader from "connecting" through "waiting for approval" (the code rotates every
+  // 30 s) to "authenticated". Only api.status.get is sent: a full configuration fetch would make
+  // the reader scan for Wi-Fi networks each time. Each poll waits for the previous one.
+  const shouldPoll = status ? TRANSIENT_STATUSES.has(status.status) : false;
+  useEffect(() => {
+    if (!shouldPoll) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      let delay = STATUS_POLL_INTERVAL_MS;
+      try {
+        delay = nextPollDelay(await refreshApiStatus());
+      } catch (error) {
+        console.error('Failed to refresh the reader API status', error);
+      }
+      if (!cancelled) timer = setTimeout(poll, delay);
+    };
+    timer = setTimeout(poll, STATUS_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [shouldPoll, refreshApiStatus]);
+
+  const refreshStatusQuietly = useCallback(() => {
+    refreshApiStatus().catch((error) => console.error('Failed to refresh the reader API status', error));
+  }, [refreshApiStatus]);
+
+  const closeApprove = useCallback(() => {
+    setApproveOpen(false);
+    refreshStatusQuietly();
+  }, [refreshStatusQuietly]);
 
   const apiConnectionData = useMemo(() => {
     const baseUrl = getBaseUrl();
@@ -44,15 +99,19 @@ export function useAttractapSerialConfiguratorApiState({
   const [manualPort, setManualPort] = useState(String(apiConnectionData.port));
   const [manualUseSSL, setManualUseSSL] = useState(apiConnectionData.useSSL);
 
-  // Seed the manual form with the reader's current values once they are known.
+  // Seed the manual form with the reader's current values once they are known. Keyed on the values,
+  // not the status object: status polling must not overwrite what the user is typing.
+  const statusHostname = status?.hostname;
+  const statusPort = status?.port;
+  const statusUseSSL = status?.useSSL;
   useEffect(() => {
-    if (!status) {
+    if (statusHostname === undefined || statusPort === undefined || statusUseSSL === undefined) {
       return;
     }
-    setManualHostname(status.hostname);
-    setManualPort(String(status.port));
-    setManualUseSSL(status.useSSL);
-  }, [status]);
+    setManualHostname(statusHostname);
+    setManualPort(String(statusPort));
+    setManualUseSSL(statusUseSSL);
+  }, [statusHostname, statusPort, statusUseSSL]);
 
   const apiDataMatchesServer = useMemo(() => {
     if (!status) {
@@ -83,6 +142,7 @@ export function useAttractapSerialConfiguratorApiState({
       port: status.port,
       deviceId: status.deviceId,
       protocolEmoji: status.useSSL ? '🔒' : '🔓',
+      code: status.enrollmentCode ?? '',
     });
   }, [status, t]);
 
@@ -96,6 +156,7 @@ export function useAttractapSerialConfiguratorApiState({
       port: status.port,
       deviceId: status.deviceId,
       protocolEmoji: status.useSSL ? '🔒' : '🔓',
+      code: status.enrollmentCode ?? '',
     });
   }, [status, t]);
 
@@ -151,6 +212,10 @@ export function useAttractapSerialConfiguratorApiState({
     setManualUseSSL,
     apiDataMatchesServer,
     handleOpenDeviceSettings,
+    pendingCode,
+    approveOpen,
+    setApproveOpen,
+    closeApprove,
     alertDescription,
     alertTitle,
     alertColor,
@@ -184,6 +249,10 @@ export function AttractapSerialConfiguratorApi({
     setManualUseSSL,
     apiDataMatchesServer,
     handleOpenDeviceSettings,
+    pendingCode,
+    approveOpen,
+    setApproveOpen,
+    closeApprove,
     alertDescription,
     alertTitle,
     alertColor,
@@ -212,6 +281,11 @@ export function AttractapSerialConfiguratorApi({
           <AlertTitle>{alertTitle}</AlertTitle>
         </AlertContent>
         {alertDescription}
+        {pendingCode && (
+          <Button variant="primary" onPress={() => setApproveOpen(true)} data-cy="attractap-api-approve-button">
+            {t('status.pending_approval.approve')}
+          </Button>
+        )}
         {status?.status === 'authenticated' && (
           <Button variant="primary" onPress={handleOpenDeviceSettings}>
             {t('status.authenticated.openDeviceSettings.button')}
@@ -281,6 +355,17 @@ export function AttractapSerialConfiguratorApi({
           </div>
         )}
       </div>
+
+      <PairingDialog
+        isOpen={approveOpen}
+        presetCode={pendingCode ?? undefined}
+        via="flasher"
+        onClose={closeApprove}
+        onPaired={(readerId) => {
+          closeApprove();
+          openDeviceSettings(String(readerId));
+        }}
+      />
     </div>
   );
 }
