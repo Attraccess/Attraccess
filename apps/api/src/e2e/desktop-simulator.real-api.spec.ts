@@ -24,6 +24,7 @@ import { AttractapGateway } from '../attractap/websockets/websocket.gateway';
 import { WebsocketService } from '../attractap/websockets/websocket.service';
 import { AttractapEventType, AuthenticatedWebSocket } from '../attractap/websockets/websocket.types';
 import { SessionService } from '../users-and-auth/auth/session.service';
+import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { SupervisionService } from '../resources/supervision/supervision.service';
 import { bootstrap } from '../main.bootstrap';
 import { existsSync, readFileSync, realpathSync } from 'fs';
@@ -43,6 +44,7 @@ describe('desktop simulator against an isolated real API', () => {
   let fixture: DesktopFixture | undefined;
   let reader: Attractap;
   let resource: Resource;
+  let approver: User;
 
   beforeAll(async () => {
     await buildProbe();
@@ -59,6 +61,13 @@ describe('desktop simulator against an isolated real API', () => {
     const address = app.getHttpServer().address();
     if (!address || typeof address === 'string') throw new Error('API did not bind TCP');
     endpoint = `http://127.0.0.1:${address.port}`;
+    approver = await db.getRepository(User).save({
+      username: 'enrollment-approver',
+      email: 'enrollment-approver@example.invalid',
+      isEmailVerified: true,
+      locale: 'de',
+    });
+    await app.get(RbacService).assignRoleByKey(approver.id, 'resource-manager');
   }, 420_000);
 
   afterEach(async () => {
@@ -88,8 +97,21 @@ describe('desktop simulator against an isolated real API', () => {
     return fixture;
   }
 
+  // A new reader only exists after a user with resources.update approved the code it shows.
+  async function approveDevice(code: string) {
+    const token = await api().get(SessionService).createSession(approver);
+    const response = await fetch(`${endpoint}${prefix}/device-enrollment/approve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    // The code rotated while the request was in flight: the next one is tried.
+    if (response.status !== 404 && !response.ok) throw new Error(`Device approval failed with ${response.status}`);
+  }
+
   async function start(scenario: string, pin = '1234') {
-    fixture = new DesktopFixture(endpoint, scenario);
+    fixture = new DesktopFixture(endpoint, scenario, approveDevice);
     await fixture.start();
     const observed = await fixture.command('inspect');
     expect(observed.authenticated).toBe(true);
@@ -549,6 +571,31 @@ describe('desktop simulator against an isolated real API', () => {
     60_000,
   );
 
+  it('only lets users with resources.update approve devices and creates nothing without a waiting device', async () => {
+    const approve = (headers: Record<string, string>) =>
+      fetch(`${endpoint}${prefix}/device-enrollment/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ code: 'K7P-3XQ' }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    const bearer = async (account: User) => ({
+      Authorization: `Bearer ${await api().get(SessionService).createSession(account)}`,
+    });
+    const plain = await db.getRepository(User).save({
+      username: 'enrollment-plain',
+      email: 'enrollment-plain@example.invalid',
+      isEmailVerified: true,
+      locale: 'de',
+    });
+    const readers = await db.getRepository(Attractap).count();
+
+    expect((await approve({})).status).toBe(401);
+    expect((await approve(await bearer(plain))).status).toBe(403);
+    expect((await approve(await bearer(approver))).status).toBe(404);
+    expect(await db.getRepository(Attractap).count()).toBe(readers);
+  }, 30_000);
+
   it('cleans up after failed startup and a failing scenario assertion', async () => {
     const failed = new DesktopFixture('invalid-endpoint', 'startup-failure');
     try {
@@ -570,7 +617,7 @@ describe('desktop simulator against an isolated real API', () => {
       })(),
     ).rejects.toThrow();
     expect(existsSync(ownedRoot)).toBe(false);
-  }, 30_000);
+  }, 90_000);
 
   it('rejects malformed commands, unsafe captures, invalid indices and bounded waits without stopping', async () => {
     await start('control-failures');

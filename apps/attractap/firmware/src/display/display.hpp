@@ -14,6 +14,7 @@
 #include "screens/setPin/setPinScreen.hpp"
 #include "screens/connectionConfiguration/connectionConfigurationScreen.hpp"
 #include "screens/init/initscreen.hpp"
+#include "screens/pendingApproval/pendingApprovalScreen.hpp"
 #include "screens/lockscreen/lockscreen.hpp"
 #include "screens/sessionSummary/sessionSummaryScreen.hpp"
 #include "screens/noResources/noResourcesScreen.hpp"
@@ -52,6 +53,7 @@ public:
     static SetPinScreen setPinScreen;
     static ConnectionConfigurationScreen connectionConfigurationScreen;
     static InitScreen initScreen;
+    static PendingApprovalScreen pendingApprovalScreen;
     static Lockscreen lockscreen;
     static NoResourcesScreen noResourcesScreen;
     static SessionSummaryScreen sessionSummaryScreen;

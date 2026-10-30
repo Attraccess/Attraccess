@@ -24,6 +24,7 @@ export interface ApiStatusData {
     | 'connecting_tcp'
     | 'connecting_websocket'
     | 'connected'
+    | 'pending_approval'
     | 'authenticating'
     | 'authenticated'
     | 'error_failed'
@@ -33,6 +34,8 @@ export interface ApiStatusData {
   port: number;
   deviceId: string;
   useSSL: boolean;
+  /** Set while a new reader waits for approval; rotates every 30 s. */
+  enrollmentCode?: string;
 }
 
 export interface NetworkStatusData {

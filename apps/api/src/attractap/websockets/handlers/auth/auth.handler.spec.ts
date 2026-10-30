@@ -72,23 +72,82 @@ describe('AttractapAuthHandler', () => {
   });
 
   describe('handleReaderRegister', () => {
-    it('creates a new reader with the firmware payload and sends READER_REGISTER response', async () => {
-      const data = { payload: { firmware: 'fw-1.2.3' } } as AttractapEvent['data'];
-      mockAttractapService.createNewReader.mockResolvedValue({
-        reader: { id: 99 },
-        token: 'tok-abc',
-      });
+    let mockEnrollment: { request: jest.Mock };
 
-      await handler.handleReaderRegister(mockSocket as any, data);
+    beforeEach(() => {
+      mockEnrollment = { request: jest.fn().mockReturnValue(true) };
+      (handler as any).deviceEnrollment = mockEnrollment;
+      (mockSocket as any).clientAddress = '10.0.0.5';
+    });
 
-      expect(mockAttractapService.createNewReader).toHaveBeenCalledWith('fw-1.2.3');
-      expect(mockAudit.recordAttractap).toHaveBeenCalledWith({
-        action: 'reader.registered',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: 99,
-        details: { source: 'reader-websocket' },
-      });
+    it('creates nothing and sends nothing for firmware without enrollment support', async () => {
+      await handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data']);
+
+      expect(mockEnrollment.request).not.toHaveBeenCalled();
+      expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
+      expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('queues an enrollment request without creating a reader', async () => {
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        {
+          payload: { enrollment: { protocol: 1 } },
+        } as AttractapEvent['data'],
+      );
+
+      expect(mockEnrollment.request).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'socket-1', address: '10.0.0.5' }),
+      );
+      expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
+    });
+
+    it('shows codes and rejections on the socket', async () => {
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        {
+          payload: { enrollment: { protocol: 1 } },
+        } as AttractapEvent['data'],
+      );
+      const connection = mockEnrollment.request.mock.calls[0][0];
+
+      connection.sendCode('K7P-3XQ', 30000, 600000);
+      connection.sendRejected('RATE_LIMITED', 5000);
+
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.READER_ENROLLMENT_CODE,
+            payload: { code: 'K7P-3XQ', rotatesInMs: 30000, expiresInMs: 600000 },
+          }),
+        }),
+      );
+      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: AttractapEventType.READER_ENROLLMENT_REJECTED,
+            payload: { reason: 'RATE_LIMITED', retryAfterMs: 5000 },
+          }),
+        }),
+      );
+    });
+
+    it('creates the reader only when provisioned and delivers {id, token}', async () => {
+      mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 99, name: 'Door' }, token: 'tok-abc' });
+      mockAttractapService.deleteReader = jest.fn().mockResolvedValue(true);
+      await handler.handleReaderRegister(
+        mockSocket as any,
+        {
+          payload: { firmware: 'fw-1.2.3', enrollment: { protocol: 1 } },
+        } as AttractapEvent['data'],
+      );
+      const connection = mockEnrollment.request.mock.calls[0][0];
+
+      const device = await connection.provision({ name: 'Door' });
+      expect(mockAttractapService.createNewReader).toHaveBeenCalledWith('fw-1.2.3', 'Door');
+      expect(device).toMatchObject({ kind: 'reader', id: 99, name: 'Door' });
+
+      await device.deliver();
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -97,39 +156,9 @@ describe('AttractapAuthHandler', () => {
           }),
         }),
       );
-    });
 
-    it('forwards the created reader id and token exactly', async () => {
-      const data = { payload: { firmware: undefined } } as AttractapEvent['data'];
-      mockAttractapService.createNewReader.mockResolvedValue({
-        reader: { id: 7 },
-        token: 'another-token',
-      });
-
-      await handler.handleReaderRegister(mockSocket as any, data);
-
-      expect(mockAttractapService.createNewReader).toHaveBeenCalledWith(undefined);
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.READER_REGISTER,
-            payload: { id: 7, token: 'another-token' },
-          }),
-        }),
-      );
-    });
-
-    it('sends the registration response when audit persistence rejects', async () => {
-      mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 7 }, token: 'another-token' });
-      mockAudit.recordAttractap.mockRejectedValueOnce(new Error('audit unavailable'));
-
-      await expect(
-        handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data']),
-      ).resolves.toBeUndefined();
-
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ payload: { id: 7, token: 'another-token' } }) }),
-      );
+      await device.rollback();
+      expect(mockAttractapService.deleteReader).toHaveBeenCalledWith(99);
     });
   });
 

@@ -15,6 +15,7 @@ import { usePtrStore } from '../stores/ptr.store';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AttraccessUserActionsBridge } from '../components/attraccessUserActionsBridge/index';
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
+import { DeviceEnrollModal } from './device-enrollment/DeviceEnrollModal';
 import { MassIntroductionRedeemModal } from './mass-introduction/MassIntroductionRedeemModal';
 import { ThemeToggle } from '../components/themeToggle';
 import { SessionBillingSummary } from './billing/sessionSummary/index';
@@ -153,7 +154,7 @@ export function AppContent() {
 }
 
 export function AppLayout(props: PropsWithChildren) {
-  const { isAuthenticated, needsTwoFactorSetup, user } = useAuth();
+  const { isAuthenticated, needsTwoFactorSetup, user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -177,6 +178,10 @@ export function AppLayout(props: PropsWithChildren) {
               {props.children}
               {/* Mass-introduction QR codes: claimed before sign-in, redeemed after (ATT-1151). */}
               <MassIntroductionRedeemModal canRedeem={isAuthenticated && !needsTwoFactorSetup} />
+              {/* New readers show a rotating code; an admin types, links or scans it (ATT-1168). */}
+              <DeviceEnrollModal
+                canEnroll={isAuthenticated && !needsTwoFactorSetup && hasPermission('resources.update')}
+              />
               {isAuthenticated && <SupervisorApprovalListener />}
               {isAuthenticated && <SessionBillingSummary key={user?.id} />}
             </AttraccessUserActionsBridge>

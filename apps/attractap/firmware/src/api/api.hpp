@@ -521,7 +521,12 @@ private:
 
     void onRegistrationData(JsonObject data);
     void onUnauthorized(JsonObject data);
+    void onEnrollmentCode(JsonObject data);
+    void onEnrollmentRejected(JsonObject data);
+    void sendRegistrationRequest();
     void sendAuthenticationRequest();
+    bool enrollmentRetryPending = false;
+    uint32_t enrollmentRetryAt = 0;
     void onReaderAuthenticated(JsonObject data);
     void onServerTime(JsonVariantConst serverTime);
     void sendFirmwareInfo();

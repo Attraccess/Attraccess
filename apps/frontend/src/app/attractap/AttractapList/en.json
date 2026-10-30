@@ -3,6 +3,7 @@
     "title": "Attractaps",
     "actions": {
       "menu": "Hardware Setup",
+      "enrollDevice": "Enroll device",
       "openHardwareSetup": "Setup RFID-Reader",
       "openSerialConsole": "Serial Console"
     }

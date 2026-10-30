@@ -47,6 +47,7 @@ import { ResourceMeteringModule } from '../resources/metering/resource-metering.
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
 import { AuditModule } from '../audit/audit.module';
 import { SettingsModule } from '../settings/settings.module';
+import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { SettingsModule } from '../settings/settings.module';
     MassIntroductionModule,
     NotificationsModule,
     AuditModule,
+    DeviceEnrollmentModule,
     SettingsModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,

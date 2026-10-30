@@ -430,6 +430,7 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
     {
         auto ws = State::getWebsocketState();
         auto api = State::getApiState();
+        auto enrollment = State::getEnrollmentState();
         AttraccessAuthConfig authCfg = Settings::getAttraccessAuthConfig();
 
         std::string status = "disconnected";
@@ -438,6 +439,10 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
             if (ws.connected)
             {
                 status = api.authenticated ? "authenticated" : "connected";
+                if (!api.authenticated && enrollment.pending)
+                {
+                    status = "pending_approval";
+                }
             }
             else
             {
@@ -445,8 +450,14 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
             }
         }
 
-        DynamicJsonDocument resp(192);
+        DynamicJsonDocument resp(320);
         resp["status"] = status;
+        if (status == "pending_approval")
+        {
+            // Lets the web flasher offer an Approve button for readers without a screen.
+            resp["enrollmentCode"] = enrollment.code;
+            resp["enrollmentRotatesInMs"] = enrollment.rotatesInMs;
+        }
         resp["hostname"] = ws.hostname;
         resp["port"] = ws.port;
         resp["useSSL"] = ws.useSSL;

@@ -13,6 +13,9 @@ export enum AttractapEventType {
   READER_REGISTER = 'READER_REGISTER',
   READER_AUTHENTICATE = 'READER_AUTHENTICATE',
   READER_UNAUTHORIZED = 'READER_UNAUTHORIZED',
+  // Server-pushed while a new reader waits for an admin to approve its code.
+  READER_ENROLLMENT_CODE = 'READER_ENROLLMENT_CODE',
+  READER_ENROLLMENT_REJECTED = 'READER_ENROLLMENT_REJECTED',
   READER_REQUEST_AUTHENTICATION = 'READER_REQUEST_AUTHENTICATION',
   READER_AUTHENTICATED = 'READER_AUTHENTICATED',
   READER_LANGUAGE = 'READER_LANGUAGE',
@@ -166,6 +169,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   id: string;
   readerId: Attractap['id'] | null;
   readerName: string | null;
+  /** Address of the peer, resolved with TRUST_PROXY. */
+  clientAddress: string;
   /**
    * Resolves `true` once the reader ACKed, `false` when every retry timed out. It never rejects, so
    * callers that only fire-and-forget stay unaffected — but anything that depends on the reader

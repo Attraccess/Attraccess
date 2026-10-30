@@ -6,11 +6,16 @@
   "updating": {
     "label": "Daten werden aktualisiert..."
   },
-
   "status": {
     "connected": {
       "title": "Attraccess verbunden",
       "description": "-> Versuche authentifizierung..."
+    },
+    "pending_approval": {
+      "title": "Wartet auf Freigabe — {{code}}",
+      "description": "Gib dieses Lesegerät in Attraccess frei, um die Einrichtung abzuschließen. Funktioniert auch bei Lesegeräten ohne Bildschirm.",
+      "approve": "Freigeben",
+      "failed": "Lesegerät konnte nicht freigegeben werden"
     },
     "authenticated": {
       "title": "Verbunden & authentifiziert",

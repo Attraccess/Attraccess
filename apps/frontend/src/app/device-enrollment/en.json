@@ -1,0 +1,23 @@
+{
+  "form": {
+    "title": "Enroll device",
+    "description": "Enter the code shown on the new device. It changes every 30 seconds.",
+    "codeLabel": "Code",
+    "codePlaceholder": "K7P-3XQ",
+    "nameLabel": "Name (optional)",
+    "submit": "Approve",
+    "scan": "Scan with camera"
+  },
+  "success": {
+    "title": "Device approved",
+    "description": "{{{name}}} is now registered and connects on its own.",
+    "openReader": "Open reader"
+  },
+  "error": {
+    "notFound": "No waiting device shows this code. Check the code and try again.",
+    "tooManyAttempts": "Too many attempts. Wait a minute and try again.",
+    "deliveryFailed": "The device did not answer. Nothing was created. Check its connection and try again.",
+    "generic": "Something went wrong: {{{error}}}"
+  },
+  "close": "Done"
+}

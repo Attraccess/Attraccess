@@ -259,6 +259,10 @@ enum class Message {
     ErrorCardMismatch,
     ErrorNoMassIntroductionInProgress,
     ErrorMassIntroductionFailed,
+    ApproveThisReaderInAttraccess,
+    EnrollmentCodeChangesIn,
+    EnrollmentTooManyAttempts,
+    EnrollmentRetryIn,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -540,6 +544,10 @@ inline constexpr Entry catalog[] = {
     {Message::ErrorCardMismatch, "Karte stimmt nicht überein", "Card does not match"},
     {Message::ErrorNoMassIntroductionInProgress, "Keine Sammeleinweisung aktiv", "No mass introduction in progress"},
     {Message::ErrorMassIntroductionFailed, "Einweisung fehlgeschlagen", "Introduction failed"},
+    {Message::ApproveThisReaderInAttraccess, "Dieses Lesegerät in Attraccess freigeben", "Approve this reader in Attraccess"},
+    {Message::EnrollmentCodeChangesIn, "Der Code ändert sich in {0} s", "The code changes in {0} s"},
+    {Message::EnrollmentTooManyAttempts, "Zu viele Anfragen. Neuer Versuch gleich.", "Too many requests. Trying again soon."},
+    {Message::EnrollmentRetryIn, "Neuer Versuch in {0} s", "Trying again in {0} s"},
 };
 
 } // namespace FirmwareI18n

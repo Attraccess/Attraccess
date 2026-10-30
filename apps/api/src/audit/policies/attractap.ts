@@ -2,6 +2,7 @@ import { AttractapAuditEvent } from './domain-events';
 import { dataFields, oneOf, positive } from './projection';
 export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet<string>> = {
   'reader.registered': new Set(['source']),
+  'reader.enrolled': new Set(['source']),
   'reader.deregistered': new Set(['source']),
   'card.linked': new Set(['readerId', 'source']),
   'card.unlinked': new Set(['readerId', 'source']),
@@ -56,6 +57,7 @@ export function projectAttractapAuditEvent(input: AttractapAuditEvent): Attracta
 
 export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.reader.registered',
+  'attractap.reader.enrolled',
   'attractap.reader.deregistered',
   'attractap.card.linked',
   'attractap.card.unlinked',

@@ -1,3 +1,4 @@
+import { DeviceEnrollmentService } from '../../device-enrollment/device-enrollment.service';
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -120,6 +121,7 @@ export function registerAttractapGatewayFixture() {
         { provide: SupervisionService, useValue: {} },
         { provide: MassIntroductionService, useValue: { setReaderPort: jest.fn() } },
         { provide: RbacService, useValue: {} },
+        { provide: DeviceEnrollmentService, useValue: { request: jest.fn(), release: jest.fn() } },
         { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
         { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
         { provide: getRepositoryToken(Resource), useValue: {} },

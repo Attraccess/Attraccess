@@ -23,7 +23,10 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await (() => ({ AlertStatusIcon: () => null }))()),
   ...(await (() => ({ EmptyState: () => <div data-testid="empty-state" /> }))()),
 }));
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+}));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn() }) }));
 
 vi.mock('../HardwareSetup', () => ({

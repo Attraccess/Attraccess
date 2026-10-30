@@ -160,6 +160,7 @@
     "sso.provisioning.user_deleted": "Provisioned user deleted",
     "sso.provisioning.permissions_synced": "SSO permissions synchronized",
     "attractap.reader.registered": "Reader registered",
+    "attractap.reader.enrolled": "Reader approved",
     "attractap.reader.deregistered": "Reader deregistered",
     "attractap.card.linked": "RFID card linked",
     "attractap.card.unlinked": "RFID card unlinked",

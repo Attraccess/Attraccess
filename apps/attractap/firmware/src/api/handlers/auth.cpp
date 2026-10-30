@@ -4,6 +4,7 @@
 
 #include "../api.hpp"
 #include "../../clock/wall_clock.hpp"
+#include "../../platform.hpp"
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -22,6 +23,7 @@ void API::onRegistrationData(JsonObject data)
             std::string apiKey = payload["token"].as<std::string>();
 
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
+            State::clearEnrollment();
 
             this->logger.infof("Reader registered with ID: %d", readerId);
 
@@ -46,7 +48,43 @@ void API::onUnauthorized(JsonObject data)
     State::setApiState(false, "");
     Settings::clearAttraccessAuthConfig();
 
-    this->sendMessage("READER_REGISTER", JsonObject());
+    this->sendRegistrationRequest();
+}
+
+// The server only creates the reader once an admin approved the code it answers with.
+void API::sendRegistrationRequest()
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["enrollment"]["protocol"] = 1;
+    this->sendMessage("READER_REGISTER", payload);
+}
+
+void API::onEnrollmentCode(JsonObject data)
+{
+    JsonObject payload = data["payload"].as<JsonObject>();
+    if (!payload["code"].is<const char *>())
+    {
+        return;
+    }
+    // The lab helper reads this line from the UART to approve readers without a screen reader.
+    logger.infof("Enrollment: code=%s rotatesInMs=%u", payload["code"].as<const char *>(),
+                 static_cast<unsigned>(payload["rotatesInMs"] | 30000U));
+    State::setEnrollmentCode(payload["code"].as<std::string>(),
+                             payload["rotatesInMs"] | 30000U,
+                             payload["expiresInMs"] | 600000U);
+}
+
+void API::onEnrollmentRejected(JsonObject data)
+{
+    uint32_t retryAfterMs = data["payload"]["retryAfterMs"] | 30000U;
+    // Never hammer the server: wait at least 5 s, at most the request lifetime.
+    if (retryAfterMs < 5000U) retryAfterMs = 5000U;
+    if (retryAfterMs > 600000U) retryAfterMs = 600000U;
+    logger.warnf("Enrollment request refused, retrying in %u ms", static_cast<unsigned>(retryAfterMs));
+    State::setEnrollmentRejected(retryAfterMs);
+    this->enrollmentRetryAt = millis() + retryAfterMs;
+    this->enrollmentRetryPending = true;
 }
 
 bool API::isRegistered()
@@ -59,7 +97,7 @@ void API::sendAuthenticationRequest()
     if (!this->isRegistered())
     {
         logger.info("Not registered, sending registration request");
-        this->sendMessage("READER_REGISTER");
+        this->sendRegistrationRequest();
         return;
     }
 

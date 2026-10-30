@@ -20,7 +20,7 @@ All configuration options for Attraccess that can be set via environment variabl
 | `LOG_FILE_PATH` | `<STORAGE_ROOT>/api.log` | Optional override when selecting `file`; defaults to `api.log` at the storage root (`./storage` when `STORAGE_ROOT` is unset). Explicit overrides must be non-blank; ignored otherwise. Relative paths resolve against the API process working directory; absolute paths are accepted. |
 | `LICENSE_KEY` | – | Seeds the license key when a new database is initialized. For existing installations, change the stored key under Settings → Application Settings. |
 | `TZ` | – | Time zone, e.g. `Europe/Berlin` |
-| `TRUST_PROXY` | – | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy. |
+| `TRUST_PROXY` | – | Trusted reverse-proxy hops so auth rate limiting uses the real client IP. `1` = single proxy (nginx/Traefik/Caddy), `2` = CDN + proxy, or a comma-separated list of trusted proxy IPs/CIDRs (or `loopback`, `linklocal`, `uniquelocal`). Unset = trust no proxy. Also used for the per-address limits on new readers waiting for approval. |
 
 > [!NOTE]
 > `TRUST_PROXY` is **off by default**. Behind a reverse proxy, every request otherwise appears to come from the proxy IP, so auth rate limiting throttles all users together instead of the real attacker. Set it to match your proxy chain (usually `1`). Trusting more hops than actually exist lets clients spoof their IP — see [Security](settings/security.md#reverse-proxies-and-the-real-client-ip). Takes effect after a restart.

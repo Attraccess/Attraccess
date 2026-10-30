@@ -81,6 +81,8 @@ Set the `TRUST_PROXY` environment variable to the number of trusted proxy hops b
 | CDN in front of a reverse proxy | `2` |
 | Specific trusted proxies only | comma-separated IPs/CIDRs, e.g. `10.0.0.0/8, 172.16.0.0/12`, or `uniquelocal` |
 
+The same setting decides which address counts for the limits on new Attractap readers waiting for approval (10 attempts per 10 minutes and 20 waiting readers per address). See [Attractap setup](attractap/setup.md#step-2-approve-the-reader-in-attraccess).
+
 > [!WARNING]
 > Trust only as many hops as actually exist in your deployment. If `TRUST_PROXY` trusts more hops than your real proxy chain, clients can forge `X-Forwarded-For` to rotate their apparent IP and evade rate limiting entirely. When unset, Attraccess trusts no forwarding headers (safe default). Changes take effect after a restart.
 

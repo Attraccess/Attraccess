@@ -1,7 +1,9 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Input, Label, TextField, cn } from '@heroui/react';
 import { AlertStatusIcon, Button, LabeledSwitch, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDeviceEnrollmentServiceApproveDeviceEnrollment } from '@attraccess/react-query-client';
 import { getBaseUrl } from '../../../../../api/index';
+import { useToastMessage } from '../../../../../components/toastProvider';
 import { useAttractapSerialComm } from '../Auth/index';
 import de from './de.json';
 import en from './en.json';
@@ -20,8 +22,28 @@ export function useAttractapSerialConfiguratorApiState({
   const { configuration, fetchConfiguration, isFetchingConfiguration, sendAuthedCommand } = useAttractapSerialComm();
   const [isUpdatingApi, setIsUpdatingApi] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const toast = useToastMessage();
 
   const status = configuration?.apiStatus ?? null;
+  const pendingCode = status?.status === 'pending_approval' ? (status.enrollmentCode ?? null) : null;
+
+  // The code rotates every 30 s, keep the one on screen current.
+  useEffect(() => {
+    if (!pendingCode) return;
+    const interval = setInterval(() => void fetchConfiguration(), 5000);
+    return () => clearInterval(interval);
+  }, [pendingCode, fetchConfiguration]);
+
+  const { mutate: approveEnrollment, isPending: isApproving } = useDeviceEnrollmentServiceApproveDeviceEnrollment({
+    onSuccess: () => void fetchConfiguration(),
+    onError: (error) => {
+      toast.error({ title: t('status.pending_approval.failed'), description: (error as Error).message });
+      void fetchConfiguration();
+    },
+  });
+  const handleApprove = useCallback(() => {
+    if (pendingCode) approveEnrollment({ requestBody: { code: pendingCode } });
+  }, [pendingCode, approveEnrollment]);
 
   const apiConnectionData = useMemo(() => {
     const baseUrl = getBaseUrl();
@@ -83,6 +105,7 @@ export function useAttractapSerialConfiguratorApiState({
       port: status.port,
       deviceId: status.deviceId,
       protocolEmoji: status.useSSL ? '🔒' : '🔓',
+      code: status.enrollmentCode ?? '',
     });
   }, [status, t]);
 
@@ -151,6 +174,9 @@ export function useAttractapSerialConfiguratorApiState({
     setManualUseSSL,
     apiDataMatchesServer,
     handleOpenDeviceSettings,
+    pendingCode,
+    isApproving,
+    handleApprove,
     alertDescription,
     alertTitle,
     alertColor,
@@ -184,6 +210,9 @@ export function AttractapSerialConfiguratorApi({
     setManualUseSSL,
     apiDataMatchesServer,
     handleOpenDeviceSettings,
+    pendingCode,
+    isApproving,
+    handleApprove,
     alertDescription,
     alertTitle,
     alertColor,
@@ -212,6 +241,16 @@ export function AttractapSerialConfiguratorApi({
           <AlertTitle>{alertTitle}</AlertTitle>
         </AlertContent>
         {alertDescription}
+        {pendingCode && (
+          <Button
+            variant="primary"
+            onPress={handleApprove}
+            isPending={isApproving}
+            data-cy="attractap-api-approve-button"
+          >
+            {t('status.pending_approval.approve')}
+          </Button>
+        )}
         {status?.status === 'authenticated' && (
           <Button variant="primary" onPress={handleOpenDeviceSettings}>
             {t('status.authenticated.openDeviceSettings.button')}

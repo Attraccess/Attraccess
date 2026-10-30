@@ -4,6 +4,7 @@
 
 #include "state.hpp"
 #include "language.hpp"
+#include "../platform.hpp"
 #include <string>
 
 
@@ -40,6 +41,13 @@ int State::websocket_cert_count = 0;
 int State::websocket_remembered_retry_count = 0;
 bool State::websocket_cert_locked = false;
 int State::websocket_next_attempt_seconds = 0;
+bool State::enrollment_pending = false;
+bool State::enrollment_rejected = false;
+std::string State::enrollment_code = "";
+uint32_t State::enrollment_received_at = 0;
+uint32_t State::enrollment_rotates_in_ms = 0;
+uint32_t State::enrollment_expires_in_ms = 0;
+uint32_t State::enrollment_retry_in_ms = 0;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
 static Language::Session language_session;
@@ -115,6 +123,49 @@ State::ApiState State::getApiState()
     state.userLanguage = language_session.userLanguage;
     state.userAuthenticated = language_session.userAuthenticated;
 
+    return state;
+}
+
+void State::setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs)
+{
+    StateLock lock(state_mutex);
+    enrollment_pending = true;
+    enrollment_rejected = false;
+    enrollment_code = code;
+    enrollment_received_at = millis();
+    enrollment_rotates_in_ms = rotatesInMs;
+    enrollment_expires_in_ms = expiresInMs;
+}
+
+void State::setEnrollmentRejected(uint32_t retryAfterMs)
+{
+    StateLock lock(state_mutex);
+    enrollment_pending = false;
+    enrollment_rejected = true;
+    enrollment_code = "";
+    enrollment_received_at = millis();
+    enrollment_retry_in_ms = retryAfterMs;
+}
+
+void State::clearEnrollment()
+{
+    StateLock lock(state_mutex);
+    enrollment_pending = false;
+    enrollment_rejected = false;
+    enrollment_code = "";
+}
+
+State::EnrollmentState State::getEnrollmentState()
+{
+    StateLock lock(state_mutex);
+    const uint32_t elapsed = millis() - enrollment_received_at;
+    EnrollmentState state;
+    state.pending = enrollment_pending;
+    state.rejected = enrollment_rejected;
+    state.code = enrollment_code;
+    state.rotatesInMs = enrollment_rotates_in_ms > elapsed ? enrollment_rotates_in_ms - elapsed : 0;
+    state.expiresInMs = enrollment_expires_in_ms > elapsed ? enrollment_expires_in_ms - elapsed : 0;
+    state.retryInMs = enrollment_retry_in_ms > elapsed ? enrollment_retry_in_ms - elapsed : 0;
     return state;
 }
 

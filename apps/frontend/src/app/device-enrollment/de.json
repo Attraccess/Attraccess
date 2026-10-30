@@ -1,0 +1,23 @@
+{
+  "form": {
+    "title": "Gerät registrieren",
+    "description": "Gib den Code ein, der auf dem neuen Gerät angezeigt wird. Er ändert sich alle 30 Sekunden.",
+    "codeLabel": "Code",
+    "codePlaceholder": "K7P-3XQ",
+    "nameLabel": "Name (optional)",
+    "submit": "Freigeben",
+    "scan": "Mit Kamera scannen"
+  },
+  "success": {
+    "title": "Gerät freigegeben",
+    "description": "{{{name}}} ist jetzt registriert und verbindet sich selbstständig.",
+    "openReader": "Lesegerät öffnen"
+  },
+  "error": {
+    "notFound": "Kein wartendes Gerät zeigt diesen Code. Prüfe den Code und versuche es erneut.",
+    "tooManyAttempts": "Zu viele Versuche. Warte eine Minute und versuche es erneut.",
+    "deliveryFailed": "Das Gerät hat nicht geantwortet. Es wurde nichts angelegt. Prüfe die Verbindung und versuche es erneut.",
+    "generic": "Etwas ist schiefgelaufen: {{{error}}}"
+  },
+  "close": "Fertig"
+}

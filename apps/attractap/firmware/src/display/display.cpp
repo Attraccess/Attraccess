@@ -65,6 +65,7 @@ ConnectionConfigurationScreen Display::connectionConfigurationScreen;
 InitScreen Display::initScreen;
 Lockscreen Display::lockscreen;
 NoResourcesScreen Display::noResourcesScreen;
+PendingApprovalScreen Display::pendingApprovalScreen;
 SessionSummaryScreen Display::sessionSummaryScreen;
 ResourceListScreen Display::resourceListScreen;
 ResourceDetailsScreen Display::resourceDetailsScreen;

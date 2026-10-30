@@ -160,6 +160,7 @@
     "sso.provisioning.user_deleted": "Bereitgestellter Benutzer gelöscht",
     "sso.provisioning.permissions_synced": "SSO-Berechtigungen synchronisiert",
     "attractap.reader.registered": "Lesegerät registriert",
+    "attractap.reader.enrolled": "Lesegerät freigegeben",
     "attractap.reader.deregistered": "Lesegerät abgemeldet",
     "attractap.card.linked": "RFID-Karte verknüpft",
     "attractap.card.unlinked": "RFID-Kartenverknüpfung aufgehoben",

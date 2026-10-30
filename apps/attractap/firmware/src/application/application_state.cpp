@@ -36,6 +36,9 @@ void Application::updateLedState() {
     ledState = LedController::LED_STATE_CONFIG_REQUIRED;
     break;
   case APPLICATION_STATE_INIT:
+#ifdef HAS_LVGL_DISPLAY
+  case APPLICATION_STATE_PENDING_APPROVAL:
+#endif
     ledState = LedController::LED_STATE_INIT;
     break;
   case APPLICATION_STATE_AUTHENTICATE_CARD:
@@ -162,6 +165,21 @@ bool Application::processConnectionState()
     this->supervision.onDisconnect();
     this->massIntroduction.onDisconnect();
 #endif
+#ifdef HAS_LVGL_DISPLAY
+        // A new reader that connected shows the code an admin has to approve.
+        const State::EnrollmentState enrollment = State::getEnrollmentState();
+        if (websocketState.connected && (networkState.ethernet_connected || networkState.wifi_connected) &&
+            (enrollment.pending || enrollment.rejected))
+        {
+            if (this->state != APPLICATION_STATE_PENDING_APPROVAL)
+            {
+                this->state = APPLICATION_STATE_PENDING_APPROVAL;
+                Display::transitionToScreen(&Display::pendingApprovalScreen);
+            }
+            return true;
+        }
+#endif
+
         if (this->state == APPLICATION_STATE_INIT)
         {
             return true;

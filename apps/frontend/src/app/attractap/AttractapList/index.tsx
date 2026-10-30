@@ -11,13 +11,13 @@ import {
   TableScrollContainer,
   Chip,
 } from '@heroui/react';
-import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
+import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, PlusIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
 import { AttractapDeleteModal } from './delete/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   EmptyState,
   PageAction,
@@ -33,6 +33,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useNow } from '../../../hooks/useNow';
+import { useDeviceEnrollmentStore } from '../../../stores/deviceEnrollment.store';
 import de from './de.json';
 import en from './en.json';
 
@@ -54,6 +55,22 @@ export function useAttractapListState() {
   const navigate = useNavigate();
 
   const [openedReaderEditor, setOpenedReaderEditor] = useState<number | null>(null);
+  const openEnrollDialog = useDeviceEnrollmentStore((store) => store.open);
+
+  // After approving a device the enroll dialog sends the admin here to set the new reader up.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editReader = searchParams.get('editReader');
+  useEffect(() => {
+    if (!editReader) return;
+    setOpenedReaderEditor(Number(editReader));
+    setSearchParams(
+      (params) => {
+        params.delete('editReader');
+        return params;
+      },
+      { replace: true },
+    );
+  }, [editReader, setSearchParams]);
 
   useEffect(() => {
     if (readersError) {
@@ -119,6 +136,7 @@ export function useAttractapListState() {
     navigate,
     openedReaderEditor,
     setOpenedReaderEditor,
+    openEnrollDialog,
     formatDateTime,
     staleReaders,
     activeReaders,
@@ -133,6 +151,7 @@ export function AttractapList() {
     navigate,
     openedReaderEditor,
     setOpenedReaderEditor,
+    openEnrollDialog,
     formatDateTime,
     staleReaders,
     activeReaders,
@@ -157,6 +176,13 @@ export function AttractapList() {
                 title={t('page.title')}
                 actions={
                   [
+                    {
+                      key: 'enroll-device',
+                      label: t('page.actions.enrollDevice'),
+                      icon: <PlusIcon className="w-4 h-4" />,
+                      onPress: () => openEnrollDialog(),
+                      dataCy: 'attractap-list-enroll-device-button',
+                    },
                     {
                       key: 'serial-console',
                       label: t('page.actions.openSerialConsole'),

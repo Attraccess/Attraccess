@@ -307,7 +307,18 @@ int main(int argc, char **argv)
     const auto screenshots = control / "screenshots";
     createScreenshotDirectory(screenshots);
     DesktopSimulator simulator(argv[1], 0, argv[3]);
-    if (!waitFor([&] { return simulator.authenticated(); }, simulator, 15000)) return 1;
+    // A new reader first shows a code that an admin approves through the API. The harness reads the
+    // current code from `pending-approval`, which is replaced atomically whenever the code rotates.
+    std::string announcedCode;
+    const auto announce = [&] {
+        const auto enrollment = State::getEnrollmentState();
+        if (!enrollment.pending || enrollment.code == announcedCode) return;
+        announcedCode = enrollment.code;
+        const auto temporary = control / "pending-approval.tmp";
+        std::ofstream(temporary) << enrollment.code << "\n";
+        std::filesystem::rename(temporary, control / "pending-approval");
+    };
+    if (!waitFor([&] { announce(); return simulator.authenticated(); }, simulator, 60000)) return 1;
     std::ofstream(control / "ready") << "authenticated\n";
 
     // Numbered files avoid blocking stdin while the real websocket and LVGL

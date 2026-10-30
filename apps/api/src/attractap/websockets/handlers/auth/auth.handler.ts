@@ -6,7 +6,7 @@ import { AttractapService } from '../../../attractap.service';
 import { verifyToken } from '../../websocket.utils';
 import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
-import { AuditService } from '../../../../audit/audit.service';
+import { DeviceEnrollmentService } from '../../../../device-enrollment/device-enrollment.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { readerServerTime } from '../../websocket-reader-payloads';
 
@@ -23,8 +23,8 @@ export class AttractapAuthHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
-  @Inject(AuditService)
-  private audit: AuditService;
+  @Inject(DeviceEnrollmentService)
+  private deviceEnrollment: DeviceEnrollmentService;
 
   @Inject(SettingsService)
   private settingsService: SettingsService;
@@ -32,29 +32,50 @@ export class AttractapAuthHandler {
   @Inject(WebsocketService)
   private websocketService: WebsocketService;
 
+  /**
+   * A new reader only asks for a code here. The record and its credentials are created once an
+   * admin approved that code, see DeviceEnrollmentService.approve. Firmware without the `enrollment`
+   * field cannot show a code, so it gets no reply and nothing is created.
+   */
   public async handleReaderRegister(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    if (!data.payload?.enrollment || typeof data.payload.enrollment !== 'object') {
+      this.logger.warn(`Ignoring REGISTER from ${socket.id}: firmware does not support enrollment codes`);
+      return;
+    }
     this.logger.debug('Received REGISTER event');
-    const response = await this.attractapService.createNewReader(data.payload.firmware);
-    await this.audit
-      .recordAttractap({
-        action: 'reader.registered',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: response.reader.id,
-        details: { source: 'reader-websocket' },
-      })
-      .catch(() => undefined);
 
-    this.logger.debug(
-      `Sending REGISTER response to client. Reader ID: ${response.reader.id}, Token: ${response.token}`,
-    );
+    this.deviceEnrollment.request({
+      id: socket.id,
+      address: socket.clientAddress,
+      sendCode: (code, rotatesInMs, expiresInMs) => {
+        void socket.sendMessage(
+          new AttractapEvent(AttractapEventType.READER_ENROLLMENT_CODE, { code, rotatesInMs, expiresInMs }),
+        );
+      },
+      sendRejected: (reason, retryAfterMs) => {
+        void socket.sendMessage(
+          new AttractapEvent(AttractapEventType.READER_ENROLLMENT_REJECTED, { reason, retryAfterMs }),
+        );
+      },
+      provision: async ({ name }) => {
+        const { reader, token } = await this.attractapService.createNewReader(data.payload.firmware, name);
+        return {
+          kind: 'reader',
+          id: reader.id,
+          name: reader.name,
+          deliver: () =>
+            socket.sendMessage(new AttractapEvent(AttractapEventType.READER_REGISTER, { id: reader.id, token })),
+          rollback: async () => {
+            await this.attractapService.deleteReader(reader.id);
+          },
+        };
+      },
+      close: () => socket.close(),
+    });
+  }
 
-    await socket.sendMessage(
-      new AttractapEvent(AttractapEventType.READER_REGISTER, {
-        id: response.reader.id,
-        token: response.token,
-      }),
-    );
+  public releaseEnrollment(socket: AuthenticatedWebSocket) {
+    this.deviceEnrollment.release(socket.id);
   }
 
   public async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {

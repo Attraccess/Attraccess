@@ -24,6 +24,12 @@ void API::updateSateInfo()
     {
         State::setApiState(false, "");
     }
+    if (!this->loopIsEnabled)
+    {
+        // The server forgets a pending request with its connection.
+        State::clearEnrollment();
+        this->enrollmentRetryPending = false;
+    }
 }
 
 void API::setup()
@@ -58,6 +64,12 @@ void API::loop()
     }
 
     this->firmware.tick();
+
+    if (this->enrollmentRetryPending && static_cast<int32_t>(millis() - this->enrollmentRetryAt) >= 0)
+    {
+        this->enrollmentRetryPending = false;
+        this->sendRegistrationRequest();
+    }
 }
 
 void API::setErrorCallback(std::function<void(const char *title, const char *message)> callback)
@@ -163,6 +175,14 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     if (strcmp(eventType, "READER_REGISTER") == 0)
     {
         this->onRegistrationData(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "READER_ENROLLMENT_CODE") == 0)
+    {
+        this->onEnrollmentCode(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "READER_ENROLLMENT_REJECTED") == 0)
+    {
+        this->onEnrollmentRejected(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "READER_UNAUTHORIZED") == 0)
     {

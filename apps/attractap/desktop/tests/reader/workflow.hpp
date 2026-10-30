@@ -135,6 +135,7 @@ struct ReaderWorkflow
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
         pump();
     }
+    void testEnrollment();
     void testLocalization();
     void testListAndAuthentication();
     void testSessionStart();

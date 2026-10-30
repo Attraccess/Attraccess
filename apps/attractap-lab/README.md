@@ -214,7 +214,8 @@ image prints `ATTRACTAP_PARKED` on the UART. Parking takes roughly 10–20 s. On
 startup and after coordinator restarts, every managed reader is parked once.
 
 Full erase also wipes NVS: each session must provision Wi-Fi/API settings
-again, and a previously paired reader registers as a new one.
+again, and a previously paired reader needs a new approval (see Agent and CI
+workflow).
 
 eFuses cannot be erased. Before erasing, the janitor requires factory values
 for secure boot, flash encryption, key purposes, download mode and USB/JTAG
@@ -257,6 +258,15 @@ labgrid's `ManagedFile`, runs esptool on the exporter, resets into firmware,
 records bounded `serial.log`, captures `screen.png`, then releases.
 Both success and ordinary failure/cancellation clean up drivers and claims.
 A busy place fails immediately. `--expect TEXT` checks a literal serial marker.
+
+A freshly erased reader (every session starts from one) does not register itself:
+it logs `Enrollment: code=K7P-3XQ` and waits until a user with `resources.update`
+approves the code. Pass `--approve-url` and `--approve-token` (or set
+`ATTRACCESS_URL` and `ATTRACCESS_TOKEN`) and the workflow approves every code it
+reads on the UART through `POST /api/device-enrollment/approve`. Use the API
+token of a dedicated user, and a `--log-seconds` long enough for registration
+(60 is plenty). Codes rotate every 30 s; a code that rotated away is skipped and the
+next one is approved. Python callers use `attractap_lab.enrollment.approver`.
 Serial reconnect follows reset, so the earliest boot messages may be missed;
 use a marker emitted after reconnect. Screen capture provides evidence, not an
 automatic assertion that the UI is correct. Offline µStreamer placeholder frames

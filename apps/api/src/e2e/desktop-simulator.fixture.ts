@@ -95,6 +95,8 @@ export class DesktopFixture {
   constructor(
     private readonly endpoint: string,
     scenario: string,
+    /** Approves the code a new reader shows, through the API. Only needed while the profile is empty. */
+    private readonly approve?: (code: string) => Promise<void>,
   ) {
     if (!/^[a-z0-9-]+$/.test(scenario)) throw new Error('Invalid scenario name');
     this.diagnostics.remember(process.env.AUTH_SESSION_SECRET);
@@ -148,11 +150,25 @@ export class DesktopFixture {
       child.once('error', () => resolveExit());
     });
     try {
-      await waitFor(() => {
-        if (spawnError) throw spawnError;
-        this.assertRunning();
-        return existsSync(join(this.control, 'ready'));
-      }, 'reader authentication');
+      let approvedCode = '';
+      await waitFor(
+        async () => {
+          if (spawnError) throw spawnError;
+          this.assertRunning();
+          const pending = join(this.control, 'pending-approval');
+          if (this.approve && existsSync(pending)) {
+            const code = readFileSync(pending, 'utf8').trim();
+            // Codes rotate; each one is tried once and the next rotation retries.
+            if (code && code !== approvedCode) {
+              approvedCode = code;
+              await this.approve(code);
+            }
+          }
+          return existsSync(join(this.control, 'ready'));
+        },
+        'reader authentication',
+        60_000,
+      );
     } catch (error) {
       await withDesktopCleanup(
         async () => {

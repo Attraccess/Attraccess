@@ -107,11 +107,12 @@ def _claim(config, place, role, *, acquire=True):
                     ]
 
 
-def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, expect=None):
+def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, expect=None, approve=None):
     """Flash/reset, collect a bounded UART log, and capture the reader screen.
 
     Artifacts survive failures. ``expect`` is an optional literal UART marker;
     screen PNGs are inspection evidence, not an assertion of UI correctness.
+    ``approve`` (see enrollment.approver) approves the code a freshly erased reader shows.
     """
     if not 0 < log_seconds <= 3600 or not 0 < max_log_bytes <= 100_000_000:
         raise ValueError("Use 0 < log_seconds <= 3600 and 0 < max_log_bytes <= 100000000")
@@ -124,7 +125,7 @@ def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, e
     flash.flash(str(image))
     target.deactivate(flash)
     target.activate(console)
-    _record(console, output / "serial.log", log_seconds, max_log_bytes)
+    _record(console, output / "serial.log", log_seconds, max_log_bytes, until=approve)
     target.deactivate(console)
     screen = target.get_driver(ScreenCaptureDriver)
     screen.capture(output / "screen.png")

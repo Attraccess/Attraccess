@@ -107,6 +107,23 @@ public:
     };
     static ApiState getApiState();
 
+    // A new reader waits here until an admin approved the code on the server. Times are relative
+    // to receipt, the reader has no synced clock while it is not registered.
+    struct EnrollmentState
+    {
+        bool pending;
+        std::string code;
+        uint32_t rotatesInMs;
+        uint32_t expiresInMs;
+        // Server refused the request (limits); retry once retryInMs passed.
+        bool rejected;
+        uint32_t retryInMs;
+    };
+    static void setEnrollmentCode(std::string code, uint32_t rotatesInMs, uint32_t expiresInMs);
+    static void setEnrollmentRejected(uint32_t retryAfterMs);
+    static void clearEnrollment();
+    static EnrollmentState getEnrollmentState();
+
 private:
     State() = delete;
 
@@ -144,6 +161,14 @@ private:
     static int websocket_remembered_retry_count;
     static bool websocket_cert_locked;
     static int websocket_next_attempt_seconds;
+
+    static bool enrollment_pending;
+    static bool enrollment_rejected;
+    static std::string enrollment_code;
+    static uint32_t enrollment_received_at;
+    static uint32_t enrollment_rotates_in_ms;
+    static uint32_t enrollment_expires_in_ms;
+    static uint32_t enrollment_retry_in_ms;
 
     static bool api_authenticated;
     static std::string api_device_name;

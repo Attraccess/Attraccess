@@ -9,6 +9,8 @@ import de from './de.json';
 import en from './en.json';
 
 interface Props {
+  /** Heading of the scanner dialog; defaults to the resource scanner title. */
+  title?: string;
   children: (open: () => void) => React.ReactNode;
 }
 
@@ -35,15 +37,21 @@ export function ResourceScanner(props: Props) {
         }
 
         navigate(url.pathname + url.search + url.hash);
+        setOpen(false);
       }
     },
-    [navigate, frontendOrigin, toast, t],
+    [navigate, frontendOrigin, toast, t, setOpen],
   );
 
   return (
     <>
       {props.children(open)}
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="md" dialogProps={{ 'aria-label': t('title') }}>
+      <StandardModal
+        isOpen={isOpen}
+        onOpenChange={setOpen}
+        size="md"
+        dialogProps={{ 'aria-label': props.title ?? t('title') }}
+      >
         {() => <Scanner onScan={onScan} components={{ tracker: boundingBox }} />}
       </StandardModal>
     </>

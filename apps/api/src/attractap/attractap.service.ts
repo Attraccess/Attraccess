@@ -241,13 +241,16 @@ export class AttractapService {
     });
   }
 
-  public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
+  public async createNewReader(
+    firmware?: AttractapFirmwareVersion,
+    name?: string,
+  ): Promise<{ reader: Attractap; token: string }> {
     const token = randomBytes(12).toString('base64url').slice(0, 16);
     const apiTokenHash = await securelyHashToken(token);
 
     const reader = await this.readerRepository.save({
       apiTokenHash,
-      name: randomBytes(3).toString('base64url').slice(0, 4),
+      name: name ?? randomBytes(3).toString('base64url').slice(0, 4),
       firmware,
     });
 

@@ -54,7 +54,13 @@ export interface ProjectAuditEvent {
 }
 
 export interface AttractapAuditEvent {
-  action: 'reader.registered' | 'reader.deregistered' | 'card.linked' | 'card.unlinked' | 'reader.crash_reported';
+  action:
+    | 'reader.registered'
+    | 'reader.enrolled'
+    | 'reader.deregistered'
+    | 'card.linked'
+    | 'card.unlinked'
+    | 'reader.crash_reported';
   actorId: number | null;
   authenticationMethod: 'session' | 'api-token' | null;
   apiTokenId?: number;

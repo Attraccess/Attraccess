@@ -116,6 +116,39 @@ the reader to its normal screens. A disconnect does too. Messages for any other
 `MassIntroduction: refused session=… reason=…` and
 `MassIntroduction: ended reason=… session=…`.
 
+## Enrollment protocol (1.8.0)
+
+Firmware 1.8.0 no longer registers itself. A reader without credentials sends
+`READER_REGISTER` with `enrollment: {protocol: 1}`. The server answers with a
+rotating code and creates the reader record only after an administrator with
+`resources.update` approved that code (ATT-1168). All times are relative: an
+unregistered reader has no synced clock.
+
+| Direction | Event | Payload |
+| --- | --- | --- |
+| Reader → server | `READER_REGISTER` | `enrollment: {protocol: 1}` |
+| Server → reader | `READER_ENROLLMENT_CODE` | `code` (`K7P-3XQ`), `rotatesInMs`, `expiresInMs`; sent again on every rotation (30 s) |
+| Server → reader | `READER_ENROLLMENT_REJECTED` | `reason` (`RATE_LIMITED`, `BUSY`), `retryAfterMs`; the reader asks again after that time (5 s to 10 min) |
+| Server → reader | `READER_REGISTER` | `id`, `token`, sent once after approval; the reader stores them and authenticates |
+
+Touch variants show the code on the pending-approval screen with a countdown.
+Every variant, including Lite, reports it on the serial console:
+`api.status.get` returns `status: "pending_approval"` plus `enrollmentCode` and
+`enrollmentRotatesInMs`, which the web flasher uses for its **Approve** button.
+A pending request ends when the connection closes or after 10 minutes, when the
+server closes the socket. A rejection (`READER_UNAUTHORIZED`) still clears the
+stored credentials, so a reader that connects to the wrong server waits for
+approval there instead of creating a record.
+
+### Compatibility
+
+| Server | Reader firmware | Behavior |
+| --- | --- | --- |
+| With enrollment codes | 1.8.0 and newer | Shows a code, receives its credentials after approval. |
+| With enrollment codes | Older than 1.8.0, not registered | Its `READER_REGISTER` has no `enrollment` field. The server creates nothing and sends no reply, so the reader waits quietly. Update it with the web flasher first. |
+| With enrollment codes | Any version, already registered | Authenticates with its stored credentials exactly as before. |
+| Without enrollment codes (older server) | 1.8.0 and newer | `READER_REGISTER` receives the old immediate `id`/`token` reply and works as before; `READER_ENROLLMENT_*` are never sent. |
+
 ## Building
 
 Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.

@@ -34,6 +34,7 @@ import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
 import { randomBytes } from 'crypto';
 import { closeSync } from 'fs';
+import { resolveClientAddress } from '../../device-enrollment/client-address';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 @UseInterceptors(WsMetricsInterceptor)
@@ -112,6 +113,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   > = {
     [AttractapEventType.READER_REGISTER]: (socket, eventData) =>
       this.authHandler.handleReaderRegister(socket, eventData),
+    [AttractapEventType.READER_ENROLLMENT_CODE]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.READER_ENROLLMENT_REJECTED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) =>
       this.authHandler.handleAuthentication(socket, eventData),
     [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
@@ -408,7 +411,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
   }
 
-  public async handleConnection(client: WebSocket) {
+  public async handleConnection(client: WebSocket, request?: Parameters<typeof resolveClientAddress>[0]) {
     this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
 
@@ -498,6 +501,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       messageCount,
       readerId: null,
       readerName: null,
+      clientAddress: resolveClientAddress(request, process.env.TRUST_PROXY),
       sendMessage,
       sendBinaryData,
       state: {
@@ -515,7 +519,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
 
     await this.clientWasActive(client as unknown as AuthenticatedWebSocket);
-
     this.logger.debug('Sending authentication request');
     try {
       await sendMessage(new AttractapEvent(AttractapEventType.READER_REQUEST_AUTHENTICATION, {}));
@@ -584,6 +587,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         // nothing to do
       }
     }
+    this.authHandler.releaseEnrollment(socket);
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

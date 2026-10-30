@@ -81,6 +81,8 @@ Setzen Sie die Umgebungsvariable `TRUST_PROXY` auf die Anzahl vertrauenswuerdige
 | CDN vor einem Reverse Proxy | `2` |
 | Nur bestimmte vertrauenswuerdige Proxies | kommagetrennte IPs/CIDRs, z.B. `10.0.0.0/8, 172.16.0.0/12`, oder `uniquelocal` |
 
+Dieselbe Einstellung bestimmt auch, welche Adresse fuer die Limits bei neuen Attractap-Lesern gilt, die auf Freigabe warten (10 Versuche in 10 Minuten und 20 wartende Leser pro Adresse). Siehe [Attractap Einrichtung](attractap/setup.md#schritt-2-leser-in-attraccess-freigeben).
+
 > [!WARNING]
 > Vertrauen Sie nur so vielen Hops, wie tatsaechlich existieren. Vertraut `TRUST_PROXY` mehr Hops als Ihre reale Proxy-Kette, koennen Clients `X-Forwarded-For` faelschen, ihre scheinbare IP rotieren und das Rate-Limiting umgehen. Nicht gesetzt vertraut Attraccess keinen Weiterleitungs-Headern (sicherer Standard). Aenderungen werden nach einem Neustart wirksam.
 
