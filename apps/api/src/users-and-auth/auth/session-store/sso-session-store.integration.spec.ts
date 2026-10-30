@@ -17,9 +17,7 @@ import { Request } from 'express';
 import { AuthController } from '../auth.controller';
 import { SessionService } from '../session.service';
 import { SsoLogoutService } from '../sso/sso-logout.service';
-import { SettingsService } from '../../../settings/settings.service';
-import { ApprovedOriginsService } from '../../../common/security/approved-origins.service';
-import { ConfigService } from '@nestjs/config';
+import { approvedOriginsFor } from '../auth.controller.auth-controller.test-fixture';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Response } from 'express';
@@ -32,10 +30,7 @@ import { SSOService } from '../sso/sso.service';
 
 jest.setTimeout(90000);
 const hash = { hashToken: (token: string) => `hashed:${token}` } as TokenHashService;
-const approvedOrigins = new ApprovedOriginsService(
-  { get: () => ({}) } as unknown as ConfigService,
-  { getUrl: async () => 'https://app.example', getPublicInternetUrl: async () => null } as unknown as SettingsService,
-);
+const approvedOrigins = approvedOriginsFor('https://app.example');
 const oidc: SsoSessionContext = {
   protocol: 'OIDC',
   providerId: 1,
@@ -229,7 +224,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
           authSession: (await store.authenticateSession('original')).session,
           headers: { authorization: 'Bearer original', origin: 'https://app.example' },
           protocol: 'https',
-          get: () => undefined,
+          host: 'api.internal:3000',
           cookies: {},
           logout: (done: () => void) => done(),
         } as unknown as AuthenticatedRequest;
@@ -288,7 +283,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         const request = {
           headers: { authorization: 'Bearer original', origin: 'https://app.example' },
           protocol: 'https',
-          get: () => undefined,
+          host: 'api.internal:3000',
           cookies: {},
           path: '/api/auth/session',
           logout: (done: () => void) => done(),

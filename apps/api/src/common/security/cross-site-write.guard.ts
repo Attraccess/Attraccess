@@ -13,11 +13,22 @@ const ALLOW_CROSS_SITE_WRITE = 'allowCrossSiteWrite';
 export const AllowCrossSiteWrite = () => SetMetadata(ALLOW_CROSS_SITE_WRITE, true);
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const MAX_LOGGED_HEADER = 200;
+
+/**
+ * True when the session strategy will authenticate with the bearer token instead of the
+ * cookie. Other schemes (Basic, Negotiate) can be added by the browser on its own, so they
+ * don't count.
+ */
+function hasBearerToken(request: Request): boolean {
+  const header = request.headers.authorization;
+  return Boolean(header?.startsWith('Bearer ') && header.substring(7).trim());
+}
 
 /**
  * Refuses data-changing requests that a browser sends on behalf of a website
- * Attraccess does not trust. Bearer tokens and API keys are not ambient
- * credentials and are not affected.
+ * Attraccess does not trust. Bearer tokens are not ambient credentials and
+ * are not affected.
  */
 @Injectable()
 export class CrossSiteWriteGuard implements CanActivate {
@@ -34,7 +45,7 @@ export class CrossSiteWriteGuard implements CanActivate {
     if (SAFE_METHODS.has(request.method)) return true;
     if (this.reflector.getAllAndOverride<boolean>(ALLOW_CROSS_SITE_WRITE, [context.getHandler(), context.getClass()]))
       return true;
-    if (request.headers.authorization || request.headers['x-api-key']) return true;
+    if (hasBearerToken(request)) return true;
 
     const origin = request.headers.origin;
     if (origin !== undefined) {
@@ -47,10 +58,15 @@ export class CrossSiteWriteGuard implements CanActivate {
   }
 
   private deny(request: Request, reason: string): never {
-    // Never log cookie or token values.
+    // Never log cookie or token values. Headers are caller-controlled, so keep them short.
+    const origin = request.headers.origin?.slice(0, MAX_LOGGED_HEADER) ?? 'none';
+    const fetchSite = request.headers['sec-fetch-site']?.toString().slice(0, MAX_LOGGED_HEADER) ?? 'none';
     this.logger.warn(
-      `Refused ${request.method} ${request.path}: ${reason} (origin=${request.headers.origin ?? 'none'}, ` +
-        `sec-fetch-site=${request.headers['sec-fetch-site'] ?? 'none'})`,
+      `Refused ${request.method} ${request.path}: ${reason} (origin=${origin}, ` +
+        `served-as=${this.approvedOrigins.servedOrigin(request) ?? 'unknown'}, ` +
+        `sec-fetch-site=${fetchSite}). ` +
+        'To approve a website, set ATTRACCESS_URL or add it to ATTRACCESS_TRUSTED_ORIGINS; behind a reverse proxy, ' +
+        'set TRUST_PROXY.',
     );
     throw new ForbiddenException('This website is not approved to make changes');
   }

@@ -68,6 +68,7 @@ jobs:
       [
         lint-and-typecheck,
         test,
+        browser-e2e,
         crap-score,
         build-companion,
         build-attractap-firmware,
@@ -170,6 +171,13 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-node-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Cross-site browser test

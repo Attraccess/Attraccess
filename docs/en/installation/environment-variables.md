@@ -13,7 +13,7 @@ All configuration options for Attraccess that can be set via environment variabl
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ATTRACCESS_URL` | `http://localhost:3000` | Main application URL |
+| `ATTRACCESS_URL` | – | Main application URL. It is an [approved website](settings/security.md#approved-websites). |
 | `ATTRACCESS_PUBLIC_INTERNET_URL` | – | Public URL for external callbacks (e.g. SumUp payments). Only needed if different from `ATTRACCESS_URL`. |
 | `ATTRACCESS_FRONTEND_URL` | – | Address of a separately served frontend. It is an [approved website](settings/security.md#approved-websites) and is used for SSO logout returns. |
 | `ATTRACCESS_TRUSTED_ORIGINS` | – | Comma-separated list of additional [approved websites](settings/security.md#approved-websites), as exact origins such as `https://portal.example.com`. No wildcards, no paths. Invalid entries are logged and skipped. |

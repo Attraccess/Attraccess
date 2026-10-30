@@ -141,6 +141,6 @@
   },
   "This website is not approved to make changes": {
     "title": "Website not approved",
-    "description": "Changes from this address are refused. Open Attraccess at its configured address, or ask an administrator to set the application URL in Settings or add this address to ATTRACCESS_TRUSTED_ORIGINS."
+    "description": "Changes from this website are refused. Open Attraccess at its usual address. If you already are, ask an administrator to check the approved websites in the server configuration (see the security documentation)."
   }
 }

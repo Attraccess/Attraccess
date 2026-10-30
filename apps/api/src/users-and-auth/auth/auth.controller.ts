@@ -169,10 +169,9 @@ export class AuthController {
     if (!token || request.user.apiTokenId) throw new UnauthorizedException('An active session is required');
     const session = request.authSession;
     if (!session) throw new UnauthorizedException('An active session is required');
+    // Bearer callers skip the global cross-site guard, so check the origin here as well.
     const origin = request.headers.origin;
-    const returnUrl = await this.ssoLogout.returnURL().catch(() => null);
-    const approved =
-      (await this.approvedOrigins.isApproved(origin, request)) || (returnUrl && new URL(returnUrl).origin === origin);
+    const approved = await this.approvedOrigins.isApproved(origin, request);
     if ((origin && !approved) || (!origin && request.headers['sec-fetch-site'] === 'cross-site'))
       throw new ForbiddenException('Cross-origin logout is not allowed');
     let result: CentralLogoutResult;

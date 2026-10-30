@@ -1,4 +1,7 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Express, Request } from 'express';
+import request from 'supertest';
 import { SettingsService } from '../../settings/settings.service';
 import { ApprovedOriginsService, originOfUrl, parseTrustedOrigins } from './approved-origins.service';
 
@@ -14,7 +17,11 @@ const build = (
   );
   return { service, settings };
 };
-const req = (protocol: string, host: string) => ({ protocol, get: () => host }) as never;
+const req = (protocol: string, host: string | undefined) => ({ protocol, host }) as never;
+
+// The Express that Nest serves requests with (v5), not the root package.
+const nestExpress = (): (() => Express) =>
+  require(require.resolve('express', { paths: [require.resolve('@nestjs/platform-express')] }));
 
 describe('ApprovedOriginsService', () => {
   it('reduces URLs to origins and rejects non-http values', () => {
@@ -55,6 +62,7 @@ describe('ApprovedOriginsService', () => {
     ])
       expect(await service.isApproved(origin)).toBe(true);
     expect(await service.isApproved('https://served.example', req('https', 'served.example'))).toBe(true);
+    expect(await service.isApproved('http://localhost:4201', req('http', 'localhost:4201'))).toBe(true);
   });
 
   it('rejects sibling hosts, other schemes and ports, "null" and missing origins', async () => {
@@ -69,29 +77,66 @@ describe('ApprovedOriginsService', () => {
       expect(await service.isApproved(origin, req('https', 'attraccess.customer.com'))).toBe(false);
   });
 
-  it('uses X-Forwarded-Host, with its port, only when the connecting hop is a trusted proxy', async () => {
+  it('has no served origin when the request has no host', () => {
     const { service } = build({});
-    const proxied = (trusted: boolean) =>
-      ({
-        protocol: 'https',
-        get: (name: string) => ({ host: 'localhost:3000', 'x-forwarded-host': 'app.example.com:8443, other' })[name],
-        app: { get: () => () => trusted },
-        socket: { remoteAddress: '10.0.0.2' },
-      }) as never;
-    expect(await service.isApproved('https://app.example.com:8443', proxied(true))).toBe(true);
-    expect(await service.isApproved('https://localhost:3000', proxied(true))).toBe(false);
-    expect(await service.isApproved('https://app.example.com:8443', proxied(false))).toBe(false);
-    expect(await service.isApproved('https://localhost:3000', proxied(false))).toBe(true);
+    expect(service.servedOrigin(req('https', undefined))).toBeNull();
+    expect(service.servedOrigin(req('https', 'app.example:443'))).toBe('https://app.example');
   });
 
-  it('caches Settings URLs for a minute and fails closed when Settings cannot be read', async () => {
-    const { service, settings } = build({}, 'https://settings.example');
-    await service.isApproved('https://settings.example');
-    await service.isApproved('https://other.example');
-    expect(settings.getUrl).toHaveBeenCalledTimes(1);
+  it('uses X-Forwarded-Host and -Proto, with the port, only when TRUST_PROXY trusts the hop', async () => {
+    const { service } = build({});
+    const servedVia = async (trustProxy: boolean | number) => {
+      const app = nestExpress()();
+      app.set('trust proxy', trustProxy);
+      app.get('/', (r: Request, res) => res.send(service.servedOrigin(r)));
+      const response = await request(app)
+        .get('/')
+        .set('Host', 'localhost:3000')
+        .set('X-Forwarded-Host', 'app.example.com:8443, other')
+        .set('X-Forwarded-Proto', 'https');
+      return response.text;
+    };
+    expect(await servedVia(1)).toBe('https://app.example.com:8443');
+    expect(await servedVia(false)).toBe('http://localhost:3000');
+  });
 
-    const broken = build({});
-    broken.settings.getUrl.mockRejectedValue(new Error('db down'));
-    expect(await broken.service.isApproved('https://settings.example')).toBe(false);
+  it('reads Settings URLs through on every check, so a changed URL applies on the next request', async () => {
+    const { service, settings } = build({}, 'https://settings.example');
+    expect(await service.isApproved('https://settings.example')).toBe(true);
+    expect(await service.isApproved('https://other.example')).toBe(false);
+    expect(settings.getUrl).toHaveBeenCalledTimes(2);
+
+    settings.getUrl.mockResolvedValue('https://moved.example');
+    expect(await service.isApproved('https://moved.example')).toBe(true);
+    expect(await service.isApproved('https://settings.example')).toBe(false);
+  });
+
+  it('does not consult Settings for env-approved or served origins', async () => {
+    const { service, settings } = build({ ATTRACCESS_URL: 'https://url.example' });
+    await service.isApproved('https://url.example');
+    await service.isApproved('https://served.example', req('https', 'served.example'));
+    expect(settings.getUrl).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for Settings URLs when Settings cannot be read', async () => {
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const { service, settings } = build({ ATTRACCESS_URL: 'https://url.example' }, 'https://settings.example');
+    settings.getUrl.mockRejectedValue(new Error('db down'));
+    expect(await service.isApproved('https://settings.example')).toBe(false);
+    expect(await service.isApproved('https://url.example')).toBe(true);
+    expect(logged).toHaveBeenCalledTimes(1);
+
+    // Backs off instead of reading (and logging) on every request while Settings is down.
+    settings.getUrl.mockClear();
+    expect(await service.isApproved('https://settings.example')).toBe(false);
+    expect(settings.getUrl).not.toHaveBeenCalled();
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
+
+    settings.getUrl.mockResolvedValue('https://settings.example');
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now + 5_001);
+    expect(await service.isApproved('https://settings.example')).toBe(true);
+    clock.mockRestore();
   });
 });

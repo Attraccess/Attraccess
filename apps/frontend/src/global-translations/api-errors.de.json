@@ -141,6 +141,6 @@
   },
   "This website is not approved to make changes": {
     "title": "Website nicht freigegeben",
-    "description": "Änderungen von dieser Adresse werden abgelehnt. Öffne Attraccess über die konfigurierte Adresse oder bitte einen Administrator, die Anwendungs-URL in den Einstellungen zu setzen oder diese Adresse in ATTRACCESS_TRUSTED_ORIGINS einzutragen."
+    "description": "Änderungen von dieser Website werden abgelehnt. Öffne Attraccess über die übliche Adresse. Falls du das schon tust, bitte eine Administratorin oder einen Administrator, die freigegebenen Websites in der Serverkonfiguration zu prüfen (siehe Sicherheitsdokumentation)."
   }
 }

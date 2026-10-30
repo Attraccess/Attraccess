@@ -4,9 +4,9 @@ import type { Request } from 'express';
 import { AppConfigType } from '../../config/app.config';
 import { SettingsService } from '../../settings/settings.service';
 
-const SETTINGS_CACHE_MS = 60_000;
+const SETTINGS_RETRY_MS = 5_000;
 
-type RequestAddress = Pick<Request, 'protocol' | 'get'> & Partial<Pick<Request, 'app' | 'socket'>>;
+type RequestAddress = Pick<Request, 'protocol' | 'host'>;
 
 /** Reduces a configured application URL (any path allowed) to its origin. */
 export function originOfUrl(value: string | null | undefined): string | null {
@@ -45,7 +45,7 @@ export function parseTrustedOrigins(raw: string | undefined, onInvalid: (entry: 
 export class ApprovedOriginsService {
   private readonly logger = new Logger(ApprovedOriginsService.name);
   private readonly configured: ReadonlySet<string>;
-  private settingsCache: { expiresAt: number; origins: string[] } | null = null;
+  private settingsRetryAt = 0;
 
   constructor(
     configService: ConfigService,
@@ -67,22 +67,12 @@ export class ApprovedOriginsService {
     this.configured = new Set(origins.filter((origin): origin is string => Boolean(origin)));
   }
 
-  /** The origin this request was addressed to (honours the trust-proxy setting). */
-  servedOrigin(request: RequestAddress): string | null {
-    const host = this.servedHost(request);
-    return host ? originOfUrl(`${request.protocol}://${host}`) : null;
-  }
-
   /**
-   * Express' own `hostname` drops the port, so the forwarded host is read here under the
-   * same rule: only when the connecting hop is trusted through TRUST_PROXY.
+   * The origin this request was addressed to. Express 5's `host` keeps the port and reads
+   * X-Forwarded-Host (like `protocol` reads X-Forwarded-Proto) only when TRUST_PROXY trusts the hop.
    */
-  private servedHost(request: RequestAddress): string | undefined {
-    const forwarded = request.get('x-forwarded-host');
-    const trusted = request.app?.get('trust proxy fn') as
-      ((address: string | undefined, hop: number) => boolean) | undefined;
-    if (forwarded && trusted?.(request.socket?.remoteAddress, 0)) return forwarded.split(',')[0].trim();
-    return request.get('host');
+  servedOrigin(request: RequestAddress): string | null {
+    return request.host ? originOfUrl(`${request.protocol}://${request.host}`) : null;
   }
 
   async isApproved(origin: string | undefined, request?: RequestAddress): Promise<boolean> {
@@ -92,18 +82,20 @@ export class ApprovedOriginsService {
     return (await this.settingsOrigins()).includes(origin);
   }
 
+  /**
+   * The settings store caches these values and refreshes them when they are saved. It does not
+   * cache errors, so a failed read backs off briefly instead of hitting the database on every request.
+   */
   private async settingsOrigins(): Promise<string[]> {
-    const now = Date.now();
-    if (this.settingsCache && this.settingsCache.expiresAt > now) return this.settingsCache.origins;
-    let origins: string[] = [];
+    if (Date.now() < this.settingsRetryAt) return [];
     try {
       const [url, publicUrl] = await Promise.all([this.settings.getUrl(), this.settings.getPublicInternetUrl()]);
-      origins = [originOfUrl(url), originOfUrl(publicUrl)].filter((origin): origin is string => Boolean(origin));
+      return [originOfUrl(url), originOfUrl(publicUrl)].filter((origin): origin is string => Boolean(origin));
     } catch (error) {
       // Fail closed for settings-derived origins; the env and served origins still apply.
+      this.settingsRetryAt = Date.now() + SETTINGS_RETRY_MS;
       this.logger.error('Could not read the application URLs from Settings', error as Error);
+      return [];
     }
-    this.settingsCache = { expiresAt: now + SETTINGS_CACHE_MS, origins };
-    return origins;
   }
 }

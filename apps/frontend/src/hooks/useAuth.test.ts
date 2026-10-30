@@ -10,7 +10,6 @@ vi.mock('@attraccess/react-query-client', () => ({
   OpenAPI: { BASE: '', TOKEN: '', WITH_CREDENTIALS: false },
   useUsersServiceGetCurrent: () => ({ data: null }),
   useAuthenticationServiceEndSession: () => ({ mutate: vi.fn() }),
-  useAuthenticationServiceRefreshSession: () => ({ data: null }),
   useAuthenticationServiceCreateSession: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
 }));
 

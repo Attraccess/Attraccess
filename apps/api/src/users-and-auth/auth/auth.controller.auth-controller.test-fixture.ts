@@ -17,6 +17,14 @@ import { SessionPermissionSync } from './sso/session-permission-sync';
 const passportRequest = require('passport/lib/http/request') as {
   logout(this: object, callback: (error?: Error) => void): void;
 };
+/** A real ApprovedOriginsService that approves only the given Settings application URL. */
+export function approvedOriginsFor(appUrl: string): ApprovedOriginsService {
+  return new ApprovedOriginsService(
+    { get: () => ({}) } as unknown as ConfigService,
+    { getUrl: async () => appUrl, getPublicInternetUrl: async () => null } as unknown as SettingsService,
+  );
+}
+
 export function registerAuthControllerFixture() {
   let authController: AuthController;
 
@@ -81,13 +89,7 @@ export function registerAuthControllerFixture() {
         },
         {
           provide: ApprovedOriginsService,
-          useValue: new ApprovedOriginsService(
-            { get: () => ({}) } as unknown as ConfigService,
-            {
-              getUrl: async () => 'https://app.example',
-              getPublicInternetUrl: async () => null,
-            } as unknown as SettingsService,
-          ),
+          useValue: approvedOriginsFor('https://app.example'),
         },
         { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },

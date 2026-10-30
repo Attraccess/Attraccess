@@ -13,7 +13,7 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 
 | Variable | Standard | Beschreibung |
 |----------|----------|-------------|
-| `ATTRACCESS_URL` | `http://localhost:3000` | Haupt-URL der Anwendung |
+| `ATTRACCESS_URL` | – | Haupt-URL der Anwendung. Sie ist eine [freigegebene Website](settings/security.md#freigegebene-websites). |
 | `ATTRACCESS_PUBLIC_INTERNET_URL` | – | Öffentliche URL für externe Callbacks (z.B. SumUp-Zahlungen). Nur nötig, wenn sich diese von `ATTRACCESS_URL` unterscheidet. |
 | `ATTRACCESS_FRONTEND_URL` | – | Adresse eines separat ausgelieferten Frontends. Sie ist eine [freigegebene Website](settings/security.md#freigegebene-websites) und wird für Rücksprünge nach dem SSO-Logout verwendet. |
 | `ATTRACCESS_TRUSTED_ORIGINS` | – | Kommagetrennte Liste zusätzlicher [freigegebener Websites](settings/security.md#freigegebene-websites) als exakte Origins, z.B. `https://portal.example.com`. Keine Wildcards, keine Pfade. Ungültige Einträge werden protokolliert und übersprungen. |
