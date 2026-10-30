@@ -1,7 +1,10 @@
 import { readdirSync, readFileSync } from 'fs';
-import { join, relative } from 'path';
+import { join, relative, resolve } from 'path';
 import { Project } from 'ts-morph';
-import { HTTP_METHODS } from './route-shadow.paths.test-fixture';
+import { inheritedMethods } from './route-shadow.controllers.test-fixture';
+
+/** Every Nest route decorator, including the rarely used ones, so none slips past the inventory. */
+const ROUTE_DECORATORS = new Set(['Get', 'Post', 'Put', 'Patch', 'Delete', 'Sse', 'All', 'Head', 'Options', 'Search']);
 
 /** Decorators that put a sign-in (or a device/companion credential) in front of a route. */
 const AUTH_DECORATORS = new Set([
@@ -45,6 +48,14 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, string> = {
   'SSOController.oidcLoginCallback': 'company sign-in callback',
   'SSOController.loginWithSaml': 'company sign-in',
   'SSOController.samlLoginCallback': 'company sign-in callback',
+  'SSOController.getAll': 'provider list for the sign-in page; client and signing secrets are @Exclude()d',
+  'SSOController.linkUserToExternalAccount': 'account linking, verified by a signed link token and the password',
+  'SSOController.oidcLogout': 'identity-provider provisioning, verified by the provider client secret',
+  'SSOController.samlLogout': 'identity-provider provisioning, verified by the provisioning secret',
+  'SSOController.oidcDeleteUser': 'identity-provider provisioning, verified by the provider client secret',
+  'SSOController.samlDeleteUser': 'identity-provider provisioning, verified by the provisioning secret',
+  'SSOController.oidcUpdatePermissions': 'identity-provider provisioning, verified by the provider client secret',
+  'SSOController.samlUpdatePermissions': 'identity-provider provisioning, verified by the provisioning secret',
   'PasswordPolicyController.getPublic': 'password rules shown on the registration form',
   'UserProfileController.confirmDeleteAccount': 'emailed single-use token',
   'UsersRegistrationController.createOne': 'self registration (can be disabled)',
@@ -67,10 +78,25 @@ function controllerFiles(dir: string): string[] {
 
 describe('route sign-in inventory (ATT-1149)', () => {
   const root = __dirname;
+  // First-party plugin backends are mounted on the same API, so their routes count too.
+  const pluginsRoot = resolve(__dirname, '../../plugins');
+  const sourceRoots = [
+    root,
+    ...readdirSync(pluginsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(pluginsRoot, entry.name, 'backend'))
+      .filter((dir) => {
+        try {
+          return readdirSync(dir).length > 0;
+        } catch {
+          return false;
+        }
+      }),
+  ];
   const project = new Project({ skipAddingFilesFromTsConfig: true, skipFileDependencyResolution: true });
   const routes: { id: string; file: string; authenticated: boolean }[] = [];
 
-  for (const file of controllerFiles(root)) {
+  for (const file of sourceRoots.flatMap(controllerFiles)) {
     if (!readFileSync(file, 'utf8').includes('@Controller(')) continue;
     for (const declaration of project.addSourceFileAtPath(file).getClasses()) {
       if (!declaration.getDecorator('Controller')) continue;
@@ -82,10 +108,11 @@ describe('route sign-in inventory (ATT-1149)', () => {
               decorator.getArguments().some((argument) => AUTH_GUARDS.has(argument.getText()))),
         );
       const classAuthenticated = isAuthentication(declaration.getDecorators());
-      for (const method of declaration.getMethods()) {
-        if (!method.getDecorators().some((decorator) => HTTP_METHODS.includes(decorator.getName()))) continue;
+      // Routes declared in a base class (e.g. PluginController's package routes) are served by this controller.
+      for (const [name, method] of inheritedMethods(declaration)) {
+        if (!method.getDecorators().some((decorator) => ROUTE_DECORATORS.has(decorator.getName()))) continue;
         routes.push({
-          id: `${declaration.getName()}.${method.getName()}`,
+          id: `${declaration.getName()}.${name}`,
           file: relative(root, file),
           authenticated: classAuthenticated || isAuthentication(method.getDecorators()),
         });
@@ -95,6 +122,14 @@ describe('route sign-in inventory (ATT-1149)', () => {
 
   it('finds the controllers', () => {
     expect(routes.length).toBeGreaterThan(200);
+  });
+
+  it('finds routes inherited from base classes and plugin backends', () => {
+    const controllers = new Set(routes.map((route) => route.id.split('.')[0]));
+    expect(routes.filter((route) => route.id.startsWith('PluginController.')).length).toBeGreaterThan(20);
+    expect(routes.filter((route) => route.id.startsWith('SSOController.')).length).toBeGreaterThan(6);
+    expect(routes.some((route) => route.file.startsWith('../../plugins/'))).toBe(true);
+    expect(controllers.size).toBeGreaterThan(40);
   });
 
   it('has no route without sign-in that is not on the reviewed public list', () => {
