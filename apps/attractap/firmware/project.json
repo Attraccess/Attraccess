@@ -81,6 +81,7 @@
           "cmake -S apps/attractap/firmware/tests/test-hooks -B apps/attractap/firmware/tests/test-hooks/build",
           "cmake --build apps/attractap/firmware/tests/test-hooks/build --parallel 2",
           "ctest --test-dir apps/attractap/firmware/tests/test-hooks/build --output-on-failure",
+          "sh apps/attractap/firmware/tests/pn532-target/run.sh",
           "node --test apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
         ],
         "parallel": false,

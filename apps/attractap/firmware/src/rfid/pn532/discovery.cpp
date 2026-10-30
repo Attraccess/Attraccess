@@ -92,6 +92,10 @@ bool Adafruit_PN532::readDetectedPassiveTargetID(uint8_t *uid,
   if (pn532_packetbuffer[7] != 1)
     return 0;
 
+  // InDataExchange addresses the inlisted target by this number. Without it
+  // the relay sends Tg = 0 and the PN532 answers every APDU with 0x27.
+  _inListedTag = pn532_packetbuffer[8];
+
   uint16_t sens_res = pn532_packetbuffer[9];
   sens_res <<= 8;
   sens_res |= pn532_packetbuffer[10];
