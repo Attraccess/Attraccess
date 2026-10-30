@@ -6,6 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Button,
   Card,
+  Chip,
+  ColorSwatch,
   Description,
   Input,
   Label,
@@ -27,6 +29,7 @@ import {
   WaitingLiteReaderDto,
   useDeviceEnrollmentServiceApproveLiteEnrollment,
   useDeviceEnrollmentServiceListWaitingLiteReaders,
+  useDeviceEnrollmentServiceListWaitingLiteReadersKey,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useNow } from '../../../../hooks/useNow';
@@ -50,21 +53,21 @@ const POLL_INTERVAL_MS = 3000;
 // Same limit as ApproveLiteEnrollmentDto.name
 const NAME_MAX_LENGTH = 64;
 
-function PatternSwatches({ pattern, wrap = false }: Readonly<{ pattern: LedColor[]; wrap?: boolean }>) {
+// One row in ring order: segment 4 sits next to segment 1 on the ring, so any other layout (e.g. a 2x2 grid read
+// clockwise) could make an admin read a different reader's pattern.
+function PatternSwatches({ pattern }: Readonly<{ pattern: LedColor[] }>) {
   const { t } = useTranslations({ en, de });
   return (
-    <ul className={wrap ? 'flex flex-row flex-wrap gap-3' : 'grid min-w-44 grid-cols-2 gap-x-3 gap-y-1'} data-cy="lite-pattern">
+    <ol className="flex flex-row gap-3" data-cy="lite-pattern">
       {pattern.map((color, index) => (
-        <li key={`${color}-${index}`} className="flex flex-row items-center gap-1">
-          <span
-            aria-hidden
-            className="inline-block size-5 rounded-full border border-default"
-            style={{ backgroundColor: SWATCH[color] }}
-          />
-          <span className="text-sm">{t(`colors.${color}`)}</span>
+        <li key={`${color}-${index}`} className="flex flex-col items-center gap-1">
+          <span aria-hidden>
+            <ColorSwatch color={SWATCH[color]} size="sm" />
+          </span>
+          <span className="text-xs">{t(`colors.${color}`)}</span>
         </li>
       ))}
-    </ul>
+    </ol>
   );
 }
 
@@ -86,7 +89,11 @@ function WaitingLiteReadersCard() {
   const queryClient = useQueryClient();
   const now = useNow();
 
-  const { data: readers = [], dataUpdatedAt } = useDeviceEnrollmentServiceListWaitingLiteReaders(undefined, {
+  const {
+    data: readers = [],
+    dataUpdatedAt,
+    isError: loadFailed,
+  } = useDeviceEnrollmentServiceListWaitingLiteReaders(undefined, {
     refetchInterval: POLL_INTERVAL_MS,
   });
 
@@ -108,8 +115,13 @@ function WaitingLiteReadersCard() {
       setResult(approved);
       void queryClient.invalidateQueries();
     },
+    // Close the confirmation on any failure: it holds the pattern from when Approve was pressed, so retrying
+    // from it could resend a stale pattern and use up the approver's attempts. The admin compares the
+    // refreshed row again instead.
     onError: (failure) => {
       submitting.current = false;
+      setSelected(null);
+      void queryClient.invalidateQueries({ queryKey: [useDeviceEnrollmentServiceListWaitingLiteReadersKey] });
       const status = (failure as ApiError)?.status;
       if (status === 404) setError(t('error.notFound'));
       else if (status === 429) setError(t('error.tooManyAttempts'));
@@ -121,13 +133,11 @@ function WaitingLiteReadersCard() {
   const openDialog = useCallback((reader: WaitingLiteReaderDto) => {
     setSelected(reader);
     setName('');
-    setError(null);
   }, []);
 
   const submit = useCallback(() => {
     if (!selected || isPending || submitting.current) return;
     submitting.current = true;
-    setError(null);
     approve({
       requestBody: {
         pendingId: selected.pendingId,
@@ -158,20 +168,32 @@ function WaitingLiteReadersCard() {
                   <TableColumn>{t('columns.address')}</TableColumn>
                   <TableColumn>{t('columns.actions')}</TableColumn>
                 </TableHeader>
-                <TableBody items={readers} dependencies={[now]} renderEmptyState={() => <EmptyState message={t('empty')} />}>
+                <TableBody
+                  items={readers}
+                  dependencies={[now]}
+                  renderEmptyState={() => <EmptyState message={loadFailed ? t('loadFailed') : t('empty')} />}
+                >
                   {(reader) => (
                     <TableRow key={reader.pendingId} id={reader.pendingId}>
                       <TableCell>
                         <PatternSwatches pattern={reader.pattern} />
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap tabular-nums">
                         {t('rotatesIn', { seconds: Math.max(0, reader.rotatesInSeconds - secondsSinceFetch) })}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
-                        {[reader.firmware?.name, reader.firmware?.variant].filter(Boolean).join(' ')}
-                        {reader.firmware?.version ? ` v${reader.firmware.version}` : ''}
+                        {reader.firmware?.name}
+                        {reader.firmware?.variant ? ` (${reader.firmware.variant})` : ''}
+                        {reader.firmware?.version && (
+                          <>
+                            <br />
+                            <Chip>v{reader.firmware.version}</Chip>
+                          </>
+                        )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{formatWaiting(reader.waitingSince, now)}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">
+                        {formatWaiting(reader.waitingSince, now)}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">{reader.clientAddress}</TableCell>
                       <TableCell>
                         <Button variant="secondary" onPress={() => openDialog(reader)} data-cy="lite-approve-button">
@@ -194,7 +216,6 @@ function WaitingLiteReadersCard() {
           onClose={() => setSelected(null)}
           status="warning"
           title={t('dialog.title')}
-          closeLabel={t('dialog.cancel')}
           action={{ label: t('dialog.submit'), onPress: submit, isPending, 'data-cy': 'lite-approve-confirm' }}
           data-cy="lite-approve-dialog"
         >
@@ -204,17 +225,24 @@ function WaitingLiteReadersCard() {
                 pattern: selected.pattern.map((color) => t(`colors.${color}`)).join(', '),
               })}
             </Description>
-            <PatternSwatches pattern={selected.pattern} wrap />
+            <PatternSwatches pattern={selected.pattern} />
             <TextField value={name} onChange={setName} isDisabled={isPending}>
               <Label>{t('dialog.nameLabel')}</Label>
               <Input autoComplete="off" maxLength={NAME_MAX_LENGTH} data-cy="lite-approve-name" />
             </TextField>
-            {error && (
-              <Description className="text-danger" role="alert">
-                {error}
-              </Description>
-            )}
           </div>
+        </StatusDialog>
+      )}
+
+      {error && (
+        <StatusDialog
+          isOpen
+          onClose={() => setError(null)}
+          status="error"
+          title={t('error.title')}
+          data-cy="lite-approve-error"
+        >
+          {error}
         </StatusDialog>
       )}
 

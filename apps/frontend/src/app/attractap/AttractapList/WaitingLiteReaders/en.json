@@ -1,6 +1,6 @@
 {
   "title": "Waiting Lite readers",
-  "description": "Lite readers have no screen. Find the reader in front of you by the colours on its LED ring and approve it.",
+  "description": "Lite readers have no screen. Find the reader in front of you by the colours on its LED ring and approve it. The ring may be turned, so start at any segment and read in either direction.",
   "columns": {
     "pattern": "Pattern on the ring",
     "rotates": "Changes in",
@@ -10,6 +10,7 @@
     "actions": "Actions"
   },
   "empty": "No Lite readers are waiting for approval.",
+  "loadFailed": "The waiting Lite readers could not be loaded. Retrying…",
   "rotatesIn": "{{seconds}} s",
   "colors": {
     "red": "Red",
@@ -22,10 +23,9 @@
   "approve": "Approve",
   "dialog": {
     "title": "Approve this reader?",
-    "warning": "Look at the reader in front of you. Only approve it if the colours on its LED ring match this pattern exactly: {{pattern}}. Approving a different device gives it access to your system.",
+    "warning": "Look at the reader in front of you. Only approve it if its LED ring shows these colours in this order: {{pattern}}. You may start at any segment and read in either direction. Approving a different device gives it access to your system.",
     "nameLabel": "Name (optional)",
-    "submit": "Approve reader",
-    "cancel": "Cancel"
+    "submit": "Approve reader"
   },
   "success": {
     "title": "Reader approved",
@@ -34,7 +34,8 @@
     "close": "Done"
   },
   "error": {
-    "notFound": "The pattern on the reader changed or the reader is gone. Compare the current pattern in the list and try again.",
+    "title": "Reader not approved",
+    "notFound": "The pattern on the reader changed or the reader is no longer connected. Compare the current pattern in the list and try again.",
     "tooManyAttempts": "Too many attempts. Wait a minute and try again.",
     "deliveryFailed": "The reader did not answer. Nothing was created. Check its connection and try again.",
     "generic": "Something went wrong: {{{error}}}"
