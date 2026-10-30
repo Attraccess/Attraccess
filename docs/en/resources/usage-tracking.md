@@ -10,14 +10,14 @@ A usage session represents a single period of resource use. It is created when a
 
 Each session contains:
 
-| Field | Description |
-|-------|-------------|
-| **User** | Who used the resource |
-| **Start Time** | When the session started |
-| **End Time** | When the session ended |
-| **Duration** | How long the resource was used |
-| **Notes** | Optional notes about the session |
-| **Project** | Optional associated project |
+| Field          | Description                      |
+| -------------- | -------------------------------- |
+| **User**       | Who used the resource            |
+| **Start Time** | When the session started         |
+| **End Time**   | When the session ended           |
+| **Duration**   | How long the resource was used   |
+| **Notes**      | Optional notes about the session |
+| **Project**    | Optional associated project      |
 
 ## Starting a Session
 
@@ -48,7 +48,7 @@ The usage history is displayed on the resource [detail page](resources/resource-
 
 <!-- TODO: Screenshot of usage history -->
 
-People with **Update Resources** (`resources.update`) see the sessions of all users. Everyone else sees only their own sessions.
+Who sees other people's sessions follows the [resource activity visibility](settings/overview.md#resource-activity-visibility) setting. Anyone allowed to see activity on the resource, including people with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`), sees all sessions. Where only free or in use is shown (supervised use), other people's sessions appear without names or details. Everyone else sees only their own sessions.
 
 ## See Also
 

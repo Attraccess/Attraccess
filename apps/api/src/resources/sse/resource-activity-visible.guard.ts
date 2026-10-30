@@ -17,7 +17,8 @@ export class ResourceActivityVisibleGuard implements CanActivate {
     const resourceId = Number(request.params['resourceId']);
     // A malformed id is answered with a 400 by the route's ParseIntPipe.
     if (!Number.isInteger(resourceId)) return true;
-    if ((await this.activityVisibility.resolve(request.user, resourceId)) === 'none') {
+    // Hidden activity is refused unless the user is running their own session; the stream then carries only that session.
+    if (!(await this.activityVisibility.canFollowLive(request.user, resourceId))) {
       throw new ForbiddenException('You cannot view activity on this resource');
     }
     return true;

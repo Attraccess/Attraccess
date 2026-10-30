@@ -17,6 +17,7 @@ function setup() {
   const visibility = {
     resolveMany: jest.fn(async (_user: AuthenticatedUser, ids: number[]) => new Map(ids.map((id) => [id, 'full']))),
     resolve: jest.fn(async () => 'full'),
+    canFollowLive: jest.fn(async () => true),
     viewLiveStream: jest.fn((stream: unknown) => stream),
   };
   const provider = new ResourceLiveTopicsProvider(

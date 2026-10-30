@@ -46,7 +46,14 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
         rejected.set(liveSubscriptionKey(subscription), 'Resource update permission required');
       } else if (!existingIds.has(subscription.resourceId)) {
         rejected.set(liveSubscriptionKey(subscription), 'Resource not found');
-      } else if (subscription.topic === 'resource' && access.get(subscription.resourceId) === 'none') {
+      } else if (
+        subscription.topic === 'resource' &&
+        !(await this.activityVisibility.canFollowLive(
+          user,
+          subscription.resourceId,
+          access.get(subscription.resourceId),
+        ))
+      ) {
         rejected.set(liveSubscriptionKey(subscription), 'Activity on this resource is not visible');
       }
     }

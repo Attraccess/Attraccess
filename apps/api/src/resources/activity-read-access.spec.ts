@@ -390,6 +390,32 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       expect((await get(`/resources/${MACHINE}/usage/5`, user)).status).toBe(200);
     });
 
+    it('lets people without activity access follow their own running session, and only that', async () => {
+      activeUsageOwner = ME;
+      const user = as('not introduced');
+      expect(
+        (
+          await topics.authorize([{ topic: 'resource', resourceId: MACHINE }], {
+            id: ME,
+            effectivePermissions: new Set(['resources.read']),
+          } as unknown as AuthenticatedUser)
+        ).size,
+      ).toBe(0);
+      const live = await feed(MACHINE, user);
+      expect(live.status).toBe(200);
+
+      const viewer = { id: ME, effectivePermissions: new Set(['resources.read']) } as unknown as AuthenticatedUser;
+      const events = new Subject<{ data: object }>();
+      eventsService.subscribeResource.mockResolvedValueOnce(events);
+      const seen: object[] = [];
+      (await sseController.streamEvents(MACHINE, { user: viewer } as never)).subscribe((event) => seen.push(event));
+      events.next({ data: { eventType: 'started', inUse: true, usage: { ...usage(), userId: OTHER } } });
+      events.next({ data: { eventType: 'ended', inUse: false } });
+      events.next({ data: { eventType: 'started', inUse: true, usage: usage() } });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(seen).toHaveLength(1);
+    });
+
     it('lets someone eligible for a supervised session subscribe to the live topic there', async () => {
       const rejected = await topics.authorize([{ topic: 'resource', resourceId: SUPERVISED_MACHINE }], {
         id: ME,
@@ -431,15 +457,27 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
       expect(response.headers['content-type']).toContain('application/json');
       expect(eventsService.subscribeResource).not.toHaveBeenCalled();
     });
-
   });
 
   describe.each(['all', 'introduced'] as const)('usage history in "%s" mode', (visibility) => {
-    it.each(Object.keys(PERSONAS))("%s: other people's history needs manage resources", async (name) => {
+    it.each(Object.keys(PERSONAS))("%s: other people's history follows the shared visibility rule", async (name) => {
       mode = visibility;
       const user = as(name);
+      const { permissions, canControl } = PERSONAS[name];
+      const full =
+        permissions.includes('resources.update') ||
+        permissions.includes('resources.access.manage') ||
+        (permissions.includes('resources.read') && (visibility === 'all' || canControl === true));
       const status = (await get(`/resources/${MACHINE}/usage/history?userId=${OTHER}`, user)).status;
-      expect(status).toBe(name === 'manage resources' ? 200 : 403);
+      expect(status).toBe(full ? 200 : 403);
+    });
+
+    it("resource and access managers can open other people's sessions", async () => {
+      mode = visibility;
+      for (const name of ['manage resources', 'manage access']) {
+        expect((await get(`/resources/${MACHINE}/usage/5`, as(name))).status).toBe(200);
+      }
+      expect(usageService.getSessionDetails).toHaveBeenCalledWith(MACHINE, 5, expect.anything(), true);
     });
   });
 

@@ -100,6 +100,15 @@ export class ResourceActivityVisibilityService {
     return { full: false, ownUsageId: active?.userId === user.id ? active.id : null };
   }
 
+  /**
+   * Whether the viewer may open a live subscription. Hidden activity refuses it, except while the viewer runs their own
+   * session on the machine; {@link viewLiveEvent} then drops every event that is not about that session.
+   */
+  async canFollowLive(user: AuthenticatedUser, resourceId: number, access?: ResourceActivityAccess): Promise<boolean> {
+    if ((access ?? (await this.resolve(user, resourceId))) !== 'none') return true;
+    return (await this.usage.getActiveSession(resourceId))?.userId === user.id;
+  }
+
   /** The "free or in use" view for viewers who may not see who is using the machine. */
   redactUsage(usage: ResourceUsage): ResourceUsage {
     return {

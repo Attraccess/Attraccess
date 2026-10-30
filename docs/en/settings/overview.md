@@ -16,11 +16,11 @@ The System Settings page lets administrators configure core application behavior
 
 General settings for the Attraccess instance:
 
-| Setting | Description |
-|---------|-------------|
-| **Application URL** | The URL where users access Attraccess (corresponds to `ATTRACCESS_URL`). |
-| **Public Internet URL** | Public URL for external callbacks, such as payment providers. Only needed if it differs from the application URL. |
-| **License Key** | Your Attraccess license key. |
+| Setting                     | Description                                                                                                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Application URL**         | The URL where users access Attraccess (corresponds to `ATTRACCESS_URL`).                                                                                                                                                                                                                                |
+| **Public Internet URL**     | Public URL for external callbacks, such as payment providers. Only needed if it differs from the application URL.                                                                                                                                                                                       |
+| **License Key**             | Your Attraccess license key.                                                                                                                                                                                                                                                                            |
 | **Default system language** | German or English as the fallback for translated content. A supported user preference or browser language takes precedence. Attractap uses the cardholder’s supported language during a session and the system fallback otherwise. Selected during first-time setup; administrators can change it here. |
 
 > [!TIP]
@@ -30,15 +30,15 @@ General settings for the Attraccess instance:
 
 Under **General**, **Who can see resource activity** controls who sees which resources are in use and by whom. Changing it requires the **Manage System Settings** (`system.settings.manage`) permission, and every change is recorded in the [audit log](settings/audit-log.md).
 
-| Option | Who sees a resource's activity |
-|--------|--------------------------------|
-| **Everyone with Read Resources** (default) | Everyone with the **Read Resources** (`resources.read`) permission. |
+| Option                                     | Who sees a resource's activity                                                                                                                                                                                         |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Everyone with Read Resources** (default) | Everyone with the **Read Resources** (`resources.read`) permission.                                                                                                                                                    |
 | **Only people introduced to the resource** | People introduced to the resource (directly or through a group), its introducers and maintainers, and anyone with **Update Resources** (`resources.update`) or **Manage Resource Access** (`resources.access.manage`). |
 
 In both modes:
 
 - You need to be signed in. Signed-out requests get `401` and no data.
-- You always see your own running session.
+- You always see your own running session, and live updates stay open while you run it, showing only that session.
 - The names of a resource's introducers and maintainers stay visible to everyone with **Read Resources**, so people who are not yet introduced know who to ask. Email addresses are never shown.
 
 With **Only people introduced to the resource**, everyone else still sees the resource in the catalog, but without activity: it has no entry in the in-use list, status requests answer `403`, and live updates for it are refused. On resources that allow or require [supervised use](resources/introductions.md#supervision-mode), they see only **Available** or **In Use**, without a name.
@@ -52,13 +52,13 @@ The setting is stored in the system settings. Instances that never set it behave
 
 Configure how Attraccess sends emails:
 
-| Setting | Description |
-|---------|-------------|
-| **SMTP Host** | Hostname of your email server |
-| **SMTP Port** | Port number for the SMTP connection |
-| **SMTP Secure** | Whether to use TLS encryption |
-| **SMTP User** | Username for authentication |
-| **SMTP Password** | Password for authentication |
+| Setting            | Description                            |
+| ------------------ | -------------------------------------- |
+| **SMTP Host**      | Hostname of your email server          |
+| **SMTP Port**      | Port number for the SMTP connection    |
+| **SMTP Secure**    | Whether to use TLS encryption          |
+| **SMTP User**      | Username for authentication            |
+| **SMTP Password**  | Password for authentication            |
 | **Sender Address** | The "From" address for outgoing emails |
 
 For a detailed email setup guide, see [Email / SMTP](setup/smtp-email.md).

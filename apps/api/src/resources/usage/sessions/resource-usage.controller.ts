@@ -1,6 +1,6 @@
 import { ResourceUsage } from '@attraccess/database-entities';
 
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, Body, Put } from '@nestjs/common';
 
@@ -136,27 +136,27 @@ export class ResourceUsageController {
     @Query() query: GetResourceHistoryQueryDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<GetResourceHistoryResponseDto> {
-    // Allow users to see their own history, or admins to see all history
-    const canUpdateResources = (req.user as AuthenticatedUser).effectivePermissions?.has('resources.update') === true;
+    // The shared visibility rule decides: full sees every session, anonymous sees them redacted, none only their own.
+    const access = await this.activityVisibility.resolve(req.user, resourceId);
     const isViewingOwnHistory = query.userId === req.user.id || query.userId === undefined;
 
-    // If not an admin and trying to view someone else's history, deny access
-    if (!canUpdateResources && !isViewingOwnHistory) {
+    // Filtering by another user would link a name to the redacted sessions, so it needs full access.
+    if (access !== 'full' && !isViewingOwnHistory) {
       throw new ForbiddenException('You can only view your own usage history');
     }
-
-    // If not an admin, force filtering by the current user's ID
-    // Other people's history needs "manage resources", which always sees full activity under the visibility rule.
-    if (!canUpdateResources) {
+    if (access === 'none') {
       query.userId = req.user.id;
     }
 
-    const { data, total } = await this.resourceUsageService.getResourceUsageHistory(
+    const { data: sessions, total } = await this.resourceUsageService.getResourceUsageHistory(
       resourceId,
       query.page,
       query.limit,
       query.userId,
     );
+    const data = sessions
+      .map((session) => this.activityVisibility.viewUsage(session, access, req.user.id))
+      .filter((session): session is ResourceUsage => session !== null);
 
     return {
       data,
@@ -332,11 +332,11 @@ export class ResourceUsageController {
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    const usage = await this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
-    if (usage.userId !== req.user.id) {
-      const access = await this.activityVisibility.resolve(req.user, resourceId);
-      if (access !== 'full') throw new ForbiddenException('You cannot view activity on this resource');
-    }
-    return usage;
+    const access = await this.activityVisibility.resolve(req.user, resourceId);
+    // Viewers with full or anonymous access need no project membership; with none, only their own session passes.
+    const usage = await this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user, access !== 'none');
+    const view = this.activityVisibility.viewUsage(usage, access, req.user.id);
+    if (!view) throw new ForbiddenException('You cannot view activity on this resource');
+    return view;
   }
 }

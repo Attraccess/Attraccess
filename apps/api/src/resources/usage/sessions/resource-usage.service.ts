@@ -176,14 +176,20 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     return map;
   }
 
-  async getSessionDetails(resourceId: number, usageId: number, user: AuthenticatedUser): Promise<ResourceUsage> {
+  /** `canViewAll`: the viewer's activity access already covers other users' sessions, so no project membership is needed. */
+  async getSessionDetails(
+    resourceId: number,
+    usageId: number,
+    user: AuthenticatedUser,
+    canViewAll = false,
+  ): Promise<ResourceUsage> {
     const usage = await this.resourceUsageRepository.findOne({
       where: { id: usageId, resourceId, lifecyclePending: false },
       relations: this.DETAIL_RELATIONS,
     });
     if (!usage) throw new NotFoundException('Usage session not found');
 
-    if (usage.userId !== user.id && !user.effectivePermissions?.has('resources.update')) {
+    if (usage.userId !== user.id && !canViewAll) {
       if (!usage.projectId) throw new NotFoundException('Usage session not found');
       await this.projectsService.findOneById(user.id, usage.projectId);
     }
