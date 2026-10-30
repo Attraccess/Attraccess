@@ -3,7 +3,7 @@ module.exports = {
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   // Direct Jest callers (including CRAP coverage) must keep native workflows opt-in too.
-  testMatch: ['**/*.spec.ts', '!**/*.real-api.spec.ts'],
+  testMatch: ['**/*.spec.ts', '!**/*.real-api.spec.ts', '!**/*.alerting.spec.ts'],
   setupFiles: ['<rootDir>/src/test/jest.setup.ts'],
   transform: {
     '^.+\\.js$': '<rootDir>/src/test/jose-transformer.cjs',
