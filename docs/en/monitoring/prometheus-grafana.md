@@ -249,6 +249,28 @@ Because the configs live inside the `attraccess` image and are copied into named
 
 The Grafana provisioning and dashboard volumes are treated as Attraccess-managed. On stack startup, Attraccess removes stale managed files before copying the current bundled files. When an alert rule UID existed in the previous bundled rules but no longer exists in the current bundle, startup also writes a temporary Grafana `deleteRules` provisioning file so removed Attraccess-managed alerts are deleted from Grafana.
 
+## Attractap reset warnings
+
+Two Grafana warnings watch the readers' reset reports. Both count the exact number of stored reports from all readers in the last hour (`attraccess_attractap_reset_reports_last_hour`, not `increase()` estimates), fire when the count is **four or more** and stays so for **5 continuous minutes** (evaluated every minute), and name the contributing readers and reset reasons in the notification:
+
+| Alert | Counts | Notification summary |
+|-------|--------|----------------------|
+| `AttractapReaderCrashes` | `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT` | "Attractap readers crashing" |
+| `AttractapReaderPowerOnResets` | `POWERON` | "Attractap readers restarting (power-on resets)" |
+
+The power-on warning never calls the resets crashes. Its message says that a power-on reset alone does not confirm a reader fault: power was cut and restored, for example by an outage, a loose cable or someone power-cycling a frozen reader.
+
+Three or fewer reports never trigger a warning. If the count drops below four the wait is cancelled, and a return to four starts a fresh 5-minute wait. A change in the contributing readers does not restart the wait. All other reset reasons (for example `SW`, `BROWNOUT`, `EXT`, `DEEPSLEEP`, `SDIO` and `UNKNOWN`) stay visible on the dashboards as reset reports but have no warning.
+
+Things to know:
+
+- **Deploy order:** update Attraccess (and its database migration) before or together with the Grafana rules. Rules that are deployed first see no data and stay quiet (`noDataState: OK`), which can hide a real problem. The bundled stack ships both in one image.
+- **Retries:** counts are stored reports; a retried upload counts twice.
+- **Database failures:** the count is read from the database on every scrape with a 5-second timeout. A failure makes `/api/metrics` return an error rather than zero, so the target shows as down. A single failed scrape does not reset a running wait: the rules use the last count scraped in the past two minutes.
+- **One installation:** replicas must share one database. Combining independent installations in one Grafana instance is unsupported.
+- **Long reader lists** are capped at about 200 characters (`; +N more`) so the Pushover message stays under Pushover's 1,024-character limit and keeps its Silence and View links. Reader names are shortened to 40 characters and `<` and `>` are removed, because Pushover renders the message as HTML.
+- **Upgrades:** the former single `AttractapReaderCrashes` rule keeps its UID and is replaced in place, so the old wording does not survive. An existing Grafana silence on `AttractapReaderCrashes` therefore also mutes the new crash warning until it expires.
+
 ## Exposing Prometheus Externally (Optional)
 
 By default, Prometheus is only exposed internally (no `ports` mapping). If you need direct access for debugging:

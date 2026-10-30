@@ -1,6 +1,8 @@
 # Nutzungsverfolgung
 
-Attraccess erfasst, wer welche Ressource wann nutzt. Jede Nutzungssitzung wird aufgezeichnet und ist in der Nutzungshistorie der Ressource einsehbar.
+Attraccess erfasst, wer welche Ressource wann nutzt. Jede Nutzungssitzung wird in der Nutzungshistorie der Ressource aufgezeichnet.
+
+Wer sehen darf, ob eine Ressource in Benutzung ist und von wem, hängt von der Einstellung [Sichtbarkeit der Ressourcennutzung](settings/overview.md#sichtbarkeit-der-ressourcennutzung) ab. Die eigenen Sitzungen sehen Sie immer.
 
 ## Was ist eine Nutzungssitzung?
 
@@ -8,14 +10,14 @@ Eine Nutzungssitzung stellt einen einzelnen Nutzungszeitraum einer Ressource dar
 
 Jede Sitzung enthält:
 
-| Feld | Beschreibung |
-|------|-------------|
-| **Benutzer** | Wer die Ressource genutzt hat |
-| **Startzeit** | Wann die Sitzung begonnen hat |
-| **Endzeit** | Wann die Sitzung beendet wurde |
-| **Dauer** | Wie lange die Ressource genutzt wurde |
-| **Notizen** | Optionale Notizen zur Sitzung |
-| **Projekt** | Optionales zugehöriges Projekt |
+| Feld          | Beschreibung                          |
+| ------------- | ------------------------------------- |
+| **Benutzer**  | Wer die Ressource genutzt hat         |
+| **Startzeit** | Wann die Sitzung begonnen hat         |
+| **Endzeit**   | Wann die Sitzung beendet wurde        |
+| **Dauer**     | Wie lange die Ressource genutzt wurde |
+| **Notizen**   | Optionale Notizen zur Sitzung         |
+| **Projekt**   | Optionales zugehöriges Projekt        |
 
 ## Sitzung starten
 
@@ -46,7 +48,9 @@ Die Nutzungshistorie wird auf der [Detailseite](resources/resource-details.md) d
 
 <!-- TODO: Screenshot der Nutzungshistorie einfügen -->
 
-Ressourcenverwalter und Administratoren können Sitzungen aller Benutzer einsehen. Reguläre Benutzer sehen ebenfalls die vollständige Historie.
+Personen mit **Ressourcen bearbeiten** (`resources.update`) oder **Ressourcen-Zugriff verwalten** (`resources.access.manage`) sowie in die Ressource eingewiesene Personen (direkt oder über eine Gruppe, einschließlich Einweisern und Wartenden) sehen die Sitzungen aller Benutzer. Alle anderen sehen nur ihre eigenen Sitzungen sowie projektbezogene Sitzungen eines [Projekts](projects/overview.md), in dem sie Mitglied sind.
+
+Ist **Nur in die Ressource eingewiesene Personen** gewählt, sehen Personen, die nicht eingewiesen sind, aber eine Ressource mit beaufsichtigter Nutzung verwenden könnten, dort nur **Verfügbar** oder **In Benutzung**: Der ungefilterte Verlauf zeigt die übrigen Sitzungen geschwärzt, nur mit Zeiten und ohne Namen oder Details. Den Verlauf nach einer anderen Person zu filtern ist für sie nicht möglich.
 
 ## Siehe auch
 

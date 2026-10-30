@@ -112,3 +112,16 @@ export const MESSAGING_RATE_LIMIT_DEFAULTS: MessagingRateLimitPolicy = {
   contactMaxPerWindow: 10,
   contactWindowSeconds: 60,
 };
+
+export const RESOURCES_PARENT = 'resources';
+
+export const RESOURCES_KEYS = {
+  activityVisibility: 'activity_visibility',
+} as const;
+
+export const RESOURCE_ACTIVITY_VISIBILITY_VALUES = ['all', 'introduced'] as const;
+
+export type ResourceActivityVisibility = (typeof RESOURCE_ACTIVITY_VISIBILITY_VALUES)[number];
+
+/** A missing stored value means "all", so upgraded instances keep today's behaviour without a migration. */
+export const RESOURCE_ACTIVITY_VISIBILITY_DEFAULT: ResourceActivityVisibility = 'all';

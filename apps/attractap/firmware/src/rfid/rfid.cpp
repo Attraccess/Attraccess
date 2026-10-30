@@ -196,6 +196,15 @@ bool NFC::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint
     bool changeKeySuccess = this->pn532.ntag424_ChangeKey(oldKey, newKey, keyNumber, keyVersion);
     if (!changeKeySuccess)
     {
+        // An earlier attempt may have changed the key and lost only its
+        // confirmation (card pulled, radio error). The card then rejects every
+        // ChangeKey made with the old key, so accept a slot that already
+        // authenticates with the new key.
+        if (keyNumber != 0 && this->authenticateInternal(keyNumber, newKey))
+        {
+            this->logger.info("changeKey successful, the card already had the new key");
+            return true;
+        }
         this->logger.error("changeKey failed, change key procedure failed");
         return false;
     }

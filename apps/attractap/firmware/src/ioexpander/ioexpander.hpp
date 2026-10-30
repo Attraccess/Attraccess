@@ -40,6 +40,18 @@
 #define IOEXP_REG_CONFIG   0x06  // Configuration port 0 (1=input, 0=output)
 #define IOEXP_REG_CONFIG_1 0x07  // Configuration port 1 (1=input, 0=output)
 
+// The V4 expander is actually Waveshare's CH32V003 firmware (WS_CH32_IO), not
+// an XL9555: 0x02 is its direction register, 0x03 its output register and the
+// LCD backlight is register 0x05, not a port pin. That value is inverted, as in
+// Waveshare's BSP: 0x00 is full brightness and 0xFF turns the backlight off.
+// The CH32 is a separate MCU that an ESP32 reset or reflash need not reset, so
+// firmware that wants a lit screen must write it. The CH32 acknowledges but can drop a write that
+// directly follows another one, so pause first (IOEXP_CH32_WRITE_GAP_MS).
+#define IOEXP_REG_BACKLIGHT_PWM  0x05
+#define IOEXP_BACKLIGHT_PWM_ON   0x00
+#define IOEXP_BACKLIGHT_PWM_OFF  0xFF
+#define IOEXP_CH32_WRITE_GAP_MS  20
+
 // Waveshare default output values (from official V4 demo code)
 // Port 0 (0xBF = 1011 1111): all pins high except bit 6 (beeper off / active-low)
 #define IOEXP_PORT0_DEFAULT 0xBF

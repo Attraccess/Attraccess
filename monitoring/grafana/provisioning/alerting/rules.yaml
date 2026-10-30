@@ -411,6 +411,14 @@ groups:
                     type: last
                     params: []
 
+      # The two reset-report rules count exact stored reports per hour from the API database
+      # (attraccess_attractap_reset_reports_last_hour), not increase() estimates. Query A is the
+      # count (max across duplicate scrape targets of one installation, never sum). last_over_time
+      # over 2m keeps the last scraped count across a single failed scrape, so one slow database
+      # answer does not read as "no data" and reset the wait; a real drop still shows on the next
+      # successful scrape. Query B only
+      # supplies the reader/reason text for the annotation, so the alert identity carries no
+      # reader names and a change of contributing readers does not restart the 5m wait.
       - uid: attractap-reader-crashes
         title: AttractapReaderCrashes
         condition: C
@@ -421,16 +429,29 @@ groups:
           severity: warning
         annotations:
           summary: "Attractap readers crashing"
-          description: "More than 3 reader crash reports were received in the last hour."
+          description: "{{ $values.A }} crash or watchdog reset reports (PANIC, INT_WDT, TASK_WDT, WDT) in the last hour. This warning fires at four or more reports held for 5 minutes.{{ if $values.B }} Readers and reset reasons: {{ $values.B.Labels.readers }}.{{ end }}"
         data:
           - refId: A
             relativeTimeRange:
-              from: 3600
+              from: 600
               to: 0
             datasourceUid: attraccess-prometheus
             model:
               refId: A
-              expr: 'sum(increase(attraccess_attractap_crash_reports_total{job="attraccess"}[1h])) or vector(0)'
+              expr: 'max(last_over_time(attraccess_attractap_reset_reports_last_hour{job="attraccess", category="crash_watchdog"}[2m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: B
+              expr: 'max by (readers) (attraccess_attractap_reset_report_readers_last_hour{job="attraccess", category="crash_watchdog"})'
               instant: true
               range: false
               datasource:
@@ -438,7 +459,70 @@ groups:
                 uid: attraccess-prometheus
           - refId: C
             relativeTimeRange:
-              from: 3600
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [3]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: attractap-reader-power-on-resets
+        title: AttractapReaderPowerOnResets
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Attractap readers restarting (power-on resets)"
+          description: "{{ $values.A }} power-on reset reports in the last hour. This warning fires at four or more reports held for 5 minutes. A power-on reset alone does not confirm a reader fault: power was cut and restored, for example by an outage, a loose cable or someone power-cycling a frozen reader.{{ if $values.B }} Readers and reset reasons: {{ $values.B.Labels.readers }}.{{ end }}"
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'max(last_over_time(attraccess_attractap_reset_reports_last_hour{job="attraccess", category="power_on"}[2m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: B
+              expr: 'max by (readers) (attraccess_attractap_reset_report_readers_last_hour{job="attraccess", category="power_on"})'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
               to: 0
             datasourceUid: __expr__
             model:

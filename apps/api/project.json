@@ -146,6 +146,9 @@
         "default",
         "^production",
         "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/monitoring/grafana/provisioning/**/*",
+        "{workspaceRoot}/monitoring/grafana/dashboards/**/*",
+        "{workspaceRoot}/monitoring/prometheus/prometheus.yml",
         {
           "externalDependencies": ["jest"]
         }
@@ -153,10 +156,39 @@
       "outputs": ["{workspaceRoot}/coverage/apps/api"],
       "options": {
         "jestConfig": "apps/api/jest.config.ts",
-        "testMatch": ["**/*.spec.ts", "!**/*.e2e.spec.ts", "!**/*.real-api.spec.ts", "!**/*.browser.spec.ts"],
+        "testMatch": [
+          "**/*.spec.ts",
+          "!**/*.e2e.spec.ts",
+          "!**/*.real-api.spec.ts",
+          "!**/*.alerting.spec.ts",
+          "!**/*.browser.spec.ts"
+        ],
         "passWithNoTests": true
       },
       "dependsOn": ["test-scripts"]
+    },
+    "test-alerting": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/scripts/jest-docker-context.ts",
+        "{workspaceRoot}/monitoring/grafana/provisioning/**/*",
+        "{workspaceRoot}/monitoring/grafana/dashboards/**/*",
+        "{workspaceRoot}/monitoring/prometheus/prometheus.yml",
+        "{workspaceRoot}/coolify.docker-compose.yml",
+        { "env": "ALERTING_GRAFANA_VERSION" },
+        { "env": "ALERTING_REAL_TIME" },
+        {
+          "externalDependencies": ["jest", "testcontainers"]
+        }
+      ],
+      "options": {
+        "jestConfig": "apps/api/jest.alerting.config.ts",
+        "passWithNoTests": false
+      }
     },
     "e2e": {
       "executor": "@nx/jest:jest",

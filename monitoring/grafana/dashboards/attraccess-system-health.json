@@ -278,7 +278,7 @@
       ]
     },
     {
-      "title": "Reader Crashes (15m)",
+      "title": "Reader Reset Reports (15m)",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -335,7 +335,7 @@
         {
           "refId": "A",
           "expr": "sum(increase(attraccess_attractap_crash_reports_total{job=\"attraccess\"}[15m]))",
-          "legendFormat": "Crashes"
+          "legendFormat": "Reset reports"
         }
       ]
     },

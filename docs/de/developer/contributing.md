@@ -60,6 +60,7 @@ Pushen Sie Ihren Branch und erstellen Sie einen Pull Request gegen den `main`-Br
 - **Framework:** Jest wird für Unit-Tests verwendet
 - Platzieren Sie Testdateien neben den Quelldateien, die sie testen (z. B. `my-service.spec.ts`)
 - Schreiben Sie Tests für neue Features und Bugfixes
+- `pnpm nx run api:test-alerting` führt den Prometheus-/Grafana-Alarmtest mit echten Containern (testcontainers) aus und benötigt Docker. Er gehört nicht zu `pnpm nx test api`; die CI führt ihn zusammen mit den anderen `test-*`-Targets aus, und er schlägt fehl, wenn Docker nicht verfügbar ist
 
 ## Issue-Tracking
 

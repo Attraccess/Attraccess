@@ -76,7 +76,7 @@
       ]
     },
     {
-      "title": "Total Crashes (24h)",
+      "title": "Total Reset Reports (24h)",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -129,12 +129,12 @@
         {
           "refId": "A",
           "expr": "sum(increase(attraccess_attractap_crash_reports_total{job=\"attraccess\"}[24h]))",
-          "legendFormat": "Crashes (24h)"
+          "legendFormat": "Reset reports (24h)"
         }
       ]
     },
     {
-      "title": "Crashes by Reset Reason (1h)",
+      "title": "Reset Reports by Reset Reason (1h)",
       "type": "piechart",
       "gridPos": {
         "h": 8,
@@ -269,7 +269,7 @@
       ]
     },
     {
-      "title": "Crash Reports Rate",
+      "title": "Reset Reports Rate",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -309,7 +309,7 @@
         {
           "refId": "A",
           "expr": "sum(rate(attraccess_attractap_crash_reports_total{job=\"attraccess\"}[15m]))",
-          "legendFormat": "crashes/s"
+          "legendFormat": "reset reports/s"
         }
       ]
     },
@@ -702,7 +702,7 @@
       ]
     },
     {
-      "title": "Crash Reports per Reader (15m rate)",
+      "title": "Reset Reports per Reader (15m rate)",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -747,7 +747,7 @@
       ]
     },
     {
-      "title": "Crash Reports per Reader (24h total, by reset reason)",
+      "title": "Reset Reports per Reader (24h total, by reset reason)",
       "type": "piechart",
       "gridPos": {
         "h": 8,
@@ -874,5 +874,5 @@
   "title": "Attraccess — Devices (Attractap)",
   "uid": "attraccess-devices",
   "version": 1,
-  "description": "Attractap NFC reader fleet: connectivity, NFC taps, crashes by reset reason, firmware updates and reader WebSocket health."
+  "description": "Attractap NFC reader fleet: connectivity, NFC taps, reset reports by reset reason, firmware updates and reader WebSocket health."
 }

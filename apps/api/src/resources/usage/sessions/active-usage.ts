@@ -8,6 +8,14 @@ export function activeUsageWhere(): FindOptionsWhere<ResourceUsage> {
   return { ...publishedState, endTime: IsNull() };
 }
 
+/** In-memory counterpart of {@link activeUsageWhere}, for usages that were loaded without that filter. */
+export function isActiveUsage(usage: ResourceUsage): boolean {
+  return (
+    usage.endTime == null &&
+    Object.entries(publishedState).every(([column, value]) => usage[column as keyof typeof publishedState] === value)
+  );
+}
+
 /** Select the published usage before resolving optional related records such as meter sessions. */
 export function findActiveUsage(manager: EntityManager, resourceId: number): Promise<ResourceUsage | null> {
   return manager.findOne(ResourceUsage, {

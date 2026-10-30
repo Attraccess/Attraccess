@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Patch, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Patch,
+  Param,
+  ParseUUIDPipe,
+  ParseIntPipe,
+  Post,
+  Req,
+  forwardRef,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceMeteringSession } from '@attraccess/database-entities';
@@ -11,12 +23,40 @@ import {
   ResourceMeteringSettlementDto,
   ResourceMeteringStatusDto,
 } from './resource-metering.dto';
+import { ResourceActivityVisibilityService } from '../usage/authorization/resource-activity-visibility.service';
 
 @ApiTags('Resource Metering')
 @Controller('resources/:resourceId/metering')
 @Auth('billing.manage')
 export class ResourceMeteringController {
-  constructor(private readonly metering: ResourceMeteringService) {}
+  constructor(
+    private readonly metering: ResourceMeteringService,
+    @Inject(forwardRef(() => ResourceActivityVisibilityService))
+    private readonly activityVisibility: ResourceActivityVisibilityService,
+  ) {}
+
+  /**
+   * The running session's consumption follows the activity visibility rule. Without full access, a viewer sees only
+   * their own session's consumption, and no live counter (a moving counter would show the machine is in use).
+   */
+  private async withVisibleSession(
+    meters: ResourceMeterDto[],
+    resourceId: number,
+    req: AuthenticatedRequest,
+  ): Promise<ResourceMeterDto[]> {
+    if (meters.length === 0) return meters;
+    const { full, ownUsageId } = await this.activityVisibility.activeSessionView(req.user, resourceId);
+    if (full) return meters;
+    return meters.map((meter) => {
+      const own = ownUsageId !== null && meter.session?.usageId === ownUsageId;
+      return {
+        ...meter,
+        session: own ? meter.session : null,
+        counterValue: ownUsageId !== null ? meter.counterValue : null,
+        latestObservedAt: ownUsageId !== null ? meter.latestObservedAt : null,
+      };
+    });
+  }
 
   @Get('meters')
   @Auth()
@@ -25,8 +65,11 @@ export class ResourceMeteringController {
     operationId: 'listResourceMeters',
   })
   @ApiResponse({ status: 200, type: [ResourceMeterDto] })
-  list(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceMeterDto[]> {
-    return this.metering.listMeters(resourceId);
+  async list(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceMeterDto[]> {
+    return this.withVisibleSession(await this.metering.listMeters(resourceId), resourceId, req);
   }
 
   @Post('meters')
@@ -77,8 +120,12 @@ export class ResourceMeteringController {
     operationId: 'getResourceMeteringLive',
   })
   @ApiResponse({ status: 200, type: ResourceMeteringLiveDto })
-  async getLive(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceMeteringLiveDto> {
-    return this.metering.getLive(resourceId);
+  async getLive(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceMeteringLiveDto> {
+    const live = await this.metering.getLive(resourceId);
+    return { ...live, meters: await this.withVisibleSession(live.meters, resourceId, req) };
   }
 
   @Post('sessions/:sessionId/retry')

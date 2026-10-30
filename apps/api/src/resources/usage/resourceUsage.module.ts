@@ -1,6 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
+import { ResourceActivityVisibilityService } from './authorization/resource-activity-visibility.service';
+import { SettingsModule } from '../../settings/settings.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
 import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
@@ -27,6 +29,7 @@ import { ResourceMeteringModule } from '../metering/resource-metering.module';
     ResourceTransactionsModule,
     TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
     RbacModule,
+    SettingsModule,
     NotificationsModule,
     ResourceIntroducersModule,
     ResourceIntroductionsModule,
@@ -47,7 +50,8 @@ import { ResourceMeteringModule } from '../metering/resource-metering.module';
     ResourceUsageNoteNotificationListener,
     ResourceSessionNotificationListener,
     SupervisedUsageAutoPromotionListener,
+    ResourceActivityVisibilityService,
   ],
-  exports: [ResourceUsageService],
+  exports: [ResourceUsageService, ResourceActivityVisibilityService],
 })
 export class ResourceUsageModule {}

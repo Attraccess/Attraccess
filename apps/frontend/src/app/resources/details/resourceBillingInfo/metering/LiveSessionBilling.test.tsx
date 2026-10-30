@@ -41,7 +41,7 @@ const props = { resourceId: 7, currency: 'EUR', minorUnit: 2, dlClass: '', value
 
 function mock(usage: object | null, live: object | null) {
   vi.mocked(useResourcesServiceResourceUsageGetActiveSession).mockReturnValue({
-    data: { usage: usage ? { id: 10, ...usage } : null },
+    data: { usage: usage ? { id: 10, user: { id: 1, username: 'Alex' }, ...usage } : null },
   } as ReturnType<typeof useResourcesServiceResourceUsageGetActiveSession>);
   vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({
     data: {
@@ -70,6 +70,20 @@ describe('LiveSessionBilling', () => {
     mock(null, null);
     const { container } = render(<LiveSessionBilling {...props} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders nothing for a redacted session that has no user', () => {
+    mock({ startTime: '2026-09-28T10:00:00Z', user: undefined }, null);
+    vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({
+      data: { meters: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 30, session: null }] },
+    } as unknown as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringLive>);
+    const { container } = render(<LiveSessionBilling {...props} />);
+    expect(container).toBeEmptyDOMElement();
+    expect(useResourceMeteringServiceGetResourceMeteringLive).toHaveBeenCalledWith(
+      { resourceId: 7 },
+      undefined,
+      expect.objectContaining({ enabled: false }),
+    );
   });
 
   it('shows the live meter value, the exact energy cost and an estimate of the whole bill', () => {

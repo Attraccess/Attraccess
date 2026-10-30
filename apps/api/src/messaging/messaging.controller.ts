@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -23,6 +24,7 @@ import { ListMessagesQueryDto } from './dtos/listMessagesQuery.dto';
 import { ListMessagesResponseDto } from './dtos/listMessagesResponse.dto';
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
 import { UnreadCountResponseDto } from './dtos/unreadCountResponse.dto';
+import { ResourceActivityVisibilityService } from '../resources/usage/authorization/resource-activity-visibility.service';
 
 @ApiTags('Messaging')
 @Controller('messaging')
@@ -31,6 +33,7 @@ export class MessagingController {
     private readonly messagingService: MessagingService,
     private readonly messagingLiveService: MessagingLiveService,
     private readonly sse: SseInstrumentation,
+    private readonly activityVisibility: ResourceActivityVisibilityService,
   ) {}
 
   @Sse('live')
@@ -64,12 +67,18 @@ export class MessagingController {
     operationId: 'messagingContactResourceHolder',
   })
   @ApiResponse({ status: 201, description: 'The conversation with the resource holder', type: ContactResponseDto })
+  @ApiResponse({ status: 403, description: 'Forbidden - The user may not see who is using this resource' })
   @ApiResponse({ status: 404, description: 'No active session for this resource' })
   @ApiResponse({ status: 429, description: 'Contact rate limit exceeded' })
   async contactResourceHolder(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ContactResponseDto> {
+    // The conversation names the holder, so it needs the same access as seeing who uses the machine.
+    // Checked before the lookup so free and in-use machines answer alike.
+    if ((await this.activityVisibility.resolve(req.user, resourceId)) !== 'full') {
+      throw new ForbiddenException('You cannot see who is using this resource');
+    }
     const holder = await this.messagingService.resolveResourceHolder(resourceId);
     if (!holder) {
       throw new NotFoundException(`No active session found for resource with ID ${resourceId}`);

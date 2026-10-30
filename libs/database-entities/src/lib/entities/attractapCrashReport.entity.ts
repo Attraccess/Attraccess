@@ -13,6 +13,7 @@ import { Attractap } from './attractap.entity';
 
 @Entity('attractap_crash_report')
 @Index(['attractapId', 'createdAt'])
+@Index('IDX_attractap_crash_report_created_at', ['createdAt'])
 export class AttractapCrashReport {
   @PrimaryGeneratedColumn()
   @ApiProperty({ description: 'The unique identifier of the crash report', example: 1 })

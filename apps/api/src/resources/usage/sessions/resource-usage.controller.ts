@@ -1,6 +1,6 @@
 import { ResourceUsage } from '@attraccess/database-entities';
 
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, Body, Put } from '@nestjs/common';
 
@@ -13,6 +13,7 @@ import { GetResourceHistoryQueryDto } from '../dtos/getResourceHistoryQuery.dto'
 import { GetResourceHistoryResponseDto } from '../dtos/GetResourceHistoryResponse.dto';
 
 import { ResourceUsageService } from './resource-usage.service';
+import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
 import { GetActiveUsageSessionDto } from '../dtos/getActiveUsageSession.dto';
@@ -24,7 +25,10 @@ import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.
 @ApiTags('Resources')
 @Controller('resources/:resourceId/usage')
 export class ResourceUsageController {
-  constructor(protected readonly resourceUsageService: ResourceUsageService) {}
+  constructor(
+    protected readonly resourceUsageService: ResourceUsageService,
+    protected readonly activityVisibility: ResourceActivityVisibilityService,
+  ) {}
 
   @Post('lock')
   @Auth()
@@ -132,26 +136,27 @@ export class ResourceUsageController {
     @Query() query: GetResourceHistoryQueryDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<GetResourceHistoryResponseDto> {
-    // Allow users to see their own history, or admins to see all history
-    const canUpdateResources = (req.user as AuthenticatedUser).effectivePermissions?.has('resources.update') === true;
+    // The shared visibility rule (session variant) decides: full sees every session, anonymous sees them redacted, none only their own.
+    const access = await this.activityVisibility.resolveSessions(req.user, resourceId);
     const isViewingOwnHistory = query.userId === req.user.id || query.userId === undefined;
 
-    // If not an admin and trying to view someone else's history, deny access
-    if (!canUpdateResources && !isViewingOwnHistory) {
+    // Filtering by another user would link a name to the redacted sessions, so it needs full access.
+    if (access !== 'full' && !isViewingOwnHistory) {
       throw new ForbiddenException('You can only view your own usage history');
     }
-
-    // If not an admin, force filtering by the current user's ID
-    if (!canUpdateResources) {
+    if (access === 'none') {
       query.userId = req.user.id;
     }
 
-    const { data, total } = await this.resourceUsageService.getResourceUsageHistory(
+    const { data: sessions, total } = await this.resourceUsageService.getResourceUsageHistory(
       resourceId,
       query.page,
       query.limit,
       query.userId,
     );
+    const data = sessions
+      .map((session) => this.activityVisibility.viewUsage(session, access, req.user.id))
+      .filter((session): session is ResourceUsage => session !== null);
 
     return {
       data,
@@ -298,11 +303,23 @@ export class ResourceUsageController {
     status: 404,
     description: 'Resource not found',
   })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Activity on this resource is not visible to the user',
+  })
   public async getActiveSession(
     @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<GetActiveUsageSessionDto> {
+    const access = await this.activityVisibility.resolve(req.user, resourceId);
     const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
-    return { usage: activeSession || null };
+    if (!activeSession) {
+      if (access === 'none') throw new ForbiddenException('You cannot view activity on this resource');
+      return { usage: null };
+    }
+    const usage = this.activityVisibility.viewUsage(activeSession, access, req.user.id);
+    if (!usage) throw new ForbiddenException('You cannot view activity on this resource');
+    return { usage };
   }
 
   @Get(':usageId')
@@ -315,6 +332,14 @@ export class ResourceUsageController {
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.getSessionDetails(resourceId, usageId, req.user);
+    const access = await this.activityVisibility.resolveSessions(req.user, resourceId);
+    // Other people's sessions open for full access or project members; anonymous access gets the redacted view.
+    return this.resourceUsageService.getSessionDetails(
+      resourceId,
+      usageId,
+      req.user,
+      access === 'full',
+      access === 'anonymous' ? (usage) => this.activityVisibility.redactUsage(usage) : undefined,
+    );
   }
 }

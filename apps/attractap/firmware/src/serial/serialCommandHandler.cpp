@@ -17,6 +17,9 @@
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include "../platform.hpp"
+#ifdef ATTRACTAP_TEST_HOOKS
+#include "../testhooks/test_hooks.hpp"
+#endif
 
 std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
@@ -72,7 +75,7 @@ void SerialCommandHandler::processLine(const std::string &line)
     size_t cmndIndex = trimmed.find("CMND");
     if (cmndIndex == std::string::npos)
     {
-        logger.errorf("Invalid command format (no CMND): %s", trimmed.c_str());
+        logger.errorf("Invalid command format (no CMND), %u bytes", static_cast<unsigned>(trimmed.size()));
         return;
     }
 
@@ -83,7 +86,7 @@ void SerialCommandHandler::processLine(const std::string &line)
     size_t firstSpace = trimmed.find(' ');
     if (firstSpace == std::string::npos)
     {
-        logger.errorf("Invalid command format (no space): %s", trimmed.c_str());
+        logger.errorf("Invalid command format (no space), %u bytes", static_cast<unsigned>(trimmed.size()));
         return;
     }
 
@@ -99,11 +102,12 @@ void SerialCommandHandler::processLine(const std::string &line)
 
     if (topic.length() == 0)
     {
-        logger.errorf("Invalid command format (no topic): %s", trimmed.c_str());
+        logger.errorf("Invalid command format (no topic), %u bytes", static_cast<unsigned>(trimmed.size()));
         return;
     }
 
-    logger.infof("Handling command: %s %s", topic.c_str(), payload.c_str());
+    // Payloads carry secrets (Wi-Fi password, PIN); never log them or raw lines.
+    logger.infof("Handling command: %s", topic.c_str());
     handleCommand(topic, payload);
 }
 
@@ -479,6 +483,13 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
         sendJsonResponse(topic, json);
         return;
     }
+
+#ifdef ATTRACTAP_TEST_HOOKS
+    if (TestHooks::handleCommand(topic, payloadObj))
+    {
+        return;
+    }
+#endif
 
     sendErrorResponse(topic, "UNKNOWN_TOPIC");
 }
