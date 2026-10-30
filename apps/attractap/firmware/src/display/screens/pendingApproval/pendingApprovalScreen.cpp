@@ -18,6 +18,9 @@ void PendingApprovalScreen::init()
    lv_obj_set_style_pad_row(this->screen, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::applyScreen(this->screen);
    lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
+   // The artwork's bright rings run through the code; dim it so the code stays readable.
+   lv_obj_set_style_bg_image_recolor(this->screen, lv_color_black(), LV_PART_MAIN);
+   lv_obj_set_style_bg_image_recolor_opa(this->screen, LV_OPA_80, LV_PART_MAIN);
    lv_obj_set_style_pad_all(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->titleLabel = lv_label_create(this->screen);
