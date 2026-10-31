@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { crc32 } from 'zlib';
 import {
+  LAB_SECURE_BOOT_KEY_DIGESTS,
   publicKeyFingerprint,
   SECURE_BOOT_SECTOR_SIZE,
   SECURE_BOOT_SIG_BLOCK_SIZE,
@@ -36,9 +37,9 @@ describe('secure boot v2 signer', () => {
     // CRC32 over the first 1196 bytes, then 16 padding bytes, exactly as espsecure lays them out.
     expect(ourBlock.readUInt32LE(1196)).toBe(crc32(ourBlock.subarray(0, 1196)));
     expect(refBlock.readUInt32LE(1196)).toBe(crc32(refBlock.subarray(0, 1196)));
-    expect(ourBlock.subarray(1200, SECURE_BOOT_SIG_BLOCK_SIZE).equals(refBlock.subarray(1200, SECURE_BOOT_SIG_BLOCK_SIZE))).toBe(
-      true,
-    );
+    expect(
+      ourBlock.subarray(1200, SECURE_BOOT_SIG_BLOCK_SIZE).equals(refBlock.subarray(1200, SECURE_BOOT_SIG_BLOCK_SIZE)),
+    ).toBe(true);
   });
 
   it('refuses to sign an image that already carries a signature sector', () => {
@@ -87,5 +88,19 @@ describe('secure boot v2 signer', () => {
     const ours = signSecureBootImage(image, keyPem);
     expect(verifySecureBootImage(ours, keyPem).keyDigest).toBe(secureBootKeyDigest(createPrivateKey(keyPem)));
     expect(publicKeyFingerprint(createPrivateKey(keyPem))).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  describe('lab key guard', () => {
+    const labDir = join(__dirname, '../../../../attractap/firmware/lab/secure-boot');
+
+    it.each(['lab-signing-key.pem', 'lab-recovery-key.pem'])('refuses to sign with %s', (file) => {
+      const pem = readFileSync(join(labDir, file)).toString();
+      expect(LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(createPrivateKey(pem)))).toBe(true);
+      expect(() => signSecureBootImage(image, pem)).toThrow(/device-lab/);
+    });
+
+    it('does not block other keys', () => {
+      expect(LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(createPrivateKey(keyPem)))).toBe(false);
+    });
   });
 });

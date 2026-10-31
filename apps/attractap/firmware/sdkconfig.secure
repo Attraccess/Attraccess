@@ -20,11 +20,11 @@ CONFIG_SECURE_BOOT_V2_RSA_ENABLED=y
 # CONFIG_SECURE_BOOT_INSECURE is not set
 # CONFIG_SECURE_BOOT_ENABLE_AGGRESSIVE_KEY_REVOKE is not set
 # CONFIG_SECURE_BOOT_SKIP_WRITE_PROTECTION_SCA is not set
-# The NVS and DS HMAC keys are burned read-protected by the app after Secure
-# Boot is on, so the bootloader must not lock RD_DIS on first boot.
-# TODO(ATT-1166 conversion protocol): the app must burn WR_DIS_RD_DIS once both
-# keys exist; until then RD_DIS stays writable. Required before any variant is
-# marked secure-profile hardware-tested.
+# Decided design (RD_DIS): the bootloader leaves eFuse read protection open
+# (RD_DIS stays writable) because the NVS (KEY4) and DS (KEY3) HMAC keys are burned
+# read-protected by the secure app after Secure Boot is on. Right after it burns
+# both keys, the secure app MUST write-protect RD_DIS (WR_DIS_RD_DIS). The server
+# may mark a reader "secured" only once the eFuse report shows that lock.
 CONFIG_SECURE_BOOT_V2_ALLOW_EFUSE_RD_DIS=y
 
 # --- Flash encryption: release mode, XTS-AES-128 (256-bit key) ---

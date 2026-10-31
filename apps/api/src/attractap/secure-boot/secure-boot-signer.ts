@@ -114,9 +114,21 @@ function buildSignatureBlock(digest: Buffer, publicKey: SecureBootPublicKey, sig
  * sector, RSA-PSS(SHA-256, salt 32) over the padded contents, then append a
  * 4 KB signature sector holding the block (unused space 0xFF).
  */
+/**
+ * eFuse digests of the public device-lab keys (apps/attractap/firmware/lab/secure-boot).
+ * Anyone can sign with them, so they must never sign a customer image.
+ */
+export const LAB_SECURE_BOOT_KEY_DIGESTS: ReadonlySet<string> = new Set([
+  'fd0e62812a67e20c36a85321733343e8ebd420e2d7940bbfd49ac9e1c502b29d', // lab signing key
+  '65c97f279aa20b82d134fd6cc0eeb39d51e42a50d9c3d771f25b42e6487fafd9', // lab recovery key
+]);
+
 export function signSecureBootImage(image: Buffer, privateKeyPem: string | KeyObject): Buffer {
   const privateKey = typeof privateKeyPem === 'string' ? createPrivateKey(privateKeyPem) : privateKeyPem;
   const publicKey = extractPublicKey(privateKey);
+  if (LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(privateKey))) {
+    throw new Error('Refusing to sign with a public device-lab Secure Boot key');
+  }
   if (hasSignatureSector(image)) {
     throw new Error('Image already carries a signature sector');
   }
