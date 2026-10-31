@@ -110,11 +110,6 @@ function buildSignatureBlock(digest: Buffer, publicKey: SecureBootPublicKey, sig
 }
 
 /**
- * Sign an image the way `espsecure sign-data --version 2` does: pad to a 4 KB
- * sector, RSA-PSS(SHA-256, salt 32) over the padded contents, then append a
- * 4 KB signature sector holding the block (unused space 0xFF).
- */
-/**
  * eFuse digests of the public device-lab keys (apps/attractap/firmware/lab/secure-boot).
  * Anyone can sign with them, so they must never sign a customer image.
  */
@@ -123,10 +118,33 @@ export const LAB_SECURE_BOOT_KEY_DIGESTS: ReadonlySet<string> = new Set([
   '65c97f279aa20b82d134fd6cc0eeb39d51e42a50d9c3d771f25b42e6487fafd9', // lab recovery key
 ]);
 
+/**
+ * SHA-256 of the lab keys' moduli (big-endian). Their primes are public, so anyone
+ * can derive another working key from the same modulus with a different exponent;
+ * the eFuse digest covers the exponent and would not catch that.
+ */
+const LAB_SECURE_BOOT_MODULUS_DIGESTS: ReadonlySet<string> = new Set([
+  '57b40bb3288d65e6d45854edb0c763ba93cf712aa262de98de078e0f2b68dbb9', // lab signing key
+  '520d9e203032ac50a7d2cf422af834348cc8221cbf83ec1f1e647cf196971843', // lab recovery key
+]);
+
+function isLabKey(key: KeyObject): boolean {
+  const modulus = Buffer.from(toPublicKey(key).export({ format: 'jwk' }).n as string, 'base64url');
+  return (
+    LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(key)) ||
+    LAB_SECURE_BOOT_MODULUS_DIGESTS.has(createHash('sha256').update(modulus).digest('hex'))
+  );
+}
+
+/**
+ * Sign an image the way `espsecure sign-data --version 2` does: pad to a 4 KB
+ * sector, RSA-PSS(SHA-256, salt 32) over the padded contents, then append a
+ * 4 KB signature sector holding the block (unused space 0xFF).
+ */
 export function signSecureBootImage(image: Buffer, privateKeyPem: string | KeyObject): Buffer {
   const privateKey = typeof privateKeyPem === 'string' ? createPrivateKey(privateKeyPem) : privateKeyPem;
   const publicKey = extractPublicKey(privateKey);
-  if (LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(privateKey))) {
+  if (isLabKey(privateKey)) {
     throw new Error('Refusing to sign with a public device-lab Secure Boot key');
   }
   if (hasSignatureSector(image)) {

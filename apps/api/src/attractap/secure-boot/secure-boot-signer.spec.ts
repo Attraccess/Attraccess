@@ -101,6 +101,45 @@ describe('secure boot v2 signer', () => {
 
     it('does not block other keys', () => {
       expect(LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(createPrivateKey(keyPem)))).toBe(false);
+      expect(() => signSecureBootImage(image, keyPem)).not.toThrow();
+    });
+
+    it('refuses a key derived from a lab modulus with a different exponent', () => {
+      // The lab primes are public, so anyone can build a working key with e = 65539.
+      const lab = createPrivateKey(readFileSync(join(labDir, 'lab-signing-key.pem'))).export({ format: 'jwk' });
+      const big = (v: string) => BigInt(`0x${Buffer.from(v, 'base64url').toString('hex')}`);
+      const b64 = (v: bigint) => {
+        const hex = v.toString(16);
+        return Buffer.from(hex.length % 2 ? `0${hex}` : hex, 'hex').toString('base64url');
+      };
+      const inverse = (a: bigint, m: bigint): bigint => {
+        let [r0, r1, s0, s1] = [a % m, m, 1n, 0n];
+        while (r1 !== 0n) {
+          const q = r0 / r1;
+          [r0, r1, s0, s1] = [r1, r0 - q * r1, s1, s0 - q * s1];
+        }
+        return ((s0 % m) + m) % m;
+      };
+      const [p, q, e] = [big(lab.p as string), big(lab.q as string), 65539n];
+      const gcd = (a: bigint, b: bigint): bigint => (b === 0n ? a : gcd(b, a % b));
+      const lambda = ((p - 1n) * (q - 1n)) / gcd(p - 1n, q - 1n);
+      const d = inverse(e, lambda);
+      const forged = createPrivateKey({
+        format: 'jwk',
+        key: {
+          kty: 'RSA',
+          n: lab.n,
+          e: b64(e),
+          d: b64(d),
+          p: lab.p,
+          q: lab.q,
+          dp: b64(d % (p - 1n)),
+          dq: b64(d % (q - 1n)),
+          qi: b64(inverse(q, p)),
+        },
+      });
+      expect(LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(forged))).toBe(false);
+      expect(() => signSecureBootImage(image, forged)).toThrow(/device-lab/);
     });
   });
 });
