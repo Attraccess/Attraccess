@@ -84,6 +84,8 @@ Setzen Sie die Umgebungsvariable `TRUST_PROXY` auf die Anzahl vertrauenswuerdige
 > [!WARNING]
 > Vertrauen Sie nur so vielen Hops, wie tatsaechlich existieren. Vertraut `TRUST_PROXY` mehr Hops als Ihre reale Proxy-Kette, koennen Clients `X-Forwarded-For` faelschen, ihre scheinbare IP rotieren und das Rate-Limiting umgehen. Nicht gesetzt vertraut Attraccess keinen Weiterleitungs-Headern (sicherer Standard). Aenderungen werden nach einem Neustart wirksam.
 
+Dieselbe Client-IP gilt für die Begrenzungen der Anfragen zur [Attractap-Reader-Kopplung](attractap/pairing.md) (pro Adresse). Stellen Sie außerdem sicher, dass der Proxy den Header `Sec-WebSocket-Protocol` durchreicht, über den Reader ihre verschlüsselte Verbindung wählen.
+
 ## Freigegebene Websites
 
 Nur freigegebene Websites dürfen eine angemeldete Browser-Sitzung verwenden. Andere Websites können keine API-Antworten lesen, und ihre datenändernden Anfragen (`POST`, `PUT`, `PATCH`, `DELETE`) werden mit `403` abgelehnt. Das gilt auch für Websites unter derselben übergeordneten Domain, z.B. `help.kunde.de` neben `attraccess.kunde.de`.

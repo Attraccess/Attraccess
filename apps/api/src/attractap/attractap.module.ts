@@ -22,7 +22,22 @@ import { AttractapBillingHandler } from './websockets/handlers/billing/billing.h
 import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
 import { AttractapSupervisionHandler } from './websockets/handlers/supervision/supervision.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
+import {
+  Attractap,
+  AttractapCrashReport,
+  AttractapCredentialEvent,
+  AttractapInstallation,
+  NFCCard,
+  Resource,
+  User,
+} from '@attraccess/database-entities';
+import { AttractapPairingController } from './pairing.controller';
+import { CredentialRegistryService } from './security/credential-registry.service';
+import { HandshakeLimiter } from './security/handshake-limiter';
+import { InstallationIdentityService } from './security/installation-identity.service';
+import { PairingService } from './security/pairing.service';
+import { ReaderSessionService } from './security/reader-session.service';
+import { SessionMetrics } from './security/session-metrics';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -46,12 +61,21 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
 import { AuditModule } from '../audit/audit.module';
+import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    TypeOrmModule.forFeature([Attractap, AttractapCrashReport, NFCCard, Resource, User]),
+    TypeOrmModule.forFeature([
+      Attractap,
+      AttractapCrashReport,
+      AttractapCredentialEvent,
+      AttractapInstallation,
+      NFCCard,
+      Resource,
+      User,
+    ]),
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,
@@ -69,11 +93,18 @@ import { SettingsModule } from '../settings/settings.module';
     MassIntroductionModule,
     NotificationsModule,
     AuditModule,
+    DeviceEnrollmentModule,
     SettingsModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
   ],
   providers: [
+    { provide: HandshakeLimiter, useFactory: () => new HandshakeLimiter() },
+    InstallationIdentityService,
+    CredentialRegistryService,
+    PairingService,
+    ReaderSessionService,
+    SessionMetrics,
     CardAccessService,
     AttractapService,
     WebsocketService,
@@ -99,6 +130,7 @@ import { SettingsModule } from '../settings/settings.module';
     AttractapNfcCardsController,
     AttractapFirmwareController,
     ResourceAttractapsController,
+    AttractapPairingController,
   ],
 })
 export class AttractapModule {}

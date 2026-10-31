@@ -1,5 +1,12 @@
 import type { DataSource } from 'typeorm';
-import { Attractap, AttractapCrashReport, Resource, ResourceBillingConfiguration } from '@attraccess/database-entities';
+import {
+  Attractap,
+  AttractapCrashReport,
+  AttractapCredentialEvent,
+  AttractapInstallation,
+  Resource,
+  ResourceBillingConfiguration,
+} from '@attraccess/database-entities';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationReaderSeeds(dataSource: DataSource, seedTag: string, resource: Resource) {
   const attractapRepo = dataSource.getRepository(Attractap);
@@ -34,6 +41,25 @@ export async function migrationReaderSeeds(dataSource: DataSource, seedTag: stri
     firmwareVersion: '1.0.0',
     coredumpSize: null,
     coredump: null,
+  }));
+
+  await ensureEntity(dataSource.getRepository(AttractapCredentialEvent), () => ({
+    readerId: attractap.id,
+    readerName: attractap.name,
+    keyFingerprint: `seed-fingerprint-${seedTag}`,
+    certificateSerial: '01',
+    state: 'paired' as const,
+    actorId: null,
+  }));
+
+  await ensureEntity(dataSource.getRepository(AttractapInstallation), () => ({
+    id: 1,
+    installationId: `seed-installation-${seedTag}`,
+    caCertificatePem: 'seed-ca-certificate',
+    caPrivateKeyEncrypted: 'seed-ca-key',
+    serverCertificatePem: 'seed-server-certificate',
+    serverPrivateKeyEncrypted: 'seed-server-key',
+    serverCertificateNotAfter: new Date('2030-01-01T00:00:00Z'),
   }));
 
   await ensureEntity(billingConfigRepo, () => ({

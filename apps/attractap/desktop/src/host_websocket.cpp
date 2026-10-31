@@ -110,6 +110,8 @@ void HostWebsocket::stop()
     }
     if (callback)
         runtime.post([callback = std::move(callback)] { callback(State::Disconnected); });
+    if (wasConnected.exchange(false))
+        publishConnection(false);
 }
 
 void HostWebsocket::enableConnectionAttempts()
@@ -131,14 +133,71 @@ void HostWebsocket::updateUrlFromSettings()
 
 bool HostWebsocket::send(const char *message, size_t length)
 {
-    if (message == nullptr || length == 0)
+    return enqueue(message, length, false);
+}
+
+bool HostWebsocket::sendBinary(const uint8_t *data, size_t length)
+{
+    return enqueue(reinterpret_cast<const char *>(data), length, true);
+}
+
+bool HostWebsocket::enqueue(const char *data, size_t length, bool binary)
+{
+    if (data == nullptr || length == 0)
         return false;
 
     std::lock_guard lock(mutex);
     if (outbound.size() == MaxQueuedMessages)
         return false;
-    outbound.emplace(message, length);
+    outbound.push({std::string(data, length), binary});
     return true;
+}
+
+void HostWebsocket::setSubprotocol(const std::string &value)
+{
+    std::lock_guard lock(mutex);
+    subprotocol = value;
+}
+
+void HostWebsocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> callback)
+{
+    std::lock_guard lock(mutex);
+    rawBinaryCallback = std::move(callback);
+}
+
+void HostWebsocket::setConnectionCallback(std::function<void(bool connected)> callback)
+{
+    std::lock_guard lock(mutex);
+    connectionCallback = std::move(callback);
+}
+
+void HostWebsocket::publishBinary(std::string data)
+{
+    std::function<bool(const uint8_t *, size_t)> callback;
+    std::shared_ptr<std::atomic_bool> lifetime;
+    {
+        std::lock_guard lock(mutex);
+        callback = rawBinaryCallback;
+        lifetime = callbackLifetime;
+    }
+    if (callback)
+        runtime.post([callback = std::move(callback), lifetime = std::move(lifetime), data = std::move(data)]
+                     {
+                         if (lifetime->load())
+                             callback(reinterpret_cast<const uint8_t *>(data.data()), data.size());
+                     });
+}
+
+void HostWebsocket::publishConnection(bool connected)
+{
+    std::function<void(bool)> callback;
+    {
+        std::lock_guard lock(mutex);
+        callback = connectionCallback;
+    }
+    // Not tied to the worker's lifetime: a close must always reach the owner, in order.
+    if (callback)
+        runtime.post([callback = std::move(callback), connected] { callback(connected); });
 }
 
 void HostWebsocket::publishState(State state)

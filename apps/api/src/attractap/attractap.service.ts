@@ -47,6 +47,16 @@ import * as en from './rfid-card-notification.en.json';
 
 export const t = createTranslator({ en, de });
 
+/** Written only by the credential registry; general reader updates must leave them alone. */
+const CREDENTIAL_COLUMNS = [
+  'pairingState',
+  'credentialFingerprint',
+  'pairedAt',
+  'certificateNotAfter',
+  'certificateSerial',
+  'apiTokenHash',
+] as const satisfies ReadonlyArray<keyof Attractap>;
+
 @Injectable()
 export class AttractapService {
   public constructor(
@@ -311,7 +321,12 @@ export class AttractapService {
       reader.resources = resources;
     }
 
-    const response = await this.readerRepository.save(reader);
+    // Credential columns are owned by the credential registry and change concurrently (pairing,
+    // revoke). Saving the stale copies loaded above would undo those changes.
+    const editable: Partial<Attractap> = { ...reader };
+    for (const column of CREDENTIAL_COLUMNS) delete editable[column];
+    await this.readerRepository.save(editable);
+    const response = (await this.findReaderById(id)) ?? reader;
 
     if (emitEvent) {
       this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));

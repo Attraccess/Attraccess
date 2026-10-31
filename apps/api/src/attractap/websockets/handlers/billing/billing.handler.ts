@@ -31,7 +31,7 @@ export class AttractapBillingHandler {
 
       const { amountCents } = data.payload as { amountCents: number };
       if (typeof amountCents !== 'number' || !Number.isInteger(amountCents) || amountCents <= 0) {
-        this.logger.warn(`BILLING_REQUEST_TOPUP invalid amount: ${JSON.stringify(data.payload)}`);
+        this.logger.warn(`BILLING_REQUEST_TOPUP invalid amount (${typeof amountCents})`);
         await socket.sendMessage(
           new AttractapEvent(AttractapEventType.BILLING_REQUEST_TOPUP, { error: 'INVALID_AMOUNT' }),
         );

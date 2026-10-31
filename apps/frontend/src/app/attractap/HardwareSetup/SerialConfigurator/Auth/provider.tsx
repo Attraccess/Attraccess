@@ -24,6 +24,7 @@ export interface ApiStatusData {
     | 'connecting_tcp'
     | 'connecting_websocket'
     | 'connected'
+    | 'pending_approval'
     | 'authenticating'
     | 'authenticated'
     | 'error_failed'
@@ -33,6 +34,10 @@ export interface ApiStatusData {
   port: number;
   deviceId: string;
   useSSL: boolean;
+  /** Set while a new reader waits for approval; rotates every 30 s. */
+  enrollmentCode?: string;
+  /** Time until the enrollment code rotates, sent together with the code. */
+  enrollmentRotatesInMs?: number;
 }
 
 export interface NetworkStatusData {
@@ -68,6 +73,8 @@ export type AttractapSerialCommContextValue = {
   setAuthCode: (code: string | null) => void;
   refreshPinStatus: () => Promise<void>;
   fetchConfiguration: () => Promise<AttractapConfiguration>;
+  /** Re-reads only the API status (no Wi-Fi scan) and merges it into the loaded configuration. */
+  refreshApiStatus: () => Promise<ApiStatusData>;
   sendAuthedCommand: <T = unknown>(
     topic: string,
     payload?: Record<string, unknown>,
@@ -254,6 +261,12 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
     }
   }, [sendAuthedCommand]);
 
+  const refreshApiStatus = useCallback(async () => {
+    const apiStatus = await sendAuthedCommand<ApiStatusData>('api.status.get', {});
+    setConfiguration((current) => (current ? { ...current, apiStatus } : current));
+    return apiStatus;
+  }, [sendAuthedCommand]);
+
   const value = useMemo(
     () => ({
       authCode,
@@ -264,6 +277,7 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
       setAuthCode,
       refreshPinStatus,
       fetchConfiguration,
+      refreshApiStatus,
       sendAuthedCommand,
     }),
     [
@@ -273,6 +287,7 @@ export function AttractapSerialCommProvider({ children }: PropsWithChildren) {
       isFetchingConfiguration,
       refreshPinStatus,
       fetchConfiguration,
+      refreshApiStatus,
       sendAuthedCommand,
     ],
   );

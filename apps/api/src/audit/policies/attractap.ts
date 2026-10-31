@@ -6,6 +6,14 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
   'card.linked': new Set(['readerId', 'source']),
   'card.unlinked': new Set(['readerId', 'source']),
   'reader.crash_reported': new Set(['source', 'resetReason', 'hasCoredump']),
+  'reader.enrolled': new Set(['method']),
+  'reader.pairing_confirmed': new Set(['mode', 'method']),
+  'reader.pairing_failed': new Set(['reason']),
+  'reader.pairing_expired': new Set(['reason']),
+  'reader.revoked': new Set(['reason']),
+  'reader.replaced': new Set(['mode']),
+  'reader.token_rejected': new Set(['reason']),
+  'reader.handshake_rejected': new Set(['reason', 'count']),
 };
 export const attractapResetReasons = new Set([
   'POWERON',
@@ -20,23 +28,29 @@ export const attractapResetReasons = new Set([
   'SDIO',
   'UNKNOWN',
 ]);
+type DetailValue = string | number | boolean;
+
+const detailValidators: Record<string, (value: DetailValue) => boolean> = {
+  source: oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset'),
+  resetReason: (value) => attractapResetReasons.has(value as string),
+  hasCoredump: (value) => typeof value === 'boolean',
+  readerId: positive,
+  count: positive,
+  mode: oneOf('new', 'pair', 'takeover'),
+  method: oneOf('code', 'led-pattern', 'flasher'),
+  reason: (value) => typeof value === 'string' && /^[a-z0-9-]{1,40}$/.test(value),
+};
+
 export function validAttractapDetails(
   action: AttractapAuditEvent['action'],
   details: Record<string, unknown>,
 ): boolean {
-  for (const [key, value] of Object.entries(details)) {
-    if (
-      !attractapDetails[action].has(key) ||
-      (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
-    )
-      return false;
-    if (key === 'source' && !oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset')(value))
-      return false;
-    if (key === 'resetReason' && !attractapResetReasons.has(value as string)) return false;
-    if (key === 'hasCoredump' && typeof value !== 'boolean') return false;
-    if (key === 'readerId' && !positive(value)) return false;
-  }
-  return true;
+  return Object.entries(details).every(
+    ([key, value]) =>
+      attractapDetails[action].has(key) &&
+      (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') &&
+      (detailValidators[key]?.(value) ?? true),
+  );
 }
 
 export function projectAttractapAuditEvent(input: AttractapAuditEvent): AttractapAuditEvent | null {
@@ -60,4 +74,12 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.card.linked',
   'attractap.card.unlinked',
   'attractap.reader.crash_reported',
+  'attractap.reader.enrolled',
+  'attractap.reader.pairing_confirmed',
+  'attractap.reader.pairing_failed',
+  'attractap.reader.pairing_expired',
+  'attractap.reader.revoked',
+  'attractap.reader.replaced',
+  'attractap.reader.token_rejected',
+  'attractap.reader.handshake_rejected',
 ];

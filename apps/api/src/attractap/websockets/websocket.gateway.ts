@@ -29,13 +29,24 @@ import { ResourceListService } from './handlers/resource-list/resource-list.serv
 import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
+
+import { CREDENTIAL_CHANGED_EVENT, PairingService } from '../security/pairing.service';
+import { ReaderSessionService } from '../security/reader-session.service';
+import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
+import { sanitizeForLVGL } from './websocket-lvgl';
+import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
 import { randomBytes } from 'crypto';
+import type { IncomingMessage } from 'http';
+
 import { closeSync } from 'fs';
 
-@WebSocketGateway({ path: '/api/attractap/websocket' })
+@WebSocketGateway({
+  path: '/api/attractap/websocket',
+  ...readerWebSocketOptions,
+})
 @UseInterceptors(WsMetricsInterceptor)
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -95,6 +106,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(AttractapMassIntroductionHandler)
   protected massIntroductionHandler: AttractapMassIntroductionHandler;
+
+  @Inject(PairingService)
+  protected pairingService: PairingService;
+
+  @Inject(ReaderSessionService)
+  protected readerSessionService: ReaderSessionService;
 
   protected readonly connectedAt = new WeakMap<object, bigint>();
 
@@ -164,6 +181,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
     },
     [AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]: () => undefined,
+    [AttractapEventType.READER_START_PAIRING]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.REQUEST_RESOURCE_LIST]: (socket, eventData) =>
       this.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId }),
     [AttractapEventType.RESOURCE_LIST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
@@ -224,7 +242,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    await Promise.all(sockets.map((socket) => socket.close()));
+    // A session socket whose credential changed must not linger in a closing handshake.
+    await Promise.all(sockets.map((socket) => (socket.transport === 'session' ? socket.terminate() : socket.close())));
+  }
+
+  /** Revoked or re-paired credentials end live sessions immediately. */
+  @OnEvent(CREDENTIAL_CHANGED_EVENT)
+  public async onCredentialChanged(readerId: number) {
+    await this.disconnectReader(readerId);
   }
 
   public async startEnrollOfNewNfcCard(data: {
@@ -245,65 +270,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     apiTokenId?: number;
   }) {
     return this.cardHandler.startResetOfNfcCard(data);
-  }
-
-  protected makeStringLVGLReady(input: string): string {
-    if (!input) return input;
-
-    // Step 1: Explicit replacements for unsupported punctuation and symbols
-    const explicitReplacements: Array<[RegExp, string]> = [
-      // Common symbols and punctuation
-      [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
-      [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
-      [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
-      [/\u2026/g, '...'], // ellipsis
-      [/\u2022/g, '-'], // bullet -> hyphen
-      [/\u2122/g, 'TM'], // trademark
-    ];
-
-    let output = input;
-    for (const [pattern, replacement] of explicitReplacements) {
-      output = output.replace(pattern, replacement);
-    }
-
-    // The reader's Latin-1 fonts cover printable ASCII plus U+00A0-U+00FF.
-    // Normalize only unsupported code points so existing Latin-1 glyphs survive.
-    return Array.from(output)
-      .map((character) => {
-        if (/^[\n\r\t\x20-\x7E\xA0-\xFF]$/.test(character)) {
-          return character;
-        }
-
-        const fallback = character.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        return /^[\x20-\x7E]*$/.test(fallback) ? fallback : '?';
-      })
-      .join('');
-  }
-
-  protected sanitizeForLVGL<T>(value: T): T {
-    const seen = new WeakSet<object>();
-
-    const sanitize = (v: unknown): unknown => {
-      if (typeof v === 'string') return this.makeStringLVGLReady(v);
-      if (v === null || v === undefined) return v;
-      if (Array.isArray(v)) return v.map((item) => sanitize(item));
-      if (typeof v === 'object') {
-        const obj = v as Record<string, unknown>;
-        if (seen.has(obj)) return obj;
-        seen.add(obj);
-        const out: Record<string, unknown> = {};
-        for (const [k, val] of Object.entries(obj)) {
-          // Select options and draft values are protocol values: changing them
-          // prevents the firmware from submitting the value the API validates.
-          // Object-based options contain display metadata such as placeholders.
-          out[k] = (k === 'options' && Array.isArray(val)) || k === 'value' || k === 'answers' ? val : sanitize(val);
-        }
-        return out;
-      }
-      return v;
-    };
-
-    return sanitize(value) as T;
   }
 
   protected async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
@@ -362,6 +328,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @SubscribeMessage('HEARTBEAT')
   public async onHeartbeat(@ConnectedSocket() socket: AuthenticatedWebSocket) {
+    // No socket state = pairing connection; violation = plain text frame on a session.
+    if (!socket.state || socket.sessionViolation) return;
     this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
     try {
@@ -378,8 +346,19 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     @MessageBody() eventData: AttractapEvent['data'],
     @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
+    // No socket state = pairing connection; violation = plain text frame on a session.
+    if (!socket.state || socket.sessionViolation) return;
+    if (
+      socket.transport === 'session' &&
+      [AttractapEventType.READER_REGISTER, AttractapEventType.READER_AUTHENTICATE].includes(eventData?.type)
+    ) {
+      // The certificate is the identity inside a session; token flows are not allowed.
+      this.logger.warn(`Closing session ${socket.id}: ${eventData.type} is not allowed inside a session`);
+      socket.terminate();
+      return;
+    }
     if (eventData.type.startsWith('ACK_')) {
-      this.logger.debug(`Received ACK response from client ${socket.id}: ${JSON.stringify(eventData)}`);
+      this.logger.debug(`Received ${eventData.type} from client ${socket.id}`);
 
       this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
       return;
@@ -395,7 +374,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     await this.clientWasActive(socket);
 
-    this.logger.debug(`Received event from client ${socket.id}: ${JSON.stringify(eventData)}`);
+    this.logger.debug(`Received event ${eventData.type} from client ${socket.id}`);
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);
@@ -408,7 +387,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
   }
 
-  public async handleConnection(client: WebSocket) {
+  public async handleConnection(client: WebSocket, request?: IncomingMessage) {
+    if (client.protocol === PAIRING_SUBPROTOCOL) {
+      // Unlicensed installations take no pairing requests (the service closes the socket).
+      const licensed = this.licenseService.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] });
+      licensed.catch(() => this.logger.error('Closing pairing connection due to license error'));
+      this.pairingService.handleConnection(client, request as IncomingMessage, licensed.then(() => undefined));
+      return;
+    }
+    // Taken over before the first await: early TLS bytes must not be missed and a stray text
+    // frame must be flagged before the framework's own message listener sees it.
+    const session = client.protocol === SESSION_SUBPROTOCOL ? this.readerSessionService.open(client) : null;
+
     this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
 
@@ -419,6 +409,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     } catch (error) {
       this.logger.error('Closing connection due to license error');
       this.logger.error(error);
+      session?.close();
       client.close();
       return;
     }
@@ -447,10 +438,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
             socket.state.readerAuthenticationAttempt !== authenticationAttempt)
         )
           return false;
-        this.logger.debug(
-          `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-          message.data.payload,
-        );
+        // Never the payload: it can carry tokens and card keys.
+        this.logger.debug(`Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`);
         // An older auth/update retry must not restore a superseded default.
         if (
           (message.data.type === AttractapEventType.READER_AUTHENTICATED ||
@@ -459,7 +448,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         ) {
           message.data.payload.language = this.websocketService.readerLanguage;
         }
-        const stringifiedMessage = JSON.stringify(this.sanitizeForLVGL(message));
+        const stringifiedMessage = JSON.stringify(sanitizeForLVGL(message));
         client.send(stringifiedMessage);
 
         this.logger.debug(
@@ -510,6 +499,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         massIntroductionFlow: null,
       },
     });
+
+    if (session) {
+      // The reader is registered only once its certificate has been accepted.
+      await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
+        this.websocketService.sockets.set(socket.id, socket);
+        this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+      });
+      return;
+    }
 
     this.websocketService.sockets.set(id, client as unknown as AuthenticatedWebSocket);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);

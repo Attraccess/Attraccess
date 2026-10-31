@@ -32,6 +32,16 @@ void HostWebsocket::run()
             return;
         }
 
+        std::string protocol;
+        {
+            std::lock_guard lock(mutex);
+            protocol = subprotocol;
+        }
+        // The subprotocol selects the reader channel (session / pairing); none is the token channel.
+        curl_slist *headers = nullptr;
+        if (!protocol.empty())
+            headers = curl_slist_append(headers, ("Sec-WebSocket-Protocol: " + protocol).c_str());
+        curl_easy_setopt(connection, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(connection, CURLOPT_URL, url.c_str());
         curl_easy_setopt(connection, CURLOPT_CONNECT_ONLY, 2L);
         curl_easy_setopt(connection, CURLOPT_CONNECTTIMEOUT_MS, 5000L);
@@ -47,6 +57,7 @@ void HostWebsocket::run()
             if (!stopRequested.load())
                 publishError(curl_easy_strerror(connected));
             curl_easy_cleanup(connection);
+            curl_slist_free_all(headers);
             for (auto slept = 0ms; slept < reconnectDelay && !stopRequested.load(); slept += 100ms)
                 std::this_thread::sleep_for(100ms);
             reconnectDelay = std::min(reconnectDelay * 2, 30s);
@@ -55,6 +66,8 @@ void HostWebsocket::run()
 
         reconnectDelay = 1s;
         publishState(State::Connected);
+        wasConnected.store(true);
+        publishConnection(true);
         std::string inbound;
         bool inboundIsText = false;
         std::array<char, 4096> buffer{};
@@ -62,11 +75,13 @@ void HostWebsocket::run()
         while (open && !stopRequested.load())
         {
             std::string outboundMessage;
+            bool outboundBinary = false;
             {
                 std::lock_guard lock(mutex);
                 if (!outbound.empty())
                 {
-                    outboundMessage = std::move(outbound.front());
+                    outboundMessage = std::move(outbound.front().data);
+                    outboundBinary = outbound.front().binary;
                     outbound.pop();
                 }
             }
@@ -77,7 +92,8 @@ void HostWebsocket::run()
                 {
                     size_t sent = 0;
                     const CURLcode sentResult = curl_ws_send(connection, outboundMessage.data() + offset,
-                                                             outboundMessage.size() - offset, &sent, 0, CURLWS_TEXT);
+                                                             outboundMessage.size() - offset, &sent, 0,
+                                                             outboundBinary ? CURLWS_BINARY : CURLWS_TEXT);
                     offset += sent;
                     if (sentResult == CURLE_AGAIN)
                     {
@@ -120,13 +136,6 @@ void HostWebsocket::run()
                 continue;
             if (inbound.empty())
                 inboundIsText = isWebsocketFrame(frame);
-            if (!inboundIsText)
-            {
-                publishError("Host WebSocket transport does not accept binary frames");
-                open = false;
-                continue;
-            }
-
             if (received > MaxInboundMessageBytes - inbound.size())
             {
                 publishError("Host WebSocket message exceeds the maximum size");
@@ -136,14 +145,20 @@ void HostWebsocket::run()
             inbound.append(buffer.data(), received);
             if (frame->bytesleft == 0 && (frame->flags & CURLWS_CONT) == 0)
             {
-                publishMessage(std::move(inbound));
+                if (inboundIsText)
+                    publishMessage(std::move(inbound));
+                else
+                    publishBinary(std::move(inbound)); // TLS records of the session channel
                 inbound.clear();
                 inboundIsText = false;
             }
         }
 
         curl_easy_cleanup(connection);
+        curl_slist_free_all(headers);
         publishState(State::Disconnected);
+        if (wasConnected.exchange(false))
+            publishConnection(false);
         for (auto slept = 0ms; slept < reconnectDelay && !stopRequested.load(); slept += 100ms)
             std::this_thread::sleep_for(100ms);
         reconnectDelay = std::min(reconnectDelay * 2, 30s);

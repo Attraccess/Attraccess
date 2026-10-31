@@ -91,6 +91,36 @@ it('assembles configuration and settles loading on success and failure', async (
   await act(async () => expect(result.current.fetchConfiguration()).rejects.toThrow('Disconnected'));
   expect(result.current.isFetchingConfiguration).toBe(false);
 });
+it('refreshes only the API status, without a Wi-Fi scan or the loading flag', async () => {
+  const { result } = renderHook(() => useAttractapSerialComm(), { wrapper });
+  state.send
+    .mockResolvedValueOnce('{"wifi_connected":true}')
+    .mockResolvedValueOnce('{"status":"connected"}')
+    .mockResolvedValueOnce('[{"ssid":"Lab"}]');
+  await act(() => result.current.fetchConfiguration());
+  state.send.mockClear();
+
+  state.send.mockResolvedValueOnce('{"status":"pending_approval","enrollmentCode":"K7P-3XQ"}');
+  const fetching: boolean[] = [];
+  await act(async () => {
+    const pending = result.current.refreshApiStatus();
+    fetching.push(result.current.isFetchingConfiguration);
+    await expect(pending).resolves.toEqual({ status: 'pending_approval', enrollmentCode: 'K7P-3XQ' });
+  });
+  fetching.push(result.current.isFetchingConfiguration);
+
+  expect(state.send).toHaveBeenCalledTimes(1);
+  expect(state.send).toHaveBeenCalledWith({ topic: 'api.status.get', payload: undefined }, true, 15000);
+  expect(fetching).toEqual([false, false]);
+  expect(result.current.configuration).toEqual({
+    networkStatus: { wifi_connected: true },
+    apiStatus: { status: 'pending_approval', enrollmentCode: 'K7P-3XQ' },
+    wifiNetworks: [{ ssid: 'Lab' }],
+  });
+
+  state.send.mockRejectedValueOnce(new Error('Disconnected'));
+  await act(async () => expect(result.current.refreshApiStatus()).rejects.toThrow('Disconnected'));
+});
 it('initializes after device startup and cancels initialization on unmount', async () => {
   vi.useFakeTimers();
   state.send.mockResolvedValue('{"pinIsSet":true}');

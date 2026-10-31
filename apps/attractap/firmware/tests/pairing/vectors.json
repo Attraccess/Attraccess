@@ -1,0 +1,149 @@
+{
+  "description": "Key-bound pairing code vectors. digest=SHA-256 of length-prefixed (uint32 BE) tag,Pr,Ps,Nr,Ns; code = first 8 bytes big-endian mod 31^6 in base 31 (alphabet 23456789ABCDEFGHJKMNPQRSTUVWXYZ, most significant first); pattern[i] = [red,green,blue,yellow,white,magenta][uint16BE(digest[8+2i]) mod 6]; commitment = SHA-256 of length-prefixed tag,Ps,Pr,Ns. Tags: attractap-pairing-code-v1 / attractap-pairing-commit-v1. Run by the API jest tests and the firmware host tests.",
+  "vectors": [
+    {
+      "readerPublicKey": "X7T3eWqjt0/1SaXBdRB2Jkr5tDN2qljIYfnQsS0BX45ftPd5aqO3T/VJpcF1EHYmSvm0M3aqWMhh+dCxLQFfjg==",
+      "serverPublicKey": "3ov02zSYLu76vu3MFe2sStyrZkzzN/Wjk8d0HC6ANrjei/TbNJgu7vq+7cwV7axK3KtmTPM39aOTx3QcLoA2uA==",
+      "readerNonce": "L6wL0FJ31sYpR/X+Q4W/Pg==",
+      "serverNonce": "FL+0tJiVGT1V3S+A1DlzMw==",
+      "commitment": "ifuo2fysp7oyH8aqkAlCUiVoX+qlPLRoRTA0qvfKwPM=",
+      "code": "B8TQ6D",
+      "pattern": [
+        "blue",
+        "red",
+        "yellow",
+        "white",
+        "blue",
+        "green",
+        "red",
+        "magenta"
+      ]
+    },
+    {
+      "readerPublicKey": "Xuf8IP2HJZ/6V7YsLQZo29VbI+kRnWb06Ad2RZ5GJ7he5/wg/Ycln/pXtiwtBmjb1Vsj6RGdZvToB3ZFnkYnuA==",
+      "serverPublicKey": "DAGTHUutuXwvUlN7916pz0Hw3tWlsA7pbK4fzZYy01YMAZMdS625fC9SU3v3XqnPQfDe1aWwDulsrh/NljLTVg==",
+      "readerNonce": "PoVPB7gWuDT+vdVG/L7DCG4=",
+      "serverNonce": "TSsz0d/d17vzjXWyj9+i5w==",
+      "commitment": "o0SxQNRPrsx5MiZusffrM/exCQ55H0s2sO4uDVaGRQM=",
+      "code": "KTDFRX",
+      "pattern": [
+        "magenta",
+        "magenta",
+        "magenta",
+        "red",
+        "green",
+        "red",
+        "yellow",
+        "blue"
+      ]
+    },
+    {
+      "readerPublicKey": "0lF4mkiO7TVxdfyyrBlNeSopxi8Ki6GAsilDoq1TZ07SUXiaSI7tNXF1/LKsGU15KinGLwqLoYCyKUOirVNnTg==",
+      "serverPublicKey": "GlDTMf5jb4/o5LZn4H15cdEuuPc6u1TueqvrGXoCIzMaUNMx/mNvj+jktmfgfXlx0S649zq7VO56q+sZegIjMw==",
+      "readerNonce": "wC4th3ELgm9f0g6zXoWZHOFX",
+      "serverNonce": "3lo3pjBUQueir0kif1RYkg==",
+      "commitment": "9W3x+wmVZhw9lHhoDI9u5FKK4kalV6z9ig5iZ+7JEjs=",
+      "code": "KABXF4",
+      "pattern": [
+        "white",
+        "green",
+        "green",
+        "magenta",
+        "magenta",
+        "magenta",
+        "white",
+        "yellow"
+      ]
+    },
+    {
+      "readerPublicKey": "Zy12Id3TGMXmJ0KYWYGBC5EIzwz6MhKpSIXRMsReUednLXYh3dMYxeYnQphZgYELkQjPDPoyEqlIhdEyxF5R5w==",
+      "serverPublicKey": "ItV6Vr7mW+wK4409+rhBEzijBPiTQXK3VXqyytIBjZki1XpWvuZb7ArjjT36uEETOKME+JNBcrdVerLK0gGNmQ==",
+      "readerNonce": "BawsreJQQHHZDh55+AdMFBg6sQ==",
+      "serverNonce": "IypX5y5mBK8pzWcyt97OZA==",
+      "commitment": "rfQh12ZykDbgaN+2S6Wvjn+Lw+ZuztvRGsZ8zEE8wOI=",
+      "code": "26CAUE",
+      "pattern": [
+        "red",
+        "red",
+        "magenta",
+        "blue",
+        "green",
+        "magenta",
+        "blue",
+        "yellow"
+      ]
+    },
+    {
+      "readerPublicKey": "cXWKl+6Q5V/fWNj6hBX4eNieunPZpeZa5yj0vn0CEiNxdYqX7pDlX99Y2PqEFfh42J66c9ml5lrnKPS+fQISIw==",
+      "serverPublicKey": "tU80xxSxqXW0/I71brhJDQbUZWAFLCQcQsW0jvHk1uO1TzTHFLGpdbT8jvVuuEkNBtRlYAUsJBxCxbSO8eTW4w==",
+      "readerNonce": "azSzf1WngxhKiL0Ipu+AQZwMQMs=",
+      "serverNonce": "Yt10iW6pEaBlsWonVHymPA==",
+      "commitment": "aXcLz3fLpVFjZgY97GKJ7VIEWBzvHCh6WMyYdLpoRdE=",
+      "code": "93GEPB",
+      "pattern": [
+        "yellow",
+        "yellow",
+        "magenta",
+        "red",
+        "red",
+        "white",
+        "green",
+        "yellow"
+      ]
+    },
+    {
+      "readerPublicKey": "V5WXalEpytrxJiQHO7PzGsoDlw76gzoUYcOM8skC9qdXlZdqUSnK2vEmJAc7s/MaygOXDvqDOhRhw4zyyQL2pw==",
+      "serverPublicKey": "w7l80YQe2Y4eUVcU1PgDVWAR+BDjenCTk7N9yTa+YkvDuXzRhB7Zjh5RVxTU+ANVYBH4EON6cJOTs33JNr5iSw==",
+      "readerNonce": "QrADmuqk3qk7lTjta3Ge33l2HyUI",
+      "serverNonce": "fQH9/dkGUGOUU0aVkSzcbw==",
+      "commitment": "7Ml9gCyQd3W8iDIOOOeFgIYc7k2Ue8Bya+8xlYgHdLc=",
+      "code": "6FP9W3",
+      "pattern": [
+        "white",
+        "blue",
+        "blue",
+        "white",
+        "red",
+        "green",
+        "green",
+        "red"
+      ]
+    },
+    {
+      "readerPublicKey": "6ydzFSAxnbgiGmlcVjZ7GY0cfGRSdR5Pw7yUW3bHye/rJ3MVIDGduCIaaVxWNnsZjRx8ZFJ1Hk/DvJRbdsfJ7w==",
+      "serverPublicKey": "n903QkVrIG+sfQHNjqxg5A7SoYcrf+/g/K3peuVTv86f3TdCRWsgb6x9Ac2OrGDkDtKhhyt/7+D8rel65VO/zg==",
+      "readerNonce": "zjsBBBGLeS9vE7Q3xymISl0RX+zoDg==",
+      "serverNonce": "38X/A9pO8y8dvXGqSNAjsw==",
+      "commitment": "Dvogh7O/3vyYO4KO+Bj5tUfTl9cmYBAobZYFlIcC9NE=",
+      "code": "EUWETX",
+      "pattern": [
+        "magenta",
+        "yellow",
+        "red",
+        "yellow",
+        "magenta",
+        "white",
+        "red",
+        "blue"
+      ]
+    },
+    {
+      "readerPublicKey": "rNojxLNhSr9ymgOsRzJBfXyEgw1wliZ2xm+LXRzrbJys2iPEs2FKv3KaA6xHMkF9fISDDXCWJnbGb4tdHOtsnA==",
+      "serverPublicKey": "JdDjjFlVSwbYuoRllX0oFvByE0wBxiumPigL4pkkNx0l0OOMWVVLBti6hGWVfSgW8HITTAHGK6Y+KAvimSQ3HQ==",
+      "readerNonce": "FJv+TQoCwePXRtCBWbowZMwePcHYfMQ=",
+      "serverNonce": "KJlh+yLGhGlI7cbo4rgBbA==",
+      "commitment": "Z2e2WRbbbzvoNrULV0Y2hXBgIN1LLu2zjekLblSYA2M=",
+      "code": "S5D3NE",
+      "pattern": [
+        "yellow",
+        "yellow",
+        "white",
+        "yellow",
+        "blue",
+        "yellow",
+        "blue",
+        "magenta"
+      ]
+    }
+  ]
+}

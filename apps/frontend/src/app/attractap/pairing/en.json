@@ -1,0 +1,123 @@
+{
+  "state": {
+    "unpaired": "Not paired",
+    "paired": "Paired",
+    "revoked": "Pairing removed",
+    "waiting": "Pairing…"
+  },
+  "dialog": {
+    "title": "Pair reader",
+    "insecureWarning": "This page does not use a secure connection. Someone on your network could show you a fake code, and a code you type here could be read by others. Check the code on the reader itself and pair only on a network you trust.",
+    "chooseMode": "What is this reader?",
+    "mode": {
+      "new": "A new reader",
+      "takeover": "A reader that takes over one I already have (after a reset or as a replacement)"
+    },
+    "targetReader": "Which reader?",
+    "connectionLost": "Connection to the server lost. The status shown here may be out of date.",
+    "colour": {
+      "red": "Red",
+      "green": "Green",
+      "blue": "Blue",
+      "yellow": "Yellow",
+      "white": "White",
+      "magenta": "Magenta"
+    },
+    "cancel": "Cancel",
+    "close": "Close",
+    "completed": "The reader is paired.",
+    "failed": "Pairing failed. The reader starts over with a new code by itself.",
+    "expired": "Pairing timed out. The reader starts over with a new code.",
+    "cancelled": "Pairing was cancelled.",
+    "reason": {
+      "cancelled-at-reader": "It was cancelled at the reader.",
+      "cancelled-by-admin": "It was cancelled in the admin interface.",
+      "reader-disconnected": "The reader disconnected before pairing finished.",
+      "protocol": "Something went wrong on the reader. Try again.",
+      "internal": "An error occurred on the server.",
+      "expired": "The reader was not approved within 10 minutes."
+    },
+    "waitingForReader": "Waiting for the reader…",
+    "findHint": "Enter the code shown on the reader.",
+    "codeLabel": "Code on the reader",
+    "typeCode": "Enter the code the reader shows right now.",
+    "scan": "Scan",
+    "scanTitle": "Scan the QR code on the reader",
+    "find": "Continue",
+    "approve": "Approve",
+    "paired": "Reader paired",
+    "codeFound": "Reader found for code {{code}}.",
+    "takesOver": "This reader takes over {{name}}.",
+    "nameLabel": "Name (optional)",
+    "liteHint": "For a Lite reader, choose it here and compare its colours:",
+    "pickLite": "Lite reader waiting since {{time}}",
+    "comparePattern": "Compare these colours with the ring on the reader, from segment 1 on.",
+    "patternHint": "Segment 1 is marked on the reader. Approve only if all eight colours match. The colours change about every 30 seconds.",
+    "patternChanged": "The colours changed while you were checking. Compare them again and then approve.",
+    "segmentStart": "1 (start)",
+    "noResponse": "The reader did not respond. Check that it is switched on and has the latest software, then try again.",
+    "error": {
+      "wrongCode": "This code does not match the reader. Check the code on the reader and try again.",
+      "codeNotFound": "No waiting reader shows this code. Check the code on the reader; it changes about every 30 seconds.",
+      "ambiguous": "Two readers show this code right now. Wait for the next code on the reader and try again.",
+      "stale": "The colours changed. Compare the new colours and approve again.",
+      "notWaiting": "This reader is no longer waiting to be paired. It may have been paired already or started over.",
+      "rateLimited": "Too many attempts. Wait a moment and try again.",
+      "rateLimitedRetry": "Too many attempts. Try again in {{seconds}} seconds.",
+      "unknown": "The reader could not be paired",
+      "failed": "Pairing failed because of an error on the server. The reader starts over with a new code by itself.",
+      "readerGone": "The reader disconnected before pairing finished. It will show a new code.",
+      "keyInUse": "This reader is already paired with another record. Choose that record to take over, or remove its pairing first.",
+      "targetNotFound": "The reader to take over no longer exists. Choose another one.",
+      "targetMissing": "Choose which reader this one takes over.",
+      "wrongMode": "This reader cannot be paired this way. Close this window and start again from the reader list."
+    },
+    "backToList": "Choose another reader",
+    "scanFallback": "Type the code instead."
+  },
+  "security": {
+    "title": "Pairing",
+    "state": "Status",
+    "immediateHint": "These actions take effect right away. You do not need to save.",
+    "pairedAt": "Paired on",
+    "pairedBy": "Paired by",
+    "actions": "Actions",
+    "repair": "Pair again",
+    "repairDescription": "Use this after the reader was reset, or when you swap in a different reader, for example after a defect. You enter the code of the reader or compare its colours. Name, machines and settings stay. The old pairing stops working right away.",
+    "revoke": "Remove pairing",
+    "revokeDescription": "Disconnects this reader right away. It cannot be used until you pair it again.",
+    "revoked": "Pairing removed",
+    "revokeFailed": "Could not remove the pairing",
+    "revokeTitle": "Remove pairing?",
+    "revokeMessage": "The reader disconnects within a second and can no longer be used. It starts over as a new reader and shows up in the reader list under Not paired, where you can pair it again.",
+    "pairedAgain": "Reader paired again",
+    "history": "History",
+    "event": {
+      "paired": "Paired",
+      "revoked": "Pairing removed",
+      "replaced": "Replaced"
+    }
+  },
+  "toPair": {
+    "title": "Not paired",
+    "description": "Pair these readers before you can set them up. Readers that sign in with a token keep working until then. The reader must be switched on and connected.",
+    "neverPaired": "Not paired yet",
+    "pairingRemoved": "Pairing was removed",
+    "newReader": "New reader",
+    "waitingSince": "Waiting since {{time}}",
+    "pair": "Pair",
+    "resume": "Continue",
+    "requestFailed": "Could not start pairing",
+    "notConnected": "The reader is not connected right now. Switch it on and try again.",
+    "diagnostics": "Diagnostics",
+    "delete": "Delete"
+  },
+  "kind": {
+    "touch": "Touch",
+    "lite": "Lite"
+  },
+  "enrollLink": {
+    "noPermissionTitle": "You can't approve readers",
+    "noPermission": "Your account does not have permission to approve readers. Ask an administrator to approve this reader."
+  }
+}

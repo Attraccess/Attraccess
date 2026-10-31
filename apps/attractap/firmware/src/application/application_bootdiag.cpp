@@ -39,6 +39,16 @@ static const char *resetReasonToString(esp_reset_reason_t reason) {
     return "BROWNOUT";
   case ESP_RST_SDIO:
     return "SDIO";
+  case ESP_RST_USB:
+    return "USB"; // USB-Serial-JTAG chip reset, e.g. a host DTR/RTS (esptool) reset
+  case ESP_RST_JTAG:
+    return "JTAG";
+  case ESP_RST_EFUSE:
+    return "EFUSE";
+  case ESP_RST_PWR_GLITCH:
+    return "PWR_GLITCH";
+  case ESP_RST_CPU_LOCKUP:
+    return "CPU_LOCKUP"; // double exception, e.g. a stack overflow
   default:
     return "UNKNOWN";
   }
@@ -61,7 +71,8 @@ void Application::setupBootDiagnostics() {
     // A clean POWERON after a long pre-freeze uptime => the device hung and
     // had to be power-cycled by hand -> silent hang.
     bool isCrash = (reason == ESP_RST_PANIC || reason == ESP_RST_TASK_WDT ||
-                    reason == ESP_RST_INT_WDT || reason == ESP_RST_WDT);
+                    reason == ESP_RST_INT_WDT || reason == ESP_RST_WDT ||
+                    reason == ESP_RST_CPU_LOCKUP);
     const char *failureClass = "clean/other";
     if (isCrash) {
       failureClass = "crash-loop";

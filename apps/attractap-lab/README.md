@@ -219,7 +219,12 @@ pnpm nx run attractap-lab:hil -- -k enroll
 
 The runner builds both firmware images, starts an API on a free port with a
 throwaway database (`STORAGE_ROOT`), and runs pytest inside one labgrid
-session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The reader gets
+session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The run seeds
+`admin`/`password` into its own database, signs in, and approves the erased
+reader's rotating pairing code (`Enrollment: code=XXX-XXX` on the UART) through
+`POST /api/attractap/pairings/resolve` and `/pairings/:id/approve` with that
+admin session; no external token is involved
+(`attractap_lab.enrollment.approve`). The reader gets
 the lab Wi-Fi through `attractap-lab-reader-wifi`, so the host needs
 `readerWifi`, and connects to the API at the address of this machine on the
 route to the reader (override with `API_HOST`). `LAB_PYTHON` defaults to the
@@ -376,7 +381,8 @@ image prints `ATTRACTAP_PARKED` on the UART. Parking takes roughly 10–20 s. On
 startup and after coordinator restarts, every managed reader is parked once.
 
 Full erase also wipes NVS: each session must provision Wi-Fi/API settings
-again, and a previously paired reader registers as a new one.
+again, and a previously paired reader needs a new approval of its pairing code
+(see Hardware-in-the-loop tests and Agent and CI workflow).
 
 eFuses cannot be erased. Before erasing, the janitor requires factory values
 for secure boot, flash encryption, key purposes, download mode and USB/JTAG
@@ -419,6 +425,11 @@ labgrid's `ManagedFile`, runs esptool on the exporter, resets into firmware,
 records bounded `serial.log`, captures `screen.png`, then releases.
 Both success and ordinary failure/cancellation clean up drivers and claims.
 A busy place fails immediately. `--expect TEXT` checks a literal serial marker.
+
+The smoke run starts no API, so nothing approves the reader. A freshly erased
+reader is expected to end on the pending-approval screen showing its rotating
+pairing code (and a QR code only if it has an app URL; Lite readers show the LED
+pattern) and to log `Enrollment: code=XXX-XXX`; that is a pass, not a failure.
 Serial reconnect follows reset, so the earliest boot messages may be missed;
 use a marker emitted after reconnect. Screen capture provides evidence, not an
 automatic assertion that the UI is correct. Offline µStreamer placeholder frames

@@ -54,8 +54,17 @@ public:
     void disableConnectionAttempts() override { stop(); }
     void forceReconnect(const char *) override { enableConnectionAttempts(); }
     void resetCertificateTrust() override {}
+    void setSubprotocol(const std::string &subprotocol) override;
+    bool sendBinary(const uint8_t *data, size_t length) override;
+    void setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> callback) override;
+    void setConnectionCallback(std::function<void(bool connected)> callback) override;
 
 private:
+    struct Outbound
+    {
+        std::string data;
+        bool binary = false;
+    };
     static constexpr size_t MaxQueuedMessages = 64;
     static constexpr size_t MaxInboundMessageBytes = 1024 * 1024;
 
@@ -64,15 +73,22 @@ private:
     void publishState(State state);
     void publishError(const std::string &message);
     void publishMessage(std::string message);
+    void publishBinary(std::string data);
+    void publishConnection(bool connected);
+    bool enqueue(const char *data, size_t length, bool binary);
 
     HostRuntime &runtime;
     std::string url;
     std::mutex mutex;
-    std::queue<std::string> outbound;
+    std::queue<Outbound> outbound;
+    std::string subprotocol;
     MessageCallback messageCallback;
+    std::function<bool(const uint8_t *, size_t)> rawBinaryCallback;
+    std::function<void(bool)> connectionCallback;
     StateCallback stateCallback;
     ErrorCallback errorCallback;
     std::shared_ptr<std::atomic_bool> callbackLifetime = std::make_shared<std::atomic_bool>(false);
     std::atomic_bool stopRequested{false};
+    std::atomic_bool wasConnected{false};
     std::thread worker;
 };
