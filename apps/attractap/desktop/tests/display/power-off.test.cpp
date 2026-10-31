@@ -47,4 +47,32 @@ void testPowerOffConfirm(SdlDisplay &display, const std::filesystem::path &scree
     Display::loop();
     lv_obj_delete(screen);
     PowerOffButton::hideConfirm(); // Safe once the host screen is gone.
+
+    // Regression: beside another action (demo settings) the confirm used to overflow the row and push the
+    // sibling and its own caption off-screen. It must wrap onto its own line inside the host.
+    lv_obj_t *host = lv_obj_create(nullptr);
+    DisplayTheme::applyScreen(host);
+    lv_obj_t *row = lv_obj_create(host);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_size(row, 440, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_t *sibling = lv_button_create(row);
+    lv_obj_set_size(sibling, 160, 40);
+    lv_obj_t *crowdedButton = PowerOffButton::create(row, [] {});
+    lv_screen_load(host);
+    lv_obj_send_event(crowdedButton, LV_EVENT_CLICKED, nullptr);
+    lv_obj_update_layout(host);
+    lv_area_t rowArea, siblingArea, labelArea, confirmArea;
+    lv_obj_get_coords(row, &rowArea);
+    lv_obj_get_coords(sibling, &siblingArea);
+    auto *crowdedLabel = findLabel(host, "Gerät ausschalten?");
+    lv_obj_get_coords(crowdedLabel, &labelArea);
+    lv_obj_get_coords(lv_obj_get_parent(findLabel(host, "Ausschalten")), &confirmArea);
+    assert(siblingArea.x1 >= rowArea.x1 && siblingArea.x2 <= rowArea.x2);
+    assert(labelArea.x1 >= rowArea.x1 && confirmArea.x2 <= rowArea.x2);
+    PowerOffButton::hideConfirm();
+    lv_screen_load(lv_obj_create(nullptr));
+    lv_obj_delete(host);
+    PowerOffButton::hideConfirm();
 }

@@ -9,7 +9,7 @@ namespace
 {
     std::function<void()> g_onConfirm;
     lv_obj_t *g_button = nullptr;
-    lv_obj_t *g_confirm = nullptr;
+    lv_obj_t *g_confirmRow = nullptr;
 
     lv_obj_t *makeButton(lv_obj_t *parent, lv_color_t color, const FirmwareI18n::Text &text, lv_event_cb_t cb,
                          const char *symbol = nullptr)
@@ -53,12 +53,12 @@ namespace
 
     void onPowerBtn(lv_event_t *)
     {
-        if (!g_button || !g_confirm)
+        if (!g_button || !g_confirmRow)
         {
             return;
         }
         lv_obj_add_flag(g_button, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(g_confirm, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(g_confirmRow, LV_OBJ_FLAG_HIDDEN);
     }
 
     void onObjectDelete(lv_event_t *e)
@@ -68,9 +68,9 @@ namespace
         {
             g_button = nullptr;
         }
-        if (deleted == g_confirm)
+        if (deleted == g_confirmRow)
         {
-            g_confirm = nullptr;
+            g_confirmRow = nullptr;
         }
     }
 
@@ -80,7 +80,8 @@ namespace
         lv_obj_t *confirm = lv_obj_create(parent);
         lv_obj_remove_style_all(confirm);
         lv_obj_remove_flag(confirm, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(confirm, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        // Full width: in a row of actions it wraps onto its own line instead of overflowing the screen.
+        lv_obj_set_size(confirm, lv_pct(100), LV_SIZE_CONTENT);
         lv_obj_set_flex_flow(confirm, LV_FLEX_FLOW_ROW_WRAP);
         lv_obj_set_flex_align(confirm, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_column(confirm, 12, LV_PART_MAIN);
@@ -107,17 +108,17 @@ lv_obj_t *PowerOffButton::create(lv_obj_t *parent, std::function<void()> cb)
     lv_obj_t *btn = makeButton(parent, DisplayTheme::danger(), FirmwareI18n::Text::literal(LV_SYMBOL_POWER) /* i18n-data: Language-neutral LVGL power icon glyph. */, &onPowerBtn);
     lv_obj_set_size(btn, 56, 40);
     g_button = btn;
-    g_confirm = createConfirm(parent);
+    g_confirmRow = createConfirm(parent);
     lv_obj_add_event_cb(g_button, &onObjectDelete, LV_EVENT_DELETE, nullptr);
-    lv_obj_add_event_cb(g_confirm, &onObjectDelete, LV_EVENT_DELETE, nullptr);
+    lv_obj_add_event_cb(g_confirmRow, &onObjectDelete, LV_EVENT_DELETE, nullptr);
     return btn;
 }
 
 void PowerOffButton::hideConfirm()
 {
-    if (g_confirm)
+    if (g_confirmRow)
     {
-        lv_obj_add_flag(g_confirm, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(g_confirmRow, LV_OBJ_FLAG_HIDDEN);
     }
     if (g_button)
     {

@@ -47,6 +47,21 @@ void ReaderWorkflow::testTimeouts()
         assert(!label(lv_screen_active(), "Unzureichendes Guthaben") && !State::getApiState().userAuthenticated);
         Display::clearNotice();
         std::cout << "PASS status timeout replaces the top-up screen and explains itself" << std::endl;
+        // The ordinary session timeout keeps its semantics on the top-up screen: it signs out and replaces it.
+        active = false; login(); click("Start");
+        {
+            const auto id = server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>();
+            server.push("START_RESOURCE_USAGE_SESSION", "{\"requestId\":" + std::to_string(id) +
+                        R"(,"success":false,"error":"INSUFFICIENT_BALANCE","sumUpEnabled":true})");
+            pump();
+            list(); // The refresh that follows a failed action, so only the session timeout is left.
+        }
+        assert(lv_screen_active() == Display::topUpScreen.getScreen());
+        pump(30500);
+        assert(lv_screen_active() != Display::topUpScreen.getScreen() && !State::getApiState().userAuthenticated);
+        assert(!label(lv_screen_active(), "Unzureichendes Guthaben"));
+        Display::clearNotice();
+        std::cout << "PASS session timeout replaces the top-up screen" << std::endl;
         nfc.setPresent(0, true); pump(); nfc.setPresent(0, false); pump();
         // The waiting card-key request also rejects a competing web approval.
         server.push("SUPERVISION_START", R"({"resourceId":1,"requesterName":"Robin","timeoutMs":30000})"); pump();
