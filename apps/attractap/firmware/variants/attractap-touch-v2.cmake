@@ -7,6 +7,8 @@ set(ATTRACTAP_FIRMWARE_VARIANT "wifi")
 set(ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME "WiFi")
 # Flip to "true" only after the secure profile passed its hardware run (ATT-1166).
 set(ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED "false")
+# Build the secure profile and run its gates for this variant in every CI stage.
+set(ATTRACTAP_SECURE_PROFILE_BUILD "true")
 
 set(ATTRACTAP_DEFINES
     FIRMWARE_NAME="${ATTRACTAP_FIRMWARE_NAME}"

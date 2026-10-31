@@ -61,6 +61,20 @@ def secure_profile_hardware_tested(variant, content):
         raise ValueError(f"demo variant {variant} must not be marked secure-profile hardware-tested")
     return tested
 
+def secure_profile_build_enabled(variant, content):
+    """Value of ATTRACTAP_SECURE_PROFILE_BUILD (absent = False): the per-variant
+    switch that makes build_firmwares.py build the secure profile and run its
+    gates, in every CI stage (PR, main, release). Demo variants can never have it."""
+    raw = extract_cmake_value(content, "ATTRACTAP_SECURE_PROFILE_BUILD")
+    if raw is None:
+        return False
+    if raw.lower() not in ("true", "false"):
+        raise ValueError(f"{variant}: ATTRACTAP_SECURE_PROFILE_BUILD must be \"true\" or \"false\", got \"{raw}\"")
+    enabled = raw.lower() == "true"
+    if enabled and is_demo_variant(content):
+        raise ValueError(f"demo variant {variant} must not enable the secure profile build")
+    return enabled
+
 def build_secure_profile(variant, variant_path, python_cmd):
     """Build the secure profile of a non-demo variant and run its build gates
     (tools/check_secure_profile.py). The images are not packaged yet: they are
@@ -352,8 +366,10 @@ def main(argv=None):
 
     # Validate the hardware-tested flags before any expensive build starts.
     secure_tested_by_variant = {}
+    secure_build_by_variant = {}
     for variant, _, content in variants:
         try:
+            secure_build_by_variant[variant] = secure_profile_build_enabled(variant, content)
             secure_tested_by_variant[variant] = secure_profile_hardware_tested(variant, content)
         except ValueError as error:
             print(f"Error: {error}", file=sys.stderr)
@@ -434,7 +450,7 @@ def main(argv=None):
             "flashSize": "16MB",
         })
 
-        if not is_demo_variant(content):
+        if secure_build_by_variant[variant]:
             print(f"\n=== Building secure profile: {variant} ===")
             build_secure_profile(variant, variant_path, python_cmd)
 

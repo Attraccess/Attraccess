@@ -210,6 +210,43 @@ for its **Approve** button. Each new code is also logged on the UART as
 (`ENROLLMENT_LOG_MARKER`) to approve readers without a screen, so do not reword it. Codes, keys,
 nonces and tokens are never logged otherwise.
 
+## Secure profile (ATT-1166)
+
+An optional build profile (`sdkconfig.secure`, `-DATTRACTAP_SECURE_PROFILE=ON`) for
+readers that an admin converts over the air to Secure Boot v2, release-mode flash
+encryption, NVS encryption and locked debug paths. Images are built unsigned; the
+API signs them per installation. It is never available for demo variants.
+
+- `ATTRACTAP_SECURE_PROFILE_BUILD "true"` in a variant `.cmake` makes
+  `build_firmwares.py` build the secure profile and run `tools/check_secure_profile.py`
+  in every CI stage (PR, main, release). Only Touch V2 has it on.
+- `ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED` (all `"false"`) is carried into
+  `firmwares.json` and gates the admin "Secure this reader" action. Customers see no
+  change until a variant is flipped after its hardware run.
+- `secure-version-floor.txt` must equal `CONFIG_BOOTLOADER_APP_SECURE_VERSION`; CI
+  fails if either decreases. The eFuse field has 16 steps: bump only for security fixes.
+
+### eFuse key block layout (fixed)
+
+| Block | Content |
+| ----- | ------- |
+| KEY0 | Secure Boot digest: per-installation signing key |
+| KEY1 | Secure Boot digest: recovery key |
+| KEY2 | Flash encryption key (XTS-AES-128) |
+| KEY3 | DS identity (HMAC key, read-protected) |
+| KEY4 | NVS encryption (HMAC key, read-protected) |
+| KEY5 | Spare |
+
+### eFuse read protection (RD_DIS)
+
+The bootloader leaves RD_DIS writable. The secure app burns the DS key (KEY3) and the
+NVS key (KEY4) read-protected on first boot and then MUST write-protect RD_DIS
+(`WR_DIS_RD_DIS`). The server marks a reader secured only after its eFuse report
+shows that lock.
+
+Lab secure readers use public keys and development-mode flash encryption; see
+`lab/secure-boot/README.md`.
+
 ## Building
 
 Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
