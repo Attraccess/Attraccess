@@ -62,6 +62,8 @@ enum applicationState_t
 #endif
         APPLICATION_STATE_CONFIGURATION_REQUIRED,
         APPLICATION_STATE_INIT,
+        // Waiting for an admin to approve the rotating pairing code (or "Pairing removed").
+        APPLICATION_STATE_PENDING_APPROVAL,
         APPLICATION_STATE_CUSTOM,
 #ifdef HAS_LVGL_DISPLAY
         APPLICATION_STATE_LOCKED,

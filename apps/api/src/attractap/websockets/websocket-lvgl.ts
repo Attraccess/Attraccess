@@ -1,4 +1,4 @@
-/** Text the reader's LVGL fonts can draw: protocol values pass through untouched. */
+/** Text sanitising for the reader's Latin-1 LVGL fonts. */
 export function makeStringLVGLReady(input: string): string {
   if (!input) return input;
 

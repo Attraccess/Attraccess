@@ -9,27 +9,6 @@
 #include <limits>
 #include <string>
 
-void API::onRegistrationData(JsonObject data)
-{
-    this->logger.info("Received registration response.");
-
-    if (data["payload"].is<JsonObject>())
-    {
-        auto payload = data["payload"].as<JsonObject>();
-        if (payload["id"].is<uint32_t>() && payload["token"].is<const char *>())
-        {
-            uint32_t readerId = payload["id"].as<uint32_t>();
-            std::string apiKey = payload["token"].as<std::string>();
-
-            Settings::saveAttraccessAuthConfig(apiKey, readerId);
-
-            this->logger.infof("Reader registered with ID: %d", readerId);
-
-            this->sendAuthenticationRequest();
-        }
-    }
-}
-
 void API::onUnauthorized(JsonObject data)
 {
     std::string message = "Unknown error";
@@ -46,7 +25,20 @@ void API::onUnauthorized(JsonObject data)
     State::setApiState(false, "");
     Settings::clearAttraccessAuthConfig();
 
-    this->sendMessage("READER_REGISTER", JsonObject());
+    // The token is gone for good: the reader can only come back through pairing.
+    this->transport.startPairing("");
+}
+
+void API::onStartPairing(JsonObject data)
+{
+    const char *ticket = data["payload"]["ticket"] | "";
+    if (ticket[0] == '\0')
+    {
+        logger.error("READER_START_PAIRING without a ticket");
+        return;
+    }
+    logger.info("Admin started pairing this reader");
+    this->transport.startPairing(ticket);
 }
 
 bool API::isRegistered()
@@ -56,10 +48,16 @@ bool API::isRegistered()
 
 void API::sendAuthenticationRequest()
 {
+    // A paired reader is authenticated by its TLS session; a token must never travel inside it.
+    if (this->transport.authenticatesReader())
+    {
+        return;
+    }
     if (!this->isRegistered())
     {
-        logger.info("Not registered, sending registration request");
-        this->sendMessage("READER_REGISTER");
+        // Open registration is gone: a reader without credentials pairs instead.
+        logger.info("No reader credentials, requesting pairing");
+        this->transport.startPairing("");
         return;
     }
 

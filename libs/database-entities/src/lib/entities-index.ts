@@ -2,6 +2,8 @@ export { ApiTokenPermission } from './entities/api-token-permission.entity';
 export { ApiToken } from './entities/api-token.entity';
 export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
+export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
+export { AttractapInstallation } from './entities/attractap-installation.entity';
 export { AuditLog } from './entities/audit-log.entity';
 export { AuthenticationDetail } from './entities/authenticationDetail.entity';
 export { BillingTransactionItem } from './entities/billing-transaction-item.entity';
@@ -124,6 +126,8 @@ import { ApiTokenPermission } from './entities/api-token-permission.entity';
 import { ApiToken } from './entities/api-token.entity';
 import { Attractap } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
+import { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
+import { AttractapInstallation } from './entities/attractap-installation.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { BillingTransactionItem } from './entities/billing-transaction-item.entity';
@@ -198,6 +202,8 @@ export const entities = {
   NFCCardPendingChange,
   Attractap,
   AttractapCrashReport,
+  AttractapCredentialEvent,
+  AttractapInstallation,
   EmailTemplate,
   EmailTemplateTranslation,
   ResourceFlowNode,

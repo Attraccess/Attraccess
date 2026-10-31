@@ -30,6 +30,7 @@ int main(int argc, char **argv)
     testSessionSummaryLifecycle();
     testFormDrafts();
     testPaymentPopup();
+    testPendingApproval(display, screenshots);
 
     TouchPoint touch{};
     // The firmware still sees a 480 x 480 screen, offset inside the CAD face.

@@ -37,8 +37,8 @@ void DemoWebsocket::loop()
     if (!_initDone)
     {
         _initDone = true;
-        // Kick off the auth handshake once callbacks are registered.
-        enqueue(R"({"event":"EVENT","data":{"type":"READER_REQUEST_AUTHENTICATION","payload":{}}})");
+        // The demo reader is "paired" with the local mock: it is signed in as soon as callbacks exist.
+        respondAuthenticated();
     }
 
     while (!_inbound.empty() && _messageCallback)
@@ -99,13 +99,6 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
         return;
 
     _logger.debugf("Demo mock received: %s", type);
-
-    if (strcmp(type, "READER_REGISTER") == 0)
-    {
-        // Respond with a registration response that contains an id and token
-        enqueue(R"({"event":"EVENT","data":{"type":"READER_REGISTER","payload":{"id":1,"token":"demo-token"}}})");
-        return;
-    }
 
     if (strcmp(type, "READER_AUTHENTICATE") == 0)
     {

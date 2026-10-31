@@ -44,6 +44,7 @@ private:
         PENDING,
         SUCCESS,
         WARNING,
+        FAILURE,
     };
     void applyStage(lv_obj_t *spinner, lv_obj_t *label, StageState newState, StageState &cached);
 

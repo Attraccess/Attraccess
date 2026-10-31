@@ -167,7 +167,7 @@ describe('AttractapGateway card relay rules', () => {
       let stateWhileCheckingCredentials: unknown;
       fixture.attractapService.findReaderById.mockImplementation(async () => {
         stateWhileCheckingCredentials = { ...socket.state };
-        return { id: 7, name: 'Lathe', apiTokenHash, resources: [] };
+        return { id: 7, name: 'Lathe', apiTokenHash, pairingState: 'unpaired', resources: [] };
       });
       jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket').mockResolvedValue(undefined);
 
@@ -302,6 +302,7 @@ describe('AttractapGateway card relay rules', () => {
       id: 7,
       name: 'Lathe',
       apiTokenHash: await securelyHashToken(token),
+      pairingState: 'unpaired',
       resources: [],
     });
     jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket').mockResolvedValue(undefined);

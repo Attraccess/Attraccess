@@ -167,11 +167,13 @@ void InitScreen::createApiRows(lv_obj_t *statesContainer)
    lv_obj_remove_flag(this->apiAuthenticationSpinner, LV_OBJ_FLAG_CLICKABLE);
 
    this->apiAuthenticationLabel = lv_label_create(apiAuthenticationContainer);
-   lv_obj_set_width(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->apiAuthenticationLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->apiAuthenticationLabel, LV_ALIGN_CENTER);
+   // Takes the rest of the row and wraps: a secure-session error is longer than the usual text.
+   lv_obj_set_flex_grow(this->apiAuthenticationLabel, 1);
+   lv_label_set_long_mode(this->apiAuthenticationLabel, LV_LABEL_LONG_WRAP);
    FirmwareI18n::setLabel(this->apiAuthenticationLabel, FirmwareI18n::Message::AuthenticatingWithApi);
-   lv_obj_set_style_text_font(this->apiAuthenticationLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->apiAuthenticationLabel, &attractap_font_montserrat_latin1_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resetState(this->apiAuthenticationSpinner, this->apiAuthenticationLabel);
 
@@ -316,6 +318,9 @@ void InitScreen::applyStage(lv_obj_t *spinner, lv_obj_t *label, StageState newSt
    case StageState::WARNING:
       this->markStateAsWarning(spinner, label);
       break;
+   case StageState::FAILURE:
+      this->markStateAsError(spinner, label);
+      break;
    case StageState::PENDING:
    default:
       this->resetState(spinner, label);
@@ -382,8 +387,16 @@ void InitScreen::loop()
 
 
    State::ApiState apiState = State::getApiState();
+   // A paired reader whose secure session does not come up says why (it keeps retrying).
+   const State::SessionProblem sessionProblem = apiState.authenticated ? State::SESSION_PROBLEM_NONE : State::getSessionProblem();
+   setLabelTextIfChanged(this->apiAuthenticationLabel,
+                         sessionProblem == State::SESSION_PROBLEM_SERVER_UNTRUSTED ? FirmwareI18n::Message::ServerCouldNotBeVerified
+                         : sessionProblem == State::SESSION_PROBLEM_HANDSHAKE_FAILED ? FirmwareI18n::Message::SecureConnectionFailed
+                                                                                     : FirmwareI18n::Message::AuthenticatingWithApi);
    this->applyStage(this->apiAuthenticationSpinner, this->apiAuthenticationLabel,
-                    apiState.authenticated ? StageState::SUCCESS : StageState::PENDING,
+                    apiState.authenticated                                ? StageState::SUCCESS
+                    : sessionProblem != State::SESSION_PROBLEM_NONE ? StageState::FAILURE
+                                                                          : StageState::PENDING,
                     this->apiAuthenticationStage);
 
    // Server target line

@@ -34,5 +34,6 @@
     }
   },
   "connected": "Connected",
-  "disconnected": "Disconnected"
+  "disconnected": "Disconnected",
+  "pairFirst": "Pair the new reader in the Not paired list before you set it up."
 }

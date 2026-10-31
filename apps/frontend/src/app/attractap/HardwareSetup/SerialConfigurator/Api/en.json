@@ -8,6 +8,11 @@
       "title": "Attraccess connected",
       "description": "Attempting authentication..."
     },
+    "pending_approval": {
+      "title": "Waiting for approval — {{code}}",
+      "description": "Press Approve to add this reader to Attraccess.",
+      "approve": "Approve"
+    },
     "authenticated": {
       "title": "Connected & authenticated",
       "description": "Device ID: {{deviceId}}",

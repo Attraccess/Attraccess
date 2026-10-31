@@ -3,6 +3,8 @@
 #ifdef HAS_WS2812_LED
 
 #include <cstdint>
+#include "freertos/FreeRTOS.h"
+#include "led_pattern.hpp"
 #include "ws2812_strip.hpp"
 
 class LedController
@@ -16,6 +18,7 @@ public:
         LED_STATE_AUTHENTICATE_CARD,
         LED_STATE_NO_RESOURCES,
         LED_STATE_FIRMWARE_UPDATE,
+        LED_STATE_ENROLLMENT_PENDING,
     };
 
     LedController() : _strip(WS2812_LED_COUNT, PIN_WS2812_DATA) {}
@@ -24,6 +27,9 @@ public:
 
     void setState(LedState state);
     void setBrightness(uint8_t brightness);
+    // Colour indices (LedPattern, one per segment) to match while LED_STATE_ENROLLMENT_PENDING.
+    // showPattern false (no current pattern: disconnected or stale): breathe white.
+    void setEnrollmentPattern(bool showPattern, const uint8_t *pattern);
     void triggerSuccess();
     void triggerError();
     void triggerIndicate();
@@ -32,6 +38,8 @@ private:
     void runAnimation();
     void runCircularAnimation();
     void runLinearAnimation();
+    void runEnrollmentPending();
+    uint8_t idleBreathBrightness() const;
     void setAll(uint32_t color);
     bool isCircularRing() const;
     uint16_t wrapIndex(int16_t i) const;
@@ -53,6 +61,10 @@ private:
     uint32_t _triggerStartMs = 0;
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;
 
+    // Written by the application task, read by the LED task.
+    portMUX_TYPE _enrollmentPatternLock = portMUX_INITIALIZER_UNLOCKED;
+    bool _showEnrollmentPattern = false;
+    uint8_t _enrollmentPattern[LedPattern::SEGMENT_COUNT] = {};
     bool _firmwarePatternSet = false;
     uint8_t _globalBrightness = 255;
     Ws2812Strip _strip;

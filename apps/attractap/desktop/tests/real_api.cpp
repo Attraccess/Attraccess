@@ -1,5 +1,6 @@
 #include "desktop_simulator.hpp"
 #include "settings/settings.hpp"
+#include "settings/reader_credentials.hpp"
 #include "display/display.hpp"
 #include "state/state.hpp"
 
@@ -129,6 +130,7 @@ std::string screenName()
     if (lv_screen_active() == Display::enrollmentScreen.getScreen()) return "enrollment";
     if (lv_screen_active() == Display::supervisionScreen.getScreen()) return "supervision";
     if (lv_screen_active() == Display::setPinScreen.getScreen()) return "set-pin";
+    if (lv_screen_active() == Display::pendingApprovalScreen.getScreen()) return "pending-approval";
     if (lv_screen_active() == Display::connectionConfigurationScreen.getScreen()) return "settings";
 #ifdef DEMO_MODE
     if (lv_screen_active() == Display::demoSettingsScreen.getScreen()) return "settings";
@@ -307,7 +309,30 @@ int main(int argc, char **argv)
     const auto screenshots = control / "screenshots";
     createScreenshotDirectory(screenshots);
     DesktopSimulator simulator(argv[1], 0, argv[3]);
-    if (!waitFor([&] { return simulator.authenticated(); }, simulator, 15000)) return 1;
+    // A new reader pairs first: the harness reads the code the reader shows from `pending-approval`
+    // (replaced atomically on every rotation) and approves it through the real pairing API. A
+    // paired reader (restart) goes straight to its TLS session.
+    std::string announcedCode;
+    const auto announce = [&] {
+        const auto enrollment = State::getEnrollmentState();
+        if (!enrollment.pending || enrollment.stale || enrollment.code == announcedCode) return;
+        announcedCode = enrollment.code;
+        const auto temporary = control / "pending-approval.tmp";
+        {
+            std::ofstream output(temporary);
+            output << enrollment.code << "\n";
+        }
+        chmod(temporary.c_str(), S_IRUSR | S_IWUSR);
+        std::filesystem::rename(temporary, control / "pending-approval");
+    };
+    const auto startupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+    waitFor([&] {
+        announce();
+        // A reader that neither shows a code nor signs in within 15 s failed to start.
+        return simulator.authenticated() ||
+               (announcedCode.empty() && std::chrono::steady_clock::now() >= startupDeadline);
+    }, simulator, 90000);
+    if (!simulator.authenticated()) return 1;
     std::ofstream(control / "ready") << "authenticated\n";
 
     // Numbered files avoid blocking stdin while the real websocket and LVGL
@@ -316,6 +341,8 @@ int main(int argc, char **argv)
     for (unsigned sequence = 1; std::chrono::steady_clock::now() < deadline;)
     {
         pump(simulator);
+        announce(); // also after "Pairing removed"
+
         auto request = control / (std::to_string(sequence) + ".json");
         if (!std::filesystem::exists(request)) continue;
         JsonDocument command;
@@ -330,7 +357,10 @@ int main(int argc, char **argv)
         result["ok"] = ok;
         result["screen"] = screenName();
         result["devicePin"] = Settings::getDeviceConfig().passCode;
-        result["readerId"] = Settings::getAttraccessAuthConfig().readerId;
+        // Paired readers learn their ID from the session grant.
+        result["readerId"] = CredentialStore::load().readerId;
+        result["paired"] = CredentialStore::load().hasCertificate();
+        result["secureSession"] = simulator.link().sessionOpen();
         result["authenticationGeneration"] = simulator.authenticationGeneration();
         result["authenticated"] = simulator.authenticated();
         result["networkAvailable"] = State::getNetworkQualityState().quality != State::NETWORK_QUALITY_OFFLINE;

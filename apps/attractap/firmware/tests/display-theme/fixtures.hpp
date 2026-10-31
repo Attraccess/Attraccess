@@ -14,6 +14,7 @@ inline uint32_t nowMs = 1000;
 inline State::NetworkState network{};
 inline State::WebsocketState websocket{};
 inline State::ApiState api{};
+inline State::SessionProblem sessionProblem = State::SESSION_PROBLEM_NONE;
 inline std::string activeLanguage = "de";
 inline std::vector<uint8_t> deletedDemoCardIndices;
 void resetDemoCards();

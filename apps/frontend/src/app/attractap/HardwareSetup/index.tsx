@@ -4,6 +4,7 @@ import { UsbIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ConnectionStateEvent, ESPTools } from '../../../utils/esp-tools';
 import { SetupTabs } from './SetupTabs';
+import type { OpenDeviceSettings } from './SerialConfigurator/Api';
 
 import de from './de.json';
 import en from './en.json';
@@ -41,7 +42,7 @@ function ConnectScreen() {
 }
 
 interface SetupContentProps {
-  openDeviceSettings: (deviceId: string) => void;
+  openDeviceSettings: OpenDeviceSettings;
   onClose: () => void;
 }
 
@@ -65,7 +66,7 @@ function SetupContent({ openDeviceSettings, onClose }: SetupContentProps) {
 
 interface Props {
   children: (onOpen: () => void) => React.ReactNode;
-  openDeviceSettings: (deviceId: string) => void;
+  openDeviceSettings: OpenDeviceSettings;
 }
 
 export function AttractapHardwareSetup(props: Props) {
@@ -103,9 +104,9 @@ export function AttractapHardwareSetup(props: Props) {
 
         <DrawerBody className="pb-6">
           <SetupContent
-            openDeviceSettings={(deviceId) => {
+            openDeviceSettings={(deviceId, justPaired) => {
               close();
-              openDeviceSettings(deviceId);
+              openDeviceSettings(deviceId, justPaired);
             }}
             onClose={close}
           />

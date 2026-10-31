@@ -31,7 +31,7 @@ describe('AttractapAuthHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    handler = Object.create(AttractapAuthHandler.prototype);
+    handler = new AttractapAuthHandler();
     (handler as any).logger = {
       log: jest.fn(),
       error: jest.fn(),
@@ -72,72 +72,28 @@ describe('AttractapAuthHandler', () => {
   });
 
   describe('handleReaderRegister', () => {
-    it('creates a new reader with the firmware payload and sends READER_REGISTER response', async () => {
-      const data = { payload: { firmware: 'fw-1.2.3' } } as AttractapEvent['data'];
-      mockAttractapService.createNewReader.mockResolvedValue({
-        reader: { id: 99 },
-        token: 'tok-abc',
-      });
+    it.each([{ payload: { firmware: { name: 'attractap' } } }, { payload: {} }])(
+      'creates nothing and sends no reply: readers join through pairing',
+      async (data) => {
+        await expect(handler.handleReaderRegister(mockSocket as any, data as AttractapEvent['data'])).resolves.toBeUndefined();
 
-      await handler.handleReaderRegister(mockSocket as any, data);
-
-      expect(mockAttractapService.createNewReader).toHaveBeenCalledWith('fw-1.2.3');
-      expect(mockAudit.recordAttractap).toHaveBeenCalledWith({
-        action: 'reader.registered',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: 99,
-        details: { source: 'reader-websocket' },
-      });
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.READER_REGISTER,
-            payload: { id: 99, token: 'tok-abc' },
-          }),
-        }),
-      );
-    });
-
-    it('forwards the created reader id and token exactly', async () => {
-      const data = { payload: { firmware: undefined } } as AttractapEvent['data'];
-      mockAttractapService.createNewReader.mockResolvedValue({
-        reader: { id: 7 },
-        token: 'another-token',
-      });
-
-      await handler.handleReaderRegister(mockSocket as any, data);
-
-      expect(mockAttractapService.createNewReader).toHaveBeenCalledWith(undefined);
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.READER_REGISTER,
-            payload: { id: 7, token: 'another-token' },
-          }),
-        }),
-      );
-    });
-
-    it('sends the registration response when audit persistence rejects', async () => {
-      mockAttractapService.createNewReader.mockResolvedValue({ reader: { id: 7 }, token: 'another-token' });
-      mockAudit.recordAttractap.mockRejectedValueOnce(new Error('audit unavailable'));
-
-      await expect(
-        handler.handleReaderRegister(mockSocket as any, { payload: {} } as AttractapEvent['data']),
-      ).resolves.toBeUndefined();
-
-      expect(mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ payload: { id: 7, token: 'another-token' } }) }),
-      );
-    });
+        expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
+        expect(mockAudit.recordAttractap).not.toHaveBeenCalled();
+        expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('handleAuthentication', () => {
     const data = { payload: { id: 42, token: 'client-token' } } as AttractapEvent['data'];
 
     it.each(['lookup', 'token', 'language'])('does not authenticate after closure during %s', async (stage) => {
-      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      mockAttractapService.findReaderById.mockResolvedValue({
+        id: 42,
+        name: 'Reader',
+        apiTokenHash: 'hash',
+        pairingState: 'unpaired',
+      });
       mockVerifyToken.mockResolvedValue(true);
       const pending =
         stage === 'lookup'
@@ -147,7 +103,11 @@ describe('AttractapAuthHandler', () => {
             : (handler as any).settingsService.getDefaultLanguage;
       pending.mockImplementationOnce(async () => {
         mockSocket.readyState = WebSocket.CLOSED;
-        return stage === 'lookup' ? { id: 42, name: 'Reader', apiTokenHash: 'hash' } : stage === 'token' ? true : 'de';
+        return stage === 'lookup'
+          ? { id: 42, name: 'Reader', apiTokenHash: 'hash', pairingState: 'unpaired' }
+          : stage === 'token'
+            ? true
+            : 'de';
       });
       await handler.handleAuthentication(mockSocket as any, data);
       expect(mockSocket.readerId).toBeNull();
@@ -157,7 +117,12 @@ describe('AttractapAuthHandler', () => {
     });
 
     it('delivers a default changed while the initial language read is pending', async () => {
-      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      mockAttractapService.findReaderById.mockResolvedValue({
+        id: 42,
+        name: 'Reader',
+        apiTokenHash: 'hash',
+        pairingState: 'unpaired',
+      });
       mockVerifyToken.mockResolvedValue(true);
       let finishRead!: (language: 'en' | 'de') => void;
       let readStarted!: () => void;
@@ -229,7 +194,7 @@ describe('AttractapAuthHandler', () => {
         .mockResolvedValueOnce(null);
       const olderAttempt = handler.handleAuthentication(mockSocket as any, data);
       await handler.handleAuthentication(mockSocket as any, data);
-      finishLookup({ id: 42, name: 'Reader', apiTokenHash: 'hash' });
+      finishLookup({ id: 42, name: 'Reader', apiTokenHash: 'hash', pairingState: 'unpaired' });
       await olderAttempt;
       expect(mockSocket.readerId).toBeNull();
       expect(mockSocket.sendMessage).toHaveBeenCalledTimes(1);
@@ -256,11 +221,46 @@ describe('AttractapAuthHandler', () => {
       expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
     });
 
+    it.each(['paired', 'revoked'])(
+      'rejects token sign-in for a %s reader without checking the token, and audits it once a minute',
+      async (pairingState) => {
+        mockAttractapService.findReaderById.mockResolvedValue({
+          id: 42,
+          name: 'Reader A',
+          apiTokenHash: '',
+          pairingState,
+        });
+
+        await handler.handleAuthentication(mockSocket as any, data);
+        await handler.handleAuthentication(mockSocket as any, data);
+
+        expect(mockVerifyToken).not.toHaveBeenCalled();
+        expect(mockSocket.readerId).toBeNull();
+        expect(mockSocket.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              type: AttractapEventType.READER_UNAUTHORIZED,
+              payload: { message: 'PAIRING_REQUIRED' },
+            }),
+          }),
+        );
+        expect(mockAudit.recordAttractap).toHaveBeenCalledTimes(1);
+        expect(mockAudit.recordAttractap).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: 'reader.token_rejected',
+            subjectId: 42,
+            details: { reason: pairingState },
+          }),
+        );
+      },
+    );
+
     it('sends READER_UNAUTHORIZED and does not set readerId when token is invalid', async () => {
       mockAttractapService.findReaderById.mockResolvedValue({
         id: 42,
         name: 'Reader A',
         apiTokenHash: 'hashed',
+        pairingState: 'unpaired',
       });
       mockVerifyToken.mockResolvedValue(false);
 
@@ -284,6 +284,7 @@ describe('AttractapAuthHandler', () => {
         id: 42,
         name: 'Reader A',
         apiTokenHash: 'hashed',
+        pairingState: 'unpaired',
       });
       mockVerifyToken.mockResolvedValue(true);
 
@@ -316,6 +317,7 @@ describe('AttractapAuthHandler', () => {
         id: 42,
         name: 'Reader A',
         apiTokenHash: 'hashed',
+        pairingState: 'unpaired',
       });
       mockVerifyToken.mockResolvedValue(true);
 
@@ -337,6 +339,7 @@ describe('AttractapAuthHandler', () => {
         id: 42,
         name: 'Reader A',
         apiTokenHash: 'hashed',
+        pairingState: 'unpaired',
       });
       mockVerifyToken.mockResolvedValue(true);
 

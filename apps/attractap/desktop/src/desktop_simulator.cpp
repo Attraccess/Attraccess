@@ -46,7 +46,9 @@ DesktopSimulator::DesktopSimulator(const std::string &endpoint, uint32_t readerI
     sdlDisplay.setClearCardCallback([this](size_t index) { virtualNfc.clearCardData(index); });
 
     Display::setup(sdlDisplay);
-    api.emplace(*websocket);
+    // The production reader link: pairing, the TLS 1.3 session, or the token channel.
+    readerLink.emplace(*websocket, ReaderLink::Options{false, {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION}});
+    api.emplace(*readerLink);
     application.emplace(virtualNfc, *api);
     application->setup();
 }

@@ -102,6 +102,11 @@ const GPIO_MACRO = /^PIN_[A-Z0-9_]+$/;
  */
 const SAFE_CALLS: Array<{ file: string; call: string; why: string }> = [
   {
+    file: 'apps/api/src/attractap/security/testing/load-test.ts',
+    call: '(JSON.stringify(result, null, 2))',
+    why: 'the developer load test prints its own aggregate counts and timings; it handles no real reader or card',
+  },
+  {
     file: 'apps/attractap/firmware/src/serial/serialCommandHandler.cpp',
     call: '("RESP %s %s',
     why: 'the provisioning protocol reply channel; replies only carry status fields (pinIsSet, never the PIN or Wi-Fi password)',

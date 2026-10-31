@@ -6,7 +6,7 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 
 | Variable | Beschreibung |
 |----------|-------------|
-| `AUTH_SESSION_SECRET` | Geheimer Schlüssel für die Verschlüsselung von Sitzungsdaten. Verwenden Sie einen zufälligen, langen Wert. |
+| `AUTH_SESSION_SECRET` | Geheimer Schlüssel für die Verschlüsselung von Sitzungsdaten. Er schützt auch die gespeicherten Schlüssel der Reader-Kopplung; sichern Sie ihn zusammen mit der Datenbank. Verwenden Sie einen zufälligen, langen Wert. |
 | `ATTRACCESS_URL` | Die URL, unter der Benutzer auf Attraccess zugreifen, z.B. `https://attraccess.meine-domain.de` |
 
 ## Anwendung
@@ -26,6 +26,8 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 
 > [!NOTE]
 > `TRUST_PROXY` ist **standardmäßig deaktiviert**. Hinter einem Reverse Proxy scheint sonst jede Anfrage von der Proxy-IP zu kommen, sodass das Auth-Rate-Limiting alle Benutzer gemeinsam drosselt statt des eigentlichen Angreifers. Setzen Sie den Wert passend zu Ihrer Proxy-Kette (meist `1`). Mehr Hops zu vertrauen als tatsächlich existieren, erlaubt Clients das Fälschen ihrer IP — siehe [Sicherheit](settings/security.md#reverse-proxies-und-die-echte-client-ip). Wird nach einem Neustart wirksam.
+>
+> Auch für die [Reader-Kopplung](attractap/pairing.md) ist die Einstellung wichtig: Die Begrenzungen für Kopplungsanfragen pro Adresse nutzen dieselbe Client-IP. Ohne `TRUST_PROXY` teilen sich alle Reader hinter dem Proxy ein Limit.
 
 ## API-Anwendungslogs
 

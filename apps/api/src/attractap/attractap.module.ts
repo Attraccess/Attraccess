@@ -25,11 +25,20 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import {
   Attractap,
   AttractapCrashReport,
+  AttractapCredentialEvent,
+  AttractapInstallation,
   NFCCard,
   NFCCardPendingChange,
   Resource,
   User,
 } from '@attraccess/database-entities';
+import { AttractapPairingController } from './pairing.controller';
+import { CredentialRegistryService } from './security/credential-registry.service';
+import { HandshakeLimiter } from './security/handshake-limiter';
+import { InstallationIdentityService } from './security/installation-identity.service';
+import { PairingService } from './security/pairing.service';
+import { ReaderSessionService } from './security/reader-session.service';
+import { SessionMetrics } from './security/session-metrics';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -53,6 +62,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
 import { AuditModule } from '../audit/audit.module';
+import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CardConversationService } from './websockets/card-conversation.service';
 import { CardDetectedRouter } from './websockets/card-detected.router';
@@ -64,7 +74,16 @@ import { EncryptionModule } from '../encryption/encryption.module';
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    TypeOrmModule.forFeature([Attractap, AttractapCrashReport, NFCCard, NFCCardPendingChange, Resource, User]),
+    TypeOrmModule.forFeature([
+      Attractap,
+      AttractapCrashReport,
+      AttractapCredentialEvent,
+      AttractapInstallation,
+      NFCCard,
+      NFCCardPendingChange,
+      Resource,
+      User,
+    ]),
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,
@@ -82,12 +101,19 @@ import { EncryptionModule } from '../encryption/encryption.module';
     MassIntroductionModule,
     NotificationsModule,
     AuditModule,
+    DeviceEnrollmentModule,
     SettingsModule,
     EncryptionModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
   ],
   providers: [
+    { provide: HandshakeLimiter, useFactory: () => new HandshakeLimiter() },
+    InstallationIdentityService,
+    CredentialRegistryService,
+    PairingService,
+    ReaderSessionService,
+    SessionMetrics,
     CardAccessService,
     AttractapService,
     CardConversationService,
@@ -118,6 +144,7 @@ import { EncryptionModule } from '../encryption/encryption.module';
     CardWriterSettingsController,
     AttractapFirmwareController,
     ResourceAttractapsController,
+    AttractapPairingController,
   ],
 })
 export class AttractapModule {}

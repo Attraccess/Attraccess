@@ -20,6 +20,8 @@ export enum AttractapEventType {
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
   READER_CRASH_REPORT = 'READER_CRASH_REPORT',
+  /** Server-pushed: asks a token-signed-in reader to open a pairing connection. */
+  READER_START_PAIRING = 'READER_START_PAIRING',
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_RESOURCE_LIST = 'REQUEST_RESOURCE_LIST',
@@ -188,6 +190,12 @@ export interface CardDetection {
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
+  /** `session` connections carry TLS 1.3 inside binary frames; everything else is legacy. */
+  transport?: 'legacy' | 'session';
+  /** Set when a session connection sent a plain text frame; nothing from it may be processed. */
+  sessionViolation?: boolean;
+  /** Drops the connection without a closing handshake. */
+  terminate: () => void;
   readerId: Attractap['id'] | null;
   readerName: string | null;
   /**

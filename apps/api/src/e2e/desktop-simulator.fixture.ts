@@ -69,6 +69,10 @@ export async function buildProbe() {
 export interface ProbeResult {
   devicePin: string;
   readerId: number;
+  /** The reader holds its installation certificate (paired). */
+  paired: boolean;
+  /** The TLS 1.3 session is open (all API traffic runs inside it). */
+  secureSession: boolean;
   authenticationGeneration: number;
   authenticated: boolean;
   networkAvailable: boolean;
@@ -92,9 +96,14 @@ export class DesktopFixture {
   readonly screenshots: string;
   readonly diagnostics = new DesktopDiagnostics();
 
+  /**
+   * @param approve called once with each code a new reader shows; approves it through the real
+   * pairing API (resolves false when this code was not accepted; the next rotation is tried).
+   */
   constructor(
     private readonly endpoint: string,
     scenario: string,
+    private readonly approve?: (code: string) => Promise<boolean>,
   ) {
     if (!/^[a-z0-9-]+$/.test(scenario)) throw new Error('Invalid scenario name');
     this.diagnostics.remember(process.env.AUTH_SESSION_SECRET);
@@ -148,11 +157,28 @@ export class DesktopFixture {
       child.once('error', () => resolveExit());
     });
     try {
-      await waitFor(() => {
-        if (spawnError) throw spawnError;
-        this.assertRunning();
-        return existsSync(join(this.control, 'ready'));
-      }, 'reader authentication');
+      // A new reader shows a rotating code until it is approved; a paired one signs in directly.
+      // Each shown code is tried once: wrong codes count toward the approver's rate limit.
+      let triedCode = '';
+      const pendingFile = join(this.control, 'pending-approval');
+      await waitFor(
+        async () => {
+          if (spawnError) throw spawnError;
+          this.assertRunning();
+          if (existsSync(join(this.control, 'ready'))) return true;
+          if (this.approve && existsSync(pendingFile)) {
+            this.assertPrivateFile(pendingFile);
+            const code = readFileSync(pendingFile, 'utf8').trim();
+            if (code && code !== triedCode) {
+              triedCode = code;
+              await this.approve(code);
+            }
+          }
+          return false;
+        },
+        'reader pairing and authentication',
+        90_000,
+      );
     } catch (error) {
       await withDesktopCleanup(
         async () => {
@@ -161,6 +187,24 @@ export class DesktopFixture {
         () => this.dispose(),
       );
     }
+  }
+
+  /** Waits for a pairing code the reader shows that differs from `previous`. */
+  async pendingCode(previous = ''): Promise<string> {
+    const pendingFile = join(this.control, 'pending-approval');
+    let code = '';
+    await waitFor(
+      () => {
+        this.assertRunning();
+        if (!existsSync(pendingFile)) return false;
+        this.assertPrivateFile(pendingFile);
+        code = readFileSync(pendingFile, 'utf8').trim();
+        return code !== '' && code !== previous;
+      },
+      'a new pairing code',
+      45_000,
+    );
+    return code;
   }
 
   private assertRunning() {

@@ -31,15 +31,26 @@ import { AttractapSupervisionHandler } from './handlers/supervision/supervision.
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { CardConversationService } from './card-conversation.service';
 import { CardDetectedRouter } from './card-detected.router';
-import { createReaderSenders, READER_MAX_INBOUND_PAYLOAD_BYTES } from './reader-socket-send';
+import { createReaderSenders } from './reader-socket-send';
+
+import { CREDENTIAL_CHANGED_EVENT, PairingService } from '../security/pairing.service';
+import { ReaderSessionService } from '../security/reader-session.service';
+import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
+import { sanitizeForLVGL } from './websocket-lvgl';
+import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { CardConversationFailure } from './card-conversation.service';
 import { randomBytes } from 'crypto';
+import type { IncomingMessage } from 'http';
+
 import { closeSync } from 'fs';
 
-@WebSocketGateway({ path: '/api/attractap/websocket', maxPayload: READER_MAX_INBOUND_PAYLOAD_BYTES })
+@WebSocketGateway({
+  path: '/api/attractap/websocket',
+  ...readerWebSocketOptions,
+})
 @UseInterceptors(WsMetricsInterceptor)
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -105,6 +116,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(AttractapMassIntroductionHandler)
   protected massIntroductionHandler: AttractapMassIntroductionHandler;
+
+  @Inject(PairingService)
+  protected pairingService: PairingService;
+
+  @Inject(ReaderSessionService)
+  protected readerSessionService: ReaderSessionService;
 
   protected readonly connectedAt = new WeakMap<object, bigint>();
 
@@ -187,6 +204,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
     },
     [AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]: () => undefined,
+    [AttractapEventType.READER_START_PAIRING]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.REQUEST_RESOURCE_LIST]: (socket, eventData) =>
       this.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId }),
     [AttractapEventType.RESOURCE_LIST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
@@ -290,7 +308,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    await Promise.all(sockets.map((socket) => socket.close()));
+    // A session socket whose credential changed must not linger in a closing handshake.
+    await Promise.all(sockets.map((socket) => (socket.transport === 'session' ? socket.terminate() : socket.close())));
+  }
+
+  /** Revoked or re-paired credentials end live sessions immediately. */
+  @OnEvent(CREDENTIAL_CHANGED_EVENT)
+  public async onCredentialChanged(readerId: number) {
+    await this.disconnectReader(readerId);
   }
 
   public async startEnrollOfNewNfcCard(data: {
@@ -369,6 +394,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @SubscribeMessage('HEARTBEAT')
   public async onHeartbeat(@ConnectedSocket() socket: AuthenticatedWebSocket) {
+    // No socket state = pairing connection; violation = plain text frame on a session.
+    if (!socket.state || socket.sessionViolation) return;
     this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
     try {
@@ -385,8 +412,19 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     @MessageBody() eventData: AttractapEvent['data'],
     @ConnectedSocket() socket: AuthenticatedWebSocket,
   ) {
+    // No socket state = pairing connection; violation = plain text frame on a session.
+    if (!socket.state || socket.sessionViolation) return;
+    if (
+      socket.transport === 'session' &&
+      [AttractapEventType.READER_REGISTER, AttractapEventType.READER_AUTHENTICATE].includes(eventData?.type)
+    ) {
+      // The certificate is the identity inside a session; token flows are not allowed.
+      this.logger.warn(`Closing session ${socket.id}: ${eventData.type} is not allowed inside a session`);
+      socket.terminate();
+      return;
+    }
     if (eventData.type.startsWith('ACK_')) {
-      this.logger.debug(`Received ACK response from client ${socket.id}: ${eventData.type}`);
+      this.logger.debug(`Received ${eventData.type} from client ${socket.id}`);
 
       this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
       return;
@@ -403,7 +441,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // Card answers arrive in bursts on the tap path; the activity write would only add latency.
     if (eventData.type !== AttractapEventType.CARD_APDU_RESPONSE) await this.clientWasActive(socket);
 
-    this.logger.debug(`Received event from client ${socket.id}: ${eventData.type}`);
+    this.logger.debug(`Received event ${eventData.type} from client ${socket.id}`);
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);
@@ -416,7 +454,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     throw new Error('THIS IS A SERVER SIDE ONLY EVENT, CLIENTS SHOULD NOT SEND THIS EVENT');
   }
 
-  public async handleConnection(client: WebSocket) {
+  public async handleConnection(client: WebSocket, request?: IncomingMessage) {
+    if (client.protocol === PAIRING_SUBPROTOCOL) {
+      // Unlicensed installations take no pairing requests (the service closes the socket).
+      const licensed = this.licenseService.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] });
+      licensed.catch(() => this.logger.error('Closing pairing connection due to license error'));
+      this.pairingService.handleConnection(client, request as IncomingMessage, licensed.then(() => undefined));
+      return;
+    }
+    // Taken over before the first await: early TLS bytes must not be missed and a stray text
+    // frame must be flagged before the framework's own message listener sees it.
+    const session = client.protocol === SESSION_SUBPROTOCOL ? this.readerSessionService.open(client) : null;
+
     this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
 
@@ -427,6 +476,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     } catch (error) {
       this.logger.error('Closing connection due to license error');
       this.logger.error(error);
+      session?.close();
       client.close();
       return;
     }
@@ -461,6 +511,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         massIntroductionFlow: null,
       },
     });
+
+    if (session) {
+      // The reader is registered only once its certificate has been accepted.
+      await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
+        this.websocketService.sockets.set(socket.id, socket);
+        this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+      });
+      return;
+    }
 
     this.websocketService.sockets.set(id, client as unknown as AuthenticatedWebSocket);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);

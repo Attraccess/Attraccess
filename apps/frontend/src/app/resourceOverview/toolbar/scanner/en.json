@@ -5,6 +5,18 @@
       "wrongOrigin": {
         "title": "Wrong origin",
         "description": "The origin of the QR code is not correct. Please check the address and try again."
+      },
+      "cameraDenied": {
+        "title": "Camera access denied",
+        "description": "Allow camera access for this page in your browser settings."
+      },
+      "cameraUnavailable": {
+        "title": "Camera not available",
+        "description": "The camera could not be started."
+      },
+      "unknown": {
+        "title": "Unknown QR code",
+        "description": "This QR code cannot be used here."
       }
     }
   }

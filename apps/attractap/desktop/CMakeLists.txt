@@ -52,6 +52,8 @@ FetchContent_Declare(ArduinoJson
     URL https://codeload.github.com/bblanchon/ArduinoJson/tar.gz/refs/tags/v7.4.2
     URL_HASH SHA256=681f703dd237f5b7f1dc1d7009a9cf246e88676b349572e73eae9154e8994a55)
 FetchContent_MakeAvailable(ArduinoJson)
+# Same Mbed TLS as ESP-IDF v6.0.2: the reader's pairing client and TLS 1.3 session run unchanged.
+include("${FIRMWARE_DIR}/tools/mbedtls_host.cmake")
 
 file(GLOB_RECURSE ATTRACTAP_FIRMWARE_SOURCES "${FIRMWARE_DIR}/src/*.cpp")
 list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/main\\.cpp$")
@@ -93,7 +95,7 @@ target_compile_definitions(attractap-production-host PUBLIC
     FIRMWARE_VERSION="desktop"
     FIRMWARE_FRIENDLY_NAME="Attractap"
     FIRMWARE_VARIANT_FRIENDLY_NAME="Desktop")
-target_link_libraries(attractap-production-host PUBLIC SDL3::SDL3 lvgl::lvgl ArduinoJson Threads::Threads)
+target_link_libraries(attractap-production-host PUBLIC SDL3::SDL3 lvgl::lvgl ArduinoJson Threads::Threads ${ATTRACTAP_MBEDTLS_LIBRARIES})
 
 configure_file(src/device_shell.S.in "${CMAKE_CURRENT_BINARY_DIR}/device_shell.S" @ONLY)
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/device_shell.S" PROPERTIES
@@ -190,7 +192,7 @@ target_compile_options(attractap-demo-session-clock-tests PRIVATE -Wall -Wextra 
 target_link_libraries(attractap-demo-session-clock-tests PRIVATE attractap-production-host)
 add_test(NAME attractap-demo-session-clock-tests COMMAND attractap-demo-session-clock-tests)
 
-add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp)
+add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp tests/display/pending-approval.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
@@ -220,6 +222,13 @@ add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-te
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
 set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
 
+# A reader without credentials: pairing channel, pending screen with and without QR, approval.
+add_executable(attractap-reader-pairing-tests tests/pairing/main.cpp)
+target_link_libraries(attractap-reader-pairing-tests PRIVATE attractap-desktop-runtime)
+target_compile_options(attractap-reader-pairing-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
+add_test(NAME attractap-reader-pairing-tests COMMAND attractap-reader-pairing-tests)
+set_tests_properties(attractap-reader-pairing-tests PROPERTIES TIMEOUT 60)
+
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
 # Includes the bilingual reader journey plus four real 30-second expiry windows.
 set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 240)
@@ -233,4 +242,5 @@ set_property(TEST
     attractap-ota-interrupt-enrollment
     attractap-ota-interrupt-reset
     attractap-reader-timeout-tests
+    attractap-reader-pairing-tests
     APPEND PROPERTY ENVIRONMENT "SDL_AUDIO_DRIVER=dummy")

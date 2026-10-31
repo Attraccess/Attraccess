@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AttractapCardRelayCapability1791900000000 } from './1791900000000-attractap-card-relay-capability';
+import { AttractapCardRelayCapability1792000000000 } from './1792000000000-attractap-card-relay-capability';
 
 describe('AttractapCardRelayCapability migration', () => {
   it('marks existing and new readers as not relaying card APDUs until they report it, and can be reverted', async () => {
@@ -8,7 +8,7 @@ describe('AttractapCardRelayCapability migration', () => {
     try {
       await runner.query(`CREATE TABLE "attractap" (id integer PRIMARY KEY, name varchar NOT NULL)`);
       await runner.query(`INSERT INTO "attractap" (id, name) VALUES (1, 'Lathe')`);
-      const migration = new AttractapCardRelayCapability1791900000000();
+      const migration = new AttractapCardRelayCapability1792000000000();
 
       await migration.up(runner);
       await runner.query(`INSERT INTO "attractap" (id, name) VALUES (2, 'Door')`);

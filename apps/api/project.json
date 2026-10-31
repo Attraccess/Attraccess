@@ -151,6 +151,7 @@
         "{workspaceRoot}/monitoring/prometheus/prometheus.yml",
         "{workspaceRoot}/apps/attractap/firmware/src/**/*",
         "{workspaceRoot}/apps/attractap/firmware/tests/reference-recordings/recordings/**/*",
+        "{workspaceRoot}/apps/attractap/firmware/tests/pairing/vectors.json",
         {
           "externalDependencies": ["jest"]
         }

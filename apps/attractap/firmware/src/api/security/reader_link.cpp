@@ -1,0 +1,514 @@
+#include "reader_link.hpp"
+
+#include <cstring>
+
+#include "../../platform.hpp"
+#include "../../settings/settings.hpp"
+#include "../../state/state.hpp"
+
+#ifdef ESP_PLATFORM
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
+#include "freertos/task.h"
+#endif
+
+namespace
+{
+    constexpr uint32_t CHANNEL_SWITCH_DELAY_MS = 0;
+
+    const char *channelName(ReaderLink::Channel channel)
+    {
+        switch (channel)
+        {
+        case ReaderLink::Channel::Legacy:
+            return "token";
+        case ReaderLink::Channel::Pairing:
+            return "pairing";
+        case ReaderLink::Channel::Session:
+        default:
+            return "session";
+        }
+    }
+
+    const char *subprotocolFor(ReaderLink::Channel channel)
+    {
+        switch (channel)
+        {
+        case ReaderLink::Channel::Pairing:
+            return SessionFraming::PAIRING_SUBPROTOCOL;
+        case ReaderLink::Channel::Session:
+            return SessionFraming::SESSION_SUBPROTOCOL;
+        case ReaderLink::Channel::Legacy:
+        default:
+            return "";
+        }
+    }
+}
+
+ReaderLink::ReaderLink(IReaderTransport &socket, Options options)
+    : socket(socket), options(std::move(options)), logger("ReaderLink")
+{
+}
+
+void ReaderLink::setup()
+{
+    loadIdentity();
+    timeFloor = TimeFloor(CredentialStore::timeFloorSeconds());
+
+    // A reader with credentials only ever uses the session; one with a token keeps signing in
+    // with it until an admin pairs it; everything else asks to be paired.
+    if (credentials.paired())
+    {
+        channel = Channel::Session;
+    }
+    else if (!Settings::getAttraccessAuthConfig().apiKey.empty())
+    {
+        channel = Channel::Legacy;
+    }
+    else
+    {
+        channel = Channel::Pairing;
+    }
+    logger.infof("Reader channel: %s", channelName(channel.load()));
+
+    socket.setMessageCallbackRaw([this](const char *data, size_t length) {
+        // The token channel keeps its old threading: the API handles messages where they arrive.
+        if (channel == Channel::Legacy)
+        {
+            if (appMessage)
+            {
+                appMessage(data, length);
+            }
+            return;
+        }
+        post(EventType::Text, std::string(data, length));
+    });
+    socket.setRawBinaryCallback([this](const uint8_t *data, size_t length) {
+        if (channel != Channel::Session)
+        {
+            return false;
+        }
+        post(EventType::Binary, std::string(reinterpret_cast<const char *>(data), length));
+        return true;
+    });
+    socket.setConnectionCallback([this](bool isConnected) {
+        post(isConnected ? EventType::Connected : EventType::Disconnected);
+    });
+    socket.setSubprotocol(subprotocolFor(channel));
+#ifdef ESP_PLATFORM
+    if (!sessionWorker)
+    {
+        // Key exchange and signature checks need ~10 KB of stack; keep them off the main loop's
+        // internal stack. A PSRAM stack costs no internal heap; the task never touches flash.
+        TaskHandle_t handle = nullptr;
+        if (xTaskCreatePinnedToCoreWithCaps(sessionWorkerEntry, "rl_tls", SESSION_WORKER_STACK, this,
+                                            SESSION_WORKER_PRIORITY, &handle, tskNO_AFFINITY,
+                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS)
+        {
+            sessionWorker = handle;
+        }
+        else
+        {
+            logger.error("Could not start the session worker; TLS runs on the main loop");
+        }
+    }
+#endif
+    socket.setup();
+}
+
+bool ReaderLink::loadIdentity()
+{
+    credentials = CredentialStore::load();
+    key = keyStore.load();
+    if (key)
+    {
+        return true;
+    }
+    return newIdentity();
+}
+
+bool ReaderLink::newIdentity()
+{
+    // A new key drops everything bound to the old one (pinned CA, certificate).
+    key = keyStore.createNew();
+    credentials = CredentialStore::load();
+    if (!key)
+    {
+        logger.error("Could not create the reader identity");
+        return false;
+    }
+    logger.info("Created a new reader identity");
+    return true;
+}
+
+void ReaderLink::post(EventType type, std::string data)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex);
+    Event event;
+    event.type = type;
+    event.data = std::move(data);
+    event.generation = generation;
+    events.push_back(std::move(event));
+}
+
+void ReaderLink::post(Event event)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex);
+    events.push_back(std::move(event));
+}
+
+void ReaderLink::loop()
+{
+    socket.loop();
+
+    std::deque<Event> pending;
+    {
+        std::lock_guard<std::mutex> lock(eventsMutex);
+        pending.swap(events);
+    }
+    for (Event &event : pending)
+    {
+        // Frames of a connection that belonged to the previous channel are meaningless now. Checked
+        // per event: an earlier event of this batch may have switched the channel.
+        if (event.type == EventType::StartPairing || event.generation == liveGeneration())
+        {
+            handle(event);
+        }
+    }
+
+    if (holding && static_cast<int32_t>(millis() - holdUntilMs) >= 0)
+    {
+        holding = false;
+        if (attemptsEnabled)
+        {
+            socket.enableConnectionAttempts();
+        }
+    }
+
+    if (channel == Channel::Session && connected && handshakeStartedMs != 0 &&
+        millis() - handshakeStartedMs > HANDSHAKE_TIMEOUT_MS)
+    {
+        // The worker may be in a handshake step right now: check again next time instead of waiting.
+        std::unique_lock<std::mutex> lock(sessionMutex, std::try_to_lock);
+        if (lock.owns_lock() && tls.status() == SessionTls::Status::Handshaking)
+        {
+            sessionEpoch++;
+            logger.error("Session handshake timed out");
+            handshakeStartedMs = 0;
+            closeSessionLocked();
+            lock.unlock();
+            onHandshakeFailed();
+            socket.forceReconnect("session handshake timeout");
+        }
+    }
+}
+
+uint32_t ReaderLink::liveGeneration() const
+{
+    std::lock_guard<std::mutex> lock(eventsMutex);
+    return generation;
+}
+
+void ReaderLink::closeSessionLocked()
+{
+    sessionReady = false;
+    tls.close();
+}
+
+void ReaderLink::handle(Event &event)
+{
+    switch (event.type)
+    {
+    case EventType::StartPairing:
+        if (channel == Channel::Legacy)
+        {
+            pairingTicket = event.data;
+            pairingFromToken = !Settings::getAttraccessAuthConfig().apiKey.empty();
+            useChannel(Channel::Pairing, event.data.empty() ? "no credentials" : "admin started pairing");
+        }
+        return;
+    case EventType::Connected:
+        connected = true;
+        if (channel == Channel::Session)
+        {
+            onSessionConnected();
+        }
+        else if (channel == Channel::Pairing)
+        {
+            onPairingConnected();
+        }
+        return;
+    case EventType::Disconnected:
+        connected = false;
+        handshakeStartedMs = 0;
+        if (channel == Channel::Session)
+        {
+            sessionEpoch++;
+            std::lock_guard<std::mutex> lock(sessionMutex);
+            closeSessionLocked();
+            outbox.clear();
+            // The sign-in belonged to that session; the next one authenticates again.
+            State::setApiState(false, "");
+        }
+        else if (channel == Channel::Pairing && pairing)
+        {
+            onPairingEnded(pairing->onDisconnected());
+        }
+        return;
+    case EventType::Text:
+        if (channel == Channel::Pairing)
+        {
+            onPairingText(event.data);
+        }
+        else if (channel == Channel::Session)
+        {
+            // A session speaks TLS bytes only. During the handshake this is typically a proxy that
+            // dropped the subprotocol, so the server took us for a token reader.
+            logger.error("Text frame on the session channel, reconnecting");
+            if (handshakeStartedMs != 0)
+            {
+                handshakeStartedMs = 0;
+                onHandshakeFailed();
+            }
+            socket.forceReconnect("text frame in session");
+        }
+        return;
+    case EventType::Binary:
+        if (channel == Channel::Session)
+        {
+            SessionWork feed;
+            feed.bytes = std::move(event.data);
+            feed.generation = event.generation;
+            feed.epoch = sessionEpoch.load();
+            submitSessionWork(std::move(feed));
+        }
+        return;
+    case EventType::SessionFrame:
+        // Decrypted before the connection closed: still authenticated, still delivered (the server
+        // sends "session.rejected" right before it closes).
+        if (channel == Channel::Session)
+        {
+            onSessionFrame(static_cast<SessionFraming::FrameType>(event.code), std::move(event.data));
+        }
+        return;
+    case EventType::SessionStatus:
+        if (channel == Channel::Session && event.epoch == sessionEpoch.load())
+        {
+            onSessionStatus(event);
+        }
+        return;
+    }
+}
+
+void ReaderLink::useChannel(Channel next, const char *reason)
+{
+    logger.infof("Switching to the %s channel (%s)", channelName(next), reason);
+    {
+        std::lock_guard<std::mutex> lock(eventsMutex);
+        generation++;
+    }
+    sessionEpoch++;
+    {
+        std::lock_guard<std::mutex> lock(sessionMutex);
+        closeSessionLocked();
+        outbox.clear();
+    }
+    pairing.reset();
+    connected = false;
+    handshakeStartedMs = 0;
+    untrusted = false;
+    bootstrapUntrusted = 0;
+    handshakeFailures = 0;
+    State::setSessionProblem(State::SESSION_PROBLEM_NONE);
+    State::setApiState(false, "");
+    channel = next;
+    socket.setSubprotocol(subprotocolFor(next));
+    reconnectAfter(CHANNEL_SWITCH_DELAY_MS);
+}
+
+void ReaderLink::reconnectAfter(uint32_t delayMs)
+{
+    if (delayMs == 0)
+    {
+        socket.forceReconnect("reader channel");
+        return;
+    }
+    // Hold the connection down: the server's limits are per address.
+    socket.disableConnectionAttempts();
+    holding = true;
+    holdUntilMs = millis() + delayMs;
+}
+
+// --- API side --------------------------------------------------------------------------------
+
+void ReaderLink::setMessageCallbackRaw(std::function<void(const char *, size_t)> callback)
+{
+    appMessage = std::move(callback);
+}
+
+#ifdef ESP_PLATFORM
+void ReaderLink::setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback)
+{
+    appBinary = callback;
+    // Token channel: OTA chunks arrive as plain binary frames, exactly as before.
+    socket.setBinaryDataCallback(std::move(callback));
+}
+#endif
+
+bool ReaderLink::sendMessage(const char *message, size_t length)
+{
+    switch (channel)
+    {
+    case Channel::Legacy:
+        return socket.sendMessage(message, length);
+    case Channel::Session:
+    {
+        // Nothing to send into before the handshake completed; never wait for a handshake step.
+        if (!sessionReady.load())
+        {
+            return false;
+        }
+        std::lock_guard<std::mutex> lock(sessionMutex);
+        if (!tls.sendFrame(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message), length))
+        {
+            return false;
+        }
+        if (flushOutbox())
+        {
+            return true;
+        }
+        closeSessionLocked();
+        socket.forceReconnect("session send failed");
+        return false;
+    }
+    case Channel::Pairing:
+    default:
+        // Nothing of the API leaves a reader that is not paired.
+        return false;
+    }
+}
+
+bool ReaderLink::sendHeartbeat(const char *message, size_t length)
+{
+    switch (channel)
+    {
+    case Channel::Legacy:
+        return socket.sendHeartbeat(message, length);
+    case Channel::Session:
+    {
+        // Heartbeats are droppable: skip one rather than wait for the TLS worker.
+        if (!sessionReady.load())
+        {
+            return false;
+        }
+        std::unique_lock<std::mutex> lock(sessionMutex, std::try_to_lock);
+        if (!lock.owns_lock() || !tls.sendFrame(SessionFraming::FrameType::HEARTBEAT, nullptr, 0))
+        {
+            return false;
+        }
+        if (flushOutbox())
+        {
+            return true;
+        }
+        closeSessionLocked();
+        socket.forceReconnect("session send failed");
+        return false;
+    }
+    case Channel::Pairing:
+    default:
+        return false;
+    }
+}
+
+void ReaderLink::enableConnectionAttempts()
+{
+    attemptsEnabled = true;
+    if (!holding)
+    {
+        socket.enableConnectionAttempts();
+    }
+}
+
+void ReaderLink::disableConnectionAttempts()
+{
+    attemptsEnabled = false;
+    socket.disableConnectionAttempts();
+}
+
+void ReaderLink::forceReconnect(const char *reason)
+{
+    socket.forceReconnect(reason);
+}
+
+void ReaderLink::startPairing(const std::string &ticket)
+{
+    // May be called from the transport task (token channel): handled on the main loop.
+    post(EventType::StartPairing, ticket);
+}
+
+// --- pairing channel -------------------------------------------------------------------------
+
+void ReaderLink::onPairingConnected()
+{
+    // Storing a new key can fail (e.g. NVS full); try again instead of idling on an open connection.
+    if (!key && !newIdentity())
+    {
+        reconnectAfter(PairingClient::RETRY_AFTER_ERROR_MS);
+        return;
+    }
+#ifdef ESP_PLATFORM
+    logger.infof("Pairing connection open; heap internal: free=%u min=%u",
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+#endif
+    pairing.reset(new PairingClient(*key, options.lite, options.firmware, options.pairingClock));
+    // A ticket is single-use: a later request of this reader is unbound.
+    const std::string ticket = pairingTicket;
+    pairingTicket.clear();
+    pairing->start(ticket, [this](const std::string &text) { return socket.sendMessage(text.data(), text.size()); });
+}
+
+void ReaderLink::onPairingText(const std::string &text)
+{
+    if (!pairing)
+    {
+        return;
+    }
+    onPairingEnded(pairing->onMessage(text.data(), text.size()));
+}
+
+void ReaderLink::onPairingEnded(PairingClient::Outcome outcome)
+{
+    if (outcome == PairingClient::Outcome::Accepted)
+    {
+        const std::vector<uint8_t> caSpki = pairing->serverPublicKey();
+        if (!CredentialStore::savePin(caSpki))
+        {
+            logger.error("Could not store the installation key");
+            reconnectAfter(PairingClient::RETRY_AFTER_ERROR_MS);
+            return;
+        }
+        credentials.caSpki = caSpki;
+        // The token stays until the bootstrap session delivered a verified grant: if this approval
+        // came from someone posing as the server, the reader can still fall back to it.
+        pairingFromToken = false;
+        useChannel(Channel::Session, "pairing approved");
+        return;
+    }
+    if (outcome != PairingClient::Outcome::Retry)
+    {
+        return;
+    }
+    const uint32_t delay = pairing->retryDelayMs();
+    pairing.reset();
+    if (pairingFromToken && !Settings::getAttraccessAuthConfig().apiKey.empty())
+    {
+        // An admin-started pairing that did not complete: keep working with the token.
+        pairingFromToken = false;
+        State::clearEnrollment();
+        useChannel(Channel::Legacy, "pairing did not complete");
+        return;
+    }
+    reconnectAfter(delay);
+}

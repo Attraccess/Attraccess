@@ -186,5 +186,6 @@ export * from './1791400000000-user-date-time-preferences';
 export * from './1791500000000-user-date-time-locale';
 export * from './1791600000000-sso-permission-sync-ttl';
 export * from './1791700000000-attractap-crash-report-created-at-index';
-export * from './1791800000000-nfc-card-pending-change';
-export * from './1791900000000-attractap-card-relay-capability';
+export * from './1791800000000-attractap-pairing';
+export * from './1791900000000-nfc-card-pending-change';
+export * from './1792000000000-attractap-card-relay-capability';

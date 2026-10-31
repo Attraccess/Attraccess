@@ -35,6 +35,10 @@ void Websocket::enableConnectionAttempts() {}
 void Websocket::disableConnectionAttempts() {}
 void Websocket::forceReconnect(const char *) {}
 void Websocket::resetCertificateTrust() {}
+void Websocket::setSubprotocol(const std::string &) {}
+bool Websocket::sendBinary(const uint8_t *, size_t) { return true; }
+void Websocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)>) {}
+void Websocket::setConnectionCallback(std::function<void(bool)>) {}
 void Websocket::lockWsClient() { xSemaphoreTake(ws_client_mutex, portMAX_DELAY); }
 void Websocket::unlockWsClient() { xSemaphoreGive(ws_client_mutex); }
 void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &index)

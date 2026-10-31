@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { WebSocket } from 'ws';
-import { sanitizeForLVGL } from './lvgl-text';
+import { sanitizeForLVGL } from './websocket-lvgl';
 import { AttractapEventType, AttractapMessage, AuthenticatedWebSocket } from './websocket.types';
 
 /**
@@ -21,14 +21,6 @@ export const READER_SEND_LIMITS = {
   retryMaxBufferedBytes: 256 * 1024,
   ackRetryCount: 3,
 } as const;
-
-/**
- * Largest message the server accepts from a reader (ws default: 100 MiB). The largest legitimate one
- * is READER_CRASH_REPORT: a coredump of at most 32 KiB (CRASH_COREDUMP_MAX_BYTES in
- * firmware/src/api/diagnostics/crash-record.hpp), about 44 KiB in base64, plus a few small fields.
- * Every other reader message is a few hundred bytes. ws closes the connection with 1009 above this.
- */
-export const READER_MAX_INBOUND_PAYLOAD_BYTES = 256 * 1024;
 
 export interface ReaderSenderContext {
   client: WebSocket;

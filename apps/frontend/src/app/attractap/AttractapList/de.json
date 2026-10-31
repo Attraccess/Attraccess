@@ -34,5 +34,6 @@
     }
   },
   "connected": "Verbunden",
-  "disconnected": "Nicht verbunden"
+  "disconnected": "Nicht verbunden",
+  "pairFirst": "Kopple den neuen Reader in der Liste „Nicht gekoppelt“, bevor du ihn einrichtest."
 }

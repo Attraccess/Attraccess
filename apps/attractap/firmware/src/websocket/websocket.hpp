@@ -43,10 +43,21 @@ public:
     // full CA list again (device settings "reset certificate" button).
     void resetCertificateTrust() override;
 
+    // Secure reader link (src/api/security/reader_link): subprotocol, binary frames, open/close.
+    void setSubprotocol(const std::string &subprotocol) override;
+    bool sendBinary(const uint8_t *data, size_t length) override;
+    void setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> callback) override;
+    void setConnectionCallback(std::function<void(bool connected)> callback) override;
+
 private:
     friend struct WebsocketPongProbeTest;
     std::function<void(const char *, size_t)> messageCallbackRaw;
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
+    std::function<bool(const uint8_t *, size_t)> rawBinaryCallback;
+    std::function<void(bool)> connectionCallback;
+    // Requested subprotocol (guarded by ws_client_mutex) and the one the current client uses.
+    std::string _subprotocol;
+    std::string _clientSubprotocol;
 
     AdaptiveCertManager _certManager;
 
@@ -175,6 +186,7 @@ private:
         char *data;
         size_t length;
         bool isHeartbeat;
+        bool isBinary;
     };
     static constexpr size_t TX_QUEUE_DEPTH = 8;
     static constexpr uint32_t TX_TASK_STACK = 4096;
@@ -186,7 +198,7 @@ private:
     TaskHandle_t tx_task = nullptr;
     static void txTaskEntry(void *arg);
     void txTaskLoop();
-    bool enqueueMessage(const char *data, size_t length, bool isHeartbeat = false);
+    bool enqueueMessage(const char *data, size_t length, bool isHeartbeat = false, bool isBinary = false);
     void drainTxQueue();
 
     static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);

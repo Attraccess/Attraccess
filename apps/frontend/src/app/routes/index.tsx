@@ -58,6 +58,7 @@ import { SSOProviderFormPage } from '../sso/providers/SSOProviderFormPage';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 import { UserManagementDetailsPage } from '../user-management/details/index';
 import { UserManagementPage } from '../user-management/index';
+import { RootRedirect } from './RootRedirect';
 
 export function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): RouteConfig[] {
   const plugin = pluginManifest.plugin;
@@ -126,7 +127,7 @@ const coreRoutes: RouteConfig[] = [
   },
   {
     path: '/',
-    element: <Navigate to="/resources" replace />,
+    element: <RootRedirect />,
     authRequired: true,
   },
   {

@@ -36,6 +36,24 @@ void testInit(Renderer &renderer)
     requireObject(screen.root, &lv_label_class, "Server: reader.example:443  (SSL)");
     renderer.capture("init-cert-search-english");
     FirmwareI18n::refreshTree(screen.root, "de");
+    // A paired reader whose server fails the check against the pinned CA, then a session that keeps
+    // failing (e.g. a proxy without the subprotocol): an error, in red, instead of "authenticating".
+    Fixtures::websocket.connected = true;
+    Fixtures::sessionProblem = State::SESSION_PROBLEM_SERVER_UNTRUSTED;
+    Fixtures::nowMs += 1000;
+    init.loop();
+    auto *untrusted = requireObject(screen.root, &lv_label_class, "Server konnte nicht überprüft werden");
+    expectColor(lv_obj_get_style_text_color(untrusted, LV_PART_MAIN), DisplayTheme::danger(), "Untrusted server color");
+    renderer.capture("init-server-untrusted");
+    Fixtures::sessionProblem = State::SESSION_PROBLEM_HANDSHAKE_FAILED;
+    Fixtures::nowMs += 1000;
+    init.loop();
+    requireObject(screen.root, &lv_label_class, "Sichere Verbindung fehlgeschlagen. Server oder Proxy prüfen.");
+    FirmwareI18n::refreshTree(screen.root, "en");
+    requireObject(screen.root, &lv_label_class, "Secure connection failed. Check the server or proxy.");
+    renderer.capture("init-session-failed-english");
+    FirmwareI18n::refreshTree(screen.root, "de");
+    Fixtures::sessionProblem = State::SESSION_PROBLEM_NONE;
     Fixtures::websocket.connected = true;
     Fixtures::websocket.phase = State::WS_CONNECTED;
     Fixtures::api.authenticated = true;

@@ -273,6 +273,16 @@ enum class Message {
     ErrorFirmwareUpdateRequired,
     ErrorReaderNotAllowedToWriteCards,
     ErrorCardOperationExpired,
+    ApproveThisReaderInAttraccess,
+    ScanOrEnterCodeInAttraccess,
+    EnterCodeInAttraccess,
+    PairingCodeChangesIn,
+    PairingWaitingForServer,
+    PairingRequestFailed,
+    PairingRemoved,
+    PairingRemovedAskingAgain,
+    ServerCouldNotBeVerified,
+    SecureConnectionFailed,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -568,6 +578,16 @@ inline constexpr Entry catalog[] = {
     {Message::ErrorFirmwareUpdateRequired, "Firmware-Update erforderlich", "Firmware update required"},
     {Message::ErrorReaderNotAllowedToWriteCards, "Dieser Reader darf keine Karten registrieren", "This reader may not enroll cards"},
     {Message::ErrorCardOperationExpired, "Zeit abgelaufen, bitte erneut starten", "Timed out, please start again"},
+    {Message::ApproveThisReaderInAttraccess, "Dieses Lesegerät in Attraccess freigeben", "Approve this reader in Attraccess"},
+    {Message::ScanOrEnterCodeInAttraccess, "Scannen oder Code in Attraccess eingeben", "Scan or enter the code in Attraccess"},
+    {Message::EnterCodeInAttraccess, "Code in Attraccess eingeben", "Enter the code in Attraccess"},
+    {Message::PairingCodeChangesIn, "Der Code ändert sich in {0} s", "The code changes in {0} s"},
+    {Message::PairingWaitingForServer, "Warte auf den Server", "Waiting for the server"},
+    {Message::PairingRequestFailed, "Anfrage fehlgeschlagen. Neuer Versuch gleich.", "Request failed. Trying again soon."},
+    {Message::PairingRemoved, "Kopplung entfernt", "Pairing removed"},
+    {Message::PairingRemovedAskingAgain, "Das Lesegerät fordert gleich eine neue Freigabe an", "The reader asks for a new approval shortly"},
+    {Message::ServerCouldNotBeVerified, "Server konnte nicht überprüft werden", "Server could not be verified"},
+    {Message::SecureConnectionFailed, "Sichere Verbindung fehlgeschlagen. Server oder Proxy prüfen.", "Secure connection failed. Check the server or proxy."},
 };
 
 } // namespace FirmwareI18n

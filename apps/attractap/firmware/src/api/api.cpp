@@ -160,9 +160,9 @@ API::API(IReaderTransport &transport) : logger("API"),
 
 void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
 {
-    if (strcmp(eventType, "READER_REGISTER") == 0)
+    if (strcmp(eventType, "READER_START_PAIRING") == 0)
     {
-        this->onRegistrationData(inboundDoc["data"].as<JsonObject>());
+        this->onStartPairing(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "READER_UNAUTHORIZED") == 0)
     {

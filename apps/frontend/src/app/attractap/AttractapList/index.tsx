@@ -13,11 +13,12 @@ import {
 } from '@heroui/react';
 import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
+import { ReadersToPair } from '../pairing/ReadersToPair';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
 import { AttractapDeleteModal } from './delete/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   EmptyState,
   PageAction,
@@ -55,6 +56,23 @@ export function useAttractapListState() {
 
   const [openedReaderEditor, setOpenedReaderEditor] = useState<number | null>(null);
 
+  // `?editReader=ID`: after a reader was paired from a link the settings open right away.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editReaderParam = searchParams.get('editReader');
+  useEffect(() => {
+    if (editReaderParam === null || !allReaders) return;
+    const reader = allReaders.find((r) => r.id === Number(editReaderParam));
+    if (reader?.pairingState === 'paired') setOpenedReaderEditor(reader.id);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete('editReader');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [editReaderParam, allReaders, setSearchParams]);
+
   useEffect(() => {
     if (readersError) {
       toast.error({
@@ -71,7 +89,8 @@ export function useAttractapListState() {
   const { stale: staleReaders, active: activeReaders } = useMemo(() => {
     const stale = [];
     const active = [];
-    for (const reader of allReaders ?? []) {
+    // Readers that are not paired are only listed in the Not paired card until they are paired.
+    for (const reader of (allReaders ?? []).filter((r) => r.pairingState === 'paired')) {
       const lastConnection = new Date(reader.lastConnection);
       const isStale = lastConnection.getTime() < now.getTime() - 24 * 60 * 60 * 1000;
       if (isStale) {
@@ -123,6 +142,8 @@ export function useAttractapListState() {
     staleReaders,
     activeReaders,
     firmwareUpdateChip,
+    allReaders,
+    toast,
   } as const;
 }
 
@@ -137,6 +158,8 @@ export function AttractapList() {
     staleReaders,
     activeReaders,
     firmwareUpdateChip,
+    allReaders,
+    toast,
   } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
@@ -146,8 +169,11 @@ export function AttractapList() {
   return (
     <>
       <AttractapHardwareSetup
-        openDeviceSettings={(deviceId) => {
-          setOpenedReaderEditor(Number(deviceId));
+        openDeviceSettings={(deviceId, justPaired) => {
+          // A reader can only be edited once it is paired. One approved a moment ago is not in this list yet.
+          const reader = allReaders?.find((r) => r.id === Number(deviceId));
+          if (justPaired || reader?.pairingState === 'paired') setOpenedReaderEditor(Number(deviceId));
+          else toast.info({ title: t('pairFirst') });
         }}
       >
         {(onOpenHardwareSetup) => (
@@ -187,6 +213,7 @@ export function AttractapList() {
       />
 
       <div className="flex flex-col gap-4">
+        <ReadersToPair readers={allReaders ?? []} onPaired={setOpenedReaderEditor} />
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
             <Card.Header>
@@ -215,9 +242,16 @@ export function AttractapList() {
                         >
                           <TableCell>{reader.name}</TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {reader.firmware.name} ({reader.firmware.variant})
-                            <br />
-                            {firmwareUpdateChip(reader)}
+                            {reader.firmware.name ? (
+                              <>
+                                {reader.firmware.name} ({reader.firmware.variant})
+                                <br />
+                                {firmwareUpdateChip(reader)}
+                              </>
+                            ) : (
+                              // A reader paired a moment ago has not reported its firmware yet.
+                              '–'
+                            )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                           <TableCell>

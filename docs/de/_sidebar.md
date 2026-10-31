@@ -60,6 +60,7 @@
   - [Leser benutzen](attractap/using-the-reader.md)
   - [Hardware](attractap/hardware.md)
   - [Einrichtung](attractap/setup.md)
+  - [Reader koppeln](attractap/pairing.md)
   - [RFID-Karten](attractap/rfid-cards.md)
   - [Firmware-Updates](attractap/firmware-updates.md)
 
