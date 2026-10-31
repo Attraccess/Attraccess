@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   refetchResult: { current: undefined as unknown },
   refetch: vi.fn(),
   approve: vi.fn(),
+  cancel: vi.fn(),
   approveOptions: { current: undefined as undefined | Record<string, (value: unknown) => unknown> },
   resolve: vi.fn(),
   resolveOptions: { current: undefined as undefined | Record<string, (value: unknown) => unknown> },
@@ -57,6 +58,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     mocks.approveOptions.current = options;
     return { mutate: mocks.approve, isPending: false };
   },
+  useAttractapServiceCancelPairing: () => ({ mutate: mocks.cancel, isPending: false }),
   useAttractapServiceResolvePairing: (options: Record<string, (value: unknown) => unknown>) => {
     mocks.resolveOptions.current = options;
     return { mutate: mocks.resolve, isPending: false };
@@ -132,9 +134,36 @@ describe('PairingDialog', () => {
     mocks.refetch
       .mockReset()
       .mockImplementation(async () => ({ data: mocks.refetchResult.current ?? mocks.pairing.current }));
-    for (const fn of [mocks.approve, mocks.resolve, mocks.toast.success, mocks.toast.error]) fn.mockClear();
+    for (const fn of [mocks.approve, mocks.cancel, mocks.resolve, mocks.toast.success, mocks.toast.error]) fn.mockClear();
   });
   afterEach(() => setSecureContext(true));
+
+  describe('cancel', () => {
+    it('ends the waiting request on the server before closing', async () => {
+      const { onClose } = open({ pairingId: 'p1' });
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(mocks.cancel).toHaveBeenCalledWith({ pairingId: 'p1' });
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('only closes while no request is known yet', async () => {
+      mocks.pairing.current = undefined;
+      const { onClose } = open({ waitForReaderId: 8 });
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(mocks.cancel).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('does not cancel an approval that is already on its way', async () => {
+      const { onClose } = open({ pairingId: 'p1' });
+      type('k7p 3xq');
+      await userEvent.click(approveButton());
+      expect(mocks.approve).toHaveBeenCalledTimes(1);
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(mocks.cancel).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
 
   describe('secure context', () => {
     it('offers the camera and no warning on a secure page', () => {

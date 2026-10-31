@@ -30,7 +30,7 @@ function Footer({ flow, onClose }: Readonly<{ flow: PairingFlow; onClose: () => 
   }
   return (
     <>
-      <Button variant="ghost" onPress={onClose}>
+      <Button variant="ghost" onPress={flow.cancel} data-cy="attractap-pairing-cancel">
         {t('dialog.cancel')}
       </Button>
       {flow.needsCodeToFind && (

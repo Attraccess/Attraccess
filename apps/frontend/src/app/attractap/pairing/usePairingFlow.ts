@@ -1,6 +1,7 @@
 import {
   PairingDto,
   useAttractapServiceApprovePairing,
+  useAttractapServiceCancelPairing,
   useAttractapServiceGetPairing,
   useAttractapServiceGetPairings,
   useAttractapServiceGetPairingsKey,
@@ -185,6 +186,23 @@ function visibleError(error: PairingError | null, secondsLeft: number, finished:
   return finished && ENDED_ERRORS.has(error.kind) ? null : error;
 }
 
+/**
+ * Cancel ends the reader's waiting request on the server, so nobody can approve it once the dialog is
+ * gone; the reader then starts over with a new code. An approval already on its way is left alone.
+ */
+function useCancelAndClose(
+  current: PairingDto | null,
+  approving: () => boolean,
+  onClose: () => void,
+  refresh: () => unknown,
+) {
+  const cancelPairing = useAttractapServiceCancelPairing({ onSettled: () => void refresh() });
+  return () => {
+    if (current && isPairingRunning(current.state) && !approving()) cancelPairing.mutate({ pairingId: current.id });
+    onClose();
+  };
+}
+
 export function usePairingFlow(props: PairingFlowProps) {
   const { onClose } = props;
   const { t } = useTranslations({ de, en });
@@ -256,6 +274,7 @@ export function usePairingFlow(props: PairingFlowProps) {
   });
 
   const idle = !resolve.isPending && !approve.isPending;
+  const cancelAndClose = useCancelAndClose(current, () => approve.isPending || submitting.current, onClose, refreshLists);
   const blocked = countdown.secondsLeft > 0;
   const normalizedCode = normalizeEnrollmentCode(codeInput);
   const bound = current?.boundReaderId != null;
@@ -357,6 +376,8 @@ export function usePairingFlow(props: PairingFlowProps) {
     findByCode,
     /** Enter in the dialog: look the reader up while it is not known, otherwise approve. */
     submitForm: () => (needsCodeToFind ? findByCode() : void submit()),
+    /** The dialog's Cancel button: ends the waiting request on the server, then closes. */
+    cancel: cancelAndClose,
     resolvePending: resolve.isPending,
     approvePending: approve.isPending,
     waitingForReader,
