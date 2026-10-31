@@ -33,7 +33,8 @@ that is an output, not the PN532 power-down/reset input.
 ### Reader power button (optional)
 
 Some readers only power up after a button press: the Touch V1's power-bank chip
-(SW6106) switches its 5 V rail on after one short press and off after two. For
+(SW6106) switches its 5 V rail on after one short press and off after two. It
+needs a battery on the board's BAT socket to keep reacting to the button. For
 those, `GPIO4` drives an optocoupler whose output is wired across the reader's
 power button:
 

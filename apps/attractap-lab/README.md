@@ -180,8 +180,11 @@ A Touch V1 (Waveshare ESP32-S3-Touch-LCD-4 V3) only powers up after a press of
 its power button, and its power-bank chip turns it off again about 30 s after
 its load drops below roughly 60 mA, as when the parking image darkens it. Wire
 an optocoupler from the place's NFC emulator across that button (see the
-[emulator README](../attractap/nfc-emulator/README.md#reader-power-button-optional));
-`ReaderPowerDriver` then switches the reader through the emulator:
+[emulator README](../attractap/nfc-emulator/README.md#reader-power-button-optional))
+and plug a 1-cell LiPo into the board's BAT socket: without a battery the chip
+stops reacting to the button some time after switching off, until USB is
+plugged in again. `ReaderPowerDriver` then switches the reader through the
+emulator:
 
 ```python
 power = target.get_driver("PowerProtocol")  # from example-emulator-env.yaml
