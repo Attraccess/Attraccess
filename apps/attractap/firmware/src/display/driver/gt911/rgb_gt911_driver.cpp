@@ -206,8 +206,15 @@ bool RgbGt911Driver::begin()
     // Flash encryption also encrypts all of PSRAM on the S3, and DMA reads of
     // the framebuffer straight from encrypted PSRAM underrun the panel (the
     // picture shakes sideways). Bounce buffers in internal RAM, refilled by the
-    // CPU through the cache, keep it steady (ATT-1166).
-    rgbConfig.bounce_buffer_size_px = 10 * 480;
+    // CPU through the cache, keep it steady (ATT-1166). Each refill covers
+    // BOUNCE_ROWS rows. Measured on a Touch V2 by photographing the screen after
+    // bursts of screen changes: 10 rows still leaves dash artifacts after about
+    // 40 % of the bursts and 12 rows after all of them, 15, 16 and 20 rows after
+    // none (20 of 20 clean). 16 rows divides the 480-row panel and costs 11.5 KB
+    // of internal RAM (TLS needs it), 15 rows 9.6 KB. bb_invalidate_cache and
+    // internal-RAM LVGL draw buffers did not beat a larger bounce buffer.
+    constexpr int BOUNCE_ROWS = 16;
+    rgbConfig.bounce_buffer_size_px = BOUNCE_ROWS * 480;
 #else
     rgbConfig.bounce_buffer_size_px = 0;
 #endif
