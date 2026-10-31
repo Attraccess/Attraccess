@@ -9,9 +9,12 @@ type Row = Record<string, unknown>;
  *
  * The provider of each user is resolved from session evidence first, else the only SAML provider, else the
  * user is skipped (never guessed). A row created by the 1769012345690 OIDC backfill for such a user
- * (OIDC binding to that backfill's lowest-id OIDC provider whose subject is the unprefixed externalIdentifier) is
- * converted to SAML when that is provable. `user.externalIdentifier` is never modified.
+ * (OIDC binding to that backfill's lowest-id OIDC provider whose subject is the externalIdentifier without the `SSO:OIDC:` prefix) is
+ * converted to SAML when that is provable. Prefixed identifiers (`SSO:OIDC:`, added to every user by 1765137500352)
+ * are only processed when SAML session evidence proves exactly one provider. `user.externalIdentifier` is never modified.
  */
+const OIDC_PREFIX = 'SSO:OIDC:';
+
 export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface {
   name = 'BackfillSamlAuthDetails1791900000000';
 
@@ -25,7 +28,7 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
       await queryRunner.query(`SELECT "id" FROM "sso_provider" WHERE "type" = 'OIDC'`)
     ).map((row: Row) => Number(row.id));
     const users: Row[] = await queryRunner.query(
-      `SELECT "id", "externalIdentifier" FROM "user" WHERE "externalIdentifier" IS NOT NULL AND "externalIdentifier" <> '' AND "externalIdentifier" NOT LIKE 'SSO:OIDC:%' ORDER BY "id"`,
+      `SELECT "id", "externalIdentifier" FROM "user" WHERE "externalIdentifier" IS NOT NULL AND "externalIdentifier" <> '' ORDER BY "id"`,
     );
     const counts = {
       inserted: 0,
@@ -38,7 +41,12 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
 
     for (const user of users) {
       const userId = Number(user.id);
-      const subject = String(user.externalIdentifier);
+      // 1765137500352 prefixed every externalIdentifier (also SAML NameIDs), so the prefix does not prove OIDC.
+      const prefixed = String(user.externalIdentifier).startsWith(OIDC_PREFIX);
+      const subject = prefixed
+        ? String(user.externalIdentifier).slice(OIDC_PREFIX.length)
+        : String(user.externalIdentifier);
+      if (!subject) continue;
       const [existing] = await queryRunner.query(
         `SELECT "id", "providerType", "providerId", "ssoSubject" FROM "authentication_detail" WHERE "userId" = ? AND "type" = 'sso'`,
         [userId],
@@ -66,6 +74,11 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
 
       const evidence = await this.findSessionProviders(queryRunner, userId, subject, samlProviderIds);
       let providerId: number | undefined;
+      if (prefixed && evidence.length !== 1) {
+        // Without SAML session proof a prefixed identifier may be a real OIDC one: leave it alone.
+        counts.unchanged++;
+        continue;
+      }
       if (evidence.length === 1) providerId = evidence[0];
       else if (evidence.length === 0 && samlProviderIds.length === 1) {
         // Without any session evidence the single SAML provider is a safe resolution. A misbound OIDC row
@@ -145,7 +158,7 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
       `DELETE FROM "authentication_detail" WHERE "id" IN (
          SELECT "detail"."id" FROM "authentication_detail" "detail"
          JOIN "user" ON "user"."id" = "detail"."userId"
-         WHERE "detail"."type" = 'sso' AND "detail"."providerType" = 'SAML' AND "detail"."ssoSubject" = "user"."externalIdentifier"
+         WHERE "detail"."type" = 'sso' AND "detail"."providerType" = 'SAML' AND ("detail"."ssoSubject" = "user"."externalIdentifier" OR 'SSO:OIDC:' || "detail"."ssoSubject" = "user"."externalIdentifier")
        )`,
     );
   }

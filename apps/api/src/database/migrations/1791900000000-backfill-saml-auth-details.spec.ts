@@ -96,6 +96,37 @@ describe('SAML auth detail backfill migration', () => {
     ]);
   });
 
+  it('binds prefixed identifiers (added by 1765137500352) only when SAML session evidence proves one provider', async () => {
+    await addProvider(2, 'SAML');
+    await addProvider(3, 'SAML');
+    await addUser(1, 'SSO:OIDC:nameid-1');
+    await addSession(1, 3, 'SAML', 'nameid-1');
+    await addUser(2, 'SSO:OIDC:nameid-2');
+    await addSession(2, 2, 'SAML', 'nameid-2');
+    await addSession(2, 3, 'SAML', 'nameid-2');
+    await addUser(3, 'SSO:OIDC:nameid-3');
+    await migration.up(runner);
+    expect(await bindings()).toEqual([{ userId: 1, providerType: 'SAML', providerId: 3, ssoSubject: 'nameid-1' }]);
+    expect(await runner.query(`SELECT externalIdentifier FROM user WHERE id = 1`)).toEqual([
+      { externalIdentifier: 'SSO:OIDC:nameid-1' },
+    ]);
+  });
+
+  it('converts a prefixed misbound OIDC row only with SAML evidence, never via the single-provider fallback', async () => {
+    await addProvider(1, 'OIDC');
+    await addProvider(2, 'SAML');
+    await addUser(1, 'SSO:OIDC:a');
+    await addBinding(1, 'OIDC', 1, 'a');
+    await addSession(1, 2, 'SAML', 'a');
+    await addUser(2, 'SSO:OIDC:b');
+    await addBinding(2, 'OIDC', 1, 'b');
+    await migration.up(runner);
+    expect(await bindings()).toEqual([
+      { userId: 1, providerType: 'SAML', providerId: 2, ssoSubject: 'a' },
+      { userId: 2, providerType: 'OIDC', providerId: 1, ssoSubject: 'b' },
+    ]);
+  });
+
   it('converts a misbound OIDC row with SAML session evidence', async () => {
     await addProvider(1, 'OIDC');
     await addProvider(2, 'SAML');
