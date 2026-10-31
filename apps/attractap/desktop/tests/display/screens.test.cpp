@@ -1,4 +1,5 @@
 #include "fixtures.hpp"
+#include "platform.hpp"
 
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots)
 {
@@ -97,13 +98,13 @@ void testScreenNotices(SdlDisplay &display, const std::filesystem::path &screens
 
     // Routing to the screen that is already showing keeps its notice: it still belongs there.
     Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-    Display::loop();
+    Display::endNoticeRenderPass();
     Display::transitionToScreen(&Display::lockscreen);
     assert(findLabel(Display::lockscreen.getScreen(), "Anmeldung fehlgeschlagen"));
 
     // A transition removes the notice of the screen that is left.
     Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-    Display::loop(); // A later tick: the notice is not part of the next transition's event.
+    Display::endNoticeRenderPass(); // A later pass: the notice is not part of the next transition's event.
     Display::transitionToScreen(&Display::resourceListScreen);
     assert(!findLabel(Display::resourceListScreen.getScreen(), "Anmeldung fehlgeschlagen"));
     assert(!findLabel(Display::lockscreen.getScreen(), "Anmeldung fehlgeschlagen"));
@@ -115,10 +116,43 @@ void testScreenNotices(SdlDisplay &display, const std::filesystem::path &screens
     assert(!findLabel(Display::resourceListScreen.getScreen(), "Status nicht verfügbar"));
 
     // Screens may be destroyed while showing one; nothing dangles afterwards.
+    Display::endNoticeRenderPass();
     Display::transitionToScreen(&Display::initScreen);
+    assert(!findLabel(Display::initScreen.getScreen(), "Status nicht verfügbar"));
     Display::loop();
     Display::lockscreen.destroy();
     Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
     Display::clearNotice();
     Display::loop();
+
+    // A missing touch panel is reported on the boot screen, which the reader
+    // leaves within seconds: that notice follows the screens until it expires.
+    Display::transitionToScreen(&Display::bootScreen);
+    Display::loop();
+    Display::showTouchUnavailableNotice();
+    Display::endNoticeRenderPass();
+    const auto touchNoticeShown = [](IScreen &screen) {
+        return screen.getScreen() && findLabel(screen.getScreen(), "Berührung nicht verfügbar") != nullptr;
+    };
+    const auto waitMs = [](uint32_t duration) {
+        const uint32_t end = millis() + duration;
+        while (static_cast<int32_t>(end - millis()) > 0) { lv_timer_handler(); SDL_Delay(20); }
+    };
+    assert(touchNoticeShown(Display::bootScreen));
+    waitMs(2000);
+    Display::transitionToScreen(&Display::initScreen);
+    Display::loop();
+    assert(touchNoticeShown(Display::initScreen) && !touchNoticeShown(Display::bootScreen));
+    waitMs(3000);
+    Display::transitionToScreen(&Display::lockscreen);
+    Display::loop();
+    assert(touchNoticeShown(Display::lockscreen) && !touchNoticeShown(Display::initScreen));
+    lv_refr_now(nullptr);
+    assert(display.pollEvents());
+    screenshot(screenshots, "notice-touch-unavailable.png");
+    waitMs(3100); // 8.1 s after it was raised
+    assert(!touchNoticeShown(Display::lockscreen));
+    Display::transitionToScreen(&Display::initScreen);
+    Display::loop();
+    assert(!touchNoticeShown(Display::initScreen));
 }

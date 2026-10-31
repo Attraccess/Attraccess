@@ -18,6 +18,7 @@ public:
     void show(lv_obj_t *screenRoot, Kind kind, const FirmwareI18n::Text &title,
               const FirmwareI18n::Text &message, uint32_t durationMs = 0);
     void clear();
+    // Shown and not yet dismissed or timed out.
     bool visible() const { return root != nullptr; }
 
 private:
