@@ -56,6 +56,7 @@ private:
 
 #ifdef HAS_POWER_BUTTON
     std::function<void()> _powerOffCb;
+    lv_obj_t *_powerOffButton = nullptr;
 #endif
 
     // Pre-allocated callback payloads — avoids heap allocation and lifetime issues.
