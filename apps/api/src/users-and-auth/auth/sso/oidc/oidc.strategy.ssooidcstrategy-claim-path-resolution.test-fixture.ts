@@ -25,7 +25,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
   ) {
     const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) } as unknown as DataSource;
     const resolver = new SsoAccountResolver(
-      usersServiceMock as UsersService,
+      { recordCreatedUser: jest.fn(), ...usersServiceMock } as UsersService,
       authServiceMock as AuthService,
       dataSource,
     );

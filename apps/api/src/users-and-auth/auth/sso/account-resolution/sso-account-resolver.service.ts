@@ -80,6 +80,8 @@ export class SsoAccountResolver {
     if (decision === 'reject') throw new UnauthorizedException();
 
     const user = await this.dataSource.transaction((manager) => this.createBoundUser(input, manager));
+    // createOne skips metrics when it runs inside a caller-owned transaction; record them once it has committed.
+    this.usersService.recordCreatedUser(user);
     this.logger.log(`Created user ${user.id} for ${providerType} provider ${providerId}`);
     return { user, created: true };
   }

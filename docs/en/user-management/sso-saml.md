@@ -22,20 +22,20 @@ Plain HTTP requests do not receive a SAML state cookie.
 
 ## Configuration
 
-| Field | Description |
-|-------|-------------|
-| **Entry Point** | SSO URL of the identity provider |
-| **Issuer** | Service provider identifier (your Attraccess URL) |
+| Field           | Description                                                 |
+| --------------- | ----------------------------------------------------------- |
+| **Entry Point** | SSO URL of the identity provider                            |
+| **Issuer**      | Service provider identifier (your Attraccess URL)           |
 | **Certificate** | Identity provider's signing certificate (X.509, PEM format) |
 
 ### Signing Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| **Sign Request** | Off | Sign AuthnRequest to the IdP |
-| **Want Assertions Signed** | On | IdP must sign assertions |
-| **Want AuthnResponse Signed** | On | IdP must sign the entire response |
-| **Force Authentication** | Off | Re-authenticate on every login |
+| Option                        | Default | Description                       |
+| ----------------------------- | ------- | --------------------------------- |
+| **Sign Request**              | Off     | Sign AuthnRequest to the IdP      |
+| **Want Assertions Signed**    | On      | IdP must sign assertions          |
+| **Want AuthnResponse Signed** | On      | IdP must sign the entire response |
+| **Force Authentication**      | Off     | Re-authenticate on every login    |
 
 > [!NOTE]
 > If **Sign Request** is enabled, you must also provide an SP signing certificate and private key.
@@ -45,6 +45,7 @@ Plain HTTP requests do not receive a SAML state cookie.
 Specify the SAML attribute names that contain the email address. Multiple values are possible (one per line).
 
 Common attribute names:
+
 - `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`
 - `email`
 - `mail`
@@ -59,7 +60,7 @@ As with [OIDC](user-management/sso-oidc.md), you can map SAML roles to Attracces
 
 ### Account Binding
 
-SAML identities are bound per provider: a user is identified by the combination of SAML provider and NameID, so the same NameID coming from a different SAML provider never opens that user's account. If a SAML login has an email address that belongs to an existing account without a binding for that provider (including local-password accounts and accounts created through another provider), the user has to confirm the [account linking](user-management/sso-overview.md) first.
+SAML identities are bound per provider: a user is identified by the combination of SAML provider and NameID, so the same NameID coming from a different SAML provider never opens that user's account. If a SAML login has an email address that belongs to an existing account without a binding for that provider, the user has to confirm the [account linking](user-management/sso-overview.md) with the local password first. This also applies to accounts that SAML created earlier before they were bound. An account can be linked to only one SSO provider, so a login whose email belongs to an account bound to another provider is rejected. Accounts without a local password (for example invited accounts) cannot confirm the linking until an administrator sets a password.
 
 **Upgrade note:** On upgrade, existing SAML users are bound to their provider automatically, based on their previous SAML sessions or, if only one SAML provider exists, to that provider. Users that cannot be assigned unambiguously (several SAML providers and no session history) are not bound. They get the account-linking prompt on their next login, which requires a local password, so an administrator has to set one up or fix the account.
 
@@ -67,11 +68,11 @@ SAML identities are bound per provider: a user is identified by the combination 
 
 Configure your SAML identity provider with these values:
 
-| Field | Value |
-|-------|-------|
+| Field                  | Value                                                           |
+| ---------------------- | --------------------------------------------------------------- |
 | **ACS URL (Callback)** | `https://your-url.com/api/auth/sso/SAML/{provider-id}/callback` |
-| **Entity ID / Issuer** | Your Attraccess URL |
-| **Binding** | HTTP-POST |
+| **Entity ID / Issuer** | Your Attraccess URL                                             |
+| **Binding**            | HTTP-POST                                                       |
 
 ## Testing
 

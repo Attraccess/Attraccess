@@ -24,6 +24,7 @@ describe('SsoAccountResolver', () => {
       ),
       createOne: jest.fn(async () => ({ id: 77 }) as User),
       buildUsernameFromSSOClaim: jest.fn((value: string) => `built:${value}`),
+      recordCreatedUser: jest.fn(),
     };
     const auth = {
       findUserIdBySSO: jest.fn().mockResolvedValue(bound),
@@ -81,6 +82,16 @@ describe('SsoAccountResolver', () => {
       },
       manager,
     );
+  });
+
+  it('records the created-user metrics only after the transaction committed', async () => {
+    const created = setup();
+    await created.resolver.resolveSsoUser(input);
+    expect(created.users.recordCreatedUser).toHaveBeenCalledWith({ id: 77 });
+    const failing = setup();
+    failing.auth.addAuthenticationDetails.mockRejectedValue(new Error('binding failed'));
+    await expect(failing.resolver.resolveSsoUser(input)).rejects.toThrow('binding failed');
+    expect(failing.users.recordCreatedUser).not.toHaveBeenCalled();
   });
 
   it('falls back to the email as username claim', async () => {

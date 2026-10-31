@@ -665,16 +665,18 @@ describe('OIDC Passport callback authentication context', () => {
     jest.spyOn(strategy, 'validateProfile').mockResolvedValue(user);
     const req = {};
     const verify = (strategy as unknown as { _verify: (...args: unknown[]) => void })._verify;
-    expect(verify.length).toBe(8);
+    expect(verify.length).toBe(10);
     await new Promise<void>((resolve, reject) =>
       verify(
         req,
         config.issuer,
+        { id: 'subject', _json: { email_verified: false } },
         { id: 'subject' },
         {},
         'signed-id-token',
         'access-token',
         'refresh-token',
+        {},
         (error: Error | null, principal: User) => {
           if (error) return reject(error);
           expect(principal).toBe(user);
@@ -683,6 +685,10 @@ describe('OIDC Passport callback authentication context', () => {
       ),
     );
     expect(verifier.verify).toHaveBeenCalledWith('signed-id-token', config);
+    // The userinfo response only reaches the strategy through the ten-argument verify callback.
+    expect(strategy.validateProfile).toHaveBeenCalledWith(config.issuer, { id: 'subject' }, {}, expect.anything(), {
+      email_verified: false,
+    });
     expect(req).toEqual({
       ssoSessionContext: {
         protocol: 'OIDC',
@@ -699,22 +705,49 @@ describe('OIDC Passport callback authentication context', () => {
     expect(user).not.toHaveProperty('ssoSessionContext');
     verifier.verify.mockRejectedValue(new Error('Bad signature'));
     await expect(
-      strategy.validate({} as never, config.issuer, { id: 'subject' } as Profile, {}, 'bad-token'),
+      strategy.validate(
+        {} as never,
+        config.issuer,
+        { id: 'subject' } as Profile,
+        { id: 'subject' } as Profile,
+        {},
+        'bad-token',
+      ),
     ).rejects.toThrow('verification failed');
     config.jwksURL = null;
     for (const code of ['ERR_JOSE_ALG_NOT_ALLOWED', 'ERR_JWKS_NO_MATCHING_KEY', 'ERR_JWT_EXPIRED']) {
       verifier.verify.mockRejectedValue(Object.assign(new Error('Invalid token'), { code }));
       await expect(
-        strategy.validate({} as never, config.issuer, { id: 'subject' } as Profile, {}, 'bad-token'),
+        strategy.validate(
+          {} as never,
+          config.issuer,
+          { id: 'subject' } as Profile,
+          { id: 'subject' } as Profile,
+          {},
+          'bad-token',
+        ),
       ).rejects.toThrow('verification failed');
     }
     verifier.verify.mockRejectedValue(new OidcVerificationUnavailableError('No optional discovery'));
     const legacyRequest = {};
     await expect(
-      strategy.validate(legacyRequest as never, config.issuer, { id: 'subject' } as Profile, {}, 'legacy-token'),
+      strategy.validate(
+        legacyRequest as never,
+        config.issuer,
+        { id: 'subject' } as Profile,
+        { id: 'subject' } as Profile,
+        {},
+        'legacy-token',
+      ),
     ).resolves.toBe(user);
     expect(legacyRequest).not.toHaveProperty('ssoSessionContext');
-    expect(strategy.validateProfile).toHaveBeenLastCalledWith(config.issuer, { id: 'subject' }, {}, undefined);
+    expect(strategy.validateProfile).toHaveBeenLastCalledWith(
+      config.issuer,
+      { id: 'subject' },
+      {},
+      undefined,
+      undefined,
+    );
   });
 });
 
@@ -748,6 +781,7 @@ describe('OIDC login without a refresh token', () => {
       strategy.validate(
         {} as never,
         config.issuer,
+        { id: 'subject' } as Profile,
         { id: 'subject' } as Profile,
         {},
         'id-token',

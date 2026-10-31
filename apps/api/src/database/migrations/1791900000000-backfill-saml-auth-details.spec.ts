@@ -77,6 +77,13 @@ describe('SAML auth detail backfill migration', () => {
     expect(await bindings()).toEqual([{ userId: 1, providerType: 'SAML', providerId: 3, ssoSubject: 'with-evidence' }]);
   });
 
+  it('does not bind an empty externalIdentifier', async () => {
+    await addProvider(2, 'SAML');
+    await addUser(1, '');
+    await migration.up(runner);
+    expect(await bindings()).toEqual([]);
+  });
+
   it('leaves users with an OIDC prefix or an unrelated SSO binding alone', async () => {
     await addProvider(2, 'SAML');
     await addProvider(5, 'OIDC');

@@ -1,10 +1,13 @@
-import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, Logger, Optional } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { SSOLinkTokenService } from '../link-token.service';
 import { getRedirectToFromRequest } from './oidc-cookie-state-store';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { recordSsoLoginFailure } from '../sso-metrics';
+import { ApprovedOriginsService } from '../../../../common/security/approved-origins.service';
+import { SSOProviderType } from '@attraccess/database-entities';
+import { SettingsService } from '../../../../settings/settings.service';
 
 @Catch(AccountLinkingRequiredException)
 export class AccountLinkingExceptionFilter implements ExceptionFilter {
@@ -13,7 +16,30 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
   constructor(
     private readonly linkTokenService: SSOLinkTokenService,
     private readonly metricsService: MetricsService,
+    @Optional() private readonly approvedOrigins?: ApprovedOriginsService,
+    @Optional() private readonly settingsService?: SettingsService,
   ) {}
+
+  /**
+   * A SAML callback is a cross-site POST without the OIDC state cookie. Like the successful login, it goes back to
+   * the RelayState address when that is approved for browser sessions, otherwise to the configured application URL.
+   */
+  private async samlRedirect(request: Request, providerType: SSOProviderType): Promise<string | undefined> {
+    if (providerType !== SSOProviderType.SAML) return undefined;
+    const body = request.body as { RelayState?: unknown } | undefined;
+    const relayState = [body?.RelayState, request.query?.RelayState].find(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0,
+    );
+    if (relayState && this.approvedOrigins) {
+      try {
+        const url = new URL(relayState);
+        if (await this.approvedOrigins.isApproved(url.origin, request)) return url.toString();
+      } catch {
+        // malformed RelayState: use the application URL
+      }
+    }
+    return (await this.settingsService?.getUrl()) || undefined;
+  }
 
   async catch(exception: AccountLinkingRequiredException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -23,10 +49,11 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
     this.logger.log(`Account linking required for email: ${exception.email}`);
     recordSsoLoginFailure(this.metricsService, exception.providerType, 'linking_failed', this.logger);
 
-    const redirectTo = getRedirectToFromRequest(
-      request as unknown as Record<string, unknown>,
-      request.query.redirectTo as string | undefined,
-    );
+    const redirectTo =
+      getRedirectToFromRequest(
+        request as unknown as Record<string, unknown>,
+        request.query.redirectTo as string | undefined,
+      ) ?? (await this.samlRedirect(request, exception.providerType));
     this.logger.debug('Original query: ', request.query);
 
     if (redirectTo) {

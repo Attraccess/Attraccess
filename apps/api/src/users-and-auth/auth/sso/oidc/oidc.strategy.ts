@@ -40,7 +40,7 @@ export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
 export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
+export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) {
   constructor(
     protected moduleRef: ModuleRef,
     config: SSOProviderOIDCConfiguration,
@@ -108,17 +108,22 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
     }
   }
 
-  // Explicit eight-argument Passport verify callback: req, issuer, profile, context, id_token, access_token,
-  // refresh_token, done. The refresh token enables session-time permission re-sync.
+  // Explicit ten-argument Passport verify callback: req, issuer, userinfo profile, id-token profile, context, id_token,
+  // access_token, refresh_token, params, done. The refresh token enables session-time permission re-sync. Only this
+  // form exposes the userinfo response (`_json`): the merged profile of the shorter forms is built before it is set.
   async validate(
     req: SsoSessionRequest,
     issuer: string,
-    profile: Profile,
+    uiProfile: Profile | undefined,
+    idProfile: Profile,
     context: unknown,
     idToken: string,
     _accessToken?: string,
     refreshToken?: string,
   ): Promise<User> {
+    const userinfo = (uiProfile as { _json?: Record<string, unknown> } | undefined)?._json;
+    // Keep today's merged profile; the userinfo response is handed over separately, for `email_verified` only.
+    const profile = { ...idProfile, ...uiProfile, _json: undefined, _raw: undefined } as Profile;
     const verifier = this.moduleRef.get(OidcTokenVerifier, { strict: false });
     let claims: Record<string, unknown> | undefined;
     try {
@@ -146,7 +151,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       delete req.ssoSessionContext;
       claims = undefined;
     }
-    const user = await this.validateProfile(issuer, profile, context, claims);
+    const user = await this.validateProfile(issuer, profile, context, claims, userinfo);
     if (req.ssoSessionContext && !refreshToken) this.reportMissingRefreshToken();
     return user;
   }
@@ -173,6 +178,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
     profile: Profile,
     _context?: unknown,
     idTokenClaims?: Record<string, unknown>,
+    userinfoClaims?: Record<string, unknown>,
   ): Promise<User> {
     this.logger.log(`Validating OIDC profile for issuer: ${_issuer}`);
 
@@ -222,7 +228,11 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
         providerId: this.config.ssoProviderId,
         subject: oidcUserId,
         email,
-        emailVerified: this.resolveEmailVerified(idTokenClaims, raw as Record<string, unknown> | undefined),
+        emailVerified: this.resolveEmailVerified(
+          idTokenClaims,
+          raw as Record<string, unknown> | undefined,
+          userinfoClaims,
+        ),
         usernameClaim: resolvedUsername || profile.username || email,
       })
       .catch((error: unknown) => {

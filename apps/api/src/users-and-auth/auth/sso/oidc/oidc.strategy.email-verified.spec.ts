@@ -47,6 +47,20 @@ describe('SSOOIDCStrategy - email_verified', () => {
     );
   });
 
+  it.each([false, 'false'])('reads email_verified from the separate userinfo response (%p)', async (value) => {
+    const { users, strategy } = setup();
+    const bare = { id: 'subject', emails: [{ value: 'user@example.com' }] } as unknown as Profile;
+    await strategy.validateProfile('issuer', bare, undefined, undefined, { email_verified: value });
+    expect(users.createOne).toHaveBeenCalledWith(
+      expect.objectContaining({ isEmailVerified: false }),
+      expect.anything(),
+    );
+    const taken = setup({ id: 9 } as User);
+    await expect(
+      taken.strategy.validateProfile('issuer', bare, undefined, undefined, { email_verified: value }),
+    ).rejects.toThrow('SSO_EMAIL_NOT_VERIFIED');
+  });
+
   it.each([true, 'true', undefined, 'maybe'])(
     'keeps linking and trusting behaviour when email_verified is %p',
     async (value) => {

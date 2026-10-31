@@ -23,7 +23,7 @@ export function buildSamlModuleRef(deps: {
   const auth = deps.auth ?? { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
   const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) };
   const resolver = new SsoAccountResolver(
-    deps.users as UsersService,
+    { recordCreatedUser: jest.fn(), ...deps.users } as unknown as UsersService,
     auth as AuthService,
     dataSource as unknown as DataSource,
   );

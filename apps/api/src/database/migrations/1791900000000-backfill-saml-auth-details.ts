@@ -22,7 +22,7 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
       await queryRunner.query(`SELECT "id" FROM "sso_provider" WHERE "type" = 'SAML'`)
     ).map((row: Row) => Number(row.id));
     const users: Row[] = await queryRunner.query(
-      `SELECT "id", "externalIdentifier" FROM "user" WHERE "externalIdentifier" IS NOT NULL AND "externalIdentifier" NOT LIKE 'SSO:OIDC:%' ORDER BY "id"`,
+      `SELECT "id", "externalIdentifier" FROM "user" WHERE "externalIdentifier" IS NOT NULL AND "externalIdentifier" <> '' AND "externalIdentifier" NOT LIKE 'SSO:OIDC:%' ORDER BY "id"`,
     );
     const counts = {
       inserted: 0,
