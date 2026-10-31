@@ -254,9 +254,7 @@ bool Adafruit_PN532::inDataExchange(uint8_t *send, uint8_t sendLength,
 
   if (!waitready(1000))
   {
-#ifdef PN532DEBUG
-    PN532DEBUGPRINT.println(F("Response never received for APDU..."));
-#endif
+    PN532DEBUGPRINT.println(F("PN532 InDataExchange: no response"));
     return false;
   }
 
@@ -280,9 +278,9 @@ bool Adafruit_PN532::inDataExchange(uint8_t *send, uint8_t sendLength,
     {
       if ((pn532_packetbuffer[7] & 0x3f) != 0)
       {
-#ifdef PN532DEBUG
-        PN532DEBUGPRINT.println(F("Status code indicates an error"));
-#endif
+        // The reader reports any failed exchange to the server as CARD_REMOVED; keep the reason
+        // (0x01 timeout, 0x13 frame format, 0x27 wrong command state) in the serial log.
+        PN532DEBUGPRINT.printf("PN532 InDataExchange status 0x%02X\n", pn532_packetbuffer[7]);
         return false;
       }
 
