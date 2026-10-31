@@ -334,6 +334,11 @@ to signed-in users, connected only while shown. The API relays the stream from
 the coordinator host, so the URL must be reachable there; a uStreamer-style
 `/snapshot` URL is watched as its sibling `/stream`.
 
+`nix/dashboard-mobile.patch` makes the frontend usable on phones:
+below 768 px the sidebar becomes a menu drawer, wide tables scroll inside their
+panel, controls grow to 40 px touch targets and dialogs fit the screen. Wider
+screens keep the upstream layout.
+
 Browser serial consoles are explicitly disabled: upstream's TCP bridge does not
 support our RFC2217/SSH transport. Use native labgrid console access instead.
 ADI-specific FPGA recovery and SD-mux routes are omitted. Power hardware is not

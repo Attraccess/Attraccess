@@ -75,10 +75,13 @@ def main():
         if mode == "full":
             page = expect(client.get("/"), 200)
             assert '<div id="root"></div>' in page.text
+            assert re.search(r'<meta name="viewport" content="width=device-width', page.text)
             asset = re.search(r'<script[^>]+src="([^"]+)"', page.text)
             assert asset is not None
             javascript = expect(client.get(asset.group(1)), 200)
             assert "javascript" in javascript.headers["content-type"]
+            # The phone navigation drawer only exists in our patched bundle.
+            assert "Open navigation" in javascript.text
             expect(client.post("/api/places/lock/acquire"), 401)
             expect(client.get("/api/places/reader-a/cameras/HTTPVideoStream"), 401)
             expect(
