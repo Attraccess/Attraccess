@@ -149,6 +149,11 @@ export class AttractapSessionHandler {
     );
   }
 
+  /** The user a reader action was sent for, captured before the first await of the handler. */
+  protected async findActingUser(userId: number | null) {
+    return userId == null ? null : this.usersService.findOne({ id: userId });
+  }
+
   protected extractUserFacingError(error: unknown): string {
     if (error instanceof FlowExecutionError) {
       return error.message.replace(/^FLOW_EXECUTION_ERROR:\s*/, '');
@@ -164,6 +169,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleLockDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId } = data.payload as { resourceId: number };
 
     if (
@@ -177,7 +184,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.LOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -194,6 +201,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleUnlockDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId } = data.payload as { resourceId: number };
 
     if (
@@ -207,7 +216,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.UNLOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -224,6 +233,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleUnlatchDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId } = data.payload as { resourceId: number };
 
     if (
@@ -237,7 +248,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.UNLATCH_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -254,6 +265,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleTriggerFlowButton(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId, buttonId } = data.payload as { resourceId: number; buttonId: string };
 
     if (
@@ -267,8 +280,13 @@ export class AttractapSessionHandler {
       return;
     }
 
+    if (userId == null) {
+      await this.reply(socket, data, AttractapEventType.TRIGGER_FLOW_BUTTON, { error: 'USER_NOT_AUTHENTICATED' });
+      return;
+    }
+
     try {
-      await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, socket.state.verifiedUserId);
+      await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, userId);
       await this.reply(socket, data, AttractapEventType.TRIGGER_FLOW_BUTTON, { success: true });
     } catch (error) {
       this.logger.error(`Failed to trigger flow button: ${error.message}`);
@@ -277,6 +295,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId, projectId, forceTakeOver } = data.payload as {
       resourceId: number;
       projectId?: number;
@@ -305,7 +325,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;
@@ -355,6 +375,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId } = data.payload as {
       resourceId: number;
     };
@@ -380,7 +402,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.verifiedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;

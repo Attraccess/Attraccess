@@ -258,6 +258,23 @@ describe('AttractapFirmwareHandler', () => {
     const payload = { name: 'attractap', variant: 'touch', version: '1.0.0' };
     const data = { payload } as AttractapEvent['data'];
 
+    it.each([
+      ['2.0.0 with the cardRelay capability', { version: '2.0.0', capabilities: { cardRelay: true } }, true],
+      ['an older firmware without capabilities', { version: '1.9.3' }, false],
+      ['2.0.0 without the capability', { version: '2.0.0', capabilities: {} }, false],
+      ['a non-boolean capability', { version: '2.0.0', capabilities: { cardRelay: 'true' } }, false],
+    ])('sets cardRelay from FIRMWARE_INFO: %s', async (_name, info, expected) => {
+      fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue(null);
+      // A reconnecting reader that downgraded must not keep a previous connection's capability.
+      fixture.socket.state.cardRelay = !expected;
+
+      await fixture.handler.handleFirmwareInfo(fixture.socket, {
+        payload: { name: 'attractap', variant: 'touch', ...info },
+      } as AttractapEvent['data']);
+
+      expect(fixture.socket.state.cardRelay).toBe(expected);
+    });
+
     it('always calls updateReaderFirmware with readerId and payload', async () => {
       fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({ version: '1.0.0' });
 

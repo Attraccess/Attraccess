@@ -31,14 +31,15 @@ import { AttractapSupervisionHandler } from './handlers/supervision/supervision.
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { CardConversationService } from './card-conversation.service';
 import { CardDetectedRouter } from './card-detected.router';
-import { sanitizeForLVGL } from './lvgl-text';
+import { createReaderSenders, READER_MAX_INBOUND_PAYLOAD_BYTES } from './reader-socket-send';
 import { WebsocketService } from './websocket.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMessage } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
+import { CardConversationFailure } from './card-conversation.service';
 import { randomBytes } from 'crypto';
 import { closeSync } from 'fs';
 
-@WebSocketGateway({ path: '/api/attractap/websocket' })
+@WebSocketGateway({ path: '/api/attractap/websocket', maxPayload: READER_MAX_INBOUND_PAYLOAD_BYTES })
 @UseInterceptors(WsMetricsInterceptor)
 export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -121,8 +122,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   > = {
     [AttractapEventType.READER_REGISTER]: (socket, eventData) =>
       this.authHandler.handleReaderRegister(socket, eventData),
-    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) =>
-      this.authHandler.handleAuthentication(socket, eventData),
+    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) => {
+      // A new identity on this connection starts from nothing: no verified card, no armed flow.
+      this.resetReaderConnectionState(socket, socket.readerId, 'READER_SESSION_ENDED');
+      return this.authHandler.handleAuthentication(socket, eventData);
+    },
     [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
       this.firmwareHandler.handleFirmwareInfo(socket, eventData),
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
@@ -222,13 +226,34 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   /** The reader's login ended (logout or timeout): forget the verified user and stop what depended on them. */
-  protected onReaderSessionEnded(socket: AuthenticatedWebSocket) {
-    this.cardConversations.abort(socket, 'READER_SESSION_ENDED');
+  protected onReaderSessionEnded(
+    socket: AuthenticatedWebSocket,
+    reason: CardConversationFailure = 'READER_SESSION_ENDED',
+  ) {
+    this.cardConversations.abort(socket, reason);
     this.cardHandler.clearVerifiedUser(socket);
     socket.state.formDrafts = undefined;
     if (socket.state.supervisionFlow && !socket.state.supervisionFlow.webInitiated) {
       this.supervisionHandler.cancelForSocket(socket);
     }
+  }
+
+  /**
+   * Everything bound to this connection's reader identity ends: the login (as on READER_SESSION_ENDED)
+   * plus flows armed for the reader (web-started supervision, mass introduction, enrollment, reset).
+   * Used on disconnect and when the connection authenticates again.
+   */
+  protected resetReaderConnectionState(
+    socket: AuthenticatedWebSocket,
+    readerId: number | null,
+    reason: CardConversationFailure,
+  ) {
+    if (!socket.state) return;
+    this.onReaderSessionEnded(socket, reason);
+    if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
+    if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
+    socket.state.enrollment = null;
+    socket.state.resetNfcCardData = null;
   }
 
   public async sendResourceList(readerId: number) {
@@ -407,88 +432,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     const id = randomBytes(4).toString('base64url').slice(0, 5);
-    let messageCount = 0;
-
-    const sendMessage = async (message: AttractapMessage) => {
-      messageCount++;
-      message.data.messageId = messageCount;
-
-      const RETRY_COUNT = 3;
-      const socket = client as unknown as AuthenticatedWebSocket;
-      const readerId = socket.readerId;
-      const authenticationAttempt = socket.state.readerAuthenticationAttempt;
-
-      let lastError: Error | undefined;
-
-      for (let i = 0; i < RETRY_COUNT; i++) {
-        // Authentication success and language retries belong to the current open reader connection.
-        if (
-          (message.data.type === AttractapEventType.READER_LANGUAGE ||
-            message.data.type === AttractapEventType.READER_AUTHENTICATED) &&
-          (!this.canReceiveReaderLanguage(socket) ||
-            socket.readerId !== readerId ||
-            socket.state.readerAuthenticationAttempt !== authenticationAttempt)
-        )
-          return false;
-        this.logger.debug(
-          `Sending ${message.event} of type ${message.data.type} to client ${socket.id} (attempt ${i + 1}/${RETRY_COUNT})`,
-        );
-        // An older auth/update retry must not restore a superseded default.
-        if (
-          (message.data.type === AttractapEventType.READER_AUTHENTICATED ||
-            message.data.type === AttractapEventType.READER_LANGUAGE) &&
-          this.websocketService.readerLanguage !== undefined
-        ) {
-          message.data.payload.language = this.websocketService.readerLanguage;
-        }
-        const stringifiedMessage = JSON.stringify(sanitizeForLVGL(message));
-        client.send(stringifiedMessage);
-
-        this.logger.debug(
-          `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
-        );
-        try {
-          await this.waitForClientResponse(client as unknown as AuthenticatedWebSocket, message.data.type);
-          lastError = undefined;
-          break;
-        } catch (error) {
-          lastError = error as Error;
-          this.logger.debug(`Attempt ${i + 1} failed: ${error.message}`);
-        }
-      }
-
-      if (lastError) {
-        this.logger.error(
-          `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
-        );
-        return false;
-      }
-
-      return true;
-    };
-
-    const sendRaw = (message: AttractapMessage): boolean => {
-      if (client.readyState !== WebSocket.OPEN) return false;
-      try {
-        client.send(JSON.stringify(message));
-        return true;
-      } catch (error) {
-        this.logger.error(`Failed to send raw message to client ${id}: ${(error as Error).message}`);
-        return false;
-      }
-    };
-
-    const sendBinaryData = (data: Buffer) => {
-      try {
-        client.send(data as unknown as BufferSource);
-      } catch (e) {
-        this.logger.error(`Failed to send binary data to client ${id}: ${(e as Error).message}`);
-      }
-    };
+    const { sendMessage, sendRaw, sendBinaryData } = createReaderSenders({
+      client,
+      id,
+      logger: this.logger,
+      waitForAck: (socket, type) => this.waitForClientResponse(socket, type),
+      canReceiveReaderLanguage: (socket) => this.canReceiveReaderLanguage(socket),
+      readerLanguage: () => this.websocketService.readerLanguage,
+    });
 
     Object.assign(client, {
       id,
-      messageCount,
+      messageCount: 0,
       readerId: null,
       readerName: null,
       sendMessage,
@@ -564,20 +519,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.logger.log('An unidentified client disconnected.');
     }
 
-    // The reader is gone: nobody stays logged in on this connection and no card talk goes on.
-    if (socket.state) {
-      this.cardConversations.abort(socket, 'READER_UNREACHABLE');
-      socket.state.verifiedUserId = null;
-      socket.state.verifiedCardUid = null;
-    }
-
-    // Tear down any in-progress two-card supervision so the supervisor's web popup doesn't linger.
-    if (socket.state?.supervisionFlow) {
-      this.supervisionHandler.cancelForSocket(socket);
-    }
-    if (socket.state?.massIntroductionFlow) {
-      this.massIntroductionHandler.cancelForSocket(socket, readerId);
-    }
+    // The reader is gone: nobody stays logged in, no card talk goes on, and armed flows (including
+    // the supervisor's web popup) are torn down.
+    this.resetReaderConnectionState(socket, readerId, 'READER_UNREACHABLE');
 
     // Clean up OTA file descriptor if present
     if (socket.state?.ota?.fd) {
