@@ -1,5 +1,6 @@
 #include "commands.hpp"
 #include "nfc_emulator/api_validation.hpp"
+#include "reader_button.hpp"
 
 #include "esp_timer.h"
 
@@ -342,6 +343,21 @@ Reply set_removal(EmulatorState &state, cJSON *arguments) {
   return ok();
 }
 
+Reply press_button(cJSON *arguments) {
+  cJSON *press = field(arguments, "ms");
+  cJSON *count = field(arguments, "count");
+  cJSON *gap = field(arguments, "gapMs");
+  int64_t press_ms = 200, count_value = 1, gap_ms = 300;
+  if ((press && !integer_value(press, INT32_MIN, INT32_MAX, press_ms)) ||
+      (count && !integer_value(count, INT32_MIN, INT32_MAX, count_value)) ||
+      (gap && !integer_value(gap, INT32_MIN, INT32_MAX, gap_ms)))
+    return fail("invalid_button", "ms, count and gapMs must be integers");
+  ApiValidationResult validation = validate_button_press(press_ms, count_value, gap_ms);
+  if (!validation.valid) return fail("invalid_button", validation.message);
+  reader_button_press(press_ms, count_value, gap_ms);
+  return ok();
+}
+
 Reply present(EmulatorState &state) {
   std::unique_lock<std::mutex> lock(state.mutex);
   if (!state.active_profile) return fail("no_profile", "select a profile first");
@@ -418,7 +434,7 @@ constexpr const char *command_names[] = {
     "help", "health", "status", "profiles.list", "profiles.create", "profiles.get",
     "profiles.update", "profiles.delete", "profiles.select", "scenario", "behavior.clear", "fault.set",
     "fault.clear", "overrides.set", "overrides.clear", "removal.set", "present",
-    "remove", "reset", "trace.get", "trace.clear"};
+    "remove", "reset", "trace.get", "trace.clear", "button.press"};
 
 }  // namespace
 
@@ -469,6 +485,7 @@ Reply run_command(EmulatorState &state, NvsStore &store, const std::string &comm
     state.trace.clear();
     return ok();
   }
+  if (command == "button.press") return press_button(arguments);
   return fail("unknown_command", "send help for the list of commands");
 }
 

@@ -67,7 +67,13 @@ let
     CONFIG
   '';
 in {
-  imports = [ ./dashboard-module.nix ];
+  imports = [
+    ./dashboard-module.nix
+    # The CI hardware tests relay on the first port and the next one up.
+    (lib.mkChangedOptionModule [ "services" "attractap-lab" "readerApiRelay" "port" ]
+      [ "services" "attractap-lab" "readerApiRelay" "ports" ]
+      (config: let port = config.services.attractap-lab.readerApiRelay.port; in [ port (port + 1) ]))
+  ];
   options.services.attractap-lab = {
     enable = mkEnableOption "the shared Attractap hardware lab";
     package = mkOption {
@@ -109,10 +115,10 @@ in {
     };
     readerApiRelay = {
       enable = mkEnableOption "letting lab users relay a test API to the readers' LAN with an SSH reverse tunnel (CI runners are not on that LAN)";
-      port = mkOption {
-        type = types.port;
-        default = 20480;
-        description = "The only port the labgrid account may forward. Open it to the readers' LAN in the host firewall; the module opens no ports.";
+      ports = mkOption {
+        type = types.nonEmptyListOf types.port;
+        default = [ 20480 20481 ];
+        description = "The only ports the labgrid account may forward, one per test run at a time. The CI hardware tests run every reader type at once, counting up from the first port. Open them to the readers' LAN in the host firewall; the module opens no ports.";
       };
     };
     readerWifi = {
@@ -251,11 +257,11 @@ in {
     };
   })
   (mkIf cfg.readerApiRelay.enable {
-    # Remote forwards on all addresses, but only on the relay port.
+    # Remote forwards on all addresses, but only on the relay ports.
     services.openssh.extraConfig = ''
       Match User labgrid
         GatewayPorts clientspecified
-        PermitListen 0.0.0.0:${toString cfg.readerApiRelay.port}
+        PermitListen ${lib.concatMapStringsSep " " (port: "0.0.0.0:${toString port}") cfg.readerApiRelay.ports}
     '';
   })
   (mkIf readerWifi.enable {

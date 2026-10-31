@@ -100,7 +100,7 @@
   },
   "toPair": {
     "title": "Nicht gekoppelt",
-    "description": "Kopple diese Reader, bevor du sie einrichten kannst. Reader, die sich mit einem Token anmelden, funktionieren bis dahin weiter. Der Reader muss eingeschaltet und verbunden sein.",
+    "description": "Ein neuer Reader zeigt einen Code auf seinem Bildschirm (Lite: Farben auf seinem Ring). Wähle „Koppeln“ und gib dann den Code ein oder vergleiche die Farben. Kopple diese Reader, bevor du sie einrichten kannst; Reader, die sich mit einem Token anmelden, funktionieren bis dahin weiter. Der Reader muss eingeschaltet und verbunden sein.",
     "neverPaired": "Noch nicht gekoppelt",
     "pairingRemoved": "Kopplung wurde entfernt",
     "newReader": "Neuer Reader",
