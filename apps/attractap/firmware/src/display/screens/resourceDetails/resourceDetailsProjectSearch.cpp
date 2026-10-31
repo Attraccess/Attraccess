@@ -36,7 +36,14 @@ void ResourceDetailsScreen::resetProjectsSearch()
    this->closeProjectsSearchEditor(false);
    this->projectsSearchQuery.clear();
    this->projectsRequestPending = false;
+   // The projects belong to the user whose session ended: never show them to the next one.
+   this->projectsCache = API::ProjectsOfUserResponse{};
+   this->projectsDataInitialized = false;
+   this->projectsCurrentPage = 1;
+   this->projectsTotalCount = 0;
+   this->projectsHasMore = false;
    this->refreshProjectsSearchField();
+   this->rebuildProjectsList();
 }
 
 void ResourceDetailsScreen::createProjectsSearchRow(lv_obj_t *panel)
