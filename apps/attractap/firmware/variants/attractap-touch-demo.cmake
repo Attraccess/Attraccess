@@ -6,6 +6,9 @@ set(ATTRACTAP_FIRMWARE_NAME "attractap_touch_demo")
 set(ATTRACTAP_FIRMWARE_FRIENDLY_NAME "Attractap Touch Demo")
 set(ATTRACTAP_FIRMWARE_VARIANT "demo")
 set(ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME "Demo")
+# Flip to "true" only after the secure profile passed its hardware run (ATT-1166).
+set(ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED "false")
+set(ATTRACTAP_SECURE_PROFILE_BUILD "false")
 
 set(ATTRACTAP_DEFINES
     FIRMWARE_NAME="${ATTRACTAP_FIRMWARE_NAME}"

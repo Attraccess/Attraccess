@@ -233,6 +233,60 @@ pytest. Logs, the emulator trace and camera photos land in
 `apps/attractap-lab/hil-artifacts/lab-artifacts/<session>`. These tests are
 not part of `pnpm nx run attractap-lab:test`, which runs without hardware.
 
+### Secure lab reader
+
+> **Never write a release (non-lab) secure image to a lab secure reader**: its first boot
+> switches flash encryption to release mode for good. The suite never burns eFuses itself (only the
+> firmware's anti-rollback version, see below); it only writes lab-signed images through `tools/secure_lab_reader.py`, which refuses anything else.
+
+`READER_PROFILE=secure-lab` runs the same tests on a Touch V2 provisioned for
+ATT-1166 (Secure Boot with the public lab keys, development-mode flash
+encryption; see `apps/attractap/firmware/lab/secure-boot/README.md`). The
+runner builds the reader with `-DATTRACTAP_SECURE_PROFILE=ON
+-DATTRACTAP_SECURE_LAB=ON -DATTRACTAP_TEST_HOOKS=ON` (the lab profile keeps the
+USB console and serial command handler; only the release profile compiles them
+out), signs it with the lab key and writes it encrypted with
+`tools/secure_lab_reader.py flash`. When the run ends it wipes the reader with
+`flash --erase-all`, because the janitor's unsigned park image would boot-loop a
+Secure Boot reader. The wipe also runs when the run fails during setup, so no
+Wi-Fi, PIN or pairing stays on the reader.
+
+The flash tool runs on the machine that has the USB cable, so the reader must be
+local for now (`READER_SERIAL_PORT=/dev/...`); moving a secure reader into a
+lab place needs a lab-signed park image first. A reader on this machine's USB
+runs without labgrid's coordinator (`HIL_LOCAL_ENV`, required for `secure-lab`).
+
+Before a run:
+
+1. The reader must already be provisioned with the lab keys (`secure_lab_reader.py provision`,
+   see the firmware's `lab/secure-boot/README.md`). Find the serial devices with
+   `ls /dev/cu.usbmodem*` and confirm the reader with
+   `python3 apps/attractap/firmware/tools/secure_lab_reader.py status --port …` (MAC, lab key digests).
+2. Write the Wi-Fi file outside the repository and readable only by you:
+   `(umask 077; printf '{"ssid": "...", "password": "..."}' > ~/hil-wifi.json)`. Delete it after the run.
+3. `labgrid-client` must be installed even in local mode: `run.sh` takes its Python (with labgrid and
+   pytest) from it, or from `LAB_PYTHON`.
+
+```sh
+. .tools/esp-idf/export.sh
+HIL_LOCAL_ENV=$PWD/apps/attractap-lab/hil/example-desk-env.yaml READER_PROFILE=secure-lab \
+  READER_SERIAL_PORT=/dev/cu.usbmodemXXXX EMULATOR_SERIAL_PORT=/dev/cu.usbmodemYYYY \
+  READER_WIFI_FILE=$HOME/hil-wifi.json pnpm nx run attractap-lab:hil
+```
+
+`run.sh` checks these inputs before it builds anything. Use absolute paths: through nx, relative
+paths are taken from `apps/attractap-lab`. `READER_SECURE_BUILD=<dir>` reuses an existing lab secure build directory
+instead of building one; `READER_CMAKE_ARGS` adds `idf.py` arguments to the build. The emulator
+keeps the firmware it runs, and there is no camera, so screenshots are skipped. The reader's
+internal heap (before pairing, after the TLS session opened, at the end) is written to
+`reader-heap.jsonl` in the run's artifacts.
+
+If a run is interrupted before its own wipe (e.g. killed), wipe the reader by hand:
+`python3 apps/attractap/firmware/tools/secure_lab_reader.py flash --port … --build-dir
+apps/attractap/firmware/build/hil-attractap-touch-v2-secure-lab --erase-all`. Running the suite
+from a branch that raises `CONFIG_BOOTLOADER_APP_SECURE_VERSION` burns the new version into the
+reader (anti-rollback), so lab images from older branches no longer boot on it afterwards.
+
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release

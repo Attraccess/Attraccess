@@ -2,6 +2,7 @@
 #include "../../../platform.hpp"
 #include "../../../utils.hpp"
 
+#include "sdkconfig.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_io_additions.h"
@@ -201,7 +202,23 @@ bool RgbGt911Driver::begin()
     rgbConfig.in_color_format = LCD_COLOR_FMT_RGB565;
     rgbConfig.out_color_format = LCD_COLOR_FMT_RGB565;
     rgbConfig.num_fbs = 1;
+#if CONFIG_SECURE_FLASH_ENC_ENABLED
+    // Flash encryption also encrypts all of PSRAM on the S3, and DMA reads of
+    // the framebuffer straight from encrypted PSRAM underrun the panel (the
+    // picture shakes sideways). Bounce buffers in internal RAM, refilled by the
+    // CPU through the cache, keep it steady (ATT-1166). Each refill covers
+    // BOUNCE_ROWS rows. Photographing a Touch V2 after bursts of screen changes:
+    // 10 rows left dash artifacts after about 40 % of the bursts, 12 rows after
+    // all, 15, 16 and 20 rows after none (20 of 20 clean). IDF allocates two bounce buffers in internal DMA RAM, so
+    // 16 rows cost 2 x 16 x 480 x 2 B = 30 KB (11.5 KB more than 10 rows) of
+    // the internal heap that TLS also needs.
+    constexpr int BOUNCE_ROWS = 16;
+    // esp_lcd only accepts a framebuffer that is a whole number of bounce buffers.
+    static_assert(480 % BOUNCE_ROWS == 0, "the 480-row framebuffer must be a multiple of the bounce buffer");
+    rgbConfig.bounce_buffer_size_px = BOUNCE_ROWS * 480;
+#else
     rgbConfig.bounce_buffer_size_px = 0;
+#endif
     rgbConfig.dma_burst_size = 64;
     rgbConfig.hsync_gpio_num = (gpio_num_t)38;
     rgbConfig.vsync_gpio_num = (gpio_num_t)39;
