@@ -196,10 +196,14 @@ Native `labgrid-client power on|off|cycle|get` uses the same driver. A reader
 already in the requested state is left alone, so `on()` is safe on any reader.
 `attractap_lab.workflow.power_on(target)` turns the reader on only when it is
 off and the place exports `NfcEmulatorSerial`, binding the emulator itself when
-the environment lists only the reader's drivers. `smoke`, the janitor's parking
-and the HIL reader fixture call it before flashing. In a session, or while
-holding a place, `attractap-lab-power on|off|cycle|get` needs no environment
-file:
+the environment lists only the reader's drivers. A V1 switched on from parking
+runs the dark parking image, so it switches itself off again about 30 s later,
+which a slow flash can outlast. `flash_reader(target, image)` therefore powers
+the reader on, flashes it once more if it went off mid-flash, and presses the
+button again if it is off after the reset. `smoke` and the HIL reader fixture
+flash through it; the janitor's parking powers on the same way. In a session,
+or while holding a place, `attractap-lab-power on|off|cycle|get` needs no
+environment file:
 
 ```sh
 labgrid-client -p attractap-touch-1 session --purpose 'ATT-1234: cold boot' -- \

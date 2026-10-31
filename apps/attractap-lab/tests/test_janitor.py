@@ -20,10 +20,10 @@ from labgrid.binding import BindingState
 from labgrid.exceptions import NoDriverFoundError, NoResourceFoundError
 import pytest
 
-from attractap_lab import efuse
+from attractap_lab import efuse, workflow
 from attractap_lab.drivers import ESPToolDriver, ReaderPowerDriver
 from attractap_lab.janitor import OWNER, Janitor
-from attractap_lab.workflow import park
+from attractap_lab.workflow import flash_reader, park
 from test_lab_workflow import eventually, executable, free_port, running
 
 
@@ -95,6 +95,9 @@ class FakeFlash:
     def erase_and_flash(self, image):
         self.events.append(("erase-and-flash", Path(image).name))
 
+    def flash(self, image):
+        self.events.append(("flash", Path(image).name))
+
 
 class FakePower:
     """A Touch V1 that is off until its emulator presses the power button."""
@@ -141,7 +144,8 @@ class FakeTarget:
         self.events.append(("deactivate", self._name(driver)))
 
 
-def test_park_checks_efuses_before_erasing(tmp_path):
+def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
+    monkeypatch.setattr(workflow, "RESET_SETTLE_SECONDS", 0)
     events = []
     target = FakeTarget(FakeConsole([b"ESP-ROM boot\n", b"ATTRACTAP_PARK", b"ED hardware=x nfc=off\n"]),
                         FakeFlash(espefuse_output(), events))
@@ -419,3 +423,44 @@ def test_janitor_parks_places_added_after_it_started(tmp_path):
     janitor.reservations.clear()
     asyncio.run(janitor.tick())
     assert reserved == ["reader"]
+
+
+def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatch):
+    monkeypatch.setattr(workflow, "RESET_SETTLE_SECONDS", 0)
+    events = []
+    power = FakePower(events)
+    flash = FakeFlash(espefuse_output(), events)
+    calls = []
+
+    def cut_once(image):
+        # The parked V1 switches itself off during the first, slow flash.
+        calls.append(image)
+        if len(calls) == 1:
+            power.powered = False
+            raise subprocess.CalledProcessError(2, ["esptool"])
+        events.append(("flash", Path(image).name))
+
+    flash.flash = cut_once
+    flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+    assert events.count("power-on") == 2
+    assert events.count(("flash", "reader.bin")) == 1
+    assert events.index("power-on") < events.index(("activate", "flash"))
+
+    # A reader that was on but switched itself off at the reset gets the
+    # button pressed after the flash.
+    events.clear()
+    flash.flash = lambda image: setattr(power, "powered", False)
+    flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+    assert power.powered
+    assert events == [("activate", "flash"), ("deactivate", "flash"),
+                      ("activate", "power"), "power-on", ("deactivate", "power")]
+
+    # A flash that fails while the reader stays on is a real failure.
+    events.clear()
+
+    def broken(image):
+        raise subprocess.CalledProcessError(2, ["esptool"])
+
+    flash.flash = broken
+    with pytest.raises(subprocess.CalledProcessError):
+        flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
