@@ -361,19 +361,19 @@ void API::processIncomingMessage(const char *buf, size_t len)
     }
 
     // Crash-report responses carry their own error codes (e.g. INVALID_CRASH_REPORT)
-    // that must not surface as a user-facing error dialog; route them to the handler.
+    // that must not surface as a user-facing error notice; route them to the handler.
     bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
 
     // Enrollment key-request errors (e.g. CARD_ALREADY_ENROLLED) must reach the
     // enrollment handler so it can show the in-screen message and re-arm card
-    // detection. The generic interceptor would otherwise pop a generic dialog
+    // detection. The generic interceptor would otherwise raise a generic notice
     // and return before recovery runs, wedging the reader with detection off
     // until enrollment times out (ATT-503).
     bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
 
     // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
     // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
-    // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
+    // cleanly. Route them to the dedicated handlers instead of the generic error notice (ATT-493).
     bool isSupervisionEvent = strcmp(eventType, "SUPERVISION_REQUEST") == 0 ||
                               strcmp(eventType, "SUPERVISION_START") == 0 ||
                               strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
@@ -387,7 +387,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
                                    strcmp(eventType, "MASS_INTRODUCTION_END") == 0;
 
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    // Background stats failures must not interrupt start/stop controls with a popup.
+    // Background stats failures must not interrupt start/stop controls with a notice.
     const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
     if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
         !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())

@@ -28,8 +28,10 @@ int main(int argc, char **argv)
     screenshot(screenshots, "device.png");
     testLockscreen(display, screenshots);
     testSessionSummaryLifecycle();
-    testFormDrafts();
-    testPaymentPopup();
+    testScreenNotices(display, screenshots);
+    testFormDrafts(display, screenshots);
+    testTopUpScreen(display, screenshots);
+    testPowerOffConfirm(display, screenshots);
     testPendingApproval(display, screenshots);
 
     TouchPoint touch{};

@@ -14,9 +14,9 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     assert(server.last("UNLOCK_DOOR")["data"]["payload"]["resourceId"].as<int>() == 3);
     server.push("UNLOCK_DOOR", R"({"error":"Denied by test"})"); pump(); list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(label(lv_layer_top(), "Something went wrong. Please try again."));
+    assert(label(lv_screen_active(), "Something went wrong. Please try again."));
     display.capture(output, "10-action-error");
-    Display::hidePopup();
+    Display::clearNotice();
     active = false; supervised = true; list(); click("Aufsicht");
     assert(lv_screen_active() == Display::supervisionScreen.getScreen());
     assert(server.last("SUPERVISION_REQUEST")["data"]["payload"]["resourceId"].as<int>() == 1);
@@ -36,7 +36,7 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     server.push("RESOURCE_USAGE_FORM_REQUEST", "{\"resourceId\":1,\"action\":\"start\",\"requestId\":" + std::to_string(oldRequestId) + ",\"forms\":[{\"id\":8,\"fieldCount\":1}]}");
     pump();
     assert(server.count("REQUEST_RESOURCE_LIST") == refreshesBefore);
-    assert(!label(lv_layer_top(), "Stale failure"));
+    assert(!label(lv_screen_active(), "Stale failure"));
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Starte Sitzung"));
     server.push("START_RESOURCE_USAGE_SESSION", "{\"success\":true,\"requestId\":" + std::to_string(currentRequestId) + "}");
@@ -46,7 +46,7 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     assert(label(lv_screen_active(), "Stop"));
     // A newer broadcast can overtake the matching refresh without trapping input.
     click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"billingSummary":{"amount":0,"total":"0,00 EUR"}})"); pump();
-    assert(!label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
+    assert(!label(lv_screen_active(), "Gesamtkosten dieser Sitzung"));
     active = false; list(true, false, false);
     const auto refreshId = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
     server.push("RESOURCE_LIST", "{\"revision\":" + std::to_string(listVersion - 1) + ",\"requestId\":" + std::to_string(refreshId) + ",\"resources\":[]}"); pump();

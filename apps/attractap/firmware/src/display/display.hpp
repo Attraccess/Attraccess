@@ -25,6 +25,8 @@
 #include "screens/supervision/supervisionScreen.hpp"
 #include "screens/massIntroduction/massIntroductionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#include "screens/topUp/topUpScreen.hpp"
+#include "shared/screenNotice.hpp"
 #ifdef DEMO_MODE
 #include "screens/demoSettings/demoSettingsScreen.hpp"
 #endif
@@ -64,6 +66,7 @@ public:
     static SupervisionScreen supervisionScreen;
     static MassIntroductionScreen massIntroductionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+    static TopUpScreen topUpScreen;
 #ifdef DEMO_MODE
     static DemoSettingsScreen demoSettingsScreen;
 #endif
@@ -83,11 +86,15 @@ public:
     static bool hasTouchInput();
     static uint32_t touchPressSequence;
 
-    // Global error popup helpers
-    static void showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
+    // Screen-owned notice: shown inside the active screen, replaced by the next
+    // one and removed when the router leaves that screen. A notice raised in the
+    // same tick as a transition lands on the destination screen instead, so
+    // "log out, then explain why" shows the explanation on the lockscreen.
+    // `durationMs` 0 selects the default for the kind (errors stay longer).
+    static void showNotice(ScreenNotice::Kind kind, const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, uint32_t durationMs = 0);
+    static void showErrorNotice(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
     static void showBillingSummary(const std::string &total);
-    static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
-    static void hidePopup();
+    static void clearNotice();
 
     // Hidden maintenance drawer: pulled down from the top edge, exposes
     // "Open Settings" and "Reboot" actions. The settings action is wired by the
@@ -106,7 +113,6 @@ public:
 private:
     static void setupFramebuffer();
     static bool touchWarningPending;
-    static void showMessagePopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool error);
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.
@@ -144,6 +150,9 @@ private:
     static uint32_t tick_cb();
 
     static void initDeviceOverlay();
+    // The device footer, network badge and maintenance drawer sit on the top
+    // layer, outside the active screen tree.
+    static void refreshChromeLanguage(const std::string &language);
     static void updateNetworkQualityOverlay();
     static lv_obj_t *deviceNameLabel;
     static FirmwareI18n::Text deviceNameInitValue;
@@ -153,14 +162,24 @@ private:
     static State::NetworkQuality networkQualityOverlayValue;
     static bool networkQualityOverlayInitialized;
 
-    static lv_obj_t *activePopup;
-    static lv_timer_t *popupAutoCloseTimer;
+    struct PendingNotice
+    {
+        ScreenNotice::Kind kind = ScreenNotice::Kind::Info;
+        FirmwareI18n::Text title;
+        FirmwareI18n::Text message;
+        uint32_t durationMs = 0;
+    };
+    static ScreenNotice notice;
+    static PendingNotice lastNotice;
+    // Raised since the last Display::loop, or raised before any screen existed.
+    static bool noticeRaisedThisTick;
+    static bool noticeAwaitsScreen;
 
     // Maintenance drawer (display_drawer.cpp)
     static void initDrawer();
     static void openDrawer();
     static void closeDrawer();
-    static void showRebootConfirm();
+    static void setRebootConfirmVisible(bool visible);
     static bool isDrawerAvailable();
     static void updateDrawerAvailability();
     // Fed every touch sample from touchpad_read to detect the top-edge pull-down
@@ -170,7 +189,8 @@ private:
     static lv_obj_t *drawerBackdrop;
     static lv_obj_t *drawerGrabber;
     static lv_obj_t *drawerPanel;
-    static lv_obj_t *rebootConfirmOverlay;
+    static lv_obj_t *drawerActions;
+    static lv_obj_t *drawerRebootConfirm;
     static bool drawerOpen;
     static std::function<void()> onOpenSettingsCallback;
     static std::function<bool()> drawerAvailableCallback;

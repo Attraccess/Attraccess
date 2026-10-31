@@ -34,23 +34,23 @@ void testDemoMaterialCaptions(Renderer &renderer)
         submitted = submission.answers[0].stringValue;
         ++submissions;
     });
-    const auto click = [](const char *caption) {
-        lv_obj_send_event(lv_obj_get_parent(requireObject(lv_layer_top(), &lv_label_class, caption)),
+    const auto click = [&](const char *caption) {
+        lv_obj_send_event(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, caption)),
                           LV_EVENT_CLICKED, nullptr);
     };
     details.showFormsModal(request);
     details.renderFormField(page, false, true, 1, 1);
-    auto *wood = requireObject(lv_layer_top(), &lv_label_class, "Holz");
+    auto *wood = requireObject(guard.root, &lv_label_class, "Holz");
     click("Holz");
     for (const auto *locale : {"en", "de", "en"}) {
         Fixtures::activeLanguage = locale;
-        FirmwareI18n::refreshTree(lv_layer_top(), locale);
+        FirmwareI18n::refreshTree(guard.root, locale);
         const bool english = std::string(locale) == "en";
-        expect(requireObject(lv_layer_top(), &lv_label_class, english ? "Wood" : "Holz") == wood,
+        expect(requireObject(guard.root, &lv_label_class, english ? "Wood" : "Holz") == wood,
                "Existing option label refreshes without rebuilding the selection");
         for (const auto *caption : (english ? std::vector<const char *>{"Aluminium", "Wood", "Plastic", "Brass", "Steel"}
                                             : std::vector<const char *>{"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"}))
-            requireObject(lv_layer_top(), &lv_label_class, caption);
+            requireObject(guard.root, &lv_label_class, caption);
         renderer.capture(english ? "demo-materials-english" : "demo-materials-german");
     }
     click("Submit");
@@ -60,7 +60,7 @@ void testDemoMaterialCaptions(Renderer &renderer)
     for (const auto *locale : {"de", "en"}) {
         Fixtures::activeLanguage = locale;
         details.renderFormField(page, false, true, 1, 1);
-        requireObject(lv_layer_top(), &lv_label_class, std::string(locale) == "en" ? "Wood" : "Holz");
+        requireObject(guard.root, &lv_label_class, std::string(locale) == "en" ? "Wood" : "Holz");
         click(std::string(locale) == "en" ? "Submit" : "Absenden");
         expect(submitted == "Holz", "Refetched selection remains valid on resubmission in either language");
     }
@@ -72,16 +72,16 @@ void testDemoMaterialCaptions(Renderer &renderer)
         page.formId = formId;
         field.id = fieldId;
         details.renderFormField(page, false, true, 1, 1);
-        FirmwareI18n::refreshTree(lv_layer_top(), "en");
-        requireObject(lv_layer_top(), &lv_label_class, "Holz");
-        expect(!findObject(lv_layer_top(), &lv_label_class, "Wood"), "Supplied option is not translated");
+        FirmwareI18n::refreshTree(guard.root, "en");
+        requireObject(guard.root, &lv_label_class, "Holz");
+        expect(!findObject(guard.root, &lv_label_class, "Wood"), "Supplied option is not translated");
     }
     page.resourceId = 1;
     page.formId = 10;
     field.id = 101;
     field.options.select.values[1] = "Holz %s";
     details.renderFormField(page, false, true, 1, 1);
-    FirmwareI18n::refreshTree(lv_layer_top(), "en");
-    requireObject(lv_layer_top(), &lv_label_class, "Holz %s");
+    FirmwareI18n::refreshTree(guard.root, "en");
+    requireObject(guard.root, &lv_label_class, "Holz %s");
     details.hideFormsModal();
 }

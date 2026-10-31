@@ -90,14 +90,14 @@ void ReaderWorkflow::testMassIntroduction()
     requireLabel(lv_screen_active(), "Robin war bereits eingewiesen");
     display.capture(output, "15-mass-introduction-already-introduced");
 
-    // Server rejections stay in the flow and are shown in-screen, not as the generic popup. The
+    // Server rejections stay in the flow and are shown in-screen, not as the generic notice. The
     // next card cuts the result dwell short.
     nfc.setPresent(1, false); pump();
     nfc.setPresent(2, true); pump();
     assert(server.count(authRequest) == 3);
     server.push("MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", R"({"sessionId":"session-a","error":"CARD_NOT_FOUND"})"); pump();
     requireLabel(lv_screen_active(), "Karte nicht gefunden");
-    assert(!label(lv_layer_top(), "Karte nicht gefunden") && server.count(confirmed) == 2);
+    assert(lv_screen_active() == Display::massIntroductionScreen.getScreen() && !label(lv_screen_active(), "Fehler") && server.count(confirmed) == 2);
     display.capture(output, "16-mass-introduction-card-not-found");
     nfc.setPresent(2, false); pump();
 

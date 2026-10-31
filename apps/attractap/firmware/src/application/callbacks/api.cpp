@@ -141,13 +141,9 @@ void Application::setupErrorCallbacks()
           p->self->handleFormsCancel();
           Display::resourceDetailsScreen.hideActionProgress();
           if (p->enabled) {
-            Display::showInsufficientBalancePopup(
-                [self = p->self](uint32_t amountCents) {
-                  self->api.requestBillingTopup(amountCents);
-                },
-                []() {});
+            p->self->openTopUp();
           } else {
-            Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("INSUFFICIENT_BALANCE"));
+            Display::showErrorNotice(FirmwareI18n::Message::Error, FirmwareI18n::readerError("INSUFFICIENT_BALANCE"));
           }
           delete p;
         },
@@ -193,7 +189,7 @@ void Application::setupErrorCallbacks()
           if (pl->self->cardAuthenticationPending) pl->self->finishCardAuthentication(false);
           pl->self->finishReaderAction(false);
           pl->self->handleFormsCancel();
-          Display::showErrorPopup(pl->t, pl->m);
+          Display::showErrorNotice(pl->t, pl->m);
           if (pl && pl->self) {
             pl->self->pendingActionType = PENDING_ACTION_NONE;
             pl->self->hasPendingFormRequest = false;
@@ -243,14 +239,15 @@ void Application::setupActionCallbacks()
           if (!result.billingTotal.empty()) {
             self->restartSessionTimeout();
             Display::showBillingSummary(result.billingTotal);
+            self->billingSummaryShown = true;
           }
         }
         else {
           self->handleFormsCancel();
           if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
-            Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
+            self->openTopUp();
           } else {
-            Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
+            Display::showErrorNotice(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
           }
         }
       }

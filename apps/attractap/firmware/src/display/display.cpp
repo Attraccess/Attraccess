@@ -26,7 +26,7 @@
 // collaborators live in sibling translation units:
 //   display_router.cpp  - screen routing (transitionToScreen)
 //   display_input.cpp   - flush + touch input dispatch
-//   display_popups.cpp  - global overlay popups
+//   display_notice.cpp  - screen-owned notices
 //   display_overlay.cpp - persistent device-info overlay
 
 static std::string s_renderedLanguage;
@@ -37,12 +37,7 @@ void Display::refreshVisibleTextForLanguageChange()
     if (language == s_renderedLanguage) return;
     s_renderedLanguage = language;
     if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
-    FirmwareI18n::refreshTree(Display::activePopup, language);
-    FirmwareI18n::refreshTree(Display::drawerPanel, language);
-    FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
-    // Project and form dialogs live on LVGL's top layer, outside the active
-    // screen tree. Refreshing the layer reaches those open dialogs as well.
-    FirmwareI18n::refreshTree(lv_layer_top(), language);
+    Display::refreshChromeLanguage(language);
 }
 
 // Static member definitions
@@ -74,27 +69,31 @@ ResetScreen Display::resetScreen;
 SupervisionScreen Display::supervisionScreen;
 MassIntroductionScreen Display::massIntroductionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
+TopUpScreen Display::topUpScreen;
 #ifdef DEMO_MODE
 DemoSettingsScreen Display::demoSettingsScreen;
 #endif
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
-lv_obj_t *Display::activePopup = nullptr;
-lv_timer_t *Display::popupAutoCloseTimer = nullptr;
+ScreenNotice Display::notice;
+Display::PendingNotice Display::lastNotice;
+bool Display::noticeRaisedThisTick = false;
+bool Display::noticeAwaitsScreen = false;
 
 lv_obj_t *Display::drawerBackdrop = nullptr;
 lv_obj_t *Display::drawerGrabber = nullptr;
 lv_obj_t *Display::drawerPanel = nullptr;
 bool Display::drawerOpen = false;
-lv_obj_t *Display::rebootConfirmOverlay = nullptr;
+lv_obj_t *Display::drawerActions = nullptr;
+lv_obj_t *Display::drawerRebootConfirm = nullptr;
 std::function<void()> Display::onOpenSettingsCallback = nullptr;
 std::function<bool()> Display::drawerAvailableCallback = nullptr;
 bool Display::gestureCandidate = false;
 bool Display::gesturePrevPressed = false;
 int16_t Display::gestureStartY = 0;
 
-// Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
-// to ensure LVGL is fully running before creating overlay objects.
+// Set during setup() if touch hardware was not found; the notice is shown on the first loop() tick
+// to ensure LVGL is fully running before creating objects.
 bool Display::touchWarningPending = false;
 
 #if LV_USE_LOG != 0
@@ -211,6 +210,7 @@ void Display::loop()
     Display::updateNetworkQualityOverlay();
     refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
+    Display::noticeRaisedThisTick = false;
     return;
 #endif
     // Runs on the main application loop; rendering itself lives on LvglTask
@@ -221,15 +221,16 @@ void Display::loop()
     if (Display::touchWarningPending)
     {
         Display::touchWarningPending = false;
-        Display::showErrorPopup(FirmwareI18n::Message::TouchUnavailable,
-                                FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot);
+        // Touch may be what is missing, so rely on the auto-hide rather than a tap.
+        Display::showNotice(ScreenNotice::Kind::Error, FirmwareI18n::Message::TouchUnavailable,
+                            FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot, 8000);
     }
 
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
     refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
-
+    Display::noticeRaisedThisTick = false;
 
     lv_unlock();
 }

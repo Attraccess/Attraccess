@@ -140,7 +140,7 @@ void Application::loop() {
   this->api.loop();
 
 #ifdef HAS_LVGL_DISPLAY
-  // processState mutates LVGL (screen transitions, popups, screen setters);
+  // processState mutates LVGL (screen transitions, notices, screen setters);
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
@@ -181,7 +181,7 @@ void Application::finishReaderAction(bool success) {
 }
 
 void Application::beginSessionSummary(const API::ActionResult &result) {
-  Display::hidePopup();
+  Display::clearNotice();
   this->onActionResult(result.type);
   this->clearFormPageCache();
   this->pendingFormFieldsReady = false;
@@ -228,7 +228,8 @@ void Application::logoutReader() {
   this->sessionSummaryVisible = false;
   this->sessionSummaryDismissRequested = false;
   Display::sessionSummaryScreen.clearSummary();
-  Display::hidePopup();
+  Display::clearNotice();
+  this->billingSummaryShown = false;
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;
