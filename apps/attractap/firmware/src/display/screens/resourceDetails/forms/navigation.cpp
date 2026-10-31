@@ -237,9 +237,10 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_bar_set_range(this->formsProgressBar, 0, 100);
    lv_bar_set_value(this->formsProgressBar, 0, LV_ANIM_OFF);
 
-   // Body: breadcrumb + the single focused field, filling the panel. Never
-   // scrolls — text fields are tap-to-edit previews, editing happens in the
-   // fullscreen editor overlay, so everything always fits the screen.
+   // Body: breadcrumb + the single focused field, filling the panel. Text
+   // fields are tap-to-edit previews (editing happens in the fullscreen editor
+   // overlay), so a field normally fits; only the largest selects overflow, and
+   // then the body scrolls vertically.
    lv_obj_t *content = lv_obj_create(panel);
    this->formsModalContent = content;
    lv_obj_remove_style_all(content);
@@ -248,7 +249,8 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_set_style_pad_row(content, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(content, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_remove_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_scroll_dir(content, LV_DIR_VER);
+   lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_AUTO);
    lv_obj_set_flex_grow(content, 1);
 
    this->formsBreadcrumbLabel = lv_label_create(content);
