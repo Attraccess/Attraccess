@@ -29,22 +29,18 @@ import { ResourceListService } from './handlers/resource-list/resource-list.serv
 import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
-import { CardConversationService } from './card-conversation.service';
+import { CardConversationService, CardConversationFailure } from './card-conversation.service';
 import { CardDetectedRouter } from './card-detected.router';
 import { createReaderSenders } from './reader-socket-send';
-
 import { CREDENTIAL_CHANGED_EVENT, PairingService } from '../security/pairing.service';
 import { ReaderSessionService } from '../security/reader-session.service';
 import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
-import { sanitizeForLVGL } from './websocket-lvgl';
 import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
-import { CardConversationFailure } from './card-conversation.service';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
-
 import { closeSync } from 'fs';
 
 @WebSocketGateway({
