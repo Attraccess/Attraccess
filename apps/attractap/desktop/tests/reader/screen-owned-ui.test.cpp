@@ -25,14 +25,40 @@ void ReaderWorkflow::testScreenOwnedUi()
         return nullptr;
     };
 
+    // A failure reported by an API callback (after the render pass) while the
+    // next pass routes away (a start from the list ran its form on the details
+    // screen) is shown on the list it returns to.
+    {
+        click("Start");
+        const auto id = server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>();
+        server.push("RESOURCE_USAGE_FORM_REQUEST", "{\"resourceId\":1,\"action\":\"start\",\"requestId\":" + std::to_string(id) +
+                    R"(,"forms":[{"id":8,"name":"Check","fieldCount":1}]})"); pump();
+        server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"start","formId":8,"offset":0,"totalFieldCount":1,"fields":[{"id":9,"name":"Sichtprüfung","type":"text","isRequired":true,"value":"OK"}]})"); pump();
+        assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+        const auto startsBeforeSubmit = server.count("START_RESOURCE_USAGE_SESSION");
+        click("Absenden");
+        server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"start","formId":8,"offset":0,"valid":true})"); pump();
+        assert(server.count("START_RESOURCE_USAGE_SESSION") == startsBeforeSubmit + 1);
+        const auto retry = server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>();
+        server.push("START_RESOURCE_USAGE_SESSION", "{\"requestId\":" + std::to_string(retry) + R"(,"success":false,"error":"Denied by test"})");
+        pump();
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+        assert(noticeShown("Aktion fehlgeschlagen"));
+        list();
+        assert(noticeShown("Aktion fehlgeschlagen"));
+        Display::clearNotice();
+    }
+
     // Insufficient balance without a payment terminal: a notice inside the screen.
     startFailsWithBalance(false);
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(noticeShown("Aktion fehlgeschlagen"));
     assert(!label(lv_layer_top(), "Aktion fehlgeschlagen"));
     display.capture(output, "notice-action-failed");
-    // It hides itself.
-    pump(8100);
+    // Errors stay for 8 seconds, then hide themselves.
+    pump(4500);
+    assert(noticeShown("Aktion fehlgeschlagen"));
+    pump(3600);
     assert(!noticeShown("Aktion fehlgeschlagen"));
 
     // With a terminal the top-up screen is routed like any other screen.
@@ -86,7 +112,18 @@ void ReaderWorkflow::testScreenOwnedUi()
     State::setApiState(true, "Test reader"); pump();
     list(false);
 
-    login(); click("Lasercutter");
+    // The same for a server message that routes away without ending the session:
+    // a resource list without the open resource returns to the list.
+    login(); click("CNC Fräse");
+    Display::showErrorNotice(FirmwareI18n::Message::ActionFailed, FirmwareI18n::Message::PleaseTryAgain);
+    pump();
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen() && noticeShown("Aktion fehlgeschlagen"));
+    list(true, true);
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen() && State::getApiState().userAuthenticated);
+    assert(!noticeShown("Aktion fehlgeschlagen"));
+    list();
+
+    click("Lasercutter");
     Display::showErrorNotice(FirmwareI18n::Message::ActionFailed, FirmwareI18n::Message::PleaseTryAgain);
     pump();
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen() && noticeShown("Aktion fehlgeschlagen"));
@@ -141,11 +178,27 @@ void ReaderWorkflow::testScreenOwnedUi()
         display.touch.pressed = false; pump();
     };
     const auto visible = [&](const char *text) { return lv_obj_is_visible(requireLabel(lv_layer_top(), text)); };
+    // The visible button with this caption on the top layer.
+    const std::function<lv_obj_t *(lv_obj_t *, const char *)> shownButton = [&](lv_obj_t *root, const char *text) -> lv_obj_t * {
+        if (lv_obj_check_type(root, &lv_label_class) && std::strcmp(lv_label_get_text(root), text) == 0 && lv_obj_is_visible(root))
+            return lv_obj_get_parent(root);
+        for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+            if (auto *found = shownButton(lv_obj_get_child(root, i), text)) return found;
+        return nullptr;
+    };
     openDrawer();
     assert(visible("Wartung") && !visible("Gerät neu starten?"));
+    lv_obj_update_layout(lv_layer_top());
+    lv_area_t rebootArea, confirmArea;
+    lv_obj_get_coords(shownButton(lv_layer_top(), "Neustart"), &rebootArea);
     click("Neustart", true);
     assert(visible("Gerät neu starten?") && !visible("Wartung"));
     display.capture(output, "drawer-reboot-confirm");
+    // A second tap where Reboot was cannot confirm: the confirm's Reboot is elsewhere.
+    lv_obj_update_layout(lv_layer_top());
+    lv_obj_get_coords(shownButton(lv_layer_top(), "Neustart"), &confirmArea);
+    assert(confirmArea.y1 > rebootArea.y2 || confirmArea.y2 < rebootArea.y1 ||
+           confirmArea.x1 > rebootArea.x2 || confirmArea.x2 < rebootArea.x1);
     click("Abbrechen", true);
     assert(visible("Wartung") && !visible("Gerät neu starten?"));
     click("Neustart", true);
