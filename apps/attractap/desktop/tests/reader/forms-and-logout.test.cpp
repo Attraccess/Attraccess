@@ -21,6 +21,10 @@ void ReaderWorkflow::testFormsAndLogout()
     display.capture(output, "06b-required-form-ready");
     click(LV_SYMBOL_CLOSE);
     assert(server.count("RESOURCE_USAGE_FORM_CANCEL") > 0);
+    { // The X closed the form.
+        auto *field = label(Display::resourceDetailsScreen.getScreen(), "Sichtprüfung *");
+        assert(!field || !lv_obj_is_visible(field));
+    }
     list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Stop"));

@@ -30,6 +30,21 @@ void ReaderWorkflow::testTimeouts()
         assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         std::cout << "PASS action pauses the real 30-second login timeout" << std::endl;
         click("Abmelden");
+        // A status refresh that never arrives after an action on the details screen signs
+        // out; the reason is shown on the signed-out screen that replaces the details.
+        active = false; login(); click("Lasercutter");
+        assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+        click("Ressource verwenden");
+        {
+            const auto id = server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>();
+            server.push("START_RESOURCE_USAGE_SESSION", "{\"requestId\":" + std::to_string(id) + R"(,"success":true})");
+            pump();
+        }
+        pump(30500);
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !State::getApiState().userAuthenticated);
+        assert(label(lv_screen_active(), "Status nicht verfügbar"));
+        Display::clearNotice();
+        std::cout << "PASS status timeout on the details screen explains itself on the list" << std::endl;
         // The top-up screen is open while the status refresh never arrives. After the 30-second
         // window the reader signs out, the screen is replaced and the reason is shown on the
         // screen that replaces it.
@@ -42,7 +57,7 @@ void ReaderWorkflow::testTimeouts()
         }
         assert(lv_screen_active() == Display::topUpScreen.getScreen());
         pump(30500);
-        assert(lv_screen_active() != Display::topUpScreen.getScreen());
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(label(lv_screen_active(), "Status nicht verfügbar"));
         assert(!label(lv_screen_active(), "Unzureichendes Guthaben") && !State::getApiState().userAuthenticated);
         Display::clearNotice();
@@ -58,8 +73,8 @@ void ReaderWorkflow::testTimeouts()
         }
         assert(lv_screen_active() == Display::topUpScreen.getScreen());
         pump(30500);
-        assert(lv_screen_active() != Display::topUpScreen.getScreen() && !State::getApiState().userAuthenticated);
-        assert(!label(lv_screen_active(), "Unzureichendes Guthaben"));
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !State::getApiState().userAuthenticated);
+        assert(!label(lv_screen_active(), "Unzureichendes Guthaben") && !label(lv_screen_active(), "Status nicht verfügbar"));
         Display::clearNotice();
         std::cout << "PASS session timeout replaces the top-up screen" << std::endl;
         nfc.setPresent(0, true); pump(); nfc.setPresent(0, false); pump();
