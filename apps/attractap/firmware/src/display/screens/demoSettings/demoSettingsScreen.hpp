@@ -31,7 +31,7 @@ public:
 
 #ifdef HAS_POWER_BUTTON
     // Application wires this to IOExpander::powerOff(). Invoked after the user
-    // confirms the power-off dialog.
+    // confirms the inline power-off confirm.
     void setPowerOffCallback(std::function<void()> cb) { _powerOffCb = cb; }
 #endif
 

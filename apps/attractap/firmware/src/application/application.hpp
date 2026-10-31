@@ -90,6 +90,11 @@ private:
     void logoutReader();
     void beginSessionSummary(const API::ActionResult &result);
     void dismissSessionSummary();
+#ifdef HAS_LVGL_DISPLAY
+    // Top-up is a routed screen: open it from the screen the user is on, leave it back to that screen.
+    void openTopUp();
+    void leaveTopUp();
+#endif
     void finishCardAuthentication(bool success);
 
 #else
