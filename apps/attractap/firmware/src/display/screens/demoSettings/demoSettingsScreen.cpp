@@ -73,6 +73,9 @@ void DemoSettingsScreen::init()
     lv_obj_set_height(titleBar, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(titleBar, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(titleBar, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    // The inline power-off confirm wraps onto its own line below the buttons.
+    lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_row(actions, 8, LV_PART_MAIN);
     lv_obj_set_width(title, lv_pct(100));
     lv_obj_set_width(actions, lv_pct(100));
 #endif

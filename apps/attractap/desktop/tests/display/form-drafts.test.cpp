@@ -138,6 +138,18 @@ void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screensho
     lv_font_glyph_dsc_t glyph{};
     assert(lv_font_get_glyph_dsc(lv_obj_get_style_text_font(error, LV_PART_MAIN), &glyph, 0x00FC, 0) && !glyph.is_placeholder);
 
+    // Leading zeros are still zero; the largest field value stays within the cents range.
+    lv_textarea_set_text(input, "000");
+    lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
+    assert(amount == 0);
+    // Only digits are accepted, so signs, separators and letters never reach the amount.
+    lv_textarea_set_text(input, "-5.5x");
+    assert(std::strcmp(lv_textarea_get_text(input), "55") == 0);
+    lv_textarea_set_text(input, "999999");
+    lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
+    assert(amount == 99999900);
+    amount = 0;
+
     lv_textarea_set_text(input, "5");
     lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
     assert(amount == 500 && !cancelled);
