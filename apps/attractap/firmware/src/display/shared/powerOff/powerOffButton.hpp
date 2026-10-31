@@ -10,15 +10,15 @@
 // callback, which the application wires to IOExpander::powerOff().
 namespace PowerOffButton
 {
-    // Adds the button (and its hidden confirm row) to `parent` and returns the button. `onConfirm` is stored in a
-    // single global slot — ponytail: all buttons power off the same board, so
-    // per-instance state would be dead weight. Give it per-button user data if
-    // a screen ever needs a different action.
+    // Adds the button (and its hidden confirm) to `parent` and returns the
+    // button. Each button keeps its own callback and confirm, so screens that
+    // are alive at the same time do not interfere.
     lv_obj_t *create(lv_obj_t *parent, std::function<void()> onConfirm);
 
-    // Tapping the button swaps it for a Cancel / Power off row in the same
-    // parent. Restores the button if the row is open. Call from onScreenLeave().
-    void hideConfirm();
+    // Tapping the button swaps it for a full-width "Power off device?" confirm
+    // with Cancel / Power off. This restores `button` if its confirm is open;
+    // nullptr is ignored. Call from the host screen's onScreenLeave().
+    void hideConfirm(lv_obj_t *button);
 }
 
 #endif // HAS_POWER_BUTTON

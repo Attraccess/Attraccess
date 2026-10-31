@@ -67,7 +67,7 @@ void DemoSettingsScreen::init()
 
 #ifdef HAS_POWER_BUTTON
     // Power-off button (V4 hardware with SYS_EN latch only).
-    PowerOffButton::create(actions, [this]() { if (_powerOffCb) _powerOffCb(); });
+    _powerOffButton = PowerOffButton::create(actions, [this]() { if (_powerOffCb) _powerOffCb(); });
     // Give the translated heading its own row when the additional power
     // control would make the title and action group overlap.
     lv_obj_set_height(titleBar, LV_SIZE_CONTENT);
@@ -104,7 +104,7 @@ void DemoSettingsScreen::onScreenLeave()
 {
     hideScanOverlay();
 #ifdef HAS_POWER_BUTTON
-    PowerOffButton::hideConfirm();
+    PowerOffButton::hideConfirm(_powerOffButton);
 #endif
 }
 
@@ -132,6 +132,9 @@ void DemoSettingsScreen::destroy()
     _cardList = nullptr;
     _scanOverlay = nullptr;
     _rolePicker = nullptr;
+#ifdef HAS_POWER_BUTTON
+    _powerOffButton = nullptr;
+#endif
 }
 
 #endif // DEMO_MODE

@@ -105,6 +105,31 @@ inline void expectReadableOption(lv_obj_t *label)
     assert(ratio >= 4.5);
 }
 
+inline lv_area_t coordsOf(lv_obj_t *object)
+{
+    lv_obj_update_layout(lv_obj_get_screen(object));
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    return area;
+}
+
+inline bool overlaps(const lv_area_t &a, const lv_area_t &b)
+{
+    return a.x1 <= b.x2 && b.x1 <= a.x2 && a.y1 <= b.y2 && b.y1 <= a.y2;
+}
+
+// The chrome on the top layer: network badge (top right) and device footer (bottom).
+inline void expectClearOfChrome(lv_obj_t *object)
+{
+    assert(object);
+    auto *badge = findLabel(lv_layer_top(), "x NET");
+    auto *deviceName = findLabel(lv_layer_top(), "Attractap");
+    assert(badge && deviceName);
+    const lv_area_t area = coordsOf(object);
+    assert(!overlaps(area, coordsOf(lv_obj_get_parent(badge))));
+    assert(!overlaps(area, coordsOf(lv_obj_get_parent(deviceName))));
+}
+
 void testSessionSummaryLifecycle();
 void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screenshots);

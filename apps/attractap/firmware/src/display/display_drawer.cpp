@@ -1,7 +1,7 @@
 #include "i18n.hpp"
-#include "fonts/attractap_fonts.hpp"
 #include "display.hpp"
 #include "theme.hpp"
+#include "shared/inlineConfirm/inlineConfirm.hpp"
 #include <functional>
 
 // Hidden maintenance drawer rendered on the LVGL top layer. It is revealed by a
@@ -149,62 +149,27 @@ void Display::initDrawer()
                      });
 
     // Reboot confirm: replaces the actions inside the panel while it is shown.
-    Display::drawerRebootConfirm = lv_obj_create(Display::drawerPanel);
-    lv_obj_t *confirm = Display::drawerRebootConfirm;
-    lv_obj_remove_style_all(confirm);
-    lv_obj_set_width(confirm, lv_pct(100));
-    lv_obj_set_height(confirm, LV_SIZE_CONTENT);
-    lv_obj_set_style_pad_row(confirm, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_flex_flow(confirm, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(confirm, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_remove_flag(confirm, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(confirm, LV_OBJ_FLAG_HIDDEN);
-
-    lv_obj_t *confirmTitle = lv_label_create(confirm);
-    FirmwareI18n::setLabel(confirmTitle, FirmwareI18n::Message::RebootDevice);
-    lv_obj_set_style_text_color(confirmTitle, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(confirmTitle, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *confirmMessage = lv_label_create(confirm);
-    FirmwareI18n::setLabel(confirmMessage, FirmwareI18n::Message::TheReaderWillRestartNow);
-    lv_obj_set_style_text_color(confirmMessage, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(confirmMessage, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_width(confirmMessage, lv_pct(100));
-
-    lv_obj_t *footer = lv_obj_create(confirm);
-    lv_obj_remove_style_all(footer);
-    lv_obj_set_width(footer, lv_pct(100));
-    lv_obj_set_height(footer, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_column(footer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *cancelBtn = lv_button_create(footer);
-    lv_obj_set_height(cancelBtn, LV_SIZE_CONTENT);
-    lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
-    DisplayTheme::secondaryButton(cancelBtn);
-    lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
-    FirmwareI18n::setLabel(cancelLbl, FirmwareI18n::Message::Cancel);
-    lv_obj_add_event_cb(cancelBtn, [](lv_event_t *e)
-                        {
-        if (lv_event_get_code(e) == LV_EVENT_CLICKED)
-            Display::setRebootConfirmVisible(false); }, LV_EVENT_CLICKED, nullptr);
-
-    lv_obj_t *rebootBtn = lv_button_create(footer);
-    lv_obj_set_height(rebootBtn, LV_SIZE_CONTENT);
-    lv_obj_set_width(rebootBtn, LV_SIZE_CONTENT);
-    DisplayTheme::button(rebootBtn, DisplayTheme::danger());
-    lv_obj_t *rebootLbl = lv_label_create(rebootBtn);
-    FirmwareI18n::setLabel(rebootLbl, FirmwareI18n::Message::Reboot);
-    lv_obj_add_event_cb(rebootBtn, [](lv_event_t *e)
-                        {
-        if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
-            return;
-        Display::logger.info("Drawer: reboot confirmed, restarting");
+    // Its buttons sit at the bottom of the panel, below where Reboot was, so a
+    // double tap on Reboot cannot confirm it.
+    InlineConfirm confirm = InlineConfirm::create(
+        Display::drawerPanel, FirmwareI18n::Message::RebootDevice, FirmwareI18n::Message::TheReaderWillRestartNow,
+        FirmwareI18n::Message::Reboot,
+        [](lv_event_t *)
+        { Display::setRebootConfirmVisible(false); },
+        [](lv_event_t *)
+        {
+            if (!Display::isDrawerAvailable())
+                return;
+            Display::logger.info("Drawer: reboot confirmed, restarting");
 #ifndef ATTRACTAP_HOST
-        esp_restart();
+            esp_restart();
 #endif
-    }, LV_EVENT_CLICKED, NULL);
+        },
+        nullptr);
+    Display::drawerRebootConfirm = confirm.root;
+    lv_obj_set_height(confirm.root, lv_pct(100));
+    lv_obj_set_flex_grow(confirm.body, 1);
+    lv_obj_set_flex_align(confirm.body, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
     // Subtle top-edge grabber as an affordance for the otherwise hidden gesture.
     Display::drawerGrabber = lv_obj_create(top);
