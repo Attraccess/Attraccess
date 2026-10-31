@@ -16,7 +16,8 @@ from attractap_lab.reader_screen import ReaderCommandError, find
 # assert what the server decided: the card records it keeps, the key versions on the emulated
 # card, and the reader's INFO-level outcome lines.
 VERIFIED = "verified"
-VERDICT = re.compile(r"Card verified by the server|Reader reported error: (\w+)")
+# The error code counts once its line is complete: the log is read while the reader is still writing it.
+VERDICT = re.compile(r"Card verified by the server|Reader reported error: (\w+)(?=[\r\n])")
 # The emulator's radio link sometimes drops one exchange. The reader reports it as CARD_REMOVED,
 # which says nothing about the card, so tests present the card again instead of reading it as a verdict.
 RADIO_DROP = "CARD_REMOVED"
@@ -151,6 +152,8 @@ def authenticate(reader, emulator, hooks, profile, timeout=60, ignore_radio_drop
     deadline = time.monotonic() + timeout
     try:
         while time.monotonic() < deadline:
+            # A failed attempt leaves an error notice; the reader ignores cards until it is dismissed.
+            dismiss_popup(hooks)
             present(emulator, profile)
             window = time.monotonic() + 12
             while time.monotonic() < window:
