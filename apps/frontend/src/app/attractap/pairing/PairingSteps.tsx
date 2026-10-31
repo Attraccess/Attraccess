@@ -90,7 +90,7 @@ export function CodeField({ flow, insecure }: Readonly<{ flow: PairingFlow; inse
   };
   return (
     <div className="flex items-end gap-2">
-      <TextField className="grow" value={flow.codeInput} onChange={flow.setCodeInput} isDisabled={!flow.idle}>
+      <TextField className="min-w-0 grow" value={flow.codeInput} onChange={flow.setCodeInput} isDisabled={!flow.idle}>
         <Label>{t('dialog.codeLabel')}</Label>
         <Input
           autoComplete="off"
@@ -105,7 +105,7 @@ export function CodeField({ flow, insecure }: Readonly<{ flow: PairingFlow; inse
       {!insecure && (
         <ResourceScanner title={t('dialog.scanTitle')} onDetected={scan} cameraFallbackHint={t('dialog.scanFallback')}>
           {(open) => (
-            <Button variant="secondary" onPress={open} data-cy="attractap-pairing-scan">
+            <Button variant="secondary" className="shrink-0" onPress={open} data-cy="attractap-pairing-scan">
               <CameraIcon className="size-4" />
               {t('dialog.scan')}
             </Button>
