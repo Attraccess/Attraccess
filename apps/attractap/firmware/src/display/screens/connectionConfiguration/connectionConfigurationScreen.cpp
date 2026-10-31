@@ -71,7 +71,7 @@ std::string ConnectionConfigurationScreen::getName()
 void ConnectionConfigurationScreen::onScreenLeave()
 {
 #ifdef HAS_POWER_BUTTON
-   PowerOffButton::hideConfirm();
+   PowerOffButton::hideConfirm(this->powerOffButton);
 #endif
 }
 
@@ -100,6 +100,9 @@ void ConnectionConfigurationScreen::destroy()
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;
+#ifdef HAS_POWER_BUTTON
+   this->powerOffButton = nullptr;
+#endif
    this->wifiScanRequested = false;
    this->wifiScanCompleted = false;
    this->wifiDropdownHasNetworks = false;
@@ -238,8 +241,8 @@ void ConnectionConfigurationScreen::createDeviceTab(const DeviceConfig &deviceCo
 
 #ifdef HAS_POWER_BUTTON
    // Power off (V4 hardware with SYS_EN latch only) — cuts battery power.
-   PowerOffButton::create(deviceTab, [this]()
-                          { if (this->onPowerOffCallback) this->onPowerOffCallback(); });
+   this->powerOffButton = PowerOffButton::create(deviceTab, [this]()
+                                                 { if (this->onPowerOffCallback) this->onPowerOffCallback(); });
 #endif
 
    lv_obj_t *containerForSaveButtonDevice = this->createSaveContainer(deviceTab);

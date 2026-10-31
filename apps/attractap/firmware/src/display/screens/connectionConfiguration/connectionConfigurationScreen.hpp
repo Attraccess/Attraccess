@@ -47,6 +47,7 @@ private:
     std::function<void()> onResetCertificateCallback;
 #ifdef HAS_POWER_BUTTON
     std::function<void()> onPowerOffCallback;
+    lv_obj_t *powerOffButton = nullptr;
 #endif
 
     PinInputPage pinInputPage;
