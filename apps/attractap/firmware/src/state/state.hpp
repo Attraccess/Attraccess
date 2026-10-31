@@ -155,6 +155,8 @@ public:
                                    uint32_t rotatesInMs, uint32_t expiresInMs);
     // Marks the reader kind (before the first round). Lite readers have a LED ring, touch readers a screen.
     static void setEnrollmentKind(bool lite);
+    // A pairing request started: pending, without a code yet (stale until the first round).
+    static void setEnrollmentRequested(bool lite);
     static void setEnrollmentDisconnected();
     static void setEnrollmentOutcome(bool accepted);
     // Returns the outcome set by setEnrollmentOutcome once (then NONE), so the LED can flash exactly once.
@@ -162,6 +164,21 @@ public:
     static void setPairingRemoved();
     static void clearEnrollment();
     static EnrollmentState getEnrollmentState();
+
+    // Why a paired reader's secure session does not come up; shown on the connecting screen (touch)
+    // and as a red flash (Lite). Cleared when a session opens or the reader changes channel.
+    enum SessionProblem : uint8_t
+    {
+        SESSION_PROBLEM_NONE = 0,
+        // The server could not prove it is the paired installation (TLS against the pinned CA failed).
+        SESSION_PROBLEM_SERVER_UNTRUSTED = 1,
+        // Repeated handshake failures or timeouts, e.g. a proxy that strips Sec-WebSocket-Protocol.
+        SESSION_PROBLEM_HANDSHAKE_FAILED = 2,
+    };
+    static void setSessionProblem(SessionProblem problem);
+    static SessionProblem getSessionProblem();
+    // True once after each reported problem, so the Lite ring flashes once per failed attempt.
+    static bool consumeSessionProblemNotice();
 
 private:
     State() = delete;
@@ -214,6 +231,8 @@ private:
     static uint8_t enrollment_outcome;
     static uint8_t enrollment_outcome_unconsumed;
     static bool pairing_removed;
+    static SessionProblem session_problem;
+    static bool session_problem_notice;
     static uint32_t pairing_removed_at;
 
     static bool api_authenticated;

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <ArduinoJson.h>
+
 #include "pairing_codec.hpp"
 #include "reader_identity.hpp"
 
@@ -14,6 +16,11 @@
 //   hello -> round (commitment) -> nonce -> reveal (check commitment, derive code) -> ... -> accepted
 // Every derived code goes to State (screen, LED ring, serial marker). A request ends with an
 // Outcome that tells the owner what to do next.
+//
+// The reader answers rounds at the server's pace only: round numbers strictly increase, each round
+// must be revealed before the next one arrives, rounds come at least MIN_ROUND_SPACING_MS apart
+// and one request has at most MAX_ROUNDS. Someone posing as the server can therefore not collect
+// codes faster than the real server rotates them and pick one that matches a code of its own.
 class PairingClient
 {
 public:
@@ -39,10 +46,16 @@ public:
     static constexpr uint32_t RETRY_AFTER_ERROR_MS = 10000;
     static constexpr uint32_t RETRY_AFTER_LIMIT_MS = 60000;
     static constexpr size_t MAX_MESSAGE_BYTES = 4096;
+    // The server rotates every 30 s; a little less tolerates jitter.
+    static constexpr uint32_t MIN_ROUND_SPACING_MS = 20000;
+    // A request lasts at most 10 minutes: 20 rounds of 30 s, plus a small margin.
+    static constexpr int MAX_ROUNDS = 22;
 
     using SendText = std::function<bool(const std::string &message)>;
+    // Milliseconds since boot; tests pass their own.
+    using Clock = uint32_t (*)();
 
-    PairingClient(const IReaderKey &key, bool lite, Firmware firmware);
+    PairingClient(const IReaderKey &key, bool lite, Firmware firmware, Clock clock = nullptr);
 
     // The pairing connection is open: sends `hello` (with the binding ticket, if any).
     void start(const std::string &ticket, SendText send);
@@ -71,14 +84,23 @@ private:
         bool revealed = false;
     };
 
-    Outcome finish(const char *reason, uint32_t delayMs);
+    Outcome onRound(JsonDocument &message);
+    Outcome onReveal(JsonDocument &message);
+    // Ends the request. `quiet`: a normal end (expiry), not shown as a failure.
+    Outcome finish(const char *reason, uint32_t delayMs, bool quiet = false);
+    uint32_t now() const;
 
     const IReaderKey &key;
     bool lite;
     Firmware firmware;
+    Clock clock;
     SendText send;
     std::vector<uint8_t> pinnedCandidate;
-    PendingRound pending[2];
+    // The latest round; a reveal is only accepted for it.
+    PendingRound current;
+    int rounds = 0;
+    // A code was derived from a verified reveal: only then may the server report an approval.
+    bool codeShown = false;
     bool active = false;
     uint32_t retryDelay = 0;
     std::string failure;

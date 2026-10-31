@@ -46,7 +46,8 @@ Pairing takes effect immediately; you do not need to save the reader afterwards.
 Codes use the letters and digits `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, so `0`, `O`, `1`, `I` and `L`
 never occur. A code changes every 30 seconds; the previous code stays valid until the next change,
 so a code you just read still works. A pending request lasts 10 minutes; then the reader asks again
-with a new code and keeps its key. If two readers happen to show the same code at the same time,
+with a new code and keeps its key. That is not an error: the reader shows no failure and only waits
+a moment for its next code. If two readers happen to show the same code at the same time,
 Attraccess asks you to wait for the next code.
 
 You can also approve from the **Not paired** list: click **Pair** on the reader's row and enter the code it shows.
@@ -59,9 +60,11 @@ A Lite reader shows the pattern on its ring of 24 LEDs, split into **8 segments 
 - The **start segment blinks**; read the segments **clockwise** from there.
 - Each segment shows one of six colours: red, green, blue, yellow, white (full brightness, not
   breathing) or magenta.
-- A slowly **breathing white** ring means the reader has no pattern yet (it is connecting or
-  waiting for the first code). This is not a code.
-- After approval the ring flashes **green** for success or **red** if pairing failed.
+- A slowly **breathing white** ring means the reader has no pattern yet (it has asked for pairing
+  and waits for the first code, lost its connection, or its request just expired after
+  10 minutes). This is not a code.
+- After approval the ring flashes **green** for success or **red** if pairing failed. A request
+  that simply expired does not flash red.
 
 Compare the eight colours with the colour list the approval page shows for the waiting Lite reader
 and approve. The pattern changes with the code every 30 seconds. See the
@@ -79,10 +82,17 @@ starts pairing and shows a code. Approve the code as above. The pairing is bound
 record, so name, machines and settings stay. If the reader is not connected, **Pair** cannot reach
 it; switch it on first. Settings of a reader that is not paired stay locked.
 
+A token reader keeps its token until the first encrypted session has delivered its certificate.
+If that session never reaches a server the reader can verify (three attempts in a row), the
+approval may have come from someone posing as your server: the reader forgets the server it
+remembered (not its own key) and goes back to its token, or to pairing if it has no token, so you
+can pair it again.
+
 After pairing, a reader never falls back to its token or to an unencrypted channel, and it never
 deletes its stored certificate authority or key because of a message that is not authenticated.
-If the TLS connection to the pinned server fails, the reader shows an error and retries; it does
-not enrol again by itself.
+If the server cannot prove it is your installation, a Touch reader shows **Server could not be
+verified** on its connecting screen and tries again every 30 seconds; a Lite reader flashes
+**red** on every failed attempt. It does not enrol again by itself.
 
 ## Remove pairing, pair again
 
@@ -114,7 +124,9 @@ commitment it received before the code was computed. An attacker who is **active
 during the enrollment** can make a reader trust the attacker instead of your server, but cannot make
 it trust your server in a way you would approve: the code the reader shows then differs from the
 code the server computes, so your approval fails ("This code does not match the reader"). If a code that you read
-correctly is rejected, stop and check the network before trying again.
+correctly is rejected, stop and check the network before trying again. The reader only computes a
+new code when your server's 30-second rotation allows it, so an attacker cannot make it run
+through codes faster to find one that matches.
 
 Attempts are limited: three per minute per connection, ten per ten minutes and twenty waiting
 requests per address, 200 waiting requests in total, and five wrong codes per admin per minute.
@@ -135,7 +147,10 @@ keys cannot be decrypted and every reader has to be paired again.
 The reader selects its transport with the WebSocket subprotocols `attractap-session.v1`
 (encrypted session) and `attractap-pairing.v1` (pairing). A reverse proxy must pass the
 `Sec-WebSocket-Protocol` header in both directions. If it strips the header, paired readers cannot
-connect and show a clear error; they never fall back to an unencrypted connection.
+connect: from the second failed attempt in a row, a Touch reader shows **Secure connection failed.
+Check the server or proxy.** on its connecting screen and a Lite reader flashes **red** after each
+failed attempt.
+They keep retrying and never fall back to an unencrypted connection.
 
 The server refuses unknown `attractap-*` subprotocol versions (for example `attractap-session.v2`)
 with HTTP 400 during the WebSocket upgrade.

@@ -3,11 +3,16 @@
 #include "../reader/server-fixtures.hpp"
 
 #include "api/security/pairing_codec.hpp"
+#include "api/security/reader_identity.hpp"
 #include "api/security/reader_link.hpp"
 #include "api/security/session_framing.hpp"
 #include "display/display.hpp"
 #include "settings/reader_credentials.hpp"
 #include "settings/settings.hpp"
+#include "state/state.hpp"
+
+#include "mbedtls/ssl.h"
+#include "mbedtls/x509_crt.h"
 
 #include <stdexcept>
 
@@ -20,6 +25,7 @@ public:
     std::string subprotocol = "unset";
     std::vector<std::string> sentText;
     size_t binaryFrames = 0;
+    std::vector<uint8_t> binaryOut;
     std::function<void(const char *, size_t)> receive;
     std::function<void(bool)> connection;
     std::function<bool(const uint8_t *, size_t)> binary;
@@ -44,9 +50,10 @@ public:
     }
     void resetCertificateTrust() override {}
     void setSubprotocol(const std::string &value) override { subprotocol = value; }
-    bool sendBinary(const uint8_t *, size_t) override
+    bool sendBinary(const uint8_t *data, size_t size) override
     {
         binaryFrames++;
+        binaryOut.insert(binaryOut.end(), data, data + size);
         return connected;
     }
     void setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> value) override { binary = std::move(value); }
@@ -107,6 +114,137 @@ void check(bool condition, const char *what)
 {
     if (!condition) throw std::runtime_error(std::string("Check failed: ") + what);
 }
+
+// The pairing client's clock: rounds must come at the server's pace (30 s).
+uint32_t pairingNow = 1000;
+uint32_t pairingClock() { return pairingNow; }
+
+// A TLS 1.3 server whose certificate is not signed by the key the reader pinned: whoever answers the
+// session is not the installation that approved the reader.
+struct ImpostorTlsServer
+{
+    std::unique_ptr<SoftwareReaderKey> key = SoftwareReaderKey::generate();
+    std::vector<uint8_t> certificate;
+    mbedtls_ssl_config conf;
+    mbedtls_ssl_context ssl;
+    mbedtls_x509_crt chain;
+    mbedtls_pk_context pk;
+    std::vector<uint8_t> in, out;
+    size_t inOffset = 0;
+
+    ImpostorTlsServer()
+    {
+        mbedtls_ssl_config_init(&conf);
+        mbedtls_ssl_init(&ssl);
+        mbedtls_x509_crt_init(&chain);
+        mbedtls_pk_init(&pk);
+        check(key && ReaderIdentity::selfSignedCertificate(*key, certificate), "impostor certificate");
+        check(mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_SERVER, MBEDTLS_SSL_TRANSPORT_STREAM,
+                                          MBEDTLS_SSL_PRESET_DEFAULT) == 0, "server config");
+        mbedtls_ssl_conf_min_tls_version(&conf, MBEDTLS_SSL_VERSION_TLS1_3);
+        mbedtls_ssl_conf_max_tls_version(&conf, MBEDTLS_SSL_VERSION_TLS1_3);
+        mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
+        check(mbedtls_x509_crt_parse_der(&chain, certificate.data(), certificate.size()) == 0, "parse certificate");
+        check(mbedtls_pk_wrap_psa(&pk, key->keyId()) == 0, "wrap key");
+        check(mbedtls_ssl_conf_own_cert(&conf, &chain, &pk) == 0, "own certificate");
+        check(mbedtls_ssl_setup(&ssl, &conf) == 0, "server setup");
+        mbedtls_ssl_set_bio(&ssl, this, send, receive, nullptr);
+    }
+    ~ImpostorTlsServer()
+    {
+        mbedtls_ssl_free(&ssl);
+        mbedtls_ssl_config_free(&conf);
+        mbedtls_x509_crt_free(&chain);
+        mbedtls_pk_free(&pk);
+    }
+    static int send(void *context, const unsigned char *data, size_t length)
+    {
+        auto *self = static_cast<ImpostorTlsServer *>(context);
+        self->out.insert(self->out.end(), data, data + length);
+        return static_cast<int>(length);
+    }
+    static int receive(void *context, unsigned char *data, size_t length)
+    {
+        auto *self = static_cast<ImpostorTlsServer *>(context);
+        const size_t available = self->in.size() - self->inOffset;
+        if (available == 0) return MBEDTLS_ERR_SSL_WANT_READ;
+        const size_t count = available < length ? available : length;
+        std::memcpy(data, self->in.data() + self->inOffset, count);
+        self->inOffset += count;
+        return static_cast<int>(count);
+    }
+    // The server's answer to the reader's ClientHello.
+    std::vector<uint8_t> answer(const std::vector<uint8_t> &clientHello)
+    {
+        in = clientHello;
+        for (int i = 0; i < 4; i++) mbedtls_ssl_handshake(&ssl);
+        std::vector<uint8_t> result;
+        result.swap(out);
+        return result;
+    }
+};
+
+// Connects the session channel and lets an impostor answer the handshake. `step` runs the reader.
+void untrustedHandshake(PairingSocket &socket, const std::function<void()> &step)
+{
+    socket.binaryOut.clear();
+    socket.open();
+    step();
+    check(!socket.binaryOut.empty(), "ClientHello sent");
+    ImpostorTlsServer impostor;
+    const std::vector<uint8_t> reply = impostor.answer(socket.binaryOut);
+    check(!reply.empty(), "impostor answered");
+    socket.binary(reply.data(), reply.size());
+    step();
+}
+
+// Completes one pairing round trip and the approval on an open pairing connection.
+void approve(PairingSocket &socket, PairingServer &server, const std::function<void()> &step)
+{
+    const std::vector<uint8_t> ns(16, 0x41);
+    socket.deliver(server.round(1, ns, nullptr));
+    step();
+    socket.deliver(PairingServer::reveal(1, ns));
+    step();
+    socket.deliver(R"({"type":"accepted"})");
+    step();
+}
+
+// A token reader an admin asked to pair, whose approval came from someone posing as the server: the
+// session never verifies, so after a few attempts it forgets that key and keeps its token.
+void tokenReaderFallsBackWhenTheServerNeverVerifies()
+{
+    Settings::saveAttraccessAuthConfig("token-1", 7);
+    PairingSocket socket;
+    ReaderLink link(socket, {false, {"attractap-desktop", "desktop", "test"}, pairingClock});
+    link.setup();
+    const auto step = [&] { for (int i = 0; i < 4; i++) link.loop(); };
+    check(link.currentChannel() == ReaderLink::Channel::Legacy, "token reader starts on the token channel");
+    link.startPairing("ticket-1");
+    step();
+    check(link.currentChannel() == ReaderLink::Channel::Pairing, "pairing on request");
+    socket.open();
+    step();
+    JsonDocument hello = socket.last();
+    check(hello["ticket"] == "ticket-1", "ticket in hello");
+    PairingServer server;
+    check(PairingCodec::base64Decode(hello["publicKey"] | "", server.readerKey), "reader key");
+    approve(socket, server, step);
+    check(link.currentChannel() == ReaderLink::Channel::Session, "session after approval");
+    check(Settings::getAttraccessAuthConfig().apiKey == "token-1", "token kept until the grant is verified");
+
+    for (int attempt = 1; attempt < ReaderLink::BOOTSTRAP_UNTRUSTED_LIMIT; attempt++)
+    {
+        untrustedHandshake(socket, step);
+        check(link.serverUntrusted() && link.currentChannel() == ReaderLink::Channel::Session, "retries the session");
+    }
+    untrustedHandshake(socket, step);
+    check(link.currentChannel() == ReaderLink::Channel::Legacy, "back to the token channel");
+    check(!CredentialStore::load().paired(), "unconfirmed pin forgotten");
+    check(Settings::getAttraccessAuthConfig().apiKey == "token-1", "token still there");
+    check(State::getSessionProblem() == State::SESSION_PROBLEM_NONE, "no session error on the token channel");
+    std::cout << "PASS token reader keeps its token when the pairing is never confirmed\n";
+}
 }
 
 int main()
@@ -124,7 +262,7 @@ int main()
         Settings::setDevicePin("1234");
 
         PairingSocket socket;
-        ReaderLink link(socket, {false, {"attractap-desktop", "desktop", "test"}});
+        ReaderLink link(socket, {false, {"attractap-desktop", "desktop", "test"}, pairingClock});
         API api(link);
         VirtualNfc nfc(profile);
         Application application(nfc, api);
@@ -151,6 +289,10 @@ int main()
         pump();
         JsonDocument hello = socket.last();
         check(hello["type"] == "hello" && hello["kind"] == "touch" && hello["ticket"].isNull(), "hello");
+        // Pending from the first moment, before any code (Lite: white breathing, not the init animation).
+        check(State::getEnrollmentState().pending && State::getEnrollmentState().stale, "pending without a code");
+        pump(200);
+        check(lv_screen_active() == Display::pendingApprovalScreen.getScreen(), "pending screen before the first code");
         PairingServer server;
         check(PairingCodec::base64Decode(hello["publicKey"] | "", server.readerKey), "reader key");
 
@@ -171,6 +313,7 @@ int main()
         display.capture("", "pairing");
 
         // Round 2 without an app URL: the new code, no QR.
+        pairingNow += 30000;
         socket.deliver(server.round(2, ns2, nullptr));
         pump();
         check(PairingCodec::base64Decode(socket.last()["nonce"] | "", nr), "nonce 2");
@@ -185,9 +328,13 @@ int main()
             check(message.find("READER_REGISTER") == std::string::npos && message.find("HEARTBEAT") == std::string::npos,
                   "nothing of the API leaves an unpaired reader");
 
-        // Approved: the CA key is pinned and the reader opens the TLS session.
+        // Approved: the CA key is pinned and the reader opens the TLS session. The pairing connection's
+        // "connected" event arrives in the same batch as the approval: it belongs to the old channel and
+        // must not start a session handshake.
         socket.deliver(R"({"type":"accepted"})");
+        socket.open();
         pump();
+        check(socket.binaryFrames == 0, "stale event of the pairing channel ignored");
         check(link.currentChannel() == ReaderLink::Channel::Session, "session channel after approval");
         check(socket.subprotocol == SessionFraming::SESSION_SUBPROTOCOL, "session subprotocol");
         check(CredentialStore::load().caSpki == server.ca->publicKeySpki(), "CA key pinned");
@@ -205,7 +352,29 @@ int main()
         check(link.currentChannel() == ReaderLink::Channel::Session, "still paired");
         check(CredentialStore::load().paired(), "pin kept");
 
+        // The server never proves it is the installation that approved us: an error on screen, retries,
+        // and since the first session never completed, the reader finally forgets that key (not its
+        // own) and asks to be paired again.
+        for (int attempt = 1; attempt < ReaderLink::BOOTSTRAP_UNTRUSTED_LIMIT; attempt++)
+        {
+            untrustedHandshake(socket, [&] { pump(); });
+            check(link.serverUntrusted() && link.currentChannel() == ReaderLink::Channel::Session, "untrusted, retrying");
+            check(State::getSessionProblem() == State::SESSION_PROBLEM_SERVER_UNTRUSTED, "session problem reported");
+            pump(300);
+            check(label(lv_screen_active(), "Server could not be verified") ||
+                      label(lv_screen_active(), "Server konnte nicht überprüft werden"),
+                  "error on the screen");
+        }
+        untrustedHandshake(socket, [&] { pump(); });
+        check(link.currentChannel() == ReaderLink::Channel::Pairing, "unconfirmed pairing abandoned");
+        check(!CredentialStore::load().paired(), "pin forgotten");
+        socket.open();
+        pump();
+        check(socket.last()["publicKey"].as<std::string>() == PairingCodec::base64Encode(server.readerKey), "same reader key");
+
         std::cout << "PASS reader pairing journey\n";
+
+        tokenReaderFallsBackWhenTheServerNeverVerifies();
     }
     catch (const std::exception &error)
     {

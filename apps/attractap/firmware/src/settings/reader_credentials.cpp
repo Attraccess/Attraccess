@@ -37,12 +37,27 @@ namespace CredentialStore
         {
             return credentials;
         }
-        credentials.privateKey = readBlob(store, "key", MAX_KEY_BYTES);
         credentials.caSpki = readBlob(store, "ca", MAX_SPKI_BYTES);
         credentials.readerId = store.getUInt("rid", 0);
         credentials.installationId = store.getString("inst", "");
         credentials.certificate = readBlob(store, "cert", MAX_CERTIFICATE_BYTES);
         return credentials;
+    }
+
+    std::vector<uint8_t> loadPrivateKey()
+    {
+        KVStore store;
+        if (!store.begin(NAMESPACE, true))
+        {
+            return {};
+        }
+        return readBlob(store, "key", MAX_KEY_BYTES);
+    }
+
+    bool eraseKey()
+    {
+        KVStore store;
+        return store.begin(NAMESPACE, false) && store.remove("key");
     }
 
     bool saveNewKey(const std::vector<uint8_t> &privateKey)
@@ -63,6 +78,20 @@ namespace CredentialStore
     {
         KVStore store;
         return store.begin(NAMESPACE, false) && writeBlob(store, "ca", caSpki);
+    }
+
+    bool clearPin()
+    {
+        KVStore store;
+        if (!store.begin(NAMESPACE, false))
+        {
+            return false;
+        }
+        store.remove("rid");
+        store.remove("inst");
+        store.remove("cert");
+        // The pin last: without it the reader never opens the bootstrap session again.
+        return store.remove("ca");
     }
 
     bool saveGrant(uint32_t readerId, const std::string &installationId, const std::vector<uint8_t> &certificate)

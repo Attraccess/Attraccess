@@ -22,5 +22,10 @@ void State::setEnrollmentRound(const std::string &code, const std::string &appUr
     fakeEnrollment.expiresInMs = expiresInMs;
 }
 void State::setEnrollmentKind(bool lite) { fakeEnrollment.lite = lite; }
+void State::setEnrollmentRequested(bool lite)
+{
+    fakeEnrollment.lite = lite;
+    fakeEnrollment.requested++;
+}
 void State::setEnrollmentDisconnected() { fakeEnrollment.disconnected++; }
 void State::setEnrollmentOutcome(bool accepted) { fakeEnrollment.outcome = accepted ? 1 : 2; }

@@ -267,6 +267,8 @@ enum class Message {
     PairingRequestFailed,
     PairingRemoved,
     PairingRemovedAskingAgain,
+    ServerCouldNotBeVerified,
+    SecureConnectionFailed,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -556,6 +558,8 @@ inline constexpr Entry catalog[] = {
     {Message::PairingRequestFailed, "Anfrage fehlgeschlagen. Neuer Versuch gleich.", "Request failed. Trying again soon."},
     {Message::PairingRemoved, "Kopplung entfernt", "Pairing removed"},
     {Message::PairingRemovedAskingAgain, "Das Lesegerät fordert gleich eine neue Freigabe an", "The reader asks for a new approval shortly"},
+    {Message::ServerCouldNotBeVerified, "Server konnte nicht überprüft werden", "Server could not be verified"},
+    {Message::SecureConnectionFailed, "Sichere Verbindung fehlgeschlagen. Server oder Proxy prüfen.", "Secure connection failed. Check the server or proxy."},
 };
 
 } // namespace FirmwareI18n

@@ -10,6 +10,9 @@ set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
 set(TF_PSA_CRYPTO_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
 set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "" FORCE)
 set(USE_STATIC_MBEDTLS_LIBRARY ON CACHE BOOL "" FORCE)
+# Record buffers as on the device (CONFIG_MBEDTLS_SSL_IN/OUT_CONTENT_LEN 8192/4096): records the reader
+# cannot take must fail here as well. Public definition, so our sources see the same value.
+set(MBEDTLS_USER_CONFIG_FILE "${CMAKE_CURRENT_LIST_DIR}/mbedtls_host_user_config.h" CACHE FILEPATH "" FORCE)
 
 if(ATTRACTAP_MBEDTLS_SOURCE_DIR)
     add_subdirectory("${ATTRACTAP_MBEDTLS_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/mbedtls" EXCLUDE_FROM_ALL)

@@ -54,6 +54,8 @@ uint32_t State::enrollment_expires_in_ms = 0;
 uint8_t State::enrollment_outcome = State::ENROLLMENT_OUTCOME_NONE;
 uint8_t State::enrollment_outcome_unconsumed = State::ENROLLMENT_OUTCOME_NONE;
 bool State::pairing_removed = false;
+State::SessionProblem State::session_problem = State::SESSION_PROBLEM_NONE;
+bool State::session_problem_notice = false;
 uint32_t State::pairing_removed_at = 0;
 bool State::api_authenticated = false;
 std::string State::api_device_name = "";
@@ -162,6 +164,16 @@ void State::setEnrollmentKind(bool lite)
     enrollment_lite = lite;
 }
 
+void State::setEnrollmentRequested(bool lite)
+{
+    StateLock lock(state_mutex);
+    enrollment_lite = lite;
+    enrollment_pending = true;
+    enrollment_code = "";
+    enrollment_app_url = "";
+    enrollment_has_pattern = false;
+}
+
 void State::setEnrollmentDisconnected()
 {
     StateLock lock(state_mutex);
@@ -227,13 +239,37 @@ State::EnrollmentState State::getEnrollmentState()
     state.rotatesInMs = enrollment_rotates_in_ms > elapsed ? enrollment_rotates_in_ms - elapsed : 0;
     state.expiresInMs = enrollment_expires_in_ms > elapsed ? enrollment_expires_in_ms - elapsed : 0;
     state.receivedAtMs = enrollment_received_at;
-    state.stale = enrollment_disconnected ||
+    state.stale = enrollment_disconnected || enrollment_code.empty() ||
                   static_cast<uint64_t>(elapsed) >= static_cast<uint64_t>(enrollment_rotates_in_ms) + ENROLLMENT_STALE_GRACE_MS;
     state.outcome = enrollment_outcome;
     // The notice stays while no new request has a code, and a few seconds after one does.
-    state.pairingRemoved = pairing_removed &&
-                           (!enrollment_pending || millis() - pairing_removed_at < PAIRING_REMOVED_NOTICE_MS);
+    state.pairingRemoved = pairing_removed && (!enrollment_pending || enrollment_code.empty() ||
+                                               millis() - pairing_removed_at < PAIRING_REMOVED_NOTICE_MS);
     return state;
+}
+
+void State::setSessionProblem(SessionProblem problem)
+{
+    StateLock lock(state_mutex);
+    session_problem = problem;
+    if (problem != SESSION_PROBLEM_NONE)
+    {
+        session_problem_notice = true;
+    }
+}
+
+State::SessionProblem State::getSessionProblem()
+{
+    StateLock lock(state_mutex);
+    return session_problem;
+}
+
+bool State::consumeSessionProblemNotice()
+{
+    StateLock lock(state_mutex);
+    const bool notice = session_problem_notice;
+    session_problem_notice = false;
+    return notice;
 }
 
 void State::setUserLanguage(bool authenticated, std::string language)

@@ -31,7 +31,8 @@ These are short overlays that interrupt the current state animation for a few hu
 |---------|-------|----------|---------|
 | **Success** | Solid green | ~400 ms | Card authentication succeeded. Access granted. |
 | **Error** | Red flashing | ~600 ms (3 flashes) | Authentication failed (invalid card, wrong key, or other error). |
-| **Pairing result** | Green or red | Whole ring, short | Green: the reader was approved. Red: pairing failed or was cancelled; it asks again with a new pattern. |
+| **Pairing result** | Green or red | Whole ring, short | Green: the reader was approved. Red: pairing failed or was cancelled; it asks again with a new pattern. A request that simply expired after 10 minutes does not flash. |
+| **Secure connection failed** | Red flashing | ~600 ms (3 flashes), once per attempt | A paired reader could not verify the server or could not set up its encrypted session (for example a proxy that strips `Sec-WebSocket-Protocol`). It keeps retrying. See [Reader Pairing](attractap/pairing.md). |
 | **Indicate** | Yellow flashing | ~400 ms (4 pulses) | Card has been held on the reader for a long time. Remove the card and try again if needed. |
 
 ## Quick Reference
@@ -47,7 +48,7 @@ These are short overlays that interrupt the current state animation for a few hu
 | Coloured segments, one blinking | Waiting for pairing approval; read clockwise from the blinking segment |
 | White breathing ring | No pairing pattern yet |
 | Solid green flash | Success — access granted |
-| Red flashing | Error — authentication failed |
+| Red flashing | Error — authentication failed, or (while connecting) the secure connection to the server failed |
 | Yellow flashing | Card held too long — remove and retry |
 
 ## Hardware Notes

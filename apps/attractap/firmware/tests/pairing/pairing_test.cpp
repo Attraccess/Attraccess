@@ -137,6 +137,10 @@ PairingClient::Outcome deliver(PairingClient &client, const std::string &text)
     return client.onMessage(text.data(), text.size());
 }
 
+// The pairing client's clock: rounds must come at the server's pace.
+uint32_t fakeNow = 1000;
+uint32_t fakeClock() { return fakeNow; }
+
 void testPairingProtocol()
 {
     auto readerKey = SoftwareReaderKey::generate();
@@ -149,8 +153,9 @@ void testPairingProtocol()
     // Touch reader with a binding ticket: full round trip.
     {
         fakeEnrollment = FakeEnrollment();
-        PairingClient client(*readerKey, false, {"attractap_touch_v2", "wifi", "2.0.0"});
+        PairingClient client(*readerKey, false, {"attractap_touch_v2", "wifi", "2.0.0"}, fakeClock);
         client.start("ticket-1", [&](const std::string &m) { server.sent.push_back(m); return true; });
+        CHECK(fakeEnrollment.requested == 1); // pending (no code yet) as soon as the request starts
         JsonDocument hello = server.last();
         CHECK(hello["type"] == "hello");
         CHECK(hello["v"] == 1);
@@ -176,6 +181,7 @@ void testPairingProtocol()
         CHECK(fakeEnrollment.expiresInMs > 599000);
 
         // Rotation: a new round with a new nonce gives a new code.
+        fakeNow += 30000;
         CHECK(deliver(client, server.round(2, ns2, nullptr)) == PairingClient::Outcome::None);
         const Bytes nr2 = bytes(server.last()["nonce"]);
         CHECK(nr2 != nr);
@@ -191,7 +197,7 @@ void testPairingProtocol()
     // Lite reader: the pattern goes to State; no ticket in hello.
     {
         fakeEnrollment = FakeEnrollment();
-        PairingClient client(*readerKey, true, {"attractap_lite", "ethernet", "2.0.0"});
+        PairingClient client(*readerKey, true, {"attractap_lite", "ethernet", "2.0.0"}, fakeClock);
         client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; });
         CHECK(server.last()["kind"] == "lite");
         CHECK(server.last()["ticket"].isNull());
@@ -207,7 +213,7 @@ void testPairingProtocol()
 
     // The revealed nonce does not match the commitment: abort, new request.
     {
-        PairingClient client(*readerKey, false, {"n", "v", "1"});
+        PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
         client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; });
         deliver(client, server.round(1, ns1));
         CHECK(deliver(client, server.reveal(1, ns2)) == PairingClient::Outcome::Retry);
@@ -218,7 +224,7 @@ void testPairingProtocol()
     // The server key changes between rounds.
     {
         auto otherKey = SoftwareReaderKey::generate();
-        PairingClient client(*readerKey, false, {"n", "v", "1"});
+        PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
         client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; });
         deliver(client, server.round(1, ns1));
         FakeServer impostor{otherKey->publicKeySpki(), readerKey->publicKeySpki(), {}, {}};
@@ -228,7 +234,7 @@ void testPairingProtocol()
 
     // Server refusals back off; expiry starts over quickly; garbage is a protocol error.
     {
-        PairingClient client(*readerKey, false, {"n", "v", "1"});
+        PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
         const auto start = [&] { client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; }); };
         start();
         CHECK(deliver(client, R"({"type":"failed","reason":"busy"})") == PairingClient::Outcome::Retry);
@@ -239,6 +245,16 @@ void testPairingProtocol()
         start();
         CHECK(deliver(client, R"({"type":"failed","reason":"expired"})") == PairingClient::Outcome::Retry);
         CHECK(client.retryDelayMs() == PairingClient::RETRY_AFTER_EXPIRY_MS);
+        // Expiry is the normal end of a request: no failure shown (Lite: no red flash), just no code.
+        fakeEnrollment.outcome = 0;
+        fakeEnrollment.disconnected = 0;
+        start();
+        CHECK(deliver(client, R"({"type":"failed","reason":"expired"})") == PairingClient::Outcome::Retry);
+        CHECK(fakeEnrollment.outcome == 0);
+        CHECK(fakeEnrollment.disconnected == 1);
+        start();
+        CHECK(deliver(client, R"({"type":"failed","reason":"cancelled-by-admin"})") == PairingClient::Outcome::Retry);
+        CHECK(fakeEnrollment.outcome == 2);
         start();
         CHECK(deliver(client, "not json") == PairingClient::Outcome::Retry);
         start();
@@ -246,11 +262,78 @@ void testPairingProtocol()
         start();
         CHECK(deliver(client, R"({"type":"accepted"})") == PairingClient::Outcome::Retry); // accepted before any round
         start();
+        deliver(client, server.round(1, ns1));
+        CHECK(deliver(client, R"({"type":"accepted"})") == PairingClient::Outcome::Retry); // round never revealed
+        CHECK(client.failureReason() == "protocol");
+        start();
         fakeEnrollment.disconnected = 0;
         CHECK(client.onDisconnected() == PairingClient::Outcome::Retry);
         CHECK(fakeEnrollment.disconnected == 1);
         CHECK(client.onDisconnected() == PairingClient::Outcome::None);
     }
+}
+
+// A man in the middle posing as the server must not collect codes faster than the real server
+// rotates them: rounds strictly increase, each is revealed before the next, they come at least
+// MIN_ROUND_SPACING_MS apart and one request has at most MAX_ROUNDS.
+void testRoundPacing()
+{
+    auto readerKey = SoftwareReaderKey::generate();
+    auto caKey = SoftwareReaderKey::generate();
+    FakeServer server{caKey->publicKeySpki(), readerKey->publicKeySpki(), {}, {}};
+    const Bytes ns(16, 0x33);
+    PairingClient client(*readerKey, false, {"n", "v", "1"}, fakeClock);
+    const auto start = [&] { client.start("", [&](const std::string &m) { server.sent.push_back(m); return true; }); };
+    const auto revealedRound = [&](int round) {
+        CHECK(deliver(client, server.round(round, ns)) == PairingClient::Outcome::None);
+        return deliver(client, server.reveal(round, ns));
+    };
+
+    // A new round while the previous one is unrevealed ends the request.
+    start();
+    CHECK(deliver(client, server.round(1, ns)) == PairingClient::Outcome::None);
+    fakeNow += 30000;
+    CHECK(deliver(client, server.round(2, ns)) == PairingClient::Outcome::Retry);
+    CHECK(client.failureReason() == "round-order");
+    CHECK(client.retryDelayMs() == PairingClient::RETRY_AFTER_ERROR_MS);
+
+    // Round numbers strictly increase.
+    start();
+    CHECK(revealedRound(5) == PairingClient::Outcome::None);
+    fakeNow += 30000;
+    CHECK(deliver(client, server.round(5, ns)) == PairingClient::Outcome::Retry);
+    CHECK(client.failureReason() == "round-order");
+    start();
+    CHECK(revealedRound(5) == PairingClient::Outcome::None);
+    fakeNow += 30000;
+    CHECK(deliver(client, server.round(4, ns)) == PairingClient::Outcome::Retry);
+    CHECK(client.failureReason() == "round-order");
+
+    // Rounds faster than the rotation end the request; the first one may come at once.
+    start();
+    CHECK(revealedRound(1) == PairingClient::Outcome::None);
+    fakeNow += PairingClient::MIN_ROUND_SPACING_MS - 1;
+    CHECK(deliver(client, server.round(2, ns)) == PairingClient::Outcome::Retry);
+    CHECK(client.failureReason() == "round-too-early");
+    start();
+    CHECK(revealedRound(1) == PairingClient::Outcome::None);
+    fakeNow += PairingClient::MIN_ROUND_SPACING_MS;
+    CHECK(revealedRound(2) == PairingClient::Outcome::None);
+
+    // At most MAX_ROUNDS per request.
+    start();
+    for (int round = 1; round <= PairingClient::MAX_ROUNDS; round++)
+    {
+        CHECK(revealedRound(round) == PairingClient::Outcome::None);
+        fakeNow += 30000;
+    }
+    CHECK(deliver(client, server.round(PairingClient::MAX_ROUNDS + 1, ns)) == PairingClient::Outcome::Retry);
+    CHECK(client.failureReason() == "too-many-rounds");
+
+    // A new request starts counting again.
+    start();
+    CHECK(revealedRound(1) == PairingClient::Outcome::None);
+    CHECK(deliver(client, R"({"type":"accepted"})") == PairingClient::Outcome::Accepted);
 }
 
 // --- framing ----------------------------------------------------------------------------------
@@ -621,6 +704,7 @@ int main()
 {
     testVectors();
     testPairingProtocol();
+    testRoundPacing();
     testFraming();
     testIdentity();
     testSessionTls();

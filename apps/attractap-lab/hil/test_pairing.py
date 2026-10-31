@@ -36,6 +36,31 @@ def wait_status(hooks, wanted, timeout=30):
     raise AssertionError(f"reader status stayed {seen!r}, expected {wanted!r}")
 
 
+def pending_code(console, hooks, since):
+    """Return the newest code logged after ``since``, checked against ``api.status.get``.
+
+    Codes rotate every 30 s: a reply that raced a rotation is compared once more.
+    """
+    for attempt in range(2):
+        reply = hooks.command("api.status.get")
+        logged = latest_code(console.data[since:])
+        assert reply["status"] == "pending_approval", reply
+        if reply.get("enrollmentCode") == logged:
+            break
+        time.sleep(1)
+    assert logged, "reader logged no pairing code"
+    assert reply.get("enrollmentCode") == logged, \
+        f"api.status.get shows {reply.get('enrollmentCode')!r}, the UART logged {logged!r}"
+    return logged
+
+
+def credentials(api, admin, reader):
+    """The reader's credential history, newest first."""
+    status, events = api.call("GET", f"/attractap/readers/{reader['id']}/credentials", token=admin)
+    assert status == 200, events
+    return events
+
+
 def base_url(api):
     return api.base[: -len("/api")]
 
@@ -98,7 +123,7 @@ def test_session_is_authenticated_after_approval(reader, hooks):
 
 def test_pending_screen_shows_code_and_qr(api, admin, reader, hooks, unpaired, artifacts):
     console = reader["console"]
-    assert latest_code(console.data[unpaired["mark"]:]), "reader logged no pairing code"
+    pending_code(console, hooks, unpaired["mark"])
     without_url = hooks.screenshot()
     without_url.save(artifacts / "pairing-pending-no-url.png")
     assert distinct_colours(without_url) > 8, "pending screen looks blank"
@@ -154,18 +179,25 @@ def test_login_inside_session(reader, resource, emulator, state, hooks):
 def test_revoke_ends_session_and_new_approval_pairs_again(api, admin, reader, hooks):
     console = reader["console"]
     old_code = latest_code(console.data)
+    old_key = credentials(api, admin, reader)[0]
+    assert old_key["state"] == "paired", old_key
     elapsed, mark = revoke(api, admin, reader)
     try:
         assert elapsed < REVOKE_DISCONNECT_SECONDS, f"session ended {elapsed:.2f}s after the revoke"
         wait_status(hooks, "pending_approval", 30)
-        new_code = latest_code(console.data[mark:])
-        assert new_code, "reader logged no pairing code after the revoke"
+        new_code = pending_code(console, hooks, mark)
         assert new_code != old_code, "a new request must show a new code"
     finally:
         repair(api, admin, reader, mark)
     wait_status(hooks, "authenticated", 30)
     status, readers = api.call("GET", "/attractap/readers", token=admin)
     assert any(item["id"] == reader["id"] for item in readers), "the record must survive"
+    events = credentials(api, admin, reader)
+    assert events[0]["state"] == "paired", events[0]
+    assert events[0]["keyFingerprint"] != old_key["keyFingerprint"], "the reader must pair with a new key"
+    assert any(event["id"] > old_key["id"] and event["state"] == "revoked"
+               and event["keyFingerprint"] == old_key["keyFingerprint"] for event in events), \
+        "the history must show the old key revoked"
 
 
 @pytest.mark.skip(reason="the HIL suite has no OTA pattern: it needs a served firmware image and an "

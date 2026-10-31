@@ -15,6 +15,7 @@ struct FakeEnrollment
     bool lite = false;
     int disconnected = 0;
     int outcome = 0;
+    int requested = 0;
 };
 
 extern FakeEnrollment fakeEnrollment;

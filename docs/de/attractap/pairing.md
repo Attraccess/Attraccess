@@ -51,7 +51,8 @@ Codes bestehen aus den Zeichen `23456789ABCDEFGHJKMNPQRSTUVWXYZ`; `0`, `O`, `1`,
 kommen nie vor. Der Code wechselt alle 30 Sekunden; der vorherige Code bleibt bis zum nächsten
 Wechsel gültig, ein soeben abgelesener Code funktioniert also noch. Eine wartende Anfrage dauert
 höchstens 10 Minuten; danach fragt der Reader mit einem neuen Code erneut an und behält seinen
-Schlüssel. Zeigen zufällig zwei Reader gleichzeitig denselben Code, bittet Attraccess dich, auf
+Schlüssel. Das ist kein Fehler: Der Reader zeigt keine Störung und wartet nur kurz auf seinen
+nächsten Code. Zeigen zufällig zwei Reader gleichzeitig denselben Code, bittet Attraccess dich, auf
 den nächsten Code zu warten.
 
 Du kannst auch aus dem Block **Nicht gekoppelt** freigeben: Klicke in der Zeile des Readers auf
@@ -66,10 +67,11 @@ Ein Lite-Reader zeigt das Muster auf seinem Ring aus 24 LEDs, aufgeteilt in **8 
 - Das **Startsegment blinkt**; lies die Segmente von dort **im Uhrzeigersinn**.
 - Jedes Segment zeigt eine von sechs Farben: Rot, Grün, Blau, Gelb, Weiß (volle Helligkeit, nicht
   atmend) oder Magenta.
-- Ein langsam **weiß atmender** Ring bedeutet, dass der Reader noch kein Muster hat (er verbindet
-  sich oder wartet auf den ersten Code). Das ist kein Code.
+- Ein langsam **weiß atmender** Ring bedeutet, dass der Reader noch kein Muster hat (er hat die
+  Kopplung angefragt und wartet auf den ersten Code, hat die Verbindung verloren, oder seine
+  Anfrage ist nach 10 Minuten abgelaufen). Das ist kein Code.
 - Nach der Freigabe blinkt der Ring **grün** bei Erfolg oder **rot**, wenn die Kopplung
-  fehlgeschlagen ist.
+  fehlgeschlagen ist. Eine einfach abgelaufene Anfrage blinkt nicht rot.
 
 Vergleiche die acht Farben mit der Farbliste, die die Freigabeseite für den wartenden
 Lite-Reader zeigt, und gib den Reader frei. Das Muster wechselt zusammen mit dem Code alle
@@ -88,10 +90,18 @@ Code wie oben frei. Die Kopplung ist an den bestehenden Eintrag gebunden, Name, 
 Einstellungen bleiben also erhalten. Ist der Reader nicht verbunden, erreicht **Koppeln** ihn
 nicht; schalte ihn zuerst ein. Die Einstellungen eines nicht gekoppelten Readers bleiben gesperrt.
 
+Ein Token-Reader behält seinen Token, bis die erste verschlüsselte Sitzung sein Zertifikat
+geliefert hat. Erreicht diese Sitzung keinen Server, den der Reader prüfen kann (drei Versuche
+nacheinander), kam die Freigabe womöglich von jemandem, der sich als dein Server ausgibt: Der Reader
+vergisst den gemerkten Server (nicht seinen eigenen Schlüssel) und kehrt zu seinem Token zurück,
+oder zur Kopplung, wenn er keinen Token hat. Du kannst ihn dann erneut koppeln.
+
 Nach der Kopplung fällt ein Reader nie auf seinen Token oder einen unverschlüsselten Kanal
 zurück und löscht seine gespeicherte Zertifizierungsstelle und seinen Schlüssel nie aufgrund einer
-nicht authentifizierten Nachricht. Scheitert die TLS-Verbindung zum gespeicherten Server, zeigt der
-Reader einen Fehler und versucht es erneut; er meldet sich nicht von selbst neu an.
+nicht authentifizierten Nachricht. Kann der Server nicht beweisen, dass er deine Installation ist,
+zeigt ein Touch-Reader auf seinem Verbindungsbildschirm **Server konnte nicht überprüft werden**
+und versucht es alle 30 Sekunden erneut; ein Lite-Reader blinkt bei jedem gescheiterten Versuch
+**rot**. Er meldet sich nicht von selbst neu an.
 
 ## Kopplung entfernen, erneut koppeln
 
@@ -126,7 +136,9 @@ Ein Angreifer, der **während der Anmeldung aktiv im Netzwerk** ist, kann einen 
 dem Angreifer statt deinem Server zu vertrauen. Er kann ihn aber nicht dazu bringen, deinem Server
 so zu vertrauen, dass du es freigeben würdest: Der Code am Reader weicht dann vom Code des Servers
 ab, und deine Freigabe schlägt fehl („Dieser Code passt nicht zum Reader“). Wird ein richtig abgelesener Code
-abgelehnt, höre auf und prüfe das Netzwerk, bevor du es erneut versuchst.
+abgelehnt, höre auf und prüfe das Netzwerk, bevor du es erneut versuchst. Der Reader berechnet
+einen neuen Code nur im 30-Sekunden-Takt deines Servers; ein Angreifer kann ihn also nicht schneller
+durch Codes jagen, um einen passenden zu finden.
 
 Versuche sind begrenzt: drei pro Minute und Verbindung, zehn pro zehn Minuten und zwanzig
 wartende Anfragen pro Adresse, insgesamt 200 wartende Anfragen und fünf falsche Codes pro Admin
@@ -149,8 +161,10 @@ Schlüssel nicht mehr entschlüsselt werden und alle Reader müssen neu gekoppel
 Der Reader wählt den Transport über die WebSocket-Subprotokolle `attractap-session.v1`
 (verschlüsselte Sitzung) und `attractap-pairing.v1` (Kopplung). Ein Reverse-Proxy muss den Header
 `Sec-WebSocket-Protocol` in beide Richtungen durchreichen. Entfernt er den Header, können
-gekoppelte Reader keine Verbindung aufbauen und zeigen einen klaren Fehler; sie fallen nie auf eine
-unverschlüsselte Verbindung zurück.
+gekoppelte Reader keine Verbindung aufbauen: Ab dem zweiten gescheiterten Versuch in Folge zeigt ein
+Touch-Reader auf seinem Verbindungsbildschirm **Sichere Verbindung fehlgeschlagen. Server oder Proxy
+prüfen.**, und ein Lite-Reader blinkt nach jedem gescheiterten Versuch **rot**. Sie versuchen es weiter und
+fallen nie auf eine unverschlüsselte Verbindung zurück.
 
 Unbekannte `attractap-*`-Subprotokollversionen (z. B. `attractap-session.v2`) lehnt der Server
 beim WebSocket-Upgrade mit HTTP 400 ab.

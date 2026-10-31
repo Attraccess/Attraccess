@@ -70,6 +70,11 @@ void Application::updateLedState() {
   } else if (outcome == State::ENROLLMENT_OUTCOME_FAILED) {
     this->led.triggerError();
   }
+  // A paired reader's secure session failed (server not verifiable, or repeated handshake
+  // failures): the error flash, once per failed attempt; the ring keeps connecting meanwhile.
+  if (State::consumeSessionProblemNotice()) {
+    this->led.triggerError();
+  }
 }
 #endif
 

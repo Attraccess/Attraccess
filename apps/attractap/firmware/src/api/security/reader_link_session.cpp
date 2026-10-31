@@ -148,6 +148,7 @@ void ReaderLink::runSessionWork(const SessionWork &item)
                 post(std::move(status));
                 return;
             }
+            sessionReady = false;
             tls.begin(config, [this](const uint8_t *data, size_t length) {
                 outbox.insert(outbox.end(), data, data + length);
                 return true;
@@ -166,8 +167,9 @@ void ReaderLink::runSessionWork(const SessionWork &item)
         status.code = static_cast<int>(tls.status());
         if (status.sendFailed)
         {
-            tls.close();
+            closeSessionLocked();
         }
+        sessionReady = tls.open();
     }
     for (auto &frame : frames)
     {
@@ -190,6 +192,9 @@ void ReaderLink::onSessionStatus(const Event &event)
     {
         handshakeStartedMs = 0;
         untrusted = false;
+        bootstrapUntrusted = 0;
+        handshakeFailures = 0;
+        State::setSessionProblem(State::SESSION_PROBLEM_NONE);
 #ifdef ESP_PLATFORM
         // The session's internal-heap cost is budgeted (mbedTLS itself allocates in PSRAM).
         logger.infof("Secure session established; heap internal: free=%u min=%u; main stack free=%u",
@@ -208,10 +213,17 @@ void ReaderLink::onSessionStatus(const Event &event)
     }
     else if (status == SessionTls::Status::Untrusted)
     {
-        // Never unpair because of this: it proves nothing about who is on the other end.
+        // Never unpair a reader with a certificate because of this: it proves nothing about who is
+        // on the other end.
         untrusted = true;
-        logger.error("Server could not prove it is the paired installation; retrying later");
         handshakeStartedMs = 0;
+        State::setSessionProblem(State::SESSION_PROBLEM_SERVER_UNTRUSTED);
+        if (!credentials.hasCertificate() && ++bootstrapUntrusted >= BOOTSTRAP_UNTRUSTED_LIMIT)
+        {
+            abandonBootstrap();
+            return;
+        }
+        logger.error("Server could not prove it is the paired installation; retrying later");
         reconnectAfter(UNTRUSTED_RETRY_MS);
     }
     else if (status == SessionTls::Status::Failed || status == SessionTls::Status::Closed)
@@ -222,9 +234,45 @@ void ReaderLink::onSessionStatus(const Event &event)
             error = tls.lastError();
         }
         logger.errorf("Secure session ended (%d)", error);
-        handshakeStartedMs = 0;
+        if (handshakeStartedMs != 0)
+        {
+            handshakeStartedMs = 0;
+            onHandshakeFailed();
+        }
         socket.forceReconnect("session ended");
     }
+}
+
+void ReaderLink::onHandshakeFailed()
+{
+    if (++handshakeFailures >= HANDSHAKE_FAILURES_BEFORE_ERROR)
+    {
+        logger.error("Secure session failed repeatedly; check the server or a proxy in between");
+        State::setSessionProblem(State::SESSION_PROBLEM_HANDSHAKE_FAILED);
+    }
+}
+
+void ReaderLink::abandonBootstrap()
+{
+    // The approval this reader pinned never led to a server it could verify, so it may have come
+    // from someone posing as the server. Without a certificate the reader is not paired yet: drop
+    // the pinned key (keep the reader key) and ask again the way it did before.
+    logger.error("No verifiable server for the pinned installation key; forgetting it");
+    if (!CredentialStore::clearPin())
+    {
+        logger.error("Could not forget the installation key; retrying later");
+        reconnectAfter(UNTRUSTED_RETRY_MS);
+        return;
+    }
+    credentials.caSpki.clear();
+    pairingTicket.clear();
+    pairingFromToken = false;
+    if (!Settings::getAttraccessAuthConfig().apiKey.empty())
+    {
+        useChannel(Channel::Legacy, "pairing not confirmed");
+        return;
+    }
+    useChannel(Channel::Pairing, "pairing not confirmed");
 }
 
 void ReaderLink::onSessionFrame(SessionFraming::FrameType type, std::string payload)
@@ -320,6 +368,9 @@ void ReaderLink::onControl(const std::string &payload)
         credentials.readerId = readerId;
         credentials.installationId = serverInstallation;
         credentials.certificate = certificate;
+        // Verified and stored: the server deleted the token with the approval, and a paired reader
+        // never uses it again.
+        Settings::clearAttraccessAuthConfig();
         State::clearEnrollment();
         logger.infof("Paired as reader %u", static_cast<unsigned>(readerId));
         // The server closes this session; the next one (soon) uses the certificate.

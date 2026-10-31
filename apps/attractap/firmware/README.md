@@ -149,7 +149,12 @@ Pairing sequence:
    a commitment to the server nonce, the app URL (or `null`) and the times until rotation and
    expiry. The reader answers with its own `nonce` (at least 16 random bytes); the server
    `reveal`s its nonce. The reader checks the commitment and, on a mismatch, aborts, closes and
-   starts a new request.
+   starts a new request. The reader only follows the server's pace: round numbers must strictly
+   increase, a new `round` while the previous one is still unrevealed ends the request, rounds
+   closer than 20 s apart (except the first) end it, and one request has at most 22 rounds
+   (10 minutes of 30 s rounds plus a margin). Otherwise someone posing as the server could make
+   the reader compute codes much faster than the real server rotates them and pick one that
+   matches a code of its own. Such an end uses the normal retry back-off (10 s).
 3. Both sides derive the code from `SHA-256` of the length-prefixed fields tag, reader key, CA
    key, reader nonce, server nonce (tag `attractap-pairing-code-v1`). The code is the first
    eight bytes as a big-endian integer mod 31^6 in base 31 over `23456789ABCDEFGHJKMNPQRSTUVWXYZ`,
@@ -158,14 +163,29 @@ Pairing sequence:
    stays valid until the next rotation. `tests/pairing/vectors.json` holds the shared test
    vectors; the API and the firmware host tests run the same file.
 4. An admin approves the code once. The server issues the reader certificate, sends `accepted`,
-   and the reader pins the CA and opens `attractap-session.v1`. The first session grant carries
+   and the reader pins the CA and opens `attractap-session.v1`. The reader takes `accepted` only
+   after a round whose reveal it verified (a code was derived). The first session grant carries
    its reader ID, installation ID and certificate; the reader stores them and the token hash is
-   deleted on the server. A pending request lasts at most 10 minutes; then the server sends
-   `failed` (`expired`) and the reader asks again with the same key.
+   deleted on the server. A token reader keeps its stored token until that grant is verified and
+   stored, and only then deletes it. A pending request lasts at most 10 minutes; then the server
+   sends `failed` (`expired`) and the reader asks again with the same key. Expiry is not shown as
+   a failure (no "Request failed", no red flash); the screen waits for the next code and the Lite
+   ring breathes white until the next round.
 
-After pairing the reader never erases its pinned CA or key because of an unauthenticated message.
-A TLS failure against the pinned CA shows an error and retries; the reader does not enroll again
-by itself. When an admin removes the pairing, the session ends within 1 s, the reader shows
+After pairing (once the reader holds its certificate) the reader never erases its pinned CA or
+key because of an unauthenticated message. A TLS failure against the pinned CA shows "Server could
+not be verified" on the connecting screen (Lite: a red error flash per attempt) and retries every
+30 s; the reader does not enroll again by itself. Two failed handshakes in a row (timeouts,
+errors, or a text frame from a server that took the connection for a token reader, as when a
+proxy strips `Sec-WebSocket-Protocol`) show "Secure connection failed. Check the server or proxy."
+(Lite: red error flash). Both messages clear when a session opens.
+
+A reader that pinned a CA but never completed the first session (no certificate yet) handles an
+unverifiable server differently: after 3 such handshakes in a row it forgets the pinned CA (not
+its own key) and goes back to its token if it still has one, or to pairing otherwise. The
+approval may have come from someone posing as the server, and the reader would otherwise stay
+stuck. The channel at boot follows the stored state: a pin means the session, otherwise the token,
+otherwise pairing. When an admin removes the pairing, the session ends within 1 s, the reader shows
 "Pairing removed", generates a **new** key and returns to pending approval.
 
 Touch variants show the code on the pending-approval screen with a countdown and a QR code of
@@ -177,8 +197,9 @@ covers create, update and delete cycles.
 
 Lite variants show the pattern on the LED ring: 8 segments of 3 LEDs, the start segment blinks
 and the colours follow clockwise. A slowly breathing white ring means there is no pattern yet
-(connecting, or no round received). The ring flashes green when the pairing was accepted and red
-when it failed. Rendering lives in `src/led/led_pattern.hpp` (state
+(the pairing request started but no round arrived yet, the connection dropped, or the request
+expired). The ring flashes green when the pairing was accepted and red when it failed; a request
+that simply expired after 10 minutes does not flash. Rendering lives in `src/led/led_pattern.hpp` (state
 `LED_STATE_ENROLLMENT_PENDING`), covered by the host tests in `tests/led-pattern`.
 
 Every variant, including Lite, reports pairing on the serial console: `api.status.get` returns
@@ -433,8 +454,8 @@ The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a use
 
 ### LED Triggers
 
-| Trigger             | Color        | When used          |
-| ------------------- | ------------ | ------------------ |
-| `triggerSuccess()`  | Green        | Auth succeeded     |
-| `triggerError()`    | Red flash    | Auth failed        |
-| `triggerIndicate()` | Yellow flash | Card held too long |
+| Trigger             | Color        | When used                                                        |
+| ------------------- | ------------ | ---------------------------------------------------------------- |
+| `triggerSuccess()`  | Green        | Auth succeeded; pairing accepted                                 |
+| `triggerError()`    | Red flash    | Auth failed; pairing failed; secure session failed (per attempt) |
+| `triggerIndicate()` | Yellow flash | Card held too long                                               |
