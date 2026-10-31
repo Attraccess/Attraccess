@@ -60,9 +60,15 @@ As with [OIDC](user-management/sso-oidc.md), you can map SAML roles to Attracces
 
 ### Account Binding
 
-SAML identities are bound per provider: a user is identified by the combination of SAML provider and NameID, so the same NameID coming from a different SAML provider never opens that user's account. If a SAML login has an email address that belongs to an existing account without a binding for that provider, the user has to confirm the [account linking](user-management/sso-overview.md) with the local password first. This also applies to accounts that SAML created earlier before they were bound. An account can be linked to only one SSO provider, so a login whose email belongs to an account bound to another provider is rejected. Accounts without a local password (for example invited accounts) cannot confirm the linking until an administrator sets a password.
+SAML identities are bound per provider: a user is identified by the combination of SAML provider and NameID. The same NameID from a different SAML provider never signs in to that user's account. Configure your identity provider to send a persistent NameID: a transient NameID changes on every login, so the user would not be recognised again.
 
-**Upgrade note:** On upgrade, existing SAML users are bound to their provider automatically, based on their previous SAML sessions or, if only one SAML provider exists, to that provider. Users that cannot be assigned unambiguously (several SAML providers and no session history) are not bound. They get the account-linking prompt on their next login, which requires a local password, so an administrator has to set one up or fix the account.
+If the email address of a SAML login belongs to an existing account that is not bound to this provider, the user first has to confirm the [account linking](user-management/sso-overview.md#account-linking) with the account's local password. This also applies to accounts created by SAML in an earlier version that the upgrade could not bind. Linking removes the local password, so afterwards the user can sign in through SSO only.
+
+- An account can be linked to only one SSO provider. If the account is already bound to another provider, the linking prompt is shown, but confirming it fails (`SSO_ALREADY_LINKED`).
+- Accounts without a local password (for example accounts created by SAML in an earlier version) cannot confirm the linking. As long as the account is not bound to any SSO provider, the user can set a password with the "forgot password" function, or an administrator can set one.
+
+> [!WARNING]
+> **Upgrade note:** On upgrade, existing SAML users are bound to their provider automatically: by their previous SAML sessions or, if only one SAML provider exists, to that provider. Users that cannot be assigned unambiguously (for example several SAML providers and no session history) are not bound and get the account-linking prompt on their next SAML login, which needs a local password (see above). Accounts that an earlier version wrongly bound to an OIDC provider are converted only when that is provable; otherwise they get the linking prompt on their SAML login, but confirming it fails with `SSO_ALREADY_LINKED`. Their binding currently has to be corrected by an administrator directly in the database.
 
 ## Service Provider Metadata
 

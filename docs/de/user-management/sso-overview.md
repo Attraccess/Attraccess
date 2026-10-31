@@ -47,7 +47,7 @@ Beispiel: Die OIDC-Rolle `attraccess_admin` wird der Berechtigung **Benutzer ver
 
 Wenn ein Benutzer bereits ein lokales Konto hat und sich erstmals über SSO anmeldet, kann das bestehende Konto mit dem SSO-Anbieter verknüpft werden. Dazu wird die E-Mail-Adresse und das lokale Passwort zur Bestätigung abgefragt.
 
-Ein bestehendes Konto mit derselben E-Mail-Adresse wird nie automatisch verknüpft. Das gilt für jede SSO-Anmeldung ohne Bindung an den jeweiligen Anbieter, für OIDC und SAML, unabhängig vom Zustand des bestehenden Kontos. Der Benutzer muss die Verknüpfung immer mit seinen lokalen Zugangsdaten bestätigen. Jeder Benutzer kann mit genau einem SSO-Anbieter verknüpft sein. OIDC-E-Mail-Adressen, die der Identity Provider als nicht verifiziert markiert (`email_verified=false`), werden nicht zum Abgleich verwendet.
+Ein bestehendes Konto mit derselben E-Mail-Adresse wird nie automatisch verknüpft. Das gilt für jede SSO-Anmeldung ohne Bindung an den jeweiligen Anbieter, für OIDC und SAML, unabhängig vom Zustand des bestehenden Kontos. Der Benutzer muss die Verknüpfung immer mit dem lokalen Passwort des Kontos bestätigen. Jeder Benutzer kann mit höchstens einem SSO-Anbieter verknüpft sein. OIDC-E-Mail-Adressen, die der Identity Provider als nicht verifiziert markiert (`email_verified=false`), werden nie zur Verknüpfung verwendet; gehört eine solche Adresse bereits zu einem Konto, wird die Anmeldung abgelehnt (siehe [OIDC](user-management/sso-oidc.md)).
 
 ## Mehrere Anbieter
 
