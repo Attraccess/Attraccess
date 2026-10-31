@@ -109,6 +109,7 @@ add_library(attractap-desktop-runtime
     src/host_websocket.cpp
     src/host_websocket_worker.cpp
     src/profile_store.cpp
+    src/virtual_card_chip.cpp
     src/virtual_rfid.cpp
     src/virtual_rfid_encoding.cpp
     src/virtual_rfid_cards.cpp
@@ -143,6 +144,7 @@ add_executable(attractap-desktop-tests
     src/host_websocket.cpp
     src/host_websocket_worker.cpp
     src/profile_store.cpp
+    src/virtual_card_chip.cpp
     src/virtual_rfid.cpp
     src/virtual_rfid_encoding.cpp
     src/virtual_rfid_cards.cpp)

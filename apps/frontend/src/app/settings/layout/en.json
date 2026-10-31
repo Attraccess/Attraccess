@@ -43,6 +43,10 @@
       "label": "Monitoring",
       "description": "Metrics endpoint and instrumentation"
     },
+    "attractap": {
+      "label": "Card enrollment",
+      "description": "Which Attractap readers may enroll and reset RFID cards"
+    },
     "auditLog": {
       "label": "Audit log",
       "description": "Administrative activity and retention"

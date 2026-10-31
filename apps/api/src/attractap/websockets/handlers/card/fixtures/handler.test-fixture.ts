@@ -10,8 +10,6 @@ export function createAttractapCardHandlerFixture() {
     findReaderById: jest.Mock;
     getNFCCardByUID: jest.Mock;
     getNFCCardByID: jest.Mock;
-    generateNTAG424Key: jest.Mock;
-    uint8ArrayToHexString: jest.Mock;
     createNFCCard: jest.Mock;
     deleteNFCCard: jest.Mock;
   };
@@ -42,9 +40,9 @@ export function createAttractapCardHandlerFixture() {
       id: 'socket-1',
       readerId: 42,
       state: {
-        lastAuthenticatedUserId: null,
+        verifiedUserId: null,
+        cardRelay: true,
         enrollment: null,
-        enrollNewCardData: null,
         resetNfcCardData: null,
         ...(overrides.state || {}),
       },

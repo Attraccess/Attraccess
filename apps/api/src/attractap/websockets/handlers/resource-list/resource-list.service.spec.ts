@@ -44,9 +44,9 @@ describe('ResourceListService', () => {
 
   describe('per-resource card access', () => {
     it('keeps users isolated while sharing list queries and same-user permission results', async () => {
-      const a = fixture.createMockSocket({ id: 'a', state: { lastAuthenticatedUserId: 1 } });
-      const b = fixture.createMockSocket({ id: 'b', state: { lastAuthenticatedUserId: 2 } });
-      const c = fixture.createMockSocket({ id: 'c', state: { lastAuthenticatedUserId: 1 } });
+      const a = fixture.createMockSocket({ id: 'a', state: { verifiedUserId: 1 } });
+      const b = fixture.createMockSocket({ id: 'b', state: { verifiedUserId: 2 } });
+      const c = fixture.createMockSocket({ id: 'c', state: { verifiedUserId: 1 } });
       const guest = fixture.createMockSocket({ id: 'guest' });
       for (const socket of [a, b, c, guest]) fixture.websocketService.sockets.set(socket.id, socket);
       fixture.attractapService.findReaderById.mockResolvedValue(
@@ -88,10 +88,10 @@ describe('ResourceListService', () => {
     });
 
     it('discards personalized results if another card arrives during authorization', async () => {
-      const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      const socket = fixture.createMockSocket({ state: { verifiedUserId: 1 } });
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       fixture.resourceUsageService.canControllResource.mockImplementation(async () => {
-        socket.state.lastAuthenticatedUserId = 2;
+        socket.state.verifiedUserId = 2;
         return true;
       });
       await fixture.service.sendResourceListToSocket(socket);
@@ -99,7 +99,7 @@ describe('ResourceListService', () => {
     });
 
     it('correlates explicit refreshes and versions snapshots before asynchronous work', async () => {
-      const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      const socket = fixture.createMockSocket({ state: { verifiedUserId: 1 } });
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       let release: () => void;
       const held = new Promise<boolean>((resolve) => {
@@ -119,7 +119,7 @@ describe('ResourceListService', () => {
     });
 
     it('fails closed for a deleted user', async () => {
-      const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      const socket = fixture.createMockSocket({ state: { verifiedUserId: 1 } });
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       (fixture.service as any).usersService.findOne.mockResolvedValue(null);
       await fixture.service.sendResourceListToSocket(socket);
@@ -406,9 +406,9 @@ describe('ResourceListService', () => {
 
       await fixture.service.sendResourceListToSocket(socket);
 
+      // Only the socket and counts: the payload names the logged-in user and every resource.
       expect((fixture.service as any).logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Sending resource list to socket sock-debug'),
-        expect.any(AttractapEvent),
+        expect.stringMatching(/^Sending resource list to socket sock-debug \(revision \d+, \d+ resources\)$/),
       );
     });
 

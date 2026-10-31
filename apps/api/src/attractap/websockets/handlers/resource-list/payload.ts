@@ -124,13 +124,17 @@ export async function sendResourceListToSockets(
   };
   await Promise.all(
     sockets.map(async (socket) => {
-      const userId = socket.state.lastAuthenticatedUserId;
+      const userId = socket.state.verifiedUserId;
       if (userId != null && !payloadsByUser.has(userId)) payloadsByUser.set(userId, forUser(userId));
       const payload = userId == null ? resourceListPayload : await payloadsByUser.get(userId);
       // A different card may have been presented while the queries were pending.
-      if (socket.state.lastAuthenticatedUserId !== userId) return;
+      if (socket.state.verifiedUserId !== userId) return;
       const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, payload);
-      context.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
+      // Counts only: the payload names the logged-in user and every resource.
+      const { revision, resources } = payload;
+      context.logger.debug(
+        `Sending resource list to socket ${socket.id} (revision ${revision}, ${resources.length} resources)`,
+      );
       await socket.sendMessage(resourceListResponse);
     }),
   );

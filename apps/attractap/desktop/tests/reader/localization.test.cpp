@@ -188,11 +188,11 @@ void ReaderWorkflow::testLocalization()
     State::setWebsocketState(true, "reader.test", 80, false);
     server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"en"})"); list(false); pump();
     assert(State::getActiveLanguage() == "en");
-    // A failed NFC verification cannot activate the advertised language.
+    // A card the server could not verify cannot activate the advertised language.
     nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
-    server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Wrong card","language":"de","keyNo":0,"key":"11111111111111111111111111111111"})"); pump();
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_AUTHENTICATION_FAILED","username":"Wrong card","language":"de"})"); pump();
     assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
-    assert(label(lv_layer_top(), "Sign-in failed"));
+    assert(label(lv_layer_top(), "Sign-in failed") && label(lv_layer_top(), "Please tap a valid RFID card."));
     display.capture(output, "i18n-failed-verification-default");
     Display::hidePopup(); nfc.setPresent(0, false); pump();
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();

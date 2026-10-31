@@ -111,7 +111,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
     return {
       id: 'sock-1',
       readerId: 42,
-      state: { lastAuthenticatedUserId: 7 },
+      state: { verifiedUserId: 7 },
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
     } as any;

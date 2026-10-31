@@ -77,7 +77,7 @@ export class AttractapController {
     @Param('readerId', ParseIntPipe) readerId: number,
     @Body() updateData: UpdateReaderDto,
   ): Promise<UpdateReaderResponseDto> {
-    this.logger.debug(`Updating reader ${readerId} with data: ${JSON.stringify(updateData)}`);
+    this.logger.debug(`Updating reader ${readerId} (fields: ${Object.keys(updateData ?? {}).join(', ')})`);
     try {
       const updatedReader = await this.attractapService.updateReader(readerId, updateData);
 

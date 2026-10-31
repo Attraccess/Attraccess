@@ -6,6 +6,7 @@ void ReaderWorkflow::testTimeouts()
         server.push("READER_LANGUAGE", R"({"language":"en"})"); pump();
         login();
         const auto stopsBeforeTimeout = server.count("STOP_RESOURCE_USAGE_SESSION");
+        const auto sessionEndsBeforeTimeout = server.count("READER_SESSION_ENDED");
         const auto loginUtc = time(nullptr);
         TestClock::set(loginUtc + 86400); // SNTP-style forward correction
         pump();
@@ -14,6 +15,8 @@ void ReaderWorkflow::testTimeouts()
         pump(31050);
         assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
         assert(label(lv_screen_active(), "Tap RFID card or open a resource"));
+        // The login timed out on the reader: the server forgets the verified user too.
+        assert(server.count("READER_SESSION_ENDED") == sessionEndsBeforeTimeout + 1);
         server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
         assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeTimeout);
         std::cout << "PASS idle login expiry preserves running usage" << std::endl;
@@ -31,13 +34,13 @@ void ReaderWorkflow::testTimeouts()
         std::cout << "PASS action pauses the real 30-second login timeout" << std::endl;
         click("Abmelden");
         nfc.setPresent(0, true); pump(); nfc.setPresent(0, false); pump();
-        // The waiting card-key request also rejects a competing web approval.
+        // The card check waiting for the server also rejects a competing web approval. The server never
+        // answers, so the check expires and the reader recovers.
         server.push("SUPERVISION_START", R"({"resourceId":1,"requesterName":"Robin","timeoutMs":30000})"); pump();
         assert(lv_screen_active() != Display::supervisionScreen.getScreen());
-        server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})"); pump();
         pump(31050);
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         assert(label(lv_layer_top(), "Anmeldung fehlgeschlagen"));
-        std::cout << "PASS lifted card authentication expires and recovers" << std::endl;
+        std::cout << "PASS an unanswered card check expires and recovers" << std::endl;
     }

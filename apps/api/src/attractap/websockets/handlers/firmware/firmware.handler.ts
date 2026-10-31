@@ -73,6 +73,9 @@ export class AttractapFirmwareHandler {
   }
 
   public async handleFirmwareInfo(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // Only readers that relay card APDUs (firmware 2.0.0+) get card functions. Set before the
+    // database write so a card tapped right after connecting is not refused.
+    socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
     await this.attractapService.updateReaderFirmware(socket.readerId, data.payload);
 
     const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload);

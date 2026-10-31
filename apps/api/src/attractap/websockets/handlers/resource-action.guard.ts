@@ -18,6 +18,8 @@ export class ResourceActionGuard {
     requestId?: number,
   ): Promise<boolean> {
     const correlation = Number.isSafeInteger(requestId) && requestId > 0 ? { requestId } : {};
+    // Read before any await: a READER_SESSION_ENDED arriving meanwhile must not change whom this action checks.
+    const verifiedUserId = socket.state.verifiedUserId;
     if (!resourceId) {
       await socket.sendMessage(new AttractapEvent(eventType, { ...correlation, error: 'INVALID_RESOURCE_ID' }));
       return false;
@@ -40,13 +42,12 @@ export class ResourceActionGuard {
       return false;
     }
 
-    const lastAuthenticatedUserId = socket.state.lastAuthenticatedUserId;
-    if (lastAuthenticatedUserId == null) {
+    if (verifiedUserId == null) {
       await socket.sendMessage(new AttractapEvent(eventType, { ...correlation, error: 'USER_NOT_AUTHENTICATED' }));
       return false;
     }
 
-    const user = await this.usersService.findOne({ id: lastAuthenticatedUserId });
+    const user = await this.usersService.findOne({ id: verifiedUserId });
     if (!user) {
       await socket.sendMessage(new AttractapEvent(eventType, { ...correlation, error: 'USER_NOT_FOUND' }));
       return false;

@@ -14,10 +14,6 @@ std::string start(const char *sessionId, uint32_t remainingMs = 900000) {
            R"(","targetName":"Lasercutter","introducerUsername":"Robin","remainingMs":)" + std::to_string(remainingMs) + "}";
 }
 
-std::string key(const char *sessionId, const char *username, const char *keyHex = "00000000000000000000000000000000") {
-    return std::string("{\"sessionId\":\"") + sessionId + "\",\"keyNo\":0,\"key\":\"" + keyHex + "\",\"username\":\"" + username + "\"}";
-}
-
 std::string result(const char *username, bool alreadyIntroduced, unsigned participantCount) {
     return std::string(R"({"sessionId":"session-a","success":true,"username":")") + username +
            "\",\"alreadyIntroduced\":" + (alreadyIntroduced ? "true" : "false") +
@@ -32,8 +28,9 @@ std::string uidOf(const JsonDocument &message) { return message["data"]["payload
 // against a simulated server.
 void ReaderWorkflow::testMassIntroduction()
 {
-    const char *authRequest = "REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA";
-    const char *confirmed = "MASS_INTRODUCTION_CARD_AUTH_CONFIRMED";
+    // The reader announces the card; the server checks it through the relay and answers with the result.
+    const char *authRequest = "CARD_DETECTED";
+    const auto cardsBefore = server.count(authRequest); // earlier journeys tapped cards too
     const char *cancel = "MASS_INTRODUCTION_CANCEL";
     auto onScanScreen = [] { return lv_screen_active() == Display::massIntroductionScreen.getScreen(); };
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
@@ -61,16 +58,15 @@ void ReaderWorkflow::testMassIntroduction()
     server.push("MASS_INTRODUCTION_START", start("session-x")); pump();
     assert(server.count(cancel) == 1 && sessionOf(server.last(cancel)) == "session-x" && onScanScreen());
 
-    // Tap: request the key, authenticate locally, confirm; only then the server introduces.
+    // Tap: the reader only announces the card; the server verifies it and then introduces its owner.
     nfc.setPresent(0, true); pump();
-    assert(server.count(authRequest) == 1);
+    assert(server.count(authRequest) == cardsBefore + 1);
     assert(sessionOf(server.last(authRequest)) == "session-a" && uidOf(server.last(authRequest)) == "04aabbccddee01");
+    assert(server.last(authRequest)["data"]["payload"]["purpose"] == "mass-introduction");
     requireLabel(lv_screen_active(), "Karte gelesen...\nbitte nicht bewegen");
-    server.push("MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", key("other-session", "Mallory")); pump();
-    assert(server.count(confirmed) == 0);
-    server.push("MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", key("session-a", "Alex")); pump();
-    assert(server.count(confirmed) == 1);
-    assert(sessionOf(server.last(confirmed)) == "session-a" && uidOf(server.last(confirmed)) == "04aabbccddee01");
+    // A result for another session is not ours.
+    server.push("MASS_INTRODUCTION_RESULT", R"({"sessionId":"other-session","success":true,"username":"Mallory"})"); pump();
+    requireLabel(lv_screen_active(), "Karte gelesen...\nbitte nicht bewegen");
     server.push("MASS_INTRODUCTION_RESULT", result("Alex", false, 1)); pump();
     requireLabel(lv_screen_active(), "Alex eingewiesen");
     assert(labelWithPrefix(lv_screen_active(), "1 eingewiesen · noch "));
@@ -78,14 +74,12 @@ void ReaderWorkflow::testMassIntroduction()
 
     // A card left on the reader is not processed again; the result gives way to waiting.
     pump(3200);
-    assert(server.count(authRequest) == 1);
+    assert(server.count(authRequest) == cardsBefore + 1);
     requireLabel(lv_screen_active(), "Bereit für die nächste Karte");
     nfc.setPresent(0, false); pump();
 
     nfc.setPresent(1, true); pump();
-    assert(server.count(authRequest) == 2 && uidOf(server.last(authRequest)) == "04aabbccddee02");
-    server.push("MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", key("session-a", "Robin")); pump();
-    assert(server.count(confirmed) == 2);
+    assert(server.count(authRequest) == cardsBefore + 2 && uidOf(server.last(authRequest)) == "04aabbccddee02");
     server.push("MASS_INTRODUCTION_RESULT", result("Robin", true, 1)); pump();
     requireLabel(lv_screen_active(), "Robin war bereits eingewiesen");
     display.capture(output, "15-mass-introduction-already-introduced");
@@ -94,23 +88,22 @@ void ReaderWorkflow::testMassIntroduction()
     // next card cuts the result dwell short.
     nfc.setPresent(1, false); pump();
     nfc.setPresent(2, true); pump();
-    assert(server.count(authRequest) == 3);
-    server.push("MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", R"({"sessionId":"session-a","error":"CARD_NOT_FOUND"})"); pump();
+    assert(server.count(authRequest) == cardsBefore + 3);
+    server.push("MASS_INTRODUCTION_RESULT", R"({"sessionId":"session-a","success":false,"error":"CARD_NOT_FOUND"})"); pump();
     requireLabel(lv_screen_active(), "Karte nicht gefunden");
-    assert(!label(lv_layer_top(), "Karte nicht gefunden") && server.count(confirmed) == 2);
+    assert(!label(lv_layer_top(), "Karte nicht gefunden"));
     display.capture(output, "16-mass-introduction-card-not-found");
     nfc.setPresent(2, false); pump();
 
-    // A card that fails crypto authentication is never confirmed.
+    // A card the server could not verify is not introduced and the scan screen stays up.
     nfc.setPresent(3, true); pump();
-    assert(server.count(authRequest) == 4);
-    server.push("MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", key("session-a", "Sam", "ffffffffffffffffffffffffffffffff")); pump();
-    requireLabel(lv_screen_active(), "Karte konnte nicht\ngelesen werden");
-    assert(server.count(confirmed) == 2 && onScanScreen());
+    assert(server.count(authRequest) == cardsBefore + 4);
+    server.push("MASS_INTRODUCTION_RESULT", R"({"sessionId":"session-a","success":false,"error":"CARD_AUTHENTICATION_FAILED"})"); pump();
+    requireLabel(lv_screen_active(), "Karte konnte nicht bestätigt werden");
+    assert(onScanScreen());
     nfc.setPresent(3, false); pump();
     nfc.setPresent(3, true); pump();
-    assert(server.count(authRequest) == 5);
-    server.push("MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA", key("session-a", "Sam")); pump();
+    assert(server.count(authRequest) == cardsBefore + 5);
     server.push("MASS_INTRODUCTION_RESULT", R"({"sessionId":"session-a","success":false,"error":"CARD_MISMATCH"})"); pump();
     requireLabel(lv_screen_active(), "Karte stimmt nicht überein");
     nfc.setPresent(3, false); pump();

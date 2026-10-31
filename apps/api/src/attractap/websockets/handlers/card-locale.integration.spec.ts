@@ -67,14 +67,17 @@ describe('persisted web UI locale at card authentication', () => {
       resourceIntroducersService: { isIntroducer: async () => false },
       rbacService: { getEffectivePermissions: async () => new Set<string>() },
       resourceListService: { sendResourceListToSocket: async () => undefined },
+      // The card proof itself is covered by card-operations.service.spec.ts.
+      cardOperations: {
+        verifyCard: async (_socket: unknown, _purpose: string, detection: { uid: string }) => ({
+          ok: true,
+          card: await attractapService.getNFCCardByUID(detection.uid),
+        }),
+      },
     });
     const sendMessage = jest.fn().mockResolvedValue(true);
     const socket = { readerId: 42, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;
-    const tap = () =>
-      handler.handleCardAuthenticationRequest(socket, {
-        type: AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA,
-        payload: { uid: card.uid, resourceId: resource.id },
-      });
+    const tap = () => handler.handleCardTap(socket, { uid: card.uid, detectionId: 1 }, resource.id);
     const expectLanguage = (language: string, languageFallback = false) =>
       expect(sendMessage).toHaveBeenLastCalledWith(
         expect.objectContaining({

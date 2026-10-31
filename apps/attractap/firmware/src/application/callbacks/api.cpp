@@ -62,28 +62,34 @@ void Application::setupApiCallbacks()
         if (!this->cardAuthenticationPending || this->unlocked) return;
 #endif
         if (response.error.length() > 0) {
+          // The server did not verify the card: never unlock, say why on the display.
           State::setUserLanguage(false);
-          this->logger.errorf("Authentication failed: %s",
-                              response.error.c_str());
+          // Same line as the generic error path: lab tests read the server's verdict from it.
+          this->logger.error((std::string("Reader reported error: ") + response.error).c_str());
           this->beeper.errorBeep();
           this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
-          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
-#else
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-#endif
-          return;
-        }
-
-        if (response.keyLen != 16) {
-          State::setUserLanguage(false);
-          this->logger.error("Invalid key bytes provided");
-          this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
-#else
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+          struct Payload {
+            Application *self;
+            FirmwareI18n::Text message;
+          };
+          // Unknown, inactive and unverifiable cards get one answer (as a wrong-key card did on
+          // firmware 1.x), so a copied UID does not reveal whether it belongs to a member. Other
+          // reasons (busy, card pulled, update needed, ...) are the reader's to fix and are named.
+          const bool rejectedCard = response.error == "CARD_AUTHENTICATION_FAILED" ||
+                                    response.error == "CARD_NOT_FOUND" || response.error == "CARD_NOT_ACTIVE";
+          auto *payload = new Payload{this, rejectedCard ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseTapAValidNfcCard)
+                                                         : FirmwareI18n::readerError(response.error)};
+          Display::asyncCall(
+              [](void *data) {
+                auto *payload = static_cast<Payload *>(data);
+                if (payload->self->cardAuthenticationPending && !payload->self->unlocked) {
+                  payload->self->finishCardAuthentication(false);
+                  Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, payload->message);
+                }
+                delete payload;
+              },
+              payload);
 #endif
           return;
         }
@@ -274,8 +280,11 @@ void Application::setupActionCallbacks()
     this->enrollPhase = ENROLL_PHASE_NONE;
     this->resetPhase = RESET_PHASE_NONE;
     this->cardAuthenticationPending = false;
-    this->enrollKeyMaterialReady = false;
+    this->enrollSucceeded = false;
     this->enrollErrorPending = false;
+    this->resetSucceeded = false;
+    this->resetErrorPending = false;
+    this->cardRelay.cancel();
 #endif
     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
     this->availableFirmwareVersion = availableVersion;

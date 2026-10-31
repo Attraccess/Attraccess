@@ -1,0 +1,21 @@
+{
+  "loading": "Loading readers...",
+  "empty": {
+    "noConnectedReader": {
+      "title": "No reader connected",
+      "description": "No Attractap is connected right now. Switch one on and wait until it is online."
+    },
+    "firmwareUpdateRequired": {
+      "title": "Firmware update required",
+      "description": "The connected Attractap readers need firmware 2.0.0 or later to enroll and reset RFID cards. They are offered the update automatically."
+    },
+    "noCardEnrollment": {
+      "title": "No suitable reader",
+      "description": "None of the connected Attractap readers can enroll or reset RFID cards."
+    },
+    "notAllowed": {
+      "title": "No reader allowed",
+      "description": "None of the connected Attractap readers is allowed to enroll or reset RFID cards. An administrator can allow readers under Settings → Card enrollment."
+    }
+  }
+}

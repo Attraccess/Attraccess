@@ -8,7 +8,7 @@ describe('AttractapProjectsHandler', () => {
   let mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number | null };
+    state: { verifiedUserId: number | null };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
@@ -36,7 +36,7 @@ describe('AttractapProjectsHandler', () => {
     mockSocket = {
       id: 'test-id',
       readerId: 42,
-      state: { lastAuthenticatedUserId: 7 },
+      state: { verifiedUserId: 7 },
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
     };
@@ -44,7 +44,7 @@ describe('AttractapProjectsHandler', () => {
 
   describe('handleProjectsOfUserRequest', () => {
     it('sends USER_NOT_AUTHENTICATED and makes no service calls when no authenticated user', async () => {
-      mockSocket.state.lastAuthenticatedUserId = null;
+      mockSocket.state.verifiedUserId = null;
       const data = { payload: {} } as AttractapEvent['data'];
 
       await handler.handleProjectsOfUserRequest(mockSocket as any, data);

@@ -1,0 +1,34 @@
+{
+  "title": "Kartenregistrierung",
+  "description": "Welche Attractap-Reader RFID-Karten registrieren und zurücksetzen dürfen. Ein neuer Kartenschlüssel wird über den Reader geschrieben, erlauben Sie daher nur Reader an einem vertrauenswürdigen Ort.",
+  "loading": "Einstellungen werden geladen...",
+  "mode": {
+    "label": "RFID-Karten registrieren und zurücksetzen an",
+    "description": "Reader, die hier nicht erlaubt sind, lassen Mitglieder sich weiterhin mit ihren Karten anmelden.",
+    "options": {
+      "all": {
+        "label": "Allen Readern",
+        "description": "Jeder Reader mit Firmware 2.0.0 oder neuer kann RFID-Karten registrieren und zurücksetzen."
+      },
+      "selected": {
+        "label": "Ausgewählten Readern",
+        "description": "Nur die unten gewählten Reader können RFID-Karten registrieren und zurücksetzen."
+      }
+    }
+  },
+  "readers": {
+    "label": "Erlaubte Reader",
+    "description": "Wählen Sie die Reader, die RFID-Karten registrieren und zurücksetzen dürfen.",
+    "loading": "Reader werden geladen",
+    "none": "Es gibt noch keine Reader.",
+    "required": "Wählen Sie mindestens einen Reader oder entscheiden Sie sich für alle Reader.",
+    "blockers": {
+      "firmwareUpdateRequired": "Kann erst mit Firmware 2.0.0 oder neuer Karten beschreiben.",
+      "noCardEnrollment": "Dieses Reader-Modell kann keine Karten registrieren oder zurücksetzen."
+    }
+  },
+  "success": {
+    "title": "Einstellungen gespeichert",
+    "description": "Ihre Änderungen wurden übernommen."
+  }
+}

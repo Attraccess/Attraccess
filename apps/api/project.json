@@ -149,6 +149,8 @@
         "{workspaceRoot}/monitoring/grafana/provisioning/**/*",
         "{workspaceRoot}/monitoring/grafana/dashboards/**/*",
         "{workspaceRoot}/monitoring/prometheus/prometheus.yml",
+        "{workspaceRoot}/apps/attractap/firmware/src/**/*",
+        "{workspaceRoot}/apps/attractap/firmware/tests/reference-recordings/recordings/**/*",
         "{workspaceRoot}/apps/attractap/firmware/tests/pairing/vectors.json",
         {
           "externalDependencies": ["jest"]
@@ -288,6 +290,13 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/api"
+      }
+    },
+    "reencrypt-card-keys": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node apps/api/scripts/reencrypt-card-keys.mjs"
       }
     },
     "seed-dev": {

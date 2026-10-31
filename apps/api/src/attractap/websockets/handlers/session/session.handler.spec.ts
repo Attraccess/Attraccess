@@ -17,7 +17,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
   let mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
@@ -882,8 +882,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         'rejects %s without looking up or disclosing readings',
         async (error) => {
           if (error === 'USER_NOT_AUTHENTICATED')
-            (readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.state as any).lastAuthenticatedUserId =
-              null;
+            (readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.state as any).verifiedUserId = null;
           else readerAccessWithTheActualResourceGuardScope.reader.resources = [];
           await readerAccessWithTheActualResourceGuardScope.parentScope.handler.handleResourceUsageStats(
             readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket as any,
@@ -921,7 +920,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
     it('discards results when the card changes during the lookup', async () => {
       liveUsageStatsScope.metering.getLive.mockImplementation(async () => {
-        liveUsageStatsScope.mockSocket.state.lastAuthenticatedUserId = 2;
+        liveUsageStatsScope.mockSocket.state.verifiedUserId = 2;
         return { meters: [] };
       });
       await liveUsageStatsScope.handler.handleResourceUsageStats(
@@ -947,7 +946,7 @@ export type AttractapSessionHandlerSessionFlowButtonTestScope = {
   mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };

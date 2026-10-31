@@ -100,6 +100,8 @@ void API::sendFirmwareInfo()
 #else
         false;
 #endif
+    // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
+    event["data"]["payload"]["capabilities"]["cardRelay"] = true;
     event["data"]["payload"]["capabilities"]["hasLeds"] =
 #ifdef HAS_WS2812_LED
         true;

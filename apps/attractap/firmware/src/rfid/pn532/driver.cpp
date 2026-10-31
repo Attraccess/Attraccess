@@ -225,7 +225,6 @@ bool Adafruit_PN532::writeGPIO(uint8_t pinstate)
 
 #ifdef PN532DEBUG
   PN532DEBUGPRINT.print(F("Received: "));
-  PrintHex(pn532_packetbuffer, 8);
   PN532DEBUGPRINT.println();
 #endif
 
@@ -273,14 +272,7 @@ uint8_t Adafruit_PN532::readGPIO(void)
 
 #ifdef PN532DEBUG
   PN532DEBUGPRINT.print(F("Received: "));
-  PrintHex(pn532_packetbuffer, 11);
   PN532DEBUGPRINT.println();
-  PN532DEBUGPRINT.print(F("P3 GPIO: 0x"));
-  PN532DEBUGPRINT.println(pn532_packetbuffer[p3offset], HEX);
-  PN532DEBUGPRINT.print(F("P7 GPIO: 0x"));
-  PN532DEBUGPRINT.println(pn532_packetbuffer[p3offset + 1], HEX);
-  PN532DEBUGPRINT.print(F("IO GPIO: 0x"));
-  PN532DEBUGPRINT.println(pn532_packetbuffer[p3offset + 2], HEX);
   // Note: You can use the IO GPIO value to detect the serial bus being used
   switch (pn532_packetbuffer[p3offset + 2])
   {
@@ -472,17 +464,6 @@ void Adafruit_PN532::writecommand(uint8_t *cmd, uint8_t cmdlen)
   }
   packet[6 + cmdlen] = ~(PN532_HOSTTOPN532 + sum) + 1;
   packet[7 + cmdlen] = PN532_POSTAMBLE;
-
-#ifdef PN532DEBUG
-  Serial.print("Sending : ");
-  for (int i = 1; i < 8 + cmdlen; i++)
-  {
-    Serial.print("0x");
-    Serial.print(packet[i], HEX);
-    Serial.print(", ");
-  }
-  Serial.println();
-#endif
 
   i2c_dev->write(packet, 8 + cmdlen);
 }

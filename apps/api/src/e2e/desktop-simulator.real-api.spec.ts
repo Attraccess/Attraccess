@@ -285,7 +285,7 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().screen('resources');
     await desktop().click(resource.name);
     await authenticate();
-    expect(socket().state.lastAuthenticatedUserId).toBe(user1.id);
+    expect(socket().state.verifiedUserId).toBe(user1.id);
     const diagnostics = readFileSync(join(desktop().screenshots, 'observations.ndjson'), 'utf8');
     for (const line of diagnostics.trim().split('\n')) expect(JSON.parse(line)).not.toHaveProperty('devicePin');
     expect(diagnostics).not.toContain('7391');
@@ -368,9 +368,11 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().command('corrupt-key', { card: 0, slot: card.keyNo });
     await authenticate();
     await desktop().click('Abmelden');
-    for (const [index, fault] of [
-      [1, 'write'],
-      [2, 'removeOnWrite'],
+    // The server only records a card after the card proved the new key. A refused write and a card
+    // pulled out mid-write both leave nothing behind and say why.
+    for (const [index, fault, message] of [
+      [1, 'write', 'Karte nicht bestätigt, bitte erneut auflegen'],
+      [2, 'removeOnWrite', 'Karte zu früh entfernt'],
     ] as const) {
       const candidate = await user(`failed-${index}`);
       await desktop().command('faults', { card: index, [fault]: true });
@@ -379,7 +381,7 @@ describe('desktop simulator against an isolated real API', () => {
       );
       await desktop().screen('enrollment');
       await desktop().present(index);
-      await desktop().text('Karte konnte nicht\ngeschrieben werden');
+      await desktop().text(message);
       expect(await db.getRepository(NFCCard).count({ where: { user: { id: candidate.id }, isActive: true } })).toBe(0);
       if (fault === 'removeOnWrite') expect((await desktop().command('inspect')).removedOnWrite).toBe(true);
       await desktop().snapshot(`failed-enrollment-${index}`);
@@ -462,7 +464,7 @@ describe('desktop simulator against an isolated real API', () => {
     );
     const usage = await db.getRepository(ResourceUsage).findOneByOrFail({ resourceId: resource.id, userId: owner.id });
     expect(usage.endTime).toBeNull();
-    expect(socket().state.lastAuthenticatedUserId).toBe(owner.id);
+    expect(socket().state.verifiedUserId).toBe(owner.id);
     const persistedReader = await db
       .getRepository(Attractap)
       .findOneOrFail({ where: { id: reader.id }, relations: ['resources'] });

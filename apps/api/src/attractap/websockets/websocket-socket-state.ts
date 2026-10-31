@@ -1,4 +1,5 @@
 import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
+import type { CardConversation } from './card-conversation.service';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {
@@ -25,6 +26,7 @@ export enum AttractapEventType {
   RESOURCE_LIST = 'RESOURCE_LIST',
   REQUEST_RESOURCE_LIST = 'REQUEST_RESOURCE_LIST',
   RESOURCE_USAGE_STATS = 'RESOURCE_USAGE_STATS',
+  /** Legacy (firmware < 2.0.0): answered with FIRMWARE_UPDATE_REQUIRED. Card keys never leave the server. */
   REQUEST_CARD_AUTHENTICATION_DATA = 'REQUEST_CARD_AUTHENTICATION_DATA',
   CARD_AUTHENTICATION_DATA = 'CARD_AUTHENTICATION_DATA',
   // Two-card supervision (ATT-493): a non-introduced user taps first, then a
@@ -34,19 +36,33 @@ export enum AttractapEventType {
   // Server-pushed (ATT-816): arms the reader to wait for a supervisor card on behalf of a
   // requester who started the flow in the web UI, so nobody has to tap a card first.
   SUPERVISION_START = 'SUPERVISION_START',
+  /** Legacy (firmware < 2.0.0). */
   REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA = 'REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA',
   SUPERVISOR_CARD_AUTHENTICATION_DATA = 'SUPERVISOR_CARD_AUTHENTICATION_DATA',
-  // Reader confirms it crypto-authenticated the supervisor card (ATT-816). Only sent for
-  // web-initiated flows, where the reader must not start the session itself.
+  /** Legacy (firmware < 2.0.0): a reader's word that a card was authenticated is never trusted. */
   SUPERVISOR_CARD_AUTH_CONFIRMED = 'SUPERVISOR_CARD_AUTH_CONFIRMED',
   SUPERVISION_RESOLVED = 'SUPERVISION_RESOLVED',
   SUPERVISION_CANCEL = 'SUPERVISION_CANCEL',
+  // Card relay (ATT-1145): the API runs the card crypto, the reader only relays complete APDUs.
+  /** Reader → server: a card is on the reader. Starts a card conversation for the named purpose. */
+  CARD_DETECTED = 'CARD_DETECTED',
+  /** Server → reader: one APDU to send to the card. Never ACKed (latency); the answer is CARD_APDU_RESPONSE. */
+  CARD_APDU = 'CARD_APDU',
+  /** Reader → server: the card's answer to CARD_APDU. */
+  CARD_APDU_RESPONSE = 'CARD_APDU_RESPONSE',
+  /** Reader → server: the card left the field mid-conversation. */
+  CARD_REMOVED = 'CARD_REMOVED',
+  /** Server → reader: the conversation is over (the result event was sent before it). */
+  CARD_CONVERSATION_END = 'CARD_CONVERSATION_END',
+  /** Reader → server: its login ended (logout or timeout); the server forgets the verified user. */
+  READER_SESSION_ENDED = 'READER_SESSION_ENDED',
   START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
   STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
   LOCK_DOOR = 'LOCK_DOOR',
   UNLOCK_DOOR = 'UNLOCK_DOOR',
   UNLATCH_DOOR = 'UNLATCH_DOOR',
   ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO = 'ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO',
+  /** Legacy (firmware < 2.0.0). */
   ENROLL_NEW_CARD_REQUEST_NFC_KEY = 'ENROLL_NEW_CARD_REQUEST_NFC_KEY',
   ENROLL_NEW_CARD = 'ENROLL_NEW_CARD',
   ENROLL_NEW_CARD_CANCEL = 'ENROLL_NEW_CARD_CANCEL',
@@ -64,8 +80,10 @@ export enum AttractapEventType {
   // Mass introduction (ATT-1151): the server shows a scan screen on a reader; every authenticated
   // card tapped there introduces its owner on behalf of the introducer who started the session.
   MASS_INTRODUCTION_START = 'MASS_INTRODUCTION_START',
+  /** Legacy (firmware < 2.0.0). */
   REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA = 'REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA',
   MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA = 'MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA',
+  /** Legacy (firmware < 2.0.0). */
   MASS_INTRODUCTION_CARD_AUTH_CONFIRMED = 'MASS_INTRODUCTION_CARD_AUTH_CONFIRMED',
   MASS_INTRODUCTION_RESULT = 'MASS_INTRODUCTION_RESULT',
   /** Reader left the session (cancel button); the QR code keeps working. */
@@ -163,6 +181,12 @@ export interface ResourceUsageFormPageResultPayload {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPayload>;
 
+/** One card presentation on a reader (CARD_DETECTED). `detectionId` is the reader's per-boot counter. */
+export interface CardDetection {
+  uid: string;
+  detectionId: number;
+}
+
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
@@ -181,31 +205,47 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
    */
   sendMessage: (message: AttractapMessage) => Promise<boolean>;
   sendBinaryData: (data: Buffer) => void;
+  /**
+   * Fire-and-forget send without ACK or retries, for latency-critical card APDUs. Returns false
+   * when the socket is closed or its send queue is full.
+   */
+  sendRaw: (message: AttractapMessage) => boolean;
   state: {
     /** Only the latest reader authentication attempt may restore its identity. */
     readerAuthenticationAttempt?: symbol;
-    lastAuthenticatedUserId: number | null;
+    /** The reader runs firmware that relays card APDUs (capabilities.cardRelay, 2.0.0+). Older readers get no card functions. */
+    cardRelay?: boolean;
+    /**
+     * The user whose card this connection verified with the server (EV2 authentication with the
+     * stored key). Never set from a UID alone or from anything the reader claims. Cleared on
+     * logout, timeout, disconnect and when a new card is tapped.
+     */
+    verifiedUserId: number | null;
+    /** UID of the card behind `verifiedUserId`. */
+    verifiedCardUid?: string | null;
+    /** Card conversation in progress (managed by CardConversationService). */
+    cardConversation?: CardConversation | null;
+    /** Newest `detectionId` this connection reported (CARD_DETECTED). Conversations for older detections are refused. */
+    latestDetectionId?: number | null;
+    /** Detections up to this id were ended (logout, disconnect, cancel) before their conversation could start. */
+    abortedDetectionId?: number | null;
     enrollment: {
       userId: number;
       auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
+      armedAt: number;
     } | null;
-    enrollNewCardData: {
-      userId: number;
-      key: string;
-      keyNo: number;
-      cardUID: string;
-      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
-    } | null;
+    /** Armed by an admin: the next card tapped on this reader is reset if it is this one. No key material here. */
     resetNfcCardData: {
       cardId: number;
-      key: string;
-      keyNo: number;
       auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      /** When the reset was armed (ms since epoch); a card arriving much later is refused. */
+      armedAt: number;
     } | null;
     // Two-card supervision flow (ATT-493). Present while the reader is waiting
     // for a supervisor to authorise a non-introduced user's session — either by
     // tapping their card at the reader, or by approving the web popup. The
-    // requester stays in `lastAuthenticatedUserId`; the supervisor is tracked
+    // requester stays in `verifiedUserId`; the supervisor is tracked
     // here separately so the session starts attributed to the requester with
     // the supervisor attached.
     supervisionFlow?: {
@@ -225,8 +265,6 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     /** Present while the reader shows a mass-introduction scan screen (ATT-1151). */
     massIntroductionFlow?: {
       sessionId: string;
-      /** The card whose key was handed out; only its confirmation may introduce someone. */
-      pendingCard: { uid: string; userId: number } | null;
     } | null;
     ota?: {
       path: string;

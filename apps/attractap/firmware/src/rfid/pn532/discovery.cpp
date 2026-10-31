@@ -92,6 +92,10 @@ bool Adafruit_PN532::readDetectedPassiveTargetID(uint8_t *uid,
   if (pn532_packetbuffer[7] != 1)
     return 0;
 
+  // InDataExchange addresses the inlisted target by this number. Without it
+  // the relay sends Tg = 0 and the PN532 answers every APDU with 0x27.
+  _inListedTag = pn532_packetbuffer[8];
+
   uint16_t sens_res = pn532_packetbuffer[9];
   sens_res <<= 8;
   sens_res |= pn532_packetbuffer[10];
@@ -250,9 +254,7 @@ bool Adafruit_PN532::inDataExchange(uint8_t *send, uint8_t sendLength,
 
   if (!waitready(1000))
   {
-#ifdef PN532DEBUG
-    PN532DEBUGPRINT.println(F("Response never received for APDU..."));
-#endif
+    PN532DEBUGPRINT.println(F("PN532 InDataExchange: no response"));
     return false;
   }
 
@@ -276,17 +278,24 @@ bool Adafruit_PN532::inDataExchange(uint8_t *send, uint8_t sendLength,
     {
       if ((pn532_packetbuffer[7] & 0x3f) != 0)
       {
-#ifdef PN532DEBUG
-        PN532DEBUGPRINT.println(F("Status code indicates an error"));
-#endif
+        // The reader reports any failed exchange to the server as CARD_REMOVED; keep the reason
+        // (0x01 timeout, 0x13 frame format, 0x27 wrong command state) in the serial log.
+        PN532DEBUGPRINT.printf("PN532 InDataExchange status 0x%02X\n", pn532_packetbuffer[7]);
         return false;
       }
 
-      length -= 3;
-
-      if (length > *responseLength)
+      // LEN counts TFI, response code and status before the card's answer. A shorter frame is
+      // corrupt; an answer that does not fit the packet buffer (data starts at byte 8) or the
+      // caller's buffer would be cut off, and a cut-off card answer is never valid.
+      if (length < 3)
       {
-        length = *responseLength; // silent truncation...
+        return false;
+      }
+      length -= 3;
+      if (length > PN532_PACKBUFFSIZ - 8 || length > *responseLength)
+      {
+        PN532DEBUGPRINT.printf("PN532 InDataExchange answer of %u bytes does not fit\n", static_cast<unsigned>(length));
+        return false;
       }
 
       for (i = 0; i < length; ++i)

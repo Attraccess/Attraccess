@@ -96,10 +96,10 @@ void ReaderWorkflow::testFormsAndLogout()
     pump(300);
     assert(lv_screen_active() == Display::sessionSummaryScreen.getScreen());
     display.touch.pressed = false; nfc.setPresent(0, false); pump();
-    const auto authBeforeSummaryCard = server.count("REQUEST_CARD_AUTHENTICATION_DATA");
+    const auto authBeforeSummaryCard = server.count("CARD_DETECTED");
     nfc.setPresent(0, true); pump(); nfc.setPresent(0, false);
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(server.count("REQUEST_CARD_AUTHENTICATION_DATA") == authBeforeSummaryCard);
+    assert(server.count("CARD_DETECTED") == authBeforeSummaryCard);
     assert(!lv_obj_has_flag(networkBadge, LV_OBJ_FLAG_HIDDEN));
     setQuality(State::NETWORK_QUALITY_GOOD); pump();
     assert(!label(lv_screen_active(), "Alex") || !lv_obj_is_visible(label(lv_screen_active(), "Alex")));
@@ -107,7 +107,10 @@ void ReaderWorkflow::testFormsAndLogout()
     // A separately running usage is unaffected by reader logout.
     active = true; list();
     const auto stopsBeforeLogout = server.count("STOP_RESOURCE_USAGE_SESSION");
+    const auto sessionEndsBeforeLogout = server.count("READER_SESSION_ENDED");
     click("Abmelden");
+    // The server forgets the verified user as soon as the reader signs them out.
+    assert(server.count("READER_SESSION_ENDED") == sessionEndsBeforeLogout + 1);
     assert(!label(lv_screen_active(), "Alex") || !lv_obj_is_visible(requireLabel(lv_screen_active(), "Alex")));
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeLogout);
     display.capture(output, "07-logout-usage-preserved");

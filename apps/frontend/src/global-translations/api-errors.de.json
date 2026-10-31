@@ -142,5 +142,37 @@
   "This website is not approved to make changes": {
     "title": "Website nicht freigegeben",
     "description": "Änderungen von dieser Website werden abgelehnt. Öffne Attraccess über die übliche Adresse. Falls du das schon tust, bitte eine Administratorin oder einen Administrator, die freigegebenen Websites in der Serverkonfiguration zu prüfen (siehe Sicherheitsdokumentation)."
+  },
+  "READER_OFFLINE": {
+    "title": "Reader nicht verbunden",
+    "description": "Der gewählte Attractap ist nicht mit dem Server verbunden. Prüfen Sie, ob er eingeschaltet und online ist, und versuchen Sie es erneut."
+  },
+  "READER_BUSY": {
+    "title": "Reader beschäftigt",
+    "description": "Der gewählte Attractap bearbeitet gerade eine Karte. Warten Sie, bis er fertig ist, und versuchen Sie es erneut."
+  },
+  "READER_FIRMWARE_UPDATE_REQUIRED": {
+    "title": "Firmware-Update erforderlich",
+    "description": "Der gewählte Attractap braucht für Kartenfunktionen Firmware 2.0.0 oder neuer. Das Update wird ihm automatisch angeboten; versuchen Sie es erneut, sobald er es installiert hat."
+  },
+  "READER_NOT_ALLOWED_TO_WRITE_CARDS": {
+    "title": "Reader nicht erlaubt",
+    "description": "Dieser Attractap darf keine RFID-Karten registrieren oder zurücksetzen. Wählen Sie einen anderen Reader oder bitten Sie eine Administratorin oder einen Administrator, ihn unter Einstellungen → Kartenregistrierung zu erlauben."
+  },
+  "READER_NOT_FOUND": {
+    "title": "Reader nicht gefunden",
+    "description": "Der gewählte Attractap existiert nicht mehr. Laden Sie die Seite neu und wählen Sie einen anderen Reader."
+  },
+  "READER_CARD_ENROLLMENT_NOT_SUPPORTED": {
+    "title": "Reader kann keine Karten registrieren",
+    "description": "Dieses Attractap-Modell kann keine Karten registrieren oder zurücksetzen. Wählen Sie einen Reader mit Display."
+  },
+  "USER_NOT_FOUND": {
+    "title": "Benutzer nicht gefunden",
+    "description": "Der Benutzer existiert nicht mehr."
+  },
+  "CARD_NOT_FOUND": {
+    "title": "Karte nicht gefunden",
+    "description": "Die Karte existiert nicht mehr. Laden Sie die Seite neu."
   }
 }

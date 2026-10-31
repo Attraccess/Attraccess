@@ -48,6 +48,7 @@ import { AuditLogSection } from '../settings/sections/audit-log/index';
 import { EmailSection } from '../settings/sections/email/index';
 import { GeneralSection } from '../settings/sections/general/index';
 import { MessagingSection } from '../settings/sections/messaging/index';
+import { AttractapSection } from '../settings/sections/attractap/index';
 import { MonitoringSection } from '../settings/sections/monitoring/index';
 import { PluginsSection } from '../settings/sections/plugins/index';
 import { RolesSection } from '../settings/sections/roles/index';
@@ -344,6 +345,15 @@ const coreRoutes: RouteConfig[] = [
     element: (
       <SettingsLayout>
         <MonitoringSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/attractap',
+    element: (
+      <SettingsLayout>
+        <AttractapSection />
       </SettingsLayout>
     ),
     authRequired: 'system.settings.manage',

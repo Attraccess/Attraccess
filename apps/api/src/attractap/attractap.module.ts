@@ -28,6 +28,7 @@ import {
   AttractapCredentialEvent,
   AttractapInstallation,
   NFCCard,
+  NFCCardPendingChange,
   Resource,
   User,
 } from '@attraccess/database-entities';
@@ -63,6 +64,12 @@ import { ResourceOperatingAttributionModule } from '../resources/operating-inter
 import { AuditModule } from '../audit/audit.module';
 import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { SettingsModule } from '../settings/settings.module';
+import { CardConversationService } from './websockets/card-conversation.service';
+import { CardDetectedRouter } from './websockets/card-detected.router';
+import { CardOperationsService } from './websockets/card-operations.service';
+import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
+import { CardWriterSettingsController } from './card-writer-settings.controller';
+import { EncryptionModule } from '../encryption/encryption.module';
 
 @Module({
   imports: [
@@ -73,6 +80,7 @@ import { SettingsModule } from '../settings/settings.module';
       AttractapCredentialEvent,
       AttractapInstallation,
       NFCCard,
+      NFCCardPendingChange,
       Resource,
       User,
     ]),
@@ -95,6 +103,7 @@ import { SettingsModule } from '../settings/settings.module';
     AuditModule,
     DeviceEnrollmentModule,
     SettingsModule,
+    EncryptionModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
   ],
@@ -107,6 +116,10 @@ import { SettingsModule } from '../settings/settings.module';
     SessionMetrics,
     CardAccessService,
     AttractapService,
+    CardConversationService,
+    CardDetectedRouter,
+    CardOperationsService,
+    CardWriterPolicyService,
     WebsocketService,
     AttractapGateway,
     WebSocketEventService,
@@ -128,6 +141,7 @@ import { SettingsModule } from '../settings/settings.module';
   controllers: [
     AttractapController,
     AttractapNfcCardsController,
+    CardWriterSettingsController,
     AttractapFirmwareController,
     ResourceAttractapsController,
     AttractapPairingController,

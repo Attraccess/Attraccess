@@ -42,6 +42,45 @@ Session security is controlled via environment variables:
 > [!TIP]
 > If you change the `AUTH_SESSION_SECRET`, all existing user sessions are invalidated and users must log in again.
 
+## Card keys and `AUTH_SESSION_SECRET`
+
+Attractap card keys are created and checked by the server only; tapping a card never exposes its key to a reader. (Enrolling and resetting cards is the exception, see [RFID Cards](attractap/rfid-cards.md#which-readers-may-enroll-and-reset-cards).) The server stores each key encrypted with a key derived from `AUTH_SESSION_SECRET`.
+
+> [!WARNING]
+> **Back up `AUTH_SESSION_SECRET` together with your database backups.** Without it the stored card keys cannot be read. Cards that were enrolled can then neither be used nor reset by Attraccess, and have to be erased with other tools.
+
+Changing the secret makes the stored card keys unreadable until they are re-encrypted. To rotate the secret deliberately:
+
+1. Stop the API and back up the database (see [Backup & Restore](installation/backup-restore.md)). With Docker Compose: `docker compose stop attraccess`.
+2. Load both secrets into your shell. `read -rs` does not show what you type, so the secrets stay out of your shell history and out of the process list. Type each secret and press Enter:
+
+   ```bash
+   read -rs OLD_AUTH_SESSION_SECRET && export OLD_AUTH_SESSION_SECRET
+   read -rs NEW_AUTH_SESSION_SECRET && export NEW_AUTH_SESSION_SECRET
+   ```
+
+3. Check that every stored card key can be read with the old secret. `--dry-run` reads every key and writes nothing.
+
+   **Docker Compose** (the command ships in the image; `-e NAME` without a value passes the variable from your shell):
+
+   ```bash
+   docker compose run --rm --no-deps -e OLD_AUTH_SESSION_SECRET -e NEW_AUTH_SESSION_SECRET \
+     attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
+   ```
+
+   **Source installation** (run from the repository root with the same `STORAGE_ROOT` as the API):
+
+   ```bash
+   pnpm nx run api:reencrypt-card-keys -- --dry-run
+   ```
+
+   The command uses `<STORAGE_ROOT>/attraccess.sqlite` (default `./storage/attraccess.sqlite`). Add `--db <path>` to name the database file directly.
+4. Run the same command without `--dry-run`. All keys are converted in one transaction; if one cannot be read with the old secret nothing is changed.
+5. Set `AUTH_SESSION_SECRET` to the new value (for example in your `.env` file), clear the shell variables with `unset OLD_AUTH_SESSION_SECRET NEW_AUTH_SESSION_SECRET`, and start the API (`docker compose up -d`).
+
+> [!WARNING]
+> The command converts card keys only. `AUTH_SESSION_SECRET` protects everything Attraccess stores encrypted: the license key, SSO provider secrets, two-factor secrets, MQTT and payment credentials. After you change it these values cannot be read any more. The API may then refuse to start because the license key is unreadable, and they have to be entered again. Only rotate the secret when you must, for example after it leaked.
+
 ## Best Practices
 
 - Always use **HTTPS** in production. See [SSL Setup](installation/ssl-setup.md).

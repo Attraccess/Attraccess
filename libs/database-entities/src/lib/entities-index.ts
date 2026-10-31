@@ -111,6 +111,7 @@ export {
 export { ResourceUsage } from './entities/resourceUsage.entity';
 export { ResourceUsageAction } from './entities/resourceUsage.type';
 export { NFCCard } from './entities/rfidCard.entity';
+export { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 export { RolePermission } from './entities/role-permission.entity';
 export { Role } from './entities/role.entity';
 export { Session } from './entities/session.entity';
@@ -171,6 +172,7 @@ import { ResourceIntroduction } from './entities/resourceIntroduction.entity';
 import { ResourceIntroductionHistoryItem } from './entities/resourceIntroductionHistoryItem.entity';
 import { ResourceUsage } from './entities/resourceUsage.entity';
 import { NFCCard } from './entities/rfidCard.entity';
+import { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 import { RolePermission } from './entities/role-permission.entity';
 import { Role } from './entities/role.entity';
 import { Session } from './entities/session.entity';
@@ -197,6 +199,7 @@ export const entities = {
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   NFCCard,
+  NFCCardPendingChange,
   Attractap,
   AttractapCrashReport,
   AttractapCredentialEvent,

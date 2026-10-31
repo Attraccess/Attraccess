@@ -18,8 +18,6 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
     getNFCCardByID: jest
       .fn()
       .mockResolvedValue({ id: 7, key: 'aabbccddeeff00112233445566778899', keyNo: 1, user: scope.mockUser }),
-    generateNTAG424Key: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    uint8ArrayToHexString: jest.fn().mockReturnValue('deadbeef'),
     createNFCCard: jest.fn().mockResolvedValue({ id: 8 }),
     deleteNFCCard: jest.fn().mockResolvedValue({ affected: 1 }),
   };
@@ -46,5 +44,25 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   (scope.handler as any).metricsService = scope.metricsService;
   (scope.handler as any).resourceRepository = scope.resourceRepository;
   (scope.handler as any).rbacService = scope.rbacService;
-  (scope.handler as any).audit = scope.audit;
+  (scope.handler as any).cardOperations = {
+    // Card verification itself is covered by card-operations.service.spec.ts; here the card is
+    // verified exactly when the stored card exists and is active.
+    verifyCard: jest.fn(async (_socket: unknown, _purpose: string, detection: { uid: string }) => {
+      const card = await scope.attractapService.getNFCCardByUID(detection.uid);
+      if (!card) return { ok: false, error: 'CARD_NOT_FOUND' };
+      if (!card.isActive) return { ok: false, error: 'CARD_NOT_ACTIVE' };
+      return { ok: true, card };
+    }),
+    enroll: jest.fn().mockResolvedValue({ ok: true }),
+    reset: jest.fn().mockResolvedValue({ ok: true }),
+  };
+  (scope.handler as any).cardWriterPolicy = { assertAllowed: jest.fn().mockResolvedValue(undefined) };
+  (scope.handler as any).cardConversations = { abort: jest.fn() };
+  // Specs written for the old request/response protocol still call this shape.
+  (scope.handler as any).handleCardAuthenticationRequest = (socket: unknown, data: any) =>
+    scope.handler.handleCardTap(
+      socket as any,
+      { uid: data.payload.uid, detectionId: data.payload.detectionId ?? 1 },
+      data.payload.resourceId,
+    );
 }

@@ -23,17 +23,9 @@ void Application::setupCardCallbacks()
     this->externalState = EXTERNAL_STATE_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO;
   });
 
-  this->api.setEnrollNewCardCallback([this](uint8_t keyNo, std::string key) {
-    uint8_t keyBytes[16] = {0};
-    stringToHexArray(key, keyBytes, 16);
-
-    this->apiEnrollNewCardData.keyNo = keyNo;
-    memset(this->apiEnrollNewCardData.keyBytes, 0, 16);
-    memcpy(this->apiEnrollNewCardData.keyBytes, keyBytes, 16);
-
-    // Just flag readiness; processEnrollment() performs the write on the main
-    // loop while the card is still held (no card-detection edge required).
-    this->enrollKeyMaterialReady = true;
+  this->api.setEnrollNewCardSucceededCallback([this]() {
+    // Runs on the websocket task; the main loop shows the outcome.
+    this->enrollSucceeded = true;
   });
 
   this->api.setEnrollNewCardErrorCallback([this](std::string error) {
@@ -48,19 +40,21 @@ void Application::setupCardCallbacks()
   Display::enrollmentScreen.setOnCancelCallback(
       [this]() { this->enrollCancelRequested = true; });
 
-  this->api.setResetNfcCardCallback(
-      [this](std::string username, uint8_t keyNo, std::string key) {
-        uint8_t keyBytes[16] = {0};
-        stringToHexArray(key, keyBytes, 16);
+  this->api.setResetNfcCardCallback([this](std::string username) {
+    this->apiResetNfcCardData.username = username;
 
-        this->apiResetNfcCardData.username = username;
-        this->apiResetNfcCardData.keyNo = keyNo;
-        memset(this->apiResetNfcCardData.keyBytes, 0, 16);
-        memcpy(this->apiResetNfcCardData.keyBytes, keyBytes, 16);
+    // The reset state machine takes over on the main loop (beginReset()).
+    this->externalState = EXTERNAL_STATE_RESET_NFC_CARD;
+  });
 
-        // The reset state machine takes over on the main loop (beginReset()).
-        this->externalState = EXTERNAL_STATE_RESET_NFC_CARD;
-      });
+  this->api.setResetNfcCardResultCallback([this](bool success, std::string error) {
+    if (success) {
+      this->resetSucceeded = true;
+      return;
+    }
+    strlcpy(this->resetErrorMessage, error.c_str(), sizeof(this->resetErrorMessage));
+    this->resetErrorPending = true;
+  });
 
   Display::resetScreen.setOnCancelCallback(
       [this]() { this->resetCancelRequested = true; });
@@ -100,10 +94,6 @@ void Application::setupCardCallbacks()
       [this](const API::MassIntroductionStartCommand &command) {
         this->massIntroduction.onStart(command);
       });
-  this->api.setMassIntroductionCardAuthenticationCallback(
-      [this](const API::MassIntroductionCardAuthenticationResponse &response) {
-        this->massIntroduction.onCardAuthentication(response);
-      });
   this->api.setMassIntroductionResultCallback(
       [this](const API::MassIntroductionResult &result) {
         this->massIntroduction.onResult(result);
@@ -137,6 +127,17 @@ void Application::setupCardCallbacks()
 
 void Application::setupNfcCallbacks()
 {
+  this->api.setCardConversationStartCallback([this]() {
+    this->sessionEndNotifyAtMs = 0; // a new card replaces the verified user on the server
+    return this->cardRelay.begin(millis());
+  });
+  this->api.setCardApduCallback(
+      [this](uint32_t detectionId, const char *id, uint32_t seq, const uint8_t *apdu, uint8_t length) {
+        this->cardRelay.onApdu(detectionId, id, seq, apdu, length);
+      });
+  this->api.setCardConversationEndCallback(
+      [this](uint32_t detectionId, const char *id) { this->cardRelay.onConversationEnd(detectionId, id); });
+
   auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength) {
 #ifdef HAS_LVGL_DISPLAY
     if (this->sessionSummaryActive) {
@@ -184,10 +185,9 @@ void Application::setupNfcCallbacks()
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
       else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
       lv_unlock();
-      this->api.requestCardAuthenticationData(uid, uidLength, this->authenticationResourceId);
+      this->api.sendCardDetected("tap", uid, uidLength, this->authenticationResourceId);
 #else
-      this->api.requestCardAuthenticationData(uid, uidLength,
-                                              this->selectedResourceId);
+      this->api.sendCardDetected("tap", uid, uidLength, this->selectedResourceId);
 #endif
       return;
     }
@@ -195,17 +195,22 @@ void Application::setupNfcCallbacks()
 #ifdef HAS_LVGL_DISPLAY
     if (this->state == APPLICATION_STATE_ENROLLMENT) {
       // A card entered the field while waiting to enroll. Flag it; the
-      // enrollment state machine picks the writable key on the main loop. We
-      // ride the normal detection loop here precisely because it re-arms the
-      // reader reliably across removals/re-presentations (ATT-503).
+      // enrollment state machine announces it to the server, which writes the
+      // key through the relay. We ride the normal detection loop here precisely
+      // because it re-arms the reader reliably across removals/re-presentations
+      // (ATT-503).
+      memcpy(this->enrollCardUid, uid, uidLength > sizeof(this->enrollCardUid) ? sizeof(this->enrollCardUid) : uidLength);
+      this->enrollCardUidLength = uidLength > sizeof(this->enrollCardUid) ? sizeof(this->enrollCardUid) : uidLength;
       this->enrollCardDetected = true;
       return;
     }
 
     if (this->state == APPLICATION_STATE_RESET) {
       // A card entered the field while waiting to reset. Same rationale as
-      // enrollment: flag it and let the reset state machine authenticate + write
-      // the factory key back on the main loop.
+      // enrollment: flag it; the reset state machine announces it to the
+      // server, which writes the factory key back through the relay.
+      memcpy(this->resetCardUid, uid, uidLength > sizeof(this->resetCardUid) ? sizeof(this->resetCardUid) : uidLength);
+      this->resetCardUidLength = uidLength > sizeof(this->resetCardUid) ? sizeof(this->resetCardUid) : uidLength;
       this->resetCardDetected = true;
       return;
     }
@@ -221,10 +226,6 @@ void Application::setupNfcCallbacks()
     }
 #endif
 
-    if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
-      this->processCardAuthenticationData();
-      return;
-    }
   };
   this->nfc.setCardDetectionCallback(cardDetectionCallback);
 

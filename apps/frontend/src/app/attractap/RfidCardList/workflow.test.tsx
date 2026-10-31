@@ -9,6 +9,9 @@ const state = vi.hoisted(() => ({
   invalidate: vi.fn(),
   licensed: true,
   cardsQuery: vi.fn(),
+  toastError: vi.fn(),
+  enrollFails: null as unknown,
+  resetFails: null as unknown,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetAllCards: (params: unknown) => {
@@ -20,11 +23,17 @@ vi.mock('@attraccess/react-query-client', () => ({
       ],
     };
   },
-  useAttractapServiceResetNfcCard: () => ({ mutate: state.reset }),
-  useAttractapServiceEnrollNfcCard: (options: { onSuccess: () => void }) => ({
+  useAttractapServiceResetNfcCard: (options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
+    mutate: (data: unknown) => {
+      state.reset(data);
+      if (state.resetFails) options.onError(state.resetFails);
+    },
+  }),
+  useAttractapServiceEnrollNfcCard: (options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
     mutate: (data: unknown) => {
       state.enroll(data);
-      options.onSuccess();
+      if (state.enrollFails) options.onError(state.enrollFails);
+      else options.onSuccess();
     },
   }),
   useAttractapServiceToggleCardActive: () => ({ mutate: state.toggle }),
@@ -53,11 +62,28 @@ vi.mock('../AttractapSelect', () => ({
   ),
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
-vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn() }) }));
+// Resolve API error toasts the way ToastProvider does, so the test sees the text a user reads.
+vi.mock('../../../components/toastProvider', async () => {
+  const { getTranslationKeyForApiError } = await import('../../../utils/apiError');
+  return {
+    useToastMessage: () => ({
+      error: state.toastError,
+      apiError: (props: Parameters<typeof getTranslationKeyForApiError>[0]) => {
+        const { key, errorMessage } = getTranslationKeyForApiError(props);
+        state.toastError({
+          title: props.t(key + '.title'),
+          description: props.t(key + '.description', { error: errorMessage }),
+        });
+      },
+    }),
+  };
+});
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 beforeEach(() => {
   vi.clearAllMocks();
   state.licensed = true;
+  state.enrollFails = null;
+  state.resetFails = null;
 });
 afterEach(cleanup);
 it('renders card identities and requires a reader before deleting a card', () => {
@@ -127,4 +153,40 @@ it('lists and enrolls cards for the selected user instead of the acting admin', 
   fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
   expect(state.enroll).toHaveBeenCalledWith({ requestBody: { readerId: 4, userId: 23 } });
+});
+
+it.each([
+  ['READER_OFFLINE', 'Reader not connected'],
+  ['READER_BUSY', 'Reader busy'],
+  ['READER_FIRMWARE_UPDATE_REQUIRED', 'Firmware update required'],
+  ['READER_NOT_ALLOWED_TO_WRITE_CARDS', 'Reader not allowed'],
+])('tells the user why the reader refused (%s) in their language, not the raw code', (code, title) => {
+  state.enrollFails = Object.assign(new Error('Refused'), { body: { message: code } });
+  render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Enroll RFID Card' }));
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
+  expect(state.toastError).toHaveBeenCalledTimes(1);
+  const [{ title: shownTitle, description }] = state.toastError.mock.calls[0];
+  expect(shownTitle).toBe(title);
+  expect(description).not.toContain(code);
+});
+
+it('reports a failed reset through the same translated reasons', () => {
+  state.resetFails = Object.assign(new Error('Refused'), { body: { message: 'READER_BUSY' } });
+  render(
+    <MemoryRouter>
+      <RfidCardList />
+    </MemoryRouter>,
+  );
+  const row = screen.getByText('AA-BB').closest('tr');
+  if (!row) throw new Error('Card row not found');
+  fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+  expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reader busy' }));
 });

@@ -1,0 +1,34 @@
+{
+  "title": "Card enrollment",
+  "description": "Which Attractap readers may enroll and reset RFID cards. A new card key is written through the reader, so allow only readers in a place you trust.",
+  "loading": "Loading settings...",
+  "mode": {
+    "label": "Enroll and reset RFID cards on",
+    "description": "Readers that are not allowed here still let members sign in with their cards.",
+    "options": {
+      "all": {
+        "label": "All readers",
+        "description": "Every reader with firmware 2.0.0 or later can enroll and reset RFID cards."
+      },
+      "selected": {
+        "label": "Selected readers",
+        "description": "Only the readers you pick below can enroll and reset RFID cards."
+      }
+    }
+  },
+  "readers": {
+    "label": "Allowed readers",
+    "description": "Pick the readers that may enroll and reset RFID cards.",
+    "loading": "Loading readers",
+    "none": "There are no readers yet.",
+    "required": "Select at least one reader, or choose all readers.",
+    "blockers": {
+      "firmwareUpdateRequired": "Cannot write cards until it runs firmware 2.0.0 or later.",
+      "noCardEnrollment": "This reader model cannot enroll or reset cards."
+    }
+  },
+  "success": {
+    "title": "Settings saved",
+    "description": "Your changes have been applied."
+  }
+}

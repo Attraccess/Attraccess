@@ -4,13 +4,16 @@ RFID cards are the physical keys that let users access machines and doors via At
 
 ## How RFID Cards Work
 
-When a user holds an RFID card to an Attractap reader, the reader sends the card's unique ID to the Attraccess backend. The backend checks:
+When a user holds an RFID card to an Attractap reader, the reader sends the card's unique ID to the Attraccess backend. The backend then talks to the card **through the reader** and checks:
 
 1. Is this card registered in the system?
-2. Which user account is the card linked to?
-3. Does that user have permission to use the assigned resource?
+2. Does the card prove it holds the secret key stored for it? (A copied card ID is not enough.)
+3. Which user account is the card linked to?
+4. Does that user have permission to use the assigned resource?
 
-If all checks pass, access is granted.
+If all checks pass, access is granted. The reader only passes messages between the backend and the card: **card keys are created and checked by the server, and a tap never exposes a card key to the reader**. A reader that is offline grants nothing.
+
+Card keys are random, 16 bytes each, and stored encrypted. See [Security Settings](settings/security.md) for backing up the secret that protects them.
 
 ## Managing RFID Cards
 
@@ -21,6 +24,11 @@ Open **RFID Cards** in the sidebar to manage your own cards. The list shows each
 1. Click **Enroll RFID Card**
 2. Select a connected Attractap that supports card enrollment
 3. Click **Enroll** and follow the instructions on the reader
+
+A card is only registered after the server has checked that the card accepted its new key. If the card is pulled away or the write fails, nothing is recorded; present the same card again and the enrollment is finished.
+
+> [!NOTE]
+> Readers need firmware 2.0.0 or later for every card function. Readers on older firmware are offered the 2.0.0 update automatically when they connect (see [Firmware Updates](attractap/firmware-updates.md)). Until they run it, the server rejects their card taps and they cannot enroll or reset cards. Cards that were enrolled before keep working once the reader is updated.
 
 ### Activating and Deactivating Cards
 
@@ -55,6 +63,17 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 
 > [!NOTE]
 > On MIFARE DESFire cards, Attractap stores its keys in a dedicated DESFire application (AID `0xACCE55`), which is created automatically during enrollment. Other applications on the card (e.g. existing access systems) are not touched.
+
+## Which Readers May Enroll and Reset Cards
+
+By default every reader can enroll and reset cards. Administrators can limit this under **Settings -> Card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
+
+> [!IMPORTANT]
+> **Only allow readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key. The reader that relays this write can work out the new key. A reader that was tampered with, or someone listening on an unencrypted connection to it, could therefore copy cards enrolled or reset on that reader. Use **Settings -> Card enrollment** to keep this to readers in a place you control, for example the front desk.
+>
+> Normal taps are not affected: when a card is used, the server checks it without the key ever passing through the reader.
+>
+> Encrypted reader connections and secured reader firmware, planned for later releases, remove this limitation.
 
 ## Administrator Features
 

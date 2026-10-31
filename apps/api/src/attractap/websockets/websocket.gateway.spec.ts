@@ -4,6 +4,7 @@ import { LicenseModuleType } from '../../license/license.service';
 import { PAIRING_SUBPROTOCOL } from '../security/session-framing';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
+import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
@@ -108,7 +109,7 @@ describe('AttractapGateway', () => {
       expect(fixture.websocketService.sockets.size).toBe(1);
       const registeredSocket = Array.from(fixture.websocketService.sockets.values())[0];
       expect(registeredSocket.readerId).toBeNull();
-      expect(registeredSocket.state.lastAuthenticatedUserId).toBeNull();
+      expect(registeredSocket.state.verifiedUserId).toBeNull();
 
       expect(mockClient.send).toHaveBeenCalled();
       const sendMock = mockClient.send as jest.Mock;
@@ -183,7 +184,7 @@ describe('AttractapGateway', () => {
       const socket = fixture.createMockSocket({
         id: 'disc-ota',
         state: {
-          lastAuthenticatedUserId: null,
+          verifiedUserId: null,
           enrollNewCardData: null,
           resetNfcCardData: null,
           ota: { path: '/tmp/test', size: 1024, fd: 999 },
