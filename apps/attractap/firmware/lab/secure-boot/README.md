@@ -31,9 +31,12 @@ Then use `tools/secure_lab_reader.py` (inside an ESP-IDF environment):
 - `flash --port … --build-dir …`: signs with the lab key and writes encrypted
   images. Also recovers a lab reader whose flash was erased. Add `--erase-all`
   to drop its settings.
-- `provision --port … --build-dir … --burn-efuses`: first time only, on a fresh
-  reader. Burns the lab key digests, then writes plaintext images; the first boot
-  enables Secure Boot and flash encryption. Irreversible.
+- `provision --port … --build-dir … --expect-mac … --burn-efuses`: first time only,
+  on a fresh reader. Refuses any chip whose MAC (shown by `status`) differs from
+  `--expect-mac`. Burns the lab key digests, erases the whole flash, then writes
+  plaintext images; the first boot enables Secure Boot and flash encryption and
+  resets a few times. Watch the console (`idf.py -p … monitor`) and keep the reader
+  powered until it shows "Welcome to Attractap". Irreversible.
 
 Do not run a release-mode (customer) secure image on a lab reader: its first
 boot switches flash encryption to release mode for good, and the reader then

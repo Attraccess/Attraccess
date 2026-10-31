@@ -46,34 +46,43 @@ def is_demo_variant(content):
     """Demo builds declare ATTRACTAP_FIRMWARE_VARIANT "demo" (CMakeLists.txt checks the same)."""
     return extract_cmake_value(content, "ATTRACTAP_FIRMWARE_VARIANT") == "demo"
 
-def secure_profile_hardware_tested(variant, content):
-    """Value of ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED for a variant (absent = False).
-
-    Raises ValueError for anything but "true"/"false", and for a demo variant
-    marked true: the secure profile is never available for demo builds."""
-    raw = extract_cmake_value(content, "ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED")
-    if raw is None:
+def variant_bool_flag(variant, content, name):
+    """`set(<name> "true"|"false")` in a variant file (absent = False). The value may
+    be unquoted and in any case; anything else raises ValueError instead of being
+    read as False, so a typo can't silently drop a variant's secure gate."""
+    code = re.sub(r"#[^\n]*", "", content)
+    matches = re.findall(rf'set\(\s*{re.escape(name)}(?:\s+"?([^"\s)]*)"?)?\s*\)', code)
+    if not matches:
+        if re.search(rf'\b{re.escape(name)}\b', code):
+            raise ValueError(f"{variant}: cannot parse {name}; use set({name} \"true\") or \"false\"")
         return False
+    if len(matches) > 1:
+        raise ValueError(f"{variant}: {name} is set more than once")
+    raw = matches[0]
     if raw.lower() not in ("true", "false"):
-        raise ValueError(f"{variant}: ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED must be \"true\" or \"false\", got \"{raw}\"")
-    tested = raw.lower() == "true"
-    if tested and is_demo_variant(content):
-        raise ValueError(f"demo variant {variant} must not be marked secure-profile hardware-tested")
-    return tested
+        raise ValueError(f"{variant}: {name} must be \"true\" or \"false\", got \"{raw}\"")
+    return raw.lower() == "true"
 
 def secure_profile_build_enabled(variant, content):
-    """Value of ATTRACTAP_SECURE_PROFILE_BUILD (absent = False): the per-variant
-    switch that makes build_firmwares.py build the secure profile and run its
-    gates, in every CI stage (PR, main, release). Demo variants can never have it."""
-    raw = extract_cmake_value(content, "ATTRACTAP_SECURE_PROFILE_BUILD")
-    if raw is None:
-        return False
-    if raw.lower() not in ("true", "false"):
-        raise ValueError(f"{variant}: ATTRACTAP_SECURE_PROFILE_BUILD must be \"true\" or \"false\", got \"{raw}\"")
-    enabled = raw.lower() == "true"
+    """ATTRACTAP_SECURE_PROFILE_BUILD: the per-variant switch that makes
+    build_firmwares.py build the secure profile and run its gates, in every CI
+    stage (PR, main, release). Demo variants can never have it."""
+    enabled = variant_bool_flag(variant, content, "ATTRACTAP_SECURE_PROFILE_BUILD")
     if enabled and is_demo_variant(content):
         raise ValueError(f"demo variant {variant} must not enable the secure profile build")
     return enabled
+
+def secure_profile_hardware_tested(variant, content):
+    """ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED, carried into firmwares.json.
+    Demo variants can never have it, and a variant can only be marked tested
+    while CI builds and gates its secure profile."""
+    tested = variant_bool_flag(variant, content, "ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED")
+    if tested and is_demo_variant(content):
+        raise ValueError(f"demo variant {variant} must not be marked secure-profile hardware-tested")
+    if tested and not secure_profile_build_enabled(variant, content):
+        raise ValueError(f"{variant} is marked secure-profile hardware-tested but ATTRACTAP_SECURE_PROFILE_BUILD "
+                         "is not \"true\": CI would not build or gate the profile it advertises")
+    return tested
 
 def build_secure_profile(variant, variant_path, python_cmd):
     """Build the secure profile of a non-demo variant and run its build gates
