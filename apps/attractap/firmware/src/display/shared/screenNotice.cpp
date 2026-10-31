@@ -6,6 +6,7 @@
 namespace
 {
     constexpr int32_t NOTICE_TOP_OFFSET = 48; // below the network badge and the drawer grabber
+    constexpr int32_t NOTICE_MIN_SIDE_MARGIN = 16; // on screens without side padding (boot, init, configuration)
     constexpr uint32_t INFO_DURATION_MS = 4000;
     constexpr uint32_t ERROR_DURATION_MS = 8000;
 }
@@ -53,6 +54,8 @@ void ScreenNotice::show(lv_obj_t *screenRoot, Kind kind, const FirmwareI18n::Tex
     lv_obj_add_flag(root, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_width(root, lv_pct(100)); // the screen's content width, like its cards
+    lv_obj_set_style_max_width(root, lv_display_get_horizontal_resolution(lv_obj_get_display(screenRoot)) - 2 * NOTICE_MIN_SIDE_MARGIN,
+                               LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_height(root, LV_SIZE_CONTENT);
     lv_obj_align(root, LV_ALIGN_TOP_MID, 0, NOTICE_TOP_OFFSET);
     DisplayTheme::applySurface(root);
