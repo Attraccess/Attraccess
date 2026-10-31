@@ -20,6 +20,9 @@ import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy'
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
 import { existsSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
+import type { Request } from 'express';
+import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import { ApprovedOriginsService } from './common/security/approved-origins.service';
 import { createCA, createCert } from 'mkcert';
 import { join } from 'path';
 
@@ -105,18 +108,21 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
 
   app.use(cookieParser());
 
-  app.enableCors({
-    origin: (requestOrigin, callback) => {
-      // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
-      if (!requestOrigin) {
-        return callback(null, true);
-      }
-
-      return callback(null, requestOrigin);
-    },
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
-    credentials: true, // Allow cookies to be sent
+  // Only approved websites may read API responses with credentials. Requests
+  // without an Origin (curl, servers, same-origin GETs) are not cross-origin.
+  app.enableCors(async (request: Request, callback: (error: Error | null, options?: CorsOptions) => void) => {
+    const origin = request.headers.origin;
+    try {
+      const allowed = origin !== undefined && (await app.get(ApprovedOriginsService).isApproved(origin, request));
+      callback(null, {
+        origin: allowed ? origin : false,
+        methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+        credentials: true, // Allow cookies to be sent
+      });
+    } catch (error) {
+      callback(error as Error);
+    }
   });
 }
 

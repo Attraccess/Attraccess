@@ -138,5 +138,9 @@
   "UserHasActiveUsageSessions": {
     "title": "User has active sessions",
     "description": "This user still has active usage sessions. End them before deleting the account."
+  },
+  "This website is not approved to make changes": {
+    "title": "Website not approved",
+    "description": "Changes from this website are refused. Open Attraccess at its usual address. If you already are, ask an administrator to check the approved websites in the server configuration (see the security documentation)."
   }
 }

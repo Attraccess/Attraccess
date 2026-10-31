@@ -1,16 +1,15 @@
 import { ForbiddenException } from '@nestjs/common';
 import { SsoLogoutService } from './sso/sso-logout.service';
 import { CentralLogoutResult, LogoutCapability } from './sso/logout.types';
-import { SettingsService } from '../../settings/settings.service';
 import {
   UnauthorizedException,
   Body,
   Controller,
   Delete,
   Get,
+  HttpCode,
   Optional,
   Post,
-  Query,
   Req,
   Res,
   UseGuards,
@@ -25,6 +24,7 @@ import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nes
 import { CookieConfigService } from '../../common/services/cookie-config.service';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { randomUUID } from 'node:crypto';
+import { ApprovedOriginsService } from '../../common/security/approved-origins.service';
 import { SessionPermissionSync } from './sso/session-permission-sync';
 
 @ApiTags('Authentication')
@@ -35,8 +35,8 @@ export class AuthController {
     private readonly cookieConfigService: CookieConfigService,
     @Optional() private readonly identityAudit?: IdentityAuditService,
     @Optional() private readonly ssoLogout?: SsoLogoutService,
-    @Optional() private readonly settings?: SettingsService,
     @Optional() private readonly ssoPermissionSync?: SessionPermissionSync,
+    @Optional() private readonly approvedOrigins?: ApprovedOriginsService,
   ) {}
 
   @Post('/session/local')
@@ -92,9 +92,14 @@ export class AuthController {
     }
   }
 
-  @Get('/session/refresh')
+  @Post('/session/refresh')
+  @HttpCode(200)
   @SessionAuth()
-  @ApiOperation({ summary: 'Refresh the current session', operationId: 'refreshSession' })
+  @ApiOperation({
+    summary:
+      'Refresh the current session. Cookie sessions receive a rotated cookie and no token; bearer callers receive a new token.',
+    operationId: 'refreshSession',
+  })
   @ApiOkResponse({
     description: 'The session has been refreshed',
     type: CreateSessionResponse,
@@ -102,7 +107,6 @@ export class AuthController {
   async refreshSession(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
-    @Query('tokenLocation') tokenLocation: 'cookie' | 'body',
   ): Promise<CreateSessionResponse> {
     const currentToken = this.sessionToken(request);
 
@@ -122,27 +126,25 @@ export class AuthController {
 
     if (!newToken) throw new UnauthorizedException('Session was ended or expired');
 
-    if (tokenLocation === 'cookie') {
-      // Update cookie with new token
-      await this.cookieConfigService.setAuthCookie(response, newToken);
-      return {
-        user: request.user,
-        authToken: '',
-      };
-    } else {
-      // Return new token for programmatic clients
-      return {
-        user: request.user,
-        authToken: newToken,
-      };
+    response.setHeader('Cache-Control', 'no-store');
+    if (this.bearerToken(request)) {
+      // Programmatic clients already hold the credential; they receive the new one.
+      return { user: request.user, authToken: newToken };
     }
+
+    // Browser sessions never expose the token to page scripts.
+    await this.cookieConfigService.setAuthCookie(response, newToken);
+    return { user: request.user, authToken: '' };
+  }
+
+  private bearerToken(request: AuthenticatedRequest): string {
+    return request.headers.authorization?.startsWith('Bearer ')
+      ? request.headers.authorization.substring(7).trim()
+      : '';
   }
 
   private sessionToken(request: AuthenticatedRequest): string | null {
-    const bearer = request.headers.authorization?.startsWith('Bearer ')
-      ? request.headers.authorization.substring(7).trim()
-      : '';
-    return bearer || request.cookies?.[this.cookieConfigService.getCookieName()] || null;
+    return this.bearerToken(request) || request.cookies?.[this.cookieConfigService.getCookieName()] || null;
   }
 
   @Get('/session/logout-capability')
@@ -167,14 +169,10 @@ export class AuthController {
     if (!token || request.user.apiTokenId) throw new UnauthorizedException('An active session is required');
     const session = request.authSession;
     if (!session) throw new UnauthorizedException('An active session is required');
+    // Bearer callers skip the global cross-site guard, so check the origin here as well.
     const origin = request.headers.origin;
-    const configuredUrl = await this.settings.getUrl();
-    const returnUrl = await this.ssoLogout.returnURL().catch(() => configuredUrl);
-    const allowedOrigins = new Set([
-      configuredUrl ? new URL(configuredUrl).origin : '',
-      returnUrl ? new URL(returnUrl).origin : '',
-    ]);
-    if ((origin && !allowedOrigins.has(origin)) || (!origin && request.headers['sec-fetch-site'] === 'cross-site'))
+    const approved = await this.approvedOrigins.isApproved(origin, request);
+    if ((origin && !approved) || (!origin && request.headers['sec-fetch-site'] === 'cross-site'))
       throw new ForbiddenException('Cross-origin logout is not allowed');
     let result: CentralLogoutResult;
     try {

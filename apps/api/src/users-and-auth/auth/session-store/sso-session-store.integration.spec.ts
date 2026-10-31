@@ -17,7 +17,7 @@ import { Request } from 'express';
 import { AuthController } from '../auth.controller';
 import { SessionService } from '../session.service';
 import { SsoLogoutService } from '../sso/sso-logout.service';
-import { SettingsService } from '../../../settings/settings.service';
+import { approvedOriginsFor } from '../auth.controller.auth-controller.test-fixture';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Response } from 'express';
@@ -30,6 +30,7 @@ import { SSOService } from '../sso/sso.service';
 
 jest.setTimeout(90000);
 const hash = { hashToken: (token: string) => `hashed:${token}` } as TokenHashService;
+const approvedOrigins = approvedOriginsFor('https://app.example');
 const oidc: SsoSessionContext = {
   protocol: 'OIDC',
   providerId: 1,
@@ -215,12 +216,15 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
               return { kind: 'redirect', redirectUrl: 'https://idp.example/logout' };
             },
           } as unknown as SsoLogoutService,
-          { getUrl: async () => 'https://app.example' } as SettingsService,
+          undefined,
+          approvedOrigins,
         );
         const request = {
           user: { id: 7 },
           authSession: (await store.authenticateSession('original')).session,
           headers: { authorization: 'Bearer original', origin: 'https://app.example' },
+          protocol: 'https',
+          host: 'api.internal:3000',
           cookies: {},
           logout: (done: () => void) => done(),
         } as unknown as AuthenticatedRequest;
@@ -278,6 +282,8 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         );
         const request = {
           headers: { authorization: 'Bearer original', origin: 'https://app.example' },
+          protocol: 'https',
+          host: 'api.internal:3000',
           cookies: {},
           path: '/api/auth/session',
           logout: (done: () => void) => done(),
@@ -300,7 +306,8 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
             returnURL: async () => 'https://app.example/',
             prepare: async () => ({ kind: 'local_only' }),
           } as unknown as SsoLogoutService,
-          { getUrl: async () => 'https://app.example' } as SettingsService,
+          undefined,
+          approvedOrigins,
         );
         if (kind === 'local') await controller.endSession(request, {} as Response);
         else await controller.logoutEverywhere(request, { setHeader: jest.fn() } as unknown as Response);

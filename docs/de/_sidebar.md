@@ -68,6 +68,10 @@
   - [Server einrichten](mqtt/server-setup.md)
   - [Beispiele](mqtt/examples.md)
 
+- **Geräte**
+  - [Matter: Architektur](devices/matter/architecture.md)
+  - [Matter: Betriebsanleitung](devices/matter/operator.md)
+
 - **Abrechnung**
   - [Überblick](billing/overview.md)
   - [Konfiguration](billing/configuration.md)

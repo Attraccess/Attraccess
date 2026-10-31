@@ -1,0 +1,130 @@
+{
+  "name": "matter-sidecar",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/matter-sidecar/src",
+  "tags": ["type:app", "scope:matter"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": [],
+      "inputs": [
+        "{projectRoot}/src/**/!(*.spec).ts",
+        "{projectRoot}/scripts/**/*",
+        "{projectRoot}/package.json",
+        "{projectRoot}/tsconfig*.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/src/**/!(*.spec).ts",
+        "{workspaceRoot}/package.json",
+        "{workspaceRoot}/pnpm-lock.yaml",
+        {
+          "externalDependencies": ["esbuild"]
+        },
+        {
+          "runtime": "git rev-parse HEAD"
+        }
+      ],
+      "outputs": ["{workspaceRoot}/dist/apps/matter-sidecar"],
+      "options": {
+        "command": "node apps/matter-sidecar/scripts/build.mjs"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/matter-contract/src/**/*",
+        {
+          "externalDependencies": ["typescript"]
+        }
+      ],
+      "options": {
+        "command": "tsc --noEmit -p apps/matter-sidecar/tsconfig.app.json && tsc --noEmit -p apps/matter-sidecar/tsconfig.spec.json"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/eslint.config.cjs",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        {
+          "externalDependencies": ["eslint", "prettier"]
+        }
+      ],
+      "options": {
+        "command": "eslint apps/matter-sidecar --max-warnings=0 && prettier --check apps/matter-sidecar"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "jestShared",
+        "contractSources",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar"],
+      "options": {
+        "jestConfig": "apps/matter-sidecar/jest.config.ts"
+      }
+    },
+    "test-integration": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "jestShared",
+        "contractSources",
+        {
+          "externalDependencies": ["jest", "ws"]
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "jestConfig": "apps/matter-sidecar/jest.integration.config.ts"
+      }
+    },
+    "test-built": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": [
+        "jestShared",
+        "contractSources",
+        { "dependentTasksOutputFiles": "**/*", "transitive": true },
+        {
+          "externalDependencies": ["jest", "ws"]
+        },
+        {
+          "runtime": "git rev-parse HEAD"
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "jestConfig": "apps/matter-sidecar/jest.built.config.ts"
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/matter-sidecar"
+      }
+    }
+  },
+  "namedInputs": {
+    "jestShared": [
+      "default",
+      "{workspaceRoot}/jest.preset.js",
+      "{workspaceRoot}/package.json",
+      "{projectRoot}/jest.base.config.ts"
+    ],
+    "contractSources": ["{workspaceRoot}/libs/matter-contract/src/**/*"]
+  }
+}

@@ -101,6 +101,52 @@ Setzen Sie die Umgebungsvariable `TRUST_PROXY` auf die Anzahl vertrauenswuerdige
 > [!WARNING]
 > Vertrauen Sie nur so vielen Hops, wie tatsaechlich existieren. Vertraut `TRUST_PROXY` mehr Hops als Ihre reale Proxy-Kette, koennen Clients `X-Forwarded-For` faelschen, ihre scheinbare IP rotieren und das Rate-Limiting umgehen. Nicht gesetzt vertraut Attraccess keinen Weiterleitungs-Headern (sicherer Standard). Aenderungen werden nach einem Neustart wirksam.
 
+## Freigegebene Websites
+
+Nur freigegebene Websites dürfen eine angemeldete Browser-Sitzung verwenden. Andere Websites können keine API-Antworten lesen, und ihre datenändernden Anfragen (`POST`, `PUT`, `PATCH`, `DELETE`) werden mit `403` abgelehnt. Das gilt auch für Websites unter derselben übergeordneten Domain, z.B. `help.kunde.de` neben `attraccess.kunde.de`.
+
+Diese Adressen sind automatisch freigegeben:
+
+- die Adresse, unter der Attraccess ausgeliefert wird (Schema und `Host` der Anfrage; hinter einem Proxy siehe die Warnung unten)
+- die Anwendungs-URL und die öffentliche Internet-URL aus den **Einstellungen** (eine Änderung wirkt sofort auf der Instanz, auf der sie gespeichert wird, und nach höchstens 60 Sekunden auf weiteren Instanzen)
+- `ATTRACCESS_URL`, `ATTRACCESS_FRONTEND_URL` und `ATTRACCESS_PUBLIC_INTERNET_URL`
+- jeder Eintrag in `ATTRACCESS_TRUSTED_ORIGINS`, einer optionalen kommagetrennten Liste exakter Origins (Schema, Host und optional Port; keine Wildcards, keine Pfade), z.B. `ATTRACCESS_TRUSTED_ORIGINS=https://portal.example.com,https://kiosk.example.com`
+
+Die Origin `null` wird nie freigegeben. Abgelehnte Anfragen protokolliert `CrossSiteWriteGuard` als Warnung, ohne Cookie- oder Token-Werte:
+
+```text
+Refused POST /api/auth/session/local: origin_not_approved (origin=https://attraccess.example.com, served-as=http://attraccess.example.com, sec-fetch-site=same-origin). To approve a website, set ATTRACCESS_URL or add it to ATTRACCESS_TRUSTED_ORIGINS; behind a reverse proxy, set TRUST_PROXY.
+```
+
+Der Grund ist `origin_not_approved`, `cross_site_request` (kein `Origin`, aber der Browser hat die Anfrage als websiteübergreifend markiert) oder `cookie_without_origin` (ein Sitzungs-Cookie ohne `Origin`). `served-as` ist die Adresse, unter der Attraccess sich aufgerufen glaubt. Unterscheidet sie sich von `origin` nur durch `http`/`https`, beachten Sie die Warnung zu Reverse Proxies unten.
+
+Nicht betroffen:
+
+- Anfragen mit einem Header `Authorization: Bearer <token>` (Sitzungs- oder API-Token). Andere Verfahren, z.B. `Basic` von einem Proxy, zählen nicht.
+- Anmeldung mit einfachem `curl` ohne Browser-Header
+- Routen, die andere Systeme gezielt aufrufen: SAML-Assertion und -Logout, OIDC-Back-Channel-Logout, SSO-Provisionierung und der SumUp-Callback. Sie authentifizieren den Aufrufer selbst.
+
+> [!NOTE]
+> Schreibzugriffe, die nur einen `x-api-key`-Header enthalten, werden weiterhin geprüft. Eine Website, die im Browser mit einem API-Key aufruft, muss in `ATTRACCESS_TRUSTED_ORIGINS` stehen oder stattdessen ein Bearer-Token verwenden.
+
+> [!NOTE]
+> **Skripte, die das Browser-Cookie verwenden**, müssen bei Schreibzugriffen einen freigegebenen `Origin`-Header senden. Verwenden Sie besser ein Bearer-Token (z.B. ein API-Token).
+
+> [!WARNING]
+> **Reverse Proxies (vor dem Update prüfen):** Schreibt Ihr Proxy den Hostnamen um oder beendet er TLS (der Browser verwendet `https`, Attraccess sieht `http`), wird jeder Schreibzugriff aus dem Browser mit `403` abgelehnt, auch die Anmeldung und die Ersteinrichtung. Beheben Sie das in der Serverkonfiguration, denn ausgesperrte Administratoren erreichen die Einstellungen nicht:
+>
+> - setzen Sie `ATTRACCESS_URL` auf die öffentliche Adresse, z.B. `https://attraccess.example.com`, oder
+> - setzen Sie `TRUST_PROXY` und stellen Sie sicher, dass der Proxy `X-Forwarded-Proto` sendet, und `X-Forwarded-Host`, falls er den Hostnamen umschreibt (nginx sendet `X-Forwarded-Host` standardmäßig nicht).
+>
+> Die Anwendungs-URL in den Einstellungen funktioniert ebenfalls, solange Sie sich noch anmelden können.
+
+### Anmeldung erneuern
+
+`GET /api/auth/session/refresh` gibt es nicht mehr, ein bloßes Öffnen eines Links kann eine Sitzung also nicht erneuern. Verwenden Sie `POST /api/auth/session/refresh`:
+
+- Aufrufer mit Browser-Cookie erhalten ein neues Cookie und **kein Token** in der Antwort.
+- Aufrufer mit Bearer-Token erhalten ein neues Token.
+
 ## Format des Anmelde-Audit-Logs
 
 Jeder Anmeldeversuch erzeugt eine einzeilige, leerzeichengetrennte Log-Zeile im `AuthAudit`-Kontext. Feldnamen und Reihenfolge sind stabil und fail2ban-tauglich.

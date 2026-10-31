@@ -15,6 +15,7 @@ import { resolve } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
+import { SecurityModule } from '../common/security/security.module';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { AttractapModule } from '../attractap/attractap.module';
 import { CompanionModule } from '../companion/companion.module';
@@ -51,6 +52,7 @@ const logger = new Logger('AppModule');
     ScheduleModule.forRoot(),
     UsersAndAuthModule,
     SettingsModule,
+    SecurityModule,
     TypeOrmModule.forRoot(dataSourceConfig),
     AuditModule,
     ResourcesModule,

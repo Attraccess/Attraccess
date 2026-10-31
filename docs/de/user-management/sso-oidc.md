@@ -84,7 +84,7 @@ Standardmäßig werden SSO-Rollen nur bei der Anmeldung (oder über die Provisio
 
 Ist seit der letzten Rollenprüfung einer Sitzung das Abgleichsintervall abgelaufen, holt ihre nächste Anfrage mit dem Refresh-Token der Sitzung aktuelle Claims vom Token- und UserInfo-Endpunkt. Die Rollen werden dann genau wie bei der Anmeldung zugeordnet. Schalten Sie den Schalter aus, endet der Abgleich für diesen Anbieter.
 
-Auch das Erneuern der Sitzung (`GET /api/auth/session/refresh`) löst einen Abgleich aus, höchstens einmal pro Minute, selbst wenn das Abgleichsintervall noch nicht abgelaufen ist.
+Auch das Erneuern der Sitzung (`POST /api/auth/session/refresh`) löst einen Abgleich aus, höchstens einmal pro Minute, selbst wenn das Abgleichsintervall noch nicht abgelaufen ist.
 
 Der Abgleich folgt denselben Regeln wie die Anmeldung. Rollen ändern sich nur, wenn sich die Rollen-/Gruppen-Claims geändert haben, und ein vollständig fehlender Claim entfernt nie Rollen. Jeder Versuch wird protokolliert und in der Metrik `attraccess_auth_sso_permission_resync_total` gezählt. Rollenänderungen werden im Audit-Log als **SSO-Berechtigungen synchronisiert** erfasst.
 

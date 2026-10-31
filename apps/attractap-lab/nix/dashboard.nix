@@ -36,7 +36,9 @@ in rec {
     version = api.version;
     inherit src;
     sourceRoot = "source/coordinator/web";
-    patches = [ ./dashboard-web.patch ];
+    # dashboard-mobile.patch: phone layout (navigation drawer, scrollable
+    # tables, touch-sized controls); wider screens keep upstream's layout.
+    patches = [ ./dashboard-web.patch ./dashboard-mobile.patch ];
     patchFlags = [ "-p3" ];
     npmDepsHash = "sha256-2Vq3dQ1q0I993VFnu0D6k7864GVaOhMqyRp+YSsBFuM=";
     installPhase = ''

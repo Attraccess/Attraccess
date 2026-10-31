@@ -1,3 +1,4 @@
+import { AllowCrossSiteWrite } from '../../../common/security/cross-site-write.guard';
 import { SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { LogoutReturnResult, SsoLogoutSetupUrls } from './logout.types';
 import {
@@ -56,6 +57,7 @@ export class SsoLogoutController {
     };
   }
 
+  @AllowCrossSiteWrite()
   @Post('/OIDC/:providerId/backchannel-logout')
   @HttpCode(200)
   @ApiConsumes('application/x-www-form-urlencoded')
@@ -112,6 +114,7 @@ export class SsoLogoutController {
     await this.saml(id, query, original, response);
   }
 
+  @AllowCrossSiteWrite()
   @Post('/SAML/:providerId/slo')
   @ApiConsumes('application/x-www-form-urlencoded')
   @ApiOperation({ summary: 'SAML Single Logout via POST binding', operationId: 'samlPostLogout' })

@@ -1,12 +1,13 @@
-import { registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
+import { approvedOriginsFor, registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
 import { SsoLogoutService } from './sso/sso-logout.service';
-import { SettingsService } from '../../settings/settings.service';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { AuthController } from './auth.controller';
 import { Response } from 'express';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { User } from '@attraccess/database-entities';
+
+const noStore = () => ({ setHeader: jest.fn() }) as unknown as Response;
 
 describe('AuthController', () => {
   const fixture = registerAuthControllerFixture();
@@ -34,6 +35,7 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
     const result = await fixture.authController.createSession(mockRequest, mockResponse, {
@@ -73,6 +75,7 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
     const result = await fixture.authController.createSession(mockRequest, mockResponse, { tokenLocation: 'cookie' });
@@ -210,9 +213,10 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
-    const result = await fixture.authController.refreshSession(mockRequest, mockResponse, 'body');
+    const result = await fixture.authController.refreshSession(mockRequest, mockResponse);
 
     expect(result).toEqual({
       authToken: 'new-session-token',
@@ -220,6 +224,19 @@ describe('AuthController', () => {
     });
     expect(fixture.sessionService.refreshSession).toHaveBeenCalledWith('current-session-token');
     expect(mockResponse.cookie).not.toHaveBeenCalled();
+  });
+
+  it('does not expose a token to cookie callers even when they ask for one', async () => {
+    const request = {
+      user: { id: 1 },
+      headers: {},
+      query: { tokenLocation: 'body' },
+      cookies: { 'auth-session': 'current-session-token' },
+    } as unknown as AuthenticatedRequest;
+    const response = noStore();
+    const result = await fixture.authController.refreshSession(request, response);
+    expect(result.authToken).toBe('');
+    expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
   });
 
   it('should refresh session for web browser and update cookie', async () => {
@@ -244,9 +261,10 @@ describe('AuthController', () => {
 
     const mockResponse = {
       cookie: jest.fn(),
+      setHeader: jest.fn(),
     } as unknown as Response;
 
-    const result = await fixture.authController.refreshSession(mockRequest, mockResponse, 'cookie');
+    const result = await fixture.authController.refreshSession(mockRequest, mockResponse);
 
     expect(result).toEqual({
       authToken: '',
@@ -261,6 +279,8 @@ describe('AuthController', () => {
       authSession: { id: 'stable-session', ssoContext: null },
       headers: { authorization: 'Bearer header-session', origin: 'https://app.example' },
       cookies: { 'auth-session': 'cookie-session' },
+      protocol: 'https',
+      host: 'app.example',
       logout: jest.fn((done: () => void) => done()),
     } as unknown as AuthenticatedRequest;
     const response = { setHeader: jest.fn() } as unknown as Response;
@@ -285,7 +305,8 @@ describe('AuthController', () => {
         },
         returnURL: async () => 'https://app.example/',
       } as unknown as SsoLogoutService,
-      { getUrl: async () => 'https://app.example' } as SettingsService,
+      undefined,
+      approvedOriginsFor('https://app.example'),
     );
     const request = {
       user: { id: 7 },
@@ -301,23 +322,51 @@ describe('AuthController', () => {
     expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
   });
 
-  it('rejects API tokens and cross-origin central logout before revoking anything', async () => {
-    const response = { setHeader: jest.fn() } as unknown as Response;
-    for (const [user, headers] of [
-      [{ id: 7, apiTokenId: 12 }, { authorization: 'Bearer api-token' }],
-      [{ id: 7 }, { authorization: 'Bearer session', origin: 'https://attacker.example' }],
-    ]) {
-      const request = {
-        user,
-        authSession: { id: 'stable-session', ssoContext: null },
-        headers,
-        cookies: {},
-        logout: jest.fn(),
-      } as unknown as AuthenticatedRequest;
-      await expect(fixture.authController.logoutEverywhere(request, response)).rejects.toThrow();
-    }
+  it.each([
+    ['an API token', { id: 7, apiTokenId: 12 }, { authorization: 'Bearer api-token' }, UnauthorizedException],
+    [
+      'a bearer call from another website',
+      { id: 7 },
+      { authorization: 'Bearer session', origin: 'https://attacker.example' },
+      ForbiddenException,
+    ],
+    [
+      'a call the browser marks cross-site without an Origin',
+      { id: 7 },
+      { authorization: 'Bearer session', 'sec-fetch-site': 'cross-site' },
+      ForbiddenException,
+    ],
+  ])('rejects central logout from %s before revoking anything', async (_label, user, headers, error) => {
+    const request = {
+      user,
+      authSession: { id: 'stable-session', ssoContext: null },
+      headers,
+      cookies: {},
+      protocol: 'https',
+      host: 'api.internal:3000',
+      logout: jest.fn(),
+    } as unknown as AuthenticatedRequest;
+    await expect(fixture.authController.logoutEverywhere(request, noStore())).rejects.toBeInstanceOf(error);
     expect(fixture.sessionService.revokeSession).not.toHaveBeenCalled();
     expect(fixture.sessionService.revokeLogoutSession).not.toHaveBeenCalled();
+    expect(request.logout).not.toHaveBeenCalled();
+  });
+
+  it('allows central logout for a bearer caller from the served address', async () => {
+    const request = {
+      user: { id: 7 },
+      authSession: { id: 'stable-session', ssoContext: null },
+      headers: { authorization: 'Bearer session', origin: 'https://attraccess.local:8443' },
+      cookies: {},
+      protocol: 'https',
+      host: 'attraccess.local:8443',
+      logout: jest.fn((done: () => void) => done()),
+    } as unknown as AuthenticatedRequest;
+    await expect(fixture.authController.logoutEverywhere(request, noStore())).resolves.toEqual({
+      kind: 'redirect',
+      redirectUrl: 'https://idp.example/logout',
+    });
+    expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
   });
 
   it('does not create a new session when refresh loses a race with logout', async () => {
@@ -328,9 +377,7 @@ describe('AuthController', () => {
       headers: { authorization: 'Bearer ended-session' },
       cookies: {},
     } as unknown as AuthenticatedRequest;
-    await expect(fixture.authController.refreshSession(request, {} as Response, 'body')).rejects.toThrow(
-      'ended or expired',
-    );
+    await expect(fixture.authController.refreshSession(request, noStore())).rejects.toThrow('ended or expired');
     expect(fixture.sessionService.createSession).not.toHaveBeenCalled();
   });
 
@@ -350,7 +397,7 @@ describe('AuthController', () => {
     });
 
     it('forces a re-sync with the session and user id', async () => {
-      await fixture.authController.refreshSession(refreshRequest(), {} as Response, 'body');
+      await fixture.authController.refreshSession(refreshRequest(), noStore());
 
       expect(syncIfDue).toHaveBeenCalledWith(authSession, 7, { force: true });
     });
@@ -358,7 +405,7 @@ describe('AuthController', () => {
     it('rejects revoked sessions without rotating them', async () => {
       syncIfDue.mockResolvedValue('revoked');
 
-      await expect(fixture.authController.refreshSession(refreshRequest(), {} as Response, 'body')).rejects.toThrow(
+      await expect(fixture.authController.refreshSession(refreshRequest(), noStore())).rejects.toThrow(
         UnauthorizedException,
       );
       expect(fixture.sessionService.refreshSession).not.toHaveBeenCalled();
@@ -369,7 +416,7 @@ describe('AuthController', () => {
       async (outcome) => {
         syncIfDue.mockResolvedValue(outcome);
 
-        const result = await fixture.authController.refreshSession(refreshRequest(), {} as Response, 'body');
+        const result = await fixture.authController.refreshSession(refreshRequest(), noStore());
 
         expect(result.authToken).toBe('new-session-token');
         expect(fixture.sessionService.refreshSession).toHaveBeenCalledWith('current-session-token');

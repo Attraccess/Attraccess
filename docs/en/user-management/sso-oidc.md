@@ -84,7 +84,7 @@ By default, SSO roles are only updated when a user signs in (or through the prov
 
 Once the re-sync interval has passed since a session's last role check, its next request uses the session's refresh token to fetch fresh claims from the token and UserInfo endpoints. The roles are then mapped exactly as at login. Turning the switch off stops re-sync for this provider.
 
-Refreshing the session (`GET /api/auth/session/refresh`) also re-syncs, at most once per minute, even if the re-sync interval has not passed yet.
+Refreshing the session (`POST /api/auth/session/refresh`) also re-syncs, at most once per minute, even if the re-sync interval has not passed yet.
 
 Re-sync follows the same rules as login. Roles are only changed when the role/group claims changed, and a wholly missing claim never removes roles. Each attempt is logged and counted in the `attraccess_auth_sso_permission_resync_total` metric. Role changes are recorded in the audit log as **SSO permissions synchronized**.
 

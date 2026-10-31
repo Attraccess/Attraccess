@@ -1,0 +1,426 @@
+diff --git a/coordinator/web/src/components/Layout.tsx b/coordinator/web/src/components/Layout.tsx
+index a1a96a3..4a8570d 100644
+--- a/coordinator/web/src/components/Layout.tsx
++++ b/coordinator/web/src/components/Layout.tsx
+@@ -1,4 +1,4 @@
+-import { ReactNode } from "react";
++import { ReactNode, useEffect } from "react";
+ import { useLocation } from "react-router-dom";
+ import {
+   Box,
+@@ -10,6 +10,11 @@ import {
+   IconButton,
+   Spacer,
+   useColorMode,
++  useDisclosure,
++  Drawer,
++  DrawerOverlay,
++  DrawerContent,
++  DrawerCloseButton,
+ } from "@chakra-ui/react";
+ import AccountMenu from "./AccountMenu";
+ import {
+@@ -26,6 +31,7 @@ import {
+   MdMovie,
+   MdOpenInNew,
+   MdSystemUpdateAlt,
++  MdMenu,
+ } from "react-icons/md";
+ import ChipIcon from "./ChipIcon";
+ import NavItem from "./ui/NavItem";
+@@ -85,66 +91,110 @@ interface LayoutProps {
+   children: ReactNode;
+ }
+ 
++function SidebarContent({ pathname }: { pathname: string }) {
++  return (
++    <>
++      {/* Logo */}
++      <Box px={4} mb={8} color="sidebar.text">
++        <ChipIcon size={36} />
++        <Text color="white" fontSize="lg" fontWeight="700" mt={2}>
++          Labgrid
++        </Text>
++        <Text color="whiteAlpha.700" fontSize="xs">
++          Coordinator Dashboard
++        </Text>
++      </Box>
++
++      {/* Navigation */}
++      <VStack spacing={1} align="stretch" flex={1}>
++        {navItems.map((item) => (
++          <NavItem
++            key={item.to}
++            {...item}
++            isActive={pathname === item.to}
++          />
++        ))}
++      </VStack>
++
++      {/* External links */}
++      <VStack spacing={1} align="stretch" mt={2}>
++        {externalNavItems.map((item) => (
++          <ExternalNavItem key={item.href} {...item} />
++        ))}
++      </VStack>
++    </>
++  );
++}
++
+ export default function Layout({ children }: LayoutProps) {
+   const location = useLocation();
+   const { colorMode, toggleColorMode } = useColorMode();
++  const nav = useDisclosure();
+   const headerBg = "surface.bg";
+   const borderColor = "border.hairline";
+ 
++  // Close the phone navigation drawer after following a link.
++  useEffect(nav.onClose, [location.pathname]);
++
+   return (
+-    <Flex h="100vh">
+-      {/* Sidebar */}
++    <Flex h="100dvh">
++      {/* Sidebar (md and up); phones use the drawer below */}
+       <Box
+         w="240px"
+         bg="sidebar.bg"
+         py={6}
+         px={3}
+         flexShrink={0}
+-        display="flex"
++        display={{ base: "none", md: "flex" }}
+         flexDirection="column"
+       >
+-        {/* Logo */}
+-        <Box px={4} mb={8} color="sidebar.text">
+-          <ChipIcon size={36} />
+-          <Text color="white" fontSize="lg" fontWeight="700" mt={2}>
+-            Labgrid
+-          </Text>
+-          <Text color="whiteAlpha.700" fontSize="xs">
+-            Coordinator Dashboard
+-          </Text>
+-        </Box>
+-
+-        {/* Navigation */}
+-        <VStack spacing={1} align="stretch" flex={1}>
+-          {navItems.map((item) => (
+-            <NavItem
+-              key={item.to}
+-              {...item}
+-              isActive={location.pathname === item.to}
+-            />
+-          ))}
+-        </VStack>
+-
+-        {/* External links */}
+-        <VStack spacing={1} align="stretch" mt={2}>
+-          {externalNavItems.map((item) => (
+-            <ExternalNavItem key={item.href} {...item} />
+-          ))}
+-        </VStack>
++        <SidebarContent pathname={location.pathname} />
+       </Box>
+ 
++      <Drawer isOpen={nav.isOpen} onClose={nav.onClose} placement="left">
++        <DrawerOverlay />
++        <DrawerContent
++          bg="sidebar.bg"
++          maxW="280px"
++          py={6}
++          px={3}
++          display="flex"
++          flexDirection="column"
++          overflowY="auto"
++        >
++          <DrawerCloseButton color="sidebar.text" size="lg" />
++          <SidebarContent pathname={location.pathname} />
++        </DrawerContent>
++      </Drawer>
++
+       {/* Main content */}
+-      <Flex flex={1} direction="column" overflow="hidden">
++      <Flex flex={1} minW={0} direction="column" overflow="hidden">
+         {/* Header */}
+         <Flex
+           h="56px"
+           align="center"
+-          px={6}
++          px={{ base: 2, md: 6 }}
+           bg={headerBg}
+           borderBottomWidth="1px"
+           borderColor={borderColor}
+           flexShrink={0}
+         >
++          <IconButton
++            aria-label="Open navigation"
++            icon={<MdMenu />}
++            onClick={nav.onOpen}
++            variant="ghost"
++            fontSize="2xl"
++            display={{ base: "inline-flex", md: "none" }}
++          />
++          <Text
++            ml={1}
++            fontWeight="700"
++            fontFamily="heading"
++            display={{ base: "block", md: "none" }}
++          >
++            Labgrid
++          </Text>
+           <Spacer />
+           <HStack spacing={2}>
+             <IconButton
+@@ -159,7 +209,7 @@ export default function Layout({ children }: LayoutProps) {
+         </Flex>
+ 
+         {/* Page content */}
+-        <Box flex={1} overflow="auto" p={6} bg="page.bg">
++        <Box flex={1} overflow="auto" p={{ base: 3, md: 6 }} bg="page.bg">
+           {children}
+         </Box>
+       </Flex>
+diff --git a/coordinator/web/src/components/RelatedPanel.tsx b/coordinator/web/src/components/RelatedPanel.tsx
+index 1381895..6f41b5b 100644
+--- a/coordinator/web/src/components/RelatedPanel.tsx
++++ b/coordinator/web/src/components/RelatedPanel.tsx
+@@ -48,7 +48,16 @@ function Section({ title, tone = "default", children }: SectionProps) {
+ function Footer({ to, children }: { to: string; children: React.ReactNode }) {
+   return (
+     <Box pt={2} borderTopWidth="1px">
+-      <Link as={RouterLink} to={to} color="link" fontSize="sm" fontWeight={500}>
++      <Link
++        as={RouterLink}
++        to={to}
++        color="link"
++        fontSize="sm"
++        fontWeight={500}
++        display={{ base: "inline-flex", md: "inline" }}
++        alignItems="center"
++        minH={{ base: 10, md: "auto" }}
++      >
+         {children}
+       </Link>
+     </Box>
+diff --git a/coordinator/web/src/pages/Deployments.tsx b/coordinator/web/src/pages/Deployments.tsx
+index 673ae87..d987391 100644
+--- a/coordinator/web/src/pages/Deployments.tsx
++++ b/coordinator/web/src/pages/Deployments.tsx
+@@ -271,7 +271,7 @@ export default function Deployments() {
+             {!error && deployments.length === 0 && (
+               <Tr>
+                 <Td colSpan={10} textAlign="center" color="text.secondary" py={8}>
+-                  No node deployments have been reported.
++                  <Box>No node deployments have been reported.</Box>
+                 </Td>
+               </Tr>
+             )}
+diff --git a/coordinator/web/src/pages/EventLog.tsx b/coordinator/web/src/pages/EventLog.tsx
+index 0310c5a..f304af9 100644
+--- a/coordinator/web/src/pages/EventLog.tsx
++++ b/coordinator/web/src/pages/EventLog.tsx
+@@ -65,7 +65,7 @@ export default function EventLog() {
+         Event Log
+       </Heading>
+ 
+-      <HStack mb={4} spacing={4}>
++      <HStack mb={4} spacing={4} flexWrap="wrap">
+         <Select
+           w="200px"
+           placeholder="All event types"
+diff --git a/coordinator/web/src/pages/PlaceWizard.tsx b/coordinator/web/src/pages/PlaceWizard.tsx
+index d4917b4..95d869b 100644
+--- a/coordinator/web/src/pages/PlaceWizard.tsx
++++ b/coordinator/web/src/pages/PlaceWizard.tsx
+@@ -228,7 +228,8 @@ export default function PlaceWizard() {
+                 active={<StepNumber />}
+               />
+             </StepIndicator>
+-            <Box flexShrink="0">
++            {/* Phones only show the current step's title. */}
++            <Box flexShrink="0" display={{ base: i === activeStep ? "block" : "none", md: "block" }}>
+               <StepTitle>{s.title}</StepTitle>
+             </Box>
+             <StepSeparator />
+diff --git a/coordinator/web/src/pages/Places.tsx b/coordinator/web/src/pages/Places.tsx
+index 42cad17..98af0c8 100644
+--- a/coordinator/web/src/pages/Places.tsx
++++ b/coordinator/web/src/pages/Places.tsx
+@@ -12,6 +12,7 @@ import {
+   Button,
+   Heading,
+   HStack,
++  Stack,
+   Tag,
+   TagLabel,
+   Spinner,
+@@ -208,7 +209,7 @@ function PlacesTable({
+           {places.length === 0 && (
+             <Tr>
+               <Td colSpan={7} textAlign="center" color="text.secondary" py={8}>
+-                {emptyMessage}
++                <Box>{emptyMessage}</Box>
+               </Td>
+             </Tr>
+           )}
+@@ -318,7 +319,7 @@ export default function Places() {
+ 
+   return (
+     <Box>
+-      <HStack justify="space-between" mb={6} align="flex-start">
++      <Stack direction={{ base: "column", md: "row" }} justify="space-between" mb={6} align="flex-start">
+         <ConceptHeading name="place" pageKey="/places" size="lg" />
+         <HStack spacing={2}>
+           <Button onClick={toggleDensity} size="sm" variant="outline">
+@@ -328,7 +329,7 @@ export default function Places() {
+             + New place
+           </Button>
+         </HStack>
+-      </HStack>
++      </Stack>
+ 
+       <VStack spacing={6} align="stretch">
+         <Box>
+@@ -360,13 +361,13 @@ export default function Places() {
+ 
+         <Box>
+           <HStack justify="space-between" mb={2} align="baseline">
+-            <Heading size="sm" color="text.primary">
++            <Heading size="sm" color="text.primary" flexShrink={0}>
+               Offline places{" "}
+               <Text as="span" color="text.secondary" fontWeight="400">
+                 ({offlinePlaces.length})
+               </Text>
+             </Heading>
+-            <HStack spacing={3}>
++            <HStack spacing={3} flexWrap="wrap" justify="flex-end">
+               <Text fontSize="xs" color="text.secondary">
+                 No backing exporter is currently contributing resources.
+               </Text>
+diff --git a/coordinator/web/src/pages/Reservations.tsx b/coordinator/web/src/pages/Reservations.tsx
+index b3bced3..d29d8a2 100644
+--- a/coordinator/web/src/pages/Reservations.tsx
++++ b/coordinator/web/src/pages/Reservations.tsx
+@@ -67,12 +67,12 @@ export default function Reservations() {
+ 
+   return (
+     <Box>
+-      <HStack justify="space-between" mb={6} align="flex-start">
++      <Stack direction={{ base: "column", md: "row" }} justify="space-between" mb={6} align="flex-start">
+         <ConceptHeading name="reservation" pageKey="/reservations" size="lg" />
+-        <Button onClick={onOpen} size="sm">
++        <Button onClick={onOpen} size="sm" flexShrink={0}>
+           Create Reservation
+         </Button>
+-      </HStack>
++      </Stack>
+ 
+       <Panel overflow="hidden">
+         <Table variant="simple" size="sm">
+diff --git a/coordinator/web/src/pages/Resources.tsx b/coordinator/web/src/pages/Resources.tsx
+index d1050dc..b4a5722 100644
+--- a/coordinator/web/src/pages/Resources.tsx
++++ b/coordinator/web/src/pages/Resources.tsx
+@@ -172,9 +172,11 @@ export default function Resources() {
+             {filtered.length === 0 && (
+               <Tr>
+                 <Td colSpan={7} textAlign="center" color="text.secondary" py={8}>
+-                  {resources?.length === 0
+-                    ? "No resources available. Connect an exporter."
+-                    : "No resources match the current filters."}
++                  <Box>
++                    {resources?.length === 0
++                      ? "No resources available. Connect an exporter."
++                      : "No resources match the current filters."}
++                  </Box>
+                 </Td>
+               </Tr>
+             )}
+diff --git a/coordinator/web/src/pages/Topology.tsx b/coordinator/web/src/pages/Topology.tsx
+index 1f06fe2..3014c17 100644
+--- a/coordinator/web/src/pages/Topology.tsx
++++ b/coordinator/web/src/pages/Topology.tsx
+@@ -310,7 +310,7 @@ export default function Topology() {
+           </VStack>
+         </Collapse>
+ 
+-        <HStack>
++        <HStack flexWrap="wrap">
+           <Input
+             size="sm" maxW="260px"
+             placeholder="Filter by name"
+@@ -323,7 +323,7 @@ export default function Topology() {
+               setParams(p, { replace: true });
+             }}
+           />
+-          <HStack pl={3} spacing={4}>
++          <HStack pl={{ base: 0, md: 3 }} spacing={4} flexWrap="wrap">
+             <HStack><Switch isChecked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} size="sm" /><Text fontSize="sm">Mine only</Text></HStack>
+             <HStack><Switch isChecked={hideOffline} onChange={(e) => setHideOffline(e.target.checked)} size="sm" /><Text fontSize="sm">Hide offline exporters</Text></HStack>
+             <HStack><Switch isChecked={hideBroken} onChange={(e) => setHideBroken(e.target.checked)} size="sm" /><Text fontSize="sm">Hide places without live matches</Text></HStack>
+diff --git a/coordinator/web/src/theme/components.ts b/coordinator/web/src/theme/components.ts
+index fe2acdc..49e2047 100644
+--- a/coordinator/web/src/theme/components.ts
++++ b/coordinator/web/src/theme/components.ts
+@@ -3,6 +3,13 @@ import { tableAnatomy } from "@chakra-ui/anatomy";
+ 
+ const tableHelpers = createMultiStyleConfigHelpers(tableAnatomy.keys);
+ 
++// Phone-only overrides (below the `md` breakpoint). Desktop keeps upstream sizes.
++const touch = (desktop: number | string) => ({ base: 10, md: desktop });
++const phone = "@media screen and (max-width: 47.98em)";
++const touchInput = (desktop: string) => ({
++  field: { "--input-height": { base: "sizes.10", md: `sizes.${desktop}` } },
++});
++
+ // Hairline "spec-sheet" table: thin rules, tabular mono cells, tracked uppercase headers.
+ const Table = tableHelpers.defineMultiStyleConfig({
+   baseStyle: {
+@@ -17,6 +24,22 @@ const Table = tableHelpers.defineMultiStyleConfig({
+     td: {
+       borderColor: "border.hairline",
+       fontVariantNumeric: "tabular-nums",
++      // Give plain text links in cells (place names etc.) a finger-sized hit area.
++      "& a:not(.chakra-button)": {
++        display: { base: "inline-flex", md: "inline" },
++        alignItems: "center",
++        minH: touch("auto"),
++      },
++      // Full-width rows (empty states, expanded details) span the whole
++      // scrollable table; keep their content within the visible phone width.
++      [phone]: {
++        "&[colspan] > *": { position: "sticky", left: 0, maxW: "calc(100vw - 4rem)" },
++      },
++    },
++    // Wide tables scroll sideways inside their panel instead of the page.
++    table: {
++      display: { base: "block", md: "table" },
++      overflowX: { base: "auto", md: "visible" },
+     },
+   },
+   defaultProps: { size: "sm" },
+@@ -26,6 +49,23 @@ export const components = {
+   Button: {
+     defaultProps: { colorScheme: "adi" },
+     baseStyle: { borderRadius: "md", fontWeight: "600" },
++    sizes: {
++      sm: { h: touch(8), minW: touch(8) },
++      xs: { h: touch(6), minW: touch(6) },
++    },
++  },
++  Input: { sizes: { sm: touchInput("8"), xs: touchInput("6") } },
++  Select: { sizes: { sm: touchInput("8"), xs: touchInput("6") } },
++  NumberInput: { sizes: { sm: touchInput("8"), xs: touchInput("6") } },
++  Menu: { baseStyle: { item: { minH: touch("auto") } } },
++  Modal: {
++    // Keep dialogs inside a phone screen with a small gutter.
++    baseStyle: ({ isCentered }: { isCentered?: boolean }) => ({
++      dialog: {
++        w: { base: "calc(100% - 1.5rem)", md: "100%" },
++        my: isCentered ? "auto" : { base: 4, md: 16 },
++      },
++    }),
+   },
+   Badge: {
+     defaultProps: { colorScheme: "adi" },

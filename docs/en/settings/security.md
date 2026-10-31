@@ -101,6 +101,52 @@ Set the `TRUST_PROXY` environment variable to the number of trusted proxy hops b
 > [!WARNING]
 > Trust only as many hops as actually exist in your deployment. If `TRUST_PROXY` trusts more hops than your real proxy chain, clients can forge `X-Forwarded-For` to rotate their apparent IP and evade rate limiting entirely. When unset, Attraccess trusts no forwarding headers (safe default). Changes take effect after a restart.
 
+## Approved websites
+
+Only approved websites may use a signed-in browser session. Other websites cannot read API responses, and their data-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) are refused with `403`. This also applies to websites under the same parent domain, for example `help.customer.com` next to `attraccess.customer.com`.
+
+These addresses are approved automatically:
+
+- the address Attraccess is served from (the scheme and `Host` of the request; behind a proxy see the warning below)
+- the application URL and the public internet URL from **Settings** (a change applies immediately on the instance where it is saved, and within 60 seconds on other instances)
+- `ATTRACCESS_URL`, `ATTRACCESS_FRONTEND_URL` and `ATTRACCESS_PUBLIC_INTERNET_URL`
+- every entry in `ATTRACCESS_TRUSTED_ORIGINS`, an optional comma-separated list of exact origins (scheme, host and optional port; no wildcards, no paths), e.g. `ATTRACCESS_TRUSTED_ORIGINS=https://portal.example.com,https://kiosk.example.com`
+
+The literal origin `null` is never approved. Refused requests are logged as a warning by `CrossSiteWriteGuard`, without cookie or token values:
+
+```text
+Refused POST /api/auth/session/local: origin_not_approved (origin=https://attraccess.example.com, served-as=http://attraccess.example.com, sec-fetch-site=same-origin). To approve a website, set ATTRACCESS_URL or add it to ATTRACCESS_TRUSTED_ORIGINS; behind a reverse proxy, set TRUST_PROXY.
+```
+
+The reason is `origin_not_approved`, `cross_site_request` (no `Origin`, but the browser marked the request as cross-site) or `cookie_without_origin` (a session cookie without an `Origin`). `served-as` is the address Attraccess thinks it was opened at. If it differs from `origin` only by `http`/`https`, see the reverse proxy warning below.
+
+Not affected:
+
+- requests with an `Authorization: Bearer <token>` header (session or API token). Other schemes, such as `Basic` added by a proxy, do not count.
+- sign-in with plain `curl` and no browser headers
+- the routes other systems call on purpose: SAML assertion and logout, OIDC back-channel logout, SSO provisioning and the SumUp callback. They authenticate the caller themselves.
+
+> [!NOTE]
+> Writes that carry only an `x-api-key` header are still checked. A website calling with an API key from the browser must be listed in `ATTRACCESS_TRUSTED_ORIGINS`, or use a bearer token instead.
+
+> [!NOTE]
+> **Scripts that use the browser cookie** must send an approved `Origin` header on writes. Prefer a bearer token (for example an API token) instead.
+
+> [!WARNING]
+> **Reverse proxies (check before upgrading):** if your proxy rewrites the host name, or terminates TLS (the browser uses `https`, Attraccess sees `http`), every write from the browser is refused with `403`, including sign-in and first-time setup. Fix it in the server configuration, since a locked-out administrator cannot reach Settings:
+>
+> - set `ATTRACCESS_URL` to the public address, e.g. `https://attraccess.example.com`, or
+> - set `TRUST_PROXY` and make sure the proxy sends `X-Forwarded-Proto`, plus `X-Forwarded-Host` if it rewrites the host name (nginx does not send `X-Forwarded-Host` by default).
+>
+> Setting the application URL in Settings works too, if you can still sign in.
+
+### Renewing a sign-in
+
+`GET /api/auth/session/refresh` no longer exists, so opening a link cannot renew a session. Use `POST /api/auth/session/refresh`:
+
+- Callers using the browser cookie get a new cookie and **no token** in the response.
+- Callers sending a bearer token get a new token.
+
 ## Auth Audit Log Format
 
 Every auth attempt produces a single-line, space-separated log record under the `AuthAudit` logger context. Field names and order are stable so the log is fail2ban-friendly.
