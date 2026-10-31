@@ -68,12 +68,14 @@ describe('PairingService', () => {
   let identity: Record<string, unknown>;
   let getUrl: () => Promise<string | null>;
   let trustProxy: string | undefined;
+  // What the gateway passes in: the Attractap license check.
+  let admission: () => Promise<void> = () => Promise.resolve();
 
   beforeAll(async () => {
     caSpki = await readerKey();
     http = createServer();
     wss = new WebSocketServer({ server: http, handleProtocols: () => PAIRING_SUBPROTOCOL });
-    wss.on('connection', (ws, req) => service.handleConnection(ws, req));
+    wss.on('connection', (ws, req) => service.handleConnection(ws, req, admission()));
     await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve));
     url = `ws://127.0.0.1:${(http.address() as AddressInfo).port}/`;
   });
@@ -88,6 +90,7 @@ describe('PairingService', () => {
     appUrl = 'https://attraccess.example';
     getUrl = async () => appUrl;
     trustProxy = undefined;
+    admission = () => Promise.resolve();
     const attractap = {
       findReaderById: async (id: number) => readers.get(id),
       createNewReader: async () => {
@@ -262,6 +265,34 @@ describe('PairingService', () => {
     expect(audited).toEqual([expect.objectContaining({ action: 'reader.enrolled', details: { method: 'code' } })]);
     expect(emitted).toEqual([done.targetReaderId]);
     expect(service.list()).toEqual([]);
+  });
+
+  it('takes no pairing request without a valid license and closes the connection', async () => {
+    admission = () => Promise.reject(new Error('License invalid'));
+    const client = new PairingClient(url);
+    clients.push(client);
+    const closed = new Promise<number>((resolve) => client.ws.once('close', (code) => resolve(code)));
+    await client.opened();
+    client.send({ type: 'hello', v: 1, kind: 'touch', publicKey: (await readerKey()).toString('base64'), firmware });
+
+    expect(await closed).toBe(1008);
+    expect(client.messages).toEqual([]);
+    expect(service.list()).toEqual([]);
+  });
+
+  it('keeps an early hello until the license check passes', async () => {
+    let release: () => void = () => undefined;
+    admission = () => new Promise<void>((resolve) => (release = resolve));
+    const client = new PairingClient(url);
+    clients.push(client);
+    await client.opened();
+    client.send({ type: 'hello', v: 1, kind: 'touch', publicKey: (await readerKey()).toString('base64'), firmware });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(service.list()).toEqual([]);
+
+    release();
+    await client.next('round');
+    expect(service.list()).toHaveLength(1);
   });
 
   it('records the flasher as the method when approving through it', async () => {

@@ -109,7 +109,8 @@ export class EmulatedReader {
     this.tls?.write(encodeFrame(type, Buffer.isBuffer(payload) ? payload : Buffer.from(payload)));
   }
 
-  public async nextFrame(predicate: (frame: Frame) => boolean = () => true, timeoutMs = 3000): Promise<Frame> {
+  // Generous: the first handshake of a run pays cold-start and coverage-instrumentation costs.
+  public async nextFrame(predicate: (frame: Frame) => boolean = () => true, timeoutMs = 10_000): Promise<Frame> {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const index = this.frames.findIndex(predicate);

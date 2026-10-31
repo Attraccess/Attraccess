@@ -1,4 +1,7 @@
+import { IncomingMessage } from 'http';
 import { WebSocket } from 'ws';
+import { LicenseModuleType } from '../../license/license.service';
+import { PAIRING_SUBPROTOCOL } from '../security/session-framing';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
@@ -61,6 +64,30 @@ describe('AttractapGateway', () => {
       await fixture.gateway.handleConnection(mockClient);
 
       expect(mockClient.close).toHaveBeenCalled();
+    });
+
+    it('gates pairing connections on the license check', async () => {
+      fixture.licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
+      const client = { protocol: PAIRING_SUBPROTOCOL, close: jest.fn(), send: jest.fn() } as unknown as WebSocket;
+      const request = {} as IncomingMessage;
+
+      await fixture.gateway.handleConnection(client, request);
+
+      expect(fixture.licenseService.verifyLicense).toHaveBeenCalledWith({ modules: [LicenseModuleType.ATTRACTAP] });
+      const handleConnection = fixture.pairingService.handleConnection;
+      expect(handleConnection).toHaveBeenCalledWith(client, request, expect.any(Promise));
+      await expect(handleConnection.mock.calls[0][2]).rejects.toThrow('License invalid');
+      expect(fixture.websocketService.sockets.size).toBe(0);
+    });
+
+    it('admits pairing connections with a valid license', async () => {
+      const client = { protocol: PAIRING_SUBPROTOCOL, close: jest.fn(), send: jest.fn() } as unknown as WebSocket;
+
+      await fixture.gateway.handleConnection(client, {} as IncomingMessage);
+
+      const admitted = fixture.pairingService.handleConnection.mock.calls[0][2];
+      await expect(admitted).resolves.toBeUndefined();
+      expect(client.close).not.toHaveBeenCalled();
     });
 
     it('registers the socket and sends auth request on successful connection', async () => {

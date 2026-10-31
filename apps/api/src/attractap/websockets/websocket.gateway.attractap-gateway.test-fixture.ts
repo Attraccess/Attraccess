@@ -139,6 +139,7 @@ export function registerAttractapGatewayFixture() {
   let websocketService: WebsocketService;
 
   let licenseService: { verifyLicense: jest.Mock };
+  let pairingService: { handleConnection: jest.Mock };
   let attractapService: { updateLastReaderConnection: jest.Mock; findReaderById: jest.Mock };
 
   beforeEach(async () => {
@@ -157,6 +158,7 @@ export function registerAttractapGatewayFixture() {
 
     gateway = module.get(AttractapGateway);
     websocketService = module.get(WebsocketService);
+    pairingService = module.get(PairingService);
   });
   return {
     get mockWsMetrics() {
@@ -173,6 +175,9 @@ export function registerAttractapGatewayFixture() {
     },
     get licenseService() {
       return licenseService;
+    },
+    get pairingService() {
+      return pairingService;
     },
     get attractapService() {
       return attractapService;

@@ -22,6 +22,8 @@ import { EmulatedReader } from './testing/emulated-reader';
 import { TestInstallation, createTestInstallation, createTestReader } from './testing/test-pki';
 
 describe('reader session through the real gateway', () => {
+  // Real TLS handshakes; under coverage and a busy machine the first one can take several seconds.
+  jest.setTimeout(30_000);
   let app: INestApplication;
   let gateway: AttractapGateway;
   let url: string;

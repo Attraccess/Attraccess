@@ -96,12 +96,20 @@ export class PairingService implements OnApplicationShutdown {
 
   // --- reader side -------------------------------------------------------------------------
 
-  public handleConnection(ws: WebSocket, request: IncomingMessage): void {
+  /**
+   * Listeners are attached right away so an early `hello` is not lost; no message is handled before
+   * `admitted` (the Attractap license check) resolves. If it rejects, the connection is closed.
+   */
+  public handleConnection(ws: WebSocket, request: IncomingMessage, admitted: Promise<void> = Promise.resolve()): void {
     const connectionId = randomUUID();
     // The same validated TRUST_PROXY value the HTTP server uses (main.bootstrap).
     const address = resolveClientAddress(request, this.config.get<AppConfigType>('app')?.TRUST_PROXY);
     let current: PairingRequest | null = null;
-    let queue: Promise<void> = Promise.resolve();
+    let allowed = true;
+    let queue: Promise<void> = admitted.catch(() => {
+      allowed = false;
+      ws.close(1008, 'license');
+    });
     this.armHelloTimeout(ws);
 
     ws.on('close', () => {
@@ -113,6 +121,7 @@ export class PairingService implements OnApplicationShutdown {
     ws.on('message', (data: Buffer, isBinary: boolean) => {
       // Messages of one connection are handled strictly one after another.
       queue = queue.then(async () => {
+        if (!allowed) return;
         try {
           if (isBinary || data.length > MAX_MESSAGE_BYTES) throw new Error('bad message');
           const message = JSON.parse(data.toString('utf8')) as Record<string, unknown>;

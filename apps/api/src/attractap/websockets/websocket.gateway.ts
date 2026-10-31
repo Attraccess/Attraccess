@@ -389,7 +389,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   public async handleConnection(client: WebSocket, request?: IncomingMessage) {
     if (client.protocol === PAIRING_SUBPROTOCOL) {
-      this.pairingService.handleConnection(client, request as IncomingMessage);
+      // Unlicensed installations take no pairing requests (the service closes the socket).
+      const licensed = this.licenseService.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] });
+      licensed.catch(() => this.logger.error('Closing pairing connection due to license error'));
+      this.pairingService.handleConnection(client, request as IncomingMessage, licensed.then(() => undefined));
       return;
     }
     // Taken over before the first await: early TLS bytes must not be missed and a stray text
