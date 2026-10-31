@@ -52,7 +52,7 @@ void ScreenNotice::show(lv_obj_t *screenRoot, Kind kind, const FirmwareI18n::Tex
     lv_obj_add_flag(root, LV_OBJ_FLAG_FLOATING);
     lv_obj_add_flag(root, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_width(root, lv_pct(92));
+    lv_obj_set_width(root, lv_pct(100)); // the screen's content width, like its cards
     lv_obj_set_height(root, LV_SIZE_CONTENT);
     lv_obj_align(root, LV_ALIGN_TOP_MID, 0, NOTICE_TOP_OFFSET);
     DisplayTheme::applySurface(root);
@@ -79,22 +79,18 @@ void ScreenNotice::show(lv_obj_t *screenRoot, Kind kind, const FirmwareI18n::Tex
     }
 
     lv_obj_add_event_cb(root, [](lv_event_t *e)
+                        { static_cast<ScreenNotice *>(lv_event_get_user_data(e))->clear(); },
+                        LV_EVENT_CLICKED, this);
+    lv_obj_add_event_cb(root, [](lv_event_t *e)
                         {
+        // The screen (or the notice itself) went away: drop what refers to it.
         auto *self = static_cast<ScreenNotice *>(lv_event_get_user_data(e));
-        if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+        self->root = nullptr;
+        if (self->timer)
         {
-            self->clear();
-        }
-        else if (lv_event_get_code(e) == LV_EVENT_DELETE)
-        {
-            // The screen (or the notice itself) went away: drop what refers to it.
-            self->root = nullptr;
-            if (self->timer)
-            {
-                lv_timer_delete(self->timer);
-                self->timer = nullptr;
-            }
-        } }, LV_EVENT_ALL, this);
+            lv_timer_delete(self->timer);
+            self->timer = nullptr;
+        } }, LV_EVENT_DELETE, this);
 
     timer = lv_timer_create([](lv_timer_t *t)
                             {

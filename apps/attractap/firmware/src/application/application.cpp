@@ -144,6 +144,9 @@ void Application::loop() {
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
+  // Notices raised before this pass (including by async callbacks after the
+  // previous one) no longer follow a transition from here on.
+  Display::endNoticeRenderPass();
   this->pollUsageStats();
   lv_unlock();
 #else
@@ -198,6 +201,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->waitingForResourceRefresh = false;
   this->returnToListAfterAction = false;
   this->actionCompletionMessage.clear();
+  this->billingSummaryShown = false;
   this->api.cancelResourceAction();
   this->resetPauseAccounting();
   Display::resourceListScreen.hideActionProgress();

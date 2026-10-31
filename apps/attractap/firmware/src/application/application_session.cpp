@@ -182,6 +182,7 @@ void Application::resetSessionOnDisconnect() {
   this->returnToListAfterAction = false;
   this->waitingForResourceRefresh = false;
   this->actionCompletionMessage.clear();
+  this->billingSummaryShown = false;
   Display::resourceDetailsScreen.hideFormsModal();
   this->resetPauseAccounting();
 
@@ -416,6 +417,7 @@ void Application::openTopUp() {
   Display::topUpScreen.reset();
   Display::topUpScreen.setCallbacks(
       [this](uint32_t amountCents) {
+        if (this->state != APPLICATION_STATE_TOP_UP || !this->unlocked) return;
         this->leaveTopUp();
         this->api.requestBillingTopup(amountCents);
         Display::showNotice(ScreenNotice::Kind::Info, FirmwareI18n::Message::PleaseContinueAtThePaymentTerminal, FirmwareI18n::Text());

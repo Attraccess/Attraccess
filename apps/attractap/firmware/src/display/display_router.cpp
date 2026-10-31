@@ -65,16 +65,7 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     // Reused screens may have been hidden when the locale last changed.
     FirmwareI18n::refreshTree(targetRoot, State::getActiveLanguage());
 
-    // Re-routing to the screen that is already showing keeps its notice: it
-    // still belongs there. Otherwise a notice raised in this tick belongs to the
-    // event behind the transition (e.g. logout, then "status unavailable"), so
-    // it follows to the destination; any older one belonged to the screen we leave.
     const bool sameScreen = screen == Display::activeScreen;
-    const bool carryNotice = !sameScreen && (Display::noticeRaisedThisTick || Display::noticeAwaitsScreen);
-    if (!sameScreen)
-    {
-        Display::notice.clear();
-    }
 
     IScreen *previousScreen = Display::activeScreen;
     if (previousScreen)
@@ -94,11 +85,8 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     }
 
     Display::updateNetworkQualityOverlay();
-    if (carryNotice)
-    {
-        Display::noticeAwaitsScreen = false;
-        Display::showNotice(Display::lastNotice.kind, Display::lastNotice.title, Display::lastNotice.message, Display::lastNotice.durationMs);
-    }
+    // Keeps, carries or drops the notice; the rule lives in display_notice.cpp.
+    Display::routeNotice(sameScreen);
 
     lv_screen_load_anim(targetRoot, Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();

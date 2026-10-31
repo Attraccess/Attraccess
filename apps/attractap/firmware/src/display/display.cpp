@@ -77,7 +77,7 @@ DemoSettingsScreen Display::demoSettingsScreen;
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 ScreenNotice Display::notice;
 Display::PendingNotice Display::lastNotice;
-bool Display::noticeRaisedThisTick = false;
+bool Display::noticeRaisedThisPass = false;
 bool Display::noticeAwaitsScreen = false;
 
 lv_obj_t *Display::drawerBackdrop = nullptr;
@@ -210,7 +210,6 @@ void Display::loop()
     Display::updateNetworkQualityOverlay();
     refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
-    Display::noticeRaisedThisTick = false;
     return;
 #endif
     // Runs on the main application loop; rendering itself lives on LvglTask
@@ -221,16 +220,13 @@ void Display::loop()
     if (Display::touchWarningPending)
     {
         Display::touchWarningPending = false;
-        // Touch may be what is missing, so rely on the auto-hide rather than a tap.
-        Display::showNotice(ScreenNotice::Kind::Error, FirmwareI18n::Message::TouchUnavailable,
-                            FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot, 8000);
+        Display::showTouchUnavailableNotice();
     }
 
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
     refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
-    Display::noticeRaisedThisTick = false;
 
     lv_unlock();
 }
