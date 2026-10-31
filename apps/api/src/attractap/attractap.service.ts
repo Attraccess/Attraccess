@@ -357,12 +357,6 @@ export class AttractapService {
     return await this.readerRepository.find(options);
   }
 
-  public uint8ArrayToHexString(uint8Array: Uint8Array) {
-    return Array.from(uint8Array)
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
   /** A new card key: 16 random bytes from the system CSPRNG, hex encoded. Nothing about it is derivable. */
   public generateCardKey(): string {
     return randomBytes(16).toString('hex');
@@ -417,19 +411,25 @@ export class AttractapService {
   public async createNFCCard(
     user: User,
     data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>,
+    options: { activate?: boolean } = {},
   ): Promise<NFCCard> {
+    const activate = options.activate ?? true;
     const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
+      if (activate) await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
 
       return await transactionalEntityManager.save(NFCCard, {
         ...data,
         key: this.encryptionService.encrypt(data.key),
         user,
-        isActive: true,
+        isActive: activate,
       });
     });
     this.notifyNfcCardChange(card, 'registered');
     return card;
+  }
+
+  public async userHasActiveNFCCard(userId: number): Promise<boolean> {
+    return (await this.nfcCardRepository.count({ where: { user: { id: userId }, isActive: true } })) > 0;
   }
 
   /**

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { MAX_RELAYED_COMMAND_LENGTH } from '../card-crypto';
 import type { CardChannel } from '../card-crypto/card-operations';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from './websocket.types';
 
 /**
  * Limits sized for 1,000 readers with 250 tapping at once (to be tuned by the load test).
@@ -38,6 +38,7 @@ export interface CardConversationResult<T> {
 export interface CardConversation {
   readonly id: string;
   readonly purpose: string;
+  readonly detectionId: number;
   exchanges: number;
   nextSeq: number;
   pending: {
@@ -48,63 +49,96 @@ export interface CardConversation {
   } | null;
   readonly deadline: NodeJS.Timeout;
   ended: boolean;
+  /** Why the conversation was cut short (new tap, logout, disconnect, removal, limits). Null while it runs or when it finished normally. */
+  abortReason: CardConversationFailure | null;
   abort: (reason: CardConversationFailure) => void;
 }
 
 /**
  * Runs card conversations for readers that only relay APDUs. The reader sends CARD_DETECTED, the
  * server drives the card one APDU at a time (CARD_APDU / CARD_APDU_RESPONSE) and ends it with
- * CARD_CONVERSATION_END. Each message carries the server-assigned conversation id and a sequence
- * number the reader echoes; anything that does not match is ignored.
+ * CARD_CONVERSATION_END. Each message carries the reader's detection id, the server-assigned
+ * conversation id and a sequence number the reader echoes; anything that does not match is ignored.
  */
 @Injectable()
 export class CardConversationService {
   private readonly logger = new Logger(CardConversationService.name);
   private active = 0;
+  /** One conversation per reader, even when the reader has more than one connection. */
+  private readonly byReader = new Map<number, CardConversation>();
 
   get activeConversations(): number {
     return this.active;
   }
 
   /**
-   * Starts a conversation on this connection and runs `work` on it. A conversation already running
-   * on the connection is aborted first (a new tap). Resolves with BUSY when the server is at its
-   * limit or the reader's send queue is full.
+   * Cheap check before any database work: would a new conversation on this connection be refused
+   * with BUSY right now (server-wide limit reached or the reader's send queue full)?
+   */
+  isBusy(socket: AuthenticatedWebSocket): boolean {
+    return this.active >= CARD_CONVERSATION_LIMITS.maxConcurrent || this.queueIsFull(socket);
+  }
+
+  /**
+   * The reader reported a new card presentation. Anything still running for an older presentation
+   * is over: the reader only relays for its newest detection.
+   */
+  noteDetection(socket: AuthenticatedWebSocket, detectionId: number): void {
+    const latest = socket.state.latestDetectionId;
+    if (latest == null || detectionId > latest) socket.state.latestDetectionId = detectionId;
+    const conversation = socket.state.cardConversation;
+    if (conversation && conversation.detectionId < detectionId) conversation.abort('CARD_REMOVED');
+  }
+
+  /**
+   * Starts a conversation for one card presentation and runs `work` on it. A conversation already
+   * running for this reader (on this or another connection) is aborted first. Resolves with BUSY
+   * when the server is at its limit or the reader's send queue is full, and with a failure when the
+   * conversation was aborted before `work` finished — even if `work` resolved afterwards.
    */
   async run<T>(
     socket: AuthenticatedWebSocket,
     purpose: string,
-    uid: string,
+    detection: CardDetection,
     work: (channel: CardChannel) => Promise<T>,
   ): Promise<CardConversationResult<T>> {
-    this.abort(socket, 'CARD_REMOVED');
-    // A new login tap ends the previous one. Supervisor and mass-introduction cards act next to it.
-    if (purpose === 'tap') {
-      socket.state.verifiedUserId = null;
-      socket.state.verifiedCardUid = null;
-    }
+    const { detectionId } = detection;
+    const latest = socket.state.latestDetectionId;
+    // A newer card presentation already took over this reader: this one is gone.
+    if (latest != null && detectionId < latest) return { ok: false, reason: 'CARD_REMOVED' };
+    const aborted = socket.state.abortedDetectionId;
+    if (aborted != null && detectionId <= aborted) return { ok: false, reason: 'CARD_REMOVED' };
+    socket.state.latestDetectionId = detectionId;
 
-    if (this.active >= CARD_CONVERSATION_LIMITS.maxConcurrent || this.queueIsFull(socket)) {
-      return { ok: false, reason: 'BUSY' };
-    }
+    socket.state.cardConversation?.abort('CARD_REMOVED');
+    const readerId = socket.readerId;
+    if (readerId != null) this.byReader.get(readerId)?.abort('CARD_REMOVED');
+
+    if (this.isBusy(socket)) return { ok: false, reason: 'BUSY' };
 
     this.active++;
-    const conversation = this.open(socket, purpose);
+    const conversation = this.open(purpose, detectionId);
     socket.state.cardConversation = conversation;
+    if (readerId != null) this.byReader.set(readerId, conversation);
 
     const channel: CardChannel = {
-      uid,
+      uid: detection.uid,
       exchange: (apdu) => this.exchange(socket, conversation, apdu),
     };
 
     try {
       const value = await work(channel);
+      // Enroll/reset results are database writes that already happened: report them as they are.
+      // A read-only check (tap, supervisor, mass introduction) aborted meanwhile must not count.
+      const writes = purpose === 'enroll' || purpose === 'reset';
+      if (conversation.abortReason && !writes) return { ok: false, reason: conversation.abortReason };
       return { ok: true, value };
     } catch (error) {
+      if (conversation.abortReason) return { ok: false, reason: conversation.abortReason };
       if (error instanceof CardConversationError) return { ok: false, reason: error.reason };
       throw error;
     } finally {
-      this.close(socket, conversation);
+      this.close(socket, conversation, readerId);
     }
   }
 
@@ -121,18 +155,18 @@ export class CardConversationService {
       this.logger.debug(`Ignoring unexpected card response from client ${socket.id}`);
       return;
     }
-    if (typeof response !== 'string' || !/^([0-9a-f]{2})+$/i.test(response)) {
-      this.logger.debug(`Ignoring malformed card response from client ${socket.id}`);
+    // Length first: the pattern test below is linear in the input, so a huge string never reaches it.
+    if (typeof response !== 'string' || response.length > 2 * CARD_CONVERSATION_LIMITS.maxResponseLength) {
+      this.logger.debug(`Ignoring oversized card response from client ${socket.id}`);
       return;
     }
-    const bytes = Buffer.from(response, 'hex');
-    if (bytes.length > CARD_CONVERSATION_LIMITS.maxResponseLength) {
-      this.logger.debug(`Ignoring oversized card response from client ${socket.id}`);
+    if (!/^([0-9a-f]{2})+$/i.test(response)) {
+      this.logger.debug(`Ignoring malformed card response from client ${socket.id}`);
       return;
     }
     clearTimeout(pending.timer);
     conversation.pending = null;
-    pending.resolve(bytes);
+    pending.resolve(Buffer.from(response, 'hex'));
   }
 
   /** Reader → server: the card left the field. */
@@ -143,27 +177,39 @@ export class CardConversationService {
     conversation.abort('CARD_REMOVED');
   }
 
-  /** Aborts a running conversation (logout, timeout, disconnect, new tap). */
-  abort(socket: AuthenticatedWebSocket, reason: CardConversationFailure): void {
-    socket.state?.cardConversation?.abort(reason);
+  /**
+   * Aborts a running conversation (logout, timeout, disconnect, cancel). The newest card presentation
+   * is ended too, so a conversation for it that has not started yet (database lookups) never runs.
+   * With `purpose`, only a conversation for that purpose is affected.
+   */
+  abort(socket: AuthenticatedWebSocket, reason: CardConversationFailure, purpose?: string): void {
+    const state = socket.state;
+    if (!state) return;
+    const conversation = state.cardConversation;
+    if (purpose && conversation && conversation.purpose !== purpose) return;
+    if (state.latestDetectionId != null) state.abortedDetectionId = state.latestDetectionId;
+    conversation?.abort(reason);
   }
 
   private queueIsFull(socket: AuthenticatedWebSocket): boolean {
     return (socket.bufferedAmount ?? 0) > CARD_CONVERSATION_LIMITS.maxBufferedBytes;
   }
 
-  private open(socket: AuthenticatedWebSocket, purpose: string): CardConversation {
+  private open(purpose: string, detectionId: number): CardConversation {
     const conversation: CardConversation = {
       id: randomBytes(6).toString('hex'),
       purpose,
+      detectionId,
       exchanges: 0,
       nextSeq: 1,
       pending: null,
       ended: false,
+      abortReason: null,
       deadline: setTimeout(() => conversation.abort('TIMEOUT'), CARD_CONVERSATION_LIMITS.conversationTimeoutMs),
       abort: (reason) => {
         if (conversation.ended) return;
         conversation.ended = true;
+        conversation.abortReason = reason;
         const pending = conversation.pending;
         conversation.pending = null;
         if (pending) {
@@ -175,48 +221,49 @@ export class CardConversationService {
     return conversation;
   }
 
-  private close(socket: AuthenticatedWebSocket, conversation: CardConversation): void {
+  private close(socket: AuthenticatedWebSocket, conversation: CardConversation, readerId: number | null): void {
     clearTimeout(conversation.deadline);
     if (conversation.pending) clearTimeout(conversation.pending.timer);
     conversation.pending = null;
     conversation.ended = true;
     this.active--;
     if (socket.state.cardConversation === conversation) socket.state.cardConversation = null;
-    socket.sendRaw?.(new AttractapEvent(AttractapEventType.CARD_CONVERSATION_END, { conversationId: conversation.id }));
+    if (readerId != null && this.byReader.get(readerId) === conversation) this.byReader.delete(readerId);
+    socket.sendRaw?.(
+      new AttractapEvent(AttractapEventType.CARD_CONVERSATION_END, {
+        conversationId: conversation.id,
+        detectionId: conversation.detectionId,
+      }),
+    );
   }
 
   private exchange(socket: AuthenticatedWebSocket, conversation: CardConversation, apdu: Buffer): Promise<Buffer> {
-    if (conversation.ended) return Promise.reject(new CardConversationError('CARD_REMOVED'));
+    if (conversation.ended) {
+      return Promise.reject(new CardConversationError(conversation.abortReason ?? 'CARD_REMOVED'));
+    }
     if (conversation.pending) return Promise.reject(new Error('card exchange already in flight'));
     if (apdu.length > MAX_RELAYED_COMMAND_LENGTH) return Promise.reject(new Error('APDU does not fit the PN532'));
-    if (conversation.exchanges >= CARD_CONVERSATION_LIMITS.maxExchanges) {
-      conversation.abort('TOO_MANY_EXCHANGES');
-      return Promise.reject(new CardConversationError('TOO_MANY_EXCHANGES'));
-    }
-    if (this.queueIsFull(socket)) return Promise.reject(new CardConversationError('BUSY'));
+    const refuse = (reason: CardConversationFailure) => {
+      conversation.abort(reason);
+      return Promise.reject(new CardConversationError(reason));
+    };
+    if (conversation.exchanges >= CARD_CONVERSATION_LIMITS.maxExchanges) return refuse('TOO_MANY_EXCHANGES');
+    if (this.queueIsFull(socket)) return refuse('BUSY');
 
     conversation.exchanges++;
     const seq = conversation.nextSeq++;
     return new Promise<Buffer>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        conversation.pending = null;
-        conversation.ended = true;
-        reject(new CardConversationError('TIMEOUT'));
-      }, CARD_CONVERSATION_LIMITS.exchangeTimeoutMs);
+      const timer = setTimeout(() => conversation.abort('TIMEOUT'), CARD_CONVERSATION_LIMITS.exchangeTimeoutMs);
       conversation.pending = { seq, resolve, reject, timer };
       const sent = socket.sendRaw(
         new AttractapEvent(AttractapEventType.CARD_APDU, {
           conversationId: conversation.id,
+          detectionId: conversation.detectionId,
           seq,
           apdu: apdu.toString('hex'),
         }),
       );
-      if (!sent) {
-        clearTimeout(timer);
-        conversation.pending = null;
-        conversation.ended = true;
-        reject(new CardConversationError('READER_UNREACHABLE'));
-      }
+      if (!sent) conversation.abort('READER_UNREACHABLE');
     });
   }
 }

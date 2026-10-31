@@ -30,29 +30,25 @@ export const LAST_DATA_KEY_NO = 5;
 export const KEY_VERSION_FREE = 0x00;
 export const KEY_VERSION_ENROLLED = 0x01;
 const DESFIRE_HW_TYPE = 0x01;
-const NTAG424_HW_TYPE = 0x04;
 const VENDOR_NXP = 0x04;
 const DESFIRE_HW_MAJOR_EV2 = 0x12;
-/** Select of the PICC master application (000000); answers whatever the key configuration is. */
-const DESFIRE_AID_MASTER = Buffer.alloc(3);
 
-export type CardCheckResult = { ok: true; kind: CardKind } | { ok: false; reason: 'unsupported-card' | 'desfire-ev1' };
+export type CardCheckResult = { ok: true; kind: CardKind } | { ok: false; reason: 'desfire-ev1' };
 
-/** GetVersion (3 frames, as the firmware sends them) and classify the card. */
+/**
+ * GetVersion (3 frames, as the firmware sends them) and classify the card like NFC::detectCardType
+ * and NFC::authenticateInternal: DESFire takes the DESFire path, everything else (NTAG 424, other
+ * vendors, short or garbled answers, unknown hardware types) the NTAG 424 path. DESFire EV1 has no
+ * AuthenticateEV2First and is refused.
+ */
 export async function detectCardKind(channel: CardChannel): Promise<CardCheckResult> {
   const first = await channel.exchange(getVersion());
   await channel.exchange(additionalFrame());
   await channel.exchange(additionalFrame());
-  if (first.length < 9 || first[0] !== VENDOR_NXP) return { ok: false, reason: 'unsupported-card' };
-  if (first[1] === NTAG424_HW_TYPE) return { ok: true, kind: 'ntag424' };
-  if (first[1] === DESFIRE_HW_TYPE) {
-    return first[3] < DESFIRE_HW_MAJOR_EV2 ? { ok: false, reason: 'desfire-ev1' } : { ok: true, kind: 'desfire' };
-  }
-  return { ok: false, reason: 'unsupported-card' };
+  const nxp = first.length >= 9 && first[0] === VENDOR_NXP;
+  if (!nxp || first[1] !== DESFIRE_HW_TYPE) return { ok: true, kind: 'ntag424' };
+  return first[3] < DESFIRE_HW_MAJOR_EV2 ? { ok: false, reason: 'desfire-ev1' } : { ok: true, kind: 'desfire' };
 }
-
-/** Key-independent presence check that replaces the factory-key probe for NTAG 424 (any answer, even an error status, means a card is there). */
-export const presenceProbe = (): Buffer => desfireSelectApplication(DESFIRE_AID_MASTER);
 
 async function selectAttraccessApp(channel: CardChannel, createIfMissing: boolean): Promise<boolean> {
   if (parsePlainOk(await channel.exchange(desfireSelectApplication()))) return true;
@@ -145,9 +141,14 @@ export async function changeKeyAndVerify(
   newKey: Buffer,
   keyVersion: number,
   random?: (size: number) => Buffer,
+  hooks?: {
+    /** Runs after the master key login succeeded, right before the ChangeKey command goes out (e.g. to save a recovery record). */
+    beforeWrite?: () => Promise<void>;
+  },
 ): Promise<'done' | 'master-refused' | 'not-confirmed'> {
   const master = await authenticate(channel, kind, 0, masterKey, random);
   if (!master) return 'master-refused';
+  await hooks?.beforeWrite?.();
   try {
     const answer = await channel.exchange(master.encodeChangeKey(oldKey, newKey, keyNo, keyVersion));
     master.decodeChangeKey(answer);
@@ -156,15 +157,4 @@ export async function changeKeyAndVerify(
   }
   const proven = await authenticate(channel, kind, keyNo, newKey, random);
   return proven ? 'done' : 'not-confirmed';
-}
-
-/** Authenticated with the stored key? Used for taps and to find out whether an interrupted write reached the card. */
-export async function proveKey(
-  channel: CardChannel,
-  kind: CardKind,
-  keyNo: number,
-  key: Buffer,
-  random?: (size: number) => Buffer,
-): Promise<Ev2Session | null> {
-  return authenticate(channel, kind, keyNo, key, random);
 }

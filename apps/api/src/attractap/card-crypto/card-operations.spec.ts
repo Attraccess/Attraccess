@@ -8,7 +8,6 @@ import {
   changeKeyAndVerify,
   detectCardKind,
   findFreeKeyNo,
-  presenceProbe,
 } from './card-operations';
 
 const channelFor = (card: EmulatedCard): CardChannel & { sent: Buffer[] } => {
@@ -102,6 +101,71 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card operations (%s)', (kind) =
   });
 });
 
-it('presence probe is a plain select of the master application', () => {
-  expect(presenceProbe().toString('hex')).toBe('905a00000300000000');
+describe('card kind detection (NFC::detectCardType)', () => {
+  /** A channel that answers GetVersion with `first` and everything else with an ISO error. */
+  const answering = (first: Buffer): CardChannel & { sent: Buffer[] } => {
+    const sent: Buffer[] = [];
+    return {
+      uid: '04aabbccddee80',
+      sent,
+      exchange: async (apdu) => {
+        sent.push(apdu);
+        return sent.length === 1 ? first : Buffer.from([0x91, 0xaf]);
+      },
+    };
+  };
+
+  it.each([
+    ['another vendor', Buffer.from([0x05, 0x01, 0x01, 0x12, 0x00, 0x1a, 0x05, 0x91, 0xaf])],
+    ['a short answer', Buffer.from([0x04, 0x01, 0x91, 0xaf])],
+    ['an error status only', Buffer.from([0x6a, 0x82])],
+    ['an unknown NXP hardware type', Buffer.from([0x04, 0x07, 0x01, 0x12, 0x00, 0x1a, 0x05, 0x91, 0xaf])],
+  ])('treats %s like the firmware: NTAG 424 path', async (_name, first) => {
+    const channel = answering(first);
+
+    expect(await detectCardKind(channel)).toEqual({ ok: true, kind: 'ntag424' });
+    // Still the three GetVersion frames the firmware sends.
+    expect(channel.sent.map((apdu) => apdu.toString('hex'))).toEqual(['9060000000', '90af000000', '90af000000']);
+  });
+
+  it('takes the DESFire path only for NXP DESFire EV2 and newer', async () => {
+    expect(
+      await detectCardKind(answering(Buffer.from([0x04, 0x01, 0x01, 0x30, 0x00, 0x1a, 0x05, 0x91, 0xaf]))),
+    ).toEqual({ ok: true, kind: 'desfire' });
+    expect(
+      await detectCardKind(answering(Buffer.from([0x04, 0x01, 0x01, 0x01, 0x00, 0x1a, 0x05, 0x91, 0xaf]))),
+    ).toEqual({ ok: false, reason: 'desfire-ev1' });
+  });
+});
+
+describe('changeKeyAndVerify beforeWrite hook', () => {
+  it('runs after the master key login and before the key write', async () => {
+    const card = new EmulatedCard('ntag424');
+    const channel = channelFor(card);
+    let sentBeforeHook = -1;
+
+    const outcome = await changeKeyAndVerify(channel, 'ntag424', 1, FACTORY_KEY, FACTORY_KEY, key(7), 1, undefined, {
+      beforeWrite: async () => {
+        sentBeforeHook = channel.sent.length;
+      },
+    });
+
+    expect(outcome).toBe('done');
+    // ISOSelect + both AuthenticateEV2First parts went out, the ChangeKey (0xC4) did not yet.
+    expect(sentBeforeHook).toBe(3);
+    expect(channel.sent[3][1]).toBe(0xc4);
+  });
+
+  it('does not run when the master key is refused', async () => {
+    const card = new EmulatedCard('ntag424');
+    card.keys[0] = key(9);
+    const beforeWrite = jest.fn();
+
+    expect(
+      await changeKeyAndVerify(channelFor(card), 'ntag424', 1, FACTORY_KEY, FACTORY_KEY, key(7), 1, undefined, {
+        beforeWrite,
+      }),
+    ).toBe('master-refused');
+    expect(beforeWrite).not.toHaveBeenCalled();
+  });
 });

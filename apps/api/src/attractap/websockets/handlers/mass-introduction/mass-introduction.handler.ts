@@ -14,7 +14,7 @@ import { ResourceUsageService } from '../../../../resources/usage/sessions/resou
 import { AttractapService } from '../../../attractap.service';
 import { CardOperationsService } from '../../card-operations.service';
 import { WebsocketService } from '../../websocket.service';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
 /**
  * Reader side of mass introductions (ATT-1151). The reader shows a scan screen; each tapped card
@@ -48,7 +48,11 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
   }
 
   /** A card was tapped on the scan screen: the server authenticates it before its owner is introduced. */
-  public async handleCardDetected(socket: AuthenticatedWebSocket, uid: string, sessionId: string | undefined) {
+  public async handleCardDetected(
+    socket: AuthenticatedWebSocket,
+    detection: CardDetection,
+    sessionId: string | undefined,
+  ) {
     const reply = (payload: Record<string, unknown>) =>
       socket.sendMessage(new AttractapEvent(AttractapEventType.MASS_INTRODUCTION_RESULT, { sessionId, ...payload }));
 
@@ -58,7 +62,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
       return;
     }
 
-    const verified = await this.cardOperations.verifyCard(socket, 'mass-introduction', uid);
+    const verified = await this.cardOperations.verifyCard(socket, 'mass-introduction', detection);
     if (!verified.ok) {
       await reply({ success: false, error: verified.error });
       return;

@@ -195,7 +195,7 @@ describe('AttractapSupervisionHandler', () => {
 
   describe('handleSupervisorCardDetected', () => {
     const present = (socket: AuthenticatedWebSocket, resourceId = fixture.RESOURCE_ID) =>
-      fixture.handler.handleSupervisorCardDetected(socket, '04aabbcc', resourceId);
+      fixture.handler.handleSupervisorCardDetected(socket, { uid: '04aabbcc', detectionId: 1 }, resourceId);
 
     const armedSocket = (webInitiated = false) =>
       fixture.makeSocket({
@@ -220,7 +220,10 @@ describe('AttractapSupervisionHandler', () => {
 
       await present(socket);
 
-      expect(fixture.cardOperations.verifyCard).toHaveBeenCalledWith(socket, 'supervisor', '04aabbcc');
+      expect(fixture.cardOperations.verifyCard).toHaveBeenCalledWith(socket, 'supervisor', {
+        uid: '04aabbcc',
+        detectionId: 1,
+      });
       expect(fixture.resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(
         fixture.RESOURCE_ID,
         fixture.requester,

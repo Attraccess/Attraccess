@@ -95,7 +95,7 @@ describe('AttractapCardHandler', () => {
         state: { verifiedUserId: 5, verifiedCardUid: 'abc' },
       });
 
-      handleCardAuthenticationRequestScope.handler.onReaderSessionEnded(socket);
+      handleCardAuthenticationRequestScope.handler.clearVerifiedUser(socket);
 
       expect(socket.state.verifiedUserId).toBeNull();
       expect(socket.state.verifiedCardUid).toBeNull();

@@ -197,14 +197,14 @@ describe('AttractapMassIntroductionHandler', () => {
 
   describe('card taps', () => {
     const tap = (socket: AuthenticatedWebSocket, sessionId = SESSION_ID) =>
-      handler.handleCardDetected(socket, UID, sessionId);
+      handler.handleCardDetected(socket, { uid: UID, detectionId: 1 }, sessionId);
 
     it('introduces the owner of a card the server verified', async () => {
       const socket = makeSocket({ massIntroductionFlow: { sessionId: SESSION_ID } });
 
       await tap(socket);
 
-      expect(cardOperations.verifyCard).toHaveBeenCalledWith(socket, 'mass-introduction', UID);
+      expect(cardOperations.verifyCard).toHaveBeenCalledWith(socket, 'mass-introduction', { uid: UID, detectionId: 1 });
       expect(sent(socket)).toEqual([
         {
           type: AttractapEventType.MASS_INTRODUCTION_RESULT,

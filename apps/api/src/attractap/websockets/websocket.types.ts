@@ -19,7 +19,7 @@ export {
   ReaderCrashReportPayload,
   ResourceThumbnailDescriptorPayload,
 } from './websocket-reader-payloads';
-export { AuthenticatedWebSocket } from './websocket-socket-state';
+export { AuthenticatedWebSocket, CardDetection } from './websocket-socket-state';
 
 export interface ResourceUsageStatsPayload {
   resourceId: number;

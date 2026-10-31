@@ -179,6 +179,12 @@ export interface ResourceUsageFormPageResultPayload {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPayload>;
 
+/** One card presentation on a reader (CARD_DETECTED). `detectionId` is the reader's per-boot counter. */
+export interface CardDetection {
+  uid: string;
+  detectionId: number;
+}
+
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
@@ -211,14 +217,22 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     verifiedCardUid?: string | null;
     /** Card conversation in progress (managed by CardConversationService). */
     cardConversation?: CardConversation | null;
+    /** Newest `detectionId` this connection reported (CARD_DETECTED). Conversations for older detections are refused. */
+    latestDetectionId?: number | null;
+    /** Detections up to this id were ended (logout, disconnect, cancel) before their conversation could start. */
+    abortedDetectionId?: number | null;
     enrollment: {
       userId: number;
       auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
+      armedAt: number;
     } | null;
     /** Armed by an admin: the next card tapped on this reader is reset if it is this one. No key material here. */
     resetNfcCardData: {
       cardId: number;
       auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      /** When the reset was armed (ms since epoch); a card arriving much later is refused. */
+      armedAt: number;
     } | null;
     // Two-card supervision flow (ATT-493). Present while the reader is waiting
     // for a supervisor to authorise a non-introduced user's session — either by

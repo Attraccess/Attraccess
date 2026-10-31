@@ -3,9 +3,13 @@ import { EmulatedCard } from '../card-crypto/card-emulator.test-fixture';
 import { AttractapService } from '../attractap.service';
 import { CardConversationService } from './card-conversation.service';
 import { CardOperationsService } from './card-operations.service';
-import { AttractapEventType } from './websocket.types';
+import { AttractapEventType, CardDetection } from './websocket.types';
 
 export const UID = '04aabbccddee80';
+
+let detectionCounter = 0;
+/** A fresh card presentation (CARD_DETECTED). Ids only grow, as the reader's per-boot counter does. */
+export const detect = (uid: string = UID): CardDetection => ({ uid, detectionId: ++detectionCounter });
 
 /** A reader that does nothing but relay: it forwards CARD_APDU to the card and answers CARD_APDU_RESPONSE. */
 export function createRelayReader(
@@ -13,16 +17,20 @@ export function createRelayReader(
   conversations: CardConversationService,
   /** One-way network delay between the server and the reader. */
   latencyMs = 0,
+  options: { readerId?: number; socketId?: string } = {},
 ) {
   const sent: Array<{ type: string; payload: any }> = [];
-  let rewrite: ((response: Buffer) => Buffer) | null = null;
+  let rewrite: ((response: Buffer, apdu: Buffer, index: number) => Buffer) | null = null;
   let silent = false;
   let dropAfterWrite = false;
+  /** Every card answer this reader relayed, in order (what a hostile reader could record). */
+  const answers: Buffer[] = [];
+  let exchanged = 0;
   const socket: any = {
-    id: 'reader-socket',
-    readerId: 7,
+    id: options.socketId ?? 'reader-socket',
+    readerId: options.readerId ?? 7,
     bufferedAmount: 0,
-    state: { verifiedUserId: null, verifiedCardUid: null, cardConversation: null },
+    state: { verifiedUserId: null, verifiedCardUid: null, cardConversation: null, cardRelay: true },
     sendRaw: (message: any) => {
       const { type, payload } = message.data;
       sent.push({ type, payload });
@@ -36,10 +44,13 @@ export function createRelayReader(
             conversations.abort(socket, 'READER_UNREACHABLE');
             return;
           }
+          const relayed = rewrite ? rewrite(response, apdu, exchanged) : response;
+          exchanged++;
+          answers.push(relayed);
           const answer = {
             conversationId: payload.conversationId,
             seq: payload.seq,
-            response: (rewrite ? rewrite(response) : response).toString('hex'),
+            response: relayed.toString('hex'),
           };
           if (latencyMs > 0) setTimeout(() => conversations.handleResponse(socket, answer), latencyMs);
           else conversations.handleResponse(socket, answer);
@@ -53,7 +64,13 @@ export function createRelayReader(
     socket,
     sent,
     apdus: () => sent.filter((m) => m.type === AttractapEventType.CARD_APDU),
-    tamper: (fn: (response: Buffer) => Buffer) => (rewrite = fn),
+    ends: () => sent.filter((m) => m.type === AttractapEventType.CARD_CONVERSATION_END),
+    answers,
+    /** Rewrites the card's answers; `index` counts the exchanges this reader relayed (0 = first GetVersion frame). */
+    tamper: (fn: (response: Buffer, apdu: Buffer, index: number) => Buffer) => {
+      rewrite = fn;
+      exchanged = 0;
+    },
     goSilent: () => (silent = true),
     dropAfterWrite: () => (dropAfterWrite = true),
   };
@@ -66,11 +83,16 @@ export function createServices() {
   const attractapService: any = {
     getNFCCardByUID: jest.fn(async (uid: string) => cards.find((card) => card.uid === uid)),
     getNFCCardByID: jest.fn(async (id: number) => cards.find((card) => card.id === id)),
-    createNFCCard: jest.fn(async (user: any, data: any) => {
-      const card = { id: nextId++, ...data, user, isActive: true };
+    createNFCCard: jest.fn(async (user: any, data: any, options: { activate?: boolean } = {}) => {
+      const activate = options.activate ?? true;
+      if (activate) for (const other of cards) if (other.user?.id === user.id) other.isActive = false;
+      const card = { id: nextId++, ...data, user, isActive: activate };
       cards.push(card);
       return { ...card, key: `encrypted:${data.key}` };
     }),
+    userHasActiveNFCCard: jest.fn(async (userId: number) =>
+      cards.some((card) => card.user?.id === userId && card.isActive),
+    ),
     deleteNFCCard: jest.fn(async (id: number) => {
       const index = cards.findIndex((card) => card.id === id);
       if (index >= 0) cards.splice(index, 1);

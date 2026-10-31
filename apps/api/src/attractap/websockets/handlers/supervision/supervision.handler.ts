@@ -25,7 +25,7 @@ import { AttractapService } from '../../../attractap.service';
 import { CardOperationsService } from '../../card-operations.service';
 import { WebsocketService } from '../../websocket.service';
 
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
 @Injectable()
 export class AttractapSupervisionHandler implements OnModuleInit {
@@ -81,7 +81,11 @@ export class AttractapSupervisionHandler implements OnModuleInit {
    * reader-started flow the reader goes on to start the session (the approval is consumed by the
    * session-start handler); for a web-started flow the pending web request is approved right here.
    */
-  public async handleSupervisorCardDetected(socket: AuthenticatedWebSocket, uid: string, resourceId: number) {
+  public async handleSupervisorCardDetected(
+    socket: AuthenticatedWebSocket,
+    detection: CardDetection,
+    resourceId: number,
+  ) {
     const reply = (payload: Record<string, unknown>) =>
       socket.sendMessage(new AttractapEvent(AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA, payload));
 
@@ -97,7 +101,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       return;
     }
 
-    const verified = await this.cardOperations.verifyCard(socket, 'supervisor', uid);
+    const verified = await this.cardOperations.verifyCard(socket, 'supervisor', detection);
     if (!verified.ok) {
       await reply({ error: verified.error });
       return;
@@ -322,9 +326,9 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     // --- no awaits from here to the assignment, so check-and-claim stays atomic ---
 
     // "Busy" also means a sub-flow that owns the screen. Deliberately NOT keyed on
-    // `verifiedUserId`: that records the last card ever tapped on this socket and is only
-    // cleared by the enrollment paths, so it survives for the life of the websocket. Using it would
-    // make every reader that has been touched once permanently "busy".
+    // `verifiedUserId`: a user who is merely logged in at the reader (until logout, timeout,
+    // disconnect or the next tap) does not own the screen, and the supervision flow runs next to
+    // that login anyway.
     if (
       sockets.some(
         (socket) =>

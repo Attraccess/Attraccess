@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 
 import { AttractapEventType } from '../../websocket.types';
@@ -14,6 +14,8 @@ import { createHandleCardAuthenticationRequestFixture } from './fixtures/authent
 export type AttractapCardHandlerTestScope = ReturnType<typeof createAttractapCardHandlerFixture>;
 
 export type HandleCardAuthenticationRequestTestScope = ReturnType<typeof createHandleCardAuthenticationRequestFixture>;
+
+const CARD = { uid: '04aabbcc', detectionId: 1 };
 
 describe('AttractapCardHandler', () => {
   const scope = createAttractapCardHandlerFixture();
@@ -75,7 +77,7 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startEnrollOfNewNfcCardScope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 }),
-      ).rejects.toThrow('Reader does not support card enrollment: 42');
+      ).rejects.toThrow('READER_CARD_ENROLLMENT_NOT_SUPPORTED');
     });
 
     it('throws when the user is not found', async () => {
@@ -83,7 +85,7 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startEnrollOfNewNfcCardScope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 }),
-      ).rejects.toThrow('User not found: 1');
+      ).rejects.toThrow('USER_NOT_FOUND');
     });
 
     it('throws when there is no connected socket for the reader', async () => {
@@ -92,7 +94,7 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startEnrollOfNewNfcCardScope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(new NotFoundException('READER_OFFLINE'));
     });
 
     it('stores the enrollment principal and sends ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO', async () => {
@@ -104,6 +106,7 @@ describe('AttractapCardHandler', () => {
       expect(socket.state.enrollment).toEqual({
         userId: startEnrollOfNewNfcCardScope.mockUser.id,
         auditPrincipal: { userId: startEnrollOfNewNfcCardScope.mockUser.id, authenticationMethod: 'session' },
+        armedAt: expect.any(Number),
       });
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -137,7 +140,7 @@ describe('AttractapCardHandler', () => {
       scope.websocketService.sockets.set(socket.id, socket);
 
       await expect(scope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 })).rejects.toThrow(
-        'Reader firmware must be updated to enroll cards: 42',
+        'READER_FIRMWARE_UPDATE_REQUIRED',
       );
       expect(socket.state.enrollment).toBeFalsy();
     });
@@ -145,9 +148,13 @@ describe('AttractapCardHandler', () => {
     it('refuses to arm enrollment on a reader the admin policy excludes', async () => {
       const socket = scope.createMockSocket();
       scope.websocketService.sockets.set(socket.id, socket);
-      (scope.handler as any).cardWriterPolicy.assertAllowed.mockRejectedValueOnce(new Error('not allowed'));
+      (scope.handler as any).cardWriterPolicy.assertAllowed.mockRejectedValueOnce(
+        new ForbiddenException('This reader is not allowed to enroll or reset cards'),
+      );
 
-      await expect(scope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 })).rejects.toThrow('not allowed');
+      await expect(scope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 })).rejects.toThrow(
+        new ForbiddenException('READER_NOT_ALLOWED_TO_WRITE_CARDS'),
+      );
       expect(socket.state.enrollment).toBeNull();
     });
 
@@ -161,11 +168,12 @@ describe('AttractapCardHandler', () => {
         authenticationMethod: 'api-token',
         apiTokenId: 9,
       });
-      await scope.handler.handleEnrollCard(socket, '04aabbcc');
+      await scope.handler.handleEnrollCard(socket, CARD);
 
-      expect((scope.handler as any).cardOperations.enroll).toHaveBeenCalledWith(socket, '04aabbcc', {
+      expect((scope.handler as any).cardOperations.enroll).toHaveBeenCalledWith(socket, CARD, {
         userId: 1,
         auditPrincipal: { userId: 99, authenticationMethod: 'api-token', apiTokenId: 9 },
+        armedAt: expect.any(Number),
       });
     });
 
@@ -175,7 +183,7 @@ describe('AttractapCardHandler', () => {
       await scope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 });
       socket.sendMessage.mockClear();
 
-      await scope.handler.handleEnrollCard(socket, '04aabbcc');
+      await scope.handler.handleEnrollCard(socket, CARD);
 
       expect(socket.state.enrollment).toBeNull();
       expect(socket.sendMessage).toHaveBeenCalledWith(
@@ -192,7 +200,7 @@ describe('AttractapCardHandler', () => {
       socket.sendMessage.mockClear();
       (scope.handler as any).cardOperations.enroll.mockResolvedValueOnce({ ok: false, error: 'ENROLL_NOT_CONFIRMED' });
 
-      await scope.handler.handleEnrollCard(socket, '04aabbcc');
+      await scope.handler.handleEnrollCard(socket, CARD);
 
       expect(socket.state.enrollment).not.toBeNull();
       expect(socket.sendMessage).toHaveBeenCalledWith(
@@ -208,7 +216,7 @@ describe('AttractapCardHandler', () => {
     it('does not enroll a card when no enrollment was armed', async () => {
       const socket = scope.createMockSocket();
 
-      await scope.handler.handleEnrollCard(socket, '04aabbcc');
+      await scope.handler.handleEnrollCard(socket, CARD);
 
       expect((scope.handler as any).cardOperations.enroll).not.toHaveBeenCalled();
       expect(socket.sendMessage).toHaveBeenCalledWith(
@@ -230,11 +238,12 @@ describe('AttractapCardHandler', () => {
       await scope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 });
       socket.sendMessage.mockClear();
 
-      await scope.handler.handleResetCard(socket, '04aabbcc');
+      await scope.handler.handleResetCard(socket, CARD);
 
-      expect((scope.handler as any).cardOperations.reset).toHaveBeenCalledWith(socket, '04aabbcc', {
+      expect((scope.handler as any).cardOperations.reset).toHaveBeenCalledWith(socket, CARD, {
         cardId: 7,
         auditPrincipal: { userId: 1, authenticationMethod: 'session' },
+        armedAt: expect.any(Number),
       });
       expect(socket.state.resetNfcCardData).toBeNull();
       expect(socket.sendMessage).toHaveBeenCalledWith(
@@ -250,7 +259,7 @@ describe('AttractapCardHandler', () => {
       await scope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 });
       (scope.handler as any).cardOperations.reset.mockResolvedValueOnce({ ok: false, error: 'RESET_NOT_CONFIRMED' });
 
-      await scope.handler.handleResetCard(socket, '04aabbcc');
+      await scope.handler.handleResetCard(socket, CARD);
 
       expect(socket.state.resetNfcCardData).not.toBeNull();
     });
@@ -258,7 +267,7 @@ describe('AttractapCardHandler', () => {
     it('answers a reset presentation without an armed reset', async () => {
       const socket = scope.createMockSocket();
 
-      await scope.handler.handleResetCard(socket, '04aabbcc');
+      await scope.handler.handleResetCard(socket, CARD);
 
       expect((scope.handler as any).cardOperations.reset).not.toHaveBeenCalled();
       expect(socket.sendMessage).toHaveBeenCalledWith(
@@ -340,9 +349,7 @@ describe('AttractapCardHandler', () => {
       await new Promise(setImmediate);
       await startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 2, cardId: 8 });
       finish({ id: 7, key: 'first-key', keyNo: 1, user: startResetOfNfcCardScope.mockUser });
-      expect(await first).toEqual(
-        expect.objectContaining({ message: 'Reader already has an active card operation: 42' }),
-      );
+      expect(await first).toEqual(expect.objectContaining({ message: 'READER_BUSY' }));
       expect(socket.sendMessage).toHaveBeenCalledTimes(1);
       expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 8 }));
     });
@@ -352,7 +359,7 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
-      ).rejects.toThrow('Reader not found: 42');
+      ).rejects.toThrow(new NotFoundException('READER_NOT_FOUND'));
     });
 
     it('throws when the user is not found', async () => {
@@ -360,13 +367,13 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
-      ).rejects.toThrow('User not found: 1');
+      ).rejects.toThrow('USER_NOT_FOUND');
     });
 
     it('throws when there is no connected socket', async () => {
       await expect(
         startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
-      ).rejects.toThrow('Reader not connected: 42');
+      ).rejects.toThrow(new NotFoundException('READER_OFFLINE'));
     });
 
     it('throws when the nfc card is not found', async () => {
@@ -376,7 +383,7 @@ describe('AttractapCardHandler', () => {
 
       await expect(
         startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
-      ).rejects.toThrow('NFC card not found: 7');
+      ).rejects.toThrow(new NotFoundException('CARD_NOT_FOUND'));
     });
 
     it('stores reset state and sends RESET_NFC_CARD without any key material on the happy path', async () => {
@@ -393,6 +400,7 @@ describe('AttractapCardHandler', () => {
       expect(socket.state.resetNfcCardData).toEqual({
         cardId: 7,
         auditPrincipal: { userId: 1, authenticationMethod: 'session' },
+        armedAt: expect.any(Number),
       });
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -415,7 +423,7 @@ describe('AttractapCardHandler', () => {
       expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 7 }));
       await expect(
         startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(new ConflictException('READER_BUSY'));
 
       expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 7 }));
     });

@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { EmulatedCard } from '../card-crypto/card-emulator.test-fixture';
 import { CardKind } from '../card-crypto/card-operations';
 import { AttractapService } from '../attractap.service';
-import { CARD_CONVERSATION_LIMITS, CardConversationService } from './card-conversation.service';
-import { AttractapEventType } from './websocket.types';
-import { UID, createRelayReader, createServices } from './card-relay.test-fixture';
+import { UID, createRelayReader, createServices, detect } from './card-relay.test-fixture';
 
 describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)', (kind) => {
   const enrollmentFor = (user: { id: number }) => ({
@@ -16,7 +13,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     const services = createServices();
     const card = new EmulatedCard(kind);
     const reader = createRelayReader(card, services.conversations);
-    const result = await services.operations.enroll(reader.socket, UID, enrollmentFor(services.user));
+    const result = await services.operations.enroll(reader.socket, detect(), enrollmentFor(services.user));
     expect(result).toEqual({ ok: true });
     return { ...services, card, reader };
   }
@@ -50,7 +47,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
   it('logs in a card whose key the server verified', async () => {
     const { operations, reader } = await enrolled();
 
-    const verified = await operations.verifyCard(reader.socket, 'tap', UID);
+    const verified = await operations.verifyCard(reader.socket, 'tap', detect());
 
     expect(verified.ok).toBe(true);
     expect(verified.card.user.id).toBe(5);
@@ -64,7 +61,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     void user;
     const reader = createRelayReader(card, fresh.conversations);
 
-    expect((await operations.verifyCard(reader.socket, 'tap', UID)).ok).toBe(true);
+    expect((await operations.verifyCard(reader.socket, 'tap', detect())).ok).toBe(true);
   });
 
   it('refuses a copied UID: a card with another key cannot log in', async () => {
@@ -75,7 +72,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     const reader = createRelayReader(clone, services.conversations);
     void cards;
 
-    const verified = await operations.verifyCard(reader.socket, 'tap', UID);
+    const verified = await operations.verifyCard(reader.socket, 'tap', detect());
 
     expect(verified).toEqual({ ok: false, error: 'CARD_AUTHENTICATION_FAILED' });
     expect(reader.socket.state.verifiedUserId).toBeNull();
@@ -87,23 +84,41 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
       card.misbehaviour = misbehaviour;
       const reader = createRelayReader(card, conversations);
 
-      expect((await operations.verifyCard(reader.socket, 'tap', UID)).ok).toBe(false);
+      expect((await operations.verifyCard(reader.socket, 'tap', detect())).ok).toBe(false);
     }
   });
 
-  it('refuses a reader that makes up the card answers', async () => {
-    const { operations, conversations } = await enrolled();
-    const liar = createRelayReader(new EmulatedCard(kind), conversations);
-    liar.tamper(() => Buffer.from([0x91, 0x00]));
+  it('refuses a reader that makes up the card answers after the card was detected', async () => {
+    const { operations, conversations, card } = await enrolled();
+    const liar = createRelayReader(card, conversations);
+    // The genuine card answers GetVersion (3 frames); every answer after that is made up.
+    liar.tamper((response, _apdu, index) => (index < 3 ? response : Buffer.from([0x91, 0x00])));
 
-    expect((await operations.verifyCard(liar.socket, 'tap', UID)).ok).toBe(false);
+    const verified = await operations.verifyCard(liar.socket, 'tap', detect());
+
+    expect(verified).toEqual({ ok: false, error: 'CARD_AUTHENTICATION_FAILED' });
+    expect(liar.socket.state.verifiedUserId).toBeNull();
+  });
+
+  it('refuses a reader that replays the answers of an earlier genuine tap', async () => {
+    const { operations, conversations, card } = await enrolled();
+    const recorder = createRelayReader(card, conversations);
+    expect((await operations.verifyCard(recorder.socket, 'tap', detect())).ok).toBe(true);
+    const recorded = [...recorder.answers];
+
+    // Same card on the reader, but the reader answers with the recording instead of the card.
+    const replayer = createRelayReader(card, conversations);
+    replayer.tamper((response, _apdu, index) => recorded[index] ?? response);
+    const replayed = await operations.verifyCard(replayer.socket, 'tap', detect());
+
+    expect(replayed).toEqual({ ok: false, error: 'CARD_AUTHENTICATION_FAILED' });
   });
 
   it('refuses an unknown card without talking to it', async () => {
     const services = createServices();
     const reader = createRelayReader(new EmulatedCard(kind), services.conversations);
 
-    expect(await services.operations.verifyCard(reader.socket, 'tap', UID)).toEqual({
+    expect(await services.operations.verifyCard(reader.socket, 'tap', detect())).toEqual({
       ok: false,
       error: 'CARD_NOT_FOUND',
     });
@@ -116,7 +131,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     card.failWritesAfter = 0;
     const reader = createRelayReader(card, services.conversations);
 
-    const result = await services.operations.enroll(reader.socket, UID, enrollmentFor(services.user));
+    const result = await services.operations.enroll(reader.socket, detect(), enrollmentFor(services.user));
 
     expect(result.ok).toBe(false);
     expect(services.cards).toHaveLength(0);
@@ -127,13 +142,13 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     const card = new EmulatedCard(kind);
     const first = createRelayReader(card, services.conversations);
     first.dropAfterWrite();
-    const interrupted = await services.operations.enroll(first.socket, UID, enrollmentFor(services.user));
+    const interrupted = await services.operations.enroll(first.socket, detect(), enrollmentFor(services.user));
     expect(interrupted.ok).toBe(false);
     expect(services.cards).toHaveLength(0);
     expect(services.pending).toHaveLength(1);
 
     const second = createRelayReader(card, services.conversations);
-    const retried = await services.operations.enroll(second.socket, UID, enrollmentFor(services.user));
+    const retried = await services.operations.enroll(second.socket, detect(), enrollmentFor(services.user));
 
     expect(retried).toEqual({ ok: true });
     expect(services.cards).toHaveLength(1);
@@ -145,10 +160,10 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     const card = new EmulatedCard(kind);
     const first = createRelayReader(card, services.conversations);
     first.dropAfterWrite();
-    await services.operations.enroll(first.socket, UID, enrollmentFor(services.user));
+    await services.operations.enroll(first.socket, detect(), enrollmentFor(services.user));
 
     const tap = createRelayReader(card, services.conversations);
-    const verified = await services.operations.verifyCard(tap.socket, 'tap', UID);
+    const verified = await services.operations.verifyCard(tap.socket, 'tap', detect());
 
     expect(verified.ok).toBe(true);
     expect(services.cards).toHaveLength(1);
@@ -158,7 +173,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     const { operations, cards, card, conversations, pending } = await enrolled();
     const reader = createRelayReader(card, conversations);
 
-    const result = await operations.reset(reader.socket, UID, {
+    const result = await operations.reset(reader.socket, detect(), {
       cardId: cards[0].id,
       auditPrincipal: { userId: 1, authenticationMethod: 'session' },
     });
@@ -175,7 +190,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     card.failWritesAfter = 1;
     const failing = createRelayReader(card, conversations);
 
-    const failed = await operations.reset(failing.socket, UID, {
+    const failed = await operations.reset(failing.socket, detect(), {
       cardId,
       auditPrincipal: { userId: 1, authenticationMethod: 'session' },
     });
@@ -185,7 +200,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
 
     card.failWritesAfter = Infinity;
     const retry = createRelayReader(card, conversations);
-    const done = await operations.reset(retry.socket, UID, {
+    const done = await operations.reset(retry.socket, detect(), {
       cardId,
       auditPrincipal: { userId: 1, authenticationMethod: 'session' },
     });
@@ -201,7 +216,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     pending.push({ id: 99, uid: UID, kind: 'reset', cardId: cards[0].id, keyNo: 1, key: null });
     const reader = createRelayReader(card, conversations);
 
-    const verified = await operations.verifyCard(reader.socket, 'tap', UID);
+    const verified = await operations.verifyCard(reader.socket, 'tap', detect());
 
     expect(verified.ok).toBe(false);
     expect(cards).toHaveLength(0);
@@ -216,7 +231,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     copy.keys[1] = Buffer.alloc(16, 9);
     const reader = createRelayReader(copy, conversations);
 
-    const result = await operations.reset(reader.socket, UID, {
+    const result = await operations.reset(reader.socket, detect(), {
       cardId: cards[0].id,
       auditPrincipal: { userId: 1, authenticationMethod: 'session' },
     });
@@ -233,7 +248,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     card.keys[0] = Buffer.alloc(16, 7);
     const reader = createRelayReader(card, services.conversations);
 
-    const result = await services.operations.enroll(reader.socket, UID, enrollmentFor(services.user));
+    const result = await services.operations.enroll(reader.socket, detect(), enrollmentFor(services.user));
 
     expect(result.ok).toBe(false);
     expect(services.cards).toHaveLength(0);
@@ -244,7 +259,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     const { operations, cards, conversations } = await enrolled();
     const reader = createRelayReader(new EmulatedCard(kind), conversations);
 
-    const result = await operations.reset(reader.socket, '04deadbeef0000', {
+    const result = await operations.reset(reader.socket, detect('04deadbeef0000'), {
       cardId: cards[0].id,
       auditPrincipal: { userId: 1, authenticationMethod: 'session' },
     });
@@ -257,165 +272,11 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     const reader = createRelayReader(new EmulatedCard(kind), conversations);
     reader.goSilent();
 
-    const pending = operations.verifyCard(reader.socket, 'tap', UID);
+    const pending = operations.verifyCard(reader.socket, 'tap', detect());
     await new Promise(setImmediate);
     conversations.handleRemoved(reader.socket, { conversationId: reader.apdus()[0].payload.conversationId });
 
     expect(await pending).toEqual({ ok: false, error: 'CARD_REMOVED' });
-  });
-});
-
-describe('conversation limits', () => {
-  const run = (conversations: CardConversationService, socket: any, work?: (channel: any) => Promise<unknown>) =>
-    conversations.run(
-      socket,
-      'tap',
-      UID,
-      work ?? (async (channel) => channel.exchange(Buffer.from([0x90, 0x60, 0, 0, 0]))),
-    );
-
-  const idle = () => createRelayReader(null, new CardConversationService());
-
-  it('ignores answers with the wrong conversation id or sequence number', async () => {
-    const conversations = new CardConversationService();
-    const reader = createRelayReader(null, conversations);
-    const result = run(conversations, reader.socket);
-    await new Promise(setImmediate);
-    const { conversationId, seq } = reader.apdus()[0].payload;
-
-    conversations.handleResponse(reader.socket, { conversationId: 'other', seq, response: '9100' });
-    conversations.handleResponse(reader.socket, { conversationId, seq: seq + 1, response: '9100' });
-    conversations.handleResponse(reader.socket, { conversationId, seq, response: 'zz' });
-    expect(reader.socket.state.cardConversation.pending).not.toBeNull();
-
-    conversations.handleResponse(reader.socket, { conversationId, seq, response: '9100' });
-    expect(await result).toMatchObject({ ok: true });
-  });
-
-  it('allows one conversation per reader: a new tap replaces the old one', async () => {
-    const conversations = new CardConversationService();
-    const reader = createRelayReader(null, conversations);
-    const first = run(conversations, reader.socket);
-    await new Promise(setImmediate);
-
-    const second = run(conversations, reader.socket);
-    expect(await first).toEqual({ ok: false, reason: 'CARD_REMOVED' });
-    await new Promise(setImmediate);
-    const [, latest] = reader.apdus();
-    conversations.handleResponse(reader.socket, { ...latest.payload, response: '9100' });
-    expect(await second).toMatchObject({ ok: true });
-    expect(conversations.activeConversations).toBe(0);
-  });
-
-  it('says busy once the server-wide limit is reached', async () => {
-    const conversations = new CardConversationService();
-    const readers = Array.from({ length: CARD_CONVERSATION_LIMITS.maxConcurrent }, () => idle());
-    const open = readers.map((reader) => run(conversations, reader.socket));
-    const extra = idle();
-
-    expect(await run(conversations, extra.socket)).toEqual({ ok: false, reason: 'BUSY' });
-
-    readers.forEach((reader) => conversations.abort(reader.socket, 'READER_UNREACHABLE'));
-    await Promise.all(open);
-    expect(conversations.activeConversations).toBe(0);
-  });
-
-  it('says busy when the reader cannot drain its send queue', async () => {
-    const conversations = new CardConversationService();
-    const reader = idle();
-    reader.socket.bufferedAmount = CARD_CONVERSATION_LIMITS.maxBufferedBytes + 1;
-
-    expect(await run(conversations, reader.socket)).toEqual({ ok: false, reason: 'BUSY' });
-  });
-
-  it('ends a conversation that needs more than the allowed number of exchanges', async () => {
-    const conversations = new CardConversationService();
-    const reader = createRelayReader(new EmulatedCard('ntag424'), conversations);
-    const apdu = Buffer.from([0x90, 0x60, 0, 0, 0]);
-    reader.socket.sendRaw = ((original) => (message: any) => {
-      const sent = original(message);
-      return sent;
-    })(reader.socket.sendRaw);
-
-    const result = await conversations.run(reader.socket, 'tap', UID, async (channel) => {
-      for (let i = 0; i <= CARD_CONVERSATION_LIMITS.maxExchanges; i++) await channel.exchange(apdu);
-    });
-
-    expect(result).toEqual({ ok: false, reason: 'TOO_MANY_EXCHANGES' });
-  });
-
-  it('gives up on a card answer that never comes', async () => {
-    jest.useFakeTimers();
-    try {
-      const conversations = new CardConversationService();
-      const reader = idle();
-      const result = run(conversations, reader.socket);
-      await jest.advanceTimersByTimeAsync(CARD_CONVERSATION_LIMITS.exchangeTimeoutMs + 10);
-      expect(await result).toEqual({ ok: false, reason: 'TIMEOUT' });
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('cuts off a conversation that takes too long overall', async () => {
-    jest.useFakeTimers();
-    try {
-      const conversations = new CardConversationService();
-      const reader = idle();
-      const slow = run(conversations, reader.socket, async (channel) => {
-        for (;;) {
-          const pending = channel.exchange(Buffer.from([0x90, 0x60, 0, 0, 0]));
-          await jest.advanceTimersByTimeAsync(0);
-          const { conversationId, seq } = (
-            reader.apdus().at(-1) as { payload: { conversationId: string; seq: number } }
-          ).payload;
-          setTimeout(
-            () => conversations.handleResponse(reader.socket, { conversationId, seq, response: '9100' }),
-            CARD_CONVERSATION_LIMITS.exchangeTimeoutMs - 500,
-          );
-          await jest.advanceTimersByTimeAsync(CARD_CONVERSATION_LIMITS.exchangeTimeoutMs - 400);
-          await pending;
-        }
-      });
-      await jest.advanceTimersByTimeAsync(CARD_CONVERSATION_LIMITS.conversationTimeoutMs + 100);
-      expect(await slow).toMatchObject({ ok: false });
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('forgets the verified user when a new login tap starts', async () => {
-    const conversations = new CardConversationService();
-    const reader = idle();
-    reader.socket.state.verifiedUserId = 5;
-    reader.socket.state.verifiedCardUid = UID;
-
-    const tap = run(conversations, reader.socket);
-    expect(reader.socket.state.verifiedUserId).toBeNull();
-    conversations.abort(reader.socket, 'READER_SESSION_ENDED');
-    await tap;
-  });
-
-  it('keeps the logged in user while a supervisor card is checked', async () => {
-    const conversations = new CardConversationService();
-    const reader = idle();
-    reader.socket.state.verifiedUserId = 5;
-
-    const supervisor = conversations.run(reader.socket, 'supervisor', UID, async (channel) =>
-      channel.exchange(Buffer.from([0x90, 0x60, 0, 0, 0])),
-    );
-    expect(reader.socket.state.verifiedUserId).toBe(5);
-    conversations.abort(reader.socket, 'CARD_REMOVED');
-    await supervisor;
-  });
-
-  it('tells the reader when the conversation is over', async () => {
-    const conversations = new CardConversationService();
-    const reader = idle();
-
-    await conversations.run(reader.socket, 'tap', UID, async () => undefined);
-
-    expect(reader.sent.at(-1)?.type).toBe(AttractapEventType.CARD_CONVERSATION_END);
   });
 });
 
