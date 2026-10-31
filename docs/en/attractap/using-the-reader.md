@@ -36,6 +36,12 @@ While the reader processes an action, the controls are temporarily unavailable. 
 
 To record machine usage against a project, tap the machine's name to open its details, tap **Projekt wählen** (Choose project), and select your project before starting there. Starting directly from the list records the usage without a project.
 
+### Messages and low balance
+
+Results and problems, such as a failed sign-in or an action that did not work, appear as a short notice at the top of the screen you are on. Tap the notice to dismiss it, or wait: it hides itself after a few seconds, and it disappears when the reader moves to another screen, for example after signing you out. Notices never block the buttons below them.
+
+If an action fails because your balance is too low and the reader has a payment terminal, the reader opens a **Top up** screen. Enter the amount in euros, tap **Top up** and continue at the payment terminal. **Cancel** returns you to where you were. If the reader signs you out meanwhile, the screen is replaced like any other.
+
 ## View live usage stats
 
 While signed in, tap the name of the machine you are using. Its details show the session duration and an **Aktuelle Nutzung** (Current usage) panel with consumed energy in **kWh**, machine operating time, and running or idle status. Readings refresh every 10 seconds while you view the details.
