@@ -34,6 +34,13 @@ def test_secure_flash_uses_the_lab_tool_and_erase_all_on_request():
     assert command[1].endswith("tools/secure_lab_reader.py") and command[2] == "flash"
     assert "--erase-all" not in command
     assert hil_profile.secure_flash_command("python3", "/dev/cu.x", "/b", erase_all=True)[-1] == "--erase-all"
+
+
+@pytest.mark.skipif(
+    not hil_profile.FIRMWARE_DIR.is_dir(),
+    reason="the Nix package build only sees apps/attractap-lab, not the firmware tree",
+)
+def test_secure_lab_tool_exists_in_a_repo_checkout():
     assert hil_profile.SECURE_LAB_READER.exists()
 
 
