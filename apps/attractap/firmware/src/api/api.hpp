@@ -347,9 +347,11 @@ protected:
     std::function<void(std::string error)> enrollNewCardErrorCallback;
     std::function<void(std::string username)> resetNfcCardCallback;
     std::function<void(bool success, std::string error)> resetNfcCardResultCallback;
-    std::function<void(const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)> cardApduCallback;
-    std::function<void(const char *conversationId)> cardConversationEndCallback;
-    std::function<void()> cardConversationStartCallback;
+    std::function<void(uint32_t detectionId, const char *conversationId, uint32_t seq, const uint8_t *apdu,
+                       uint8_t length)>
+        cardApduCallback;
+    std::function<void(uint32_t detectionId, const char *conversationId)> cardConversationEndCallback;
+    std::function<uint32_t()> cardConversationStartCallback;
     std::function<void(const char *title, const char *message)> errorCallback;
     std::function<void(const ActionResult &)> actionResultCallback;
     std::function<void(bool)> insufficientBalanceCallback;
@@ -395,7 +397,8 @@ public:
 
     // --- Card relay ---------------------------------------------------------------------------
     // The server runs all card crypto. The reader announces a card and then relays one complete
-    // APDU at a time: CARD_APDU in, CARD_APDU_RESPONSE out, until CARD_CONVERSATION_END.
+    // APDU at a time: CARD_APDU in, CARD_APDU_RESPONSE out, until CARD_CONVERSATION_END. CARD_DETECTED
+    // carries the card relay's detectionId; the server echoes it in CARD_APDU and CARD_CONVERSATION_END.
     // purpose: "tap", "enroll", "reset", "supervisor" or "mass-introduction".
     void sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId = 0,
                           const char *sessionId = nullptr);
@@ -403,11 +406,14 @@ public:
     void sendCardRemoved(const char *conversationId);
     // The reader's login ended (logout or timeout): the server forgets the verified user.
     void sendReaderSessionEnded();
-    void setCardApduCallback(
-        std::function<void(const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)> callback);
-    // Called right before CARD_DETECTED goes out: the card relay opens before the first command can arrive.
-    void setCardConversationStartCallback(std::function<void()> callback);
-    void setCardConversationEndCallback(std::function<void(const char *conversationId)> callback);
+    void setCardApduCallback(std::function<void(uint32_t detectionId, const char *conversationId, uint32_t seq,
+                                                const uint8_t *apdu, uint8_t length)>
+                                 callback);
+    // Called right before CARD_DETECTED goes out: the card relay opens before the first command can
+    // arrive. Returns the detection id for the CARD_DETECTED payload.
+    void setCardConversationStartCallback(std::function<uint32_t()> callback);
+    // conversationId is nullptr when the server ends a detection without a conversation (early error).
+    void setCardConversationEndCallback(std::function<void(uint32_t detectionId, const char *conversationId)> callback);
 
     void setCardAuthenticationDetailsResponseCallback(std::function<void(CardAuthenticationDetailsResponse)> callback);
 
@@ -418,7 +424,7 @@ public:
 
     // Server-pushed arming (ATT-816): the requester started in the web UI and picked this reader,
     // so there is no first card tap. The reader waits for a supervisor card exactly as usual, but
-    // must not start the session itself — it confirms the card auth and the server does the rest.
+    // must not start the session itself — the server verifies the card through the relay and does the rest.
 
     void requestSupervision(uint32_t resourceId);
     void cancelSupervision();

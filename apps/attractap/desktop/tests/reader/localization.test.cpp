@@ -192,7 +192,7 @@ void ReaderWorkflow::testLocalization()
     nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_AUTHENTICATION_FAILED","username":"Wrong card","language":"de"})"); pump();
     assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
-    assert(label(lv_layer_top(), "Card could not be verified"));
+    assert(label(lv_layer_top(), "Sign-in failed") && label(lv_layer_top(), "Please tap a valid RFID card."));
     display.capture(output, "i18n-failed-verification-default");
     Display::hidePopup(); nfc.setPresent(0, false); pump();
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();

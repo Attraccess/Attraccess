@@ -372,6 +372,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // the reader with detection off until the flow times out (ATT-503).
     bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD") == 0 || strcmp(eventType, "RESET_NFC_CARD") == 0;
 
+    // A rejected tap (CARD_NOT_FOUND, CARD_AUTHENTICATION_FAILED, BUSY, ...) belongs to the pending
+    // sign-in: its handler ends the "checking card" state and says why the sign-in failed.
+    bool isCardAuthenticationEvent = strcmp(eventType, "CARD_AUTHENTICATION_DATA") == 0;
+
     // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
     // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
     // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
@@ -389,8 +393,8 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
     // Background stats failures must not interrupt start/stop controls with a popup.
     const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
-    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
-        !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())
+    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isCardAuthenticationEvent &&
+        !isSupervisionEvent && !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
         if (payload["error"].is<const char *>())

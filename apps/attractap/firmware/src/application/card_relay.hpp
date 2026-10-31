@@ -8,17 +8,22 @@
 //
 // CARD_APDU arrives on the websocket task, but the PN532 is only touched from the main loop, so the
 // command is parked in a one-slot mailbox and executed by loop().
+//
+// Every card presentation gets its own detection id (sent with CARD_DETECTED). The server echoes it
+// in CARD_APDU and CARD_CONVERSATION_END, so a late message for an earlier card can neither close
+// nor take over the conversation of the card that is on the reader now.
 
 #include <cstdint>
 #include <cstring>
 #include <functional>
 #include <mutex>
+#include "../rfid/rfid_contract.hpp"
 
 class CardRelay
 {
 public:
-    static constexpr uint8_t MAX_APDU_LENGTH = 62;
-    static constexpr uint8_t MAX_RESPONSE_LENGTH = 64;
+    static constexpr uint8_t MAX_APDU_LENGTH = INfc::MAX_APDU_COMMAND_LENGTH;
+    static constexpr uint8_t MAX_RESPONSE_LENGTH = INfc::MAX_APDU_RESPONSE_LENGTH;
     static constexpr size_t MAX_CONVERSATION_ID_LENGTH = 24;
     // The server ends a conversation after 15 s. A reader that never hears the end (connection
     // lost) must not keep the card to itself for longer than that plus a margin.
@@ -37,23 +42,27 @@ public:
 
     explicit CardRelay(Hooks hooks) : hooks(std::move(hooks)) {}
 
-    // The reader announced a card (CARD_DETECTED): from now on the server may send commands.
-    void begin(uint32_t nowMs)
+    // The reader announces a card (CARD_DETECTED): from now on the server may send commands for it.
+    // Returns the detection id that goes out with CARD_DETECTED.
+    uint32_t begin(uint32_t nowMs)
     {
         std::lock_guard<std::mutex> lock(mutex);
         reset();
         active_ = true;
         startedAtMs = nowMs;
+        detectionId_ = ++lastDetectionId;
         if (hooks.setConversationActive) hooks.setConversationActive(true);
+        return detectionId_;
     }
 
     // Websocket task: a command from the server.
-    void onApdu(const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)
+    void onApdu(uint32_t detectionId, const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)
     {
         if (conversationId == nullptr || apdu == nullptr || length == 0 || length > MAX_APDU_LENGTH) return;
         if (strlen(conversationId) >= MAX_CONVERSATION_ID_LENGTH) return;
         std::lock_guard<std::mutex> lock(mutex);
         if (!active_) return; // not asked for: a command without a CARD_DETECTED is ignored
+        if (detectionId != detectionId_) return; // meant for an earlier card
         if (conversationId_[0] == '\0') {
             strlcopy(conversationId_, conversationId);
         } else if (strcmp(conversationId_, conversationId) != 0) {
@@ -65,11 +74,13 @@ public:
         memcpy(pending.apdu, apdu, length);
     }
 
-    // Websocket task: the server closed the conversation (result already delivered).
-    void onConversationEnd(const char *conversationId)
+    // Websocket task: the server is done with this card (result already delivered). The server sends
+    // this after every CARD_DETECTED, also when it answered with an error and never sent a command;
+    // conversationId is then absent (nullptr).
+    void onConversationEnd(uint32_t detectionId, const char *conversationId)
     {
         std::lock_guard<std::mutex> lock(mutex);
-        if (!active_) return;
+        if (!active_ || detectionId != detectionId_) return;
         if (conversationId_[0] != '\0' && conversationId != nullptr && strcmp(conversationId_, conversationId) != 0)
             return;
         close();
@@ -155,6 +166,9 @@ private:
     mutable std::mutex mutex;
     bool active_ = false;
     uint32_t startedAtMs = 0;
+    // Per boot; the first card is 1.
+    uint32_t lastDetectionId = 0;
+    uint32_t detectionId_ = 0;
     char conversationId_[MAX_CONVERSATION_ID_LENGTH] = {0};
     Pending pending;
 };

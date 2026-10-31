@@ -270,6 +270,9 @@ enum class Message {
     ErrorResetNotConfirmed,
     ErrorWrongCard,
     ErrorCardKeyUnavailable,
+    ErrorFirmwareUpdateRequired,
+    ErrorReaderNotAllowedToWriteCards,
+    ErrorCardOperationExpired,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -562,6 +565,9 @@ inline constexpr Entry catalog[] = {
     {Message::ErrorResetNotConfirmed, "Zurücksetzen nicht bestätigt, bitte erneut auflegen", "Reset not confirmed, please tap the card again"},
     {Message::ErrorWrongCard, "Das ist nicht die ausgewählte Karte", "This is not the selected card"},
     {Message::ErrorCardKeyUnavailable, "Kartenschlüssel nicht verfügbar", "Card key unavailable"},
+    {Message::ErrorFirmwareUpdateRequired, "Firmware-Update erforderlich", "Firmware update required"},
+    {Message::ErrorReaderNotAllowedToWriteCards, "Dieser Reader darf keine Karten registrieren", "This reader may not enroll cards"},
+    {Message::ErrorCardOperationExpired, "Zeit abgelaufen, bitte erneut starten", "Timed out, please start again"},
 };
 
 } // namespace FirmwareI18n

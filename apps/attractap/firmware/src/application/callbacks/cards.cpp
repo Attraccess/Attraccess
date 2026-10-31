@@ -128,14 +128,15 @@ void Application::setupCardCallbacks()
 void Application::setupNfcCallbacks()
 {
   this->api.setCardConversationStartCallback([this]() {
-    this->cardRelay.begin(millis());
     this->sessionEndNotifyAtMs = 0; // a new card replaces the verified user on the server
+    return this->cardRelay.begin(millis());
   });
   this->api.setCardApduCallback(
-      [this](const char *id, uint32_t seq, const uint8_t *apdu, uint8_t length) {
-        this->cardRelay.onApdu(id, seq, apdu, length);
+      [this](uint32_t detectionId, const char *id, uint32_t seq, const uint8_t *apdu, uint8_t length) {
+        this->cardRelay.onApdu(detectionId, id, seq, apdu, length);
       });
-  this->api.setCardConversationEndCallback([this](const char *id) { this->cardRelay.onConversationEnd(id); });
+  this->api.setCardConversationEndCallback(
+      [this](uint32_t detectionId, const char *id) { this->cardRelay.onConversationEnd(detectionId, id); });
 
   auto cardDetectionCallback = [this](uint8_t *uid, uint8_t uidLength) {
 #ifdef HAS_LVGL_DISPLAY
@@ -194,9 +195,10 @@ void Application::setupNfcCallbacks()
 #ifdef HAS_LVGL_DISPLAY
     if (this->state == APPLICATION_STATE_ENROLLMENT) {
       // A card entered the field while waiting to enroll. Flag it; the
-      // enrollment state machine picks the writable key on the main loop. We
-      // ride the normal detection loop here precisely because it re-arms the
-      // reader reliably across removals/re-presentations (ATT-503).
+      // enrollment state machine announces it to the server, which writes the
+      // key through the relay. We ride the normal detection loop here precisely
+      // because it re-arms the reader reliably across removals/re-presentations
+      // (ATT-503).
       memcpy(this->enrollCardUid, uid, uidLength > sizeof(this->enrollCardUid) ? sizeof(this->enrollCardUid) : uidLength);
       this->enrollCardUidLength = uidLength > sizeof(this->enrollCardUid) ? sizeof(this->enrollCardUid) : uidLength;
       this->enrollCardDetected = true;
@@ -205,8 +207,8 @@ void Application::setupNfcCallbacks()
 
     if (this->state == APPLICATION_STATE_RESET) {
       // A card entered the field while waiting to reset. Same rationale as
-      // enrollment: flag it and let the reset state machine authenticate + write
-      // the factory key back on the main loop.
+      // enrollment: flag it; the reset state machine announces it to the
+      // server, which writes the factory key back through the relay.
       memcpy(this->resetCardUid, uid, uidLength > sizeof(this->resetCardUid) ? sizeof(this->resetCardUid) : uidLength);
       this->resetCardUidLength = uidLength > sizeof(this->resetCardUid) ? sizeof(this->resetCardUid) : uidLength;
       this->resetCardDetected = true;

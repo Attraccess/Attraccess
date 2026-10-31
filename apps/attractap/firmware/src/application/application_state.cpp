@@ -264,6 +264,8 @@ bool Application::processCardFlowState()
   if (this->state == APPLICATION_STATE_SUPERVISION) {
     SupervisionFlow::Outcome outcome = this->supervision.tick(millis());
     if (outcome != SupervisionFlow::Outcome::None) {
+      // Cancelled or timed out while the server may still talk to the supervisor card: free it.
+      if (outcome == SupervisionFlow::Outcome::ReturnToRouting) this->cardRelay.cancel();
       this->externalState = EXTERNAL_STATE_NONE;
       this->state = APPLICATION_STATE_INIT;
       const bool hadLogin = this->unlocked;
@@ -291,6 +293,7 @@ bool Application::processCardFlowState()
   // countdown runs out or someone presses cancel. Nobody is signed in, so routing starts fresh.
   if (this->state == APPLICATION_STATE_MASS_INTRODUCTION) {
     if (this->massIntroduction.tick(millis()) == MassIntroductionFlow::Outcome::ReturnToRouting) {
+      this->cardRelay.cancel(); // the session ended mid-card: the server's commands stop reaching it
       this->externalState = EXTERNAL_STATE_NONE;
       this->state = APPLICATION_STATE_INIT;
     }
@@ -319,8 +322,8 @@ bool Application::processAuthenticationState()
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
-  // This must run before the AUTHENTICATE_CARD early return (card lifted while
-  // waiting for its key). Otherwise that wait would never expire.
+  // This must run before the AUTHENTICATE_CARD early return (no server verdict
+  // for the tapped card). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
     Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain);

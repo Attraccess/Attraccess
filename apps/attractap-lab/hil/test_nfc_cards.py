@@ -439,10 +439,14 @@ def test_interrupted_reset_is_finished_on_next_tap(api, admin, reader, resource,
     finally:
         emulator.command("remove")
         emulator.command("behavior.clear")
-    if card in card_ids(api, admin, users["alice"]):
-        # Not recorded yet: leave the armed reset screen (it times out) so this is an ordinary tap.
-        wait_idle(hooks, timeout=45)
-        assert authenticate(reader, emulator, hooks, "alice") == "CARD_NOT_FOUND"
+    # Without this the test would pass without exercising recovery at all.
+    assert card in card_ids(api, admin, users["alice"]), (
+        "the interruption did not interrupt: the server confirmed the factory key and removed the card "
+        "record before the card left, so the recovery tap cannot be tested"
+    )
+    # Leave the armed reset screen (it times out) so this is an ordinary tap.
+    wait_idle(hooks, timeout=45)
+    assert authenticate(reader, emulator, hooks, "alice") == "CARD_NOT_FOUND"
     assert card not in card_ids(api, admin, users["alice"]), "the tap did not finish the reset"
     assert factory_keys(emulator, "alice")
     state["alice-reset"] = True
@@ -467,10 +471,14 @@ def test_interrupted_enroll_is_recovered_on_next_tap(api, admin, reader, resourc
     finally:
         emulator.command("remove")
         emulator.command("behavior.clear")
-    if card_record(api, admin, users["alice"], stored["uid"]) is None:
-        # Leave the armed enrollment screen (it times out) so this is an ordinary tap.
-        wait_idle(hooks, timeout=45)
-        assert authenticate(reader, emulator, hooks, "alice") == VERIFIED
+    # Without this the test would pass without exercising recovery at all.
+    assert card_record(api, admin, users["alice"], stored["uid"]) is None, (
+        "the interruption did not interrupt: the server confirmed the new key and recorded the card "
+        "before the card left, so the recovery tap cannot be tested"
+    )
+    # Leave the armed enrollment screen (it times out) so this is an ordinary tap.
+    wait_idle(hooks, timeout=45)
+    assert authenticate(reader, emulator, hooks, "alice") == VERIFIED
     record = card_record(api, admin, users["alice"], stored["uid"])
     assert record is not None, "the tap did not record the interrupted enrollment"
     state["alice-card"] = record["id"]

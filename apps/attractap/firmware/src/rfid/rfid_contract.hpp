@@ -11,8 +11,13 @@
 class INfc
 {
 public:
-    // Longest command the PN532 accepts in one InDataExchange (packet buffer minus framing).
+    // The PN532 driver's packet buffer is PN532_PACKBUFFSIZ (64) bytes. A command takes it after the
+    // InDataExchange command byte and target number; an answer after the 8 bytes of frame header,
+    // TFI, response code and status.
+    // Longest command the PN532 accepts in one InDataExchange.
     static constexpr uint8_t MAX_APDU_COMMAND_LENGTH = 62;
+    // Longest card answer (status bytes included) the reader can return from one InDataExchange.
+    static constexpr uint8_t MAX_APDU_RESPONSE_LENGTH = 56;
 
     virtual ~INfc() = default;
     virtual void setup() = 0;

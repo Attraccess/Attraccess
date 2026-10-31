@@ -123,7 +123,9 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
     {
         // The demo has no card crypto: it ends the conversation at once (the reader's relay must not
         // wait for commands) and answers like a server that verified the card.
-        enqueue(R"({"event":"EVENT","data":{"type":"CARD_CONVERSATION_END","payload":{"conversationId":"demo"}}})");
+        const uint32_t detectionId = doc["data"]["payload"]["detectionId"] | 0u;
+        enqueue(std::string(R"({"event":"EVENT","data":{"type":"CARD_CONVERSATION_END","payload":{"detectionId":)") +
+                std::to_string(detectionId) + R"(,"conversationId":"demo"}}})");
         const char *purpose = doc["data"]["payload"]["purpose"] | "";
         if (strcmp(purpose, "tap") == 0)
         {

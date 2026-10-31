@@ -107,7 +107,10 @@ void ReaderWorkflow::testFormsAndLogout()
     // A separately running usage is unaffected by reader logout.
     active = true; list();
     const auto stopsBeforeLogout = server.count("STOP_RESOURCE_USAGE_SESSION");
+    const auto sessionEndsBeforeLogout = server.count("READER_SESSION_ENDED");
     click("Abmelden");
+    // The server forgets the verified user as soon as the reader signs them out.
+    assert(server.count("READER_SESSION_ENDED") == sessionEndsBeforeLogout + 1);
     assert(!label(lv_screen_active(), "Alex") || !lv_obj_is_visible(requireLabel(lv_screen_active(), "Alex")));
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeLogout);
     display.capture(output, "07-logout-usage-preserved");

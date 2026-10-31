@@ -51,10 +51,9 @@
     // (dangling pointer / torn read). A plain char[] has no pointer to dangle.
 
     // Card reset/deletion. Mirrors the sticky, poll-driven enrollment sub-flow:
-    // once started it owns the display until success, cancel or timeout. Unlike
-    // enrollment there is no key round-trip — the server hands over the stored
-    // key + slot up front, so the reader can authenticate the card and write the
-    // factory key back as soon as a card is presented.
+    // once started it owns the display until success, cancel or timeout. The
+    // reader only announces the presented card; the server authenticates it and
+    // writes the factory key back through the card relay.
 
     // Set by the card-detection callback when a card enters the field during
     // RESET_PHASE_WAIT_FOR_CARD; consumed on the main loop. Rides the proven

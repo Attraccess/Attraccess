@@ -2,6 +2,7 @@
 // FEATURE: api-card-auth
 
 #include "../api.hpp"
+#include "../../rfid/rfid_contract.hpp"
 #include <functional>
 #include <cstring>
 #include <string>
@@ -9,13 +10,12 @@
 void API::sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId,
                            const char *sessionId)
 {
-    if (this->cardConversationStartCallback != nullptr)
-    {
-        this->cardConversationStartCallback();
-    }
+    const uint32_t detectionId =
+        this->cardConversationStartCallback != nullptr ? this->cardConversationStartCallback() : 0;
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["purpose"] = purpose;
+    payload["detectionId"] = detectionId;
     payload["uid"] = hexToString(const_cast<uint8_t *>(uid), uidLength);
     if (resourceId != 0)
     {
@@ -53,18 +53,19 @@ void API::sendReaderSessionEnded()
     this->sendMessage("READER_SESSION_ENDED", payload);
 }
 
-void API::setCardApduCallback(
-    std::function<void(const char *conversationId, uint32_t seq, const uint8_t *apdu, uint8_t length)> callback)
+void API::setCardApduCallback(std::function<void(uint32_t detectionId, const char *conversationId, uint32_t seq,
+                                                  const uint8_t *apdu, uint8_t length)>
+                                   callback)
 {
     this->cardApduCallback = callback;
 }
 
-void API::setCardConversationStartCallback(std::function<void()> callback)
+void API::setCardConversationStartCallback(std::function<uint32_t()> callback)
 {
     this->cardConversationStartCallback = callback;
 }
 
-void API::setCardConversationEndCallback(std::function<void(const char *conversationId)> callback)
+void API::setCardConversationEndCallback(std::function<void(uint32_t detectionId, const char *conversationId)> callback)
 {
     this->cardConversationEndCallback = callback;
 }
@@ -80,21 +81,23 @@ void API::onCardApdu(JsonObject data)
     JsonObject payload = data["payload"].as<JsonObject>();
     const char *conversationId = payload["conversationId"].is<const char *>() ? payload["conversationId"].as<const char *>() : nullptr;
     const char *apduHex = payload["apdu"].is<const char *>() ? payload["apdu"].as<const char *>() : nullptr;
-    if (conversationId == nullptr || apduHex == nullptr || !payload["seq"].is<uint32_t>())
+    if (conversationId == nullptr || apduHex == nullptr || !payload["seq"].is<uint32_t>() ||
+        !payload["detectionId"].is<uint32_t>())
     {
         return;
     }
     const size_t hexLength = strlen(apduHex);
-    if (hexLength == 0 || hexLength % 2 != 0 || hexLength > 2 * 62)
+    if (hexLength == 0 || hexLength % 2 != 0 || hexLength > 2 * INfc::MAX_APDU_COMMAND_LENGTH)
     {
         return;
     }
-    uint8_t apdu[62];
+    uint8_t apdu[INfc::MAX_APDU_COMMAND_LENGTH];
     if (!stringToHexArray(std::string(apduHex), apdu, hexLength / 2))
     {
         return;
     }
-    this->cardApduCallback(conversationId, payload["seq"].as<uint32_t>(), apdu, static_cast<uint8_t>(hexLength / 2));
+    this->cardApduCallback(payload["detectionId"].as<uint32_t>(), conversationId, payload["seq"].as<uint32_t>(), apdu,
+                           static_cast<uint8_t>(hexLength / 2));
 }
 
 void API::onCardConversationEnd(JsonObject data)
@@ -104,10 +107,13 @@ void API::onCardConversationEnd(JsonObject data)
         return;
     }
     JsonObject payload = data["payload"].as<JsonObject>();
-    if (payload["conversationId"].is<const char *>())
+    if (!payload["detectionId"].is<uint32_t>())
     {
-        this->cardConversationEndCallback(payload["conversationId"].as<const char *>());
+        return;
     }
+    const char *conversationId =
+        payload["conversationId"].is<const char *>() ? payload["conversationId"].as<const char *>() : nullptr;
+    this->cardConversationEndCallback(payload["detectionId"].as<uint32_t>(), conversationId);
 }
 
 void API::onCardAuthenticationDetailsResponse(JsonObject data)

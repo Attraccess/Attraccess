@@ -158,8 +158,8 @@ void NFC::handleCardDetection()
     if (this->foundCard)
     {
         // Presence probe throttled to every 250 ms (see presenceCheckIntervalMs)
-        // so a card parked on the reader doesn't hold the shared I2C bus with a
-        // full AES handshake on every loop pass (PERFORMANCE_ANALYSIS.md M2).
+        // so a card parked on the reader doesn't hold the shared I2C bus on
+        // every loop pass (PERFORMANCE_ANALYSIS.md M2).
         uint32_t now = millis();
         if (now - this->lastPresenceCheckMs < NFC::presenceCheckIntervalMs)
         {
@@ -182,7 +182,7 @@ void NFC::handleCardDetection()
             static const uint8_t probe[] = {0x90, 0x5A, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00};
             uint8_t command[sizeof(probe)];
             memcpy(command, probe, sizeof(probe));
-            uint8_t answer[16];
+            uint8_t answer[MAX_APDU_RESPONSE_LENGTH];
             uint8_t answerLength = sizeof(answer);
             authSuccess = this->pn532.inDataExchange(command, sizeof(probe), answer, &answerLength);
         }

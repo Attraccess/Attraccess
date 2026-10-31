@@ -15,8 +15,8 @@
 
 // Owns the reader side of one mass introduction session (ATT-1151). Websocket, NFC and touch
 // callbacks only enqueue events here; NFC and UI work is performed on the main loop by
-// takePendingStart() and tick(). Cards are handled one at a time: request the key, authenticate
-// relay it to the server, show the server's result briefly, wait for the next card.
+// takePendingStart() and tick(). Cards are handled one at a time: announce the card, let the
+// server verify it through the card relay, show the server's result briefly, wait for the next card.
 class MassIntroductionFlow {
 public:
     enum class Outcome { None, ReturnToRouting };

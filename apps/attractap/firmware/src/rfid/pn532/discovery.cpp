@@ -284,11 +284,18 @@ bool Adafruit_PN532::inDataExchange(uint8_t *send, uint8_t sendLength,
         return false;
       }
 
-      length -= 3;
-
-      if (length > *responseLength)
+      // LEN counts TFI, response code and status before the card's answer. A shorter frame is
+      // corrupt; an answer that does not fit the packet buffer (data starts at byte 8) or the
+      // caller's buffer would be cut off, and a cut-off card answer is never valid.
+      if (length < 3)
       {
-        length = *responseLength; // silent truncation...
+        return false;
+      }
+      length -= 3;
+      if (length > PN532_PACKBUFFSIZ - 8 || length > *responseLength)
+      {
+        PN532DEBUGPRINT.printf("PN532 InDataExchange answer of %u bytes does not fit\n", static_cast<unsigned>(length));
+        return false;
       }
 
       for (i = 0; i < length; ++i)

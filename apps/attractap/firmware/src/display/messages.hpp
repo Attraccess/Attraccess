@@ -98,6 +98,9 @@ inline Text readerError(const std::string &code) {
     if (code == "WRONG_CARD") return Message::ErrorWrongCard;
     if (code == "CARD_KEY_UNAVAILABLE") return Message::ErrorCardKeyUnavailable;
     if (code == "CARD_MASTER_KEY_UNKNOWN") return Message::ErrorCardKeyUnavailable;
+    if (code == "FIRMWARE_UPDATE_REQUIRED") return Message::ErrorFirmwareUpdateRequired;
+    if (code == "READER_NOT_ALLOWED_TO_WRITE_CARDS") return Message::ErrorReaderNotAllowedToWriteCards;
+    if (code == "ENROLLMENT_EXPIRED" || code == "RESET_EXPIRED") return Message::ErrorCardOperationExpired;
     std::fprintf(stderr, "Unknown reader error: %s\n", code.c_str());
     // Unknown server errors have no reliable language; preserve English fallback.
     return Text::literal("Something went wrong. Please try again.");
