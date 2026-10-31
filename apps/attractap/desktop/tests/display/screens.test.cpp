@@ -95,6 +95,12 @@ void testScreenNotices(SdlDisplay &display, const std::filesystem::path &screens
     lv_obj_send_event(noticeOf(Display::lockscreen.getScreen(), "Gesamtkosten dieser Sitzung"), LV_EVENT_CLICKED, nullptr);
     assert(!findLabel(Display::lockscreen.getScreen(), "2,90 EUR"));
 
+    // Routing to the screen that is already showing keeps its notice: it still belongs there.
+    Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
+    Display::loop();
+    Display::transitionToScreen(&Display::lockscreen);
+    assert(findLabel(Display::lockscreen.getScreen(), "Anmeldung fehlgeschlagen"));
+
     // A transition removes the notice of the screen that is left.
     Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
     Display::loop(); // A later tick: the notice is not part of the next transition's event.

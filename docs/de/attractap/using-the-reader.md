@@ -38,7 +38,7 @@ Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen de
 
 ### Meldungen und niedriges Guthaben
 
-Ergebnisse und Probleme, etwa eine fehlgeschlagene Anmeldung oder eine Aktion, die nicht geklappt hat, erscheinen als kurze Meldung am oberen Rand des aktuellen Bildschirms. Tippen Sie auf die Meldung, um sie zu schließen, oder warten Sie ab: Sie verschwindet nach einigen Sekunden von selbst und auch dann, wenn der Leser zu einem anderen Bildschirm wechselt, zum Beispiel nach der Abmeldung. Meldungen blockieren die Schaltflächen darunter nicht.
+Ergebnisse und Probleme, etwa eine fehlgeschlagene Anmeldung oder eine Aktion, die nicht geklappt hat, erscheinen als kurze Meldung am oberen Rand des aktuellen Bildschirms. Tippen Sie auf die Meldung, um sie zu schließen, oder warten Sie ab: Sie verschwindet nach einigen Sekunden von selbst und auch dann, wenn der Leser zu einem anderen Bildschirm wechselt, zum Beispiel nach der Abmeldung. Solange eine Meldung angezeigt wird, verdeckt sie einen Teil des Bildschirms. Tippen Sie sie an, um an das Darunterliegende zu kommen; alles außerhalb der Meldung bleibt bedienbar.
 
 Schlägt eine Aktion wegen zu geringen Guthabens fehl und hat der Leser ein Zahlungsterminal, öffnet der Leser den Bildschirm **Aufladen**. Geben Sie den Betrag in Euro ein, tippen Sie auf **Aufladen** und fahren Sie am Zahlungsterminal fort. **Abbrechen** bringt Sie zurück. Meldet der Leser Sie währenddessen ab, wird der Bildschirm wie jeder andere ersetzt.
 
