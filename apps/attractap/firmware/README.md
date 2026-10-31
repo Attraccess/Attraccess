@@ -218,13 +218,27 @@ encryption, NVS encryption and locked debug paths. Images are built unsigned; th
 API signs them per installation. It is never available for demo variants.
 
 - `ATTRACTAP_SECURE_PROFILE_BUILD "true"` in a variant `.cmake` makes
-  `build_firmwares.py` build the secure profile and run `tools/check_secure_profile.py`
-  in every CI stage (PR, main, release). Only Touch V2 has it on.
+  `build_firmwares.py` build the secure profile into `build/<variant>-secure/` and run
+  `tools/check_secure_profile.py` on it in every CI stage (PR, main, release). These
+  images are unsigned and never packaged. Only Touch V2 has it on.
 - `ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED` (all `"false"`) is carried into
-  `firmwares.json` and gates the admin "Secure this reader" action. Customers see no
-  change until a variant is flipped after its hardware run.
+  `firmwares.json` and will gate the admin "Secure this reader" action. It can only be
+  `"true"` while the variant's secure build is on. Customers see no change until a
+  variant is flipped after its hardware run.
+- Standard builds refuse every fuse-burning option (Secure Boot, flash encryption, NVS
+  encryption, anti-rollback), so a web-flashable image can never burn eFuses.
 - `secure-version-floor.txt` must equal `CONFIG_BOOTLOADER_APP_SECURE_VERSION`; CI
   fails if either decreases. The eFuse field has 16 steps: bump only for security fixes.
+
+Build the secure profile locally (always in its own build directory and sdkconfig;
+CMake refuses a reused one):
+
+```bash
+idf.py -B build/attractap-touch-v2-secure \
+  -DSDKCONFIG=$PWD/build/attractap-touch-v2-secure/sdkconfig \
+  -DATTRACTAP_VARIANT=attractap-touch-v2 -DATTRACTAP_SECURE_PROFILE=ON build
+python3 tools/check_secure_profile.py build/attractap-touch-v2-secure
+```
 
 ### eFuse key block layout (fixed)
 

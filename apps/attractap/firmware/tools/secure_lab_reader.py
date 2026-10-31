@@ -9,7 +9,8 @@ encryption, so it stays re-flashable over USB with encrypted writes.
   status     print the reader's security eFuses (read-only)
   provision  first time only: burn the lab key digests into KEY0/KEY1, erase
              flash and write the signed images in plaintext. The first boot
-             enables Secure Boot and flash encryption. IRREVERSIBLE.
+             enables Secure Boot and flash encryption. IRREVERSIBLE: needs
+             --expect-mac with the reader's MAC, and --burn-efuses.
   flash      re-flash a provisioned lab reader with signed, encrypted images
              (also recovers a reader whose flash was erased)
 
@@ -37,7 +38,10 @@ class LabReaderError(Exception):
 
 def run(cmd, capture=False):
     print("+ " + " ".join(cmd), flush=True)
-    result = subprocess.run(cmd, text=True, capture_output=capture)
+    try:
+        result = subprocess.run(cmd, text=True, capture_output=capture)
+    except FileNotFoundError as error:
+        raise LabReaderError(f"{cmd[0]} not found: run inside an ESP-IDF environment") from error
     if result.returncode != 0:
         if capture:
             sys.stderr.write(result.stdout + result.stderr)
@@ -70,13 +74,30 @@ def block_hex(efuses, name):
 
 
 def crypt_cnt(efuses):
-    raw = value(efuses, "SPI_BOOT_CRYPT_CNT")
+    """Raw SPI_BOOT_CRYPT_CNT (0, 1, 3 or 7). espefuse's `value` only says
+    Enable/Disable, which hides whether the count can still change."""
+    entry = efuses["SPI_BOOT_CRYPT_CNT"]
+    raw = entry.get("raw_value", entry["value"])
     if isinstance(raw, int):
         return raw
-    return {"Disable": 0, "Enable": 1}.get(raw, None) if not str(raw).isdigit() else int(raw)
+    try:
+        return int(str(raw), 0)
+    except ValueError:
+        return None
+
+
+def flash_encryption_on(cnt):
+    """Flash encryption is on when an odd number of SPI_BOOT_CRYPT_CNT bits is set (1 or 7; 3 is off)."""
+    return cnt is not None and bin(cnt).count("1") % 2 == 1
+
+
+def mac(efuses):
+    """Factory MAC as lowercase aa:bb:cc:dd:ee:ff (espefuse appends ' (OK)')."""
+    return str(value(efuses, "MAC")).split()[0].lower()
 
 
 def describe(efuses):
+    print(f"  {'MAC':28} {mac(efuses)}")
     names = ["SECURE_BOOT_EN", "SPI_BOOT_CRYPT_CNT", "DIS_DOWNLOAD_MANUAL_ENCRYPT", "ENABLE_SECURITY_DOWNLOAD",
              "SECURE_VERSION", "RD_DIS"] + [f"KEY_PURPOSE_{i}" for i in range(6)]
     for name in names:
@@ -91,17 +112,38 @@ def lab_digests_burned(efuses, digests):
             and block_hex(efuses, "BLOCK_KEY1") == digests[1])
 
 
+def read_json(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError) as error:
+        raise LabReaderError(f"cannot read {path}: {error}") from error
+
+
 def flash_layout(build_dir):
-    """[(offset, path, encrypted)] including the bootloader, from flasher_args.json."""
-    with open(os.path.join(build_dir, "flasher_args.json")) as f:
-        args = json.load(f)
-    sdkconfig = open(os.path.join(build_dir, "sdkconfig")).read()
-    if "CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT=y" not in sdkconfig or "CONFIG_SECURE_BOOT_V2_ENABLED=y" not in sdkconfig:
+    """[(offset, path, encrypted, needs_signature)] including the bootloader.
+
+    Reads config/sdkconfig.json, the configuration the images were actually built
+    with (<build>/sdkconfig can be stale when -DSDKCONFIG pointed elsewhere). A
+    release-mode image would switch a lab reader's flash encryption to release
+    mode for good, so anything but the lab profile is refused."""
+    config = read_json(os.path.join(build_dir, "config", "sdkconfig.json"))
+    if not (config.get("SECURE_BOOT_V2_ENABLED") is True
+            and config.get("SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT") is True
+            and config.get("SECURE_FLASH_ENCRYPTION_MODE_RELEASE") is not True):
         raise LabReaderError(f"{build_dir} is not a lab secure build (-DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON)")
+    args = read_json(os.path.join(build_dir, "flasher_args.json"))
     images = [(BOOTLOADER_OFFSET, os.path.join(build_dir, "bootloader", "bootloader.bin"), True, True)]
-    for entry in ("partition-table", "otadata", "app"):
-        info = args[entry]
-        images.append((info["offset"], os.path.join(build_dir, info["file"]), info["encrypted"] == "true", entry == "app"))
+    try:
+        for entry in ("partition-table", "otadata", "app"):
+            info = args[entry]
+            images.append((info["offset"], os.path.join(build_dir, info["file"]), info["encrypted"] == "true",
+                           entry == "app"))
+    except KeyError as error:
+        raise LabReaderError(f"{build_dir}/flasher_args.json has no {error} entry") from error
+    missing = [path for _, path, _, _ in images if not os.path.isfile(path)]
+    if missing:
+        raise LabReaderError(f"missing build output: {', '.join(missing)}")
     return images
 
 
@@ -128,6 +170,9 @@ def cmd_provision(args):
     images = flash_layout(args.build_dir)
     efuses = read_efuses(args.port)
     describe(efuses)
+    expected = args.expect_mac.strip().lower().replace("-", ":")
+    if mac(efuses) != expected:
+        raise LabReaderError(f"the reader on {args.port} has MAC {mac(efuses)}, not {expected}; refusing to provision it")
     digests = (key_digest(SIGNING_KEY), key_digest(RECOVERY_KEY))
     if value(efuses, "SECURE_BOOT_EN") or crypt_cnt(efuses) != 0:
         raise LabReaderError("Secure Boot or flash encryption is already on: use `flash` instead")
@@ -163,7 +208,9 @@ def cmd_flash(args):
     if not value(efuses, "SECURE_BOOT_EN") or not lab_digests_burned(efuses, digests):
         raise LabReaderError("Not a provisioned lab reader (Secure Boot off or KEY0/KEY1 not the lab key digests)")
     cnt = crypt_cnt(efuses)
-    if cnt is None or cnt % 2 == 0 or value(efuses, "DIS_DOWNLOAD_MANUAL_ENCRYPT") \
+    # On the ESP32-S3, release mode burns DIS_DOWNLOAD_MANUAL_ENCRYPT (and counts CRYPT_CNT up to 7);
+    # 7 alone can still be development mode. The write-protect check is an extra guard.
+    if not flash_encryption_on(cnt) or value(efuses, "DIS_DOWNLOAD_MANUAL_ENCRYPT") \
             or not efuses["SPI_BOOT_CRYPT_CNT"].get("writeable", True):
         raise LabReaderError("Flash encryption is not in development mode: this reader only takes signed OTA updates")
     with tempfile.TemporaryDirectory() as tmp:
@@ -190,6 +237,8 @@ def main():
         p.add_argument("--port", required=True)
         if name != "status":
             p.add_argument("--build-dir", required=True, help="lab secure build directory")
+    sub.choices["provision"].add_argument("--expect-mac", required=True,
+                                          help="MAC of the reader to provision (see `status`); any other chip is refused")
     sub.choices["provision"].add_argument("--burn-efuses", action="store_true",
                                           help="allow burning the lab key digests (irreversible)")
     sub.choices["flash"].add_argument("--erase-all", action="store_true",

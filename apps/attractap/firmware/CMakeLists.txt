@@ -92,9 +92,13 @@ elseif(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_ESP_COREDUMP_ENABLE_TO_NONE AND 
 elseif(ATTRACTAP_SECURE_PROFILE AND NOT ATTRACTAP_SECURE_LAB AND NOT CONFIG_ESP_CONSOLE_NONE)
     message(FATAL_ERROR "ATTRACTAP_SECURE_PROFILE=ON but ${SDKCONFIG} still has a console enabled. "
                         "Build in a clean directory with its own -DSDKCONFIG.")
-elseif(NOT ATTRACTAP_SECURE_PROFILE AND (CONFIG_SECURE_BOOT OR CONFIG_SECURE_FLASH_ENC_ENABLED))
-    message(FATAL_ERROR "${SDKCONFIG} enables Secure Boot or flash encryption, but ATTRACTAP_SECURE_PROFILE is OFF. "
-                        "It comes from a secure build; build in a clean directory with its own -DSDKCONFIG.")
+elseif(NOT ATTRACTAP_SECURE_PROFILE AND (CONFIG_SECURE_BOOT OR CONFIG_SECURE_FLASH_ENC_ENABLED
+                                           OR CONFIG_NVS_ENCRYPTION OR CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK))
+    # NVS encryption (HMAC scheme) burns an eFuse key on first boot even without flash
+    # encryption, and anti-rollback burns SECURE_VERSION: neither may reach a web-flashable build.
+    message(FATAL_ERROR "${SDKCONFIG} enables a fuse-burning option (Secure Boot, flash encryption, NVS encryption "
+                        "or anti-rollback), but ATTRACTAP_SECURE_PROFILE is OFF. If it comes from a secure build, "
+                        "build in a clean directory with its own -DSDKCONFIG; otherwise remove the option.")
 elseif(ATTRACTAP_SECURE_LAB AND NOT CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT)
     message(FATAL_ERROR "ATTRACTAP_SECURE_LAB=ON but ${SDKCONFIG} uses release-mode flash encryption. "
                         "Build in a clean directory with its own -DSDKCONFIG.")

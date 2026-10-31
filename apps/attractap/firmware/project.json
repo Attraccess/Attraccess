@@ -64,6 +64,7 @@
         "commands": [
           "python3 -I apps/attractap/firmware/tools/test_check_secure_profile.py",
           "python3 -I apps/attractap/firmware/tools/test_secure_profile_flag.py",
+          "python3 -I apps/attractap/firmware/tools/test_secure_lab_reader.py",
           "cmake -S apps/attractap/firmware/tests/supervision -B apps/attractap/firmware/tests/supervision/build",
           "cmake --build apps/attractap/firmware/tests/supervision/build",
           "ctest --test-dir apps/attractap/firmware/tests/supervision/build --output-on-failure",
