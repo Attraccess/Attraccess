@@ -356,7 +356,7 @@ bool Application::processAuthenticationState()
   // waiting for its key). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
-    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
+    Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
   }
 #endif
 
@@ -421,14 +421,14 @@ void Application::renderResourceState()
       now - this->pendingUiStartedAt > 60000) {
     this->finishReaderAction(false);
     this->handleFormsCancel();
-    Display::showErrorPopup(FirmwareI18n::Message::ActionNotConfirmed, FirmwareI18n::Message::ResourceStatusIsBeingRefreshedCheckItBeforeTryingAgain);
+    Display::showErrorNotice(FirmwareI18n::Message::ActionNotConfirmed, FirmwareI18n::Message::ResourceStatusIsBeingRefreshedCheckItBeforeTryingAgain);
   }
   // Finishing an action starts a new refresh timer; do not subtract its newer
   // timestamp from the earlier sample and wrap the unsigned elapsed duration.
   now = millis();
   if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
     this->logoutReader();
-    Display::showErrorPopup(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
+    Display::showErrorNotice(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
   }
   if (this->unlocked) {
     uint32_t effectivePause = this->accumulatedPauseMs;
@@ -458,6 +458,9 @@ void Application::renderResourceState()
     }
     return;
   }
+  // The top-up screen owns the reader while someone is signed in. The session timeout above still
+  // runs; once it logs out, state is no longer pinned here and routing below replaces the screen.
+  if (this->state == APPLICATION_STATE_TOP_UP && this->unlocked) return;
   if (!this->resourceIsSelected) {
     Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
     const auto target = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;

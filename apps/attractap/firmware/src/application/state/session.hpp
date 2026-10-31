@@ -52,6 +52,8 @@ uint32_t resourceRefreshRequestId = 0;
 
 #if defined(HAS_LVGL_DISPLAY)
     FirmwareI18n::Text actionCompletionMessage;
+    // The billing total notice already answers the action; the completion notice must not replace it.
+    bool billingSummaryShown = false;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

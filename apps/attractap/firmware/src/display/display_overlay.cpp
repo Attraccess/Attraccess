@@ -77,6 +77,11 @@ void Display::initDeviceOverlay()
     lv_obj_set_style_text_font(Display::networkQualityLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
+void Display::refreshChromeLanguage(const std::string &language)
+{
+    FirmwareI18n::refreshTree(lv_layer_top(), language);
+}
+
 void Display::updateNetworkQualityOverlay()
 {
     if (!Display::networkQualityContainer || !Display::networkQualityLabel)

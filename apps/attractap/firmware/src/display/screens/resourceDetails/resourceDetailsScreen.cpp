@@ -117,18 +117,14 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 void ResourceDetailsScreen::onScreenLeave()
 {
    this->hideActionProgressVisual();
-   if (this->successToast)
-   {
-      lv_obj_add_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);
-   }
    this->hideProjectsModal();
+   this->hideFormsModal();
 }
 
 void ResourceDetailsScreen::destroy()
 {
    this->disposeProjectsModal();
    this->disposeFormsModal();
-   this->disposeSuccessToast();
 
    if (this->screen)
    {
@@ -188,7 +184,6 @@ void ResourceDetailsScreen::destroy()
    this->activeActionButton = nullptr;
    this->activeActionLabel = nullptr;
    this->activeActionSpinner = nullptr;
-   this->successToast = nullptr;
    this->formsModalMeta = nullptr;
    this->formsModalPage = nullptr;
    this->formFieldWidgetCount = 0;

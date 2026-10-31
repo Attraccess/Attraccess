@@ -22,26 +22,26 @@ void ReaderWorkflow::testLocalization()
         server.push("READER_LANGUAGE", std::string("{\"language\":\"") + language + "\"}");
         pump(0); // Exercise API-to-display settling without relying on elapsed time.
     };
-    // Exercise the API parser and application error callback, then refresh the popup.
+    // Exercise the API parser and application error callback, then refresh the notice.
     server.push("BILLING_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})");
     pump();
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Card is inactive")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card is inactive")));
     defaultLanguage("de");
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Karte ist nicht aktiv")));
-    display.capture(output, "i18n-popup-german");
-    Display::hidePopup();
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
+    display.capture(output, "i18n-notice-german");
+    Display::clearNotice();
     server.push("BILLING_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Karte ist nicht aktiv")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
     defaultLanguage("en");
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Card is inactive")));
-    display.capture(output, "i18n-popup-english");
-    Display::hidePopup();
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card is inactive")));
+    display.capture(output, "i18n-notice-english");
+    Display::clearNotice();
     server.push("BILLING_TOPUP", R"({"error":"UNKNOWN_READER_ERROR"})"); pump();
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Something went wrong. Please try again.")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Something went wrong. Please try again.")));
     defaultLanguage("de");
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Something went wrong. Please try again.")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Something went wrong. Please try again.")));
     defaultLanguage("en");
-    Display::hidePopup();
+    Display::clearNotice();
     // A real driver touch sequence opens the maintenance drawer.
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 150, true}; pump();
@@ -67,7 +67,8 @@ void ReaderWorkflow::testLocalization()
     assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Reboot device?")));
     display.capture(output, "i18n-reboot-english");
     click("Cancel", true);
-    assert(!label(lv_layer_top(), "Reboot device?"));
+    assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), "Reboot device?")));
+    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Maintenance")));
     // Display-module fixtures keep dialogs open while real API locale messages
     // drive the normal display loop. Authentication itself is exercised below.
     {
@@ -89,14 +90,14 @@ void ReaderWorkflow::testLocalization()
             api.loop(); Display::loop(); lv_timer_handler();
         };
         refreshDialogs("de");
-        assert(label(lv_layer_top(), "Seite 2 von 5"));
-        assert(label(lv_layer_top(), "Maintenance %s"));
+        assert(label(lv_screen_active(), "Seite 2 von 5"));
+        assert(label(lv_screen_active(), "Maintenance %s"));
         display.capture(output, "i18n-project-dialog-german");
         refreshDialogs("en");
-        assert(label(lv_layer_top(), "Page 2 of 5"));
-        assert(label(lv_layer_top(), "Maintenance %s"));
+        assert(label(lv_screen_active(), "Page 2 of 5"));
+        assert(label(lv_screen_active(), "Maintenance %s"));
         display.capture(output, "i18n-project-dialog-english");
-        auto *closeProject = lv_obj_get_parent(label(lv_layer_top(), LV_SYMBOL_CLOSE));
+        auto *closeProject = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_CLOSE));
         lv_obj_send_event(closeProject, LV_EVENT_CLICKED, nullptr);
         API::ResourceUsageFormRequest request{};
         request.resourceId = 1; request.action = API::ResourceUsageFormActionType::START;
@@ -109,14 +110,14 @@ void ReaderWorkflow::testLocalization()
         page.fields[0].type = API::ResourceUsageFormFieldType::TEXT;
         page.fields[0].isRequired = true;
         dialogs.renderFormField(page, false, true, 2, 3);
-        auto *submit = lv_obj_get_parent(label(lv_layer_top(), "Submit"));
+        auto *submit = lv_obj_get_parent(label(lv_screen_active(), "Submit"));
         lv_obj_send_event(submit, LV_EVENT_CLICKED, nullptr);
         refreshDialogs("de");
-        assert(label(lv_layer_top(), "Pflichtfeld"));
+        assert(label(lv_screen_active(), "Pflichtfeld"));
         display.capture(output, "i18n-form-dialog-german");
         refreshDialogs("en");
-        assert(label(lv_layer_top(), "Required field"));
-        assert(label(lv_layer_top(), "Please complete before starting\nMaintenance - Notes %s"));
+        assert(label(lv_screen_active(), "Required field"));
+        assert(label(lv_screen_active(), "Please complete before starting\nMaintenance - Notes %s"));
         display.capture(output, "i18n-form-dialog-english");
         dialogs.hideFormsModal();
         Display::transitionToScreen(&Display::resourceListScreen);
@@ -192,9 +193,9 @@ void ReaderWorkflow::testLocalization()
     nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
     server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Wrong card","language":"de","keyNo":0,"key":"11111111111111111111111111111111"})"); pump();
     assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
-    assert(label(lv_layer_top(), "Sign-in failed"));
+    assert(label(lv_screen_active(), "Sign-in failed"));
     display.capture(output, "i18n-failed-verification-default");
-    Display::hidePopup(); nfc.setPresent(0, false); pump();
+    Display::clearNotice(); nfc.setPresent(0, false); pump();
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
     // API rejection clears the session and keeps the most recent default.
     userLocale = "en"; login();

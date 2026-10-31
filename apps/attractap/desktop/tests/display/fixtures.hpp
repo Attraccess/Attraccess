@@ -106,7 +106,9 @@ inline void expectReadableOption(lv_obj_t *label)
 }
 
 void testSessionSummaryLifecycle();
-void testFormDrafts();
-void testPaymentPopup();
+void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testScreenNotices(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testPowerOffConfirm(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testPendingApproval(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots);

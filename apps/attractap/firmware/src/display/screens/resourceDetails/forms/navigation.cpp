@@ -176,15 +176,12 @@ void ResourceDetailsScreen::ensureFormsModal()
       return;
    }
 
-   lv_obj_t *overlay = lv_obj_create(lv_layer_top());
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_t *overlay = createFullScreenView(this->screen);
    this->formsModalOverlay = overlay;
-   lv_obj_remove_style_all(overlay);
-   lv_obj_remove_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
-   lv_obj_set_style_bg_color(overlay, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(overlay, 170, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_all(overlay, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(overlay, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(overlay, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -193,8 +190,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    this->formsModalPanel = panel;
    lv_obj_remove_style_all(panel);
    lv_obj_set_size(panel, lv_pct(100), lv_pct(100));
-   lv_obj_set_style_max_width(panel, LV_COORD_MAX, LV_PART_MAIN | LV_STATE_DEFAULT);
-   DisplayTheme::applySurface(panel);
+   DisplayTheme::applyScreen(panel);
    lv_obj_set_style_pad_all(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);

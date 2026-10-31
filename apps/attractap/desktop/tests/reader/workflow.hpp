@@ -74,15 +74,15 @@ struct ReaderWorkflow
             ++iterations;
         } while (iterations < 4 || static_cast<int32_t>(end - millis()) > 0);
     }
-    void click(const char *text, bool popup = false) {
-        auto *found = label(popup ? lv_layer_top() : lv_screen_active(), text);
+    void click(const char *text, bool inDrawer = false) {
+        auto *found = label(inDrawer ? lv_layer_top() : lv_screen_active(), text);
         if (!found) throw std::runtime_error(std::string("Missing button: ") + text);
         // Screen transitions can leave controls disabled until their animation finishes.
         const auto readyDeadline = millis() + 2000;
         while (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED) &&
                static_cast<int32_t>(readyDeadline - millis()) > 0) {
             pump();
-            found = label(popup ? lv_layer_top() : lv_screen_active(), text);
+            found = label(inDrawer ? lv_layer_top() : lv_screen_active(), text);
             if (!found) throw std::runtime_error(std::string("Button disappeared: ") + text);
         }
         if (lv_obj_has_state(lv_obj_get_parent(found), LV_STATE_DISABLED))
@@ -145,6 +145,7 @@ struct ReaderWorkflow
     void testMassIntroduction();
     void testIdentityAndPendingAuthentication();
     void testSessionSummary();
+    void testScreenOwnedUi();
     void testWallClock();
     void testTimeouts();
     void testFirmwareUpdate(bool reset);

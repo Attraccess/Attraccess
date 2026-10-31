@@ -50,8 +50,8 @@ void ReaderWorkflow::testSessionSummary()
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(label(lv_screen_active(), "Alex"));
         if (std::string(metadata).find("billingSummary") != std::string::npos)
-            assert(label(lv_layer_top(), "12,50 EUR"));
-        Display::hidePopup(); click("Abmelden");
+            assert(label(lv_screen_active(), "12,50 EUR"));
+        Display::clearNotice(); click("Abmelden");
     }
     username = "abcdefghijklmnopqrstuvwxyz012345";
     login(); click("Stop");

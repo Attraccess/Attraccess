@@ -190,7 +190,7 @@ target_compile_options(attractap-demo-session-clock-tests PRIVATE -Wall -Wextra 
 target_link_libraries(attractap-demo-session-clock-tests PRIVATE attractap-production-host)
 add_test(NAME attractap-demo-session-clock-tests COMMAND attractap-demo-session-clock-tests)
 
-add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp tests/display/pending-approval.test.cpp)
+add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp tests/display/pending-approval.test.cpp tests/display/power-off.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
@@ -228,8 +228,8 @@ add_test(NAME attractap-reader-pairing-tests COMMAND attractap-reader-pairing-te
 set_tests_properties(attractap-reader-pairing-tests PROPERTIES TIMEOUT 60)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
-# Includes the bilingual reader journey plus four real 30-second expiry windows.
-set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 240)
+# Includes the bilingual reader journey plus five real 30-second expiry windows.
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 360)
 
 # Exercise the production beeper without playing sound on the developer's machine.
 set_property(TEST
