@@ -79,6 +79,24 @@ void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshot
     assert(submit);
     lv_obj_send_event(lv_obj_get_parent(submit), LV_EVENT_CLICKED, nullptr);
     assert(submitted == "Size™");
+    {
+        // The largest select (MAX_SELECT_OPTIONS) stays reachable above the footer buttons.
+        auto many = field;
+        many.options.select.count = API::MAX_SELECT_OPTIONS;
+        for (size_t i = 0; i < API::MAX_SELECT_OPTIONS; ++i) many.options.select.values[i] = "Option " + std::to_string(i + 1);
+        page.fields[0] = many;
+        screen.renderFormField(page, false, true, 1, 1);
+        auto *last = lv_obj_get_parent(findLabel(lv_screen_active(), "Option 12"));
+        lv_obj_scroll_to_view_recursive(last, LV_ANIM_OFF);
+        const lv_area_t lastArea = coordsOf(last);
+        const lv_area_t footerArea = coordsOf(lv_obj_get_parent(findLabel(lv_screen_active(), "Absenden")));
+        assert(lastArea.y2 < footerArea.y1);
+        expectClearOfChrome(last);
+        lv_obj_send_event(last, LV_EVENT_CLICKED, nullptr);
+        lv_obj_send_event(lv_obj_get_parent(findLabel(lv_screen_active(), "Absenden")), LV_EVENT_CLICKED, nullptr);
+        assert(submitted == "Option 12");
+        page.fields[0] = field;
+    }
     // A normal reader must preserve supplied options even when their IDs and
     // wording happen to match the built-in demo form.
     page.resourceId = 1;

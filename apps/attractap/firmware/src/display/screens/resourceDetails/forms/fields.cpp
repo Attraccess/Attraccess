@@ -20,6 +20,10 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
    lv_obj_clean(this->formsModalList);
    this->formFieldWidgetCount = 0;
+   if (this->formsModalContent)
+   {
+      lv_obj_scroll_to_y(this->formsModalContent, 0, LV_ANIM_OFF);
+   }
 
 
    if (this->formsModalErrorLabel)
