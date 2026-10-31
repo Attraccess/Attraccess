@@ -4,13 +4,15 @@
 #   pnpm nx run attractap-lab:hil [-- PYTEST_ARGS]
 #
 # Off the readers' LAN (CI), set API_RELAY_SSH (e.g. labgrid@lab-host),
-# API_RELAY_HOST (lab host address on the readers' LAN) and API_RELAY_PORT:
-# an SSH reverse tunnel on the lab host then carries the readers' API traffic
-# (NixOS option readerApiRelay).
+# API_RELAY_HOST (lab host address on the readers' LAN) and API_RELAY_PORT
+# (one of the lab host's relay ports, NixOS option readerApiRelay.ports): an SSH
+# reverse tunnel on the lab host then carries the readers' API traffic. Runs on
+# different places in parallel need different ports.
 #
-# Builds both firmware images (unless READER_IMAGE / EMULATOR_IMAGE are set),
-# starts an API with a throwaway database (waiting up to API_START_TIMEOUT
-# seconds, default 600), and runs pytest inside one labgrid
+# Builds both firmware images (unless READER_IMAGE / EMULATOR_IMAGE are set;
+# the reader image for READER_VARIANT, by default the place name without its
+# -<n> suffix), starts an API with a throwaway database (waiting up to
+# API_START_TIMEOUT seconds, default 600), and runs pytest inside one labgrid
 # session on LG_PLACE_NAME. Needs ESP-IDF (source export.sh) for the builds,
 # the labgrid client environment (LAB_PYTHON: labgrid fork + pytest) and a lab
 # host with readerWifi enabled. Artifacts land in apps/attractap-lab/hil-artifacts.
@@ -19,7 +21,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Second stage, run by labgrid-client inside the session: holding the place
-# also serializes use of the lab host's single relay port.
+# also serializes runs that relay through the same lab host port.
 if [[ "${1:-}" == --in-session ]]; then
   shift
   relay_pid=
@@ -38,6 +40,8 @@ fi
 
 ROOT="$(cd "$HERE/../../.." && pwd)"
 PLACE="${LG_PLACE_NAME:-attractap-touch-v2-1}"
+# Places are named <firmware variant>-<n>.
+VARIANT="${READER_VARIANT:-${PLACE%-*}}"
 COORDINATOR="${LG_COORDINATOR:-attractap-lab:20408}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/attractap-hil.XXXXXX")"
 
@@ -57,9 +61,9 @@ require_idf() {
 if [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
   firmware="$ROOT/apps/attractap/firmware"
-  build="$firmware/build/hil-attractap-touch-v2"
+  build="$firmware/build/hil-$VARIANT"
   (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
-    idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT=attractap-touch-v2 \
+    idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
       ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
   (cd "$build" && esptool --chip esp32s3 merge-bin -o "$WORK/reader.bin" @flash_args >/dev/null)

@@ -112,6 +112,15 @@ void api_validation() {
   CHECK(!validate_removal(-1, -1, -1).valid);
   CHECK(!validate_removal(-1, 0, -1).valid);
   CHECK(!validate_removal(-1, -1, 256).valid);
+  CHECK(validate_button_press(200, 1, 300).valid);
+  CHECK(validate_button_press(10, 5, 10).valid);
+  CHECK(validate_button_press(5000, 5, 2000).valid);
+  CHECK(!validate_button_press(9, 1, 300).valid);
+  CHECK(!validate_button_press(5001, 1, 300).valid);
+  CHECK(!validate_button_press(200, 0, 300).valid);
+  CHECK(!validate_button_press(200, 6, 300).valid);
+  CHECK(!validate_button_press(200, 2, 9).valid);
+  CHECK(!validate_button_press(200, 2, 2001).valid);
 }
 
 void command_lines() {

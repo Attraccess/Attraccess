@@ -30,6 +30,22 @@ standardized across all boards; change the arguments to `Pn532Target::begin`
 for a different pinout. Do not connect GPIO7 to a module pin labeled `RSTO`;
 that is an output, not the PN532 power-down/reset input.
 
+### Reader power button (optional)
+
+Some readers only power up after a button press: the Touch V1's power-bank chip
+(SW6106) switches its 5 V rail on after one short press and off after two. For
+those, `GPIO4` drives an optocoupler whose output is wired across the reader's
+power button:
+
+| ESP32-S3 Supermini | Optocoupler                     | Purpose                 |
+| ------------------ | ------------------------------- | ----------------------- |
+| `GPIO4`            | LED anode, through its resistor | High presses the button |
+| `GND`              | LED cathode                     | Common ground           |
+
+The optocoupler's transistor goes across the button. The firmware holds `GPIO4`
+low from boot, and a reset or flashing leaves it floating, so neither presses
+the button. Leave `GPIO4` unconnected when the reader has no such button.
+
 ## UID limitation
 
 PN532 target mode fixes the first byte of the synthetic four-byte UID to
@@ -133,10 +149,17 @@ Mutating commands reply only after the requested control state is visible.
 | `present`, `remove`                |             | Enter or leave PN532 target mode                         |
 | `reset`                            |             | Restore and persist the active factory snapshot          |
 | `trace.get`, `trace.clear`         |             | Read or clear the bounded 128-exchange trace             |
+| `button.press`                     | press       | Press the reader's button wired to `GPIO4`               |
+
+`button.press` accepts `{"ms":200,"count":1,"gapMs":300}` (the defaults): `count`
+presses from 1 to 5, each held for `ms` (10 to 5000) with `gapMs` (10 to 2000)
+released in between. It replies once the last press is released. One press
+turns a Touch V1 on, `{"count":2}` turns it off.
 
 Errors carry a stable `error` code, for example `invalid_json`,
 `invalid_profile`, `not_found`, `profile_exists`, `profile_presented`,
-`no_profile`, `persist_failed`, `pn532_not_ready`, or `unknown_command`.
+`no_profile`, `persist_failed`, `pn532_not_ready`, `invalid_button`, or
+`unknown_command`.
 Creating an existing profile returns `profile_exists`. Replacing or deleting a
 missing profile returns `not_found`. Storage failures return `persist_failed`
 and leave runtime state unchanged. You must `remove` an active profile before

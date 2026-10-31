@@ -1,19 +1,20 @@
 name: Attractap lab hardware tests
 
 # Runs the hardware-in-the-loop tests (apps/attractap-lab/hil) against real
-# reader firmware and the NFC card emulator in the Attractap lab. Called from
-# the release and main-branch (nightly) workflows; skipped unless the
-# ATTRACTAP_LAB_HIL_ENABLED variable is "true".
+# reader firmware and the NFC card emulator in the Attractap lab, on every
+# reader type at once: one job per firmware variant, in place <variant>-1.
+# Called from the release and main-branch (nightly) workflows; skipped unless
+# the ATTRACTAP_LAB_HIL_ENABLED variable is "true".
 #
 # Repository variable (the job's `if:` cannot read environment variables):
 #   ATTRACTAP_LAB_HIL_ENABLED       "true" to run at all
 # Variables (repository or `attractap-lab` environment):
 #   LAB_HOST                        Lab host on the tailnet (SSH + coordinator)
 #   ATTRACTAP_LAB_COORDINATOR_PORT  Labgrid coordinator port (default 20408)
-#   ATTRACTAP_LAB_PLACE             Place with reader + emulator (default attractap-touch-v2-1)
 #   ATTRACTAP_LAB_TAILSCALE_TAGS    Tags for the runner's tailnet node (default tag:ci)
 #   ATTRACTAP_LAB_API_RELAY_HOST    Lab host address the readers reach on their LAN
-#   ATTRACTAP_LAB_API_RELAY_PORT    Port the lab host relays to the runner's API (default 20480)
+#   ATTRACTAP_LAB_API_RELAY_PORT    First port the lab host relays to a runner's API
+#                                   (default 20480); each job adds its matrix offset
 #   ATTRACTAP_LAB_LABGRID           pip requirement for the labgrid client with `session`
 #                                   (default git+https://github.com/JappyJan/labgrid@stable-26)
 #   ATTRACTAP_LAB_WAIT_MINUTES      How long to wait for a busy reader (default 30)
@@ -40,24 +41,37 @@ permissions:
   id-token: write
 
 # No concurrency group: it would cancel queued runs (and so block a release).
-# Runs queue for the place in `labgrid-client session` instead, and run.sh
-# opens the lab host's single relay port only while holding the place.
+# Runs queue for their place in `labgrid-client session` instead. Each variant
+# relays on its own lab host port, which run.sh opens only while holding the place.
 
 jobs:
   hil:
     if: vars.ATTRACTAP_LAB_HIL_ENABLED == 'true'
+    name: hil (${{ matrix.variant }})
+    strategy:
+      # Each reader runs in its own place; a failure on one must not cancel the other.
+      fail-fast: false
+      matrix:
+        include:
+          - variant: attractap-touch-v2
+            relay-offset: 0
+          # The Touch V1 is off while idle; its NFC emulator presses the power button.
+          - variant: attractap-touch
+            relay-offset: 1
     runs-on: ubuntu-latest
     environment: attractap-lab
     timeout-minutes: 90
     env:
       LAB_HOST: ${{ vars.LAB_HOST }}
       LG_COORDINATOR: ${{ vars.LAB_HOST }}:${{ vars.ATTRACTAP_LAB_COORDINATOR_PORT || '20408' }}
-      LG_PLACE_NAME: ${{ vars.ATTRACTAP_LAB_PLACE || 'attractap-touch-v2-1' }}
+      LG_PLACE_NAME: ${{ matrix.variant }}-1
+      READER_VARIANT: ${{ matrix.variant }}
       API_RELAY_SSH: labgrid@${{ vars.LAB_HOST }}
       API_RELAY_HOST: ${{ vars.ATTRACTAP_LAB_API_RELAY_HOST }}
-      API_RELAY_PORT: ${{ vars.ATTRACTAP_LAB_API_RELAY_PORT || '20480' }}
+      API_RELAY_FIRST_PORT: ${{ vars.ATTRACTAP_LAB_API_RELAY_PORT || '20480' }}
+      API_RELAY_OFFSET: ${{ matrix.relay-offset }}
       HIL_WAIT_MINUTES: ${{ vars.ATTRACTAP_LAB_WAIT_MINUTES || '30' }}
-      HIL_PURPOSE: CI ${{ github.workflow }} ${{ github.ref_name }} run ${{ github.run_id }}
+      HIL_PURPOSE: CI ${{ github.workflow }} ${{ github.ref_name }} run ${{ github.run_id }} ${{ matrix.variant }}
     steps:
       - name: Check configuration
         run: |
@@ -110,13 +124,14 @@ jobs:
         run: |
           . "$HOME/esp/esp-idf/export.sh" >/dev/null
           export HIL_WAIT_TIMEOUT=$((HIL_WAIT_MINUTES * 60))
+          export API_RELAY_PORT=$((API_RELAY_FIRST_PORT + API_RELAY_OFFSET))
           # shellcheck disable=SC2086
           pnpm nx run attractap-lab:hil -- $PYTEST_ARGS
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: attractap-lab-hil-${{ github.run_id }}
+          name: attractap-lab-hil-${{ matrix.variant }}-${{ github.run_id }}
           path: apps/attractap-lab/hil-artifacts/
           if-no-files-found: ignore
           retention-days: 14

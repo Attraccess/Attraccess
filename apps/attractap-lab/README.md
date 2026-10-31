@@ -174,6 +174,38 @@ to the reader. `NfcEmulatorFlashDriver` flashes the emulator's merged image.
 Emulator profiles persist across sessions; runtime state (selection,
 presentation, faults, overrides) resets when the emulator reboots.
 
+## Readers with a power button
+
+A Touch V1 (Waveshare ESP32-S3-Touch-LCD-4 V3) only powers up after a press of
+its power button, and its power-bank chip turns it off again about 30 s after
+its load drops below roughly 60 mA, as when the parking image darkens it. Wire
+an optocoupler from the place's NFC emulator across that button (see the
+[emulator README](../attractap/nfc-emulator/README.md#reader-power-button-optional));
+`ReaderPowerDriver` then switches the reader through the emulator:
+
+```python
+power = target.get_driver("PowerProtocol")  # from example-emulator-env.yaml
+power.on()   # one press, then waits for the reader's serial port to appear
+power.off()  # two presses, then waits for it to disappear
+```
+
+Native `labgrid-client power on|off|cycle|get` uses the same driver. A reader
+already in the requested state is left alone, so `on()` is safe on any reader.
+`attractap_lab.workflow.power_on(target)` turns the reader on only when it is
+off and the place exports `NfcEmulatorSerial`, binding the emulator itself when
+the environment lists only the reader's drivers. `smoke`, the janitor's parking
+and the HIL reader fixture call it before flashing. In a session, or while
+holding a place, `attractap-lab-power on|off|cycle|get` needs no environment
+file:
+
+```sh
+labgrid-client -p attractap-touch-1 session --purpose 'ATT-1234: cold boot' -- \
+  sh -c 'attractap-lab-power off && attractap-lab-power on'
+```
+
+The emulator needs firmware with `button.press`; older firmware answers
+`unknown_command`.
+
 ## Reader Wi-Fi without revealing the secret
 
 Readers start empty after every release, so each session has to put its
@@ -219,7 +251,11 @@ pnpm nx run attractap-lab:hil -- -k enroll
 
 The runner builds both firmware images, starts an API on a free port with a
 throwaway database (`STORAGE_ROOT`), and runs pytest inside one labgrid
-session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The run seeds
+session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The reader image
+is built for `READER_VARIANT`, by default the place name without its `-<n>`
+suffix (`attractap-touch-1` runs the `attractap-touch` firmware). The tests
+flash the emulator first, then turn the reader on with its power button if it
+is off (a Touch V1 while idle), then flash the reader. The run seeds
 `admin`/`password` into its own database, signs in, and approves the erased
 reader's rotating pairing code (`Enrollment: code=XXX-XXX` on the UART) through
 `POST /api/attractap/pairings/resolve` and `/pairings/:id/approve` with that
@@ -236,11 +272,13 @@ not part of `pnpm nx run attractap-lab:test`, which runs without hardware.
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release
-workflow and on every push to `main`. It is off until the repository variable
+workflow and on every push to `main`, on every reader type at once: one job
+each for the Touch V2 (`attractap-touch-v2-1`) and the Touch V1
+(`attractap-touch-1`), in parallel. It is off until the repository variable
 `ATTRACTAP_LAB_HIL_ENABLED` is `true` (a repository variable, because the job's
 `if:` runs before the `attractap-lab` environment loads); the
-workflow file lists all variables (lab host, coordinator port, place,
-Tailscale tags, relay address/port, labgrid package) and the secrets it reuses
+workflow file lists all variables (lab host, coordinator port, Tailscale tags,
+relay address/port, labgrid package) and the secrets it reuses
 from the hardware smoke workflow (`TS_OAUTH_CLIENT_ID`, `TS_AUDIENCE`,
 `LAB_SSH_PRIVATE_KEY`, `LAB_SSH_KNOWN_HOSTS`).
 
@@ -252,10 +290,11 @@ GitHub concurrency group, which would cancel queued runs.
 
 A runner joins the tailnet, but readers only reach the lab's LAN. The runner
 therefore relays its API through the lab host: enable
-`services.attractap-lab.readerApiRelay` (default port 20480), which lets the
-`labgrid` account open exactly that remote forward, and allow the port from
-the readers' LAN in the host firewall. Set `ATTRACTAP_LAB_API_RELAY_HOST` to
-the lab host's address on that LAN.
+`services.attractap-lab.readerApiRelay` (default ports 20480 and 20481), which
+lets the `labgrid` account open exactly those remote forwards, and allow the
+ports from the readers' LAN in the host firewall. The Touch V2 job relays on
+the first port, the Touch V1 job on the next one. Set
+`ATTRACTAP_LAB_API_RELAY_HOST` to the lab host's address on that LAN.
 
 ## Reader touchscreen and screenshots
 
@@ -379,6 +418,8 @@ the reader as `attractap-lab-janitor/janitor`, checks its eFuses, runs
 `esptool write-flash --erase-all` with the parking image and releases once the
 image prints `ATTRACTAP_PARKED` on the UART. Parking takes roughly 10–20 s. On
 startup and after coordinator restarts, every managed reader is parked once.
+A reader with a power button that is off is switched on first; a parked Touch
+V1 turns itself off again about 30 s later.
 
 Full erase also wipes NVS: each session must provision Wi-Fi/API settings
 again, and a previously paired reader needs a new approval of its pairing code

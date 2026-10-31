@@ -16,9 +16,12 @@ import asyncio
 from types import SimpleNamespace
 
 import grpc
+from labgrid.binding import BindingState
+from labgrid.exceptions import NoDriverFoundError, NoResourceFoundError
 import pytest
 
 from attractap_lab import efuse
+from attractap_lab.drivers import ESPToolDriver, ReaderPowerDriver
 from attractap_lab.janitor import OWNER, Janitor
 from attractap_lab.workflow import park
 from test_lab_workflow import eventually, executable, free_port, running
@@ -93,23 +96,49 @@ class FakeFlash:
         self.events.append(("erase-and-flash", Path(image).name))
 
 
+class FakePower:
+    """A Touch V1 that is off until its emulator presses the power button."""
+
+    def __init__(self, events):
+        self.events = events
+        self.emulator = SimpleNamespace(state=BindingState.bound)
+        self.powered = False
+
+    def get(self):
+        return self.powered
+
+    def on(self):
+        self.events.append("power-on")
+        self.powered = True
+
+
 class FakeTarget:
-    def __init__(self, console, flash):
+    def __init__(self, console, flash, power=None):
         self.console = console
         self.flash = flash
+        self.power = power
         self.events = flash.events
 
     def get_driver(self, name, activate=True):
-        return self.console if name == "SerialDriver" else self.flash
+        drivers = {"SerialDriver": self.console, ESPToolDriver: self.flash, ReaderPowerDriver: self.power}
+        if drivers.get(name) is None:
+            raise NoDriverFoundError(f"no {name}")
+        return drivers[name]
+
+    def get_resource(self, cls, name=None, wait_avail=True):
+        raise NoResourceFoundError(f"no {name}")
 
     def await_resources(self, resources, timeout):
         assert resources == [self.flash.device] and timeout > 0
 
+    def _name(self, driver):
+        return {id(self.console): "serial", id(self.flash): "flash"}.get(id(driver), "power")
+
     def activate(self, driver):
-        self.events.append(("activate", "serial" if driver is self.console else "flash"))
+        self.events.append(("activate", self._name(driver)))
 
     def deactivate(self, driver):
-        self.events.append(("deactivate", "serial" if driver is self.console else "flash"))
+        self.events.append(("deactivate", self._name(driver)))
 
 
 def test_park_checks_efuses_before_erasing(tmp_path):
@@ -136,6 +165,13 @@ def test_park_checks_efuses_before_erasing(tmp_path):
     silent = FakeTarget(FakeConsole([b"garbage\n"]), FakeFlash(espefuse_output(), []))
     with pytest.raises(TimeoutError):
         park(silent, tmp_path / "park.bin", tmp_path / "silent", marker_seconds=0.5)
+
+    # A reader with a power button that turned itself off is switched on first.
+    events = []
+    off = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                     FakeFlash(espefuse_output(), events), FakePower(events))
+    park(off, tmp_path / "park.bin", tmp_path / "off", baseline_dir=tmp_path / "base")
+    assert events.index("power-on") < events.index("efuse")
 
 
 FAKE_PARK = textwrap.dedent("""

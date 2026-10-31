@@ -11,13 +11,16 @@ import socket
 import uuid
 
 from labgrid import Environment
+from labgrid.binding import BindingState
+from labgrid.exceptions import NoDriverFoundError, NoResourceFoundError
 from labgrid.remote.client import start_session
 from labgrid.remote.generated import labgrid_coordinator_pb2 as messages
+from labgrid.resource.common import Resource
 from labgrid.resource.remote import RemotePlaceManager
 from pexpect import TIMEOUT
 
 from . import efuse
-from .drivers import ESPToolDriver, ScreenCaptureDriver
+from .drivers import ESPToolDriver, NfcEmulatorDriver, ReaderPowerDriver, ScreenCaptureDriver
 
 
 @contextmanager
@@ -108,6 +111,48 @@ def _claim(config, place, role, *, acquire=True):
                     ]
 
 
+def reader_power(target):
+    """Return the reader's ReaderPowerDriver, or None if its place has no NFC emulator.
+
+    Uses the environment's driver when it lists one. Otherwise, as for
+    environments that only bind the reader, binds a new one (and an
+    NfcEmulatorDriver if needed) to the place's NfcEmulatorSerial resource.
+    """
+    try:
+        return target.get_driver(ReaderPowerDriver, activate=False)
+    except NoDriverFoundError:
+        pass
+    try:
+        target.get_driver(NfcEmulatorDriver, activate=False)
+    except NoDriverFoundError:
+        try:
+            target.get_resource(Resource, name="NfcEmulatorSerial", wait_avail=False)
+        except NoResourceFoundError:
+            return None
+        target.set_binding_map({"port": "NfcEmulatorSerial"})
+        NfcEmulatorDriver(target, None)
+    return ReaderPowerDriver(target, None)
+
+
+def power_on(target):
+    """Turn the reader on if it is off and its NFC emulator can press its power button.
+
+    A Touch V1 turns itself off about 30 s after its screen goes dark, as when
+    parked. Readers that are on, and places without an emulator, are left alone.
+    """
+    power = reader_power(target)
+    if power is None or power.get():
+        return
+    # Keep an emulator connection the caller uses; close one opened here, as
+    # flashing the emulator needs its port.
+    close = power.emulator.state is not BindingState.active
+    target.activate(power)
+    try:
+        power.on()
+    finally:
+        target.deactivate(power.emulator if close else power)
+
+
 def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, expect=None):
     """Flash/reset, collect a bounded UART log, and capture the reader screen.
 
@@ -121,6 +166,7 @@ def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, e
     console = target.get_driver("SerialDriver", activate=False)
     # Close any earlier console session before esptool opens the same UART.
     target.deactivate(console)
+    power_on(target)
     flash = target.get_driver(ESPToolDriver)
     flash.flash(str(image))
     target.deactivate(flash)
@@ -165,6 +211,7 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     console = target.get_driver("SerialDriver", activate=False)
     target.deactivate(console)
     flash = target.get_driver(ESPToolDriver, activate=False)
+    power_on(target)
     # Labgrid waits forever for an unavailable resource; a missing reader must fail.
     target.await_resources([flash.device], timeout=resource_seconds)
     target.activate(flash)
