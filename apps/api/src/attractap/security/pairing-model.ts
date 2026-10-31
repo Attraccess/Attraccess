@@ -1,15 +1,27 @@
 import { webcrypto } from 'crypto';
 import type { WebSocket } from 'ws';
-import type { PairingFailureReason } from '../dtos/pairing.dto';
 import type { DerivedCode, LiteColour } from './pairing-protocol';
 
 const MAX_FIRMWARE_FIELD = 64;
 
 export const CREDENTIAL_CHANGED_EVENT = 'attractap.credential.changed';
 
-export type PairingState = 'waiting' | 'completed' | 'failed' | 'cancelled' | 'expired';
-export type PairingMode = 'new' | 'pair' | 'takeover';
+export const PAIRING_STATES = ['waiting', 'completed', 'failed', 'cancelled', 'expired'] as const;
+export type PairingState = (typeof PAIRING_STATES)[number];
+export const PAIRING_MODES = ['new', 'pair', 'takeover'] as const;
+export type PairingMode = (typeof PAIRING_MODES)[number];
+export const READER_KINDS = ['touch', 'lite'] as const;
+export type ReaderKind = (typeof READER_KINDS)[number];
 export type PairingMethod = 'code' | 'led-pattern' | 'flasher';
+export const PAIRING_FAILURE_REASONS = [
+  'cancelled-at-reader',
+  'cancelled-by-admin',
+  'reader-disconnected',
+  'protocol',
+  'expired',
+  'internal',
+] as const;
+export type PairingFailureReason = (typeof PAIRING_FAILURE_REASONS)[number];
 
 export interface Actor {
   userId: number;
@@ -47,7 +59,7 @@ export interface PairingRequest {
   address: string;
   createdAt: number;
   expiresAt: number;
-  kind: 'touch' | 'lite';
+  kind: ReaderKind;
   firmware: ReaderFirmware;
   state: PairingState;
   readerPublicKey: Buffer;
@@ -59,6 +71,12 @@ export interface PairingRequest {
   nextRotationAt: number;
   /** An approval is being committed; no second one may start. */
   approving: boolean;
+  /**
+   * The request was asked to end (reader gone, cancelled, expired) while an approval was running.
+   * The approval checks it before committing and applies it when it finishes. `audited`: the
+   * approval already wrote the audit event that explains this end.
+   */
+  endRequested: { reason: PairingFailureReason; actor: Actor | null; audited?: boolean } | null;
   mode: PairingMode | null;
   targetReaderId: number | null;
   rotationTimer: NodeJS.Timeout | null;
@@ -69,7 +87,7 @@ export interface PairingRequest {
 export interface PairingView {
   id: string;
   state: PairingState;
-  kind: 'touch' | 'lite';
+  kind: ReaderKind;
   firmware: ReaderFirmware;
   boundReaderId: number | null;
   targetReaderId: number | null;
@@ -92,7 +110,7 @@ export interface CachedGrant extends BootstrapGrant {
   expiresAt: number;
 }
 
-export const TERMINAL_STATES: PairingState[] = ['completed', 'failed', 'cancelled', 'expired'];
+export const TERMINAL_STATES: readonly PairingState[] = PAIRING_STATES.filter((state) => state !== 'waiting');
 
 export function isTerminal(request: PairingRequest): boolean {
   return TERMINAL_STATES.includes(request.state);

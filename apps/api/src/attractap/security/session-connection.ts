@@ -15,6 +15,12 @@ export const QUEUE_WAIT_TIMEOUT_MS = 10_000;
 export const FIRST_BYTE_TIMEOUT_MS = 5_000;
 const REJECTION_FLUSH_MS = 500;
 const POST_HANDSHAKE_READ_LIMIT_BYTES = 256 * 1024;
+/**
+ * Largest TLS record the server sends. The reader's mbedTLS receive buffer holds 8 KiB of record
+ * content (CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN) and TLS 1.3 negotiates no smaller record size, so
+ * Node's default of 16 KiB would make a large message unreadable for the reader.
+ */
+export const MAX_TLS_RECORD_BYTES = 4096;
 
 export interface SessionTlsMaterial {
   certificateChainPem: string;
@@ -31,7 +37,10 @@ export interface PeerIdentity {
   authorizationError: string | null;
   spkiFingerprint: string;
   spki: Buffer;
-  /** Reader ID from the certificate's URI SAN (only meaningful when chainValid). */
+  /**
+   * Reader ID from the certificate's URI SAN, read only from a certificate the CA signed. Only
+   * `chainValid` makes it an identity; for an out-of-date one it just names the reader in logs.
+   */
   readerId: number | null;
   certificateNotAfter: Date;
 }
@@ -39,7 +48,12 @@ export interface PeerIdentity {
 export type SessionDecision =
   | { kind: 'reader'; readerId: number; certificateNotAfter: Date }
   | { kind: 'bootstrap' }
-  | { kind: 'reject'; reason: string };
+  /**
+   * `notifyReader`: tell the reader inside TLS (`session.rejected`). The reader acts on it by
+   * erasing its key and pin, so it is only sent for a credential decision, never for a
+   * certificate the reader could fix by retrying (e.g. one that looks expired to a wrong clock).
+   */
+  | { kind: 'reject'; reason: string; notifyReader: boolean };
 
 export type SessionCloseReason =
   'handshake-refused' | 'handshake-timeout' | 'handshake-failed' | 'rejected' | 'protocol' | 'closed';
@@ -48,6 +62,8 @@ export class SessionError extends Error {
   public constructor(
     public readonly reason: SessionCloseReason,
     message: string,
+    /** A `session.rejected` frame is on its way; the connection closes once it had time to leave. */
+    public readonly readerNotified = false,
   ) {
     super(message);
   }
@@ -143,8 +159,8 @@ export class SessionConnection extends EventEmitter {
         const decision = await authorize(peer);
         this.throwIfClosed();
         if (decision.kind === 'reject') {
-          this.notifyRejected(decision.reason);
-          throw new SessionError('rejected', decision.reason);
+          if (decision.notifyReader) this.notifyRejected(decision.reason);
+          throw new SessionError('rejected', decision.reason, decision.notifyReader);
         }
 
         this.stream.readLimitBytes = POST_HANDSHAKE_READ_LIMIT_BYTES;
@@ -153,7 +169,7 @@ export class SessionConnection extends EventEmitter {
       });
     } catch (error) {
       // A rejected reader gets a moment to receive the reason; everything else closes right away.
-      if (error instanceof SessionError && error.reason === 'rejected') this.closeAfterFlush();
+      if (error instanceof SessionError && error.readerNotified) this.closeAfterFlush();
       else this.close();
       throw error;
     } finally {
@@ -262,6 +278,11 @@ export class SessionConnection extends EventEmitter {
         rejectUnauthorized: false,
       });
       this.tls = tls;
+      if (!tls.setMaxSendFragment(MAX_TLS_RECORD_BYTES)) {
+        tls.destroy();
+        reject(new SessionError('handshake-failed', 'cannot limit the TLS record size'));
+        return;
+      }
       const onError = (error: Error) => reject(new SessionError('handshake-failed', error.message));
       const onClose = () => reject(new SessionError('handshake-failed', 'closed during handshake'));
       tls.on('error', onError);
@@ -293,7 +314,7 @@ export class SessionConnection extends EventEmitter {
       authorizationError: error,
       spki,
       spkiFingerprint: spkiFingerprint(spki),
-      readerId: error ? null : parseReaderId(sanUri(cert, READER_URI_PREFIX)),
+      readerId: error === NOT_ISSUED_BY_CA ? null : parseReaderId(sanUri(cert, READER_URI_PREFIX)),
       certificateNotAfter: new Date(cert.validTo),
     };
   }

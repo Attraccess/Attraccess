@@ -19,6 +19,8 @@ export interface EmulatedReaderOptions {
   maxVersion?: 'TLSv1.2' | 'TLSv1.3';
   /** A TLS session from an earlier connection, to prove the server never resumes it. */
   session?: Buffer;
+  /** Keep every encrypted byte received, to inspect the TLS records the server sends. */
+  recordWire?: boolean;
 }
 
 /**
@@ -30,6 +32,8 @@ export class EmulatedReader {
   public ws: WebSocket | null = null;
   public stream: WsByteStream | null = null;
   public readonly frames: Frame[] = [];
+  /** Encrypted bytes as received, only with `recordWire`. */
+  public readonly wire: Buffer[] = [];
   /** The last TLS session (ticket) the server handed out, if any. */
   public session: Buffer | null = null;
   public readonly closed: Promise<void>;
@@ -55,7 +59,9 @@ export class EmulatedReader {
     const stream = new WsByteStream(ws, 1024 * 1024);
     this.stream = stream;
     ws.on('message', (data: Buffer, isBinary: boolean) => {
-      if (isBinary) stream.feed(Buffer.from(data));
+      if (!isBinary) return;
+      if (this.options.recordWire) this.wire.push(Buffer.from(data));
+      stream.feed(Buffer.from(data));
     });
     ws.on('close', () => stream.destroy());
 

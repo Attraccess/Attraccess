@@ -93,8 +93,8 @@ export class AttractapPairingController {
   @Auth('resources.update')
   @HttpCode(204)
   @ApiOperation({ summary: 'Cancel a pairing', operationId: 'cancelPairing' })
-  public async cancel(@Param('pairingId') pairingId: string): Promise<void> {
-    await this.pairing.cancel(pairingId);
+  public async cancel(@Param('pairingId') pairingId: string, @Req() req: AuthenticatedRequest): Promise<void> {
+    await this.pairing.cancel(pairingId, actorOf(req));
   }
 
   @Post('readers/:readerId/pair')

@@ -2,7 +2,13 @@ import { createServer, Server } from 'http';
 import { AddressInfo } from 'net';
 import { WebSocket, WebSocketServer } from 'ws';
 import { HandshakeLimiter } from './handshake-limiter';
-import { PeerIdentity, SessionConnection, SessionDecision, SessionError } from './session-connection';
+import {
+  MAX_TLS_RECORD_BYTES,
+  PeerIdentity,
+  SessionConnection,
+  SessionDecision,
+  SessionError,
+} from './session-connection';
 import { FrameType, MAX_MESSAGE_BYTES, SESSION_SUBPROTOCOL } from './session-framing';
 import { EmulatedReader } from './testing/emulated-reader';
 import { TestInstallation, createTestInstallation, createTestReader } from './testing/test-pki';
@@ -24,8 +30,9 @@ describe('SessionConnection', () => {
   const authorize = async (peer: PeerIdentity): Promise<SessionDecision> => {
     if (peer.readerId === SLOW_READER) await new Promise((r) => setTimeout(r, 300));
     if (!peer.chainValid || peer.readerId === null)
-      return { kind: 'reject', reason: `chain ${peer.authorizationError} ${peer.readerId}` };
-    if (known.get(peer.spkiFingerprint) !== peer.readerId) return { kind: 'reject', reason: 'unknown credential' };
+      return { kind: 'reject', reason: `chain ${peer.authorizationError} ${peer.readerId}`, notifyReader: false };
+    if (known.get(peer.spkiFingerprint) !== peer.readerId)
+      return { kind: 'reject', reason: 'unknown credential', notifyReader: true };
     return { kind: 'reader', readerId: peer.readerId, certificateNotAfter: peer.certificateNotAfter };
   };
 
@@ -131,6 +138,8 @@ describe('SessionConnection', () => {
     await reader.connect().catch(() => undefined);
     await reader.closed;
     expect(await outcomes[0]).toBeInstanceOf(SessionError);
+    // Not a credential decision: the reader is not told to give up its pairing.
+    expect(reader.frames).toHaveLength(0);
   });
 
   it('rejects an unknown (never paired) and a revoked credential', async () => {
@@ -217,6 +226,28 @@ describe('SessionConnection', () => {
     readers.push(again);
     await again.connect();
     expect((again.tls as NonNullable<typeof again.tls>).isSessionReused()).toBe(false);
+  });
+
+  it('sends no TLS record larger than the reader can receive', async () => {
+    const identity = await createTestReader(installation, 21);
+    known.set(identity.fingerprint, 21);
+    const reader = new EmulatedReader({ url, identity, recordWire: true });
+    readers.push(reader);
+    await reader.connect();
+    await outcomes[0];
+    // Larger than Node's default record size (16 KiB), so it must be split.
+    expect(connections[0].sendFrame(FrameType.BINARY, Buffer.alloc(40_000, 3))).toBe(true);
+    expect((await reader.nextFrame()).payload.length).toBe(40_000);
+
+    const bytes = Buffer.concat(reader.wire);
+    const records: number[] = [];
+    for (let offset = 0; offset + 5 <= bytes.length; offset += 5 + bytes.readUInt16BE(offset + 3)) {
+      records.push(bytes.readUInt16BE(offset + 3));
+    }
+    expect(records.reduce((sum, length) => sum + 5 + length, 0)).toBe(bytes.length);
+    expect(records.length).toBeGreaterThan(10);
+    // TLS 1.3 adds the inner content type and the 16-byte AEAD tag to each record.
+    expect(Math.max(...records)).toBeLessThanOrEqual(MAX_TLS_RECORD_BYTES + 1 + 16);
   });
 
   it('drops a reader whose outgoing queue exceeds the per-reader limit', async () => {

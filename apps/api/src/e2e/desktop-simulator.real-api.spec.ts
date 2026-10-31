@@ -321,10 +321,30 @@ describe('desktop simulator against an isolated real API', () => {
       return observed.paired && observed.secureSession && observed.authenticated;
     }, 'second pairing');
     const repaired = await desktop().command('inspect');
-    // A new key and a new record ("new" mode); the removed record stays revoked.
+    // A new record ("new" mode); the removed record stays revoked.
     expect(repaired.readerId).not.toBe(removed.id);
     expect(await db.getRepository(Attractap).count()).toBe(readers + 1);
     expect((await db.getRepository(Attractap).findOneByOrFail({ id: removed.id })).pairingState).not.toBe('paired');
+
+    // And a new key: the credential history (as the admin API reports it) names different keys.
+    const history = async (readerId: number) => {
+      const token = await api().get(SessionService).createSession(pairingAdmin as User);
+      desktop().diagnostics.remember(token);
+      const response = await fetch(`${endpoint}${prefix}/attractap/readers/${readerId}/credentials`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(response.status).toBe(200);
+      return (await response.json()) as Array<{ keyFingerprint: string; state: string }>;
+    };
+    const removedHistory = await history(removed.id);
+    const repairedHistory = await history(repaired.readerId);
+    const removedKey = removedHistory.find((event) => event.state === 'paired')?.keyFingerprint;
+    const repairedKey = repairedHistory.find((event) => event.state === 'paired')?.keyFingerprint;
+    expect(removedHistory.map((event) => event.state)).toEqual(['revoked', 'paired']);
+    expect(removedHistory.every((event) => event.keyFingerprint === removedKey)).toBe(true);
+    expect(removedKey).toBeTruthy();
+    expect(repairedKey).toBeTruthy();
+    expect(repairedKey).not.toBe(removedKey);
   }, 120_000);
 
   it('enrolls cards, rejects unknown and incorrect keys, and recovers from write failure and removal', async () => {

@@ -16,6 +16,16 @@ export interface IssuedCertificate {
   notAfter: Date;
 }
 
+/** The credential columns of a reader row as `markPaired` found them, so an undo can put them back. */
+export interface CredentialSnapshot {
+  pairingState: Attractap['pairingState'];
+  credentialFingerprint: string | null;
+  pairedAt: Date | null;
+  certificateNotAfter: Date | null;
+  certificateSerial: string | null;
+  apiTokenHash: string;
+}
+
 const SNAPSHOT = {
   id: true,
   name: true,
@@ -23,6 +33,8 @@ const SNAPSHOT = {
   credentialFingerprint: true,
   certificateSerial: true,
 } as const;
+
+const FULL_SNAPSHOT = { ...SNAPSHOT, pairedAt: true, certificateNotAfter: true, apiTokenHash: true } as const;
 
 /**
  * Owns every change to a reader's credential. Each change writes the reader row and the
@@ -81,6 +93,7 @@ export class CredentialRegistryService {
    * Makes `fingerprint` the reader's only credential. A different, still active credential is
    * closed in the history as revoked (re-pair) or replaced (replace). Decided on the row as it
    * is inside the transaction, so concurrent changes cannot leave the history inconsistent.
+   * Returns the credential columns as they were, for `undoPairing`.
    */
   public async markPaired(input: {
     readerId: number;
@@ -88,12 +101,18 @@ export class CredentialRegistryService {
     certificate: IssuedCertificate;
     actorId: number;
     previousCredentialBecomes: 'revoked' | 'replaced';
-  }): Promise<{ previousFingerprint: string | null }> {
+  }): Promise<{ previousFingerprint: string | null; before: CredentialSnapshot }> {
     const { readerId, fingerprint, certificate, actorId } = input;
     try {
       return await runSerializedTransaction(this.readers.manager, async (manager) => {
-        const reader = await manager.findOne(Attractap, { where: { id: readerId }, select: SNAPSHOT });
+        const reader = await manager.findOne(Attractap, { where: { id: readerId }, select: FULL_SNAPSHOT });
         if (!reader) throw new NotFoundException('Reader not found');
+        // One key, one reader: two records must never share an active credential.
+        const holder = await manager.findOne(Attractap, {
+          where: { credentialFingerprint: fingerprint, pairingState: 'paired' },
+          select: { id: true },
+        });
+        if (holder && holder.id !== reader.id) throw new ConflictException('PairingKeyInUse');
         const previous =
           reader.pairingState === 'paired' &&
           reader.credentialFingerprint &&
@@ -126,7 +145,52 @@ export class CredentialRegistryService {
           state: 'paired',
           actorId,
         });
-        return { previousFingerprint: previous };
+        return { previousFingerprint: previous, before: snapshotOf(reader) };
+      });
+    } finally {
+      this.invalidate(readerId);
+    }
+  }
+
+  /**
+   * Takes back a pairing the reader never learned about: the row gets the credential columns
+   * `markPaired` found (`before`) again, with the token hash, so a working reader keeps working.
+   * Applied only while `fingerprint` is still the reader's active credential; a change that
+   * happened since wins. The history is appended to, never rewritten: the undone key is closed as
+   * revoked and a credential that becomes active again is recorded as paired. Returns whether it
+   * undid anything.
+   */
+  public async undoPairing(input: {
+    readerId: number;
+    fingerprint: string;
+    before: CredentialSnapshot;
+    actorId: number;
+  }): Promise<boolean> {
+    const { readerId, fingerprint, before, actorId } = input;
+    try {
+      return await runSerializedTransaction(this.readers.manager, async (manager) => {
+        const reader = await manager.findOne(Attractap, { where: { id: readerId }, select: SNAPSHOT });
+        if (!reader || reader.pairingState !== 'paired' || reader.credentialFingerprint !== fingerprint) return false;
+        const restored = before.pairingState === 'paired' ? before.credentialFingerprint : null;
+        const event = { readerId: reader.id, readerName: reader.name, actorId };
+        if (restored !== fingerprint) {
+          await manager.insert(AttractapCredentialEvent, {
+            ...event,
+            keyFingerprint: fingerprint,
+            certificateSerial: reader.certificateSerial,
+            state: 'revoked',
+          });
+        }
+        if (restored) {
+          await manager.insert(AttractapCredentialEvent, {
+            ...event,
+            keyFingerprint: restored,
+            certificateSerial: before.certificateSerial,
+            state: 'paired',
+          });
+        }
+        await manager.update(Attractap, reader.id, { ...before });
+        return true;
       });
     } finally {
       this.invalidate(readerId);
@@ -171,4 +235,15 @@ export class CredentialRegistryService {
   public async history(readerId: number): Promise<AttractapCredentialEvent[]> {
     return await this.events.find({ where: { readerId }, order: { createdAt: 'DESC', id: 'DESC' } });
   }
+}
+
+function snapshotOf(reader: Attractap): CredentialSnapshot {
+  return {
+    pairingState: reader.pairingState,
+    credentialFingerprint: reader.credentialFingerprint,
+    pairedAt: reader.pairedAt ?? null,
+    certificateNotAfter: reader.certificateNotAfter ?? null,
+    certificateSerial: reader.certificateSerial ?? null,
+    apiTokenHash: reader.apiTokenHash ?? '',
+  };
 }

@@ -1,8 +1,13 @@
+import { ENROLLMENT_CODE_ALPHABET, ENROLLMENT_CODE_LENGTH } from '@attraccess/shared';
 import { randomInt } from 'crypto';
 
-/** Readable alphabet without 0/1/I/L/O so a code can be read off a screen without mistakes. */
-export const ENROLLMENT_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-export const ENROLLMENT_CODE_LENGTH = 6;
+// The alphabet, length, normalisation and display form are shared with the web app.
+export {
+  ENROLLMENT_CODE_ALPHABET,
+  ENROLLMENT_CODE_LENGTH,
+  formatEnrollmentCode,
+  normalizeEnrollmentCode,
+} from '@attraccess/shared';
 
 export function generateEnrollmentCode(isTaken: (code: string) => boolean = () => false): string {
   for (;;) {
@@ -12,18 +17,6 @@ export function generateEnrollmentCode(isTaken: (code: string) => boolean = () =
     }
     if (!isTaken(code)) return code;
   }
-}
-
-/** Case, whitespace and the display hyphen do not matter; returns null when the input cannot be a code. */
-export function normalizeEnrollmentCode(input: string): string | null {
-  const code = input.replace(/[\s-]/g, '').toUpperCase();
-  if (code.length !== ENROLLMENT_CODE_LENGTH) return null;
-  for (const char of code) if (!ENROLLMENT_CODE_ALPHABET.includes(char)) return null;
-  return code;
-}
-
-export function formatEnrollmentCode(code: string): string {
-  return `${code.slice(0, 3)}-${code.slice(3)}`;
 }
 
 /**

@@ -103,8 +103,4 @@ export class EnrollmentLimitsService {
     if (failures) failures.count += 1;
     else this.approverFailures.set(userId, { count: 1, firstAt: now });
   }
-
-  clearApprover(userId: number): void {
-    this.approverFailures.delete(userId);
-  }
 }

@@ -6,12 +6,13 @@ import {
   NotFoundException,
   OnApplicationShutdown,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Attractap } from '@attraccess/database-entities';
 import { randomBytes, randomUUID } from 'crypto';
 import type { IncomingMessage } from 'http';
 import type { WebSocket } from 'ws';
 import { AuditService } from '../../audit/audit.service';
+import type { AppConfigType } from '../../config/app.config';
 import { resolveClientAddress } from '../../device-enrollment/client-address';
 import {
   ENROLLMENT_CODE_ROTATION_MS,
@@ -21,19 +22,19 @@ import { normalizeEnrollmentCode } from '../../device-enrollment/enrollment-code
 import { EnrollmentLimitsService } from '../../device-enrollment/enrollment-limits.service';
 import { SettingsService } from '../../settings/settings.service';
 import { AttractapService } from '../attractap.service';
-import type { PairingFailureReason } from '../dtos/pairing.dto';
+import { BootstrapGrants } from './bootstrap-grants';
 import { CredentialRegistryService } from './credential-registry.service';
 import { InstallationIdentityService } from './installation-identity.service';
+import { PairingApproval } from './pairing-approval';
+import { PairingAuditAction, recordPairingEvent } from './pairing-audit';
 import { commitment, deriveCode, generateNonce, NONCE_BYTES } from './pairing-protocol';
-import { spkiFingerprint } from './pki';
 import {
   Actor,
   ApproveInput,
   BootstrapGrant,
   CREDENTIAL_CHANGED_EVENT,
-  CachedGrant,
+  PairingFailureReason,
   PairingMethod,
-  PairingMode,
   PairingRequest,
   PairingView,
   Round,
@@ -58,8 +59,6 @@ const HELLO_TIMEOUT_MS = 30_000;
 const MAX_MESSAGE_BYTES = 4096;
 const TICKET_TTL_MS = 5 * 60 * 1000;
 const MAX_TICKETS = 256;
-const MAX_NAME_LENGTH = 64;
-const GRANT_TTL_MS = 5 * 60 * 1000;
 const APP_URL_CACHE_MS = ENROLLMENT_CODE_ROTATION_MS;
 const TERMINAL_VISIBLE_MS = 60_000;
 
@@ -69,8 +68,10 @@ export { CREDENTIAL_CHANGED_EVENT };
 export class PairingService implements OnApplicationShutdown {
   private readonly logger = new Logger(PairingService.name);
   private readonly requests = new Map<string, PairingRequest>();
-  /** Certificates issued at pairing, by key fingerprint, kept until the reader used one. */
-  private readonly grants = new Map<string, CachedGrant>();
+  private readonly grants = new BootstrapGrants();
+  private readonly approval: PairingApproval;
+  /** Closes a pairing connection that has no request and sends no `hello` in time. */
+  private readonly helloTimers = new WeakMap<WebSocket, NodeJS.Timeout>();
   /** One-time tickets that let a token reader bind its pairing request to its own record. */
   private readonly tickets = new Map<string, { readerId: number; expiresAt: number }>();
   private appUrl: { value: string | null; fetchedAt: number } | null = null;
@@ -83,7 +84,11 @@ export class PairingService implements OnApplicationShutdown {
     private readonly events: EventEmitter2,
     private readonly limits: EnrollmentLimitsService,
     private readonly settings: SettingsService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    // Not a provider of its own: it shares the bootstrap grants and runs only inside `approve`.
+    this.approval = new PairingApproval(attractap, identity, registry, audit, events, this.grants);
+  }
 
   public onApplicationShutdown(): void {
     for (const request of this.requests.values()) this.clearTimers(request);
@@ -93,13 +98,14 @@ export class PairingService implements OnApplicationShutdown {
 
   public handleConnection(ws: WebSocket, request: IncomingMessage): void {
     const connectionId = randomUUID();
-    const address = resolveClientAddress(request, process.env.TRUST_PROXY);
+    // The same validated TRUST_PROXY value the HTTP server uses (main.bootstrap).
+    const address = resolveClientAddress(request, this.config.get<AppConfigType>('app')?.TRUST_PROXY);
     let current: PairingRequest | null = null;
     let queue: Promise<void> = Promise.resolve();
-    let helloTimer = setTimeout(() => ws.close(1008, 'hello timeout'), HELLO_TIMEOUT_MS);
+    this.armHelloTimeout(ws);
 
     ws.on('close', () => {
-      clearTimeout(helloTimer);
+      this.clearHelloTimeout(ws);
       this.limits.forgetConnection(connectionId);
       if (current && !isTerminal(current)) void this.fail(current, 'reader-disconnected');
     });
@@ -111,15 +117,11 @@ export class PairingService implements OnApplicationShutdown {
           if (isBinary || data.length > MAX_MESSAGE_BYTES) throw new Error('bad message');
           const message = JSON.parse(data.toString('utf8')) as Record<string, unknown>;
           if (!current || isTerminal(current)) {
-            clearTimeout(helloTimer);
+            this.clearHelloTimeout(ws);
             current = await this.onHello(ws, connectionId, address, message);
             return;
           }
           await this.onReaderMessage(current, message);
-          if (isTerminal(current) && ws.readyState === ws.OPEN) {
-            // A cancelled request leaves the connection open for a new `hello`.
-            helloTimer = setTimeout(() => ws.close(1008, 'hello timeout'), HELLO_TIMEOUT_MS);
-          }
         } catch (error) {
           this.logger.debug(`Pairing message rejected: ${(error as Error).message}`);
           if (current && !isTerminal(current)) await this.fail(current, 'protocol');
@@ -140,13 +142,14 @@ export class PairingService implements OnApplicationShutdown {
     const kind = message['kind'];
     const firmware = validFirmware(message['firmware']);
     const readerPublicKey = await canonicalP256Spki(message['publicKey']);
-    const boundReaderId = await this.resolveTicket(message['ticket']);
 
+    // Admitted first: a rate-limited hello must not use up the reader's one-time ticket.
     const admission = this.limits.admit(connectionId, address);
     if (!admission.allowed) {
       this.refuse(ws, admission.reason === 'RATE_LIMITED' ? 'rate-limited' : 'busy');
       return null;
     }
+    const boundReaderId = await this.resolveTicket(message['ticket']);
     const serverPublicKey = await this.identity.getCaPublicKeySpki();
     if (ws.readyState !== ws.OPEN) throw new Error('reader went away');
 
@@ -172,6 +175,7 @@ export class PairingService implements OnApplicationShutdown {
       previous: null,
       nextRotationAt: now + ENROLLMENT_CODE_ROTATION_MS,
       approving: false,
+      endRequested: null,
       mode: null,
       targetReaderId: boundReaderId,
       rotationTimer: null,
@@ -184,6 +188,9 @@ export class PairingService implements OnApplicationShutdown {
     request.expiryTimer.unref?.();
     this.requests.set(id, request);
     await this.announceRound(request);
+    // The close handler only knows the request once this returns; a reader that left while the
+    // first round was being prepared must not leave a request behind that holds its limits.
+    if (ws.readyState !== ws.OPEN) await this.fail(request, 'reader-disconnected');
     return request;
   }
 
@@ -300,22 +307,29 @@ export class PairingService implements OnApplicationShutdown {
     const request = this.mustFind(id);
     if (isTerminal(request) || request.approving) throw new ConflictException('PairingNotWaiting');
     const method = this.verifyProof(request, input, actor);
-    this.limits.clearApprover(actor.userId);
+    // A correct code does not reset the wrong-code count; it runs out with its window.
 
     // Claimed before the first await so concurrent approvals cannot both pass the guards above.
+    // While it is set, a disconnect, cancel or expiry only records that the request should end.
     request.approving = true;
     try {
-      const target = await this.resolveTarget(request, input);
-      await this.complete(request, input, target, method, actor);
+      const readerId = await this.approval.run(request, input, method, actor);
+      request.state = 'completed';
+      request.mode = input.mode;
+      request.targetReaderId = readerId;
+      this.finish(request);
     } finally {
       request.approving = false;
+      const ending = request.endRequested;
+      request.endRequested = null;
+      if (ending && !isTerminal(request)) await this.end(request, ending.reason, ending.actor, ending.audited);
     }
     return this.view(request, true);
   }
 
-  public async cancel(id: string): Promise<void> {
+  public async cancel(id: string, actor: Actor): Promise<void> {
     const request = this.mustFind(id);
-    await this.fail(request, 'cancelled-by-admin');
+    await this.fail(request, 'cancelled-by-admin', actor);
   }
 
   private requestForCode(rawCode: string, actor: Actor): PairingRequest {
@@ -350,118 +364,15 @@ export class PairingService implements OnApplicationShutdown {
     return 'led-pattern';
   }
 
-  private async resolveTarget(request: PairingRequest, input: ApproveInput): Promise<number | null> {
-    if (input.mode === 'new') {
-      if (request.boundReaderId) throw new BadRequestException('This reader already has a record; use pair');
-      return null;
-    }
-    if (input.mode === 'pair') {
-      if (!request.boundReaderId) throw new BadRequestException('Only readers signed in with a token can be paired');
-      return request.boundReaderId;
-    }
-    if (!input.targetReaderId) throw new BadRequestException('targetReaderId is required');
-    if (request.boundReaderId && request.boundReaderId !== input.targetReaderId) {
-      throw new BadRequestException('This reader is bound to a different record');
-    }
-    if (!(await this.attractap.findReaderById(input.targetReaderId))) throw new NotFoundException('Reader not found');
-    return input.targetReaderId;
-  }
-
-  private async complete(
-    request: PairingRequest,
-    input: ApproveInput,
-    targetId: number | null,
-    method: PairingMethod,
-    actor: Actor,
-  ): Promise<void> {
-    if (request.ws.readyState !== request.ws.OPEN) {
-      await this.fail(request, 'reader-disconnected');
-      throw new ConflictException('PairingReaderGone');
-    }
-    let created: Attractap | null = null;
-    try {
-      const fingerprint = spkiFingerprint(request.readerPublicKey);
-      let reader: Attractap | null;
-      if (targetId) {
-        reader = await this.attractap.findReaderById(targetId);
-      } else {
-        created = (await this.attractap.createNewReader()).reader;
-        reader = created;
-        const name = input.name?.trim();
-        if (name) reader = await this.attractap.updateReader(created.id, { name: name.slice(0, MAX_NAME_LENGTH) });
-      }
-      if (!reader) throw new Error('target reader disappeared');
-
-      const certificate = await this.identity.issueReaderCertificate(reader.id, request.readerPublicKey);
-      const { previousFingerprint } = await this.registry.markPaired({
-        readerId: reader.id,
-        fingerprint,
-        certificate,
-        actorId: actor.userId,
-        previousCredentialBecomes: input.mode === 'takeover' ? 'replaced' : 'revoked',
-      });
-      request.state = 'completed';
-      request.mode = input.mode;
-      request.targetReaderId = reader.id;
-      this.dropGrantsFor(reader.id);
-      this.grants.set(fingerprint, {
-        readerId: reader.id,
-        certificatePem: certificate.pem,
-        expiresAt: Date.now() + GRANT_TTL_MS,
-      });
-      this.events.emit(CREDENTIAL_CHANGED_EVENT, reader.id);
-      this.deliverAccepted(request);
-      created = null; // delivered: nothing to roll back any more
-      await this.recordApproval(reader.id, input.mode, method, actor, previousFingerprint !== null);
-      this.finish(request);
-    } catch (error) {
-      await this.rollBack(request, created, error as Error);
-      throw error instanceof ConflictException || error instanceof NotFoundException
-        ? error
-        : new ConflictException('PairingFailed');
-    }
-  }
-
-  private deliverAccepted(request: PairingRequest): void {
-    // `send` throws when the connection is gone; the caller then rolls the new record back.
-    request.ws.send(JSON.stringify({ type: 'accepted' }));
-  }
-
-  private async rollBack(request: PairingRequest, created: Attractap | null, error: Error): Promise<void> {
-    this.logger.error(`Completing pairing failed: ${error.message}`);
-    if (created) {
-      this.dropGrantsFor(created.id);
-      await this.attractap.deleteReader(created.id).catch(() => undefined);
-    }
-    if (!isTerminal(request) || request.state === 'completed') {
-      request.state = 'failed';
-      request.failureReason = 'internal';
-      this.send(request, { type: 'failed', reason: 'internal' });
-      this.finish(request);
-    }
-  }
-
-  private async recordApproval(
-    readerId: number,
-    mode: PairingMode,
-    method: PairingMethod,
-    actor: Actor,
-    hadPrevious: boolean,
-  ): Promise<void> {
-    if (hadPrevious) await this.record(readerId, 'reader.replaced', actor, { replacedReaderId: readerId });
-    if (mode === 'new') await this.record(readerId, 'reader.enrolled', actor, { method });
-    else await this.record(readerId, 'reader.pairing_confirmed', actor, { mode, method });
-  }
-
   // --- bootstrap and lifecycle -------------------------------------------------------------
 
   public async resolveBootstrap(peer: { spkiFingerprint: string; spki: Buffer }): Promise<BootstrapGrant | null> {
     const fingerprint = peer.spkiFingerprint;
     const cached = this.grants.get(fingerprint);
-    if (cached && cached.expiresAt > Date.now() && (await this.registry.isActive(cached.readerId, fingerprint))) {
+    if (cached && (await this.registry.isActive(cached.readerId, fingerprint))) {
       return { readerId: cached.readerId, certificatePem: cached.certificatePem };
     }
-    this.grants.delete(fingerprint);
+    this.grants.forget(fingerprint);
 
     const readerId = await this.registry.findPairedReaderByFingerprint(fingerprint);
     if (!readerId) return null;
@@ -472,33 +383,51 @@ export class PairingService implements OnApplicationShutdown {
 
   /** The reader opened a normal session with its certificate: the bootstrap grant is spent. */
   public forgetGrant(keyFingerprint: string): void {
-    this.grants.delete(keyFingerprint);
+    this.grants.forget(keyFingerprint);
   }
 
   /** Revoke: the credential stops working immediately and the live session ends. */
   public async revoke(readerId: number, actor: Actor): Promise<void> {
     await this.registry.revoke(readerId, actor.userId);
-    this.dropGrantsFor(readerId);
+    this.grants.forgetReader(readerId);
     this.events.emit(CREDENTIAL_CHANGED_EVENT, readerId);
     await this.record(readerId, 'reader.revoked', actor, { reason: 'admin' });
   }
 
-  private async fail(request: PairingRequest, reason: PairingFailureReason): Promise<void> {
+  /** Ends a request; while an approval runs, only notes it so the approval can stop or apply it. */
+  private async fail(request: PairingRequest, reason: PairingFailureReason, actor: Actor | null = null): Promise<void> {
     if (isTerminal(request)) return;
-    request.state = reason === 'cancelled-at-reader' || reason === 'cancelled-by-admin' ? 'cancelled' : 'failed';
-    request.failureReason = reason;
-    if (reason !== 'cancelled-at-reader') this.send(request, { type: 'failed', reason });
-    this.finish(request, reason !== 'cancelled-at-reader');
-    await this.record(request.boundReaderId, 'reader.pairing_failed', null, { reason });
+    if (request.approving) {
+      request.endRequested ??= { reason, actor };
+      return;
+    }
+    await this.end(request, reason, actor);
   }
 
   private async expire(request: PairingRequest): Promise<void> {
+    await this.fail(request, 'expired');
+  }
+
+  /** `audited`: the approval already recorded why the request ends. */
+  private async end(
+    request: PairingRequest,
+    reason: PairingFailureReason,
+    actor: Actor | null,
+    audited = false,
+  ): Promise<void> {
     if (isTerminal(request)) return;
-    request.state = 'expired';
-    request.failureReason = 'expired';
-    this.send(request, { type: 'failed', reason: 'expired' });
-    this.finish(request);
-    await this.record(request.boundReaderId, 'reader.pairing_expired', null, { reason: 'timeout' });
+    request.failureReason = reason;
+    if (reason === 'expired') {
+      request.state = 'expired';
+      this.send(request, { type: 'failed', reason });
+      this.finish(request);
+      await this.record(request.boundReaderId, 'reader.pairing_expired', null, { reason: 'timeout' });
+      return;
+    }
+    request.state = reason === 'cancelled-at-reader' || reason === 'cancelled-by-admin' ? 'cancelled' : 'failed';
+    if (reason !== 'cancelled-at-reader') this.send(request, { type: 'failed', reason });
+    this.finish(request, reason !== 'cancelled-at-reader');
+    if (!audited) await this.record(request.boundReaderId, 'reader.pairing_failed', actor, { reason });
   }
 
   private clearTimers(request: PairingRequest): void {
@@ -508,11 +437,16 @@ export class PairingService implements OnApplicationShutdown {
     request.expiryTimer = null;
   }
 
-  /** Releases a request that reached a terminal state; closes the connection unless the reader cancelled. */
+  /**
+   * Releases a request that reached a terminal state. Closes the connection unless the reader
+   * cancelled; then it may send a new `hello`, within the usual time.
+   */
   private finish(request: PairingRequest, closeConnection = true): void {
     this.clearTimers(request);
     this.limits.releasePending(request.id);
-    if (closeConnection) {
+    if (!closeConnection) {
+      this.armHelloTimeout(request.ws);
+    } else {
       try {
         request.ws.close(1000);
       } catch {
@@ -523,8 +457,18 @@ export class PairingService implements OnApplicationShutdown {
     setTimeout(() => this.requests.delete(request.id), TERMINAL_VISIBLE_MS).unref();
   }
 
-  private dropGrantsFor(readerId: number): void {
-    for (const [key, grant] of this.grants) if (grant.readerId === readerId) this.grants.delete(key);
+  private armHelloTimeout(ws: WebSocket): void {
+    this.clearHelloTimeout(ws);
+    if (ws.readyState !== ws.OPEN) return;
+    this.helloTimers.set(
+      ws,
+      setTimeout(() => ws.close(1008, 'hello timeout'), HELLO_TIMEOUT_MS),
+    );
+  }
+
+  private clearHelloTimeout(ws: WebSocket): void {
+    clearTimeout(this.helloTimers.get(ws));
+    this.helloTimers.delete(ws);
   }
 
   private consumeTicket(ticket: string): number | null {
@@ -535,30 +479,13 @@ export class PairingService implements OnApplicationShutdown {
 
   // --- helpers -----------------------------------------------------------------------------
 
-  /** The audit log needs a reader and a responsible person; reader-initiated failures use the device actor. */
-  private async record(
+  private record(
     readerId: number | null,
-    action:
-      | 'reader.enrolled'
-      | 'reader.pairing_confirmed'
-      | 'reader.pairing_failed'
-      | 'reader.pairing_expired'
-      | 'reader.revoked'
-      | 'reader.replaced',
+    action: PairingAuditAction,
     actor: Actor | null,
     details: Record<string, string | number>,
   ): Promise<void> {
-    if (!readerId) return;
-    await this.audit
-      .recordAttractap({
-        action,
-        actorId: actor ? actor.userId : null,
-        authenticationMethod: actor ? actor.authenticationMethod : null,
-        apiTokenId: actor?.authenticationMethod === 'api-token' ? actor.apiTokenId : undefined,
-        subjectId: readerId,
-        details,
-      })
-      .catch(() => undefined);
+    return recordPairingEvent(this.audit, readerId, action, actor, details);
   }
 
   private send(request: PairingRequest, message: Record<string, unknown>): void {

@@ -1,5 +1,6 @@
 import { ENROLLMENT_CODE_ALPHABET, generateEnrollmentCode, normalizeEnrollmentCode } from './enrollment-code';
 
+// Normalisation and formatting are tested with the shared code in libs/shared.
 describe('enrollment codes', () => {
   it('uses 6 characters of the unambiguous alphabet', () => {
     for (let i = 0; i < 200; i++) {
@@ -13,14 +14,8 @@ describe('enrollment codes', () => {
     expect(calls).toBe(5);
   });
 
-  it('ignores case, spaces and the hyphen', () => {
-    expect(normalizeEnrollmentCode(' k7p-3xq ')).toBe('K7P3XQ');
-    expect(normalizeEnrollmentCode('K7P3XQ')).toBe('K7P3XQ');
-  });
-
-  it('rejects ambiguous characters and wrong lengths', () => {
-    expect(normalizeEnrollmentCode('K7P-3X0')).toBeNull();
-    expect(normalizeEnrollmentCode('K7P-3X')).toBeNull();
-    expect(normalizeEnrollmentCode('')).toBeNull();
+  it('generates codes that survive normalisation unchanged', () => {
+    const code = generateEnrollmentCode();
+    expect(normalizeEnrollmentCode(code)).toBe(code);
   });
 });

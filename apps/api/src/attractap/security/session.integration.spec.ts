@@ -1,5 +1,6 @@
 import { Attractap } from '@attraccess/database-entities';
 import { INestApplication } from '@nestjs/common';
+import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { createWsAdapter } from '../../common/text-frame-ws-adapter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
@@ -7,12 +8,13 @@ import { AddressInfo } from 'net';
 import { WebSocket } from 'ws';
 import { LicenseService } from '../../license/license.service';
 import { AttractapService } from '../attractap.service';
+import { AttractapAuthHandler } from '../websockets/handlers/auth/auth.handler';
 import { AttractapGateway } from '../websockets/websocket.gateway';
 import { gatewayProviders } from '../websockets/websocket.gateway.attractap-gateway.test-fixture';
 import { CredentialRegistryService } from './credential-registry.service';
 import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
-import { PairingService } from './pairing.service';
+import { CREDENTIAL_CHANGED_EVENT, PairingService } from './pairing.service';
 import { ReaderSessionService } from './reader-session.service';
 import { FrameType, SESSION_SUBPROTOCOL } from './session-framing';
 import { SessionMetrics } from './session-metrics';
@@ -27,6 +29,14 @@ describe('reader session through the real gateway', () => {
   const active = new Set<string>();
   const readers: EmulatedReader[] = [];
   const grants = new Map<string, { readerId: number; certificatePem: string; expiresAt: number }>();
+  /** 0: the registry answers from its cache; otherwise it reads the database first. */
+  let registryReadMs = 0;
+  const recordCertificate = jest.fn(async () => undefined);
+  const issueReaderCertificate = jest.fn(async () => ({
+    pem: 'RENEWED-CERT-PEM',
+    serial: '0b',
+    notAfter: new Date(Date.now() + 365 * 24 * 3600_000),
+  }));
 
   beforeAll(async () => {
     installation = await createTestInstallation('inst-gw');
@@ -51,11 +61,18 @@ describe('reader session through the real gateway', () => {
           }),
           getCaCertificatePem: async () => installation.caPem,
           getInstallationId: async () => installation.installationId,
+          issueReaderCertificate,
         },
       },
       {
         provide: CredentialRegistryService,
-        useValue: { isActive: async (id: number, fp: string) => active.has(`${id}:${fp}`) },
+        useValue: {
+          isActive: async (id: number, fp: string) => {
+            if (registryReadMs > 0) await new Promise((r) => setTimeout(r, registryReadMs));
+            return active.has(`${id}:${fp}`);
+          },
+          recordCertificate,
+        },
       },
       {
         provide: PairingService,
@@ -72,6 +89,7 @@ describe('reader session through the real gateway', () => {
       ReaderSessionService,
     ];
     const module = await Test.createTestingModule({
+      imports: [EventEmitterModule.forRoot()],
       providers: (
         gatewayProviders(
           attractapService,
@@ -93,11 +111,14 @@ describe('reader session through the real gateway', () => {
     void AttractapService;
   }, 30_000);
 
-  afterEach(() => readers.splice(0).forEach((r) => r.close()));
+  afterEach(() => {
+    readers.splice(0).forEach((r) => r.close());
+    registryReadMs = 0;
+  });
   afterAll(async () => app.close());
 
-  async function connectPaired(readerId: number) {
-    const identity = await createTestReader(installation, readerId);
+  async function connectPaired(readerId: number, options: Parameters<typeof createTestReader>[2] = {}) {
+    const identity = await createTestReader(installation, readerId, options);
     active.add(`${readerId}:${identity.fingerprint}`);
     const reader = new EmulatedReader({ url, identity });
     readers.push(reader);
@@ -166,7 +187,8 @@ describe('reader session through the real gateway', () => {
     await reader.nextFrame((f) => f.type === FrameType.JSON);
     const started = Date.now();
     active.clear(); // what the registry reports once the credential is revoked
-    await gateway.onCredentialChanged(7);
+    // What PairingService.revoke emits; the gateway listens for it.
+    app.get(EventEmitter2).emit(CREDENTIAL_CHANGED_EVENT, 7);
     await reader.closed;
     expect(Date.now() - started).toBeLessThan(1000);
 
@@ -178,12 +200,30 @@ describe('reader session through the real gateway', () => {
     expect(again.frames.filter((f) => f.type === FrameType.JSON)).toHaveLength(0);
   });
 
-  it('rejects a reader whose credential is not active', async () => {
+  it.each([
+    ['answered from the cache', 0],
+    ['read from the database', 50],
+  ])('tells a reader whose credential is not active, with the registry %s', async (_name, readMs) => {
+    registryReadMs = readMs;
     const identity = await createTestReader(installation, 8); // never registered as active
     const reader = new EmulatedReader({ url, identity });
     readers.push(reader);
     await reader.connect().catch(() => undefined);
     await reader.closed;
+    // Nothing of the application reached it, but the reason did, inside TLS.
+    expect(reader.frames.filter((f) => f.type !== FrameType.CONTROL)).toHaveLength(0);
+    expect(reader.frames.map((f) => json(f))).toEqual([{ t: 'session.rejected', reason: 'inactive-credential' }]);
+  });
+
+  it('renews a reader certificate that expires soon and records it', async () => {
+    // The sign-in itself is covered above; here it just succeeds so the renewal check runs next.
+    const signIn = jest.spyOn(app.get(AttractapAuthHandler), 'authenticateSessionReader').mockResolvedValueOnce(true);
+    const { reader, identity } = await connectPaired(18, { validityMs: 30 * 24 * 3600_000 });
+    const renew = await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'cert.renew', 5000);
+    expect(json(renew)).toEqual({ t: 'cert.renew', certificate: 'RENEWED-CERT-PEM' });
+    expect(issueReaderCertificate).toHaveBeenCalledWith(18, expect.any(Buffer));
+    expect(recordCertificate).toHaveBeenCalledWith(18, identity.fingerprint, expect.objectContaining({ serial: '0b' }));
+    signIn.mockRestore();
   });
 
   it('hands a freshly paired reader its certificate in a bootstrap session', async () => {
@@ -217,17 +257,31 @@ describe('reader session through the real gateway', () => {
     grants.delete(bootstrapIdentity.fingerprint);
   });
 
-  it('does not renew an expired installation certificate through the bootstrap path', async () => {
+  it('neither renews nor tells a reader whose expired certificate still belongs to its active credential', async () => {
     const expired = await createTestReader(installation, 17, {
       validityMs: 1000,
       now: new Date(Date.now() - 3600_000),
     });
+    active.add(`17:${expired.fingerprint}`); // the clock may be wrong: the reader must keep its pairing
     grants.set(expired.fingerprint, { readerId: 17, certificatePem: 'CERT-PEM', expiresAt: Date.now() + 60_000 });
     const reader = new EmulatedReader({ url, identity: expired });
     readers.push(reader);
     await reader.connect().catch(() => undefined);
     await reader.closed;
     expect(reader.frames).toHaveLength(0);
+  });
+
+  it('tells a reader with an expired certificate whose credential was revoked or replaced', async () => {
+    const expired = await createTestReader(installation, 19, {
+      validityMs: 1000,
+      now: new Date(Date.now() - 3600_000),
+    });
+    // Not active: what the registry reports once the credential is revoked or replaced.
+    const reader = new EmulatedReader({ url, identity: expired });
+    readers.push(reader);
+    await reader.connect().catch(() => undefined);
+    await reader.closed;
+    expect(reader.frames.map((f) => json(f))).toEqual([{ t: 'session.rejected', reason: 'inactive-credential' }]);
   });
 
   it('refuses unknown subprotocol versions at upgrade and still serves legacy connections', async () => {

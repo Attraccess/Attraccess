@@ -64,6 +64,8 @@ describe('AttractapPairingController authorization and throttling', () => {
     ['post', '/attractap/pairings/abc/approve'],
     ['delete', '/attractap/pairings/abc'],
     ['post', '/attractap/readers/4/revoke'],
+    ['post', '/attractap/readers/4/pair'],
+    ['get', '/attractap/readers/4/credentials'],
   ];
 
   it.each(endpoints)('%s %s: 401 without sign-in', async (method, path) => {
@@ -109,6 +111,14 @@ describe('AttractapPairingController authorization and throttling', () => {
       { code: 'K7P3XQ', mode: 'new', name: 'Laser' },
       { userId: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
     );
+  });
+
+  it('records who cancelled a pairing', async () => {
+    await call('delete', '/attractap/pairings/p1')
+      .set('x-test-user', '3')
+      .set('x-test-permissions', 'resources.update')
+      .expect(204);
+    expect(pairing.cancel).toHaveBeenCalledWith('p1', { userId: 3, authenticationMethod: 'session' });
   });
 
   it('rejects an invalid approve body', async () => {

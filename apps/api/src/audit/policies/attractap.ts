@@ -11,7 +11,7 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
   'reader.pairing_failed': new Set(['reason']),
   'reader.pairing_expired': new Set(['reason']),
   'reader.revoked': new Set(['reason']),
-  'reader.replaced': new Set(['replacedReaderId']),
+  'reader.replaced': new Set(['mode']),
   'reader.token_rejected': new Set(['reason']),
   'reader.handshake_rejected': new Set(['reason', 'count']),
 };
@@ -35,7 +35,6 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   resetReason: (value) => attractapResetReasons.has(value as string),
   hasCoredump: (value) => typeof value === 'boolean',
   readerId: positive,
-  replacedReaderId: positive,
   count: positive,
   mode: oneOf('new', 'pair', 'takeover'),
   method: oneOf('code', 'led-pattern', 'flasher'),

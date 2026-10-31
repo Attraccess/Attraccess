@@ -5,7 +5,8 @@ import { enrollmentCodeFromDigest } from '../../device-enrollment/enrollment-cod
  * Key-bound rotating code. The server commits to its nonce, the reader answers with its own, the
  * server reveals. Both sides derive the same code from both keys and both nonces, so an
  * attacker who swapped a key shows the admin a code that does not match the one on the reader.
- * The firmware derives the same values (see tests/pairing-vectors.json, run by both sides).
+ * The firmware derives the same values (see apps/attractap/firmware/tests/pairing/vectors.json, run by
+ * both sides).
  */
 export const COMMIT_TAG = 'attractap-pairing-commit-v1';
 export const CODE_TAG = 'attractap-pairing-code-v1';

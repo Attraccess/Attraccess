@@ -74,14 +74,25 @@ export class ReaderSessionService implements OnModuleDestroy {
           if (!peer.chainValid) {
             // An expired or otherwise invalid installation certificate is rejected, never
             // renewed through the bootstrap path.
-            if (peer.issuedByCa) return { kind: 'reject', reason: 'invalid-certificate' };
+            if (peer.issuedByCa) {
+              rejectedReaderId = peer.readerId;
+              // A key that is no longer the reader's credential (revoked, replaced) is told so:
+              // that is server state alone, so a wrong clock cannot cause it, and the reader can
+              // start over. While it is still the credential the reader is not told: a reader
+              // whose clock or the server's is off would otherwise erase its pairing. It retries;
+              // the rejection still shows in metrics and the audit log.
+              if (peer.readerId !== null && !(await this.registry.isActive(peer.readerId, peer.spkiFingerprint))) {
+                return { kind: 'reject', reason: 'inactive-credential', notifyReader: true };
+              }
+              return { kind: 'reject', reason: 'invalid-certificate', notifyReader: false };
+            }
             grant = await this.pairing.resolveBootstrap(peer);
-            return grant ? { kind: 'bootstrap' } : { kind: 'reject', reason: 'unknown-credential' };
+            return grant ? { kind: 'bootstrap' } : { kind: 'reject', reason: 'unknown-credential', notifyReader: true };
           }
-          if (peer.readerId === null) return { kind: 'reject', reason: 'no-reader-id' };
+          if (peer.readerId === null) return { kind: 'reject', reason: 'no-reader-id', notifyReader: false };
           rejectedReaderId = peer.readerId;
           if (!(await this.registry.isActive(peer.readerId, peer.spkiFingerprint))) {
-            return { kind: 'reject', reason: 'inactive-credential' };
+            return { kind: 'reject', reason: 'inactive-credential', notifyReader: true };
           }
           return { kind: 'reader', readerId: peer.readerId, certificateNotAfter: peer.certificateNotAfter };
         },
@@ -117,7 +128,8 @@ export class ReaderSessionService implements OnModuleDestroy {
       this.metrics.handshakeFailures.inc({ reason: detail });
       if (reason === 'rejected') this.noteRejection(rejectedReaderId, detail);
       this.logger.debug(`Session handshake ended: ${reason}`);
-      connection.close();
+      // A rejection frame still has to leave through TLS; the connection closes itself after it.
+      if (!(error instanceof SessionError && error.readerNotified)) connection.close();
     }
   }
 

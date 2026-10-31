@@ -2,13 +2,20 @@ import { createServer, Server } from 'http';
 import { AddressInfo } from 'net';
 import { ECDH, webcrypto } from 'crypto';
 import { WebSocket, WebSocketServer } from 'ws';
-import { PairingService } from './pairing.service';
+import { CREDENTIAL_CHANGED_EVENT, PairingService } from './pairing.service';
 import { commitmentMatches, deriveCode } from './pairing-protocol';
+import { spkiFingerprint } from './pki';
 import { EnrollmentLimitsService } from '../../device-enrollment/enrollment-limits.service';
 import { EnrollmentRateLimitedException } from '../../device-enrollment/enrollment-rate-limited.exception';
 import { PAIRING_SUBPROTOCOL } from './session-framing';
 
 const actor = { userId: 1, authenticationMethod: 'session' as const };
+
+function deferred() {
+  let release!: () => void;
+  const promise = new Promise<void>((resolve) => (release = resolve));
+  return { promise, release };
+}
 
 async function readerKey() {
   const keys = (await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
@@ -53,10 +60,14 @@ describe('PairingService', () => {
   const credentialEvents: Array<Record<string, unknown>> = [];
   const audited: Array<Record<string, unknown>> = [];
   const emitted: unknown[] = [];
+  const emittedEvents: string[] = [];
   const clients: PairingClient[] = [];
   let nextId = 1;
   let appUrl: string | null = 'https://attraccess.example';
   let registry: Record<string, unknown>;
+  let identity: Record<string, unknown>;
+  let getUrl: () => Promise<string | null>;
+  let trustProxy: string | undefined;
 
   beforeAll(async () => {
     caSpki = await readerKey();
@@ -72,8 +83,11 @@ describe('PairingService', () => {
     credentialEvents.length = 0;
     audited.length = 0;
     emitted.length = 0;
+    emittedEvents.length = 0;
     nextId = 1;
     appUrl = 'https://attraccess.example';
+    getUrl = async () => appUrl;
+    trustProxy = undefined;
     const attractap = {
       findReaderById: async (id: number) => readers.get(id),
       createNewReader: async () => {
@@ -91,7 +105,7 @@ describe('PairingService', () => {
       deleteReader: async (id: number) => readers.delete(id),
       updateReader: async (id: number, update: Record<string, unknown>) => Object.assign(readers.get(id) ?? {}, update),
     };
-    const identity = {
+    identity = {
       getCaPublicKeySpki: async () => caSpki,
       issueReaderCertificate: async () => ({ pem: 'CERT', serial: '01', notAfter: new Date(Date.now() + 1e9) }),
     };
@@ -116,6 +130,12 @@ describe('PairingService', () => {
       }) => {
         const reader = readers.get(input.readerId) as Record<string, unknown>;
         const { fingerprint } = input;
+        const before = {
+          pairingState: reader['pairingState'],
+          credentialFingerprint: reader['credentialFingerprint'] ?? null,
+          certificateSerial: reader['certificateSerial'] ?? null,
+          apiTokenHash: reader['apiTokenHash'] ?? '',
+        };
         const previous =
           reader['pairingState'] === 'paired' && reader['credentialFingerprint'] !== fingerprint
             ? (reader['credentialFingerprint'] as string)
@@ -135,7 +155,20 @@ describe('PairingService', () => {
           apiTokenHash: '',
         });
         credentialEvents.push({ readerId: reader['id'], keyFingerprint: fingerprint, state: 'paired' });
-        return { previousFingerprint: previous };
+        return { previousFingerprint: previous, before };
+      },
+      undoPairing: async (input: { readerId: number; fingerprint: string; before: Record<string, unknown> }) => {
+        const reader = readers.get(input.readerId);
+        if (!reader || reader['pairingState'] !== 'paired' || reader['credentialFingerprint'] !== input.fingerprint) {
+          return false;
+        }
+        const restored = input.before['pairingState'] === 'paired' ? input.before['credentialFingerprint'] : null;
+        if (restored !== input.fingerprint) {
+          credentialEvents.push({ readerId: input.readerId, keyFingerprint: input.fingerprint, state: 'revoked' });
+        }
+        if (restored) credentialEvents.push({ readerId: input.readerId, keyFingerprint: restored, state: 'paired' });
+        Object.assign(reader, input.before);
+        return true;
       },
       revoke: async (id: number) => {
         const reader = readers.get(id);
@@ -150,9 +183,15 @@ describe('PairingService', () => {
       identity as never,
       registry as never,
       { recordAttractap: async (event: Record<string, unknown>) => void audited.push(event) } as never,
-      { emit: (_e: string, id: unknown) => emitted.push(id) } as never,
+      {
+        emit: (event: string, id: unknown) => {
+          emittedEvents.push(event);
+          emitted.push(id);
+        },
+      } as never,
       limits,
-      { getUrl: async () => appUrl } as never,
+      { getUrl: () => getUrl() } as never,
+      { get: (key: string) => (key === 'app' ? { TRUST_PROXY: trustProxy } : undefined) } as never,
     );
   });
 
@@ -308,6 +347,13 @@ describe('PairingService', () => {
     );
     expect(readerSide.code).not.toBe(relayed.code);
     expect(() => service.resolve(readerSide.code, actor)).toThrow('PairingCodeNotFound');
+    // Approving the attacker's request with the code on the real reader is refused too.
+    const attackerRequest = await pendingOf();
+    await expect(
+      service.approve(attackerRequest.id, { code: readerSide.code, mode: 'new' }, actor),
+    ).rejects.toThrow('PairingCodeNotFound');
+    expect(readers.size).toBe(0);
+    expect(service.get(attackerRequest.id).state).toBe('waiting');
   });
 
   it('refuses a code that belongs to another waiting reader and counts it', async () => {
@@ -343,6 +389,32 @@ describe('PairingService', () => {
     expect(readers.size).toBe(0);
     // another approver is not affected
     expect(service.resolve(code, { ...actor, userId: 2 }).id).toBe(pending.id);
+  });
+
+  it('does not reset the wrong-code count when an approval succeeds', async () => {
+    const { code } = await announce();
+    const pending = await pendingOf();
+    for (let i = 0; i < 4; i++) expect(() => service.resolve('AAAAAA', actor)).toThrow('PairingCodeNotFound');
+    await service.approve(pending.id, { code, mode: 'new' }, actor);
+    expect(() => service.resolve('AAAAAA', actor)).toThrow('PairingCodeNotFound');
+    expect(() => service.resolve('AAAAAA', actor)).toThrow(EnrollmentRateLimitedException);
+  });
+
+  it('approves a Lite reader by the previous round until the next rotation', async () => {
+    const { client, publicKey, round } = await announce({}, 'lite');
+    const pending = await pendingOf();
+    const internal = service as unknown as { rotate: (r: unknown) => Promise<void>; requests: Map<string, unknown> };
+    const request = internal.requests.get(pending.id);
+    await internal.rotate(request);
+    const second = await completeRound(client, publicKey);
+    await internal.rotate(request);
+    // Two rotations later the first pattern is gone; the second one is now the previous round.
+    await expect(service.approve(pending.id, { round: round['round'] as number, mode: 'new' }, actor)).rejects.toThrow(
+      'PairingRoundStale',
+    );
+    await service.approve(pending.id, { round: second.round['round'] as number, mode: 'new' }, actor);
+    expect(readers.size).toBe(1);
+    expect(audited[0]).toMatchObject({ action: 'reader.enrolled', details: { method: 'led-pattern' } });
   });
 
   it('lets only one of several concurrent approvals through', async () => {
@@ -398,6 +470,7 @@ describe('PairingService', () => {
     await service.approve(pending.id, { code, mode: 'takeover', targetReaderId: 3 }, actor);
     expect(credentialEvents.map((e) => e['state'])).toEqual(['replaced', 'paired']);
     expect(audited.map((a) => a['action'])).toEqual(['reader.replaced', 'reader.pairing_confirmed']);
+    expect(audited[0]).toMatchObject({ subjectId: 3, details: { mode: 'takeover' } });
     expect(readers.size).toBe(1);
   });
 
@@ -416,9 +489,230 @@ describe('PairingService', () => {
     const { client, code } = await announce();
     const pending = await pendingOf();
     client.ws.close();
-    await new Promise((r) => setTimeout(r, 100));
-    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toBeDefined();
+    await waitFor(() => service.list().length === 0);
+    // The request ended with the disconnect; its code no longer resolves.
+    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow('PairingNotWaiting');
+    expect(service.get(pending.id)).toMatchObject({ state: 'failed', failureReason: 'reader-disconnected' });
     expect(readers.size).toBe(0);
+    expect(credentialEvents).toEqual([]);
+    expect(emitted).toEqual([]);
+  });
+
+  /** The server side of the request, to watch its socket. */
+  const requestOf = (id: string) =>
+    (service as unknown as { requests: Map<string, { ws: WebSocket; endRequested: unknown }> }).requests.get(id) as {
+      ws: WebSocket;
+      endRequested: unknown;
+    };
+
+  it('does not pair a reader that disconnects while the approval is being committed', async () => {
+    const { client, code } = await announce();
+    const pending = await pendingOf();
+    const gate = deferred();
+    const issue = identity['issueReaderCertificate'] as () => Promise<unknown>;
+    identity['issueReaderCertificate'] = async () => {
+      await gate.promise;
+      return issue();
+    };
+
+    const approval = service.approve(pending.id, { code, mode: 'new' }, actor);
+    await waitFor(() => readers.size === 1); // the new record exists, the commit has not happened
+    client.ws.close();
+    await waitFor(() => requestOf(pending.id).endRequested !== null);
+    expect(service.get(pending.id).state).toBe('waiting'); // the disconnect waits for the approval
+    gate.release();
+
+    await expect(approval).rejects.toThrow('PairingReaderGone');
+    expect(readers.size).toBe(0);
+    expect(credentialEvents).toEqual([]);
+    expect(emitted).toEqual([]);
+    expect(audited.map((a) => a['action'])).not.toContain('reader.enrolled');
+    expect(service.get(pending.id)).toMatchObject({ state: 'failed', failureReason: 'reader-disconnected' });
+    expect(limits.pendingCount).toBe(0);
+  });
+
+  it('does not pair a reader when an admin cancels while the approval is being committed', async () => {
+    const { code } = await announce();
+    const pending = await pendingOf();
+    const gate = deferred();
+    const issue = identity['issueReaderCertificate'] as () => Promise<unknown>;
+    identity['issueReaderCertificate'] = async () => {
+      await gate.promise;
+      return issue();
+    };
+    const approval = service.approve(pending.id, { code, mode: 'new' }, actor);
+    await waitFor(() => readers.size === 1);
+    await service.cancel(pending.id, { userId: 2, authenticationMethod: 'session' });
+    gate.release();
+    await expect(approval).rejects.toThrow('PairingReaderGone');
+    expect(readers.size).toBe(0);
+    expect(service.get(pending.id)).toMatchObject({ state: 'cancelled', failureReason: 'cancelled-by-admin' });
+  });
+
+  it('undoes an approval the reader never received because it left right after the commit', async () => {
+    const { client, code } = await announce();
+    const pending = await pendingOf();
+    const markPaired = registry['markPaired'] as (input: unknown) => Promise<unknown>;
+    registry['markPaired'] = async (input: unknown) => {
+      const result = await markPaired(input);
+      client.ws.close();
+      await waitFor(() => requestOf(pending.id).ws.readyState === WebSocket.CLOSED);
+      return result;
+    };
+
+    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow('PairingReaderGone');
+    // The new credential is closed in the history and the record created for it is gone.
+    expect(credentialEvents.map((e) => e['state'])).toEqual(['paired', 'revoked']);
+    expect(readers.size).toBe(0);
+    expect(audited.map((a) => a['action'])).not.toContain('reader.enrolled');
+    expect(service.get(pending.id)).toMatchObject({ state: 'failed', failureReason: 'reader-disconnected' });
+  });
+
+  it('gives a token reader its token back when it never received its approval', async () => {
+    readers.set(7, { id: 7, name: 'old', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
+    nextId = 8;
+    const { client, code } = await announce({ ticket: service.issueBindingTicket(7) });
+    const pending = await pendingOf();
+    const markPaired = registry['markPaired'] as (input: unknown) => Promise<unknown>;
+    registry['markPaired'] = async (input: unknown) => {
+      const result = await markPaired(input);
+      client.ws.close();
+      await waitFor(() => requestOf(pending.id).ws.readyState === WebSocket.CLOSED);
+      return result;
+    };
+    await expect(service.approve(pending.id, { code, mode: 'pair' }, actor)).rejects.toThrow('PairingReaderGone');
+    // Still the token reader it was: it keeps signing in with its token and can be paired again.
+    expect(readers.get(7)).toMatchObject({ pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
+    expect(credentialEvents.map((e) => e['state'])).toEqual(['paired', 'revoked']);
+    // One audit event says why; no enrolment or confirmation for the undone approval.
+    expect(audited).toEqual([
+      expect.objectContaining({ action: 'reader.pairing_failed', subjectId: 7, details: { reason: 'not-delivered' } }),
+    ]);
+    expect(emitted).toEqual([7, 7]); // after the commit and after the undo
+  });
+
+  /** Makes the reader leave right after the commit, before `accepted` reaches it. */
+  function leaveAfterCommit(client: PairingClient, id: string, meanwhile: () => void = () => undefined) {
+    const markPaired = registry['markPaired'] as (input: unknown) => Promise<unknown>;
+    registry['markPaired'] = async (input: unknown) => {
+      const result = await markPaired(input);
+      meanwhile();
+      client.ws.close();
+      await waitFor(() => requestOf(id).ws.readyState === WebSocket.CLOSED);
+      return result;
+    };
+  }
+
+  it('gives a taken-over reader its credential back when the new one never received the approval', async () => {
+    readers.set(3, {
+      id: 3,
+      name: 'old',
+      pairingState: 'paired',
+      credentialFingerprint: 'old-fp',
+      certificateSerial: '00',
+      apiTokenHash: '',
+    });
+    const { client, code } = await announce();
+    const pending = await pendingOf();
+    leaveAfterCommit(client, pending.id);
+    await expect(service.approve(pending.id, { code, mode: 'takeover', targetReaderId: 3 }, actor)).rejects.toThrow(
+      'PairingReaderGone',
+    );
+    // Reader A keeps working: its key is the active credential again, with its certificate.
+    expect(readers.get(3)).toMatchObject({ pairingState: 'paired', credentialFingerprint: 'old-fp', certificateSerial: '00' });
+    expect(await (registry['isActive'] as (id: number, fp: string) => Promise<boolean>)(3, 'old-fp')).toBe(true);
+    // Append-only history: replaced, the undone key, then the old key active again.
+    expect(credentialEvents.map((e) => [e['state'], e['keyFingerprint']])).toEqual([
+      ['replaced', 'old-fp'],
+      ['paired', expect.any(String)],
+      ['revoked', expect.any(String)],
+      ['paired', 'old-fp'],
+    ]);
+    expect(audited).toEqual([
+      expect.objectContaining({ action: 'reader.pairing_failed', subjectId: 3, details: { reason: 'not-delivered' } }),
+    ]);
+    expect(emitted).toEqual([3, 3]); // live sessions and caches refresh after the undo
+    expect(readers.size).toBe(1);
+  });
+
+  it('leaves a pairing alone that another approval committed while this one waited for the reader', async () => {
+    readers.set(3, { id: 3, name: 'old', pairingState: 'paired', credentialFingerprint: 'old-fp', certificateSerial: '00' });
+    const { client, code } = await announce();
+    const pending = await pendingOf();
+    leaveAfterCommit(client, pending.id, () =>
+      // What a second approval for the same record commits meanwhile.
+      Object.assign(readers.get(3) as Record<string, unknown>, { credentialFingerprint: 'other-fp', certificateSerial: '02' }),
+    );
+    await expect(service.approve(pending.id, { code, mode: 'takeover', targetReaderId: 3 }, actor)).rejects.toThrow(
+      'PairingReaderGone',
+    );
+    expect(readers.get(3)).toMatchObject({ pairingState: 'paired', credentialFingerprint: 'other-fp', certificateSerial: '02' });
+    expect(credentialEvents.map((e) => e['state'])).toEqual(['replaced', 'paired']);
+  });
+
+  it('does not delete a created record that another approval paired while this one waited', async () => {
+    const { client, code } = await announce();
+    const pending = await pendingOf();
+    leaveAfterCommit(client, pending.id, () =>
+      Object.assign(readers.get(1) as Record<string, unknown>, { credentialFingerprint: 'other-fp' }),
+    );
+    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow('PairingReaderGone');
+    expect(readers.get(1)).toMatchObject({ pairingState: 'paired', credentialFingerprint: 'other-fp' });
+  });
+
+  it('refuses to pair a key that is already the credential of another reader', async () => {
+    const { publicKey, code } = await announce();
+    const pending = await pendingOf();
+    readers.set(3, {
+      id: 3,
+      name: 'holder',
+      pairingState: 'paired',
+      credentialFingerprint: spkiFingerprint(publicKey),
+      certificateSerial: '00',
+    });
+    nextId = 4;
+    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow('PairingKeyInUse');
+    expect(readers.size).toBe(1);
+    expect(service.get(pending.id).state).toBe('waiting');
+    // Taking over the record that already holds the key is not a second reader.
+    await service.approve(pending.id, { code, mode: 'takeover', targetReaderId: 3 }, actor);
+    expect(readers.size).toBe(1);
+  });
+
+  it('ends a request whose reader left while its first round was being prepared', async () => {
+    const gate = deferred();
+    let asked = false;
+    getUrl = async () => {
+      asked = true;
+      await gate.promise;
+      return appUrl;
+    };
+    const client = new PairingClient(url);
+    clients.push(client);
+    await client.opened();
+    client.send({ type: 'hello', v: 1, kind: 'touch', publicKey: (await readerKey()).toString('base64'), firmware });
+    await waitFor(() => asked);
+    expect(limits.pendingCount).toBe(1);
+    client.ws.close();
+    await new Promise((r) => setTimeout(r, 100)); // the server sees the close while the round is pending
+    gate.release();
+    await waitFor(() => limits.pendingCount === 0);
+    expect(limits.pendingCount).toBe(0);
+    expect(service.list()).toEqual([]);
+  });
+
+  it('does not use up a binding ticket on a hello that was rate limited', async () => {
+    readers.set(7, { id: 7, name: 'old', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
+    const ticket = service.issueBindingTicket(7);
+    jest.spyOn(limits, 'admit').mockReturnValueOnce({ allowed: false, reason: 'RATE_LIMITED' });
+    const limited = new PairingClient(url);
+    clients.push(limited);
+    await limited.opened();
+    limited.send({ type: 'hello', v: 1, kind: 'touch', publicKey: (await readerKey()).toString('base64'), firmware, ticket });
+    expect((await limited.next('failed'))['reason']).toBe('rate-limited');
+
+    await announce({ ticket });
+    expect((await pendingOf()).boundReaderId).toBe(7);
   });
 
   it('aborts when the reader cancels, and accepts a new request on the same connection', async () => {
@@ -428,6 +722,32 @@ describe('PairingService', () => {
     client.send({ type: 'hello', v: 1, kind: 'touch', publicKey: publicKey.toString('base64'), firmware });
     await client.next('round');
     expect(service.list()).toHaveLength(1);
+  });
+
+  it('closes a connection that cancelled during an approval and then stays silent', async () => {
+    const { client, code } = await announce();
+    const pending = await pendingOf();
+    const gate = deferred();
+    const issue = identity['issueReaderCertificate'] as () => Promise<unknown>;
+    identity['issueReaderCertificate'] = async () => {
+      await gate.promise;
+      return issue();
+    };
+    const timers = jest.spyOn(global, 'setTimeout');
+    const approval = service.approve(pending.id, { code, mode: 'new' }, actor);
+    await waitFor(() => readers.size === 1);
+    client.send({ type: 'cancel' });
+    await waitFor(() => requestOf(pending.id).endRequested !== null);
+    gate.release();
+    await expect(approval).rejects.toThrow('PairingReaderGone');
+    expect(service.get(pending.id)).toMatchObject({ state: 'cancelled', failureReason: 'cancelled-at-reader' });
+    expect(client.ws.readyState).toBe(WebSocket.OPEN); // open for a new hello, but not forever
+
+    const helloTimeout = timers.mock.calls.find(([, ms]) => ms === 30_000);
+    expect(helloTimeout).toBeDefined();
+    const closed = new Promise<number>((resolve) => client.ws.once('close', (closeCode) => resolve(closeCode)));
+    (helloTimeout?.[0] as () => void)();
+    expect(await closed).toBe(1008);
   });
 
   it('allows 3 attempts per connection per minute', async () => {
@@ -463,19 +783,14 @@ describe('PairingService', () => {
       await client.next('round');
     };
 
-    const previous = process.env.TRUST_PROXY;
-    try {
-      delete process.env.TRUST_PROXY;
-      await hello('203.0.113.9');
-      expect(admit).toHaveBeenLastCalledWith(expect.any(String), '127.0.0.1');
+    // The validated app config, the same value the HTTP server uses.
+    trustProxy = undefined;
+    await hello('203.0.113.9');
+    expect(admit).toHaveBeenLastCalledWith(expect.any(String), '127.0.0.1');
 
-      process.env.TRUST_PROXY = 'loopback';
-      await hello('203.0.113.9');
-      expect(admit).toHaveBeenLastCalledWith(expect.any(String), '203.0.113.9');
-    } finally {
-      if (previous === undefined) delete process.env.TRUST_PROXY;
-      else process.env.TRUST_PROXY = previous;
-    }
+    trustProxy = 'loopback';
+    await hello('203.0.113.9');
+    expect(admit).toHaveBeenLastCalledWith(expect.any(String), '203.0.113.9');
   });
 
   it('rejects a public key that is not in canonical uncompressed form', async () => {
@@ -502,13 +817,42 @@ describe('PairingService', () => {
     expect(service.list()).toEqual([]);
   });
 
-  it('revokes a paired reader and drops its bootstrap grant', async () => {
-    const { code } = await announce();
+  it('revokes a paired reader, ends its sessions and drops its bootstrap grant', async () => {
+    const { code, publicKey } = await announce();
     const pending = await pendingOf();
     const done = await service.approve(pending.id, { code, mode: 'new' }, actor);
-    await service.revoke(done.targetReaderId as number, actor);
-    expect(readers.get(done.targetReaderId as number)).toMatchObject({ pairingState: 'revoked' });
+    const readerId = done.targetReaderId as number;
+    const peer = { spkiFingerprint: spkiFingerprint(publicKey), spki: publicKey };
+    const grants = (service as unknown as { grants: { get: (fingerprint: string) => unknown } }).grants;
+    expect(grants.get(peer.spkiFingerprint)).toBeDefined();
+    expect(await service.resolveBootstrap(peer)).toEqual({ readerId, certificatePem: 'CERT' });
+    emitted.length = 0;
+    emittedEvents.length = 0;
+
+    await service.revoke(readerId, actor);
+    expect(readers.get(readerId)).toMatchObject({ pairingState: 'revoked' });
     expect(audited.at(-1)).toMatchObject({ action: 'reader.revoked' });
-    expect(await service.resolveBootstrap({ spkiFingerprint: 'unknown', spki: Buffer.alloc(1) })).toBeNull();
+    expect(emittedEvents).toEqual([CREDENTIAL_CHANGED_EVENT]);
+    expect(emitted).toEqual([readerId]);
+    expect(grants.get(peer.spkiFingerprint)).toBeUndefined();
+    expect(await service.resolveBootstrap(peer)).toBeNull();
+  });
+
+  it('records the admin who cancelled a pairing', async () => {
+    readers.set(7, { id: 7, name: 'old', pairingState: 'unpaired', apiTokenHash: 'h', credentialFingerprint: null });
+    const { client } = await announce({ ticket: service.issueBindingTicket(7) });
+    const pending = await pendingOf();
+    await service.cancel(pending.id, { userId: 2, authenticationMethod: 'api-token', apiTokenId: 5 });
+    expect((await client.next('failed'))['reason']).toBe('cancelled-by-admin');
+    expect(audited).toEqual([
+      expect.objectContaining({
+        action: 'reader.pairing_failed',
+        actorId: 2,
+        authenticationMethod: 'api-token',
+        apiTokenId: 5,
+        subjectId: 7,
+        details: { reason: 'cancelled-by-admin' },
+      }),
+    ]);
   });
 });

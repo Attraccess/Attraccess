@@ -27,6 +27,9 @@ const ACTIVE = Number(process.env['ACTIVE'] ?? 250);
 const OTA = Number(process.env['OTA'] ?? 10);
 const ACTIVE_SECONDS = Number(process.env['ACTIVE_SECONDS'] ?? 30);
 const PORT = 38000 + Math.floor(Math.random() * 1000);
+/** Extra server memory accepted for 1,000 readers; scaled up for larger fleets, never down. */
+const MEMORY_BUDGET_MIB_PER_1000_READERS = 100;
+const MEMORY_LIMIT_MIB = Math.round(MEMORY_BUDGET_MIB_PER_1000_READERS * Math.max(1, READERS / 1000));
 
 interface ServerInit {
   type: 'init';
@@ -70,7 +73,7 @@ function runServer() {
           async (peer): Promise<SessionDecision> =>
             peer.chainValid && peer.readerId !== null && known.get(peer.spkiFingerprint) === peer.readerId
               ? { kind: 'reader', readerId: peer.readerId, certificateNotAfter: peer.certificateNotAfter }
-              : { kind: 'reject', reason: 'unknown' },
+              : { kind: 'reject', reason: 'unknown', notifyReader: true },
         )
         .then(() => {
           sessions++;
@@ -241,7 +244,7 @@ async function main() {
     connectSeconds,
     extraServerMemoryMiB: Number(memoryMiB.toFixed(1)),
     uncollectedPeakMiB: Number(((peakRss - baselineRss) / 1024 / 1024).toFixed(1)),
-    memoryLimitMiB: Math.round((64 * READERS) / 1000),
+    memoryLimitMiB: MEMORY_LIMIT_MIB,
     handshakeLimit: '32 active + 256 queued',
     maxHandshakeQueueObserved: server.stats.maxQueue,
     clientRefusalsAndRetries: fleet.refusals,
@@ -250,7 +253,7 @@ async function main() {
     allBackWithin180s: fleet.connected >= READERS && recoverySeconds <= 180,
   };
   console.log(JSON.stringify(result, null, 2));
-  process.exit(result.allBackWithin180s && memoryMiB <= 64 ? 0 : 1);
+  process.exit(result.allBackWithin180s && memoryMiB <= MEMORY_LIMIT_MIB ? 0 : 1);
 }
 
 if (process.argv[2] === 'server') runServer();

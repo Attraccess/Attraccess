@@ -51,6 +51,5 @@ describe('EnrollmentLimitsService', () => {
     expect(() => limits.assertApproverAllowed(7, t + 1000)).toThrow(EnrollmentRateLimitedException);
     expect(() => limits.assertApproverAllowed(8, t + 1000)).not.toThrow();
     expect(() => limits.assertApproverAllowed(7, t + 61_000)).not.toThrow();
-    limits.clearApprover(7);
   });
 });

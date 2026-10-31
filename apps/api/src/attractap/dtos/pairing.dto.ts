@@ -1,15 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-
-export type PairingFailureReason =
-  | 'cancelled-at-reader'
-  | 'cancelled-by-admin'
-  | 'reader-disconnected'
-  | 'protocol'
-  | 'expired'
-  | 'internal';
-
-export const LITE_PATTERN_COLOURS = ['red', 'green', 'blue', 'yellow', 'white', 'magenta'] as const;
+import {
+  PAIRING_FAILURE_REASONS,
+  PAIRING_MODES,
+  PAIRING_STATES,
+  PairingFailureReason,
+  PairingMode,
+  PairingState,
+  READER_KINDS,
+  ReaderKind,
+} from '../security/pairing-model';
+import { LITE_COLOURS, LiteColour } from '../security/pairing-protocol';
 
 export class PairingFirmwareDto {
   @ApiProperty()
@@ -26,11 +27,11 @@ export class PairingDto {
   @ApiProperty()
   id!: string;
 
-  @ApiProperty({ enum: ['waiting', 'completed', 'failed', 'cancelled', 'expired'] })
-  state!: 'waiting' | 'completed' | 'failed' | 'cancelled' | 'expired';
+  @ApiProperty({ enum: PAIRING_STATES })
+  state!: PairingState;
 
-  @ApiProperty({ enum: ['touch', 'lite'] })
-  kind!: 'touch' | 'lite';
+  @ApiProperty({ enum: READER_KINDS })
+  kind!: ReaderKind;
 
   @ApiProperty({ type: PairingFirmwareDto })
   firmware!: PairingFirmwareDto;
@@ -41,8 +42,8 @@ export class PairingDto {
   @ApiProperty({ nullable: true, description: 'The reader record this request was paired to, once approved' })
   targetReaderId!: number | null;
 
-  @ApiProperty({ nullable: true, enum: ['new', 'pair', 'takeover'] })
-  mode!: 'new' | 'pair' | 'takeover' | null;
+  @ApiProperty({ nullable: true, enum: PAIRING_MODES })
+  mode!: PairingMode | null;
 
   @ApiProperty()
   createdAt!: Date;
@@ -52,18 +53,18 @@ export class PairingDto {
 
   @ApiProperty({
     nullable: true,
-    enum: ['cancelled-at-reader', 'cancelled-by-admin', 'reader-disconnected', 'protocol', 'expired', 'internal'],
+    enum: PAIRING_FAILURE_REASONS,
     description: 'Why a pairing ended without completing',
   })
   failureReason!: PairingFailureReason | null;
 
   @ApiPropertyOptional({
-    enum: LITE_PATTERN_COLOURS,
+    enum: LITE_COLOURS,
     isArray: true,
     nullable: true,
     description: 'Detail view of a Lite reader only: the eight colours on its ring, in ring order',
   })
-  pattern?: (typeof LITE_PATTERN_COLOURS)[number][] | null;
+  pattern?: LiteColour[] | null;
 
   @ApiPropertyOptional({ nullable: true, description: 'Detail view of a Lite reader only: the round of the pattern' })
   round?: number | null;
@@ -91,12 +92,12 @@ export class ApprovePairingDto {
   round?: number;
 
   @ApiProperty({
-    enum: ['new', 'pair', 'takeover'],
+    enum: PAIRING_MODES,
     description:
       'new: create a reader record; pair: pair the token reader that is connecting; takeover: bind the device to targetReaderId',
   })
-  @IsIn(['new', 'pair', 'takeover'])
-  mode!: 'new' | 'pair' | 'takeover';
+  @IsIn(PAIRING_MODES)
+  mode!: PairingMode;
 
   @ApiPropertyOptional()
   @IsOptional()
