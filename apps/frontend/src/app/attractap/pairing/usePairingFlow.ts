@@ -245,7 +245,13 @@ export function usePairingFlow(props: PairingFlowProps) {
     if (classified.retryAfterSeconds) countdown.start(classified.retryAfterSeconds);
   };
 
+  // Tracked here instead of the mutation's isPending: the `?enroll=` / flasher lookup starts from an effect
+  // on mount, and StrictMode's simulated unmount detaches the mutation observer, which then reports
+  // "pending" forever and kept Approve disabled. The mutation's own callbacks always run.
+  const [resolving, setResolving] = useState(false);
   const resolve = useAttractapServiceResolvePairing({
+    onMutate: () => setResolving(true),
+    onSettled: () => setResolving(false),
     onSuccess: (found) => {
       submitting.current = false;
       setResolved(found);
@@ -273,7 +279,7 @@ export function usePairingFlow(props: PairingFlowProps) {
     },
   });
 
-  const idle = !resolve.isPending && !approve.isPending;
+  const idle = !resolving && !approve.isPending;
   const cancelAndClose = useCancelAndClose(current, () => approve.isPending || submitting.current, onClose, refreshLists);
   const blocked = countdown.secondsLeft > 0;
   const normalizedCode = normalizeEnrollmentCode(codeInput);
@@ -378,7 +384,7 @@ export function usePairingFlow(props: PairingFlowProps) {
     submitForm: () => (needsCodeToFind ? findByCode() : void submit()),
     /** The dialog's Cancel button: ends the waiting request on the server, then closes. */
     cancel: cancelAndClose,
-    resolvePending: resolve.isPending,
+    resolvePending: resolving,
     approvePending: approve.isPending,
     waitingForReader,
     needsCodeToFind,
