@@ -38,8 +38,11 @@ import {
   useLicenseServiceGetLicenseInformation,
   useAttractapServiceEnrollNfcCard,
   useAttractapServiceResetNfcCard,
+  ApiError,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import de from './de.json';
 import en from './en.json';
 import { PlusIcon, ServerIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react';
@@ -53,11 +56,21 @@ export interface EnrollNfcCardProps {
   userId?: number;
 }
 
-/** The server says why (reader busy, not allowed, firmware too old); the status text alone does not. */
-function describeError(error: unknown): string {
-  const body = (error as { body?: { message?: string | string[] } }).body;
-  const message = Array.isArray(body?.message) ? body?.message[0] : body?.message;
-  return message ?? (error as Error).message;
+/**
+ * The server refuses a card operation with a code (READER_OFFLINE, READER_BUSY,
+ * READER_FIRMWARE_UPDATE_REQUIRED, READER_NOT_ALLOWED_TO_WRITE_CARDS) that the shared API error
+ * translations turn into a reason the user can act on.
+ */
+function useCardOperationErrorToast() {
+  const { t, tExists } = useTranslations({
+    en: { api: API_ERROR_TRANSLATIONS_EN },
+    de: { api: API_ERROR_TRANSLATIONS_DE },
+  });
+  const toast = useToastMessage();
+  return useCallback(
+    (error: unknown) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
+    [toast, t, tExists],
+  );
 }
 
 export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
@@ -70,10 +83,10 @@ export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
   const [readerId, setReaderId] = useState<number | null>(null);
 
   const close = useCallback(() => setShow(false), []);
-  const toast = useToastMessage();
+  const showError = useCardOperationErrorToast();
   const { mutate: enrollNfcCardMutation, isPending } = useAttractapServiceEnrollNfcCard({
     onSuccess: close,
-    onError: (error) => toast.error({ title: t('errorOperation'), description: describeError(error) }),
+    onError: showError,
   });
 
   const enrollNfcCard = useCallback(() => {
@@ -147,10 +160,10 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
 
   const [readerId, setReaderId] = useState<number | null>(null);
 
-  const toast = useToastMessage();
+  const showError = useCardOperationErrorToast();
   const { mutate: resetNfcCard, isPending } = useAttractapServiceResetNfcCard({
     onSuccess: props.close,
-    onError: (error) => toast.error({ title: t('errorOperation'), description: describeError(error) }),
+    onError: showError,
   });
 
   const deleteCard = useCallback(() => {

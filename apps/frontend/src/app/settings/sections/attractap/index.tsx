@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Checkbox, CheckboxGroup, Description, Label, Radio, RadioGroup, Spinner } from '@heroui/react';
+import { Checkbox, CheckboxGroup, Description, FieldError, Label, Radio, RadioGroup, Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -14,6 +14,7 @@ import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { cardWritingBlocker } from '../../../attractap/cardWriting';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
@@ -22,8 +23,8 @@ import de from './de.json';
 type Mode = CardWriterSettingsDto['mode'];
 
 /**
- * Which Attractap readers may enroll and reset cards. Card keys are written through these readers,
- * so an operator can limit the work to readers in a trusted place.
+ * Card enrollment: which Attractap readers may enroll and reset RFID cards. Card keys are written
+ * through these readers, so an operator can limit the work to readers in a trusted place.
  */
 export function AttractapSection() {
   const { t, tExists } = useTranslations({
@@ -34,7 +35,7 @@ export function AttractapSection() {
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useAttractapServiceGetCardWriterSettings();
-  const { data: readers } = useAttractapServiceGetReaders();
+  const { data: readers, isLoading: readersLoading } = useAttractapServiceGetReaders();
 
   // A key absent from the draft means "untouched": the field then shows the server's value, so a
   // background refetch can never overwrite what the operator is typing.
@@ -96,15 +97,19 @@ export function AttractapSection() {
 
       {mode === 'selected' && (
         <SettingsRow label={t('readers.label')} hint={t('readers.description')} stacked>
-          <div className="flex flex-col gap-2">
-            {readers?.length ? (
-              <CheckboxGroup
-                value={readerIds.map(String)}
-                onChange={(values) => setDraft((current) => ({ ...current, readerIds: values.map(Number) }))}
-                aria-label={t('readers.label')}
-                data-testid="card-writer-readers"
-              >
-                {readers.map((reader) => (
+          {readersLoading ? (
+            <Spinner size="sm" aria-label={t('readers.loading')} data-testid="card-writer-readers-loading" />
+          ) : readers?.length ? (
+            <CheckboxGroup
+              value={readerIds.map(String)}
+              onChange={(values) => setDraft((current) => ({ ...current, readerIds: values.map(Number) }))}
+              aria-label={t('readers.label')}
+              isInvalid={isSaveDisabled}
+              data-testid="card-writer-readers"
+            >
+              {readers.map((reader) => {
+                const blocker = cardWritingBlocker(reader);
+                return (
                   <Checkbox key={reader.id} value={String(reader.id)}>
                     <Checkbox.Content>
                       <Checkbox.Control>
@@ -112,14 +117,19 @@ export function AttractapSection() {
                       </Checkbox.Control>
                       <Label>{reader.name}</Label>
                     </Checkbox.Content>
+                    {blocker ? (
+                      <Description data-testid={`card-writer-reader-${reader.id}-blocker`}>
+                        {t(`readers.blockers.${blocker}`)}
+                      </Description>
+                    ) : null}
                   </Checkbox>
-                ))}
-              </CheckboxGroup>
-            ) : (
-              <span className="text-sm text-muted">{t('readers.none')}</span>
-            )}
-            {isSaveDisabled ? <span className="text-sm text-danger">{t('readers.required')}</span> : null}
-          </div>
+                );
+              })}
+              <FieldError>{t('readers.required')}</FieldError>
+            </CheckboxGroup>
+          ) : (
+            <Description>{t('readers.none')}</Description>
+          )}
         </SettingsRow>
       )}
 

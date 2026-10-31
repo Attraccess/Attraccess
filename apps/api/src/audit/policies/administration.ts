@@ -107,6 +107,9 @@ export const SETTING_KEYS = [
   'audit.plugin_domains_disabled',
   'audit.retention_days',
   'resources.activityVisibility',
+  'attractap.cardWriterMode',
+  'attractap.cardWriterReaders',
+  'attractap.cardWriterReaderCount',
   'metrics.apiKeyConfigured',
   'metrics.slowQueryThresholdSeconds',
   ...['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'].map((key) => `metrics.toggles.${key}`),
@@ -307,6 +310,8 @@ function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
+  if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
+  if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
   if (key === 'smtp.host') return value === safeAuditHost(value);

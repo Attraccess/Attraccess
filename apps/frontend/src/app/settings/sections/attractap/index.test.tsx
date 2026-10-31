@@ -28,6 +28,24 @@ vi.mock('../../../../components/toastProvider', () => ({
 
 const save = vi.fn();
 
+const reader = (id: number, name: string, capabilities: Record<string, boolean> = {}) => ({
+  id,
+  name,
+  firmware: { capabilities: { cardEnrollment: true, cardRelay: true, ...capabilities } },
+});
+
+const readersQuery = (data: ReturnType<typeof reader>[] | undefined, isLoading = false) =>
+  vi.mocked(useAttractapServiceGetReaders).mockReturnValue({
+    data,
+    isLoading,
+  } as unknown as ReturnType<typeof useAttractapServiceGetReaders>);
+
+const selectedMode = (readerIds: number[]) =>
+  vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+    data: { mode: 'selected', readerIds },
+    isLoading: false,
+  } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+
 describe('AttractapSection (which readers may write cards)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,12 +53,7 @@ describe('AttractapSection (which readers may write cards)', () => {
       data: { mode: 'all', readerIds: [] },
       isLoading: false,
     } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
-    vi.mocked(useAttractapServiceGetReaders).mockReturnValue({
-      data: [
-        { id: 1, name: 'Entrance' },
-        { id: 2, name: 'Workshop' },
-      ],
-    } as ReturnType<typeof useAttractapServiceGetReaders>);
+    readersQuery([reader(1, 'Entrance'), reader(2, 'Workshop')]);
     vi.mocked(useAttractapServiceUpdateCardWriterSettings).mockReturnValue({
       mutate: save,
       isPending: false,
@@ -58,6 +71,7 @@ describe('AttractapSection (which readers may write cards)', () => {
     render(<AttractapSection />);
     await userEvent.click(screen.getByRole('radio', { name: /mode.options.selected.label/ }));
     expect(screen.getByText('readers.required')).toBeInTheDocument();
+    expect(screen.getByTestId('card-writer-readers')).toHaveAttribute('data-invalid', 'true');
     expect(screen.getByRole('button', { name: 'saveBar.save' })).toBeDisabled();
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'Workshop' }));
@@ -75,13 +89,40 @@ describe('AttractapSection (which readers may write cards)', () => {
   });
 
   it('ignores a deleted reader that is still in the stored list', () => {
-    vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
-      data: { mode: 'selected', readerIds: [2, 99] },
-      isLoading: false,
-    } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+    selectedMode([2, 99]);
     const view = render(<AttractapSection />);
     expect(screen.getByRole('checkbox', { name: 'Workshop' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Entrance' })).not.toBeChecked();
     expect(view.container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+  });
+
+  it('shows a spinner instead of "no readers" while the readers load', () => {
+    selectedMode([]);
+    readersQuery(undefined, true);
+    render(<AttractapSection />);
+    expect(screen.getByTestId('card-writer-readers-loading')).toBeInTheDocument();
+    expect(screen.queryByText('readers.none')).toBeNull();
+  });
+
+  it('says so when there are no readers', () => {
+    selectedMode([]);
+    readersQuery([]);
+    render(<AttractapSection />);
+    expect(screen.getByText('readers.none')).toBeInTheDocument();
+  });
+
+  it('marks readers that cannot write cards and why', () => {
+    selectedMode([1]);
+    readersQuery([
+      reader(1, 'Entrance'),
+      reader(2, 'Old firmware', { cardRelay: false }),
+      reader(3, 'No display', { cardEnrollment: false }),
+    ]);
+    render(<AttractapSection />);
+    expect(screen.queryByTestId('card-writer-reader-1-blocker')).toBeNull();
+    expect(screen.getByTestId('card-writer-reader-2-blocker')).toHaveTextContent(
+      'readers.blockers.firmwareUpdateRequired',
+    );
+    expect(screen.getByTestId('card-writer-reader-3-blocker')).toHaveTextContent('readers.blockers.noCardEnrollment');
   });
 });

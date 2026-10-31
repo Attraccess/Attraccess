@@ -142,5 +142,37 @@
   "This website is not approved to make changes": {
     "title": "Website not approved",
     "description": "Changes from this website are refused. Open Attraccess at its usual address. If you already are, ask an administrator to check the approved websites in the server configuration (see the security documentation)."
+  },
+  "READER_OFFLINE": {
+    "title": "Reader not connected",
+    "description": "The selected Attractap is not connected to the server. Check that it is switched on and online, then try again."
+  },
+  "READER_BUSY": {
+    "title": "Reader busy",
+    "description": "The selected Attractap is already handling a card. Wait until it is finished, then try again."
+  },
+  "READER_FIRMWARE_UPDATE_REQUIRED": {
+    "title": "Firmware update required",
+    "description": "The selected Attractap needs firmware 2.0.0 or later for card functions. It is offered the update automatically; try again once it has installed it."
+  },
+  "READER_NOT_ALLOWED_TO_WRITE_CARDS": {
+    "title": "Reader not allowed",
+    "description": "This Attractap is not allowed to enroll or reset RFID cards. Choose another reader, or ask an administrator to allow it under Settings → Card enrollment."
+  },
+  "READER_NOT_FOUND": {
+    "title": "Reader not found",
+    "description": "The selected Attractap no longer exists. Reload the page and pick another reader."
+  },
+  "READER_CARD_ENROLLMENT_NOT_SUPPORTED": {
+    "title": "Reader cannot enroll cards",
+    "description": "The selected Attractap model cannot enroll or reset cards. Pick a reader with a display."
+  },
+  "USER_NOT_FOUND": {
+    "title": "User not found",
+    "description": "The user no longer exists."
+  },
+  "CARD_NOT_FOUND": {
+    "title": "Card not found",
+    "description": "The card no longer exists. Reload the page."
   }
 }

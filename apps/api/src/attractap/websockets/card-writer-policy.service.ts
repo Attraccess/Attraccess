@@ -1,10 +1,10 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { SettingsStoreService } from '../../settings/settings-store.service';
+import { ATTRACTAP_KEYS, ATTRACTAP_PARENT } from '../../settings/constants';
 import { CardWriterMode, CardWriterSettingsDto } from '../dtos/card-writer-settings.dto';
 
-const PARENT = 'attractap';
-const MODE_KEY = 'card_writer_mode';
-const READERS_KEY = 'card_writer_readers';
+/** Error code the frontend translates; see api-errors.{en,de}.json. */
+export const READER_NOT_ALLOWED_TO_WRITE_CARDS = 'READER_NOT_ALLOWED_TO_WRITE_CARDS';
 
 /**
  * Which readers may enroll and reset cards. Card keys are written through these readers, so an
@@ -16,8 +16,9 @@ export class CardWriterPolicyService {
   private readonly settings: SettingsStoreService;
 
   async get(): Promise<CardWriterSettingsDto> {
-    const mode = (await this.settings.getPlainSetting(PARENT, MODE_KEY)) === 'selected' ? 'selected' : 'all';
-    const raw = await this.settings.getPlainSetting(PARENT, READERS_KEY);
+    const storedMode = await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterMode);
+    const mode: CardWriterMode = storedMode === 'selected' ? 'selected' : 'all';
+    const raw = await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterReaders);
     let readerIds: number[] = [];
     try {
       const parsed: unknown = raw ? JSON.parse(raw) : [];
@@ -25,13 +26,13 @@ export class CardWriterPolicyService {
     } catch {
       readerIds = [];
     }
-    return { mode: mode as CardWriterMode, readerIds };
+    return { mode, readerIds };
   }
 
   async set(settings: CardWriterSettingsDto): Promise<CardWriterSettingsDto> {
     const readerIds = [...new Set(settings.readerIds)].sort((a, b) => a - b);
-    await this.settings.setPlainSetting(PARENT, MODE_KEY, settings.mode);
-    await this.settings.setPlainSetting(PARENT, READERS_KEY, JSON.stringify(readerIds));
+    await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterMode, settings.mode);
+    await this.settings.setPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterReaders, JSON.stringify(readerIds));
     return { mode: settings.mode, readerIds };
   }
 
@@ -42,7 +43,7 @@ export class CardWriterPolicyService {
 
   async assertAllowed(readerId: number): Promise<void> {
     if (!(await this.isAllowed(readerId))) {
-      throw new ForbiddenException('This reader is not allowed to enroll or reset cards');
+      throw new ForbiddenException(READER_NOT_ALLOWED_TO_WRITE_CARDS);
     }
   }
 }

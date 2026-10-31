@@ -1,0 +1,21 @@
+{
+  "loading": "Reader werden geladen...",
+  "empty": {
+    "noConnectedReader": {
+      "title": "Kein Reader verbunden",
+      "description": "Gerade ist kein Attractap verbunden. Schalten Sie einen ein und warten Sie, bis er online ist."
+    },
+    "firmwareUpdateRequired": {
+      "title": "Firmware-Update erforderlich",
+      "description": "Die verbundenen Attractap-Reader brauchen Firmware 2.0.0 oder neuer, um RFID-Karten zu registrieren und zurückzusetzen. Das Update wird ihnen automatisch angeboten."
+    },
+    "noCardEnrollment": {
+      "title": "Kein geeigneter Reader",
+      "description": "Keiner der verbundenen Attractap-Reader kann RFID-Karten registrieren oder zurücksetzen."
+    },
+    "notAllowed": {
+      "title": "Kein Reader erlaubt",
+      "description": "Keiner der verbundenen Attractap-Reader darf RFID-Karten registrieren oder zurücksetzen. Eine Administratorin oder ein Administrator kann Reader unter Einstellungen → Kartenregistrierung erlauben."
+    }
+  }
+}
