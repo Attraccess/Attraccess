@@ -1,0 +1,89 @@
+{
+  "name": "matter-contract",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/matter-contract/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:plugin-sdk"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "{workspaceRoot}/tsconfig.base.json", { "externalDependencies": ["typescript"] }],
+      "options": {
+        "command": "tsc --noEmit -p libs/matter-contract/tsconfig.lib.json && tsc --noEmit -p libs/matter-contract/tsconfig.spec.json"
+      }
+    },
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/matter-contract",
+        "tsConfig": "libs/matter-contract/tsconfig.lib.json",
+        "packageJson": "libs/matter-contract/package.json",
+        "main": "libs/matter-contract/src/index.ts",
+        "assets": []
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/eslint.config.cjs",
+        "{workspaceRoot}/tools/eslint-rules/**/*",
+        { "externalDependencies": ["eslint", "prettier"] }
+      ],
+      "options": {
+        "command": "eslint libs/matter-contract --max-warnings=0 && prettier --check libs/matter-contract"
+      }
+    },
+    "export-contracts": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/tsconfig.base.json",
+        { "externalDependencies": ["zod", "esbuild"] }
+      ],
+      "outputs": ["{workspaceRoot}/dist/contracts/matter"],
+      "options": {
+        "command": "node libs/matter-contract/scripts/export-contracts.mjs dist/contracts/matter"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/package.json",
+        { "externalDependencies": ["jest"] }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/libs/matter-contract"],
+      "options": {
+        "jestConfig": "libs/matter-contract/jest.config.ts"
+      }
+    },
+    "test-artifacts": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["export-contracts"],
+      "inputs": [
+        "default",
+        "{workspaceRoot}/jest.preset.js",
+        { "dependentTasksOutputFiles": "**/*.json" },
+        { "externalDependencies": ["jest", "ajv", "ajv-formats", "zod"] }
+      ],
+      "options": {
+        "command": "jest --config libs/matter-contract/jest.artifacts.config.ts"
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/matter-contract"
+      }
+    }
+  }
+}

@@ -74,6 +74,8 @@
   - [WAGO Recovery Runbooks](devices/wago-recovery-runbooks.md)
   - [WAGO Threat Model and Pen-Test Brief](devices/wago-threat-model.md)
   - [WAGO Safety Boundary](devices/wago-safety-boundary.md)
+  - [Matter: Architecture](devices/matter/architecture.md)
+  - [Matter: Operator Guide](devices/matter/operator.md)
 
 - **Billing**
   - [Overview](billing/overview.md)

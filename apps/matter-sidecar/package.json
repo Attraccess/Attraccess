@@ -1,0 +1,6 @@
+{
+  "name": "@attraccess/matter-sidecar",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Standalone Matter controller sidecar for Attraccess. Foundation only: contract, health and event stream."
+}
