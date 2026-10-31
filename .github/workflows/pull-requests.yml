@@ -68,6 +68,7 @@ jobs:
       [
         lint-and-typecheck,
         test,
+        browser-e2e,
         crap-score,
         build-companion,
         build-attractap-firmware,
@@ -159,6 +160,28 @@ jobs:
           esp-idf: 'false'
       - name: Test all core projects
         run: node scripts/ci-test-projects.mjs --group=core
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-node-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Cross-site browser test
+        run: pnpm nx run api:browser-e2e
 
   crap-score:
     runs-on: ubuntu-latest

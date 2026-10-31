@@ -40,7 +40,9 @@ export default defineConfig(({ command }) => {
             proxy: {
               '/api': {
                 target: apiProxyTarget,
-                changeOrigin: true,
+                // Keep the browser's Host so the API sees the address the page was served from and
+                // approves it as the app's own website (any port, 127.0.0.1 or LAN address).
+                changeOrigin: false,
                 ws: true,
               },
               '/cdn': {

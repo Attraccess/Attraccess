@@ -1,3 +1,4 @@
+import { AllowCrossSiteWrite } from '../common/security/cross-site-write.guard';
 import {
   Auth,
   AuthenticatedRequest,
@@ -337,6 +338,7 @@ export class BillingController {
     return await this.sumUpService.topUpWithReader(request.user.id, body.readerId, body.amount);
   }
 
+  @AllowCrossSiteWrite()
   @Post('/billing/top-up/sumup/callback')
   @ApiOperation({
     summary: 'Callback from SumUp',

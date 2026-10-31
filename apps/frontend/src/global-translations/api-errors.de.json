@@ -138,5 +138,9 @@
   "UserHasActiveUsageSessions": {
     "title": "Benutzer hat aktive Sitzungen",
     "description": "Dieser Benutzer hat noch aktive Nutzungssitzungen. Beende diese, bevor das Konto gelöscht wird."
+  },
+  "This website is not approved to make changes": {
+    "title": "Website nicht freigegeben",
+    "description": "Änderungen von dieser Website werden abgelehnt. Öffne Attraccess über die übliche Adresse. Falls du das schon tust, bitte eine Administratorin oder einen Administrator, die freigegebenen Websites in der Serverkonfiguration zu prüfen (siehe Sicherheitsdokumentation)."
   }
 }

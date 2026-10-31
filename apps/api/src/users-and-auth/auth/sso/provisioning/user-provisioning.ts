@@ -1,3 +1,4 @@
+import { AllowCrossSiteWrite } from '../../../../common/security/cross-site-write.guard';
 import { SsoSessionRequest } from '../sso-session-request';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
@@ -66,6 +67,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     return auth;
   }
 
+  @AllowCrossSiteWrite()
   @Post(`/${SSOProviderType.SAML}/:providerId/users/delete`)
   @ApiOperation({ summary: 'SAML-initiated user deletion', operationId: 'ssoSamlDeleteUser' })
   @ApiParam({
@@ -110,6 +112,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     return { OK: true };
   }
 
+  @AllowCrossSiteWrite()
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/permissions`)
   @ApiOperation({ summary: 'SSO-initiated permission update', operationId: 'ssoOidcUpdatePermissions' })
   @ApiParam({
@@ -154,6 +157,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     return { OK: true };
   }
 
+  @AllowCrossSiteWrite()
   @Post(`/${SSOProviderType.SAML}/:providerId/users/permissions`)
   @ApiOperation({ summary: 'SAML-initiated permission update', operationId: 'ssoSamlUpdatePermissions' })
   @ApiParam({
@@ -198,6 +202,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     return { OK: true };
   }
 
+  @AllowCrossSiteWrite()
   @Post(`/${SSOProviderType.OIDC}/:providerId/logout`)
   @ApiOperation({ summary: 'SSO-initiated logout', operationId: 'ssoOidcLogout' })
   @ApiParam({
@@ -242,6 +247,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     return { OK: true };
   }
 
+  @AllowCrossSiteWrite()
   @Post(`/${SSOProviderType.SAML}/:providerId/logout`)
   @ApiOperation({ summary: 'SAML-initiated logout', operationId: 'ssoSamlLogout' })
   @ApiParam({
@@ -286,6 +292,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     return { OK: true };
   }
 
+  @AllowCrossSiteWrite()
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/delete`)
   @ApiOperation({ summary: 'SSO-initiated user deletion', operationId: 'ssoOidcDeleteUser' })
   @ApiParam({
