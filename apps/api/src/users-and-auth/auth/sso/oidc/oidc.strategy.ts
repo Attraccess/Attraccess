@@ -1,7 +1,7 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { OidcTokenVerifier, OidcVerificationUnavailableError } from './oidc-token-verifier.service';
 import { EncryptionService } from '../../../../encryption/encryption.service';
-import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
+import { SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 
@@ -11,13 +11,9 @@ import { Profile, Strategy } from 'passport-openidconnect';
 
 import { MetricsService } from '../../../../metrics/metrics.service';
 
-import { UsersService } from '../../../users/users.service';
-
-import { AuthService } from '../../auth.service';
+import { SsoAccountResolver } from '../account-resolution/sso-account-resolver.service';
 
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-
-import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 
@@ -189,9 +185,6 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       throw error;
     }
 
-    const usersService = await this.moduleRef.get(UsersService, { strict: false });
-    const authService = await this.moduleRef.get(AuthService, { strict: false });
-
     // Build candidate sources to resolve claims from
     const claimSources: unknown[] = [profile];
     const raw = profile && '_json' in profile && profile._json ? profile._json : undefined;
@@ -215,74 +208,46 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       throw error;
     }
 
-    // Step 1: Check if user exists by SSO auth detail
-    this.logger.debug(`Checking if user exists with SSO binding: ${oidcUserId}`);
-    const existingUserId = await authService.findUserIdBySSO(
-      SSOProviderType.OIDC,
-      this.config.ssoProviderId,
-      oidcUserId,
-    );
-    let user = existingUserId ? await usersService.findOne({ id: existingUserId }) : null;
-
-    if (user) {
-      this.logger.log(`Found existing user with SSO binding: ${oidcUserId}`);
-      return await this.syncPermissionsFromClaims(user, claimSources);
-    }
-
-    // Step 2: No user found by external ID, check by email
-    this.logger.debug(`Checking if user exists with email: ${email}`);
-    user = await usersService.findOne({ email }, ['authenticationDetails']).catch(() => null);
-
-    if (user) {
-      // Step 3: User exists with email but no SSO binding - require linking flow
-      this.logger.log(`Found user with email ${email} but no SSO binding. Account linking required.`);
-      const error = new AccountLinkingRequiredException({
-        email,
-        externalId: oidcUserId,
-        providerId: this.config.ssoProviderId,
-        providerType: SSOProviderType.OIDC,
-      });
-      throw error;
-    }
-
-    // Step 4: No user exists, create new user with external ID
     const defaultUsernamePaths = ['preferred_username', 'email', 'sub'];
     const usernamePaths =
       this.config.usernameClaimPaths && this.config.usernameClaimPaths.length > 0
         ? this.config.usernameClaimPaths
         : defaultUsernamePaths;
     const resolvedUsername = this.firstNonEmptyStringFromPaths(usernamePaths, claimSources);
-    const rawUsername = resolvedUsername || profile.username || email;
-    const username = usersService.buildUsernameFromSSOClaim(rawUsername, email);
-    this.logger.log(`Creating new user with external ID: ${oidcUserId}`);
-    user = await usersService.createOne({
-      username,
-      email,
-      externalIdentifier: null,
-      isEmailVerified: true,
-    });
 
-    if (!user) {
-      this.logger.error('Failed to create user after SSO authentication');
-      const error = new UnauthorizedException();
-      this.recordFailure(error);
-      throw error;
-    }
-
-    // The user row is durable now, even if adding its SSO binding subsequently fails.
-    await this.recordProvisioningAudit(user.id, true);
-
-    await authService.addAuthenticationDetails(user.id, {
-      type: AuthenticationType.SSO,
-      details: {
-        providerId: this.config.ssoProviderId,
+    const resolver = this.moduleRef.get(SsoAccountResolver, { strict: false });
+    const { user, created } = await resolver
+      .resolveSsoUser({
         providerType: SSOProviderType.OIDC,
+        providerId: this.config.ssoProviderId,
         subject: oidcUserId,
-      },
-    });
+        email,
+        emailVerified: this.resolveEmailVerified(idTokenClaims, raw as Record<string, unknown> | undefined),
+        usernameClaim: resolvedUsername || profile.username || email,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof UnauthorizedException) this.recordFailure(error);
+        throw error;
+      });
 
-    this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
+    if (created) {
+      this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
+      await this.recordProvisioningAudit(user.id, true);
+    }
     return await this.syncPermissionsFromClaims(user, claimSources);
+  }
+
+  /** `email_verified` from the id-token claims and userinfo; any explicit "false" wins, absent/other = undefined. */
+  protected resolveEmailVerified(...sources: Array<Record<string, unknown> | undefined>): boolean | undefined {
+    const states = sources.map((source) => {
+      const value = source?.email_verified;
+      if (typeof value === 'boolean') return value;
+      if (typeof value !== 'string') return undefined;
+      const normalized = value.trim().toLowerCase();
+      return normalized === 'true' ? true : normalized === 'false' ? false : undefined;
+    });
+    if (states.includes(false)) return false;
+    return states.includes(true) ? true : undefined;
   }
 
   protected async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {

@@ -57,6 +57,12 @@ Optional können Sie ein Provisioning-Secret festlegen. Damit kann Ihr Identity 
 
 Wie bei [OIDC](user-management/sso-oidc.md) können Sie SAML-Rollen den Attraccess-Berechtigungen zuordnen.
 
+### Kontobindung
+
+SAML-Identitäten sind pro Anbieter gebunden: Ein Benutzer wird über die Kombination aus SAML-Anbieter und NameID erkannt. Dieselbe NameID eines anderen SAML-Anbieters öffnet das Konto daher nie. Gehört die E-Mail-Adresse einer SAML-Anmeldung zu einem bestehenden Konto ohne Bindung an diesen Anbieter (auch lokale Passwort-Konten und über einen anderen Anbieter erstellte Konten), muss der Benutzer zuerst die [Kontoverknüpfung](user-management/sso-overview.md) bestätigen.
+
+**Hinweis zum Update:** Beim Update werden bestehende SAML-Benutzer automatisch an ihren Anbieter gebunden, anhand früherer SAML-Sitzungen oder, falls es nur einen SAML-Anbieter gibt, an diesen. Benutzer, die sich nicht eindeutig zuordnen lassen (mehrere SAML-Anbieter und keine Sitzungshistorie), werden nicht gebunden. Sie sehen bei der nächsten Anmeldung die Aufforderung zur Kontoverknüpfung, die ein lokales Passwort voraussetzt. Ein Administrator muss daher ein Passwort einrichten oder das Konto korrigieren.
+
 ## Service Provider Metadaten
 
 Konfigurieren Sie Ihren SAML-Identity-Provider mit diesen Werten:

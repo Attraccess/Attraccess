@@ -14,6 +14,7 @@ import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { AuthController } from './auth/auth.controller';
 
 import { AuthService } from './auth/auth.service';
+import { SsoAccountResolver } from './auth/sso/account-resolution/sso-account-resolver.service';
 
 import { SessionService } from './auth/session.service';
 
@@ -231,6 +232,7 @@ export const sessionStoreProvider = {
     SSOSamlPassportGuard,
     SSOSamlStrategy,
     SSOLinkTokenService,
+    SsoAccountResolver,
     AccountLinkingExceptionFilter,
     BruteForceProtectionService,
     AuthAuditLogger,

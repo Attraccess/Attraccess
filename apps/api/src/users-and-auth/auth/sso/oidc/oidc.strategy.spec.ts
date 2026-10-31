@@ -105,10 +105,14 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     expect(user.username).toBe('preferred.user');
     expect(user.email).toBe('user@example.com');
     expect(usersService.createOne).toHaveBeenCalled();
-    expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(123, {
-      type: AuthenticationType.SSO,
-      details: { providerId: 1, providerType: SSOProviderType.OIDC, subject: 'ext-1' },
-    });
+    expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(
+      123,
+      {
+        type: AuthenticationType.SSO,
+        details: { providerId: 1, providerType: SSOProviderType.OIDC, subject: 'ext-1' },
+      },
+      expect.anything(),
+    );
   });
 
   it('resolves email using configured emailClaimPaths', async () => {
@@ -252,7 +256,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     );
   });
 
-  it('records a newly created user before binding failure without silently deleting it', async () => {
+  it('does not audit a user creation when the binding fails and the transaction rolls back', async () => {
     const usersService = {
       findOne: jest.fn().mockResolvedValue(null),
       buildUsernameFromSSOClaim: jest.fn((value: string) => value),
@@ -297,9 +301,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     ).rejects.toThrow('binding failed');
 
     expect(usersService.deleteOne).not.toHaveBeenCalled();
-    expect(audit.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 123 } }),
-    );
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('normalizes SSO usernames before user creation', async () => {
@@ -345,6 +347,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
         username: 'name.surname',
         email: 'user@example.com',
       }),
+      expect.anything(),
     );
   });
 

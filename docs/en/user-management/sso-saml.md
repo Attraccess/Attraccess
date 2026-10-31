@@ -57,6 +57,12 @@ Optionally set a provisioning secret. This allows your identity provider to mana
 
 As with [OIDC](user-management/sso-oidc.md), you can map SAML roles to Attraccess permissions.
 
+### Account Binding
+
+SAML identities are bound per provider: a user is identified by the combination of SAML provider and NameID, so the same NameID coming from a different SAML provider never opens that user's account. If a SAML login has an email address that belongs to an existing account without a binding for that provider (including local-password accounts and accounts created through another provider), the user has to confirm the [account linking](user-management/sso-overview.md) first.
+
+**Upgrade note:** On upgrade, existing SAML users are bound to their provider automatically, based on their previous SAML sessions or, if only one SAML provider exists, to that provider. Users that cannot be assigned unambiguously (several SAML providers and no session history) are not bound. They get the account-linking prompt on their next login, which requires a local password, so an administrator has to set one up or fix the account.
+
 ## Service Provider Metadata
 
 Configure your SAML identity provider with these values:

@@ -20,6 +20,7 @@ import { TokenHashService } from '../../../encryption/token-hash.service';
 import type { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuthService } from '../../../users-and-auth/auth/auth.service';
+import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 export function createOidcTestServices(dataSource: DataSource) {
@@ -88,8 +89,10 @@ export function createOidcTestServices(dataSource: DataSource) {
 
   const verifier = new OidcTokenVerifier();
   const encryption = new EncryptionService(mockConfigService);
+  const resolver = new SsoAccountResolver(usersService, authService, dataSource);
   const mockModuleRef = {
     get: (token: unknown): unknown => {
+      if (token === SsoAccountResolver) return resolver;
       if (token === UsersService) return usersService;
       if (token === AuthService) return authService;
       if (token === RbacService) return rbacService;
