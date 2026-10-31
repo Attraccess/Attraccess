@@ -143,6 +143,13 @@ void testScreenNotices(SdlDisplay &display, const std::filesystem::path &screens
     Display::transitionToScreen(&Display::initScreen);
     Display::loop();
     assert(touchNoticeShown(Display::initScreen) && !touchNoticeShown(Display::bootScreen));
+    {
+        // The init screen has no side padding; the notice still keeps off the bezel.
+        lv_obj_t *card = findLabel(Display::initScreen.getScreen(), "Berührung nicht verfügbar");
+        while (lv_obj_get_parent(card) != Display::initScreen.getScreen()) card = lv_obj_get_parent(card);
+        const lv_area_t area = coordsOf(card);
+        assert(area.x1 >= 16 && area.x2 <= 480 - 16);
+    }
     waitMs(3000);
     Display::transitionToScreen(&Display::lockscreen);
     Display::loop();
