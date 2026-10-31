@@ -2,6 +2,7 @@
 #include "topUpScreen.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../theme.hpp"
+#include "../../shared/fullScreenView.hpp"
 #include <cstdlib>
 
 namespace
@@ -16,17 +17,20 @@ namespace
         return label;
     }
 
-    lv_obj_t *makeButton(lv_obj_t *parent, const FirmwareI18n::Text &text, bool primary, lv_event_cb_t cb, void *self)
+    // Grows with its share of the row, like the usage forms' footer.
+    lv_obj_t *makeButton(lv_obj_t *parent, const FirmwareI18n::Text &text, bool primary, uint8_t grow, lv_event_cb_t cb, void *self)
     {
         lv_obj_t *btn = lv_button_create(parent);
+        lv_obj_set_flex_grow(btn, grow);
         lv_obj_set_height(btn, LV_SIZE_CONTENT);
-        lv_obj_set_width(btn, LV_SIZE_CONTENT);
+        lv_obj_set_style_pad_all(btn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
         if (primary)
             DisplayTheme::button(btn);
         else
             DisplayTheme::secondaryButton(btn);
         lv_obj_t *label = lv_label_create(btn);
         FirmwareI18n::setLabel(label, text);
+        lv_obj_set_align(label, LV_ALIGN_CENTER);
         lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, self);
         return btn;
     }
@@ -41,7 +45,7 @@ void TopUpScreen::init()
     this->screen = lv_obj_create(NULL);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
     DisplayTheme::applyScreen(this->screen);
-    lv_obj_set_style_pad_all(this->screen, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    FullScreenInsets::apply(this->screen);
     lv_obj_set_style_pad_row(this->screen, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -68,11 +72,11 @@ void TopUpScreen::init()
     lv_obj_set_width(footer, lv_pct(100));
     lv_obj_set_height(footer, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_column(footer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(footer, LV_OBJ_FLAG_SCROLLABLE);
-    makeButton(footer, FirmwareI18n::Message::Cancel, false, &TopUpScreen::onCancelClick, this);
-    makeButton(footer, FirmwareI18n::Message::TopUp, true, &TopUpScreen::onTopUpClick, this);
+    makeButton(footer, FirmwareI18n::Message::Cancel, false, 1, &TopUpScreen::onCancelClick, this);
+    makeButton(footer, FirmwareI18n::Message::TopUp, true, 2, &TopUpScreen::onTopUpClick, this);
 
     // Pinned to the bottom, outside the column layout, so it never pushes or
     // covers the field above it.

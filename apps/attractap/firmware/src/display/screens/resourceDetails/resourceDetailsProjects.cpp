@@ -130,7 +130,6 @@ void ResourceDetailsScreen::ensureProjectsModal()
    }
    lv_obj_t *overlay = createFullScreenView(this->screen);
    this->projectsModal = overlay;
-   DisplayTheme::applyScreen(overlay);
    lv_obj_set_flex_flow(overlay, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(overlay, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
@@ -140,10 +139,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_size(panel, lv_pct(100), lv_pct(100));
    DisplayTheme::applyScreen(panel);
    lv_obj_remove_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_pad_left(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_all(panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT); // the view holds the insets
    lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
 
