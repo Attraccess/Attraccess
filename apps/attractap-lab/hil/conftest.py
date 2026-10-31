@@ -9,6 +9,9 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
+import sys
+import tempfile
 import time
 import urllib.error
 
@@ -18,12 +21,18 @@ from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
 )
 from attractap_lab.enrollment import approve, latest_code
+from attractap_lab import hil_profile, reader_wifi
 from attractap_lab.reader_screen import ReaderTestHooks
 from attractap_lab.workflow import claim, send_reader_wifi
 
 from support import Api, ReaderConsole
 
 ENVIRONMENT = Path(__file__).parents[1] / "example-emulator-env.yaml"
+PROFILE = hil_profile.reader_profile(os.environ)
+# HIL_LOCAL_ENV: a reader and emulator on this machine's USB instead of a labgrid place.
+LOCAL = bool(os.environ.get("HIL_LOCAL_ENV"))
+if LOCAL and PROFILE != hil_profile.SECURE_LAB:
+    raise RuntimeError("HIL_LOCAL_ENV is only supported with READER_PROFILE=secure-lab")
 PIN = os.environ.get("READER_PIN", "4711")
 CARD_UIDS = ("08a11ce1", "08b0b001", "08ca0101")
 
@@ -35,8 +44,27 @@ def artifacts():
     return path
 
 
+def local_target():
+    """A labgrid target on local serial ports only (no coordinator, no claim)."""
+    from labgrid import Environment
+    text = Path(os.environ["HIL_LOCAL_ENV"]).read_text()
+    for name in ("READER_SERIAL_PORT", "EMULATOR_SERIAL_PORT"):
+        text = text.replace(f"@{name}@", os.environ[name])
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml") as config:
+        config.write(text)
+        config.flush()
+        environment = Environment(config.name)
+        try:
+            yield environment.get_target("main")
+        finally:
+            environment.cleanup()
+
+
 @pytest.fixture(scope="session")
 def target():
+    if LOCAL:
+        yield from local_target()
+        return
     with claim(ENVIRONMENT, os.environ["LG_PLACE"]) as target:
         yield target
 
@@ -55,9 +83,10 @@ def screenshot(target, artifacts):
 
 @pytest.fixture(scope="session")
 def emulator(target, artifacts):
-    flash = target.get_driver(NfcEmulatorFlashDriver)
-    flash.flash(os.environ["EMULATOR_IMAGE"])
-    target.deactivate(flash)
+    if not LOCAL:
+        flash = target.get_driver(NfcEmulatorFlashDriver)
+        flash.flash(os.environ["EMULATOR_IMAGE"])
+        target.deactivate(flash)
     emulator = target.get_driver(NfcEmulatorDriver)
     emulator.command("remove")
     emulator.command("behavior.clear")
@@ -137,16 +166,50 @@ def approve_pairing(console, url, token, timeout=180, since=0, **options):
     raise AssertionError("reader never showed a pairing code the API accepted")
 
 
+def secure_flash(erase_all=False):
+    """Sign with the lab key and write encrypted (tools/secure_lab_reader.py flash)."""
+    command = hil_profile.secure_flash_command(
+        sys.executable, hil_profile.secure_lab_port(os.environ), os.environ["READER_SECURE_BUILD"], erase_all=erase_all)
+    subprocess.run(command, check=True, stdin=subprocess.DEVNULL, timeout=600)
+
+
+def reboot_local_reader():
+    """Hard-reset a local reader through its USB serial port."""
+    subprocess.run(["esptool", "--chip", "esp32s3", "-p", hil_profile.secure_lab_port(os.environ),
+                    "--no-stub", "--after", "hard-reset", "run"],
+                   check=True, stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
+
+
+def send_wifi(target, driver):
+    """Put the lab Wi-Fi on the reader without it ever reaching a log we keep.
+
+    A lab place has its credentials root-only on the lab host; a local reader
+    reads READER_WIFI_FILE (JSON with ssid and password) on this machine.
+    """
+    if not LOCAL:
+        send_reader_wifi(target, PIN)
+        return
+    ssid, password = hil_profile.load_wifi(os.environ["READER_WIFI_FILE"])
+    driver._write(reader_wifi.command_line(ssid, password, PIN))
+
+
 @pytest.fixture(scope="session")
 def reader(target, api, admin, artifacts):
     """A freshly flashed reader on the lab Wi-Fi, paired with the test API.
 
-    The janitor erases readers between sessions, so the reader starts unpaired
-    and is approved with the admin session of the API this run started.
+    The janitor erases readers between sessions (a secure-lab reader is wiped
+    here instead), so the reader starts unpaired and is approved with the admin
+    session of the API this run started.
     """
-    flash = target.get_driver(ESPToolDriver)
-    flash.flash(os.environ["READER_IMAGE"])
-    target.deactivate(flash)
+    secure = PROFILE == hil_profile.SECURE_LAB
+    if secure:
+        # Like a lab place after the janitor: no settings, Wi-Fi or pairing left from earlier runs.
+        secure_flash(erase_all=True)
+        flash = None
+    else:
+        flash = target.get_driver(ESPToolDriver)
+        flash.flash(os.environ["READER_IMAGE"])
+        target.deactivate(flash)
     driver = target.get_driver("SerialDriver", activate=False)
     open_console(target, driver)
     console = ReaderConsole(driver, artifacts / "reader-serial.log")
@@ -154,7 +217,7 @@ def reader(target, api, admin, artifacts):
     time.sleep(3)
     assert "error" not in console.command("auth.code.set", {"newCode": PIN}).lower()
     mark = console.mark()
-    send_reader_wifi(target, PIN)
+    send_wifi(target, driver)
     response = console.expect(r"RESP network\.wifi\.credentials\.set ([^\r\n]*)", mark, 30).group(1)
     assert b"error" not in response.lower(), response
     reader_ip = console.expect(r"Got IP (\d+\.\d+\.\d+\.\d+)", mark, 60).group(1).decode()
@@ -166,9 +229,12 @@ def reader(target, api, admin, artifacts):
     # Leave the configuration-required state with a reboot.
     console.stop()
     target.deactivate(driver)
-    target.activate(flash)
-    flash.reset()
-    target.deactivate(flash)
+    if secure or LOCAL:
+        reboot_local_reader()
+    else:
+        target.activate(flash)
+        flash.reset()
+        target.deactivate(flash)
     open_console(target, driver)
     console.start()
     # The erased reader shows a rotating code; approve it as admin on the API
@@ -177,6 +243,11 @@ def reader(target, api, admin, artifacts):
     console.expect(r"Reader Authentication successful", 0, 120)
     yield {"id": reader_id, "console": console}
     console.stop()
+    if secure:
+        # An unsigned park image would boot-loop a Secure Boot reader: wipe it
+        # (settings, Wi-Fi, pairing) and leave the lab image instead.
+        target.deactivate(driver)
+        secure_flash(erase_all=True)
 
 
 @pytest.fixture

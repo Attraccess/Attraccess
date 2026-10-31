@@ -8,6 +8,15 @@
 # an SSH reverse tunnel on the lab host then carries the readers' API traffic
 # (NixOS option readerApiRelay).
 #
+# READER_PROFILE=secure-lab runs against a Secure Boot lab reader (public lab keys,
+# development-mode flash encryption; see README "Secure lab reader"): the image is
+# built with -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON, signed with
+# the lab key and written encrypted by tools/secure_lab_reader.py (needs
+# READER_SERIAL_PORT, the reader's serial device on this machine), and the reader
+# is wiped with `flash --erase-all` afterwards. HIL_LOCAL_ENV=<yaml> skips labgrid's
+# coordinator and uses the local resources of that file (hil/example-desk-env.yaml;
+# also READER_WIFI_FILE, a JSON file with ssid and password, and EMULATOR_SERIAL_PORT).
+#
 # Builds both firmware images (unless READER_IMAGE / EMULATOR_IMAGE are set),
 # starts an API with a throwaway database (waiting up to API_START_TIMEOUT
 # seconds, default 600), and runs pytest inside one labgrid
@@ -37,6 +46,14 @@ if [[ "${1:-}" == --in-session ]]; then
 fi
 
 ROOT="$(cd "$HERE/../../.." && pwd)"
+READER_PROFILE="${READER_PROFILE:-plain}"
+case "$READER_PROFILE" in
+  plain|secure-lab) ;;
+  *) echo "READER_PROFILE must be plain or secure-lab" >&2; exit 1 ;;
+esac
+if [[ "$READER_PROFILE" == secure-lab && -z "${READER_SERIAL_PORT:-}" ]]; then
+  echo "READER_PROFILE=secure-lab needs READER_SERIAL_PORT (the reader's serial device)" >&2; exit 1
+fi
 PLACE="${LG_PLACE_NAME:-attractap-touch-v2-1}"
 COORDINATOR="${LG_COORDINATOR:-attractap-lab:20408}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/attractap-hil.XXXXXX")"
@@ -54,7 +71,19 @@ require_idf() {
   command -v idf.py >/dev/null || { echo "Source ESP-IDF export.sh first (or set READER_IMAGE/EMULATOR_IMAGE)" >&2; exit 1; }
 }
 
-if [[ -z "${READER_IMAGE:-}" ]]; then
+if [[ "$READER_PROFILE" == secure-lab ]]; then
+  # A secure build is a directory (bootloader, partition table, app), not a merged image.
+  if [[ -z "${READER_SECURE_BUILD:-}" ]]; then
+    require_idf
+    firmware="$ROOT/apps/attractap/firmware"
+    READER_SECURE_BUILD="$firmware/build/hil-attractap-touch-v2-secure-lab"
+    (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
+      idf.py -B "$READER_SECURE_BUILD" -DSDKCONFIG="$READER_SECURE_BUILD/sdkconfig" -DATTRACTAP_VARIANT=attractap-touch-v2 \
+        -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
+        -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON ${READER_CMAKE_ARGS:-} reconfigure build >"$WORK/reader-build.log")
+  fi
+  export READER_SECURE_BUILD
+elif [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
   firmware="$ROOT/apps/attractap/firmware"
   build="$firmware/build/hil-attractap-touch-v2"
@@ -65,7 +94,8 @@ if [[ -z "${READER_IMAGE:-}" ]]; then
   (cd "$build" && esptool --chip esp32s3 merge-bin -o "$WORK/reader.bin" @flash_args >/dev/null)
   READER_IMAGE="$WORK/reader.bin"
 fi
-if [[ -z "${EMULATOR_IMAGE:-}" ]]; then
+# A local emulator (HIL_LOCAL_ENV) keeps the firmware it already runs.
+if [[ -z "${EMULATOR_IMAGE:-}" && -z "${HIL_LOCAL_ENV:-}" ]]; then
   require_idf
   emulator="$ROOT/apps/attractap/nfc-emulator"
   (cd "$emulator" && ./scripts/idf.sh build >"$WORK/emulator-build.log")
@@ -101,11 +131,17 @@ fi
 
 mkdir -p "$HERE/../hil-artifacts"
 cd "$HERE/../hil-artifacts"
-GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTHON" \
-  READER_IMAGE="$READER_IMAGE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
+export GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTHON" \
+  READER_IMAGE="${READER_IMAGE:-}" EMULATOR_IMAGE="${EMULATOR_IMAGE:-}" READER_PROFILE="$READER_PROFILE" \
   API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
-  API_RELAY_SSH="${API_RELAY_SSH:-}" \
+  API_RELAY_SSH="${API_RELAY_SSH:-}"
+if [[ -n "${HIL_LOCAL_ENV:-}" ]]; then
+  # Local resources, no labgrid coordinator or place (a reader on this machine's USB).
+  LG_ARTIFACTS="${LG_ARTIFACTS:-$PWD/lab-artifacts/local-$(date +%Y%m%dT%H%M%S)}" \
+    bash "$HERE/run.sh" --in-session "$@"
+else
   labgrid-client -x "$COORDINATOR" -p "$PLACE" session \
     --purpose "${HIL_PURPOSE:-Attractap HIL: NFC emulator tests}" --wait-timeout "${HIL_WAIT_TIMEOUT:-1800}" -- \
     bash "$HERE/run.sh" --in-session "$@"
+fi

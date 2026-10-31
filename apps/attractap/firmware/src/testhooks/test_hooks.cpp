@@ -383,6 +383,17 @@ namespace TestHooks
             return true;
         }
 
+        if (topic == "system.heap.get")
+        {
+            JsonDocument doc;
+            doc["internalFree"] = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            doc["internalLargest"] = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            doc["internalMinFree"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            doc["psramFree"] = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+            reply(topic, doc);
+            return true;
+        }
+
         if (topic == "ui.screenshot.get")
         {
             handleScreenshot(topic);
