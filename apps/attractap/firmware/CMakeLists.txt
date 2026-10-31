@@ -82,6 +82,16 @@ project(attractap)
 if(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_SECURE_BOOT AND CONFIG_SECURE_FLASH_ENC_ENABLED))
     message(FATAL_ERROR "ATTRACTAP_SECURE_PROFILE=ON but ${SDKCONFIG} lacks Secure Boot / flash encryption. "
                         "It predates the secure profile; build in a clean directory with its own -DSDKCONFIG.")
+elseif(ATTRACTAP_SECURE_PROFILE AND NOT (CONFIG_ESP_COREDUMP_ENABLE_TO_NONE AND CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC))
+    # ESP-IDF enables the fuse options of a stale standard sdkconfig but keeps its explicit
+    # coredump/MbedTLS choices, so the profile is only half applied. Check the options
+    # that differ between the standard and the secure profile (tools/check_secure_profile.py
+    # checks the full overlay on built images).
+    message(FATAL_ERROR "ATTRACTAP_SECURE_PROFILE=ON but ${SDKCONFIG} does not carry the full secure profile "
+                        "(coredump/MbedTLS options of a standard build). Build in a clean directory with its own -DSDKCONFIG.")
+elseif(ATTRACTAP_SECURE_PROFILE AND NOT ATTRACTAP_SECURE_LAB AND NOT CONFIG_ESP_CONSOLE_NONE)
+    message(FATAL_ERROR "ATTRACTAP_SECURE_PROFILE=ON but ${SDKCONFIG} still has a console enabled. "
+                        "Build in a clean directory with its own -DSDKCONFIG.")
 elseif(NOT ATTRACTAP_SECURE_PROFILE AND (CONFIG_SECURE_BOOT OR CONFIG_SECURE_FLASH_ENC_ENABLED))
     message(FATAL_ERROR "${SDKCONFIG} enables Secure Boot or flash encryption, but ATTRACTAP_SECURE_PROFILE is OFF. "
                         "It comes from a secure build; build in a clean directory with its own -DSDKCONFIG.")
