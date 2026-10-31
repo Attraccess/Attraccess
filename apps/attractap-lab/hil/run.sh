@@ -13,8 +13,8 @@
 # built with -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON, signed with
 # the lab key and written encrypted by tools/secure_lab_reader.py (needs
 # READER_SERIAL_PORT, the reader's serial device on this machine), and the reader
-# is wiped with `flash --erase-all` afterwards. HIL_LOCAL_ENV=<yaml> skips labgrid's
-# coordinator and uses the local resources of that file (hil/example-desk-env.yaml;
+# is wiped with `flash --erase-all` afterwards. HIL_LOCAL_ENV=<yaml> (required for
+# secure-lab for now) skips labgrid's coordinator and uses the local resources of that file (hil/example-desk-env.yaml;
 # also READER_WIFI_FILE, a JSON file with ssid and password, and EMULATOR_SERIAL_PORT).
 #
 # Builds both firmware images (unless READER_IMAGE / EMULATOR_IMAGE are set),
@@ -51,8 +51,25 @@ case "$READER_PROFILE" in
   plain|secure-lab) ;;
   *) echo "READER_PROFILE must be plain or secure-lab" >&2; exit 1 ;;
 esac
-if [[ "$READER_PROFILE" == secure-lab && -z "${READER_SERIAL_PORT:-}" ]]; then
-  echo "READER_PROFILE=secure-lab needs READER_SERIAL_PORT (the reader's serial device)" >&2; exit 1
+fail() { echo "$*" >&2; exit 1; }
+# pytest runs from hil-artifacts, so relative paths must be made absolute here.
+absolute() { [[ -z "$1" || "$1" == /* ]] && printf '%s' "$1" || printf '%s/%s' "$PWD" "$1"; }
+HIL_LOCAL_ENV="$(absolute "${HIL_LOCAL_ENV:-}")"
+READER_WIFI_FILE="$(absolute "${READER_WIFI_FILE:-}")"
+READER_SECURE_BUILD="$(absolute "${READER_SECURE_BUILD:-}")"
+if [[ "$READER_PROFILE" == secure-lab ]]; then
+  # A lab place's janitor would park a Secure Boot reader with an unsigned image (boot loop),
+  # and the flash tool needs the reader's USB here: secure-lab runs only locally for now.
+  [[ -n "$HIL_LOCAL_ENV" ]] || fail "READER_PROFILE=secure-lab needs HIL_LOCAL_ENV (absolute path, e.g. <repo>/apps/attractap-lab/hil/example-desk-env.yaml)"
+  [[ -n "${READER_SERIAL_PORT:-}" ]] || fail "READER_PROFILE=secure-lab needs READER_SERIAL_PORT (the reader's serial device)"
+elif [[ -n "$HIL_LOCAL_ENV" ]]; then
+  fail "HIL_LOCAL_ENV is only supported with READER_PROFILE=secure-lab"
+fi
+if [[ -n "$HIL_LOCAL_ENV" ]]; then
+  [[ -f "$HIL_LOCAL_ENV" ]] || fail "HIL_LOCAL_ENV=$HIL_LOCAL_ENV does not exist"
+  [[ -n "${EMULATOR_SERIAL_PORT:-}" ]] || fail "HIL_LOCAL_ENV needs EMULATOR_SERIAL_PORT (the NFC emulator's serial device)"
+  [[ -f "$READER_WIFI_FILE" ]] || fail "HIL_LOCAL_ENV needs READER_WIFI_FILE, a JSON file with ssid and password"
+  export HIL_LOCAL_ENV READER_WIFI_FILE
 fi
 PLACE="${LG_PLACE_NAME:-attractap-touch-v2-1}"
 COORDINATOR="${LG_COORDINATOR:-attractap-lab:20408}"

@@ -11,7 +11,7 @@ import pytest
 
 from attractap_lab.enrollment import latest_code
 
-from conftest import approve_pairing, open_console
+from conftest import approve_pairing, open_console, reboot_reader
 from test_nfc_cards import login, requires, sign_out
 
 REVOKE_DISCONNECT_SECONDS = 1.0
@@ -148,13 +148,10 @@ def test_pending_screen_shows_code_and_qr(api, admin, reader, hooks, unpaired, a
 
 
 def test_reboot_stays_paired(api, admin, target, reader, hooks):
-    flash = target.get_driver("ESPToolDriver", activate=False)
     console, driver = reader["console"], target.get_driver("SerialDriver", activate=False)
     console.stop()
     target.deactivate(driver)
-    target.activate(flash)
-    flash.reset()
-    target.deactivate(flash)
+    reboot_reader(target)
     open_console(target, driver)
     mark = console.mark()
     console.start()

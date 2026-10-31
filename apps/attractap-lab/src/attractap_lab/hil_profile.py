@@ -29,17 +29,6 @@ def reader_profile(environ):
     return profile
 
 
-def build_directory_name(profile):
-    return "hil-attractap-touch-v2" if profile == PLAIN else "hil-attractap-touch-v2-secure-lab"
-
-
-def cmake_arguments(profile):
-    """Extra idf.py arguments of the reader build (test hooks are always on)."""
-    if profile == PLAIN:
-        return []
-    return ["-DATTRACTAP_SECURE_PROFILE=ON", "-DATTRACTAP_SECURE_LAB=ON"]
-
-
 def secure_lab_port(environ):
     """The reader's local serial device; secure-lab flashing runs on this machine."""
     port = environ.get("READER_SERIAL_PORT")

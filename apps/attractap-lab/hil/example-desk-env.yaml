@@ -1,6 +1,6 @@
 # Local resources for HIL_LOCAL_ENV: a reader and its NFC emulator on this
-# machine's USB, no labgrid coordinator. run.sh fills in the device paths from
-# READER_SERIAL_PORT and EMULATOR_SERIAL_PORT. There is no camera and no
+# machine's USB, no labgrid coordinator. hil/conftest.py fills in the device paths
+# from READER_SERIAL_PORT and EMULATOR_SERIAL_PORT. There is no camera and no
 # emulator flash driver here: the emulator keeps the firmware it already runs.
 imports:
   - attractap_lab.drivers

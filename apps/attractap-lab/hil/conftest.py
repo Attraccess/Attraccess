@@ -33,6 +33,10 @@ PROFILE = hil_profile.reader_profile(os.environ)
 LOCAL = bool(os.environ.get("HIL_LOCAL_ENV"))
 if LOCAL and PROFILE != hil_profile.SECURE_LAB:
     raise RuntimeError("HIL_LOCAL_ENV is only supported with READER_PROFILE=secure-lab")
+if PROFILE == hil_profile.SECURE_LAB and not LOCAL:
+    # The flash tool needs the reader's USB on this machine, and a lab place's janitor
+    # would park a Secure Boot reader with an unsigned image (boot loop).
+    raise RuntimeError("READER_PROFILE=secure-lab needs HIL_LOCAL_ENV (the secure reader must be on this machine's USB)")
 PIN = os.environ.get("READER_PIN", "4711")
 CARD_UIDS = ("08a11ce1", "08b0b001", "08ca0101")
 
@@ -174,10 +178,35 @@ def secure_flash(erase_all=False):
 
 
 def reboot_local_reader():
-    """Hard-reset a local reader through its USB serial port."""
+    """Hard-reset a local reader through its USB serial port.
+
+    Same esptool call as ESPToolDriver.reset, which needs a labgrid USB resource
+    that a reader on this machine's USB (HIL_LOCAL_ENV) does not have.
+    """
     subprocess.run(["esptool", "--chip", "esp32s3", "-p", hil_profile.secure_lab_port(os.environ),
                     "--no-stub", "--after", "hard-reset", "run"],
                    check=True, stdin=subprocess.DEVNULL, capture_output=True, timeout=120)
+
+
+def reboot_reader(target):
+    """Hard-reset the reader: through its local USB port, or the place's flash driver."""
+    if LOCAL:
+        reboot_local_reader()
+        return
+    flash = target.get_driver(ESPToolDriver, activate=False)
+    target.activate(flash)
+    flash.reset()
+    target.deactivate(flash)
+
+
+def record_heap(console, artifacts, label):
+    """Append the reader's internal heap (system.heap.get test hook) to reader-heap.jsonl."""
+    try:
+        heap = ReaderTestHooks(console.stream(), PIN).command("system.heap.get")
+    except Exception as error:  # diagnostics only: never fail a run over it
+        heap = {"error": str(error)}
+    with (artifacts / "reader-heap.jsonl").open("a") as log:
+        log.write(json.dumps({"label": label, "profile": PROFILE, **heap}) + "\n")
 
 
 def send_wifi(target, driver):
@@ -205,49 +234,56 @@ def reader(target, api, admin, artifacts):
     if secure:
         # Like a lab place after the janitor: no settings, Wi-Fi or pairing left from earlier runs.
         secure_flash(erase_all=True)
-        flash = None
     else:
         flash = target.get_driver(ESPToolDriver)
         flash.flash(os.environ["READER_IMAGE"])
         target.deactivate(flash)
     driver = target.get_driver("SerialDriver", activate=False)
-    open_console(target, driver)
-    console = ReaderConsole(driver, artifacts / "reader-serial.log")
-    console.start()
-    time.sleep(3)
-    assert "error" not in console.command("auth.code.set", {"newCode": PIN}).lower()
-    mark = console.mark()
-    send_wifi(target, driver)
-    response = console.expect(r"RESP network\.wifi\.credentials\.set ([^\r\n]*)", mark, 30).group(1)
-    assert b"error" not in response.lower(), response
-    reader_ip = console.expect(r"Got IP (\d+\.\d+\.\d+\.\d+)", mark, 60).group(1).decode()
-    configuration = console.command("api.configuration.set", {
-        "authCode": PIN, "hostname": api_host(reader_ip),
-        "port": int(os.environ.get("READER_API_PORT") or os.environ["API_PORT"]), "useSSL": False,
-    })
-    assert "error" not in configuration.lower(), configuration
-    # Leave the configuration-required state with a reboot.
-    console.stop()
-    target.deactivate(driver)
-    if secure or LOCAL:
-        reboot_local_reader()
-    else:
-        target.activate(flash)
-        flash.reset()
-        target.deactivate(flash)
-    open_console(target, driver)
-    console.start()
-    # The erased reader shows a rotating code; approve it as admin on the API
-    # this run started (a code that rotated away is retried with the next one).
-    reader_id = approve_pairing(console, api.base[:-len("/api")], admin)
-    console.expect(r"Reader Authentication successful", 0, 120)
-    yield {"id": reader_id, "console": console}
-    console.stop()
-    if secure:
-        # An unsigned park image would boot-loop a Secure Boot reader: wipe it
-        # (settings, Wi-Fi, pairing) and leave the lab image instead.
+    console = None
+    try:
+        open_console(target, driver)
+        console = ReaderConsole(driver, artifacts / "reader-serial.log")
+        console.start()
+        time.sleep(3)
+        assert "error" not in console.command("auth.code.set", {"newCode": PIN}).lower()
+        mark = console.mark()
+        send_wifi(target, driver)
+        response = console.expect(r"RESP network\.wifi\.credentials\.set ([^\r\n]*)", mark, 30).group(1)
+        assert b"error" not in response.lower(), response
+        reader_ip = console.expect(r"Got IP (\d+\.\d+\.\d+\.\d+)", mark, 60).group(1).decode()
+        configuration = console.command("api.configuration.set", {
+            "authCode": PIN, "hostname": api_host(reader_ip),
+            "port": int(os.environ.get("READER_API_PORT") or os.environ["API_PORT"]), "useSSL": False,
+        })
+        assert "error" not in configuration.lower(), configuration
+        # Leave the configuration-required state with a reboot.
+        console.stop()
         target.deactivate(driver)
-        secure_flash(erase_all=True)
+        reboot_reader(target)
+        open_console(target, driver)
+        console.start()
+        record_heap(console, artifacts, "before pairing")
+        # The erased reader shows a rotating code; approve it as admin on the API
+        # this run started (a code that rotated away is retried with the next one).
+        reader_id = approve_pairing(console, api.base[:-len("/api")], admin)
+        console.expect(r"Reader Authentication successful", 0, 120)
+        record_heap(console, artifacts, "after the TLS session opened")
+        yield {"id": reader_id, "console": console}
+        record_heap(console, artifacts, "end of session")
+    finally:
+        if console is not None:
+            try:
+                console.stop()
+            except Exception:  # the wipe below must still run
+                pass
+        if secure:
+            # Always, also when setup failed: no Wi-Fi, PIN or pairing may stay on the
+            # reader, and an unsigned park image would boot-loop a Secure Boot reader.
+            try:
+                target.deactivate(driver)
+            except Exception:
+                pass
+            secure_flash(erase_all=True)
 
 
 @pytest.fixture
