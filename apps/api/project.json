@@ -149,6 +149,8 @@
         "{workspaceRoot}/monitoring/grafana/provisioning/**/*",
         "{workspaceRoot}/monitoring/grafana/dashboards/**/*",
         "{workspaceRoot}/monitoring/prometheus/prometheus.yml",
+        "{workspaceRoot}/apps/attractap/firmware/src/**/*",
+        "{workspaceRoot}/apps/attractap/firmware/tests/reference-recordings/recordings/**/*",
         {
           "externalDependencies": ["jest"]
         }
