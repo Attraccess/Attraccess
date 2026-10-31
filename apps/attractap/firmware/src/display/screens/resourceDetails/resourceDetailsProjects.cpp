@@ -124,30 +124,22 @@ void ResourceDetailsScreen::ensureProjectsModal()
       return;
    }
 
-   lv_obj_t *overlay = lv_obj_create(lv_layer_top());
+   if (!this->screen)
+   {
+      return;
+   }
+   lv_obj_t *overlay = createFullScreenView(this->screen);
    this->projectsModal = overlay;
-   lv_obj_remove_style_all(overlay);
-   lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
-   lv_obj_set_align(overlay, LV_ALIGN_CENTER);
-   lv_obj_set_style_bg_color(overlay, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(overlay, 160, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(overlay, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(overlay, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_flex_align(overlay, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
    lv_obj_t *panel = lv_obj_create(overlay);
    this->projectsModalPanel = panel;
    lv_obj_remove_style_all(panel);
-   lv_obj_set_width(panel, lv_pct(90));
-   lv_obj_set_style_max_width(panel, 400, LV_PART_MAIN | LV_STATE_DEFAULT);
-   // Fits header, search row, four projects and pagination on the 480 px display.
-   lv_obj_set_style_min_height(panel, 422, LV_PART_MAIN | LV_STATE_DEFAULT);
-   DisplayTheme::applySurface(panel);
-   lv_obj_set_style_pad_left(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_size(panel, lv_pct(100), lv_pct(100));
+   DisplayTheme::applyScreen(panel);
+   lv_obj_remove_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_all(panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT); // the view holds the insets
    lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
 
@@ -228,7 +220,7 @@ void ResourceDetailsScreen::showProjectsModal()
    this->ensureProjectsModal();
    if (this->projectsRequestPending)
    {
-      // The awaited reply may have been lost while the dialog was closed.
+      // The awaited reply may have been lost while the view was hidden.
       this->requestProjects(this->projectsPendingPage);
    }
    else if (!this->projectsDataInitialized)

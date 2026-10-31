@@ -36,7 +36,14 @@ void ResourceDetailsScreen::resetProjectsSearch()
    this->closeProjectsSearchEditor(false);
    this->projectsSearchQuery.clear();
    this->projectsRequestPending = false;
+   // The projects belong to the user whose session ended: never show them to the next one.
+   this->projectsCache = API::ProjectsOfUserResponse{};
+   this->projectsDataInitialized = false;
+   this->projectsCurrentPage = 1;
+   this->projectsTotalCount = 0;
+   this->projectsHasMore = false;
    this->refreshProjectsSearchField();
+   this->rebuildProjectsList();
 }
 
 void ResourceDetailsScreen::createProjectsSearchRow(lv_obj_t *panel)
@@ -100,10 +107,8 @@ void ResourceDetailsScreen::createProjectsSearchEditor(lv_obj_t *overlay)
    lv_obj_set_size(editor, lv_pct(100), lv_pct(100));
    lv_obj_set_align(editor, LV_ALIGN_CENTER);
    DisplayTheme::applyScreen(editor);
-   lv_obj_set_style_pad_top(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_left(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(editor, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Fills the full-screen view's content area, which already leaves room for the chrome.
+   lv_obj_set_style_pad_all(editor, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_row(editor, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(editor, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(editor, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);

@@ -5,24 +5,20 @@
 #include <lvgl.h>
 #include <functional>
 
-// Power-off button + confirmation modal, shared by every settings screen on
+// Power-off button + inline confirmation, shared by every settings screen on
 // hardware that has the SYS_EN latch (V4 / touch v2). Confirming invokes the
 // callback, which the application wires to IOExpander::powerOff().
 namespace PowerOffButton
 {
-    // Adds the button to `parent` and returns it. `onConfirm` is stored in a
-    // single global slot — ponytail: all buttons power off the same board, so
-    // per-instance state would be dead weight. Give it per-button user data if
-    // a screen ever needs a different action.
+    // Adds the button (and its hidden confirm) to `parent` and returns the
+    // button. Each button keeps its own callback and confirm, so screens that
+    // are alive at the same time do not interfere.
     lv_obj_t *create(lv_obj_t *parent, std::function<void()> onConfirm);
 
-    // Closes the modal if open. Call from onScreenLeave().
-    void hideConfirm();
-
-    // True while the confirm modal is up. The drawer gesture is not LVGL
-    // hit-tested, so Display::handleGestureSample() has to check this itself —
-    // otherwise a top-edge swipe opens the drawer behind the modal, invisibly.
-    bool isConfirmVisible();
+    // Tapping the button swaps it for a full-width "Power off device?" confirm
+    // with Cancel / Power off. This restores `button` if its confirm is open;
+    // nullptr is ignored. Call from the host screen's onScreenLeave().
+    void hideConfirm(lv_obj_t *button);
 }
 
 #endif // HAS_POWER_BUTTON

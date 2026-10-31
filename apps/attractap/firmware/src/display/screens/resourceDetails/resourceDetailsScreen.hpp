@@ -13,6 +13,7 @@
 #include "../../theme.hpp"
 #include "../../shared/sessionHeader.hpp"
 #include "../../shared/actionOverlay.hpp"
+#include "../../shared/fullScreenView.hpp"
 #include "../../../utils.hpp"
 #include "../../../api/api.hpp"
 
@@ -56,7 +57,6 @@ public:
     // UI helpers for async actions
     void showActionProgress(const FirmwareI18n::Text &text);
     void hideActionProgress();
-    void showSuccessToast(const FirmwareI18n::Text &text, uint16_t ms = 1200);
 
     void setProjects(const API::ProjectsOfUserResponse &projects);
 
@@ -114,7 +114,6 @@ private:
     std::function<void(uint32_t, const std::string &)> projectSelectionCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);
-    static void onToastDelete(lv_event_t *e);
     static void onProjectsButtonClick(lv_event_t *e);
     static void onClearProjectSelectionClick(lv_event_t *e);
     static void onProjectsModalClose(lv_event_t *e);
@@ -151,8 +150,6 @@ private:
     lv_obj_t *activeActionLabel = nullptr;
     lv_obj_t *activeActionSpinner = nullptr;
     bool actionInProgress = false;
-    lv_obj_t *successToast = nullptr;
-    lv_timer_t *successToastTimer = nullptr;
 
     void refreshProjectsButtonLabel();
     void updateClearProjectButtonState();
@@ -183,7 +180,6 @@ private:
     void applyCachedState();
     void disposeProjectsModal();
     void disposeFormsModal();
-    void disposeSuccessToast();
     void hideActionProgressVisual();
     void resetFormsModalState();
 };

@@ -36,6 +36,12 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
 
+### Meldungen und niedriges Guthaben
+
+Ergebnisse und Probleme, etwa eine fehlgeschlagene Anmeldung oder eine Aktion, die nicht geklappt hat, erscheinen als kurze Meldung am oberen Rand des aktuellen Bildschirms. Tippen Sie auf die Meldung, um sie zu schließen, oder warten Sie ab: Sie verschwindet nach einigen Sekunden von selbst. Eine Meldung gehört zu dem Bildschirm, auf dem sie erscheint, und verschwindet deshalb auch, wenn der Leser zu einem anderen Bildschirm wechselt. Meldet der Leser Sie ab, etwa weil der Status der Maschine nicht aktualisiert werden konnte, sehen Sie den Grund stattdessen auf dem Bildschirm, den der Leser nach der Abmeldung zeigt. Solange eine Meldung angezeigt wird, verdeckt sie einen Teil des Bildschirms. Tippen Sie darauf, um den verdeckten Bereich wieder zu bedienen; alles außerhalb der Meldung bleibt bedienbar.
+
+Schlägt eine Aktion wegen zu geringen Guthabens fehl und hat der Leser ein Zahlungsterminal, öffnet der Leser den Bildschirm **Unzureichendes Guthaben**. Geben Sie den Betrag in ganzen Euro ein, tippen Sie auf **Aufladen** und fahren Sie am Zahlungsterminal fort. **Abbrechen** bringt Sie zurück. Meldet der Leser Sie währenddessen ab, wird der Bildschirm wie jeder andere ersetzt.
+
 ## Live-Statistiken ansehen
 
 Tippen Sie nach der Anmeldung auf den Namen der Maschine, die Sie gerade nutzen. Die Details zeigen die Sitzungsdauer sowie **Aktuelle Nutzung** mit dem Energieverbrauch in **kWh**, der Betriebszeit und dem Status „Läuft“ oder „Leerlauf“. Die Messwerte werden alle 10 Sekunden aktualisiert, solange Sie die Details ansehen.

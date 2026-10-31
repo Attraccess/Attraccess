@@ -25,6 +25,8 @@
 #include "screens/supervision/supervisionScreen.hpp"
 #include "screens/massIntroduction/massIntroductionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#include "screens/topUp/topUpScreen.hpp"
+#include "shared/screenNotice.hpp"
 #ifdef DEMO_MODE
 #include "screens/demoSettings/demoSettingsScreen.hpp"
 #endif
@@ -64,6 +66,7 @@ public:
     static SupervisionScreen supervisionScreen;
     static MassIntroductionScreen massIntroductionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+    static TopUpScreen topUpScreen;
 #ifdef DEMO_MODE
     static DemoSettingsScreen demoSettingsScreen;
 #endif
@@ -83,11 +86,21 @@ public:
     static bool hasTouchInput();
     static uint32_t touchPressSequence;
 
-    // Global error popup helpers
-    static void showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
+    // Screen-owned notice: shown inside the active screen, replaced by the next
+    // one and removed when the router leaves that screen. Carry rule: a notice
+    // raised since the application's last render pass belongs to the event that
+    // the next pass turns into a transition, so it lands on the destination
+    // ("log out, then explain why" shows the explanation on the lockscreen).
+    // Async API callbacks run after a pass, so their notices count for the next.
+    static void showNotice(ScreenNotice::Kind kind, const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
+    static void showErrorNotice(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
     static void showBillingSummary(const std::string &total);
-    static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
-    static void hidePopup();
+    // Missing touch panel. Raised on the boot screen, which is replaced within
+    // seconds, so it follows every transition until it expires.
+    static void showTouchUnavailableNotice();
+    static void clearNotice();
+    // Called by the application at the end of each render pass (processState).
+    static void endNoticeRenderPass();
 
     // Hidden maintenance drawer: pulled down from the top edge, exposes
     // "Open Settings" and "Reboot" actions. The settings action is wired by the
@@ -106,7 +119,6 @@ public:
 private:
     static void setupFramebuffer();
     static bool touchWarningPending;
-    static void showMessagePopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool error);
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.
@@ -144,6 +156,9 @@ private:
     static uint32_t tick_cb();
 
     static void initDeviceOverlay();
+    // The device footer, network badge and maintenance drawer sit on the top
+    // layer, outside the active screen tree.
+    static void refreshChromeLanguage(const std::string &language);
     static void updateNetworkQualityOverlay();
     static lv_obj_t *deviceNameLabel;
     static FirmwareI18n::Text deviceNameInitValue;
@@ -153,14 +168,30 @@ private:
     static State::NetworkQuality networkQualityOverlayValue;
     static bool networkQualityOverlayInitialized;
 
-    static lv_obj_t *activePopup;
-    static lv_timer_t *popupAutoCloseTimer;
+    struct PendingNotice
+    {
+        ScreenNotice::Kind kind = ScreenNotice::Kind::Info;
+        FirmwareI18n::Text title;
+        FirmwareI18n::Text message;
+        // Set for a notice that follows transitions until `expiresAt` (millis).
+        bool followsScreens = false;
+        uint32_t expiresAt = 0;
+    };
+    static ScreenNotice notice;
+    static PendingNotice lastNotice;
+    // Raised since the last application render pass.
+    static bool noticeRaisedThisPass;
+    // Raised before any screen existed.
+    static bool noticeAwaitsScreen;
+    static void presentNotice();
+    // Router hook, called once the new screen is active: keeps, carries or drops the notice.
+    static void routeNotice(bool sameScreen);
 
     // Maintenance drawer (display_drawer.cpp)
     static void initDrawer();
     static void openDrawer();
     static void closeDrawer();
-    static void showRebootConfirm();
+    static void setRebootConfirmVisible(bool visible);
     static bool isDrawerAvailable();
     static void updateDrawerAvailability();
     // Fed every touch sample from touchpad_read to detect the top-edge pull-down
@@ -170,7 +201,8 @@ private:
     static lv_obj_t *drawerBackdrop;
     static lv_obj_t *drawerGrabber;
     static lv_obj_t *drawerPanel;
-    static lv_obj_t *rebootConfirmOverlay;
+    static lv_obj_t *drawerActions;
+    static lv_obj_t *drawerRebootConfirm;
     static bool drawerOpen;
     static std::function<void()> onOpenSettingsCallback;
     static std::function<bool()> drawerAvailableCallback;

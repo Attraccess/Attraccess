@@ -65,6 +65,8 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     // Reused screens may have been hidden when the locale last changed.
     FirmwareI18n::refreshTree(targetRoot, State::getActiveLanguage());
 
+    const bool sameScreen = screen == Display::activeScreen;
+
     IScreen *previousScreen = Display::activeScreen;
     if (previousScreen)
     {
@@ -83,6 +85,8 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     }
 
     Display::updateNetworkQualityOverlay();
+    // Keeps, carries or drops the notice; the rule lives in display_notice.cpp.
+    Display::routeNotice(sameScreen);
 
     lv_screen_load_anim(targetRoot, Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();

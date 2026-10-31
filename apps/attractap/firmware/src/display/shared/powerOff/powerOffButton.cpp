@@ -2,133 +2,90 @@
 #ifdef HAS_POWER_BUTTON
 
 #include "powerOffButton.hpp"
+#include "../inlineConfirm/inlineConfirm.hpp"
 #include "../../theme.hpp"
-#include "../../fonts/attractap_fonts.hpp"
 
 namespace
 {
-    std::function<void()> g_onConfirm;
-    lv_obj_t *g_confirm = nullptr;
-
-    lv_obj_t *makeButton(lv_obj_t *parent, lv_color_t color, const FirmwareI18n::Text &text, lv_event_cb_t cb,
-                         const char *symbol = nullptr)
+    // Owned by the wrapper that holds the button and its confirm; freed with it.
+    struct PowerOff
     {
-        lv_obj_t *btn = lv_button_create(parent);
-        DisplayTheme::button(btn, color);
-        lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, nullptr);
+        std::function<void()> onConfirm;
+        lv_obj_t *wrapper = nullptr;
+        lv_obj_t *button = nullptr;
+        lv_obj_t *confirm = nullptr;
+    };
 
-        if (symbol)
-        {
-            lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_ROW);
-            lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-            lv_obj_set_style_pad_column(btn, 8, LV_PART_MAIN);
-            lv_obj_t *icon = lv_label_create(btn);
-            FirmwareI18n::setDynamicLabel(icon, symbol) /* i18n-data: Language-neutral LVGL icon glyph, separate from the localized action caption. */;
-            lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, LV_PART_MAIN);
-        }
-
-        lv_obj_t *lbl = lv_label_create(btn);
-        FirmwareI18n::setLabel(lbl, text);
-        lv_obj_set_align(lbl, LV_ALIGN_CENTER);
-        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, LV_PART_MAIN);
-        return btn;
+    PowerOff *from(lv_event_t *e)
+    {
+        return static_cast<PowerOff *>(lv_event_get_user_data(e));
     }
 
-    void onCancel(lv_event_t *)
+    void showConfirm(PowerOff *powerOff, bool visible)
     {
-        PowerOffButton::hideConfirm();
+        lv_obj_set_flag(powerOff->button, LV_OBJ_FLAG_HIDDEN, visible);
+        lv_obj_set_flag(powerOff->confirm, LV_OBJ_FLAG_HIDDEN, !visible);
+        // Full width while confirming: in a row of actions it wraps onto its own line.
+        lv_obj_set_width(powerOff->wrapper, visible ? lv_pct(100) : LV_SIZE_CONTENT);
     }
 
-    void onConfirm(lv_event_t *)
+    void onPowerButton(lv_event_t *e) { showConfirm(from(e), true); }
+
+    void onCancel(lv_event_t *e) { showConfirm(from(e), false); }
+
+    void onConfirm(lv_event_t *e)
     {
-        if (g_onConfirm)
+        PowerOff *powerOff = from(e);
+        if (powerOff->onConfirm)
         {
-            g_onConfirm(); // cuts SYS_EN — board powers down if on battery
+            powerOff->onConfirm(); // cuts SYS_EN — board powers down if on battery
         }
         // On battery the board is already dead here; on USB/DC power SYS_EN has
-        // no effect, so dismiss the dialog instead of leaving the UI stuck.
-        PowerOffButton::hideConfirm();
+        // no effect, so restore the button instead of leaving the UI stuck.
+        showConfirm(powerOff, false);
     }
 
-    void onPowerBtn(lv_event_t *)
-    {
-        if (g_confirm)
-        {
-            return;
-        }
-
-        // Built on the top layer so it floats above whatever screen opened it
-        // (tabview, flex column, …) without participating in its layout.
-        g_confirm = lv_obj_create(lv_layer_top());
-        // Modal: full-screen and clickable so taps can't fall through to the
-        // screen behind the dimmed backdrop.
-        lv_obj_add_flag(g_confirm, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(g_confirm, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(g_confirm, lv_pct(100), lv_pct(100));
-        lv_obj_align(g_confirm, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_set_style_bg_color(g_confirm, lv_color_hex(0x000000), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(g_confirm, 200, LV_PART_MAIN);
-        lv_obj_set_style_border_width(g_confirm, 0, LV_PART_MAIN);
-        lv_obj_set_style_radius(g_confirm, 0, LV_PART_MAIN);
-        lv_obj_set_flex_flow(g_confirm, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(g_confirm, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_row(g_confirm, 24, LV_PART_MAIN);
-
-        // Keep the full-screen click guard; only wrap the existing content in a light card.
-        lv_obj_t *dialog = lv_obj_create(g_confirm);
-        lv_obj_remove_style_all(dialog);
-        DisplayTheme::applySurface(dialog);
-        lv_obj_remove_flag(dialog, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(dialog, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_style_border_width(dialog, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_all(dialog, 16, LV_PART_MAIN);
-        lv_obj_set_style_pad_row(dialog, 24, LV_PART_MAIN);
-        lv_obj_set_flex_flow(dialog, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-        lv_obj_t *lbl = lv_label_create(dialog);
-        FirmwareI18n::setLabel(lbl, FirmwareI18n::Message::PowerOffDevice);
-        lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
-        lv_obj_set_style_text_font(lbl, &attractap_font_montserrat_latin1_24, LV_PART_MAIN);
-        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-
-        lv_obj_t *row = lv_obj_create(dialog);
-        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-        lv_obj_set_style_bg_opa(row, 0, LV_PART_MAIN);
-        lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
-        lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
-        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-        lv_obj_set_style_pad_column(row, 16, LV_PART_MAIN);
-
-        lv_obj_t *cancelBtn = makeButton(row, DisplayTheme::primary(), FirmwareI18n::Message::Cancel, &onCancel);
-        DisplayTheme::secondaryButton(cancelBtn);
-        lv_obj_set_size(cancelBtn, 180, 52);
-        lv_obj_set_size(makeButton(row, DisplayTheme::danger(), FirmwareI18n::Message::PowerOff, &onConfirm,
-                                  LV_SYMBOL_POWER), 180, 52);
-    }
+    void onWrapperDelete(lv_event_t *e) { delete from(e); }
 }
 
 lv_obj_t *PowerOffButton::create(lv_obj_t *parent, std::function<void()> cb)
 {
-    g_onConfirm = cb;
-    lv_obj_t *btn = makeButton(parent, DisplayTheme::danger(), FirmwareI18n::Text::literal(LV_SYMBOL_POWER) /* i18n-data: Language-neutral LVGL power icon glyph. */, &onPowerBtn);
-    lv_obj_set_size(btn, 56, 40);
-    return btn;
+    auto *powerOff = new PowerOff{std::move(cb)};
+
+    powerOff->wrapper = lv_obj_create(parent);
+    lv_obj_remove_style_all(powerOff->wrapper);
+    lv_obj_remove_flag(powerOff->wrapper, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(powerOff->wrapper, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(powerOff->wrapper, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_user_data(powerOff->wrapper, powerOff);
+    lv_obj_add_event_cb(powerOff->wrapper, &onWrapperDelete, LV_EVENT_DELETE, powerOff);
+
+    powerOff->button = lv_button_create(powerOff->wrapper);
+    lv_obj_set_size(powerOff->button, 56, 40);
+    DisplayTheme::button(powerOff->button, DisplayTheme::danger());
+    lv_obj_add_event_cb(powerOff->button, &onPowerButton, LV_EVENT_CLICKED, powerOff);
+    lv_obj_t *icon = lv_label_create(powerOff->button);
+    FirmwareI18n::setLabel(icon, FirmwareI18n::Text::literal(LV_SYMBOL_POWER) /* i18n-data: Language-neutral LVGL power icon glyph. */);
+    lv_obj_set_align(icon, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_font(icon, &lv_font_montserrat_20, LV_PART_MAIN);
+
+    powerOff->confirm = InlineConfirm::create(powerOff->wrapper, FirmwareI18n::Message::PowerOffDevice, FirmwareI18n::Text(),
+                                              FirmwareI18n::Message::PowerOff, &onCancel, &onConfirm, powerOff)
+                            .root;
+    return powerOff->button;
 }
 
-void PowerOffButton::hideConfirm()
+void PowerOffButton::hideConfirm(lv_obj_t *button)
 {
-    if (g_confirm)
+    if (!button)
     {
-        lv_obj_del(g_confirm);
-        g_confirm = nullptr;
+        return;
     }
-}
-
-bool PowerOffButton::isConfirmVisible()
-{
-    return g_confirm != nullptr;
+    auto *powerOff = static_cast<PowerOff *>(lv_obj_get_user_data(lv_obj_get_parent(button)));
+    if (powerOff)
+    {
+        showConfirm(powerOff, false);
+    }
 }
 
 #endif // HAS_POWER_BUTTON
