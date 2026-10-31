@@ -178,6 +178,33 @@ def test_reader_power_presses_the_button_only_when_needed(tmp_path, monkeypatch,
         env.cleanup()
 
 
+def test_reader_power_presses_again_when_a_press_is_missed(tmp_path, monkeypatch, emulator_port):
+    monkeypatch.setattr(RemotePlaceManager, "poll", lambda self: None)
+    port, received, presses = emulator_port
+    env = environment(tmp_path, port)
+    target = env.get_target("main")
+    try:
+        reader = target.get_resource("NetworkSerialPort", name="USBSerialPort", wait_avail=False)
+        reader.avail = False
+        missed = []
+
+        def press(arguments):
+            # Right after switching, the power-bank chip ignores a press.
+            if not missed:
+                missed.append(arguments)
+                return
+            reader.avail = arguments["count"] == 1
+
+        presses.append(press)
+        power = target.get_driver(ReaderPowerDriver)
+        power.retry = 0.1
+        power.on()
+        assert reader.avail
+        assert [command for command, _ in received].count("button.press") == 2
+    finally:
+        env.cleanup()
+
+
 def test_power_on_binds_the_place_emulator_for_reader_environments(tmp_path, monkeypatch, emulator_port):
     monkeypatch.setattr(RemotePlaceManager, "poll", lambda self: None)
     port, received, presses = emulator_port
