@@ -5,6 +5,8 @@ import { RbacService } from '../../../rbac/rbac.service';
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { SSOService } from '../sso.service';
+import { SsoAccountResolver } from '../account-resolution/sso-account-resolver.service';
+import { DataSource } from 'typeorm';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { SSOOIDCStrategy } from './oidc.strategy';
 
@@ -21,8 +23,15 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
     ssoServiceMock?: Partial<SSOService>,
     ssoAuditMock?: Partial<SsoAuditService>,
   ) {
+    const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) } as unknown as DataSource;
+    const resolver = new SsoAccountResolver(
+      { recordCreatedUser: jest.fn(), ...usersServiceMock } as UsersService,
+      authServiceMock as AuthService,
+      dataSource,
+    );
     const moduleRef = {
       get: jest.fn((token: unknown) => {
+        if (token === SsoAccountResolver) return resolver;
         if (token === UsersService) return usersServiceMock;
         if (token === AuthService) return authServiceMock;
         if (token === RbacService) return rbacServiceMock ?? { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };

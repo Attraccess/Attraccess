@@ -9,7 +9,7 @@ import { PassportSamlConfig, Profile as SamlProfile, Strategy, MultiSamlStrategy
 
 import { MetricsService } from '../../../../metrics/metrics.service';
 
-import { UsersService } from '../../../users/users.service';
+import { SsoAccountResolver } from '../account-resolution/sso-account-resolver.service';
 
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 
@@ -101,7 +101,6 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
     (req as SsoSessionRequest).ssoSessionContext = buildSamlSessionContext(profile, providerId, samlUserId);
 
-    const usersService = await this.moduleRef.get(UsersService);
     const email = this.resolveEmail(profile, config);
 
     if (!email)
@@ -110,48 +109,30 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
         new BadRequestException('No email found in SAML assertion'),
       );
 
-    let user = await usersService.findOne({ externalIdentifier: samlUserId }).catch(() => null);
-    if (user) {
-      return await this.syncPermissionsFromClaims(user, profile, config);
-    }
-
-    user = await usersService.findOne({ email }, ['authenticationDetails']).catch(() => null);
-    if (user) {
-      if (user.authenticationDetails.length === 0) {
-        const updated = await usersService.updateOne(user.id, { externalIdentifier: samlUserId });
-        return await this.syncPermissionsFromClaims(updated, profile, config);
-      }
-
-      const error = new AccountLinkingRequiredException({
-        email,
-        externalId: samlUserId,
-        providerId,
+    const resolver = this.moduleRef.get(SsoAccountResolver, { strict: false });
+    const { user, created } = await resolver
+      .resolveSsoUser({
         providerType: SSOProviderType.SAML,
-      });
-      throw error;
-    }
-
-    const rawUsername = this.resolveDisplayName(profile, email);
-    const username = usersService.buildUsernameFromSSOClaim(rawUsername, email);
-    user = await usersService
-      .createOne({
-        username,
+        providerId,
+        subject: samlUserId,
         email,
-        externalIdentifier: samlUserId,
-        isEmailVerified: true,
+        emailVerified: undefined,
+        usernameClaim: this.resolveDisplayName(profile, email),
       })
-      .catch((error: Error) => {
-        this.logger.error('Failed to create user after SAML authentication', error.stack);
-        return null;
+      .catch((error: unknown) => {
+        if (error instanceof AccountLinkingRequiredException) throw error;
+        if (!(error instanceof UnauthorizedException)) {
+          this.logger.error(
+            'Failed to resolve user after SAML authentication',
+            error instanceof Error ? error.stack : undefined,
+          );
+          error = new UnauthorizedException();
+        }
+        this.recordFailure(error);
+        throw error;
       });
 
-    if (!user) {
-      const error = new UnauthorizedException();
-      this.recordFailure(error);
-      throw error;
-    }
-
-    await this.recordProvisioningAudit(user.id, config.ssoProviderId, 'user_created');
+    if (created) await this.recordProvisioningAudit(user.id, config.ssoProviderId, 'user_created');
     return await this.syncPermissionsFromClaims(user, profile, config);
   }
 

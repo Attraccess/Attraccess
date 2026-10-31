@@ -22,20 +22,20 @@ damit Attraccess sichere Anfragen erkennt. Über HTTP wird kein SAML-Status-Cook
 
 ## Konfiguration
 
-| Feld | Beschreibung |
-|------|-------------|
-| **Entry Point** | SSO-URL des Identity Providers |
-| **Issuer** | Service Provider Identifier (Ihre Attraccess-URL) |
-| **Zertifikat** | Signaturzertifikat des Identity Providers (X.509, PEM-Format) |
+| Feld            | Beschreibung                                                  |
+| --------------- | ------------------------------------------------------------- |
+| **Entry Point** | SSO-URL des Identity Providers                                |
+| **Issuer**      | Service Provider Identifier (Ihre Attraccess-URL)             |
+| **Zertifikat**  | Signaturzertifikat des Identity Providers (X.509, PEM-Format) |
 
 ### Signaturoptionen
 
-| Option | Standard | Beschreibung |
-|--------|----------|-------------|
-| **Request signieren** | Aus | AuthnRequest an den IdP signieren |
-| **Signierte Assertions erwarten** | Ein | IdP muss Assertions signieren |
-| **Signierte Responses erwarten** | Ein | IdP muss die gesamte Response signieren |
-| **Authentifizierung erzwingen** | Aus | Bei jedem Login erneut authentifizieren |
+| Option                            | Standard | Beschreibung                            |
+| --------------------------------- | -------- | --------------------------------------- |
+| **Request signieren**             | Aus      | AuthnRequest an den IdP signieren       |
+| **Signierte Assertions erwarten** | Ein      | IdP muss Assertions signieren           |
+| **Signierte Responses erwarten**  | Ein      | IdP muss die gesamte Response signieren |
+| **Authentifizierung erzwingen**   | Aus      | Bei jedem Login erneut authentifizieren |
 
 > [!NOTE]
 > Wenn **Request signieren** aktiviert ist, müssen Sie zusätzlich ein SP-Signaturzertifikat und einen privaten Schlüssel angeben.
@@ -45,6 +45,7 @@ damit Attraccess sichere Anfragen erkennt. Über HTTP wird kein SAML-Status-Cook
 Geben Sie die SAML-Attributnamen an, die die E-Mail-Adresse enthalten. Mehrere Werte sind möglich (einer pro Zeile).
 
 Häufige Attributnamen:
+
 - `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`
 - `email`
 - `mail`
@@ -57,15 +58,21 @@ Optional können Sie ein Provisioning-Secret festlegen. Damit kann Ihr Identity 
 
 Wie bei [OIDC](user-management/sso-oidc.md) können Sie SAML-Rollen den Attraccess-Berechtigungen zuordnen.
 
+### Kontobindung
+
+SAML-Identitäten sind pro Anbieter gebunden: Ein Benutzer wird über die Kombination aus SAML-Anbieter und NameID erkannt. Dieselbe NameID eines anderen SAML-Anbieters öffnet das Konto daher nie. Gehört die E-Mail-Adresse einer SAML-Anmeldung zu einem bestehenden Konto ohne Bindung an diesen Anbieter, muss der Benutzer zuerst die [Kontoverknüpfung](user-management/sso-overview.md) mit dem lokalen Passwort bestätigen. Das gilt auch für Konten, die SAML früher angelegt hat, bevor sie gebunden wurden. Ein Konto kann nur mit einem SSO-Anbieter verknüpft werden. Eine Anmeldung, deren E-Mail-Adresse zu einem an einen anderen Anbieter gebundenen Konto gehört, wird daher abgelehnt. Konten ohne lokales Passwort (zum Beispiel eingeladene Konten) können die Verknüpfung erst bestätigen, wenn ein Administrator ein Passwort festlegt.
+
+**Hinweis zum Update:** Beim Update werden bestehende SAML-Benutzer automatisch an ihren Anbieter gebunden, anhand früherer SAML-Sitzungen oder, falls es nur einen SAML-Anbieter gibt, an diesen. Benutzer, die sich nicht eindeutig zuordnen lassen (mehrere SAML-Anbieter und keine Sitzungshistorie), werden nicht gebunden. Sie sehen bei der nächsten Anmeldung die Aufforderung zur Kontoverknüpfung, die ein lokales Passwort voraussetzt. Ein Administrator muss daher ein Passwort einrichten oder das Konto korrigieren.
+
 ## Service Provider Metadaten
 
 Konfigurieren Sie Ihren SAML-Identity-Provider mit diesen Werten:
 
-| Feld | Wert |
-|------|------|
+| Feld                   | Wert                                                           |
+| ---------------------- | -------------------------------------------------------------- |
 | **ACS URL (Callback)** | `https://ihre-url.de/api/auth/sso/SAML/{provider-id}/callback` |
-| **Entity ID / Issuer** | Ihre Attraccess-URL |
-| **Binding** | HTTP-POST |
+| **Entity ID / Issuer** | Ihre Attraccess-URL                                            |
+| **Binding**            | HTTP-POST                                                      |
 
 ## Testen
 

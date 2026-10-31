@@ -10,10 +10,10 @@ Attraccess unterstützt Single Sign-On (SSO) über zwei Protokolle: **OpenID Con
 
 ## Unterstützte Protokolle
 
-| Protokoll | Anwendungsfall | Beispiel-Anbieter |
-|-----------|---------------|-------------------|
-| **OIDC** | Moderne Webanwendungen | Authentik, Keycloak, Azure AD, Google Workspace |
-| **SAML** | Unternehmen und Bildungseinrichtungen | Authentik, Keycloak, Azure AD, Shibboleth |
+| Protokoll | Anwendungsfall                        | Beispiel-Anbieter                               |
+| --------- | ------------------------------------- | ----------------------------------------------- |
+| **OIDC**  | Moderne Webanwendungen                | Authentik, Keycloak, Azure AD, Google Workspace |
+| **SAML**  | Unternehmen und Bildungseinrichtungen | Authentik, Keycloak, Azure AD, Shibboleth       |
 
 ## Anbieter konfigurieren
 
@@ -23,6 +23,7 @@ Attraccess unterstützt Single Sign-On (SSO) über zwei Protokolle: **OpenID Con
 4. Füllen Sie die Konfiguration aus
 
 Detaillierte Anleitungen:
+
 - [OIDC einrichten](user-management/sso-oidc.md)
 - [SAML einrichten](user-management/sso-saml.md)
 
@@ -45,6 +46,8 @@ Beispiel: Die OIDC-Rolle `attraccess_admin` wird der Berechtigung **Benutzer ver
 ## Kontoverknüpfung
 
 Wenn ein Benutzer bereits ein lokales Konto hat und sich erstmals über SSO anmeldet, kann das bestehende Konto mit dem SSO-Anbieter verknüpft werden. Dazu wird die E-Mail-Adresse und das lokale Passwort zur Bestätigung abgefragt.
+
+Ein bestehendes Konto mit derselben E-Mail-Adresse wird nie automatisch verknüpft. Das gilt für jede SSO-Anmeldung ohne Bindung an den jeweiligen Anbieter, für OIDC und SAML, unabhängig vom Zustand des bestehenden Kontos. Der Benutzer muss die Verknüpfung immer mit seinen lokalen Zugangsdaten bestätigen. Jeder Benutzer kann mit genau einem SSO-Anbieter verknüpft sein. OIDC-E-Mail-Adressen, die der Identity Provider als nicht verifiziert markiert (`email_verified=false`), werden nicht zum Abgleich verwendet.
 
 ## Mehrere Anbieter
 

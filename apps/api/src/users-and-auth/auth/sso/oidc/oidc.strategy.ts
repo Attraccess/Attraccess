@@ -1,7 +1,7 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { OidcTokenVerifier, OidcVerificationUnavailableError } from './oidc-token-verifier.service';
 import { EncryptionService } from '../../../../encryption/encryption.service';
-import { AuthenticationType, SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
+import { SSOProviderOIDCConfiguration, SSOProviderType, User } from '@attraccess/database-entities';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 
@@ -11,13 +11,9 @@ import { Profile, Strategy } from 'passport-openidconnect';
 
 import { MetricsService } from '../../../../metrics/metrics.service';
 
-import { UsersService } from '../../../users/users.service';
-
-import { AuthService } from '../../auth.service';
+import { SsoAccountResolver } from '../account-resolution/sso-account-resolver.service';
 
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
-
-import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 
@@ -44,7 +40,7 @@ export const SSO_OIDC_CALLBACK_URL_REQUEST_KEY = '_ssoOidcCallbackUrl';
 export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 
 @Injectable()
-export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
+export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) {
   constructor(
     protected moduleRef: ModuleRef,
     config: SSOProviderOIDCConfiguration,
@@ -112,17 +108,22 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
     }
   }
 
-  // Explicit eight-argument Passport verify callback: req, issuer, profile, context, id_token, access_token,
-  // refresh_token, done. The refresh token enables session-time permission re-sync.
+  // Explicit ten-argument Passport verify callback: req, issuer, userinfo profile, id-token profile, context, id_token,
+  // access_token, refresh_token, params, done. The refresh token enables session-time permission re-sync. Only this
+  // form exposes the userinfo response (`_json`): the merged profile of the shorter forms is built before it is set.
   async validate(
     req: SsoSessionRequest,
     issuer: string,
-    profile: Profile,
+    uiProfile: Profile | undefined,
+    idProfile: Profile,
     context: unknown,
     idToken: string,
     _accessToken?: string,
     refreshToken?: string,
   ): Promise<User> {
+    const userinfo = (uiProfile as { _json?: Record<string, unknown> } | undefined)?._json;
+    // Keep today's merged profile; the userinfo response is handed over separately, for `email_verified` only.
+    const profile = { ...idProfile, ...uiProfile, _json: undefined, _raw: undefined } as Profile;
     const verifier = this.moduleRef.get(OidcTokenVerifier, { strict: false });
     let claims: Record<string, unknown> | undefined;
     try {
@@ -150,7 +151,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       delete req.ssoSessionContext;
       claims = undefined;
     }
-    const user = await this.validateProfile(issuer, profile, context, claims);
+    const user = await this.validateProfile(issuer, profile, context, claims, userinfo);
     if (req.ssoSessionContext && !refreshToken) this.reportMissingRefreshToken();
     return user;
   }
@@ -177,6 +178,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
     profile: Profile,
     _context?: unknown,
     idTokenClaims?: Record<string, unknown>,
+    userinfoClaims?: Record<string, unknown>,
   ): Promise<User> {
     this.logger.log(`Validating OIDC profile for issuer: ${_issuer}`);
 
@@ -188,9 +190,6 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       this.recordFailure(error);
       throw error;
     }
-
-    const usersService = await this.moduleRef.get(UsersService, { strict: false });
-    const authService = await this.moduleRef.get(AuthService, { strict: false });
 
     // Build candidate sources to resolve claims from
     const claimSources: unknown[] = [profile];
@@ -215,74 +214,50 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 8) {
       throw error;
     }
 
-    // Step 1: Check if user exists by SSO auth detail
-    this.logger.debug(`Checking if user exists with SSO binding: ${oidcUserId}`);
-    const existingUserId = await authService.findUserIdBySSO(
-      SSOProviderType.OIDC,
-      this.config.ssoProviderId,
-      oidcUserId,
-    );
-    let user = existingUserId ? await usersService.findOne({ id: existingUserId }) : null;
-
-    if (user) {
-      this.logger.log(`Found existing user with SSO binding: ${oidcUserId}`);
-      return await this.syncPermissionsFromClaims(user, claimSources);
-    }
-
-    // Step 2: No user found by external ID, check by email
-    this.logger.debug(`Checking if user exists with email: ${email}`);
-    user = await usersService.findOne({ email }, ['authenticationDetails']).catch(() => null);
-
-    if (user) {
-      // Step 3: User exists with email but no SSO binding - require linking flow
-      this.logger.log(`Found user with email ${email} but no SSO binding. Account linking required.`);
-      const error = new AccountLinkingRequiredException({
-        email,
-        externalId: oidcUserId,
-        providerId: this.config.ssoProviderId,
-        providerType: SSOProviderType.OIDC,
-      });
-      throw error;
-    }
-
-    // Step 4: No user exists, create new user with external ID
     const defaultUsernamePaths = ['preferred_username', 'email', 'sub'];
     const usernamePaths =
       this.config.usernameClaimPaths && this.config.usernameClaimPaths.length > 0
         ? this.config.usernameClaimPaths
         : defaultUsernamePaths;
     const resolvedUsername = this.firstNonEmptyStringFromPaths(usernamePaths, claimSources);
-    const rawUsername = resolvedUsername || profile.username || email;
-    const username = usersService.buildUsernameFromSSOClaim(rawUsername, email);
-    this.logger.log(`Creating new user with external ID: ${oidcUserId}`);
-    user = await usersService.createOne({
-      username,
-      email,
-      externalIdentifier: null,
-      isEmailVerified: true,
-    });
 
-    if (!user) {
-      this.logger.error('Failed to create user after SSO authentication');
-      const error = new UnauthorizedException();
-      this.recordFailure(error);
-      throw error;
-    }
-
-    // The user row is durable now, even if adding its SSO binding subsequently fails.
-    await this.recordProvisioningAudit(user.id, true);
-
-    await authService.addAuthenticationDetails(user.id, {
-      type: AuthenticationType.SSO,
-      details: {
-        providerId: this.config.ssoProviderId,
+    const resolver = this.moduleRef.get(SsoAccountResolver, { strict: false });
+    const { user, created } = await resolver
+      .resolveSsoUser({
         providerType: SSOProviderType.OIDC,
+        providerId: this.config.ssoProviderId,
         subject: oidcUserId,
-      },
-    });
+        email,
+        emailVerified: this.resolveEmailVerified(
+          idTokenClaims,
+          raw as Record<string, unknown> | undefined,
+          userinfoClaims,
+        ),
+        usernameClaim: resolvedUsername || profile.username || email,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof UnauthorizedException) this.recordFailure(error);
+        throw error;
+      });
 
-    this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
+    if (created) {
+      this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
+      await this.recordProvisioningAudit(user.id, true);
+    }
     return await this.syncPermissionsFromClaims(user, claimSources);
+  }
+
+  /** `email_verified` from the id-token claims and userinfo; any explicit "false" wins, absent/other = undefined. */
+  protected resolveEmailVerified(...sources: Array<Record<string, unknown> | undefined>): boolean | undefined {
+    const states = sources.map((source) => {
+      const value = source?.email_verified;
+      if (typeof value === 'boolean') return value;
+      if (typeof value !== 'string') return undefined;
+      const normalized = value.trim().toLowerCase();
+      return normalized === 'true' ? true : normalized === 'false' ? false : undefined;
+    });
+    if (states.includes(false)) return false;
+    return states.includes(true) ? true : undefined;
   }
 
   protected async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {
