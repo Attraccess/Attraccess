@@ -90,6 +90,7 @@ void ReaderWorkflow::testProjectSearch()
     // Reopening while a search is pending asks again instead of showing the old results.
     search("laser", "werk");
     click(LV_SYMBOL_CLOSE);
+    assert(!shown("Projekt auswählen")); // The X closed the picker.
     const auto requestsBeforeReopen = server.count("PROJECTS_OF_USER");
     click("Projekt wählen");
     assert(server.count("PROJECTS_OF_USER") == requestsBeforeReopen + 1);
