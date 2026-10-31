@@ -26,7 +26,19 @@ export function readerIdsWaitingToPair(
 }
 
 export type PairingErrorKind =
-  'wrongCode' | 'codeNotFound' | 'ambiguous' | 'stale' | 'notWaiting' | 'rateLimited' | 'unknown';
+  | 'wrongCode'
+  | 'codeNotFound'
+  | 'ambiguous'
+  | 'stale'
+  | 'notWaiting'
+  | 'failed'
+  | 'readerGone'
+  | 'keyInUse'
+  | 'targetNotFound'
+  | 'targetMissing'
+  | 'wrongMode'
+  | 'rateLimited'
+  | 'unknown';
 
 export interface PairingError {
   kind: PairingErrorKind;
@@ -35,19 +47,50 @@ export interface PairingError {
   message?: string;
 }
 
+const CONFLICTS: Record<string, PairingErrorKind> = {
+  PairingCodeAmbiguous: 'ambiguous',
+  PairingRoundStale: 'stale',
+  PairingFailed: 'failed',
+  PairingReaderGone: 'readerGone',
+  PairingKeyInUse: 'keyInUse',
+};
+
+const NOT_FOUND: Record<string, PairingErrorKind> = {
+  'Reader not found': 'targetNotFound',
+};
+
+// The server's wording for a mode that does not fit the reader; the dialog says it in plain words.
+const BAD_REQUESTS: Record<string, PairingErrorKind> = {
+  'targetReaderId is required': 'targetMissing',
+  'This reader already has a record; use pair': 'wrongMode',
+  'Only readers signed in with a token can be paired': 'wrongMode',
+  'This reader is bound to a different record': 'wrongMode',
+};
+
+const KNOWN_BY_STATUS: Record<number, Record<string, PairingErrorKind>> = {
+  400: BAD_REQUESTS,
+  404: NOT_FOUND,
+  409: CONFLICTS,
+};
+
+function codeNotFound(whileResolving: boolean): PairingError {
+  return { kind: whileResolving ? 'codeNotFound' : 'wrongCode' };
+}
+
+function rateLimited(retry: unknown): PairingError {
+  return { kind: 'rateLimited', retryAfterSeconds: typeof retry === 'number' ? Math.ceil(retry) : undefined };
+}
+
 /** Sorts a failed pairing call into the cases the dialog explains; everything else keeps the server message. */
 export function classifyPairingError(error: unknown, whileResolving = false): PairingError {
   const status = (error as { status?: number } | null)?.status;
   const body = (error as { body?: { message?: unknown; retryAfterSeconds?: unknown } } | null)?.body;
-  const message = typeof body?.message === 'string' ? body.message : undefined;
-  if (status === 429) {
-    const retry = body?.retryAfterSeconds;
-    return { kind: 'rateLimited', retryAfterSeconds: typeof retry === 'number' ? Math.ceil(retry) : undefined };
-  }
-  if (status === 404 && message === 'PairingCodeNotFound')
-    return { kind: whileResolving ? 'codeNotFound' : 'wrongCode' };
-  if (status === 409 && message === 'PairingCodeAmbiguous') return { kind: 'ambiguous' };
-  if (status === 409 && message === 'PairingRoundStale') return { kind: 'stale' };
+  const message = typeof body?.message === 'string' ? body.message : '';
+  if (status === 429) return rateLimited(body?.retryAfterSeconds);
+  if (status === 404 && message === 'PairingCodeNotFound') return codeNotFound(whileResolving);
+  const known = KNOWN_BY_STATUS[status ?? 0]?.[message];
+  if (known) return { kind: known };
+  // Any other 404 or 409: the request is gone or no longer waits (PairingNotWaiting, Pairing not found).
   if (status === 409 || status === 404) return { kind: 'notWaiting' };
   return { kind: 'unknown', message: apiErrorMessage(error) };
 }

@@ -8,11 +8,11 @@
       },
       "cameraDenied": {
         "title": "Camera access denied",
-        "description": "Allow camera access for this page in your browser settings, or type the code instead."
+        "description": "Allow camera access for this page in your browser settings."
       },
       "cameraUnavailable": {
         "title": "Camera not available",
-        "description": "The camera could not be started. Type the code instead."
+        "description": "The camera could not be started."
       },
       "unknown": {
         "title": "Unknown QR code",

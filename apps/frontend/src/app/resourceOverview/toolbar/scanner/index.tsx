@@ -17,6 +17,8 @@ interface Props {
    * scanner then closes. Return false to show an "unknown QR code" notice and keep scanning.
    */
   onDetected?: (rawValue: string) => boolean;
+  /** What to do instead when the camera cannot be used, added to the camera error (e.g. "Type the code instead."). */
+  cameraFallbackHint?: string;
 }
 
 export function ResourceScanner(props: Props) {
@@ -65,17 +67,19 @@ export function ResourceScanner(props: Props) {
     [navigate, frontendOrigin, toast, t, setOpen, onDetected],
   );
 
+  const { cameraFallbackHint } = props;
   const onError = useCallback(
     (error: unknown) => {
       const denied =
         error instanceof Error && ['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error.name);
+      const reason = t(denied ? 'scan.error.cameraDenied.description' : 'scan.error.cameraUnavailable.description');
       toast.error({
         title: t(denied ? 'scan.error.cameraDenied.title' : 'scan.error.cameraUnavailable.title'),
-        description: t(denied ? 'scan.error.cameraDenied.description' : 'scan.error.cameraUnavailable.description'),
+        description: cameraFallbackHint ? `${reason} ${cameraFallbackHint}` : reason,
       });
       setOpen(false);
     },
-    [toast, t, setOpen],
+    [toast, t, setOpen, cameraFallbackHint],
   );
 
   return (

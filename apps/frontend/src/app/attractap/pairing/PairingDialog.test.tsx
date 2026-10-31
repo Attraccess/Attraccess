@@ -41,6 +41,8 @@ const mocks = vi.hoisted(() => ({
   onDetected: { current: undefined as undefined | ((raw: string) => boolean) },
   pairingOptions: { current: undefined as unknown },
   invalidateQueries: vi.fn(() => Promise.resolve()),
+  readers: { current: [] as unknown[] },
+  selects: [] as Array<{ items: Array<{ key: string; label: string }>; onChange?: (key: string) => void }>,
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
@@ -50,7 +52,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { data: mocks.pairing.current, isError: false, refetch: mocks.refetch };
   },
   useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
-  useAttractapServiceGetReaders: () => ({ data: [{ id: 7, name: 'Door', pairingState: 'paired' }] }),
+  useAttractapServiceGetReaders: () => ({ data: mocks.readers.current }),
   useAttractapServiceApprovePairing: (options: Record<string, (value: unknown) => unknown>) => {
     mocks.approveOptions.current = options;
     return { mutate: mocks.approve, isPending: false };
@@ -74,13 +76,19 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
   return {
     ...(await importOriginal<object>()),
     useTranslations: () => ({ t }),
+    useDateTimeFormatter: () => (value: string) => `at ${value}`,
     AlertStatusIcon: () => null,
     StandardModal: ({ children, isOpen }: { children: () => React.ReactNode; isOpen: boolean }) =>
       isOpen ? <div>{children()}</div> : null,
   };
 });
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => mocks.toast }));
-vi.mock('../../../components/select', () => ({ Select: () => null }));
+vi.mock('../../../components/select', () => ({
+  Select: (props: (typeof mocks.selects)[number]) => {
+    mocks.selects.push(props);
+    return null;
+  },
+}));
 vi.mock('../../resourceOverview/toolbar/scanner', () => ({
   ResourceScanner: ({
     children,
@@ -115,6 +123,11 @@ describe('PairingDialog', () => {
     setSecureContext(true);
     mocks.pairing.current = waiting();
     mocks.pairings.current = [];
+    mocks.readers.current = [
+      { id: 7, name: 'Door', pairingState: 'paired' },
+      { id: 8, name: 'Old token reader', pairingState: 'unpaired' },
+    ];
+    mocks.selects.length = 0;
     mocks.refetchResult.current = undefined;
     mocks.refetch
       .mockReset()
@@ -217,8 +230,16 @@ describe('PairingDialog', () => {
       await act(async () => {
         await mocks.approveOptions.current?.onSuccess?.(waiting({ state: 'completed', targetReaderId: 9 }));
       });
-      expect(mocks.toast.success).toHaveBeenCalled();
+      expect(mocks.toast.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reader paired' }));
       expect(onPaired).toHaveBeenCalledWith(9);
+    });
+
+    it('says the reader was paired again when it took over a record', async () => {
+      open({ pairingId: 'p1', presetTargetReaderId: 9 });
+      await act(async () => {
+        await mocks.approveOptions.current?.onSuccess?.(waiting({ state: 'completed', targetReaderId: 9 }));
+      });
+      expect(mocks.toast.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reader paired again' }));
     });
   });
 
@@ -288,8 +309,6 @@ describe('PairingDialog', () => {
     });
 
     it('updates live when the pattern rotates', () => {
-      const view = render(<></>);
-      view.unmount();
       const { rerender } = render(<PairingDialog isOpen pairingId="p1" onClose={vi.fn()} />);
       mocks.pairing.current = lite(4, ['white', 'white', 'white', 'white', 'white', 'white', 'white', 'white']);
       rerender(<PairingDialog isOpen pairingId="p1" onClose={vi.fn()} />);
@@ -338,6 +357,10 @@ describe('PairingDialog', () => {
       mocks.pairings.current = [lite(1)];
       open({ presetTargetReaderId: 7 });
       expect(document.querySelector('[data-cy="attractap-pairing-lite-list"]')).not.toBeNull();
+      // Each waiting Lite reader is told apart by when it started waiting.
+      expect(
+        screen.getByRole('button', { name: 'Lite reader waiting since at 2026-10-30T07:00:00.000Z' }),
+      ).toBeInTheDocument();
       mocks.pairing.current = lite(1);
       await userEvent.click(document.querySelector('[data-cy="attractap-pairing-pick-p1"]') as HTMLElement);
       await userEvent.click(approveButton());
@@ -345,6 +368,28 @@ describe('PairingDialog', () => {
         pairingId: 'p1',
         requestBody: { mode: 'takeover', targetReaderId: 7, round: 1 },
       });
+    });
+  });
+
+  describe('Lite list', () => {
+    it('mentions Lite readers only when some are listed', () => {
+      mocks.pairing.current = undefined;
+      open({ presetTargetReaderId: 7 });
+      expect(screen.getByText('Enter the code shown on the reader.')).toBeInTheDocument();
+      expect(screen.queryByText(/For a Lite reader/)).toBeNull();
+    });
+
+    it('goes back to the list after a Lite reader was picked', async () => {
+      mocks.pairing.current = undefined;
+      mocks.pairings.current = [lite(1), { ...lite(1), id: 'p2', createdAt: '2026-10-30T07:05:00.000Z' }];
+      open({ presetTargetReaderId: 7 });
+      mocks.pairing.current = lite(1);
+      await userEvent.click(document.querySelector('[data-cy="attractap-pairing-pick-p1"]') as HTMLElement);
+      expect(document.querySelector('[data-cy="attractap-pairing-lite-list"]')).toBeNull();
+      mocks.pairing.current = undefined;
+      await userEvent.click(screen.getByRole('button', { name: 'Choose another reader' }));
+      expect(document.querySelector('[data-cy="attractap-pairing-lite-list"]')).not.toBeNull();
+      expect(document.querySelector('[data-cy="attractap-pairing-pick-p2"]')).not.toBeNull();
     });
   });
 
@@ -382,6 +427,35 @@ describe('PairingDialog', () => {
         expect(screen.getByText(/did not respond/)).toBeInTheDocument();
       });
 
+      it('lets the admin approve a reader that arrives after 30 seconds', async () => {
+        mocks.pairing.current = undefined;
+        const props = { isOpen: true, waitForReaderId: 4, onClose: vi.fn() };
+        const { rerender } = render(<PairingDialog {...props} />);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30_000);
+        });
+        expect(screen.getByText(/did not respond/)).toBeInTheDocument();
+        mocks.pairing.current = waiting({ boundReaderId: 4 });
+        mocks.pairings.current = [waiting({ boundReaderId: 4 })];
+        rerender(<PairingDialog {...props} />);
+        expect(screen.queryByText(/did not respond/)).toBeNull();
+        type('K7P3XQ');
+        expect(approveButton()).toBeEnabled();
+      });
+
+      it('keeps showing the request after it ended, with the reason', () => {
+        mocks.pairing.current = waiting({ boundReaderId: 4 });
+        mocks.pairings.current = [waiting({ boundReaderId: 4 })];
+        const props = { isOpen: true, waitForReaderId: 4, onClose: vi.fn() };
+        const { rerender } = render(<PairingDialog {...props} />);
+        // The list holds running requests only; the detail of the ended one is still there.
+        mocks.pairings.current = [];
+        mocks.pairing.current = waiting({ boundReaderId: 4, state: 'expired', failureReason: 'expired' });
+        rerender(<PairingDialog {...props} />);
+        expect(screen.queryByText('Waiting for the reader…')).toBeNull();
+        expect(screen.getByText('The reader was not approved within 10 minutes.')).toBeInTheDocument();
+      });
+
       it('continues with the request the reader sends', () => {
         mocks.pairing.current = waiting({ boundReaderId: 4 });
         mocks.pairings.current = [waiting({ boundReaderId: 4 })];
@@ -389,6 +463,166 @@ describe('PairingDialog', () => {
         expect(screen.queryByText('Waiting for the reader…')).toBeNull();
         expect(approveButton()).toBeDisabled();
       });
+    });
+  });
+  describe('server answers', () => {
+    const cases: Array<[number, string, RegExp]> = [
+      [409, 'PairingFailed', /because of an error on the server/],
+      [409, 'PairingReaderGone', /disconnected before pairing finished. It will show a new code/],
+      [409, 'PairingKeyInUse', /already paired with another record/],
+      [409, 'PairingNotWaiting', /no longer waiting/],
+      [404, 'Reader not found', /to take over no longer exists/],
+      [400, 'This reader is bound to a different record', /cannot be paired this way/],
+      [400, 'targetReaderId is required', /Choose which reader this one takes over/],
+    ];
+    it.each(cases)('explains %i %s in its own words', (status, message, text) => {
+      open({ pairingId: 'p1' });
+      act(() => mocks.approveOptions.current?.onError?.(apiError(status, { message })));
+      expect(screen.getByText(text)).toBeInTheDocument();
+      expect(screen.queryByText(/could not be paired:/)).toBeNull();
+    });
+
+    it('keeps the server message for anything it does not know', () => {
+      open({ pairingId: 'p1' });
+      act(() => mocks.approveOptions.current?.onError?.(apiError(400, { message: 'name too long' })));
+      expect(screen.getByText('The reader could not be paired: name too long')).toBeInTheDocument();
+    });
+
+    it('re-reads an ended request and lets the result explain it instead of the error', async () => {
+      const { rerender } = render(<PairingDialog isOpen pairingId="p1" onClose={vi.fn()} />);
+      mocks.refetch.mockClear();
+      await act(async () => mocks.approveOptions.current?.onError?.(apiError(409, { message: 'PairingReaderGone' })));
+      expect(mocks.refetch).toHaveBeenCalled();
+      mocks.pairing.current = waiting({ state: 'failed', failureReason: 'reader-disconnected' });
+      rerender(<PairingDialog isOpen pairingId="p1" onClose={vi.fn()} />);
+      expect(screen.getByText('Pairing failed. The reader starts over with a new code by itself.')).toBeInTheDocument();
+      expect(screen.getByText('The reader disconnected before pairing finished.')).toBeInTheDocument();
+      expect(document.querySelector('[data-cy="attractap-pairing-error"]')).toBeNull();
+    });
+  });
+
+  describe('waiting after too many attempts', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('counts down, keeps the wait while typing, and blocks approving until it is over', async () => {
+      open({ pairingId: 'p1' });
+      type('K7P3XQ');
+      act(() =>
+        mocks.approveOptions.current?.onError?.(
+          apiError(429, { message: 'EnrollmentRateLimited', retryAfterSeconds: 3 }),
+        ),
+      );
+      expect(screen.getByText('Too many attempts. Try again in 3 seconds.')).toBeInTheDocument();
+      expect(approveButton()).toBeDisabled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(screen.getByText('Too many attempts. Try again in 2 seconds.')).toBeInTheDocument();
+      type('K7P3XR');
+      expect(screen.getByText('Too many attempts. Try again in 2 seconds.')).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(screen.queryByText(/Too many attempts/)).toBeNull();
+      expect(approveButton()).toBeEnabled();
+    });
+
+    it('also blocks looking a code up', async () => {
+      mocks.pairing.current = undefined;
+      open({});
+      type('K7P3XQ');
+      act(() =>
+        mocks.resolveOptions.current?.onError?.(
+          apiError(429, { message: 'EnrollmentRateLimited', retryAfterSeconds: 5 }),
+        ),
+      );
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+    });
+  });
+
+  describe('a code that went stale', () => {
+    it('asks for the current code again after a found code was rejected', async () => {
+      open({ presetCode: 'K7P-3XQ' });
+      act(() => mocks.resolveOptions.current?.onSuccess?.(waiting()));
+      expect(document.querySelector('[data-cy="attractap-pairing-code-input"]')).toBeNull();
+      await userEvent.click(approveButton());
+      act(() => mocks.approveOptions.current?.onError?.(apiError(404, { message: 'PairingCodeNotFound' })));
+
+      expect(screen.getByText(/does not match the reader/)).toBeInTheDocument();
+      expect(document.querySelector('[data-cy="attractap-pairing-code-input"]')).toHaveValue('');
+      expect(approveButton()).toBeDisabled();
+      type('MNP-4RS');
+      await userEvent.click(approveButton());
+      expect(mocks.approve).toHaveBeenLastCalledWith({
+        pairingId: 'p1',
+        requestBody: { mode: 'new', code: 'MNP4RS' },
+      });
+    });
+
+    it('follows the code the web flasher reads while the admin has not typed one', async () => {
+      const props = { isOpen: true, presetCode: 'K7P-3XQ', via: 'flasher' as const, onClose: vi.fn() };
+      const { rerender } = render(<PairingDialog {...props} />);
+      act(() => mocks.resolveOptions.current?.onSuccess?.(waiting()));
+      rerender(<PairingDialog {...props} presetCode="MNP-4RS" />);
+      expect(screen.getByText(/Reader found for code MNP-4RS/)).toBeInTheDocument();
+      await userEvent.click(approveButton());
+      expect(mocks.approve).toHaveBeenLastCalledWith({
+        pairingId: 'p1',
+        requestBody: { mode: 'new', code: 'MNP4RS', via: 'flasher' },
+      });
+      expect(mocks.resolve).toHaveBeenCalledTimes(1);
+    });
+
+    it('fills in the newer flasher code after a rejection, but never overwrites a typed code', () => {
+      const props = { isOpen: true, presetCode: 'K7P-3XQ', via: 'flasher' as const, onClose: vi.fn() };
+      const { rerender } = render(<PairingDialog {...props} />);
+      act(() => mocks.resolveOptions.current?.onSuccess?.(waiting()));
+      act(() => mocks.approveOptions.current?.onError?.(apiError(404, { message: 'PairingCodeNotFound' })));
+      rerender(<PairingDialog {...props} presetCode="MNP-4RS" />);
+      const input = () => document.querySelector('[data-cy="attractap-pairing-code-input"]');
+      expect(input()).toHaveValue('MNP-4RS');
+      type('ABC-DEF');
+      rerender(<PairingDialog {...props} presetCode="XYZ-234" />);
+      expect(input()).toHaveValue('ABC-DEF');
+    });
+  });
+
+  describe('Enter key', () => {
+    it('looks the reader up when its code is needed, once even when pressed twice', async () => {
+      mocks.pairing.current = undefined;
+      open({});
+      const input = screen.getByRole('textbox', { name: /code on the reader/i });
+      await userEvent.type(input, 'k7p3xq{enter}{enter}');
+      expect(mocks.resolve).toHaveBeenCalledTimes(1);
+      expect(mocks.resolve).toHaveBeenCalledWith({ requestBody: { code: 'K7P3XQ' } });
+    });
+
+    it('approves when the reader is known', async () => {
+      open({ pairingId: 'p1' });
+      await userEvent.type(screen.getByRole('textbox', { name: /code on the reader/i }), 'K7P3XQ{enter}');
+      expect(mocks.approve).toHaveBeenCalledWith({ pairingId: 'p1', requestBody: { mode: 'new', code: 'K7P3XQ' } });
+    });
+
+    it('does nothing without a valid code', async () => {
+      open({ pairingId: 'p1' });
+      await userEvent.type(screen.getByRole('textbox', { name: /code on the reader/i }), 'K7P{enter}');
+      expect(mocks.approve).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('takeover picker', () => {
+    it('offers every reader, also a token reader that was never paired', () => {
+      open({ pairingId: 'p1' });
+      act(() => mocks.selects[0]?.onChange?.('takeover'));
+      const picker = mocks.selects.at(-1);
+      expect(picker?.items.map((item) => item.label)).toEqual(['Door', 'Old token reader']);
     });
   });
 });

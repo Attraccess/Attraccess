@@ -1,11 +1,17 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
 
-const data = vi.hoisted(() => ({ readers: [] as unknown[] }));
+const data = vi.hoisted(() => ({
+  readers: [] as unknown[],
+  openDeviceSettings: undefined as undefined | ((deviceId: string, justPaired?: boolean) => void),
+  onPaired: undefined as undefined | ((readerId: number) => void),
+  editor: vi.fn(),
+  toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+}));
 
 vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
@@ -29,16 +35,33 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
-vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn() }) }));
+vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => data.toast }));
 
 vi.mock('../HardwareSetup', () => ({
-  AttractapHardwareSetup: ({ children }: { children: (fn: () => void) => React.ReactNode }) => (
-    <div data-testid="hardware-setup">{children(vi.fn())}</div>
-  ),
+  AttractapHardwareSetup: ({
+    children,
+    openDeviceSettings,
+  }: {
+    children: (fn: () => void) => React.ReactNode;
+    openDeviceSettings: (deviceId: string, justPaired?: boolean) => void;
+  }) => {
+    data.openDeviceSettings = openDeviceSettings;
+    return <div data-testid="hardware-setup">{children(vi.fn())}</div>;
+  },
 }));
 vi.mock('../HardwareSetup/WebSerialConsole', () => ({ WebSerialConsole: () => null }));
-vi.mock('../AttractapEditor/AttractapEditor', () => ({ AttractapEditor: () => null }));
-vi.mock('../pairing/ReadersToPair', () => ({ ReadersToPair: () => null }));
+vi.mock('../AttractapEditor/AttractapEditor', () => ({
+  AttractapEditor: (props: { readerId?: number; isOpen: boolean }) => {
+    data.editor(props);
+    return null;
+  },
+}));
+vi.mock('../pairing/ReadersToPair', () => ({
+  ReadersToPair: ({ onPaired }: { onPaired: (readerId: number) => void }) => {
+    data.onPaired = onPaired;
+    return null;
+  },
+}));
 vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
 
@@ -97,5 +120,42 @@ describe('AttractapList pairing', () => {
     expect(screen.getByText('Just paired')).toBeInTheDocument();
     expect(screen.queryByText('()')).toBeNull();
     expect(screen.getByText('–')).toBeInTheDocument();
+  });
+
+  describe('opening the settings', () => {
+    beforeEach(() => {
+      mockLicense(['attractap']);
+      data.editor.mockClear();
+      Object.values(data.toast).forEach((fn) => fn.mockClear());
+    });
+    const editorOpenFor = (readerId: number) =>
+      expect(data.editor).toHaveBeenLastCalledWith(expect.objectContaining({ readerId, isOpen: true }));
+
+    it('opens the settings of a reader the web flasher just paired, although the list does not know it yet', () => {
+      // The token reader is still listed as not paired, and the new reader is not listed at all.
+      data.readers = [reader(2, 'Token reader', 'unpaired')];
+      render(<AttractapList />);
+      act(() => data.openDeviceSettings?.('2', true));
+      editorOpenFor(2);
+      act(() => data.openDeviceSettings?.('42', true));
+      editorOpenFor(42);
+      expect(data.toast.info).not.toHaveBeenCalled();
+    });
+
+    it('asks to pair first when the settings of a reader that is not paired are opened', () => {
+      data.readers = [reader(2, 'Token reader', 'unpaired')];
+      render(<AttractapList />);
+      act(() => data.openDeviceSettings?.('2'));
+      expect(data.toast.info).toHaveBeenCalledWith({ title: 'pairFirst' });
+      expect(data.editor).toHaveBeenLastCalledWith(expect.objectContaining({ isOpen: false }));
+    });
+
+    it('opens the settings of a reader paired from the Not paired card without a second toast', () => {
+      data.readers = [];
+      render(<AttractapList />);
+      act(() => data.onPaired?.(9));
+      editorOpenFor(9);
+      expect(data.toast.success).not.toHaveBeenCalled();
+    });
   });
 });

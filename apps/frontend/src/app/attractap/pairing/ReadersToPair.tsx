@@ -1,12 +1,15 @@
 import { Button, Card } from '@heroui/react';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ActivityIcon, Trash2Icon } from 'lucide-react';
+import { PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
   useAttractapServiceGetPairings,
   useAttractapServiceRequestReaderPairing,
 } from '@attraccess/react-query-client';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
+import { AttractapDeleteModal } from '../AttractapList/delete';
 import { PairingDialog, PairingDialogProps } from './PairingDialog';
 import { PairingRow, readerKindOf } from './PairingRow';
 import { apiErrorMessage, isPairingRunning } from './pairingUtils';
@@ -15,10 +18,47 @@ import en from './en.json';
 
 type OpenDialog = Pick<PairingDialogProps, 'pairingId' | 'waitForReaderId' | 'presetTargetReaderId'>;
 
+/** Actions of a reader record that is not paired: pair it, look at its diagnostics, or delete it. */
+function RecordActions(props: Readonly<{ readerId: number; pair: ReactNode }>) {
+  const { t } = useTranslations({ de, en });
+  const navigate = useNavigate();
+  const { readerId } = props;
+  return (
+    <div className="flex items-center gap-1">
+      {props.pair}
+      <Button
+        size="sm"
+        variant="ghost"
+        isIconOnly
+        aria-label={t('toPair.diagnostics')}
+        onPress={() => navigate(`/attractap/readers/${readerId}/diagnostics`)}
+        data-cy={`attractap-to-pair-diagnostics-${readerId}`}
+      >
+        <ActivityIcon className="size-4" />
+      </Button>
+      <AttractapDeleteModal readerId={readerId}>
+        {(onOpen) => (
+          <Button
+            size="sm"
+            variant="danger-soft"
+            isIconOnly
+            aria-label={t('toPair.delete')}
+            onPress={onOpen}
+            data-cy={`attractap-to-pair-delete-${readerId}`}
+          >
+            <Trash2Icon className="size-4" />
+          </Button>
+        )}
+      </AttractapDeleteModal>
+    </div>
+  );
+}
+
 /**
  * Everything that must be paired before it can be used: readers that were never paired, readers
- * whose pairing was removed, and new readers that wait for approval. The only action is Pair.
- * Codes are never shown here; the admin reads them from the reader.
+ * whose pairing was removed, and new readers that wait for approval. Reader records can also be
+ * deleted or diagnosed; a new reader can only be paired. Codes are never shown here; the admin
+ * reads them from the reader.
  */
 export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: (readerId: number) => void }>) {
   const { t } = useTranslations({ de, en });
@@ -53,12 +93,11 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
   return (
     <>
       {(readers.length > 0 || devices.length > 0) && (
-        <Card className="p-4 flex flex-col gap-3" data-cy="attractap-readers-to-pair">
-          <div>
-            <h2 className="text-lg font-semibold">{t('toPair.title')}</h2>
-            <p className="text-sm text-default-500">{t('toPair.description')}</p>
-          </div>
-          <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
+        <Card data-cy="attractap-readers-to-pair">
+          <Card.Header>
+            <PageHeader noMargin title={t('toPair.title')} subtitle={t('toPair.description')} />
+          </Card.Header>
+          <Card.Content className="flex max-h-72 flex-col gap-3 overflow-y-auto">
             {readers.map((reader) => (
               <PairingRow
                 key={`reader-${reader.id}`}
@@ -66,14 +105,19 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                 name={reader.name}
                 detail={t(reader.pairingState === 'revoked' ? 'toPair.pairingRemoved' : 'toPair.neverPaired')}
                 action={
-                  <Button
-                    size="sm"
-                    isPending={requestPairing.isPending && requestPairing.variables?.readerId === reader.id}
-                    onPress={() => pair(reader)}
-                    data-cy={`attractap-pair-reader-${reader.id}`}
-                  >
-                    {runningFor(reader.id) ? t('toPair.resume') : t('toPair.pair')}
-                  </Button>
+                  <RecordActions
+                    readerId={reader.id}
+                    pair={
+                      <Button
+                        size="sm"
+                        isPending={requestPairing.isPending && requestPairing.variables?.readerId === reader.id}
+                        onPress={() => pair(reader)}
+                        data-cy={`attractap-pair-reader-${reader.id}`}
+                      >
+                        {runningFor(reader.id) ? t('toPair.resume') : t('toPair.pair')}
+                      </Button>
+                    }
+                  />
                 }
               />
             ))}
@@ -94,7 +138,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                 }
               />
             ))}
-          </div>
+          </Card.Content>
         </Card>
       )}
 

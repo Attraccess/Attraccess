@@ -1,18 +1,8 @@
-import {
-  Alert,
-  AlertContent,
-  AlertDescription,
-  Button,
-  ColorSwatch,
-  Input,
-  Label,
-  Spinner,
-  TextField,
-} from '@heroui/react';
-import { CameraIcon } from 'lucide-react';
-import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
+import { Button, ColorSwatch, Input, Label, Spinner, TextField } from '@heroui/react';
+import { ArrowLeftIcon, CameraIcon } from 'lucide-react';
+import { useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { PairingDto } from '@attraccess/react-query-client';
-import { ReactNode, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Select } from '../../../components/select';
 import { ResourceScanner } from '../../resourceOverview/toolbar/scanner';
 import { enrollmentCodeFromScan, formatEnrollmentCode } from './enrollmentCode';
@@ -35,17 +25,6 @@ const MODES: Choice[] = ['new', 'takeover'];
 
 type T = PairingFlow['t'];
 
-export function Notice(props: Readonly<{ status: 'warning' | 'danger'; dataCy: string; children: ReactNode }>) {
-  return (
-    <Alert status={props.status} data-cy={props.dataCy}>
-      <AlertStatusIcon status={props.status} />
-      <AlertContent>
-        <AlertDescription>{props.children}</AlertDescription>
-      </AlertContent>
-    </Alert>
-  );
-}
-
 const ERROR_TEXT: Record<string, (t: T, error: PairingError) => string> = {
   rateLimited: (t, error) =>
     error.retryAfterSeconds === undefined
@@ -58,22 +37,27 @@ export function errorText(t: T, error: PairingError) {
   return (ERROR_TEXT[error.kind] ?? ((tt: T) => tt(`dialog.error.${error.kind}`)))(t, error);
 }
 
-/** One row in ring order: segment 8 sits next to segment 1, so any other layout could be misread. */
+/**
+ * One row in ring order: segment 8 sits next to segment 1, so any other layout could be misread. On a
+ * narrow screen the row scrolls sideways instead of wrapping.
+ */
 function PatternSwatches(
   props: Readonly<{ pattern: LedColour[]; colourName: (colour: string) => string; startLabel: string }>,
 ) {
   return (
-    <ol className="flex flex-row flex-wrap justify-center gap-3" data-cy="attractap-pairing-pattern">
-      {props.pattern.map((colour, index) => (
-        <li key={`${index}-${colour}`} className="flex flex-col items-center gap-1 text-xs">
-          <span aria-hidden="true">
-            <ColorSwatch color={SWATCH[colour]} size="sm" />
-          </span>
-          <span className="font-semibold">{index === 0 ? props.startLabel : index + 1}</span>
-          <span>{props.colourName(colour)}</span>
-        </li>
-      ))}
-    </ol>
+    <div className="w-full overflow-x-auto">
+      <ol className="mx-auto flex w-max gap-2" data-cy="attractap-pairing-pattern">
+        {props.pattern.map((colour, index) => (
+          <li key={`${index}-${colour}`} className="flex flex-col items-center gap-1 text-xs">
+            <span aria-hidden="true">
+              <ColorSwatch color={SWATCH[colour]} size="sm" />
+            </span>
+            <span className="font-semibold">{index === 0 ? props.startLabel : index + 1}</span>
+            <span>{props.colourName(colour)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -119,7 +103,7 @@ export function CodeField({ flow, insecure }: Readonly<{ flow: PairingFlow; inse
         />
       </TextField>
       {!insecure && (
-        <ResourceScanner title={t('dialog.scanTitle')} onDetected={scan}>
+        <ResourceScanner title={t('dialog.scanTitle')} onDetected={scan} cameraFallbackHint={t('dialog.scanFallback')}>
           {(open) => (
             <Button variant="secondary" onPress={open} data-cy="attractap-pairing-scan">
               <CameraIcon className="size-4" />
@@ -136,6 +120,7 @@ export function CodeField({ flow, insecure }: Readonly<{ flow: PairingFlow; inse
 export function FindStep(props: Readonly<{ flow: PairingFlow; insecure: boolean; presetTargetReaderId?: number }>) {
   const { flow, presetTargetReaderId } = props;
   const { t } = flow;
+  const format = useDateTimeFormatter();
   const targetName = flow.readers?.find((reader) => reader.id === presetTargetReaderId)?.name;
   const waitingLite = presetTargetReaderId
     ? flow.running.filter((p) => p.kind === 'lite' && p.boundReaderId === null && !p.mode)
@@ -155,7 +140,7 @@ export function FindStep(props: Readonly<{ flow: PairingFlow; insecure: boolean;
               onPress={() => flow.setPickedId(p.id)}
               data-cy={`attractap-pairing-pick-${p.id}`}
             >
-              {t('dialog.pickLite')}
+              {t('dialog.pickLite', { time: format(p.createdAt) })}
             </Button>
           ))}
         </div>
@@ -167,13 +152,14 @@ export function FindStep(props: Readonly<{ flow: PairingFlow; insecure: boolean;
 /** New reader (optional name) or a takeover of an existing record. */
 export function ModeStep({ flow }: Readonly<{ flow: PairingFlow }>) {
   const { t } = flow;
+  const ownReaderId = flow.current?.boundReaderId ?? null;
   const readerOptions = useMemo(
-    // Only readers that were paired before can be taken over.
+    // Any record can be taken over, also a token reader that was never paired (new hardware replaces it).
     () =>
       (flow.readers ?? [])
-        .filter((reader) => reader.pairingState !== 'unpaired')
+        .filter((reader) => reader.id !== ownReaderId)
         .map((reader) => ({ key: reader.id.toString(), label: reader.name })),
-    [flow.readers],
+    [flow.readers, ownReaderId],
   );
   return (
     <div className="flex flex-col gap-3">
@@ -206,7 +192,7 @@ export function ProofStep(props: Readonly<{ flow: PairingFlow; current: PairingD
   const { flow, current } = props;
   const { t } = flow;
   if (flow.byPattern) return <PatternStep flow={flow} current={current} />;
-  if (flow.resolvedByCode) {
+  if (flow.resolvedByCode && !flow.codeRejected) {
     const code = flow.normalizedCode ? formatEnrollmentCode(flow.normalizedCode) : '';
     return <p data-cy="attractap-pairing-code-chosen">{t('dialog.codeFound', { code })}</p>;
   }
@@ -222,6 +208,18 @@ export function ReaderStep(props: Readonly<{ flow: PairingFlow; current: Pairing
   const { flow, current } = props;
   return (
     <div className="flex flex-col gap-4">
+      {flow.pickedFromList && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onPress={flow.backToList}
+          data-cy="attractap-pairing-back-to-list"
+        >
+          <ArrowLeftIcon className="size-4" />
+          {flow.t('dialog.backToList')}
+        </Button>
+      )}
       <p className="text-sm text-default-500">
         {flow.t(`kind.${current.kind}`)}
         {current.firmware?.version ? ` · v${current.firmware.version}` : ''}

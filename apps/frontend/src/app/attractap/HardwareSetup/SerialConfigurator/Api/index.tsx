@@ -7,6 +7,9 @@ import { useAttractapSerialComm, type ApiStatusData } from '../Auth/index';
 import de from './de.json';
 import en from './en.json';
 
+/** Opens a reader's settings; `justPaired` when it was approved a moment ago and lists may not show it yet. */
+export type OpenDeviceSettings = (deviceId: string, justPaired?: boolean) => void;
+
 /** While the reader is on its way to being connected, follow its status without a manual refresh. */
 const TRANSIENT_STATUSES: ReadonlySet<ApiStatusData['status']> = new Set([
   'connecting_tcp',
@@ -29,7 +32,7 @@ export function useAttractapSerialConfiguratorApiState({
   openDeviceSettings,
   className,
 }: {
-  openDeviceSettings: (deviceId: string) => void;
+  openDeviceSettings: OpenDeviceSettings;
   className?: string;
 }) {
   const { t } = useTranslations({
@@ -230,7 +233,7 @@ export function AttractapSerialConfiguratorApi({
   openDeviceSettings,
   className,
 }: {
-  openDeviceSettings: (deviceId: string) => void;
+  openDeviceSettings: OpenDeviceSettings;
   className?: string;
 }) {
   const {
@@ -363,7 +366,7 @@ export function AttractapSerialConfiguratorApi({
         onClose={closeApprove}
         onPaired={(readerId) => {
           closeApprove();
-          openDeviceSettings(String(readerId));
+          openDeviceSettings(String(readerId), true);
         }}
       />
     </div>

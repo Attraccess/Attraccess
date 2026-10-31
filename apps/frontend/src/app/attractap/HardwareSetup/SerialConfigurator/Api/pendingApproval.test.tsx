@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttractapSerialConfiguratorApi } from './index';
@@ -53,5 +53,15 @@ describe('web flasher: waiting for approval', () => {
     mocks.status.current = { ...onServer, status: 'authenticated' };
     render(<AttractapSerialConfiguratorApi openDeviceSettings={vi.fn()} />, { wrapper: TestWrapper });
     expect(screen.queryByRole('button', { name: /approve|freigeben/i })).toBeNull();
+  });
+
+  it('opens the settings of the reader it just paired', async () => {
+    mocks.status.current = { ...onServer, status: 'pending_approval', enrollmentCode: 'K7P-3XQ' };
+    const openDeviceSettings = vi.fn();
+    render(<AttractapSerialConfiguratorApi openDeviceSettings={openDeviceSettings} />, { wrapper: TestWrapper });
+    const { onPaired } = mocks.pairingDialog.mock.lastCall?.[0] as { onPaired: (readerId: number) => void };
+    act(() => onPaired(12));
+    // The reader lists may not show it as paired yet, so the settings must open without checking them.
+    expect(openDeviceSettings).toHaveBeenCalledWith('12', true);
   });
 });

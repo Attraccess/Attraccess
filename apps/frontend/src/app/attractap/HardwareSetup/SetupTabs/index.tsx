@@ -5,7 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Key, useEffect, useRef, useState } from 'react';
 import { FirmwareFlasher } from '../FirmwareFlasher';
 import { FirmwareSelector } from '../FirmwareSelector';
-import { AttractapSerialConfiguratorApi } from '../SerialConfigurator/Api';
+import { AttractapSerialConfiguratorApi, type OpenDeviceSettings } from '../SerialConfigurator/Api';
 import {
   AttractapSerialCommGate,
   AttractapSerialCommProvider,
@@ -66,7 +66,7 @@ function AutoFetchConfiguration() {
 }
 
 interface Props {
-  openDeviceSettings: (deviceId: string) => void;
+  openDeviceSettings: OpenDeviceSettings;
   onClose: () => void;
 }
 

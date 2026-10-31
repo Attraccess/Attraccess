@@ -13,6 +13,19 @@ const mocks = vi.hoisted(() => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
   pairingDialog: vi.fn(),
   onPaired: vi.fn(),
+  navigate: vi.fn(),
+  deleteModal: vi.fn(),
+}));
+
+vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
+vi.mock('../AttractapList/delete', () => ({
+  AttractapDeleteModal: ({
+    readerId,
+    children,
+  }: {
+    readerId: number;
+    children: (open: () => void) => React.ReactNode;
+  }) => children(() => mocks.deleteModal(readerId)),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -26,6 +39,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useTranslations: () => ({ t: (key: string) => key }),
   useDateTimeFormatter: () => (value: string) => `at ${value}`,
+  PageHeader: ({ title, subtitle }: { title: string; subtitle: string }) => (
+    <div>
+      <h2>{title}</h2>
+      <p>{subtitle}</p>
+    </div>
+  ),
   StandardModal: ({
     children,
     isOpen,
@@ -63,6 +82,8 @@ describe('ReadersToPair', () => {
     mocks.requestPairing.mockClear();
     mocks.pairingDialog.mockClear();
     mocks.onPaired.mockClear();
+    mocks.navigate.mockClear();
+    mocks.deleteModal.mockClear();
     Object.values(mocks.toast).forEach((fn) => fn.mockClear());
   });
 
@@ -71,7 +92,7 @@ describe('ReadersToPair', () => {
     expect(document.querySelector('[data-cy="attractap-readers-to-pair"]')).toBeNull();
   });
 
-  it('lists every reader that is not paired the same way, with nothing but a Pair button', () => {
+  it('lists every reader that is not paired the same way; only reader records can be deleted or diagnosed', () => {
     mocks.pairings.current = [pairing('dev', { kind: 'lite' })];
     render(
       <ReadersToPair
@@ -94,8 +115,30 @@ describe('ReadersToPair', () => {
     expect(
       within(card)
         .getAllByRole('button')
-        .map((b) => b.textContent),
-    ).toEqual(['toPair.pair', 'toPair.pair', 'toPair.pair']);
+        .map((b) => b.textContent || b.getAttribute('aria-label')),
+    ).toEqual([
+      'toPair.pair',
+      'toPair.diagnostics',
+      'toPair.delete',
+      'toPair.pair',
+      'toPair.diagnostics',
+      'toPair.delete',
+      'toPair.pair',
+    ]);
+  });
+
+  it('deletes a reader record that is not paired', async () => {
+    const user = userEvent.setup();
+    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(1, 'unpaired')]} />);
+    await user.click(screen.getByRole('button', { name: 'toPair.delete' }));
+    expect(mocks.deleteModal).toHaveBeenCalledWith(1);
+  });
+
+  it('opens the diagnostics of a reader record that is not paired', async () => {
+    const user = userEvent.setup();
+    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(3, 'revoked')]} />);
+    await user.click(screen.getByRole('button', { name: 'toPair.diagnostics' }));
+    expect(mocks.navigate).toHaveBeenCalledWith('/attractap/readers/3/diagnostics');
   });
 
   it('lets a reader whose pairing was removed take over its own record', async () => {

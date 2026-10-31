@@ -180,7 +180,8 @@ export function AppLayout(props: PropsWithChildren) {
               <MassIntroductionRedeemModal canRedeem={isAuthenticated && !needsTwoFactorSetup} />
               {/* A touch reader's QR code links here; the admin approves with the code (not a global enroll button). */}
               <EnrollLinkDialog
-                canEnroll={isAuthenticated && !needsTwoFactorSetup && hasPermission('resources.update')}
+                signedIn={isAuthenticated && !needsTwoFactorSetup}
+                canEnroll={hasPermission('resources.update')}
               />
               {isAuthenticated && <SupervisorApprovalListener />}
               {isAuthenticated && <SessionBillingSummary key={user?.id} />}

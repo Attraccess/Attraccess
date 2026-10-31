@@ -8,11 +8,11 @@
       },
       "cameraDenied": {
         "title": "Kamerazugriff verweigert",
-        "description": "Erlaube den Kamerazugriff für diese Seite in den Browser-Einstellungen oder tippe stattdessen den Code ein."
+        "description": "Erlaube den Kamerazugriff für diese Seite in den Browser-Einstellungen."
       },
       "cameraUnavailable": {
         "title": "Kamera nicht verfügbar",
-        "description": "Die Kamera konnte nicht gestartet werden. Tippe stattdessen den Code ein."
+        "description": "Die Kamera konnte nicht gestartet werden."
       },
       "unknown": {
         "title": "Unbekannter QR-Code",

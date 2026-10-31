@@ -169,10 +169,10 @@ export function AttractapList() {
   return (
     <>
       <AttractapHardwareSetup
-        openDeviceSettings={(deviceId) => {
-          // A reader can only be edited once it is paired.
+        openDeviceSettings={(deviceId, justPaired) => {
+          // A reader can only be edited once it is paired. One approved a moment ago is not in this list yet.
           const reader = allReaders?.find((r) => r.id === Number(deviceId));
-          if (reader?.pairingState === 'paired') setOpenedReaderEditor(reader.id);
+          if (justPaired || reader?.pairingState === 'paired') setOpenedReaderEditor(Number(deviceId));
           else toast.info({ title: t('pairFirst') });
         }}
       >
@@ -213,13 +213,7 @@ export function AttractapList() {
       />
 
       <div className="flex flex-col gap-4">
-        <ReadersToPair
-          readers={allReaders ?? []}
-          onPaired={(readerId) => {
-            toast.success({ title: t('paired'), duration: 2500 });
-            setOpenedReaderEditor(readerId);
-          }}
-        />
+        <ReadersToPair readers={allReaders ?? []} onPaired={setOpenedReaderEditor} />
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
             <Card.Header>

@@ -32,10 +32,12 @@ function CurrentUrl() {
   return <output aria-label="Current URL">{location.pathname + location.search}</output>;
 }
 
-function mount(onDetected?: (rawValue: string) => boolean) {
+function mount(onDetected?: (rawValue: string) => boolean, cameraFallbackHint?: string) {
   render(
     <MemoryRouter initialEntries={['/attractap/readers']}>
-      <ResourceScanner onDetected={onDetected}>{(open) => <button onClick={open}>Scan</button>}</ResourceScanner>
+      <ResourceScanner onDetected={onDetected} cameraFallbackHint={cameraFallbackHint}>
+        {(open) => <button onClick={open}>Scan</button>}
+      </ResourceScanner>
       <CurrentUrl />
     </MemoryRouter>,
   );
@@ -108,7 +110,11 @@ describe('ResourceScanner', () => {
     const denied = Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' });
     act(() => state.onError?.(denied));
 
-    expect(state.toast.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Camera access denied' }));
+    // The resource toolbar has no code field, so the default message offers no code to type.
+    expect(state.toast.error).toHaveBeenCalledWith({
+      title: 'Camera access denied',
+      description: 'Allow camera access for this page in your browser settings.',
+    });
     await vi.waitFor(() => expect(screen.queryByText('Camera')).toBeNull());
   });
 
@@ -118,6 +124,21 @@ describe('ResourceScanner', () => {
     await screen.findByText('Camera');
     act(() => state.onError?.(new Error('no camera')));
 
-    expect(state.toast.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Camera not available' }));
+    expect(state.toast.error).toHaveBeenCalledWith({
+      title: 'Camera not available',
+      description: 'The camera could not be started.',
+    });
+  });
+
+  it('adds what the caller offers instead of the camera', async () => {
+    mount(() => true, 'Type the code instead.');
+    fireEvent.click(screen.getByRole('button', { name: 'Scan' }));
+    await screen.findByText('Camera');
+    act(() => state.onError?.(new Error('no camera')));
+
+    expect(state.toast.error).toHaveBeenCalledWith({
+      title: 'Camera not available',
+      description: 'The camera could not be started. Type the code instead.',
+    });
   });
 });

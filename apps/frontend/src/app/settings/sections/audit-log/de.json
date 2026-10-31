@@ -170,7 +170,7 @@
     "attractap.reader.pairing_expired": "Kopplung des Lesegeräts abgelaufen",
     "attractap.reader.revoked": "Kopplung des Lesegeräts entfernt",
     "attractap.reader.replaced": "Lesegerät ersetzt",
-    "attractap.reader.token_rejected": "Token-Anmeldung eines gekoppelten oder entkoppelten Lesegeräts blockiert",
+    "attractap.reader.token_rejected": "Token-Anmeldung eines gekoppelten Lesegeräts oder eines Lesegeräts mit entfernter Kopplung blockiert",
     "attractap.reader.handshake_rejected": "Verbindungen des Lesegeräts abgelehnt",
     "settings.updated": "Systemeinstellungen geändert",
     "settings.api_key.generated": "Metrik-API-Schlüssel erstellt",
@@ -345,8 +345,7 @@
     "changes": "Angewendete Änderungen",
     "method": "Freigabeart",
     "mode": "Kopplungsart",
-    "count": "Anzahl",
-    "replacedReaderId": "ID des ersetzten Lesegeräts"
+    "count": "Anzahl"
   },
   "eventType": "Ereignistyp",
   "pluginId": "Integrations-ID",

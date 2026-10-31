@@ -26,7 +26,7 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "completed": "Der Reader ist gekoppelt.",
-    "failed": "Kopplung fehlgeschlagen. Drücke am Reader erneut auf Koppeln, um neu zu beginnen.",
+    "failed": "Kopplung fehlgeschlagen. Der Reader beginnt von selbst mit einem neuen Code von vorn.",
     "expired": "Zeitüberschreitung. Der Reader beginnt mit einem neuen Code von vorn.",
     "cancelled": "Kopplung wurde abgebrochen.",
     "reason": {
@@ -38,7 +38,7 @@
       "expired": "Der Reader wurde nicht innerhalb von 10 Minuten freigegeben."
     },
     "waitingForReader": "Warte auf den Reader…",
-    "findHint": "Gib den Code ein, den der Reader zeigt. Einen Lite-Reader wählst du unten aus und vergleichst seine Farben.",
+    "findHint": "Gib den Code ein, den der Reader zeigt.",
     "codeLabel": "Code am Reader",
     "typeCode": "Gib den Code ein, den der Reader gerade zeigt.",
     "scan": "Scannen",
@@ -49,8 +49,8 @@
     "codeFound": "Reader zum Code {{code}} gefunden.",
     "takesOver": "Dieser Reader übernimmt {{name}}.",
     "nameLabel": "Name (optional)",
-    "liteHint": "Lite-Reader, die auf die Kopplung warten:",
-    "pickLite": "Farben eines wartenden Lite-Readers vergleichen",
+    "liteHint": "Einen Lite-Reader wählst du hier aus und vergleichst seine Farben:",
+    "pickLite": "Lite-Reader, wartet seit {{time}}",
     "comparePattern": "Vergleiche diese Farben mit dem Ring am Reader, ab Segment 1.",
     "patternHint": "Segment 1 ist am Reader markiert. Gib nur frei, wenn alle acht Farben übereinstimmen. Die Farben wechseln etwa alle 30 Sekunden.",
     "patternChanged": "Die Farben haben sich während deiner Prüfung geändert. Vergleiche sie erneut und gib dann frei.",
@@ -64,8 +64,16 @@
       "notWaiting": "Dieser Reader wartet nicht mehr auf die Kopplung. Er ist vielleicht schon gekoppelt oder hat neu begonnen.",
       "rateLimited": "Zu viele Versuche. Warte einen Moment und versuche es erneut.",
       "rateLimitedRetry": "Zu viele Versuche. Versuche es in {{seconds}} Sekunden erneut.",
-      "unknown": "Der Reader konnte nicht gekoppelt werden"
-    }
+      "unknown": "Der Reader konnte nicht gekoppelt werden",
+      "failed": "Kopplung wegen eines Fehlers auf dem Server fehlgeschlagen. Der Reader beginnt von selbst mit einem neuen Code von vorn.",
+      "readerGone": "Der Reader hat die Verbindung getrennt, bevor die Kopplung abgeschlossen war. Er zeigt gleich einen neuen Code.",
+      "keyInUse": "Dieser Reader ist bereits mit einem anderen Eintrag gekoppelt. Wähle diesen Eintrag zur Übernahme oder entferne zuerst dessen Kopplung.",
+      "targetNotFound": "Den Reader, der übernommen werden soll, gibt es nicht mehr. Wähle einen anderen.",
+      "targetMissing": "Wähle, welchen Reader dieser übernimmt.",
+      "wrongMode": "Dieser Reader kann so nicht gekoppelt werden. Schließe dieses Fenster und beginne erneut in der Reader-Liste."
+    },
+    "backToList": "Anderen Reader wählen",
+    "scanFallback": "Tippe stattdessen den Code ein."
   },
   "security": {
     "title": "Kopplung",
@@ -92,7 +100,7 @@
   },
   "toPair": {
     "title": "Nicht gekoppelt",
-    "description": "Kopple diese Reader, bevor du sie nutzen oder einrichten kannst. Der Reader muss eingeschaltet und verbunden sein.",
+    "description": "Kopple diese Reader, bevor du sie einrichten kannst. Reader, die sich mit einem Token anmelden, funktionieren bis dahin weiter. Der Reader muss eingeschaltet und verbunden sein.",
     "neverPaired": "Noch nicht gekoppelt",
     "pairingRemoved": "Kopplung wurde entfernt",
     "newReader": "Neuer Reader",
@@ -100,10 +108,16 @@
     "pair": "Koppeln",
     "resume": "Fortsetzen",
     "requestFailed": "Kopplung konnte nicht gestartet werden",
-    "notConnected": "Der Reader ist gerade nicht verbunden. Schalte ihn ein und versuche es erneut."
+    "notConnected": "Der Reader ist gerade nicht verbunden. Schalte ihn ein und versuche es erneut.",
+    "diagnostics": "Diagnose",
+    "delete": "Löschen"
   },
   "kind": {
     "touch": "Touch",
     "lite": "Lite"
+  },
+  "enrollLink": {
+    "noPermissionTitle": "Du kannst keine Reader freigeben",
+    "noPermission": "Dein Konto hat keine Berechtigung, Reader freizugeben. Bitte eine Administratorin oder einen Administrator, diesen Reader freizugeben."
   }
 }
