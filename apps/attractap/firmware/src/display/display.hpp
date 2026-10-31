@@ -87,14 +87,20 @@ public:
     static uint32_t touchPressSequence;
 
     // Screen-owned notice: shown inside the active screen, replaced by the next
-    // one and removed when the router leaves that screen. A notice raised in the
-    // same tick as a transition lands on the destination screen instead, so
-    // "log out, then explain why" shows the explanation on the lockscreen.
-    // `durationMs` 0 selects the default for the kind (errors stay longer).
-    static void showNotice(ScreenNotice::Kind kind, const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, uint32_t durationMs = 0);
+    // one and removed when the router leaves that screen. Carry rule: a notice
+    // raised since the application's last render pass belongs to the event that
+    // the next pass turns into a transition, so it lands on the destination
+    // ("log out, then explain why" shows the explanation on the lockscreen).
+    // Async API callbacks run after a pass, so their notices count for the next.
+    static void showNotice(ScreenNotice::Kind kind, const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
     static void showErrorNotice(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
     static void showBillingSummary(const std::string &total);
+    // Missing touch panel. Raised on the boot screen, which is replaced within
+    // seconds, so it follows every transition until it expires.
+    static void showTouchUnavailableNotice();
     static void clearNotice();
+    // Called by the application at the end of each render pass (processState).
+    static void endNoticeRenderPass();
 
     // Hidden maintenance drawer: pulled down from the top edge, exposes
     // "Open Settings" and "Reboot" actions. The settings action is wired by the
@@ -167,13 +173,19 @@ private:
         ScreenNotice::Kind kind = ScreenNotice::Kind::Info;
         FirmwareI18n::Text title;
         FirmwareI18n::Text message;
-        uint32_t durationMs = 0;
+        // Set for a notice that follows transitions until `expiresAt` (millis).
+        bool followsScreens = false;
+        uint32_t expiresAt = 0;
     };
     static ScreenNotice notice;
     static PendingNotice lastNotice;
-    // Raised since the last Display::loop, or raised before any screen existed.
-    static bool noticeRaisedThisTick;
+    // Raised since the last application render pass.
+    static bool noticeRaisedThisPass;
+    // Raised before any screen existed.
     static bool noticeAwaitsScreen;
+    static void presentNotice();
+    // Router hook, called once the new screen is active: keeps, carries or drops the notice.
+    static void routeNotice(bool sameScreen);
 
     // Maintenance drawer (display_drawer.cpp)
     static void initDrawer();
