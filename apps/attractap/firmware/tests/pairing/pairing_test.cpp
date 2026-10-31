@@ -508,6 +508,31 @@ void testSessionTls()
             received.emplace_back(reinterpret_cast<const char *>(payload), length);
         });
         CHECK(!received.empty() && received.back() == control);
+
+        // An OTA-sized message followed by another one, all in one feed: every byte that arrived
+        // is decrypted and delivered before feed() returns (nothing else would trigger the rest).
+        Bytes big(60000, 0x5a), bigFrame, smallFrame;
+        SessionFraming::encode(SessionFraming::FrameType::BINARY, big.data(), big.size(), bigFrame);
+        SessionFraming::encode(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(hello.data()),
+                               hello.size(), smallFrame);
+        for (const Bytes *frame : {&bigFrame, &smallFrame})
+            for (size_t offset = 0; offset < frame->size();)
+            {
+                const int written = mbedtls_ssl_write(&server.ssl, frame->data() + offset, frame->size() - offset);
+                CHECK(written > 0);
+                if (written <= 0) break;
+                offset += static_cast<size_t>(written);
+            }
+        std::vector<std::pair<SessionFraming::FrameType, size_t>> delivered;
+        chunk.clear();
+        chunk.swap(server.toClient);
+        client.feed(chunk.data(), chunk.size(), [&](SessionFraming::FrameType type, const uint8_t *, size_t length) {
+            delivered.emplace_back(type, length);
+        });
+        CHECK(delivered.size() == 2);
+        CHECK(delivered.size() == 2 && delivered[0].first == SessionFraming::FrameType::BINARY &&
+              delivered[0].second == big.size() && delivered[1].second == hello.size());
+        CHECK(client.open());
     }
 
     // Bootstrap: no installation known yet, learned from the verified certificate.

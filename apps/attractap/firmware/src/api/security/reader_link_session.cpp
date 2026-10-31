@@ -11,6 +11,8 @@
 
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #endif
 
 namespace
@@ -46,15 +48,8 @@ bool ReaderLink::flushOutbox()
     }
     std::vector<uint8_t> records;
     records.swap(outbox);
-    if (socket.sendBinary(records.data(), records.size()))
-    {
-        return true;
-    }
-    // A lost record breaks the TLS stream: start over.
-    logger.error("Session data could not be sent, reconnecting");
-    tls.close();
-    socket.forceReconnect("session send failed");
-    return false;
+    // A lost record breaks the TLS stream: the caller starts over.
+    return socket.sendBinary(records.data(), records.size());
 }
 
 void ReaderLink::onSessionConnected()
@@ -63,70 +58,155 @@ void ReaderLink::onSessionConnected()
     {
         return;
     }
-    SessionTls::Config config;
-    config.key = key.get();
-    config.caSpki = credentials.caSpki;
-    config.timeFloorSeconds = timeFloor.seconds();
-    if (credentials.hasCertificate())
+    SessionWork begin;
+    begin.begin = true;
+    begin.config.key = key.get();
+    begin.config.caSpki = credentials.caSpki;
+    begin.config.timeFloorSeconds = timeFloor.seconds();
+    begin.bootstrap = !credentials.hasCertificate();
+    if (!begin.bootstrap)
     {
-        config.certificate = credentials.certificate;
-        config.installationId = credentials.installationId;
+        begin.config.certificate = credentials.certificate;
+        begin.config.installationId = credentials.installationId;
     }
-    else if (!ReaderIdentity::selfSignedCertificate(*key, config.certificate))
     {
-        logger.error("Could not create the bootstrap certificate");
-        return;
+        std::lock_guard<std::mutex> lock(eventsMutex);
+        begin.generation = generation;
     }
-    logger.info(credentials.hasCertificate() ? "Opening secure session" : "Opening first secure session");
+    begin.epoch = ++sessionEpoch;
+    logger.info(begin.bootstrap ? "Opening first secure session" : "Opening secure session");
     handshakeStartedMs = millis() | 1;
-    std::lock_guard<std::mutex> lock(sessionMutex);
-    tls.begin(config, [this](const uint8_t *data, size_t length) {
-        outbox.insert(outbox.end(), data, data + length);
-        return true;
-    });
-    flushOutbox();
+    submitSessionWork(std::move(begin));
 }
 
-void ReaderLink::onSessionBytes(const std::string &bytes)
+void ReaderLink::submitSessionWork(SessionWork item)
+{
+#ifdef ESP_PLATFORM
+    if (sessionWorker)
+    {
+        {
+            std::lock_guard<std::mutex> lock(workMutex);
+            work.push_back(std::move(item));
+        }
+        xTaskNotifyGive(static_cast<TaskHandle_t>(sessionWorker));
+        return;
+    }
+#endif
+    runSessionWork(item);
+}
+
+#ifdef ESP_PLATFORM
+void ReaderLink::sessionWorkerEntry(void *argument)
+{
+    static_cast<ReaderLink *>(argument)->sessionWorkerLoop();
+}
+
+void ReaderLink::sessionWorkerLoop()
+{
+    for (;;)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        for (;;)
+        {
+            SessionWork item;
+            {
+                std::lock_guard<std::mutex> lock(workMutex);
+                if (work.empty())
+                {
+                    break;
+                }
+                item = std::move(work.front());
+                work.pop_front();
+            }
+            runSessionWork(item);
+        }
+    }
+}
+#endif
+
+// Worker side (or inline on the host): touches only the TLS engine and the socket, and reports
+// back to the main loop through events. Nothing here writes flash.
+void ReaderLink::runSessionWork(const SessionWork &item)
 {
     std::vector<std::pair<SessionFraming::FrameType, std::string>> frames;
-    SessionTls::Status status;
-    bool justOpened = false;
+    Event status;
+    status.type = EventType::SessionStatus;
+    status.generation = item.generation;
+    status.epoch = item.epoch;
     {
         std::lock_guard<std::mutex> lock(sessionMutex);
-        const bool wasHandshaking = tls.status() == SessionTls::Status::Handshaking;
-        status = tls.feed(reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size(),
-                          [&frames](SessionFraming::FrameType type, const uint8_t *payload, size_t length) {
-                              frames.emplace_back(type, std::string(reinterpret_cast<const char *>(payload), length));
-                          });
-        justOpened = wasHandshaking && status == SessionTls::Status::Open;
-        flushOutbox();
+        if (item.epoch != sessionEpoch.load())
+        {
+            return; // that connection is gone
+        }
+        if (item.begin)
+        {
+            SessionTls::Config config = item.config;
+            if (item.bootstrap && !ReaderIdentity::selfSignedCertificate(*config.key, config.certificate))
+            {
+                status.code = static_cast<int>(SessionTls::Status::Failed);
+                post(std::move(status));
+                return;
+            }
+            tls.begin(config, [this](const uint8_t *data, size_t length) {
+                outbox.insert(outbox.end(), data, data + length);
+                return true;
+            });
+        }
+        else
+        {
+            const bool wasHandshaking = tls.status() == SessionTls::Status::Handshaking;
+            tls.feed(reinterpret_cast<const uint8_t *>(item.bytes.data()), item.bytes.size(),
+                     [&frames](SessionFraming::FrameType type, const uint8_t *payload, size_t length) {
+                         frames.emplace_back(type, std::string(reinterpret_cast<const char *>(payload), length));
+                     });
+            status.opened = wasHandshaking && tls.status() == SessionTls::Status::Open;
+        }
+        status.sendFailed = !flushOutbox();
+        status.code = static_cast<int>(tls.status());
+        if (status.sendFailed)
+        {
+            tls.close();
+        }
     }
-    if (justOpened)
+    for (auto &frame : frames)
+    {
+        Event event;
+        event.type = EventType::SessionFrame;
+        event.generation = item.generation;
+        event.epoch = item.epoch;
+        event.code = static_cast<int>(frame.first);
+        event.data = std::move(frame.second);
+        post(std::move(event));
+    }
+    post(std::move(status));
+}
+
+// Main loop: what the session work found out.
+void ReaderLink::onSessionStatus(const Event &event)
+{
+    const auto status = static_cast<SessionTls::Status>(event.code);
+    if (event.opened)
     {
         handshakeStartedMs = 0;
         untrusted = false;
 #ifdef ESP_PLATFORM
         // The session's internal-heap cost is budgeted (mbedTLS itself allocates in PSRAM).
-        logger.infof("Secure session established; heap internal: free=%u min=%u",
+        logger.infof("Secure session established; heap internal: free=%u min=%u; main stack free=%u",
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                     (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
+                     (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+                     (unsigned)uxTaskGetStackHighWaterMark(nullptr));
 #else
         logger.info("Secure session established");
 #endif
     }
-
-    // Delivered outside the session lock: handlers answer through sendMessage().
-    for (auto &frame : frames)
+    if (event.sendFailed)
     {
-        onSessionFrame(frame.first, std::move(frame.second));
-        if (channel != Channel::Session)
-        {
-            return; // pairing removed while handling a control message
-        }
+        logger.error("Session data could not be sent, reconnecting");
+        handshakeStartedMs = 0;
+        socket.forceReconnect("session send failed");
     }
-
-    if (status == SessionTls::Status::Untrusted)
+    else if (status == SessionTls::Status::Untrusted)
     {
         // Never unpair because of this: it proves nothing about who is on the other end.
         untrusted = true;
@@ -136,7 +216,12 @@ void ReaderLink::onSessionBytes(const std::string &bytes)
     }
     else if (status == SessionTls::Status::Failed || status == SessionTls::Status::Closed)
     {
-        logger.errorf("Secure session ended (%d)", tls.lastError());
+        int error;
+        {
+            std::lock_guard<std::mutex> lock(sessionMutex);
+            error = tls.lastError();
+        }
+        logger.errorf("Secure session ended (%d)", error);
         handshakeStartedMs = 0;
         socket.forceReconnect("session ended");
     }
@@ -186,7 +271,11 @@ void ReaderLink::onControl(const std::string &payload)
         return;
     }
     const char *type = message["t"] | "";
-    const std::string serverInstallation = tls.serverInstallationId();
+    std::string serverInstallation;
+    {
+        std::lock_guard<std::mutex> lock(sessionMutex);
+        serverInstallation = tls.serverInstallationId();
+    }
 
     uint32_t seconds = 0;
     if (serverSeconds(message["serverTime"], seconds) && timeFloor.raise(seconds))

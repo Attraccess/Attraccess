@@ -48,6 +48,9 @@ public:
     static constexpr uint32_t HANDSHAKE_TIMEOUT_MS = 20000;
     // After the pinned server could not be verified: wait before trying again.
     static constexpr uint32_t UNTRUSTED_RETRY_MS = 30000;
+    // Session worker (device only): stack in PSRAM, below the LVGL and WebSocket tasks.
+    static constexpr uint32_t SESSION_WORKER_STACK = 16384;
+    static constexpr unsigned SESSION_WORKER_PRIORITY = 2;
 
     ReaderLink(IReaderTransport &socket, Options options);
 
@@ -79,15 +82,45 @@ private:
         Text,
         Binary,
         StartPairing,
+        // Results of session work: one decrypted frame, then the session status after the work.
+        SessionFrame,
+        SessionStatus,
     };
     struct Event
     {
         EventType type;
         std::string data;
         uint32_t generation;
+        int code = 0;        // SessionFrame: frame type; SessionStatus: SessionTls::Status
+        bool opened = false; // SessionStatus: the handshake completed during this work
+        bool sendFailed = false;
+        uint32_t epoch = 0;  // SessionStatus: the connection the result belongs to
+    };
+
+    // TLS work that needs a deep stack (key exchange, signatures). On the device it runs on a
+    // worker task whose stack lives in PSRAM, so the main loop's internal stack is not at risk.
+    struct SessionWork
+    {
+        bool begin = false;
+        bool bootstrap = false; // begin: create the self-signed certificate first
+        SessionTls::Config config;
+        std::string bytes; // feed
+        uint32_t generation = 0;
+        uint32_t epoch = 0; // the connection this work belongs to
     };
 
     void post(EventType type, std::string data = "");
+    void post(Event event);
+    void submitSessionWork(SessionWork work);
+    void runSessionWork(const SessionWork &work);
+    void onSessionStatus(const Event &event);
+#ifdef ESP_PLATFORM
+    static void sessionWorkerEntry(void *argument);
+    void sessionWorkerLoop();
+    void *sessionWorker = nullptr; // TaskHandle_t
+    std::mutex workMutex;
+    std::deque<SessionWork> work;
+#endif
     void handle(const Event &event);
     void useChannel(Channel next, const char *reason);
     void reconnectAfter(uint32_t delayMs);
@@ -95,10 +128,10 @@ private:
     bool newIdentity();
 
     void onSessionConnected();
-    void onSessionBytes(const std::string &bytes);
     void onSessionFrame(SessionFraming::FrameType type, std::string payload);
     void onControl(const std::string &payload);
     void onPairingRemoved(const char *reason);
+    // Sends the queued TLS records as one binary frame. Caller holds sessionMutex.
     bool flushOutbox();
 
     void onPairingConnected();
@@ -137,6 +170,9 @@ private:
 
     // TLS session, used from the main loop and from API senders.
     mutable std::mutex sessionMutex;
+    // Bumped whenever the session connection changes: work and status of an older one are dropped
+    // (frames it already decrypted are still delivered).
+    std::atomic<uint32_t> sessionEpoch{0};
     SessionTls tls;
     std::vector<uint8_t> outbox;
 };

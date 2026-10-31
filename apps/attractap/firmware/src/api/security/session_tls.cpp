@@ -1,6 +1,7 @@
 #include "session_tls.hpp"
 #include "session_certificates.hpp"
 
+#include <cstdint>
 #include <cstring>
 
 #include "mbedtls/oid.h"
@@ -16,9 +17,8 @@ namespace
     const int CIPHERSUITES[] = {MBEDTLS_TLS1_3_AES_128_GCM_SHA256, 0};
     const uint16_t GROUPS[] = {MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1, MBEDTLS_SSL_IANA_TLS_GROUP_NONE};
     const uint16_t SIGNATURE_ALGORITHMS[] = {MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256, MBEDTLS_TLS1_3_SIG_NONE};
-    constexpr size_t READ_CHUNK_BYTES = 2048;
-    // A TLS read that loops forever on a hostile peer must not starve the main loop.
-    constexpr int MAX_READS_PER_FEED = 64;
+    // Small on purpose: the caller's stack also carries the handshake.
+    constexpr size_t READ_CHUNK_BYTES = 1024;
 
     int verifyCallback(void *context, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
     {
@@ -219,7 +219,11 @@ SessionTls::Status SessionTls::advance(const SessionFraming::Decoder::FrameCallb
     }
 
     uint8_t chunk[READ_CHUNK_BYTES];
-    for (int reads = 0; reads < MAX_READS_PER_FEED && state == Status::Open; reads++)
+    size_t lastWaiting = SIZE_MAX;
+    int stalls = 0;
+    // Every received byte is consumed before returning: nothing else would come back for the rest.
+    // The loop is bounded by the input (each read consumes bytes or ends it).
+    while (state == Status::Open)
     {
         const int result = mbedtls_ssl_read(&impl->ssl, chunk, sizeof(chunk));
         if (result > 0)
@@ -233,9 +237,12 @@ SessionTls::Status SessionTls::advance(const SessionFraming::Decoder::FrameCallb
         if (result == MBEDTLS_ERR_SSL_WANT_READ || result == MBEDTLS_ERR_SSL_WANT_WRITE)
         {
             // A consumed post-handshake message (session ticket) also returns WANT_READ: keep
-            // reading while received bytes are still waiting.
-            if (impl->inbound.size() > impl->inboundOffset || mbedtls_ssl_check_pending(&impl->ssl))
+            // reading while received bytes are still waiting, as long as reads make progress.
+            const size_t waiting = impl->inbound.size() - impl->inboundOffset;
+            const bool pending = waiting > 0 || mbedtls_ssl_check_pending(&impl->ssl);
+            if (pending && (waiting != lastWaiting || stalls++ < 2))
             {
+                lastWaiting = waiting;
                 continue;
             }
             break;

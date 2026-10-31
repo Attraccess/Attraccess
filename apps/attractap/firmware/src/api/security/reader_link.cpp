@@ -9,6 +9,9 @@
 
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
+#include "freertos/task.h"
 #endif
 
 namespace
@@ -94,6 +97,24 @@ void ReaderLink::setup()
         post(isConnected ? EventType::Connected : EventType::Disconnected);
     });
     socket.setSubprotocol(subprotocolFor(channel));
+#ifdef ESP_PLATFORM
+    if (!sessionWorker)
+    {
+        // Key exchange and signature checks need ~10 KB of stack; keep them off the main loop's
+        // internal stack. A PSRAM stack costs no internal heap; the task never touches flash.
+        TaskHandle_t handle = nullptr;
+        if (xTaskCreatePinnedToCoreWithCaps(sessionWorkerEntry, "rl_tls", SESSION_WORKER_STACK, this,
+                                            SESSION_WORKER_PRIORITY, &handle, tskNO_AFFINITY,
+                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS)
+        {
+            sessionWorker = handle;
+        }
+        else
+        {
+            logger.error("Could not start the session worker; TLS runs on the main loop");
+        }
+    }
+#endif
     socket.setup();
 }
 
@@ -133,7 +154,17 @@ bool ReaderLink::newIdentity()
 void ReaderLink::post(EventType type, std::string data)
 {
     std::lock_guard<std::mutex> lock(eventsMutex);
-    events.push_back({type, std::move(data), generation});
+    Event event;
+    event.type = type;
+    event.data = std::move(data);
+    event.generation = generation;
+    events.push_back(std::move(event));
+}
+
+void ReaderLink::post(Event event)
+{
+    std::lock_guard<std::mutex> lock(eventsMutex);
+    events.push_back(std::move(event));
 }
 
 void ReaderLink::loop()
@@ -171,6 +202,7 @@ void ReaderLink::loop()
         std::lock_guard<std::mutex> lock(sessionMutex);
         if (tls.status() == SessionTls::Status::Handshaking)
         {
+            sessionEpoch++;
             logger.error("Session handshake timed out");
             handshakeStartedMs = 0;
             tls.close();
@@ -207,6 +239,7 @@ void ReaderLink::handle(const Event &event)
         handshakeStartedMs = 0;
         if (channel == Channel::Session)
         {
+            sessionEpoch++;
             std::lock_guard<std::mutex> lock(sessionMutex);
             tls.close();
             outbox.clear();
@@ -233,7 +266,25 @@ void ReaderLink::handle(const Event &event)
     case EventType::Binary:
         if (channel == Channel::Session)
         {
-            onSessionBytes(event.data);
+            SessionWork feed;
+            feed.bytes = event.data;
+            feed.generation = event.generation;
+            feed.epoch = sessionEpoch.load();
+            submitSessionWork(std::move(feed));
+        }
+        return;
+    case EventType::SessionFrame:
+        // Decrypted before the connection closed: still authenticated, still delivered (the server
+        // sends "session.rejected" right before it closes).
+        if (channel == Channel::Session)
+        {
+            onSessionFrame(static_cast<SessionFraming::FrameType>(event.code), event.data);
+        }
+        return;
+    case EventType::SessionStatus:
+        if (channel == Channel::Session && event.epoch == sessionEpoch.load())
+        {
+            onSessionStatus(event);
         }
         return;
     }
@@ -246,6 +297,7 @@ void ReaderLink::useChannel(Channel next, const char *reason)
         std::lock_guard<std::mutex> lock(eventsMutex);
         generation++;
     }
+    sessionEpoch++;
     {
         std::lock_guard<std::mutex> lock(sessionMutex);
         tls.close();
@@ -299,8 +351,17 @@ bool ReaderLink::sendMessage(const char *message, size_t length)
     case Channel::Session:
     {
         std::lock_guard<std::mutex> lock(sessionMutex);
-        return tls.sendFrame(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message), length) &&
-               flushOutbox();
+        if (!tls.sendFrame(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message), length))
+        {
+            return false;
+        }
+        if (flushOutbox())
+        {
+            return true;
+        }
+        tls.close();
+        socket.forceReconnect("session send failed");
+        return false;
     }
     case Channel::Pairing:
     default:
@@ -318,7 +379,17 @@ bool ReaderLink::sendHeartbeat(const char *message, size_t length)
     case Channel::Session:
     {
         std::lock_guard<std::mutex> lock(sessionMutex);
-        return tls.sendFrame(SessionFraming::FrameType::HEARTBEAT, nullptr, 0) && flushOutbox();
+        if (!tls.sendFrame(SessionFraming::FrameType::HEARTBEAT, nullptr, 0))
+        {
+            return false;
+        }
+        if (flushOutbox())
+        {
+            return true;
+        }
+        tls.close();
+        socket.forceReconnect("session send failed");
+        return false;
     }
     case Channel::Pairing:
     default:
