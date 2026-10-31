@@ -136,10 +136,10 @@ export class CreateResourceDto extends CreateResourceDtoDocumentation {
     type: Number,
   })
   @ToNumber()
+  @ValidateIf((o) => o.maxParallelSessions !== undefined)
   @IsInt()
   @Min(1)
   @Max(1000)
-  @IsOptional()
   maxParallelSessions?: number;
 
   @ApiProperty({

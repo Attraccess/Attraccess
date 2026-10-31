@@ -95,6 +95,17 @@ void ReaderWorkflow::testParallelSessions()
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("error":"Stop denied")");
     Display::hidePopup();
 
+    // A crowded machine lists at most 16 sessions (reader memory bound); the rest stay unlisted.
+    std::vector<std::string> crowdNames;
+    for (int i = 1; i <= 18; ++i) crowdNames.push_back("U" + std::to_string(i));
+    Scenario crowded{20, false, false, {}};
+    for (int i = 0; i < 18; ++i) crowded.others.push_back({100 + i, crowdNames[i].c_str()});
+    parallelList(crowded);
+    assert(label(lv_screen_active(), "Sitzung von U1 beenden"));
+    assert(label(lv_screen_active(), "Sitzung von U16 beenden"));
+    assert(!label(lv_screen_active(), "Sitzung von U17 beenden"));
+    assert(!label(lv_screen_active(), "Sitzung von U18 beenden"));
+
     // Limit 1 is unchanged: foreign session, classic wording, force-stop without usageId.
     parallelList({1, false, false, {{7, "Robin"}}});
     assert(label(lv_screen_active(), "Fremde Sitzung beenden"));

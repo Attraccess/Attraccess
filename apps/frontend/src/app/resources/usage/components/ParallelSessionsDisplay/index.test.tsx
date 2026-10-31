@@ -25,8 +25,8 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   ),
   DateTimeDisplay: () => <span>time</span>,
   useTranslations: () => ({
-    t: (key: string, params?: { count: number; max: number }) =>
-      params ? `${key} ${params.count}/${params.max}` : key,
+    t: (key: string, params?: { count?: number; max?: number; name?: string }) =>
+      params?.name ? `${key} ${params.name}` : params ? `${key} ${params.count}/${params.max}` : key,
   }),
 }));
 vi.mock('../../../../../components/toastProvider', () => ({
@@ -53,8 +53,13 @@ vi.mock('../SessionStatusCard', () => ({
 }));
 vi.mock('../SessionNotesModal', () => ({
   SessionModalMode: { END: 'end' },
-  SessionNotesModal: ({ isOpen, onConfirm }: ComponentProps<typeof SessionNotesModal>) =>
-    isOpen ? <button onClick={() => onConfirm('done')}>Confirm notes</button> : null,
+  SessionNotesModal: ({ isOpen, onConfirm, description }: ComponentProps<typeof SessionNotesModal>) =>
+    isOpen ? (
+      <div>
+        <p>{description}</p>
+        <button onClick={() => onConfirm('done')}>Confirm notes</button>
+      </div>
+    ) : null,
 }));
 
 const usages = [
@@ -112,6 +117,7 @@ describe('ParallelSessionsDisplay', () => {
     state.update = true;
     mount();
     fireEvent.click(screen.getAllByRole('button', { name: 'endSession.button' })[0]);
+    expect(screen.getByText('endSession.confirm Alex')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm notes' }));
     await waitFor(() =>
       expect(state.end).toHaveBeenCalledWith({

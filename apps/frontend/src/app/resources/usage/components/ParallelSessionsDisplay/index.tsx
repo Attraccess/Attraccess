@@ -155,6 +155,9 @@ export function ParallelSessionsDisplay({
         onConfirm={(notes) => void confirmEnd(notes)}
         mode={SessionModalMode.END}
         isSubmitting={endSession.isPending}
+        description={
+          usageToEnd ? t('endSession.confirm', { name: usageToEnd.user?.username ?? t('unknownUser') }) : undefined
+        }
       />
       {formsModal}
     </>

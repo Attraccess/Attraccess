@@ -38,9 +38,9 @@ Jede Sitzung enthält:
 
 ## Gemeinsam genutzte Maschinen (parallele Sitzungen)
 
-Eine Maschine kann über **Max. parallele Sitzungen** von mehreren Personen gleichzeitig genutzt werden (siehe [Ressourcen erstellen](resources/creating-resources.md#max-parallele-sitzungen)). Jede Person hat ihre eigene Sitzung; pro Maschine ist nur eine aktive Sitzung je Person möglich. Ein Start wird mit „Sie haben bereits eine aktive Sitzung an dieser Maschine.“ abgelehnt oder, wenn alle Plätze belegt sind, mit „Diese Maschine ist voll (N/N Sitzungen belegt).“ Eine beaufsichtigte Sitzung zählt als eine Sitzung (die der beaufsichtigten Person); die [Aufsicht](resources/introductions.md#beaufsichtigungsmodus) belegt keinen Platz.
+Eine Maschine kann über **Maximale parallele Sitzungen** von mehreren Personen gleichzeitig genutzt werden (siehe [Ressourcen erstellen](resources/creating-resources.md#maximale-parallele-sitzungen)). Jede Person hat ihre eigene Sitzung; pro Maschine ist nur eine aktive Sitzung je Person möglich. Ein Start wird mit **Sitzung bereits aktiv** abgelehnt, wenn Sie bereits eine Sitzung haben, oder mit **Maschine ist voll**, wenn alle Plätze belegt sind. Eine beaufsichtigte Sitzung zählt als eine Sitzung (die der beaufsichtigten Person); die [Aufsicht](resources/introductions.md#beaufsichtigungsmodus) belegt keinen Platz.
 
-Jede Person beendet ihre eigene Sitzung. Ressourcenverwalter, Wartende, Einweiser und die Aufsicht einer Sitzung können die gewählte Sitzung einer anderen Person beenden, indem sie diese auf der [Detailseite](resources/resource-details.md) aus der Liste der aktiven Sitzungen auswählen und auf **Sitzung beenden** klicken.
+Jede Person beendet ihre eigene Sitzung. Ressourcenverwalter, Einweiser und die Aufsicht einer Sitzung können die gewählte Sitzung einer anderen Person beenden, indem sie diese auf der [Detailseite](resources/resource-details.md) aus der Liste der aktiven Sitzungen auswählen und auf **Sitzung beenden** klicken.
 
 > [!WARNING]
 > **Vorläufiges Verhalten von Flows und Abrechnung bei gemeinsam genutzten Maschinen (Limit über 1).** Flows und Abrechnung berücksichtigen noch nicht, wie viele Sitzungen laufen. Bei einem Limit von 1 ändert sich nichts.

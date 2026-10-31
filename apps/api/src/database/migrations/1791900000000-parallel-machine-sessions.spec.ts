@@ -40,6 +40,10 @@ describe('parallel machine sessions migration', () => {
       const migration = new ParallelMachineSessions1791900000000();
       await migration.up(runner);
 
+      // The session that was running before the upgrade survives untouched.
+      const survivor = 'SELECT id, resourceId, userId, endTime FROM resource_usage WHERE id = 1';
+      expect(await runner.query(survivor)).toEqual([{ id: 1, resourceId: 1, userId: 1, endTime: null }]);
+
       expect(await runner.query('SELECT maxParallelSessions FROM resource')).toEqual([{ maxParallelSessions: 1 }]);
       // Different people may now share the machine; capacity is enforced by the lifecycle transaction.
       await runner.query('INSERT INTO resource_usage (resourceId, userId, isFinalized) VALUES (1, 2, 1)');
@@ -65,7 +69,10 @@ describe('parallel machine sessions migration', () => {
       await expect(runner.query(attempt, ['d', 10, null])).rejects.toThrow('UNIQUE constraint');
       await expect(runner.query(attempt, ['e', null, 12])).rejects.toThrow('UNIQUE constraint');
 
+      // Rolling back keeps the pre-existing running session too.
+      await runner.query('DELETE FROM resource_usage WHERE id != 1');
       await migration.down(runner);
+      expect(await runner.query(survivor)).toEqual([{ id: 1, resourceId: 1, userId: 1, endTime: null }]);
       expect(await runner.query('SELECT COUNT(*) AS c FROM resource_usage_lifecycle_attempt')).toEqual([{ c: 0 }]);
       expect((await runner.query('PRAGMA table_info(resource)')).map((c: { name: string }) => c.name)).not.toContain(
         'maxParallelSessions',

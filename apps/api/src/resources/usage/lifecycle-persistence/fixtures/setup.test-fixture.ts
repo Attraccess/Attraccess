@@ -85,6 +85,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     hasActiveMaintenance: jest.fn().mockResolvedValue(false),
     canManageMaintenance: jest.fn().mockResolvedValue(false),
   };
+  scope.health = { isResourceUnhealthy: jest.fn().mockResolvedValue(false) };
   scope.usage = new ResourceUsageService(
     scope.source.getRepository(Resource),
     scope.source.getRepository(ResourceUsage),
@@ -122,7 +123,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
       resourceUsageSessionsActive: { inc: jest.fn(), dec: jest.fn() },
       resourceUsageDurationSeconds: { observe: jest.fn() },
     } as never,
-    { isResourceUnhealthy: jest.fn().mockResolvedValue(false) } as never,
+    scope.health as never,
     { emit: jest.fn() } as never,
     {} as never,
     { recordResource: jest.fn().mockResolvedValue(undefined) } as never,

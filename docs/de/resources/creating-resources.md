@@ -14,24 +14,24 @@ Sie benötigen die Berechtigung **Ressourcen verwalten**, um neue Ressourcen anz
 | **Typ** | Ja | Maschine oder Tür |
 | **Beschreibung** | Nein | Detaillierte Beschreibung |
 | **Bild** | Nein | Foto der Ressource (JPG, PNG) |
-| **Übernahme erlauben** | Nein | Nächster Benutzer kann Sitzung übernehmen, ohne dass der vorherige sie beendet. Nur verfügbar, wenn **Max. parallele Sitzungen** 1 ist |
-| **Max. parallele Sitzungen** | Nein | Nur Maschinen: Wie viele Personen die Maschine gleichzeitig nutzen dürfen (1-1000, Standard 1). Türen ignorieren diese Einstellung |
+| **Übernahme erlauben** | Nein | Nächster Benutzer kann Sitzung übernehmen, ohne dass der vorherige sie beendet. Wirkt nur, wenn **Maximale parallele Sitzungen** 1 ist |
+| **Maximale parallele Sitzungen** | Nein | Nur Maschinen: Wie viele Personen die Maschine gleichzeitig nutzen dürfen (1-1000, Standard 1). Türen ignorieren diese Einstellung |
 
 4. Klicken Sie auf **Speichern**
 
 <!-- TODO: Screenshot des Erstellungsformulars einfügen -->
 
-### Max. parallele Sitzungen
+### Maximale parallele Sitzungen
 
-Standardmäßig kann eine Maschine von einer Person gleichzeitig genutzt werden. Wenn mehrere Personen eine Maschine sicher gleichzeitig verwenden können (zum Beispiel eine Werkbank oder eine gemeinsame Werkzeugstation), erhöhen Sie **Max. parallele Sitzungen** auf dem Reiter **Maschine** (Verhalten) der Ressourceneinstellungen, neben **Übernahme erlauben**.
+Standardmäßig kann eine Maschine jeweils von einer Person genutzt werden. Wenn mehrere Personen eine Maschine sicher gleichzeitig verwenden können (zum Beispiel eine Werkbank oder eine gemeinsame Werkzeugstation), erhöhen Sie **Maximale parallele Sitzungen** in den Ressourceneinstellungen unter **Ressourcentyp und Verhalten** (bei ausgewähltem Typ **Maschine**), neben **Übernahme erlauben**.
 
 - Bei einem Limit von **1** funktioniert alles genau wie bisher.
 - Bei einem Limit von **N** können bis zu N verschiedene Personen gleichzeitig jeweils eine eigene aktive Sitzung haben. Jede Person kann pro Maschine nur eine aktive Sitzung haben.
-- Sind alle Plätze belegt, werden weitere Starts mit „Diese Maschine ist voll“ abgelehnt.
-- **Übernahme erlauben** gilt nur bei einem Limit von 1. Bei Maschinen mit höherem Limit ist keine Übernahme möglich.
+- Sind alle Plätze belegt, werden weitere Starts mit der Meldung **Maschine ist voll** abgelehnt.
+- **Übernahme erlauben** gilt nur bei einem Limit von 1. Bei Maschinen mit höherem Limit wird keine Übernahme angeboten.
 - Einweisung, Berechtigung, [Beaufsichtigungsmodus](resources/introductions.md), Formulare, Guthaben, Wartung und Zustandsprüfungen werden wie bisher für jede Person einzeln angewendet.
 
-Das Limit kann jederzeit gesenkt werden. Laufende Sitzungen werden nie automatisch beendet; neue Starts sind blockiert, bis weniger Sitzungen als das Limit aktiv sind. Liegt das neue Limit unter der Zahl der aktuell aktiven Sitzungen, zeigt die Einstellungsseite einen Hinweis an.
+Das Limit kann jederzeit gesenkt werden. Laufende Sitzungen werden nie automatisch beendet; neue Starts sind blockiert, bis weniger Sitzungen als das Limit aktiv sind. Liegt das neue Limit unter der Zahl der aktuell aktiven Sitzungen, zeigt die Einstellungsseite einen Hinweis an. Wird das Limit über 1 erhöht, erscheint außerdem eine Warnung zu Flows.
 
 > [!WARNING]
 > [Flows](flows/overview.md) und Abrechnung berücksichtigen noch nicht, wie viele Sitzungen laufen. Flows laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab. Zähler und Laufzeit werden nur einer einzigen Sitzung berechnet. Lesen Sie [Gemeinsam genutzte Maschinen](resources/usage-tracking.md#gemeinsam-genutzte-maschinen-parallele-sitzungen), bevor Sie parallele Sitzungen an einer Maschine mit Stromsteuerung oder Zählerabrechnung aktivieren.

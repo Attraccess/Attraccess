@@ -73,6 +73,53 @@ describe('LiveSessionBilling', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  describe('parallel sessions', () => {
+    // I (user 1) run session 10 next to user 2's earlier session 5; the meter belongs to whoever holds it.
+    function parallel(meterSession: object | null) {
+      vi.mocked(useResourcesServiceResourceUsageGetActiveSession).mockReturnValue({
+        data: {
+          usage: { id: 5, userId: 2, startTime: '2026-09-28T10:00:00Z' },
+          usages: [
+            { id: 5, userId: 2, startTime: '2026-09-28T10:00:00Z' },
+            {
+              id: 10,
+              userId: 1,
+              user: { id: 1, username: 'Alex' },
+              startTime: '2026-09-28T10:01:00Z',
+              creditsPerUsage: 100,
+              meterRates: [{ meterId: 1, name: 'Heartbeats', creditsPerUnit: 30 }],
+            },
+          ],
+          maxParallelSessions: 3,
+        },
+      } as unknown as ReturnType<typeof useResourcesServiceResourceUsageGetActiveSession>);
+      vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({
+        data: { meters: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 30, session: meterSession }] },
+      } as unknown as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringLive>);
+    }
+
+    it('estimates my bill without the meter that another running session holds', () => {
+      parallel({ sessionId: 's5', usageId: 5, meterName: 'Heartbeats', creditsPerUnit: 30, chargeCredits: 900 });
+      render(<LiveSessionBilling {...props} />);
+      expect(screen.getByText('1 EUR')).toBeInTheDocument();
+      expect(screen.queryByText(en.live.estimateWaiting)).not.toBeInTheDocument();
+      expect(screen.queryByText('Heartbeats')).not.toBeInTheDocument();
+    });
+
+    it('does not wait for a meter reading once the holder ended and my session has no meter session', () => {
+      parallel({ sessionId: null, usageId: 10, meterName: 'Heartbeats', creditsPerUnit: 30, chargeCredits: null });
+      render(<LiveSessionBilling {...props} />);
+      expect(screen.getByText('1 EUR')).toBeInTheDocument();
+      expect(screen.queryByText(en.live.estimateWaiting)).not.toBeInTheDocument();
+    });
+
+    it('still waits for the reading of a meter session that is my own', () => {
+      parallel({ sessionId: 's10', usageId: 10, meterName: 'Heartbeats', creditsPerUnit: 30, chargeCredits: null });
+      render(<LiveSessionBilling {...props} />);
+      expect(screen.getByText(en.live.estimateWaiting)).toBeInTheDocument();
+    });
+  });
+
   it('renders nothing for a redacted session that has no user', () => {
     mock({ startTime: '2026-09-28T10:00:00Z', user: undefined }, null);
     vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({

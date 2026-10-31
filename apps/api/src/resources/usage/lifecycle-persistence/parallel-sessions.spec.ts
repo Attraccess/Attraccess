@@ -141,6 +141,15 @@ describe('Parallel sessions on one machine', () => {
     await expect(scope.usage.endSession(1, scope.users[0], {})).resolves.toMatchObject({ userId: 1 });
   });
 
+  it('blocks only new starts while the machine is unhealthy; running sessions stop normally', async () => {
+    await setLimit(3);
+    await scope.usage.startSession(1, scope.users[0], {});
+    scope.health.isResourceUnhealthy.mockResolvedValue(true);
+    await expect(scope.usage.startSession(1, scope.users[1], {})).rejects.toThrow();
+    expect(await scope.usage.getActiveSessionsForResource(1)).toHaveLength(1);
+    await expect(scope.usage.endSession(1, scope.users[0], {})).resolves.toMatchObject({ userId: 1 });
+  });
+
   it('lets a supervisor run their own session next to supervised ones without taking a slot', async () => {
     await setLimit(2);
     const [supervisee, other] = await addUsers(2);

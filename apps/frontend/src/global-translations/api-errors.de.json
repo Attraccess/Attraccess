@@ -17,7 +17,7 @@
   },
   "AlreadyHasActiveSessionError": {
     "title": "Sitzung bereits aktiv",
-    "description": "Du hast bereits eine aktive Sitzung auf dieser Maschine."
+    "description": "Sie haben bereits eine aktive Sitzung auf dieser Maschine."
   },
   "ResourceUnhealthyException": {
     "title": "Ressource nicht betriebsbereit",

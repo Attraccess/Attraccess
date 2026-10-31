@@ -43,8 +43,8 @@ Diese Seite listet häufig auftretende Probleme und deren Lösungen auf.
 | Keine Einweisung | Sie benötigen eine Sicherheitseinweisung, bevor Sie die Ressource nutzen können. Fragen Sie einen autorisierten Einweiser für die Ressource. |
 | Ressource in Wartung | Die Ressource ist möglicherweise vorübergehend für Wartungsarbeiten nicht verfügbar. Prüfen Sie den Ressourcenstatus auf der Detailseite. |
 | Ressource in Benutzung | Eine andere Person nutzt möglicherweise die Ressource. Warten Sie, bis deren Sitzung beendet ist. |
-| „Diese Maschine ist voll (N/N Sitzungen belegt)“ | Die Maschine erlaubt mehrere parallele Sitzungen und alle Plätze sind belegt. Warten Sie, bis jemand fertig ist, oder bitten Sie einen Ressourcenverwalter, **Max. parallele Sitzungen** zu erhöhen. Bei Maschinen mit mehr als einer parallelen Sitzung ist keine Übernahme möglich. |
-| „Sie haben bereits eine aktive Sitzung an dieser Maschine“ | Sie können pro Maschine nur eine aktive Sitzung haben. Beenden Sie zuerst Ihre bestehende Sitzung (auf der Detailseite oder am Leser). |
+| „Maschine ist voll“ | Die Maschine erlaubt mehrere parallele Sitzungen und alle Plätze sind belegt. Warten Sie, bis jemand fertig ist, oder bitten Sie einen Ressourcenverwalter, **Maximale parallele Sitzungen** zu erhöhen. Bei Maschinen mit mehr als einer parallelen Sitzung wird keine Übernahme angeboten. |
+| „Sitzung bereits aktiv“ | Sie haben bereits eine aktive Sitzung an dieser Maschine; pro Maschine ist nur eine aktive Sitzung möglich. Beenden Sie zuerst Ihre bestehende Sitzung (auf der Detailseite oder am Leser). |
 
 ## Passwort vergessen
 

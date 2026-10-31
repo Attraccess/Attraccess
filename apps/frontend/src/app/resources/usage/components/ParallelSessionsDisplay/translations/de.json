@@ -12,7 +12,8 @@
   },
   "endSession": {
     "button": "Sitzung beenden",
+    "confirm": "Sie beenden die Sitzung von {{name}}.",
     "successful": "Sitzung beendet",
-    "successfulDescription": "Du hast die Sitzung des anderen Nutzers beendet."
+    "successfulDescription": "Sie haben die Sitzung des anderen Nutzers beendet."
   }
 }

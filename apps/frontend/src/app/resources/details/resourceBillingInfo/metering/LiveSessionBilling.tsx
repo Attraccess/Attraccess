@@ -54,18 +54,33 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
   const money = (credits: number) => t('live.billingValue', { credits: formatMoney(credits), currency });
 
   const elapsedMs = Math.max(0, now - new Date(usage.startTime).getTime());
-  const mismatchedUsage = live?.meters.some((meter) => meter.session && meter.session.usageId !== usage.id);
+  // Interim rule for parallel sessions: the earliest running session alone holds a meter, later ones are not charged
+  // for it. A meter session of another running session is therefore expected here, not stale data to wait for.
+  const parallel = (active?.maxParallelSessions ?? 1) > 1;
+  const otherRunningIds = new Set(parallel ? (usages ?? []).filter((u) => u.id !== usage.id).map((u) => u.id) : []);
+  const heldElsewhere = (session: { usageId: number } | null | undefined) =>
+    !!session && otherRunningIds.has(session.usageId);
+  const mismatchedUsage = live?.meters.some(
+    (meter) => meter.session && meter.session.usageId !== usage.id && !heldElsewhere(meter.session),
+  );
   const meters =
     live?.meters.flatMap((meter) =>
       meter.session?.usageId === usage.id ? [{ id: meter.id, ...meter.session }] : [],
     ) ?? [];
+  // Without a meter session of its own (parallel sessions) nothing is metered for this session, so nothing is awaited.
+  const awaitsCharge = (meter: (typeof meters)[number]) =>
+    meter.chargeCredits == null && !(parallel && meter.sessionId === null);
   const paidRates =
     usage.meterRates?.filter((rate) => typeof rate.creditsPerUnit === 'number' && rate.creditsPerUnit > 0) ?? [];
   const waitingForMeters =
     !live ||
     mismatchedUsage ||
-    meters.some((meter) => meter.creditsPerUnit > 0 && meter.chargeCredits == null) ||
-    paidRates.some((rate) => !meters.some((meter) => meter.id === rate.meterId && meter.chargeCredits != null));
+    meters.some((meter) => meter.creditsPerUnit > 0 && awaitsCharge(meter)) ||
+    paidRates.some(
+      (rate) =>
+        !live.meters.some((meter) => meter.id === rate.meterId && heldElsewhere(meter.session)) &&
+        !meters.some((meter) => meter.id === rate.meterId && !awaitsCharge(meter)),
+    );
   let estimate: number | null = null;
   try {
     const gross =

@@ -73,14 +73,14 @@ Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**
 
 Manche Maschinen erlauben es, dass mehrere Personen gleichzeitig arbeiten (siehe [Ressourcen nutzen](end-user/using-resources.md#gemeinsam-genutzte-maschine-verwenden)). Am Touchleser gilt:
 
-- Liste und Details zeigen **In Benutzung k/N** mit einer Aktion **Start**, solange Plätze frei sind, und **Voll**, wenn alle Plätze belegt sind.
-- Haben Sie eine Sitzung an der Maschine, steht dort **Von Ihnen genutzt** mit **Stop**. Die Live-Statistiken auf dem Detailbildschirm gelten für Ihre eigene Sitzung.
-- Ressourcenverwalter und Einweiser erhalten auf dem Detailbildschirm eine Sitzungsauswahl, um eine bestimmte andere Sitzung zu beenden.
-- Der Sperrbildschirm zeigt, ob die Maschine in Benutzung oder voll ist.
+- Liste und Details zeigen **In Verwendung k/N**, solange einige Plätze belegt sind. Die Aktion **Start** bleibt in der Liste (in den Details **Ressource verwenden**) verfügbar, solange ein Platz frei ist und Sie keine eigene Sitzung haben. Sind alle Plätze belegt, zeigt die Maschine **Voll**.
+- Haben Sie eine Sitzung an der Maschine, steht dort **Von dir verwendet** mit **Stop** in der Liste und **Sitzung beenden** in den Details. Die Live-Statistiken auf dem Detailbildschirm gelten für Ihre eigene Sitzung.
+- Ressourcenverwalter und Einweiser erhalten auf dem Detailbildschirm die Liste **Fremde Sitzung beenden:** mit einer Schaltfläche je weiterer Sitzung, um genau diese Sitzung zu beenden.
+- Der Sperrbildschirm zeigt, ob die Maschine in Verwendung (**In Verwendung k/N**) oder voll (**Voll**) ist.
 
 Maschinen mit einem Limit von 1 verhalten sich wie oben beschrieben; Übernahme und erzwungenes Beenden bleiben unverändert.
 
-An Attractap-Lite-Lesern (ohne Display) startet ein kurzes Auflegen Ihrer Karte Ihre Sitzung, ein langes Auflegen beendet Ihre eigene Sitzung. Die LEDs signalisieren einen Fehler, wenn die Maschine voll ist oder Sie bereits eine Sitzung haben.
+An Attractap-Lite-Lesern (ohne Display) startet ein kurzes Auflegen Ihrer Karte Ihre Sitzung. Um Ihre eigene Sitzung zu beenden, halten Sie die Karte an den Leser, bis dieser das lange Auflegen signalisiert (nach etwa 1,5 Sekunden mit einem Signalton und einem LED-Blitz), und nehmen Sie sie dann weg. Ein langes Auflegen beendet nie die Sitzung einer anderen Person. Ist die Maschine voll oder haben Sie bereits eine Sitzung, gibt der Leser den Fehlerton aus.
 
 ## Ein erforderliches Formular ausfüllen
 

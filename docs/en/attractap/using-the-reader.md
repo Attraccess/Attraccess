@@ -73,14 +73,14 @@ The device currently uses German labels, including **Bis bald!**. Future English
 
 Some machines allow several people to work at the same time (see [Using Resources](end-user/using-resources.md#use-a-shared-machine)). On the touch reader:
 
-- The list and details show **In use k/N** with a **Start** action while slots are free, and **Full** when all slots are taken.
-- If you have a session on the machine, it shows **In use by you** with **Stop**. Live stats on the details screen are for your own session.
-- Managers and introducers get a session picker on the details screen to end a specific other session.
-- The lock screen shows whether the machine is in use or full.
+- The list and details show **In Verwendung k/N** (In use k/N) while some slots are taken. A **Start** action stays available in the list (**Ressource verwenden** in the details) as long as a slot is free and you have no session of your own. When all slots are taken, the machine shows **Voll** (Full).
+- If you have a session on the machine, it shows **Von dir verwendet** (In use by you) with **Stop** in the list and **Sitzung beenden** (End session) in the details. Live stats on the details screen are for your own session.
+- Resource managers and introducers get a list **Fremde Sitzung beenden:** (End another session) on the details screen with one button per other session, to end that specific session.
+- The lock screen shows whether the machine is in use (**In Verwendung k/N**) or full (**Voll**).
 
 Machines with a limit of 1 behave as described above; takeover and force-stop are unchanged.
 
-On Attractap Lite (headless) readers, a short tap of your card starts your session and a long tap stops your own session. The LEDs signal an error if the machine is full or you already have a session.
+On Attractap Lite readers (without a display), a short tap of your card starts your session. To stop your own session, hold the card against the reader until the reader signals the long tap (about 1.5 seconds, with a beep and an LED flash), then remove it. A long tap never ends someone else's session. If the machine is full or you already have a session, the reader plays the error beep.
 
 ## Complete a required form
 

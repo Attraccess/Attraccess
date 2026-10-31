@@ -38,9 +38,9 @@ Each session contains:
 
 ## Shared Machines (Parallel Sessions)
 
-A machine can allow several people to use it at the same time via **Max parallel sessions** (see [Creating Resources](resources/creating-resources.md#max-parallel-sessions)). Each person has their own session; a person can have only one active session per machine. Starting is refused with "You already have an active session on this machine." or, when all slots are used, "This machine is full (N/N sessions in use)." A supervised session counts as one session (the supervisee's); the [supervisor](resources/introductions.md#supervision-mode) does not use a slot.
+A machine can allow several people to use it at the same time via **Max parallel sessions** (see [Creating Resources](resources/creating-resources.md#max-parallel-sessions)). Each person has their own session; a person can have only one active session per machine. Starting is refused with **Session already active** if you already have a session, or with **Machine is full** when all slots are used. A supervised session counts as one session (the supervisee's); the [supervisor](resources/introductions.md#supervision-mode) does not use a slot.
 
-Everybody ends their own session. Resource managers, maintainers, introducers and the supervisor of a session can end a chosen session of someone else by picking it from the list of active sessions on the [detail page](resources/resource-details.md) and clicking **End session**.
+Everybody ends their own session. Resource managers, introducers and the supervisor of a session can end a chosen session of someone else by picking it from the list of active sessions on the [detail page](resources/resource-details.md) and clicking **End session**.
 
 > [!WARNING]
 > **Interim behavior of flows and billing on shared machines (limit above 1).** Flows and billing are not yet aware of the number of running sessions. With a limit of 1, nothing changes.

@@ -40,6 +40,7 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
   };
 
   let maintenance: { hasActiveMaintenance: jest.Mock; canManageMaintenance: jest.Mock };
+  let health: { isResourceUnhealthy: jest.Mock };
 
   const draftItem = {
     name: 'Energy',
@@ -207,6 +208,12 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     },
     set maintenance(value: typeof maintenance) {
       maintenance = value;
+    },
+    get health() {
+      return health;
+    },
+    set health(value: typeof health) {
+      health = value;
     },
     get directory() {
       return directory;

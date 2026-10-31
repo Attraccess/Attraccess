@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, AlertContent, AlertDescription, Input, Label, TextField } from '@heroui/react';
 import { useResourcesServiceResourceUsageGetActiveSession } from '@attraccess/react-query-client';
-import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
 
 const MIN_PARALLEL_SESSIONS = 1;
@@ -61,6 +61,7 @@ export function MachineTab(props: EditorTabProps) {
 
       {maxParallelSessions > 1 && (
         <Alert status="warning" data-cy="resource-edit-modal-max-parallel-sessions-flows-warning">
+          <AlertStatusIcon status="warning" />
           <AlertContent>
             <AlertDescription>{t('inputs.machine.maxParallelSessions.flowsWarning')}</AlertDescription>
           </AlertContent>

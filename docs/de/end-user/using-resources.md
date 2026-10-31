@@ -84,9 +84,9 @@ Wenn Sie die Ressource nicht mehr benötigen:
 
 Manche Maschinen erlauben es, dass mehrere Personen gleichzeitig arbeiten. An einer solchen Maschine gilt:
 
-- Jede Person hat ihre eigene Sitzung. Sie können pro Maschine nur eine aktive Sitzung haben; ein erneuter Start zeigt „Sie haben bereits eine aktive Sitzung an dieser Maschine.“
-- Der Status zeigt **In Benutzung k/N**, solange einige Plätze belegt sind (Sie können weiterhin starten), und **Voll**, wenn alle Plätze belegt sind. Dann wird ein Start mit „Diese Maschine ist voll (N/N Sitzungen belegt).“ abgelehnt. Warten Sie, bis jemand fertig ist.
-- Auf der Detailseite sehen Sie Ihre eigene Sitzung mit **Stop** und eine Liste der anderen aktiven Sitzungen. Als Ressourcenverwalter, Wartender oder Einweiser sowie als Aufsicht einer Sitzung können Sie die Sitzung einer anderen Person in dieser Liste mit **Sitzung beenden** beenden.
+- Jede Person hat ihre eigene Sitzung. Sie können pro Maschine nur eine aktive Sitzung haben; ein erneuter Start zeigt **Sitzung bereits aktiv**.
+- Der Status zeigt **In Benutzung k/N**, solange einige Plätze belegt sind (Sie können weiterhin starten), und **Voll**, wenn alle Plätze belegt sind. Dann wird ein Start mit **Maschine ist voll** abgelehnt. Warten Sie, bis jemand fertig ist.
+- Auf der Detailseite sehen Sie Ihre eigene Sitzung mit **Sitzung beenden** und eine Liste der anderen aktiven Sitzungen. Als Ressourcenverwalter oder Einweiser sowie als Aufsicht einer Sitzung können Sie die Sitzung einer anderen Person in dieser Liste mit **Sitzung beenden** beenden.
 - Beenden ohne Auswahl einer Sitzung beendet immer Ihre eigene Sitzung.
 - Die Ansicht aktualisiert sich live, ohne neu zu laden.
 

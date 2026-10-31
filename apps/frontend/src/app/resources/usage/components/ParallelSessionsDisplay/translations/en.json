@@ -12,6 +12,7 @@
   },
   "endSession": {
     "button": "End session",
+    "confirm": "You are about to end the session of {{name}}.",
     "successful": "Session ended",
     "successfulDescription": "You have ended the session of the other user."
   }
