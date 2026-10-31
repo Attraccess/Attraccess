@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 /* eslint-disable no-console -- CLI output. */
 // Re-encrypts stored NFC card keys from one AUTH_SESSION_SECRET to another, in one transaction.
-// Usage: OLD_AUTH_SESSION_SECRET=... NEW_AUTH_SESSION_SECRET=... pnpm nx run api:reencrypt-card-keys [-- --dry-run]
-// Reads STORAGE_ROOT like the API. Stop the API first and keep a copy of attraccess.sqlite.
+//
+// Usage: OLD_AUTH_SESSION_SECRET=... NEW_AUTH_SESSION_SECRET=... node reencrypt-card-keys.mjs [--dry-run] [--db <path>]
+//   Source checkout: pnpm nx run api:reencrypt-card-keys -- --dry-run
+//   Docker image:    node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
+// Without --db the database is <STORAGE_ROOT>/attraccess.sqlite, resolved like the API does.
+// Stop the API first and keep a copy of attraccess.sqlite.
+//
+// Plain Node only: the production image has no TypeScript sources, so nothing here may import a .ts
+// file. The only dependency is sqlite3, which the deployed API package ships.
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sqlite3pkg from 'sqlite3';
-import { resolveDatabasePath } from '../src/config/storage-path.ts';
 
 const SALT = Buffer.from('attraccess.encryption.salt', 'utf8');
 const INFO = Buffer.from('attraccess|aes-256-gcm|content-encryption', 'utf8');
@@ -34,6 +41,28 @@ export function decrypt(key, token) {
   const decipher = createDecipheriv('aes-256-gcm', key, payload.subarray(0, 12));
   decipher.setAuthTag(payload.subarray(payload.length - 16));
   return Buffer.concat([decipher.update(payload.subarray(12, payload.length - 16)), decipher.final()]).toString('utf8');
+}
+
+/** Same rule as resolveDatabasePath() in apps/api/src/config/storage-path.ts (a test keeps them in step). */
+export function resolveDatabasePath(env = process.env, cwd = process.cwd()) {
+  const storageRoot = resolve(cwd, env.STORAGE_ROOT ?? join(cwd, 'storage'));
+  return join(storageRoot, 'attraccess.sqlite');
+}
+
+export function parseArgs(argv, env = process.env, cwd = process.cwd()) {
+  let dryRun = false;
+  let db;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--dry-run') dryRun = true;
+    else if (arg === '--db') {
+      db = argv[++i];
+      if (!db) throw new Error('--db needs a path');
+    } else if (arg.startsWith('--db=')) db = arg.slice('--db='.length);
+    else if (arg === '--') continue;
+    else throw new Error(`unknown argument: ${arg}`);
+  }
+  return { dryRun, databasePath: db ? resolve(cwd, db) : resolveDatabasePath(env, cwd) };
 }
 
 const call = (db, method, sql, params = []) =>
@@ -84,9 +113,8 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
 }
 
 async function main() {
-  const databasePath = resolveDatabasePath();
+  const { dryRun, databasePath } = parseArgs(process.argv.slice(2));
   if (!existsSync(databasePath)) throw new Error(`database not found: ${databasePath}`);
-  const dryRun = process.argv.includes('--dry-run');
   const db = new (sqlite3pkg.verbose().Database)(databasePath);
   try {
     const counts = await reencryptCardKeys(
@@ -95,7 +123,9 @@ async function main() {
       process.env.NEW_AUTH_SESSION_SECRET,
       { dryRun },
     );
-    console.log(`${dryRun ? 'Checked (nothing written)' : 'Re-encrypted'}: ${JSON.stringify(counts)}`);
+    console.log(
+      `${dryRun ? 'Checked (nothing written)' : 'Re-encrypted'} in ${databasePath}: ${JSON.stringify(counts)}`,
+    );
     if (!dryRun) console.log('Now set AUTH_SESSION_SECRET to the new secret and start the API.');
   } finally {
     db.close();

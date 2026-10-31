@@ -11,7 +11,7 @@ When a user holds an RFID card to an Attractap reader, the reader sends the card
 3. Which user account is the card linked to?
 4. Does that user have permission to use the assigned resource?
 
-If all checks pass, access is granted. The reader only passes messages between the backend and the card: **card keys are created and checked by the server and never reach a reader**. A reader that is offline grants nothing.
+If all checks pass, access is granted. The reader only passes messages between the backend and the card: **card keys are created and checked by the server, and a tap never exposes a card key to the reader**. A reader that is offline grants nothing.
 
 Card keys are random, 16 bytes each, and stored encrypted. See [Security Settings](settings/security.md) for backing up the secret that protects them.
 
@@ -28,7 +28,7 @@ Open **RFID Cards** in the sidebar to manage your own cards. The list shows each
 A card is only registered after the server has checked that the card accepted its new key. If the card is pulled away or the write fails, nothing is recorded; present the same card again and the enrollment is finished.
 
 > [!NOTE]
-> Only readers running firmware 2.0.0 or later can enroll and reset cards. Older readers are updated automatically the next time they connect (see [Firmware Updates](attractap/firmware-updates.md)); until then they offer no card functions and show that an update is needed. Cards that were enrolled before keep working.
+> Readers need firmware 2.0.0 or later for every card function. Readers on older firmware are offered the 2.0.0 update automatically when they connect (see [Firmware Updates](attractap/firmware-updates.md)). Until they run it, the server rejects their card taps and they cannot enroll or reset cards. Cards that were enrolled before keep working once the reader is updated.
 
 ### Activating and Deactivating Cards
 
@@ -66,7 +66,14 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 
 ## Which Readers May Enroll and Reset Cards
 
-By default every reader can enroll and reset cards. Administrators can limit this under **Settings -> Card readers**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
+By default every reader can enroll and reset cards. Administrators can limit this under **Settings -> Card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
+
+> [!IMPORTANT]
+> **Only allow readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key. The reader that relays this write can work out the new key. A reader that was tampered with, or someone listening on an unencrypted connection to it, could therefore copy cards enrolled or reset on that reader. Use **Settings -> Card enrollment** to keep this to readers in a place you control, for example the front desk.
+>
+> Normal taps are not affected: when a card is used, the server checks it without the key ever passing through the reader.
+>
+> Encrypted reader connections and secured reader firmware, planned for later releases, remove this limitation.
 
 ## Administrator Features
 

@@ -44,17 +44,39 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 
 ## Kartenschluessel und `AUTH_SESSION_SECRET`
 
-Die Schluessel der Attractap-Karten werden nur vom Server erzeugt und geprueft; ein Leser sieht sie nie. Der Server speichert jeden Schluessel verschluesselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schluessel.
+Die Schluessel der Attractap-Karten werden nur vom Server erzeugt und geprueft; beim Vorhalten einer Karte erfaehrt ein Leser ihren Schluessel nicht. (Ausnahme sind das Registrieren und Zuruecksetzen von Karten, siehe [RFID-Karten](attractap/rfid-cards.md#welche-leser-karten-registrieren-und-zuruecksetzen-duerfen).) Der Server speichert jeden Schluessel verschluesselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schluessel.
 
 > [!WARNING]
 > **Sichern Sie `AUTH_SESSION_SECRET` zusammen mit den Datenbank-Backups.** Ohne das Secret lassen sich die gespeicherten Kartenschluessel nicht lesen. Bereits eingerichtete Karten koennen dann weder genutzt noch von Attraccess zurueckgesetzt werden und muessen mit anderen Werkzeugen geloescht werden.
 
 Wird das Secret geaendert, sind die gespeicherten Kartenschluessel unlesbar, bis sie neu verschluesselt wurden. So tauschen Sie das Secret gezielt aus:
 
-1. API stoppen und `storage/attraccess.sqlite` kopieren.
-2. `OLD_AUTH_SESSION_SECRET=<alt> NEW_AUTH_SESSION_SECRET=<neu> pnpm nx run api:reencrypt-card-keys -- --dry-run` ausfuehren. Es liest alle Kartenschluessel und schreibt nichts.
-3. Denselben Befehl ohne `--dry-run` ausfuehren. Alle Schluessel werden in einer Transaktion umgestellt; laesst sich einer mit dem alten Secret nicht lesen, bleibt alles unveraendert.
-4. `AUTH_SESSION_SECRET` auf den neuen Wert setzen und die API starten.
+1. Stoppen Sie die API und sichern Sie die Datenbank (siehe [Backup & Wiederherstellung](installation/backup-restore.md)). Mit Docker Compose: `docker compose stop attraccess`.
+2. Laden Sie beide Secrets in Ihre Shell. `read -rs` zeigt die Eingabe nicht an, so landen die Secrets weder im Shell-Verlauf noch in der Prozessliste. Geben Sie jedes Secret ein und druecken Sie Enter:
+
+   ```bash
+   read -rs OLD_AUTH_SESSION_SECRET && export OLD_AUTH_SESSION_SECRET
+   read -rs NEW_AUTH_SESSION_SECRET && export NEW_AUTH_SESSION_SECRET
+   ```
+
+3. Pruefen Sie, ob sich alle gespeicherten Kartenschluessel mit dem alten Secret lesen lassen. `--dry-run` liest alle Schluessel und schreibt nichts.
+
+   **Docker Compose** (der Befehl ist im Image enthalten; `-e NAME` ohne Wert uebernimmt die Variable aus Ihrer Shell):
+
+   ```bash
+   docker compose run --rm --no-deps -e OLD_AUTH_SESSION_SECRET -e NEW_AUTH_SESSION_SECRET \
+     attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
+   ```
+
+   **Installation aus dem Quellcode** (im Wurzelverzeichnis des Repositorys, mit demselben `STORAGE_ROOT` wie die API):
+
+   ```bash
+   pnpm nx run api:reencrypt-card-keys -- --dry-run
+   ```
+
+   Der Befehl verwendet `<STORAGE_ROOT>/attraccess.sqlite` (Standard: `./storage/attraccess.sqlite`). Mit `--db <Pfad>` geben Sie die Datenbankdatei direkt an.
+4. Fuehren Sie denselben Befehl ohne `--dry-run` aus. Alle Schluessel werden in einer Transaktion umgestellt; laesst sich einer mit dem alten Secret nicht lesen, bleibt alles unveraendert.
+5. Setzen Sie `AUTH_SESSION_SECRET` auf den neuen Wert (zum Beispiel in Ihrer `.env`-Datei), loeschen Sie die Shell-Variablen mit `unset OLD_AUTH_SESSION_SECRET NEW_AUTH_SESSION_SECRET` und starten Sie die API (`docker compose up -d`).
 
 > [!WARNING]
 > Der Befehl stellt nur Kartenschluessel um. `AUTH_SESSION_SECRET` schuetzt alles, was Attraccess verschluesselt speichert: den Lizenzschluessel, Zugangsdaten von SSO-Anbietern, Zwei-Faktor-Geheimnisse sowie MQTT- und Zahlungs-Zugangsdaten. Nach einer Aenderung lassen sich diese Werte nicht mehr lesen. Die API startet dann unter Umstaenden nicht mehr, weil der Lizenzschluessel unlesbar ist, und die Werte muessen neu eingegeben werden. Tauschen Sie das Secret nur aus, wenn es sein muss, zum Beispiel nach einem Leck.

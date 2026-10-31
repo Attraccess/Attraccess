@@ -11,7 +11,7 @@ Wenn ein Benutzer eine RFID-Karte an einen Attractap-Leser haelt, sendet der Les
 3. Mit welchem Benutzerkonto ist die Karte verknuepft?
 4. Hat dieser Benutzer die Berechtigung, die zugewiesene Ressource zu nutzen?
 
-Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt. Der Leser reicht nur Nachrichten zwischen Backend und Karte durch: **Kartenschluessel werden vom Server erzeugt und geprueft und erreichen nie einen Leser**. Ein Leser ohne Verbindung gewaehrt nichts.
+Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt. Der Leser reicht nur Nachrichten zwischen Backend und Karte durch: **Kartenschluessel werden vom Server erzeugt und geprueft; beim Vorhalten einer Karte erfaehrt der Leser keinen Kartenschluessel**. Ein Leser ohne Verbindung gewaehrt nichts.
 
 Kartenschluessel sind zufaellig, je 16 Byte lang, und werden verschluesselt gespeichert. Wie Sie das Secret sichern, das sie schuetzt, steht unter [Sicherheitseinstellungen](settings/security.md).
 
@@ -28,7 +28,7 @@ Kartenschluessel sind zufaellig, je 16 Byte lang, und werden verschluesselt gesp
 Eine Karte wird erst registriert, nachdem der Server geprueft hat, dass die Karte ihren neuen Schluessel angenommen hat. Wird die Karte weggezogen oder schlaegt das Schreiben fehl, wird nichts gespeichert; halten Sie dieselbe Karte erneut an den Leser, dann wird die Registrierung abgeschlossen.
 
 > [!NOTE]
-> Nur Leser mit Firmware 2.0.0 oder neuer koennen Karten registrieren und zuruecksetzen. Aeltere Leser werden beim naechsten Verbindungsaufbau automatisch aktualisiert (siehe [Firmware-Updates](attractap/firmware-updates.md)); bis dahin bieten sie keine Kartenfunktionen und zeigen, dass ein Update noetig ist. Bereits eingerichtete Karten funktionieren weiter.
+> Fuer alle Kartenfunktionen brauchen Leser Firmware 2.0.0 oder neuer. Lesern mit aelterer Firmware wird das Update auf 2.0.0 beim Verbindungsaufbau automatisch angeboten (siehe [Firmware-Updates](attractap/firmware-updates.md)). Bis sie es installiert haben, lehnt der Server ihre Kartenanmeldungen ab, und sie koennen keine Karten registrieren oder zuruecksetzen. Bereits registrierte Karten funktionieren weiter, sobald der Leser aktualisiert ist.
 
 ### Karten aktivieren und deaktivieren
 
@@ -66,7 +66,14 @@ Attractap-Leser verwenden AES-verschluesselte Authentifizierung, die Karten mit 
 
 ## Welche Leser Karten registrieren und zuruecksetzen duerfen
 
-Standardmaessig kann jeder Leser Karten registrieren und zuruecksetzen. Administratoren koennen das unter **Einstellungen -> Kartenleser** begrenzen: **Ausgewaehlte Leser** waehlen und die Leser ankreuzen, die Karten beschreiben duerfen. Die Bildschirme zum Registrieren und Zuruecksetzen zeigen dann nur diese Leser. Alle Leser lassen Mitglieder sich weiterhin mit ihrer Karte anmelden.
+Standardmaessig kann jeder Leser Karten registrieren und zuruecksetzen. Administratoren koennen das unter **Einstellungen -> Kartenregistrierung** begrenzen: **Ausgewaehlten Readern** waehlen und die Leser ankreuzen, die Karten beschreiben duerfen. Die Bildschirme zum Registrieren und Zuruecksetzen zeigen dann nur diese Leser. Alle Leser lassen Mitglieder sich weiterhin mit ihrer Karte anmelden.
+
+> [!IMPORTANT]
+> **Erlauben Sie nur vertrauenswuerdigen Lesern, Karten zu registrieren und zurueckzusetzen.** Eine neue Karte hat noch den oeffentlich bekannten Werksschluessel, deshalb schreibt der Server den neuen Kartenschluessel unter diesem Werksschluessel. Der Leser, der diesen Schreibvorgang weiterreicht, kann den neuen Schluessel ermitteln. Ein manipulierter Leser oder jemand, der eine unverschluesselte Verbindung zu ihm mitliest, koennte so Karten kopieren, die an diesem Leser registriert oder zurueckgesetzt wurden. Beschraenken Sie das unter **Einstellungen -> Kartenregistrierung** auf Leser an einem Ort, den Sie kontrollieren, zum Beispiel am Empfang.
+>
+> Das normale Vorhalten einer Karte ist nicht betroffen: Der Server prueft die Karte, ohne dass der Schluessel ueber den Leser laeuft.
+>
+> Verschluesselte Verbindungen zu den Lesern und abgesicherte Leser-Firmware, die fuer spaetere Versionen geplant sind, heben diese Einschraenkung auf.
 
 ## Administratorfunktionen
 

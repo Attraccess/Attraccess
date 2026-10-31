@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import sqlite3pkg from 'sqlite3';
-import { decrypt, deriveKey, encrypt, reencryptCardKeys } from './reencrypt-card-keys.mjs';
+import {
+  decrypt,
+  deriveKey,
+  encrypt,
+  parseArgs,
+  reencryptCardKeys,
+  resolveDatabasePath,
+} from './reencrypt-card-keys.mjs';
 
 const run = (db, sql, params = []) =>
   new Promise((resolve, reject) => db.run(sql, params, (e) => (e ? reject(e) : resolve())));
@@ -52,4 +61,30 @@ test('refuses missing or identical secrets', async () => {
   const db = await database();
   await assert.rejects(() => reencryptCardKeys(db, '', 'x'));
   await assert.rejects(() => reencryptCardKeys(db, 'same', 'same'));
+});
+
+test('finds the database like the API does, unless --db names it', async () => {
+  const { resolveDatabasePath: apiResolveDatabasePath } = await import('../src/config/storage-path.ts');
+  for (const env of [{}, { STORAGE_ROOT: '/srv/attraccess' }, { STORAGE_ROOT: 'relative/storage' }]) {
+    assert.equal(resolveDatabasePath(env, '/work'), apiResolveDatabasePath(env, '/work'));
+  }
+  assert.equal(resolveDatabasePath({ STORAGE_ROOT: '/app/storage' }, '/app'), '/app/storage/attraccess.sqlite');
+
+  assert.deepEqual(parseArgs([], { STORAGE_ROOT: '/app/storage' }, '/app'), {
+    dryRun: false,
+    databasePath: '/app/storage/attraccess.sqlite',
+  });
+  assert.deepEqual(parseArgs(['--', '--dry-run', '--db', 'copy.sqlite'], {}, '/backup'), {
+    dryRun: true,
+    databasePath: '/backup/copy.sqlite',
+  });
+  assert.equal(parseArgs(['--db=/data/a.sqlite'], {}, '/x').databasePath, '/data/a.sqlite');
+  assert.throws(() => parseArgs(['--db']), /--db needs a path/);
+  assert.throws(() => parseArgs(['--secret=abc']), /unknown argument/);
+});
+
+test('runs as a plain Node script without TypeScript sources', async () => {
+  const source = await readFile(fileURLToPath(new URL('./reencrypt-card-keys.mjs', import.meta.url)), 'utf8');
+  assert.doesNotMatch(source, /from\s+['"][^'"]+\.ts['"]/);
+  assert.doesNotMatch(source, /import\(\s*['"][^'"]+\.ts['"]\s*\)/);
 });
