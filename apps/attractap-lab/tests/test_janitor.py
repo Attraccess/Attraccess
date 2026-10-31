@@ -389,3 +389,33 @@ def test_janitor_releases_a_claim_without_resources(tmp_path):
     assert not janitor._hardware_registered(place("serial-only", []))
     assert not janitor._hardware_registered(place("missing", []))
     assert not janitor._hardware_registered(place("gone", []))
+
+
+def test_janitor_parks_places_added_after_it_started(tmp_path):
+    from labgrid.remote.common import Place, ResourceEntry, ResourceMatch
+    reserved = []
+
+    class Stub:
+        async def CreateReservation(self, request, timeout):
+            reserved.append(request.filters["main"].filter["name"])
+            return SimpleNamespace(reservation=SimpleNamespace(token=f"TOKEN{len(reserved)}"))
+
+    session = SimpleNamespace(stub=Stub(), places={}, resources={"test": {"reader": {
+        "Flash": ResourceEntry({"cls": "NetworkUSBFlashableDevice"}),
+        "Serial": ResourceEntry({"cls": "NetworkSerialPort"}),
+    }}})
+    janitor = Janitor(session, config=None, images={"touch": "park.bin"}, state_dir=tmp_path,
+                      priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
+                      marker_seconds=1)
+    asyncio.run(janitor.tick())
+    assert reserved == []
+    # A deployment adds the place after the janitor started.
+    session.places["reader"] = Place(name="reader", tags={"variant": "touch"},
+                                     matches=[ResourceMatch.fromstr("test/reader/*")])
+    asyncio.run(janitor.tick())
+    assert reserved == ["reader"]
+    # Parked once, it is not parked again until someone claims it.
+    janitor.dirty.clear()
+    janitor.reservations.clear()
+    asyncio.run(janitor.tick())
+    assert reserved == ["reader"]

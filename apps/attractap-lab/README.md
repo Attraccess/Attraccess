@@ -417,7 +417,8 @@ itself, so the janitor always gets it before waiting sessions. It then claims
 the reader as `attractap-lab-janitor/janitor`, checks its eFuses, runs
 `esptool write-flash --erase-all` with the parking image and releases once the
 image prints `ATTRACTAP_PARKED` on the UART. Parking takes roughly 10–20 s. On
-startup and after coordinator restarts, every managed reader is parked once.
+startup and after coordinator restarts, every managed reader is parked once,
+and so is a reader whose place appears later, as when a deployment adds it.
 A reader with a power button that is off is switched on first; a parked Touch
 V1 turns itself off again about 30 s later.
 
