@@ -89,4 +89,13 @@ describe('AttractapList pairing', () => {
     expect(screen.queryByText('New lathe')).toBeNull();
     expect(screen.queryByText('Old')).toBeNull();
   });
+
+  it('shows a dash instead of an empty type for a reader that has not reported its firmware yet', () => {
+    mockLicense(['attractap']);
+    data.readers = [{ ...reader(1, 'Just paired', 'paired'), firmware: { name: '', variant: '', version: '' } }];
+    render(<AttractapList />);
+    expect(screen.getByText('Just paired')).toBeInTheDocument();
+    expect(screen.queryByText('()')).toBeNull();
+    expect(screen.getByText('–')).toBeInTheDocument();
+  });
 });

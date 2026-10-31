@@ -6,13 +6,21 @@ import { ResourceScanner } from './index';
 
 const state = vi.hoisted(() => ({
   onScan: undefined as ((codes: Array<{ rawValue: string }>) => void) | undefined,
+  onError: undefined as ((error: unknown) => void) | undefined,
   toast: { error: vi.fn() },
 }));
 
 vi.mock('@yudiel/react-qr-scanner', () => ({
   boundingBox: () => undefined,
-  Scanner: ({ onScan }: { onScan: (codes: Array<{ rawValue: string }>) => void }) => {
+  Scanner: ({
+    onScan,
+    onError,
+  }: {
+    onScan: (codes: Array<{ rawValue: string }>) => void;
+    onError: (error: unknown) => void;
+  }) => {
     state.onScan = onScan;
+    state.onError = onError;
     return <p>Camera</p>;
   },
 }));
@@ -49,6 +57,7 @@ const currentUrl = () => screen.getByRole('status', { name: 'Current URL' });
 beforeEach(() => {
   vi.clearAllMocks();
   state.onScan = undefined;
+  state.onError = undefined;
 });
 afterEach(cleanup);
 
@@ -90,5 +99,25 @@ describe('ResourceScanner', () => {
     expect(onDetected).toHaveBeenLastCalledWith('K7P3XQ');
     expect(currentUrl()).toHaveTextContent('/attractap/readers');
     await vi.waitFor(() => expect(screen.queryByText('Camera')).toBeNull());
+  });
+
+  it('explains a denied camera permission and closes the scanner', async () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Scan' }));
+    await screen.findByText('Camera');
+    const denied = Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' });
+    act(() => state.onError?.(denied));
+
+    expect(state.toast.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Camera access denied' }));
+    await vi.waitFor(() => expect(screen.queryByText('Camera')).toBeNull());
+  });
+
+  it('reports a camera that cannot be started', async () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Scan' }));
+    await screen.findByText('Camera');
+    act(() => state.onError?.(new Error('no camera')));
+
+    expect(state.toast.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Camera not available' }));
   });
 });

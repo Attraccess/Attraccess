@@ -6,6 +6,14 @@
         "title": "Falsche Quelladresse",
         "description": "Die Quelladresse des QR-Codes ist nicht korrekt. Bitte überprüfen Sie die Adresse und versuchen Sie es erneut."
       },
+      "cameraDenied": {
+        "title": "Kamerazugriff verweigert",
+        "description": "Erlaube den Kamerazugriff für diese Seite in den Browser-Einstellungen oder tippe stattdessen den Code ein."
+      },
+      "cameraUnavailable": {
+        "title": "Kamera nicht verfügbar",
+        "description": "Die Kamera konnte nicht gestartet werden. Tippe stattdessen den Code ein."
+      },
       "unknown": {
         "title": "Unbekannter QR-Code",
         "description": "Dieser QR-Code kann hier nicht verwendet werden."

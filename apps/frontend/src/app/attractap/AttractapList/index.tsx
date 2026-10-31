@@ -248,9 +248,16 @@ export function AttractapList() {
                         >
                           <TableCell>{reader.name}</TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {reader.firmware.name} ({reader.firmware.variant})
-                            <br />
-                            {firmwareUpdateChip(reader)}
+                            {reader.firmware.name ? (
+                              <>
+                                {reader.firmware.name} ({reader.firmware.variant})
+                                <br />
+                                {firmwareUpdateChip(reader)}
+                              </>
+                            ) : (
+                              // A reader paired a moment ago has not reported its firmware yet.
+                              '–'
+                            )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{formatDateTime(reader.lastConnection)}</TableCell>
                           <TableCell>

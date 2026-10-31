@@ -65,6 +65,19 @@ export function ResourceScanner(props: Props) {
     [navigate, frontendOrigin, toast, t, setOpen, onDetected],
   );
 
+  const onError = useCallback(
+    (error: unknown) => {
+      const denied =
+        error instanceof Error && ['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error.name);
+      toast.error({
+        title: t(denied ? 'scan.error.cameraDenied.title' : 'scan.error.cameraUnavailable.title'),
+        description: t(denied ? 'scan.error.cameraDenied.description' : 'scan.error.cameraUnavailable.description'),
+      });
+      setOpen(false);
+    },
+    [toast, t, setOpen],
+  );
+
   return (
     <>
       {props.children(open)}
@@ -74,7 +87,7 @@ export function ResourceScanner(props: Props) {
         size="md"
         dialogProps={{ 'aria-label': props.title ?? t('title') }}
       >
-        {() => <Scanner onScan={onScan} components={{ tracker: boundingBox }} />}
+        {() => <Scanner onScan={onScan} onError={onError} components={{ tracker: boundingBox }} />}
       </StandardModal>
     </>
   );
