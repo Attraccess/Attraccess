@@ -116,20 +116,53 @@ describe('SAML auth detail backfill migration', () => {
     expect(await bindings()).toEqual([{ userId: 1, providerType: 'SAML', providerId: 2, ssoSubject: 'name-1' }]);
   });
 
-  it('leaves misbound rows with OIDC sessions or an ambiguous provider unchanged', async () => {
+  // Each case has exactly one SAML provider, so only the guard under test can keep the row unchanged.
+  it.each([
+    ['an OIDC session for the subject', [[1, 'OIDC']]],
+    [
+      'an OIDC session next to SAML session evidence',
+      [
+        [1, 'OIDC'],
+        [2, 'SAML'],
+      ],
+    ],
+    ['a SAML session at a provider that no longer exists', [[7, 'SAML']]],
+  ] as Array<[string, Array<[number, 'SAML' | 'OIDC']>]>)(
+    'leaves a misbound row with %s unchanged',
+    async (_label, sessions) => {
+      await addProvider(1, 'OIDC');
+      await addProvider(2, 'SAML');
+      await addUser(1, 'subject');
+      await addBinding(1, 'OIDC', 1, 'subject');
+      for (const [providerId, protocol] of sessions) await addSession(1, providerId, protocol, 'subject');
+      await migration.up(runner);
+      expect(await bindings()).toEqual([{ userId: 1, providerType: 'OIDC', providerId: 1, ssoSubject: 'subject' }]);
+    },
+  );
+
+  it('leaves a misbound row unchanged when several SAML providers exist and there is no evidence', async () => {
     await addProvider(1, 'OIDC');
     await addProvider(2, 'SAML');
-    await addUser(1, 'real-oidc');
-    await addBinding(1, 'OIDC', 1, 'real-oidc');
-    await addSession(1, 1, 'OIDC', 'real-oidc');
-    await addUser(2, 'any-session');
-    await addBinding(2, 'OIDC', 1, 'any-session');
-    await addSession(2, 7, 'SAML', 'any-session');
     await addProvider(3, 'SAML');
-    await addUser(3, 'ambiguous');
-    await addBinding(3, 'OIDC', 1, 'ambiguous');
+    await addUser(1, 'ambiguous');
+    await addBinding(1, 'OIDC', 1, 'ambiguous');
     await migration.up(runner);
-    expect((await bindings()).map((row) => row.providerType)).toEqual(['OIDC', 'OIDC', 'OIDC']);
+    expect(await bindings()).toEqual([{ userId: 1, providerType: 'OIDC', providerId: 1, ssoSubject: 'ambiguous' }]);
+  });
+
+  it('only treats bindings to the lowest-id OIDC provider (the old backfill target) as misbound', async () => {
+    await addProvider(4, 'OIDC');
+    await addProvider(5, 'OIDC');
+    await addProvider(6, 'SAML');
+    await addUser(1, 'real-oidc');
+    await addBinding(1, 'OIDC', 5, 'real-oidc');
+    await addUser(2, 'deleted-target');
+    await addBinding(2, 'OIDC', 1, 'deleted-target');
+    await migration.up(runner);
+    expect(await bindings()).toEqual([
+      { userId: 1, providerType: 'OIDC', providerId: 5, ssoSubject: 'real-oidc' },
+      { userId: 2, providerType: 'SAML', providerId: 6, ssoSubject: 'deleted-target' },
+    ]);
   });
 
   it('skips a user when the target binding already belongs to another user', async () => {
@@ -151,25 +184,26 @@ describe('SAML auth detail backfill migration', () => {
     expect(first).toHaveLength(1);
   });
 
-  it('down() restores the OIDC backfill shape and removes bindings without an OIDC provider', async () => {
+  it('down() removes the bindings it can attribute to the backfill and never creates OIDC bindings', async () => {
     await addProvider(1, 'OIDC');
     await addProvider(2, 'SAML');
     await addUser(1, 'name-1');
     await addUser(2, 'name-2');
+    await addBinding(2, 'OIDC', 1, 'name-2');
     await addUser(3, null);
     await addBinding(3, 'SAML', 2, 'linked-via-ui');
+    await addUser(4, 'SSO:OIDC:abc');
+    await addBinding(4, 'OIDC', 1, 'abc');
     await migration.up(runner);
+    expect(await bindings()).toHaveLength(4);
     await migration.down(runner);
     expect(await bindings()).toEqual([
-      { userId: 1, providerType: 'OIDC', providerId: 1, ssoSubject: 'name-1' },
-      { userId: 2, providerType: 'OIDC', providerId: 1, ssoSubject: 'name-2' },
       { userId: 3, providerType: 'SAML', providerId: 2, ssoSubject: 'linked-via-ui' },
+      { userId: 4, providerType: 'OIDC', providerId: 1, ssoSubject: 'abc' },
     ]);
-
-    await runner.query(`DELETE FROM sso_provider WHERE type = 'OIDC'`);
-    await runner.query(`DELETE FROM authentication_detail WHERE userId IN (1, 2)`);
-    await migration.up(runner);
-    await migration.down(runner);
-    expect((await bindings()).map((row) => row.userId)).toEqual([3]);
+    expect(await runner.query(`SELECT externalIdentifier FROM user WHERE id IN (1, 2) ORDER BY id`)).toEqual([
+      { externalIdentifier: 'name-1' },
+      { externalIdentifier: 'name-2' },
+    ]);
   });
 });

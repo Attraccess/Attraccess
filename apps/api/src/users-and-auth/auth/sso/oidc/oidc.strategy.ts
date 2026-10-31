@@ -240,10 +240,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) 
         throw error;
       });
 
-    if (created) {
-      this.logger.log(`New user (ID: ${user.id}) created successfully with SSO subject: ${oidcUserId}`);
-      await this.recordProvisioningAudit(user.id, true);
-    }
+    if (created) await this.recordProvisioningAudit(user.id, true);
     return await this.syncPermissionsFromClaims(user, claimSources);
   }
 

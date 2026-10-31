@@ -1,5 +1,6 @@
 import { Profile } from 'passport-openidconnect';
 import { User } from '@attraccess/database-entities';
+import { MetricsService } from '../../../../metrics/metrics.service';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { registerSsooidcstrategyClaimPathResolutionFixture } from './oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
 
@@ -17,7 +18,21 @@ describe('SSOOIDCStrategy - email_verified', () => {
       buildUsernameFromSSOClaim: jest.fn((value: string) => value),
     };
     const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(boundUserId), addAuthenticationDetails: jest.fn() };
-    return { users, auth, strategy: fixture.createStrategy({}, users, auth) };
+    const metrics = { authSsoLoginFailuresTotal: { inc: jest.fn() } };
+    const strategy = fixture.createStrategy(
+      {},
+      users,
+      auth,
+      undefined,
+      undefined,
+      undefined,
+      metrics as unknown as MetricsService,
+    );
+    const audit = jest.spyOn(
+      strategy as unknown as { recordProvisioningAudit: () => Promise<void> },
+      'recordProvisioningAudit',
+    );
+    return { users, auth, metrics, audit, strategy };
   };
 
   it.each([false, 'false', 'FALSE'])('does not match by email when email_verified is %p', async (value) => {
@@ -30,11 +45,12 @@ describe('SSOOIDCStrategy - email_verified', () => {
   });
 
   it.each([false, 'false'])('rejects with SSO_EMAIL_NOT_VERIFIED instead of linking (%p)', async (value) => {
-    const { users, auth, strategy } = setup({ id: 9 } as User);
+    const { users, auth, metrics, strategy } = setup({ id: 9 } as User);
     const error = await strategy
       .validateProfile('issuer', profile({ email_verified: value }))
       .catch((caught: unknown) => caught);
     expect(error).toMatchObject({ message: 'SSO_EMAIL_NOT_VERIFIED', status: 401 });
+    expect(metrics.authSsoLoginFailuresTotal.inc).toHaveBeenCalledTimes(1);
     expect(error).not.toBeInstanceOf(AccountLinkingRequiredException);
     expect(users.createOne).not.toHaveBeenCalled();
     expect(auth.addAuthenticationDetails).not.toHaveBeenCalled();
@@ -68,6 +84,8 @@ describe('SSOOIDCStrategy - email_verified', () => {
       await expect(
         linking.strategy.validateProfile('issuer', profile({ email_verified: value })),
       ).rejects.toBeInstanceOf(AccountLinkingRequiredException);
+      // The linking filter records this failure; the strategy must not count it twice.
+      expect(linking.metrics.authSsoLoginFailuresTotal.inc).not.toHaveBeenCalled();
 
       const creating = setup();
       await creating.strategy.validateProfile('issuer', profile({ email_verified: value }));
@@ -79,9 +97,25 @@ describe('SSOOIDCStrategy - email_verified', () => {
   );
 
   it('still logs in an existing bound user whose email is unverified', async () => {
-    const { users, strategy } = setup(null, 7);
+    const { users, audit, strategy } = setup(null, 7);
     const user = await strategy.validateProfile('issuer', profile({ email_verified: false }));
     expect(user).toMatchObject({ id: 7 });
     expect(users.createOne).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalledWith(7, true);
+  });
+
+  it('records the user_created audit only for a newly created user', async () => {
+    const { audit, strategy } = setup();
+    await strategy.validateProfile('issuer', profile());
+    expect(audit).toHaveBeenCalledWith(50, true);
+  });
+
+  it('lets an explicit false from userinfo win over true in the id token', async () => {
+    const { users, strategy } = setup();
+    await strategy.validateProfile('issuer', profile(), undefined, { email_verified: true }, { email_verified: false });
+    expect(users.createOne).toHaveBeenCalledWith(
+      expect.objectContaining({ isEmailVerified: false }),
+      expect.anything(),
+    );
   });
 });

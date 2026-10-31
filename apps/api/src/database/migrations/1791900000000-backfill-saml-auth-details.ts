@@ -9,8 +9,8 @@ type Row = Record<string, unknown>;
  *
  * The provider of each user is resolved from session evidence first, else the only SAML provider, else the
  * user is skipped (never guessed). A row created by the 1769012345690 OIDC backfill for such a user
- * (OIDC binding whose subject is the unprefixed externalIdentifier) is converted to SAML when that is provable.
- * `user.externalIdentifier` is never modified.
+ * (OIDC binding to that backfill's lowest-id OIDC provider whose subject is the unprefixed externalIdentifier) is
+ * converted to SAML when that is provable. `user.externalIdentifier` is never modified.
  */
 export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface {
   name = 'BackfillSamlAuthDetails1791900000000';
@@ -20,6 +20,9 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const samlProviderIds: number[] = (
       await queryRunner.query(`SELECT "id" FROM "sso_provider" WHERE "type" = 'SAML'`)
+    ).map((row: Row) => Number(row.id));
+    const oidcProviderIds: number[] = (
+      await queryRunner.query(`SELECT "id" FROM "sso_provider" WHERE "type" = 'OIDC'`)
     ).map((row: Row) => Number(row.id));
     const users: Row[] = await queryRunner.query(
       `SELECT "id", "externalIdentifier" FROM "user" WHERE "externalIdentifier" IS NOT NULL AND "externalIdentifier" <> '' AND "externalIdentifier" NOT LIKE 'SSO:OIDC:%' ORDER BY "id"`,
@@ -37,14 +40,19 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
       const userId = Number(user.id);
       const subject = String(user.externalIdentifier);
       const [existing] = await queryRunner.query(
-        `SELECT "id", "providerType", "ssoSubject" FROM "authentication_detail" WHERE "userId" = ? AND "type" = 'sso'`,
+        `SELECT "id", "providerType", "providerId", "ssoSubject" FROM "authentication_detail" WHERE "userId" = ? AND "type" = 'sso'`,
         [userId],
       );
       if (existing?.providerType === 'SAML') {
         counts.alreadyBound++;
         continue;
       }
-      const isMisbound = existing?.providerType === 'OIDC' && existing.ssoSubject === subject;
+      // The 1769012345690 backfill only ever bound to the lowest-id OIDC provider. Provider ids only grow, so a
+      // binding to an OIDC provider with a lower-id OIDC provider still existing was not created by it.
+      const isMisbound =
+        existing?.providerType === 'OIDC' &&
+        existing.ssoSubject === subject &&
+        !oidcProviderIds.some((id) => id < Number(existing.providerId));
       if (existing && !isMisbound) {
         counts.unchanged++;
         continue;
@@ -126,34 +134,19 @@ export class BackfillSamlAuthDetails1791900000000 implements MigrationInterface 
   }
 
   /**
-   * Best-effort reversal. SAML rows whose subject equals the owner's externalIdentifier can only come from this
-   * migration (SAML logins and linking leave externalIdentifier empty). They are returned to the shape the
-   * 1769012345690 OIDC backfill produced (OIDC + lowest-id OIDC provider), or deleted when no OIDC provider
-   * exists or the OIDC binding would collide. Whether a row was inserted or converted is not recorded, so
-   * rows this migration inserted also become OIDC bindings, exactly as the old backfill would have bound them.
+   * Best-effort reversal. Whether a row was inserted or converted is not recorded, so every SAML row whose subject
+   * equals the owner's externalIdentifier is deleted (rows created by later SAML logins have no externalIdentifier).
+   * Converted rows are deliberately not turned back into OIDC bindings: that would restore the cross-provider binding
+   * this migration removes. The previous release resolves SAML logins and provisioning by externalIdentifier, which
+   * this migration never changes, so those users keep working after the rollback.
    */
   public async down(queryRunner: QueryRunner): Promise<void> {
-    const [oidcProvider] = await queryRunner.query(
-      `SELECT "id" FROM "sso_provider" WHERE "type" = 'OIDC' ORDER BY "id" LIMIT 1`,
+    await queryRunner.query(
+      `DELETE FROM "authentication_detail" WHERE "id" IN (
+         SELECT "detail"."id" FROM "authentication_detail" "detail"
+         JOIN "user" ON "user"."id" = "detail"."userId"
+         WHERE "detail"."type" = 'sso' AND "detail"."providerType" = 'SAML' AND "detail"."ssoSubject" = "user"."externalIdentifier"
+       )`,
     );
-    const rows: Row[] = await queryRunner.query(
-      `SELECT "detail"."id" AS "id", "detail"."ssoSubject" AS "subject" FROM "authentication_detail" "detail"
-       JOIN "user" ON "user"."id" = "detail"."userId"
-       WHERE "detail"."type" = 'sso' AND "detail"."providerType" = 'SAML' AND "detail"."ssoSubject" = "user"."externalIdentifier"`,
-    );
-    for (const row of rows) {
-      const [conflict] = oidcProvider
-        ? await queryRunner.query(
-            `SELECT 1 FROM "authentication_detail" WHERE "providerType" = 'OIDC' AND "providerId" = ? AND "ssoSubject" = ?`,
-            [oidcProvider.id, row.subject],
-          )
-        : [true];
-      if (conflict) await queryRunner.query(`DELETE FROM "authentication_detail" WHERE "id" = ?`, [row.id]);
-      else
-        await queryRunner.query(
-          `UPDATE "authentication_detail" SET "providerType" = 'OIDC', "providerId" = ? WHERE "id" = ?`,
-          [oidcProvider.id, row.id],
-        );
-    }
   }
 }

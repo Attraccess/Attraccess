@@ -22,18 +22,25 @@ describe('AccountLinkingExceptionFilter', () => {
     const host = {
       switchToHttp: () => ({ getResponse: () => response, getRequest: () => ({ query: {}, ...request }) }),
     } as unknown as ArgumentsHost;
+    const linkTokens = { issue: jest.fn().mockResolvedValue('signed-token') };
     const filter = new AccountLinkingExceptionFilter(
-      { issue: jest.fn().mockResolvedValue('signed-token') } as unknown as SSOLinkTokenService,
+      linkTokens as unknown as SSOLinkTokenService,
       { authSsoLoginFailuresTotal: { inc: jest.fn() } } as unknown as MetricsService,
       { isApproved: jest.fn(async (origin: string) => approved.includes(origin)) } as unknown as ApprovedOriginsService,
       settings as unknown as SettingsService,
     );
-    return { filter, host, response };
+    return { filter, host, response, linkTokens };
   }
 
   it('redirects a SAML callback to the approved RelayState address with the link token', async () => {
-    const { filter, host, response } = setup({ body: { RelayState: 'https://app.example/?foo=bar' } });
+    const { filter, host, response, linkTokens } = setup({ body: { RelayState: 'https://app.example/?foo=bar' } });
     await filter.catch(exception(SSOProviderType.SAML), host);
+    expect(linkTokens.issue).toHaveBeenCalledWith({
+      email: 'user@example.com',
+      providerId: 2,
+      providerType: SSOProviderType.SAML,
+      ssoSubject: 'name-id',
+    });
     const target = new URL(response.redirect.mock.calls[0][0]);
     expect(target.origin).toBe('https://app.example');
     expect(target.searchParams.get('accountLinking')).toBe('required');
@@ -57,6 +64,18 @@ describe('AccountLinkingExceptionFilter', () => {
       expect(new URL(response.redirect.mock.calls[0][0]).origin).toBe('https://app.example');
     },
   );
+
+  it('checks a SAML redirectTo query like RelayState and prefers it when approved', async () => {
+    const evil = setup({
+      query: { redirectTo: 'https://evil.example/' },
+      body: { RelayState: 'https://app.example/x' },
+    });
+    await evil.filter.catch(exception(SSOProviderType.SAML), evil.host);
+    expect(evil.response.redirect.mock.calls[0][0]).toMatch(/^https:\/\/app\.example\/x\?/);
+    const approved = setup({ query: { redirectTo: 'https://app.example/y' } });
+    await approved.filter.catch(exception(SSOProviderType.SAML), approved.host);
+    expect(approved.response.redirect.mock.calls[0][0]).toMatch(/^https:\/\/app\.example\/y\?/);
+  });
 
   it('ignores RelayState for OIDC and answers with JSON when there is no redirect target', async () => {
     const oidc = setup({ body: { RelayState: 'https://app.example/' } });

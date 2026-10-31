@@ -1,6 +1,7 @@
 import { SSOProvider, SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
 import { ModuleRef } from '@nestjs/core';
 import { SsoAuditService } from '../../../../audit/sso-audit.service';
+import { MetricsService } from '../../../../metrics/metrics.service';
 import { RbacService } from '../../../rbac/rbac.service';
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
@@ -22,6 +23,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
     rbacServiceMock?: Partial<RbacService>,
     ssoServiceMock?: Partial<SSOService>,
     ssoAuditMock?: Partial<SsoAuditService>,
+    metricsServiceMock?: Partial<MetricsService>,
   ) {
     const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) } as unknown as DataSource;
     const resolver = new SsoAccountResolver(
@@ -37,6 +39,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
         if (token === RbacService) return rbacServiceMock ?? { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
         if (token === SSOService) return ssoServiceMock;
         if (token === SsoAuditService) return ssoAuditMock;
+        if (token === MetricsService && metricsServiceMock) return metricsServiceMock;
         throw new Error('Unexpected dependency request');
       }),
     } as unknown as ModuleRef;

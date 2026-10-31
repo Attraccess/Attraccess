@@ -17,7 +17,11 @@ describe('SsoAccountResolver', () => {
     usernameClaim: 'Some Name',
   };
 
-  function setup({ bound = null, byEmail = null }: { bound?: number | null; byEmail?: Partial<User> | null } = {}) {
+  function setup({
+    bound = null,
+    byEmail = null,
+    hook,
+  }: { bound?: number | null; byEmail?: Partial<User> | null; hook?: SsoProvisioningHook } = {}) {
     const users = {
       findOne: jest.fn(async (query: Record<string, unknown>) =>
         'id' in query ? ({ id: query.id } as User) : (byEmail as User | null),
@@ -35,6 +39,7 @@ describe('SsoAccountResolver', () => {
       users as unknown as UsersService,
       auth as unknown as AuthService,
       dataSource as unknown as DataSource,
+      hook,
     );
     return { users, auth, dataSource, resolver };
   }
@@ -101,9 +106,9 @@ describe('SsoAccountResolver', () => {
   });
 
   it('lets the provisioning hook reject without creating anything', async () => {
-    const { resolver, users, auth } = setup();
     const hook: SsoProvisioningHook = jest.fn().mockResolvedValue('reject');
-    await expect(resolver.resolveSsoUser(input, { provisioning: hook })).rejects.toBeInstanceOf(UnauthorizedException);
+    const { resolver, users, auth } = setup({ hook });
+    await expect(resolver.resolveSsoUser(input)).rejects.toBeInstanceOf(UnauthorizedException);
     expect(hook).toHaveBeenCalledWith(expect.objectContaining({ subject: 'name-id', emailTrusted: true }));
     expect(users.createOne).not.toHaveBeenCalled();
     expect(auth.addAuthenticationDetails).not.toHaveBeenCalled();
@@ -111,9 +116,9 @@ describe('SsoAccountResolver', () => {
 
   it('does not consult the hook when the identity is bound or the email matches', async () => {
     const hook: SsoProvisioningHook = jest.fn().mockResolvedValue('create');
-    await setup({ bound: 5 }).resolver.resolveSsoUser(input, { provisioning: hook });
-    await setup({ byEmail: { id: 9 } })
-      .resolver.resolveSsoUser(input, { provisioning: hook })
+    await setup({ bound: 5, hook }).resolver.resolveSsoUser(input);
+    await setup({ byEmail: { id: 9 }, hook })
+      .resolver.resolveSsoUser(input)
       .catch(() => undefined);
     expect(hook).not.toHaveBeenCalled();
   });
@@ -133,10 +138,35 @@ describe('SsoAccountResolver', () => {
     expect(auth.addAuthenticationDetails).not.toHaveBeenCalled();
   });
 
-  it('fails the login when user creation returns nothing or the binding fails', async () => {
-    const empty = setup();
-    empty.users.createOne.mockResolvedValue(null as never);
-    await expect(empty.resolver.resolveSsoUser(input)).rejects.toBeInstanceOf(UnauthorizedException);
+  it('lets a hook fail the login with its own error', async () => {
+    const coded = new UnauthorizedException('SSO_PROVISIONING_DISABLED');
+    const { resolver, users } = setup({ hook: jest.fn().mockRejectedValue(coded) });
+    await expect(resolver.resolveSsoUser(input)).rejects.toBe(coded);
+    expect(users.createOne).not.toHaveBeenCalled();
+  });
+
+  it('matches and stores the email without surrounding whitespace', async () => {
+    const linked = setup({ byEmail: { id: 9 } });
+    await expect(linked.resolver.resolveSsoUser({ ...input, email: ' user@example.com ' })).rejects.toMatchObject({
+      email: 'user@example.com',
+    });
+    expect(linked.users.findOne).toHaveBeenCalledWith({ email: 'user@example.com' });
+    const created = setup();
+    await created.resolver.resolveSsoUser({ ...input, email: ' user@example.com ' });
+    expect(created.users.createOne).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'user@example.com' }),
+      manager,
+    );
+  });
+
+  it('fails closed when the email lookup fails instead of treating it as no match', async () => {
+    const { resolver, users } = setup();
+    users.findOne.mockRejectedValue(new Error('db down'));
+    await expect(resolver.resolveSsoUser(input)).rejects.toThrow('db down');
+    expect(users.createOne).not.toHaveBeenCalled();
+  });
+
+  it('fails the login when the binding fails', async () => {
     const failing = setup();
     failing.auth.addAuthenticationDetails.mockRejectedValue(new Error('binding failed'));
     await expect(failing.resolver.resolveSsoUser(input)).rejects.toThrow('binding failed');
