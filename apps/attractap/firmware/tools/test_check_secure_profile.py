@@ -1,3 +1,4 @@
+import json
 import os
 import struct
 import sys
@@ -22,22 +23,31 @@ REQUIRED = {
     "SECURE_BOOT_ALLOW_JTAG": "n",
     "SECURE_BOOT_INSECURE": "n",
     "SECURE_BOOT_ENABLE_AGGRESSIVE_KEY_REVOKE": "n",
+    "SECURE_BOOT_SKIP_WRITE_PROTECTION_SCA": "n",
+    # Decided design: the bootloader leaves RD_DIS open; the secure app locks it.
+    "SECURE_BOOT_V2_ALLOW_EFUSE_RD_DIS": "y",
     "SECURE_FLASH_ENC_ENABLED": "y",
     "SECURE_FLASH_ENCRYPTION_MODE_RELEASE": "y",
     "SECURE_FLASH_ENCRYPTION_AES128": "y",
+    "SECURE_FLASH_CHECK_ENC_EN_IN_APP": "y",
+    "SECURE_FLASH_UART_BOOTLOADER_ALLOW_ENC": "n",
     "EFUSE_VIRTUAL": "n",
     "SECURE_ENABLE_SECURE_ROM_DL_MODE": "y",
     "NVS_ENCRYPTION": "y",
     "NVS_SEC_KEY_PROTECT_USING_HMAC": "y",
+    # Fixed eFuse layout: KEY3 is the DS key, KEY4 the NVS key.
+    "NVS_SEC_HMAC_EFUSE_KEY_ID": "4",
     "BOOTLOADER_APP_ROLLBACK_ENABLE": "y",
     "BOOTLOADER_APP_ANTI_ROLLBACK": "y",
     "BOOTLOADER_EFUSE_SECURE_VERSION_EMULATE": "n",
+    "ESP_CONSOLE_USB_SERIAL_JTAG": "n",
     "ESP_CONSOLE_NONE": "y",
     "ESP_CONSOLE_SECONDARY_NONE": "y",
     "ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED": "n",
     "ESP_SYSTEM_PANIC_GDBSTUB": "n",
     "ESP_SYSTEM_GDBSTUB_RUNTIME": "n",
     "ESP_COREDUMP_ENABLE_TO_NONE": "y",
+    "ESP_COREDUMP_ENABLE_TO_FLASH": "n",
     "BOOTLOADER_LOG_LEVEL_NONE": "y",
     "PARTITION_TABLE_CUSTOM_FILENAME": "partitions.csv",
     "PARTITION_TABLE_OFFSET": "0x8000",
@@ -52,7 +62,13 @@ def build_table(entries):
     return out + b"\xeb\xeb" + b"\xff" * 30
 
 
-def write_build_dir(root, sdkconfig=PROFILE, bootloader_size=0x6000, table=None):
+SECURE_COMPILE_COMMANDS = [
+    {"file": "/fw/src/main.cpp", "command": "xtensa-esp32s3-elf-g++ -DATTRACTAP_SECURE_PROFILE=1 -c main.cpp"},
+]
+
+
+def write_build_dir(root, sdkconfig=PROFILE, bootloader_size=0x6000, table=None,
+                    compile_commands=SECURE_COMPILE_COMMANDS):
     os.makedirs(os.path.join(root, "bootloader"))
     os.makedirs(os.path.join(root, "partition_table"))
     with open(os.path.join(root, "sdkconfig"), "w") as f:
@@ -61,6 +77,8 @@ def write_build_dir(root, sdkconfig=PROFILE, bootloader_size=0x6000, table=None)
         f.write(b"\0" * bootloader_size)
     with open(os.path.join(root, "partition_table", "partition-table.bin"), "wb") as f:
         f.write(table if table is not None else build_table(c.parse_partition_csv(CSV)))
+    with open(os.path.join(root, "compile_commands.json"), "w") as f:
+        json.dump(compile_commands, f)
 
 
 class SecureProfileChecks(unittest.TestCase):
@@ -125,8 +143,21 @@ class SecureProfileChecks(unittest.TestCase):
     def test_run_checks_reports_every_failure(self):
         with tempfile.TemporaryDirectory() as build:
             write_build_dir(build, sdkconfig=PROFILE.replace("CONFIG_NVS_ENCRYPTION=y\n", ""),
-                            bootloader_size=0x7800, table=build_table([]))
-            self.assertEqual(len(c.run_checks(build)), 3)
+                            bootloader_size=0x7800, table=build_table([]),
+                            compile_commands=[{"file": "/fw/src/serial/serialCommandHandler.cpp",
+                                               "arguments": ["g++", "-c", "serialCommandHandler.cpp"]}])
+            self.assertEqual(len(c.run_checks(build)), 5)
+
+    def test_serial_handler_must_be_compiled_out(self):
+        errors = c.check_serial_handler_compiled_out(
+            SECURE_COMPILE_COMMANDS + [{"file": "/fw/src/serial/serialCommandHandler.cpp", "command": "g++ -c x"}])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("serial config handler is compiled in", errors[0])
+
+    def test_secure_profile_define_is_required(self):
+        errors = c.check_serial_handler_compiled_out([{"file": "/fw/src/main.cpp", "arguments": ["g++", "-c", "x"]}])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("ATTRACTAP_SECURE_PROFILE=1", errors[0])
 
 
 class BaseRefChecks(unittest.TestCase):
@@ -154,7 +185,15 @@ class BaseRefChecks(unittest.TestCase):
 
     def test_lowering_only_the_profile_version_fails(self):
         with self.at_base(1, 2):
-            self.assertEqual(len(c.check_against_base("base")), 1)
+            errors = c.check_against_base("base")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("CONFIG_BOOTLOADER_APP_SECURE_VERSION dropped from 2", errors[0])
+
+    def test_lowering_only_the_floor_fails(self):
+        with self.at_base(2, 1):
+            errors = c.check_against_base("base")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("secure-version-floor.txt dropped from 2", errors[0])
 
 
 class GateInputErrors(unittest.TestCase):

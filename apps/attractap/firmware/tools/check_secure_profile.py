@@ -5,7 +5,9 @@ With a secure build directory, fails (exit 1) when:
   - the resolved sdkconfig differs from any line of sdkconfig.secure,
   - the signed bootloader would not fit below the partition table (0x8000),
   - the built partition table differs from partitions.csv,
-  - CONFIG_BOOTLOADER_APP_SECURE_VERSION differs from secure-version-floor.txt.
+  - CONFIG_BOOTLOADER_APP_SECURE_VERSION differs from secure-version-floor.txt,
+  - the USB serial config handler (src/serial/) was compiled in, or the
+    ATTRACTAP_SECURE_PROFILE define that compiles it out is missing.
 With --base-ref (no build needed), fails when the secure version or the floor
 is lower than on that ref: anti-rollback means it must never decrease.
 
@@ -13,6 +15,7 @@ Usage: check_secure_profile.py [<build-dir>] [--base-ref origin/main]
 """
 
 import argparse
+import json
 import os
 import struct
 import subprocess
@@ -198,6 +201,22 @@ def check_against_base(ref):
     return errors
 
 
+def check_serial_handler_compiled_out(compile_commands):
+    """The secure profile has no serial config path: CMake must drop src/serial/
+    and define ATTRACTAP_SECURE_PROFILE (read from compile_commands.json)."""
+    if not isinstance(compile_commands, list) or not all(isinstance(e, dict) and "file" in e for e in compile_commands):
+        raise GateError("compile_commands.json is not a list of compile entries")
+    errors = []
+    serial = sorted({e["file"] for e in compile_commands if "/src/serial/" in e["file"].replace(os.sep, "/")})
+    if serial:
+        errors.append(f"the USB serial config handler is compiled in: {', '.join(serial)}")
+    def command(entry):
+        return entry.get("command") or " ".join(entry.get("arguments", []))
+    if not any("ATTRACTAP_SECURE_PROFILE=1" in command(e) for e in compile_commands):
+        errors.append("no source is compiled with -DATTRACTAP_SECURE_PROFILE=1 (main.cpp keeps the USB console driver)")
+    return errors
+
+
 def run_checks(build_dir):
     errors = check_profile(
         read(os.path.join(FIRMWARE_DIR, "sdkconfig.secure")),
@@ -216,11 +235,17 @@ def run_checks(build_dir):
     resolved = parse_sdkconfig(read(os.path.join(build_dir, "sdkconfig")))
     version = parse_int(resolved.get("BOOTLOADER_APP_SECURE_VERSION", "0"), "CONFIG_BOOTLOADER_APP_SECURE_VERSION")
     errors += check_secure_version(version, floor)
+
+    try:
+        compile_commands = json.loads(read(os.path.join(build_dir, "compile_commands.json")))
+    except ValueError as error:
+        raise GateError(f"{build_dir}/compile_commands.json is not valid JSON") from error
+    errors += check_serial_handler_compiled_out(compile_commands)
     return errors
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("build_dir", nargs="?", help="secure build directory to check")
     parser.add_argument("--base-ref", help="git ref the secure version must not drop below")
     args = parser.parse_args()
@@ -239,7 +264,11 @@ def main():
 
     for error in errors:
         print(f"secure profile check failed: {error}", file=sys.stderr)
-    sys.exit(1 if errors else 0)
+    if errors:
+        sys.exit(1)
+    checked = [f"build {args.build_dir}"] if args.build_dir else []
+    checked += [f"secure version against {args.base_ref}"] if args.base_ref else []
+    print(f"secure profile check passed ({'; '.join(checked)})")
 
 
 if __name__ == "__main__":
