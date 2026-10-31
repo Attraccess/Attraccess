@@ -6,6 +6,9 @@ import {
   AccordionItem,
   AccordionPanel,
   AccordionTrigger,
+  Alert,
+  AlertContent,
+  AlertDescription,
   Card,
   Chip,
   ProgressCircle,
@@ -13,7 +16,7 @@ import {
   ProgressCircleTrack,
   ProgressCircleTrackCircle,
 } from '@heroui/react';
-import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AlertStatusIcon, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
@@ -46,7 +49,7 @@ function FirmwareCard({ firmware, onSelect }: { firmware: AttractapFirmware; onS
 }
 
 export function FirmwareSelector(props: Props) {
-  const { data: firmwares, isLoading } = useAttractapServiceGetFirmwares();
+  const { data: firmwares, isLoading, isError } = useAttractapServiceGetFirmwares();
   const { t } = useTranslations({ de, en });
 
   const standard = firmwares?.filter((firmware) => firmware.variant !== 'demo') ?? [];
@@ -62,6 +65,17 @@ export function FirmwareSelector(props: Props) {
           </ProgressCircleTrack>
         </ProgressCircle>
       )}
+      {isError && (
+        <Alert status="danger">
+          <AlertStatusIcon status="danger" />
+          <AlertContent>
+            <AlertDescription>{t('loadFailed')}</AlertDescription>
+          </AlertContent>
+        </Alert>
+      )}
+      {!isLoading && !isError && standard.length === 0 && demo.length === 0 && (
+        <p className="text-sm text-muted">{t('empty')}</p>
+      )}
       {standard.map((firmware) => (
         <FirmwareCard key={`${firmware.name}-${firmware.variant}`} firmware={firmware} onSelect={props.onSelect} />
       ))}
@@ -74,7 +88,7 @@ export function FirmwareSelector(props: Props) {
             </AccordionHeading>
             <AccordionPanel>
               <AccordionBody className="flex flex-col gap-4">
-                <p className="text-sm text-default-500">{t('demo.description')}</p>
+                <p className="text-sm text-muted">{t('demo.description')}</p>
                 {demo.map((firmware) => (
                   <FirmwareCard
                     key={`${firmware.name}-${firmware.variant}`}
