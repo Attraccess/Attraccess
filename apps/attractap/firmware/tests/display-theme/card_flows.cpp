@@ -287,11 +287,9 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     click(guard.root, "Projekt wählen");
     requireObject(guard.root, &lv_label_class, "Seite 2 von 5");
     FirmwareI18n::refreshTree(guard.root, "en");
-    FirmwareI18n::refreshTree(guard.root, "en");
     requireObject(guard.root, &lv_label_class, "Page 2 of 5");
     requireObject(guard.root, &lv_label_class, "Maintenance %s");
     renderer.capture("projects-english-page-two");
-    FirmwareI18n::refreshTree(guard.root, "de");
     FirmwareI18n::refreshTree(guard.root, "de");
     requireObject(guard.root, &lv_label_class, "Seite 2 von 5");
     renderer.capture("projects-german-page-two");
