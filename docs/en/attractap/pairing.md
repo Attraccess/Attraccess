@@ -15,12 +15,12 @@ themselves: nobody can add a reader without an admin approving it.
 
 | State               | Meaning                                                                                                                                               |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Waiting**         | A new reader shows its code and waits for an admin. It appears in the **Pending readers** list while it is waiting.                                   |
+| **Waiting**         | A new reader shows its code and waits for an admin. It appears as a **New reader** row in the **Not paired** list while it is waiting.                |
 | **Not paired**      | A reader registered with a token before this version. It keeps working with its token until an admin pairs it from its row. Its settings stay locked. |
 | **Paired**          | The reader has its own key and certificate and can be used and set up.                                                                                |
 | **Pairing removed** | An admin removed the pairing. The reader disconnects within a second, shows "Pairing removed" and waits for approval again with a new key.            |
 
-Only paired readers are listed in the **Active** and **Stale** tables and can be edited.
+Only paired readers are listed in the **Active Attractaps** and **Stale Attractaps** tables and can be edited.
 
 ## Pairing a new reader
 
@@ -36,9 +36,10 @@ Pairing takes effect immediately; you do not need to save the reader afterwards.
      when the server knows its public address; otherwise type the code.
    - **Lite readers** have no screen. The LED ring shows a colour pattern and the **web
      flasher** shows the code (see below).
-3. In Attraccess, open the readers page, choose to pair a reader, and enter the code, or just
-   follow the QR link. The page shows which reader the code belongs to (type and firmware).
-   Optionally give it a name and approve it.
+3. In Attraccess, open the readers page (**Devices** > **Attractap Readers**). The waiting reader
+   appears in the **Not paired** list as **New reader**. Click **Pair**, enter the code, optionally
+   give the reader a name and click **Approve**. Or just follow the QR link: it opens the same
+   dialog with the code filled in and shows which reader it belongs to (type and firmware).
 4. The reader shows a short green result, restarts its connection into the encrypted session and
    is ready. Its settings open so you can assign resources.
 
@@ -48,7 +49,7 @@ so a code you just read still works. A pending request lasts 10 minutes; then th
 with a new code and keeps its key. If two readers happen to show the same code at the same time,
 Attraccess asks you to wait for the next code.
 
-You can also approve from the list of waiting readers: pick the reader and enter the code it shows.
+You can also approve from the **Not paired** list: click **Pair** on the reader's row and enter the code it shows.
 Touch readers always need the code: it proves that you are looking at that very reader.
 
 ### Lite readers: LED pattern
@@ -92,7 +93,7 @@ These actions are in the **Pairing** tab of a paired reader's settings.
   Name, machines and settings stay; the old pairing stops working right away.
 - **Remove pairing**: asks for confirmation, then disconnects the reader within a second. It shows
   "Pairing removed", creates a **new key** and waits for approval again. It never uses its old
-  sign-in.
+  sign-in. Afterwards the reader appears in the **Not paired** list; click **Pair** to pair it again.
 
 The **History** in the Pairing tab lists every pairing, replacement and removal with the user who
 did it and when. It is kept even after the reader is deleted.
@@ -112,7 +113,7 @@ exactly the reader and server that computed it. A Touch reader checks your serve
 commitment it received before the code was computed. An attacker who is **actively in the network
 during the enrollment** can make a reader trust the attacker instead of your server, but cannot make
 it trust your server in a way you would approve: the code the reader shows then differs from the
-code the server computes, so your approval fails ("code not found"). If a code that you read
+code the server computes, so your approval fails ("This code does not match the reader"). If a code that you read
 correctly is rejected, stop and check the network before trying again.
 
 Attempts are limited: three per minute per connection, ten per ten minutes and twenty waiting

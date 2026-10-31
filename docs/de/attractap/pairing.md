@@ -16,12 +16,12 @@ mehr selbst registrieren: Niemand kann einen Reader hinzufügen, ohne dass ein A
 
 | Status                | Bedeutung                                                                                                                                                                               |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er in der Liste der wartenden Reader.                                                           |
+| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er als Zeile **Neuer Reader** im Block **Nicht gekoppelt**.                                     |
 | **Nicht gekoppelt**   | Ein Reader, der vor dieser Version per Token registriert wurde. Er funktioniert mit seinem Token weiter, bis ein Admin ihn in seiner Zeile koppelt. Die Einstellungen bleiben gesperrt. |
 | **Gekoppelt**         | Der Reader hat einen eigenen Schlüssel und ein Zertifikat und kann genutzt und eingerichtet werden.                                                                                     |
 | **Kopplung entfernt** | Ein Admin hat die Kopplung entfernt. Der Reader wird innerhalb einer Sekunde getrennt, zeigt „Kopplung entfernt“ und wartet mit einem neuen Schlüssel wieder auf Freigabe.              |
 
-Nur gekoppelte Reader stehen in den Tabellen **Aktiv** und **Veraltet** und lassen sich bearbeiten.
+Nur gekoppelte Reader stehen in den Tabellen **Aktive Attractaps** und **Veraltete Attractaps** und lassen sich bearbeiten.
 
 ## Neuen Reader koppeln
 
@@ -39,9 +39,11 @@ bearbeiten** angezeigt). Die Kopplung wirkt sofort; du musst den Reader danach n
      Code ein.
    - **Lite-Reader** haben kein Display. Der LED-Ring zeigt ein Farbmuster, und der
      **Web-Flasher** zeigt den Code (siehe unten).
-3. Öffne in Attraccess die Reader-Seite, wähle, einen Reader zu koppeln, und gib den Code ein
-   (oder folge einfach dem QR-Link). Die Seite zeigt, zu welchem Reader der Code gehört (Typ und
-   Firmware). Vergib optional einen Namen und gib den Reader frei.
+3. Öffne in Attraccess die Reader-Seite (**Geräte** > **Attractap-Lesegeräte**). Der wartende
+   Reader steht im Block **Nicht gekoppelt** als **Neuer Reader**. Klicke **Koppeln**, gib den Code
+   ein, vergib optional einen Namen und klicke **Freigeben**. Oder folge einfach dem QR-Link: Er
+   öffnet denselben Dialog mit eingetragenem Code und zeigt, zu welchem Reader der Code gehört (Typ
+   und Firmware).
 4. Der Reader zeigt kurz Grün, wechselt in die verschlüsselte Sitzung und ist einsatzbereit. Seine
    Einstellungen öffnen sich, damit du Ressourcen zuweisen kannst.
 
@@ -52,8 +54,8 @@ höchstens 10 Minuten; danach fragt der Reader mit einem neuen Code erneut an un
 Schlüssel. Zeigen zufällig zwei Reader gleichzeitig denselben Code, bittet Attraccess dich, auf
 den nächsten Code zu warten.
 
-Du kannst auch aus der Liste der wartenden Reader freigeben: den Reader auswählen und den Code
-eingeben, den er zeigt. Touch-Reader verlangen immer den Code: Er beweist, dass du genau diesen
+Du kannst auch aus dem Block **Nicht gekoppelt** freigeben: Klicke in der Zeile des Readers auf
+**Koppeln** und gib den Code ein, den er zeigt. Touch-Reader verlangen immer den Code: Er beweist, dass du genau diesen
 Reader vor dir hast.
 
 ### Lite-Reader: LED-Muster
@@ -71,7 +73,7 @@ Ein Lite-Reader zeigt das Muster auf seinem Ring aus 24 LEDs, aufgeteilt in **8 
 
 Vergleiche die acht Farben mit der Farbliste, die die Freigabeseite für den wartenden
 Lite-Reader zeigt, und gib den Reader frei. Das Muster wechselt zusammen mit dem Code alle
-30 Sekunden. Siehe auch den LED-Leitfaden (englisch: [LED Guide](attractap/led-guide.md)).
+30 Sekunden. Der LED-Leitfaden für die Lite-Variante liegt nur auf Englisch vor (Seite „LED Guide (Lite)“ der englischen Dokumentation).
 
 Lite-Reader berechnen auch den normalen Code. Öffne den Web-Flasher, verbinde den Reader und
 drücke **Freigeben** neben dem angezeigten Code, oder lies die Zeile `Enrollment: code=XXX-XXX`
@@ -123,7 +125,7 @@ prüft deinen Server gegen eine Verpflichtung, die er erhalten hat, bevor der Co
 Ein Angreifer, der **während der Anmeldung aktiv im Netzwerk** ist, kann einen Reader dazu bringen,
 dem Angreifer statt deinem Server zu vertrauen. Er kann ihn aber nicht dazu bringen, deinem Server
 so zu vertrauen, dass du es freigeben würdest: Der Code am Reader weicht dann vom Code des Servers
-ab, und deine Freigabe schlägt fehl („Code nicht gefunden“). Wird ein richtig abgelesener Code
+ab, und deine Freigabe schlägt fehl („Dieser Code passt nicht zum Reader“). Wird ein richtig abgelesener Code
 abgelehnt, höre auf und prüfe das Netzwerk, bevor du es erneut versuchst.
 
 Versuche sind begrenzt: drei pro Minute und Verbindung, zehn pro zehn Minuten und zwanzig

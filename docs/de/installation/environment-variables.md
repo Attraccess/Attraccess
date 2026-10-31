@@ -6,7 +6,7 @@ Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetz
 
 | Variable | Beschreibung |
 |----------|-------------|
-| `AUTH_SESSION_SECRET` | Geheimer Schlüssel für die Verschlüsselung von Sitzungsdaten. Verwenden Sie einen zufälligen, langen Wert. |
+| `AUTH_SESSION_SECRET` | Geheimer Schlüssel für die Verschlüsselung von Sitzungsdaten. Er schützt auch die gespeicherten Schlüssel der Reader-Kopplung; sichern Sie ihn zusammen mit der Datenbank. Verwenden Sie einen zufälligen, langen Wert. |
 | `ATTRACCESS_URL` | Die URL, unter der Benutzer auf Attraccess zugreifen, z.B. `https://attraccess.meine-domain.de` |
 
 ## Anwendung

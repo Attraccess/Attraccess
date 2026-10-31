@@ -6,7 +6,7 @@ All configuration options for Attraccess that can be set via environment variabl
 
 | Variable | Description |
 |----------|-------------|
-| `AUTH_SESSION_SECRET` | Secret key for encrypting session data. Use a random, long value. |
+| `AUTH_SESSION_SECRET` | Secret key for encrypting session data. It also protects the stored reader-pairing keys, so back it up together with the database. Use a random, long value. |
 | `ATTRACCESS_URL` | The URL where users access Attraccess, e.g. `https://attraccess.your-domain.com` |
 
 ## Application

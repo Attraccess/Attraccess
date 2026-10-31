@@ -1,6 +1,6 @@
 # Attractap Setup
 
-This guide walks you through registering a new Attractap reader in Attraccess and assigning it to a resource.
+This guide walks you through pairing a new Attractap reader in Attraccess and assigning it to a resource.
 
 ## Prerequisites
 
@@ -37,8 +37,9 @@ A reader cannot register itself. It shows a rotating code and an admin approves 
    to pairing and shows a code (Touch: on the screen and as a QR code; Lite: as a colour pattern
    on the LED ring and in the web flasher).
 2. Scan the QR code with your phone, or open the readers page in Attraccess (**Devices** >
-   **Attractap Readers**), choose to pair a reader and enter the code.
-3. Optionally enter a name (for example "Laser Cutter Reader") and approve.
+   **Attractap Readers**), click **Pair** on the waiting reader in the **Not paired** list and enter
+   the code.
+3. Optionally enter a name (for example "Laser Cutter Reader") and click **Approve**.
 
 The reader connects and is ready. See [Reader Pairing](attractap/pairing.md) for details, the Lite
 LED pattern, security notes and what to do with readers that were registered before.
@@ -51,10 +52,10 @@ LED pattern, security notes and what to do with readers that were registered bef
 
 After pairing the reader, you need to assign which resource(s) it controls:
 
-1. Open the reader you just paired
-2. In the **Resources** section, click **Add Resource**
+1. Open the reader you just paired (it opens automatically; later use **Edit** on its row)
+2. Open the **Resources** tab
 3. Select the resource (machine or door) that this reader should control
-4. Click **Save**
+4. Click **Save Changes**
 
 > [!TIP]
 > A single reader can be assigned to one resource. If you need to control multiple machines, set up a separate reader for each one.

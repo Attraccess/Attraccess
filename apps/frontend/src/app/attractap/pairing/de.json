@@ -26,7 +26,7 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "completed": "Der Reader ist gekoppelt.",
-    "failed": "Kopplung fehlgeschlagen. Starte am Reader neu.",
+    "failed": "Kopplung fehlgeschlagen. Drücke am Reader erneut auf Koppeln, um neu zu beginnen.",
     "expired": "Zeitüberschreitung. Der Reader beginnt mit einem neuen Code von vorn.",
     "cancelled": "Kopplung wurde abgebrochen.",
     "reason": {

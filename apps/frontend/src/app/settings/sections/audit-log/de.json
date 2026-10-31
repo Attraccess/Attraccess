@@ -170,7 +170,7 @@
     "attractap.reader.pairing_expired": "Kopplung des Lesegeräts abgelaufen",
     "attractap.reader.revoked": "Kopplung des Lesegeräts entfernt",
     "attractap.reader.replaced": "Lesegerät ersetzt",
-    "attractap.reader.token_rejected": "Alte Anmeldung eines gekoppelten Lesegeräts blockiert",
+    "attractap.reader.token_rejected": "Token-Anmeldung eines gekoppelten oder entkoppelten Lesegeräts blockiert",
     "attractap.reader.handshake_rejected": "Verbindungen des Lesegeräts abgelehnt",
     "settings.updated": "Systemeinstellungen geändert",
     "settings.api_key.generated": "Metrik-API-Schlüssel erstellt",
@@ -343,6 +343,7 @@
     "configuration.clientSecretConfigured": "Client-Secret konfiguriert",
     "provider": "Identitätsanbieter",
     "changes": "Angewendete Änderungen",
+    "method": "Freigabeart",
     "mode": "Kopplungsart",
     "count": "Anzahl",
     "replacedReaderId": "ID des ersetzten Lesegeräts"

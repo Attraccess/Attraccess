@@ -34,8 +34,8 @@ Stellen Sie vor Beginn sicher, dass:
 Ein Leser kann sich nicht selbst registrieren. Er zeigt einen wechselnden Code, den ein Admin einmal freigibt.
 
 1. Der Leser muss die Adresse Ihres Servers kennen. Ein Leser ohne Zugangsdaten startet dann direkt die Kopplung und zeigt einen Code (Touch: auf dem Display und als QR-Code; Lite: als Farbmuster auf dem LED-Ring und im Web-Flasher).
-2. Scannen Sie den QR-Code mit Ihrem Smartphone, oder oeffnen Sie in Attraccess die Leser-Seite (**Geraete** > **Attractap-Lesegeraete**), waehlen Sie, einen Leser zu koppeln, und geben Sie den Code ein.
-3. Geben Sie optional einen Namen ein (z.B. "Lasercutter-Leser") und geben Sie den Leser frei.
+2. Scannen Sie den QR-Code mit Ihrem Smartphone, oder oeffnen Sie in Attraccess die Leser-Seite (**Geraete** > **Attractap-Lesegeraete**), klicken Sie im Block **Nicht gekoppelt** beim wartenden Leser auf **Koppeln** und geben Sie den Code ein.
+3. Geben Sie optional einen Namen ein (z.B. "Lasercutter-Leser") und klicken Sie auf **Freigeben**.
 
 Der Leser verbindet sich und ist einsatzbereit. Details, das LED-Muster der Lite-Variante, Sicherheitshinweise und den Umgang mit frueher registrierten Lesern finden Sie unter [Reader koppeln](attractap/pairing.md).
 
@@ -46,10 +46,10 @@ Der Leser verbindet sich und ist einsatzbereit. Details, das LED-Muster der Lite
 
 Nach der Kopplung des Lesers muessen Sie festlegen, welche Ressource(n) er steuert:
 
-1. Oeffnen Sie den soeben gekoppelten Leser
-2. Klicken Sie im Bereich **Ressourcen** auf **Ressource hinzufuegen**
+1. Oeffnen Sie den soeben gekoppelten Leser (er oeffnet sich automatisch; spaeter ueber **Bearbeiten** in seiner Zeile)
+2. Oeffnen Sie den Tab **Ressourcen**
 3. Waehlen Sie die Ressource (Maschine oder Tuer), die dieser Leser steuern soll
-4. Klicken Sie auf **Speichern**
+4. Klicken Sie auf **Änderungen speichern**
 
 > [!TIP]
 > Ein einzelner Leser kann einer Ressource zugewiesen werden. Wenn Sie mehrere Maschinen steuern muessen, richten Sie fuer jede einen separaten Leser ein.

@@ -170,7 +170,7 @@
     "attractap.reader.pairing_expired": "Reader pairing expired",
     "attractap.reader.revoked": "Reader pairing removed",
     "attractap.reader.replaced": "Reader replaced",
-    "attractap.reader.token_rejected": "Old sign-in by a paired reader blocked",
+    "attractap.reader.token_rejected": "Token sign-in blocked for a paired or unpaired reader",
     "attractap.reader.handshake_rejected": "Reader connections rejected",
     "settings.updated": "System settings updated",
     "settings.api_key.generated": "Metrics API key generated",
@@ -343,6 +343,7 @@
     "configuration.clientSecretConfigured": "Client secret configured",
     "provider": "Identity provider",
     "changes": "Applied changes",
+    "method": "Approval method",
     "mode": "Pairing mode",
     "count": "Count",
     "replacedReaderId": "Replaced reader ID"
