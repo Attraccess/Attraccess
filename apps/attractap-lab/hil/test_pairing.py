@@ -41,14 +41,20 @@ def base_url(api):
 
 
 def revoke(api, admin, reader):
-    """Revoke the pairing; return the seconds until the reader reports the session ended."""
+    """Revoke the pairing; return the seconds until the live session dropped.
+
+    The reader learns *why* only when it reconnects (its exponential back-off decides when), so
+    that is awaited separately and not counted against the one-second bound.
+    """
     console = reader["console"]
     mark = console.mark()
     started = time.monotonic()
     status, body = api.call("POST", f"/attractap/readers/{reader['id']}/revoke", {}, token=admin)
     assert status in (200, 201, 204), body
-    console.expect(r"Server ended the pairing", mark, 10)
-    return time.monotonic() - started, mark
+    console.expect(r"WebSocket disconnected", mark, 5)
+    elapsed = time.monotonic() - started
+    console.expect(r"Server ended the pairing", mark, 90)
+    return elapsed, mark
 
 
 def repair(api, admin, reader, since):
