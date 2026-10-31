@@ -19,7 +19,7 @@ from attractap_lab.drivers import (
 )
 from attractap_lab.enrollment import approve, latest_code
 from attractap_lab.reader_screen import ReaderTestHooks
-from attractap_lab.workflow import claim, send_reader_wifi
+from attractap_lab.workflow import claim, flash_reader, send_reader_wifi
 
 from support import Api, ReaderConsole
 
@@ -138,15 +138,17 @@ def approve_pairing(console, url, token, timeout=180, since=0, **options):
 
 
 @pytest.fixture(scope="session")
-def reader(target, api, admin, artifacts):
+def reader(target, emulator, api, admin, artifacts):
     """A freshly flashed reader on the lab Wi-Fi, paired with the test API.
 
     The janitor erases readers between sessions, so the reader starts unpaired
     and is approved with the admin session of the API this run started.
     """
-    flash = target.get_driver(ESPToolDriver)
-    flash.flash(os.environ["READER_IMAGE"])
-    target.deactivate(flash)
+    # An idle Touch V1 is off: flash_reader turns it on with its power button,
+    # which the emulator presses now that it runs this run's firmware, and keeps
+    # it on through the flash. Readers that are on, like a Touch V2, are left alone.
+    flash_reader(target, os.environ["READER_IMAGE"])
+    flash = target.get_driver(ESPToolDriver, activate=False)
     driver = target.get_driver("SerialDriver", activate=False)
     open_console(target, driver)
     console = ReaderConsole(driver, artifacts / "reader-serial.log")
