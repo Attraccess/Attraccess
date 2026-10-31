@@ -188,6 +188,7 @@ void Application::resetSessionOnDisconnect() {
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
+  this->pendingActionUsageId = 0;
   this->hasPendingFormRequest = false;
   this->hasPendingServerFormFlow = false;
   this->pendingFormRequestResourceId = 0;
@@ -215,7 +216,7 @@ void Application::updateSelectedResourceDetails() {
     const auto &resource = this->resourceList.items[i];
     if (resource.id != this->selectedResourceId) continue;
     Display::lockscreen.setResourceName(resource.name);
-    Display::lockscreen.setUsageInfo(resource.hasActiveUsage, resource.activeUser, resource.isUnderMaintenance);
+    Display::lockscreen.setUsageInfo(resource);
     Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
     const bool personalized = resource.accessKnown && this->cardAuthenticationData.username == this->resourceList.authenticatedUsername;
     const bool legacy = !resource.accessKnown && this->authenticationResourceId == resource.id;
@@ -290,7 +291,8 @@ void Application::handleResourceDetailsButtonClick(
     for (uint16_t i = 0; i < this->resourceList.count; ++i) {
       if (this->resourceList.items[i].id == this->selectedResourceId) {
         const auto &res = this->resourceList.items[i];
-        isTakeover = res.hasActiveUsage && res.allowTakeOver &&
+        // Takeover only exists on single-session machines; parallel machines just use a free slot.
+        isTakeover = !res.isMultiSession() && res.hasActiveUsage && res.allowTakeOver &&
                      strcmp(res.activeUser,
                             this->cardAuthenticationData.username.c_str()) != 0;
         break;
@@ -336,9 +338,10 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = 0;
     this->pendingActionIsTakeover = false;
+    this->pendingActionUsageId = evt.usageId;
     this->hasPendingFormRequest = false;
     this->formFlowSubmitted = false;
-    this->api.stopResourceUsageSession(this->selectedResourceId);
+    this->api.stopResourceUsageSession(this->selectedResourceId, evt.usageId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
     this->pendingUiAction = "LOCK_DOOR";

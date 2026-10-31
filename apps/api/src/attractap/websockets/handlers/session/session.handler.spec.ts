@@ -351,6 +351,26 @@ describe('AttractapSessionHandler – session + flow button', () => {
   describe('handleStopResourceUsageSession', () => {
     const fixture = createHandleStopResourceUsageSessionFixture(scope);
 
+    it('passes the chosen usageId through to endSession, and none for the holder own session', async () => {
+      fixture.mockResourceUsageService.endSession.mockResolvedValue({ id: 99, userId: 2 });
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
+        { payload: { resourceId: 10, usageId: 55 } } as AttractapEvent['data'],
+      );
+      expect(fixture.mockResourceUsageService.endSession).toHaveBeenLastCalledWith(
+        10,
+        expect.anything(),
+        expect.objectContaining({ usageId: 55 }),
+        expect.anything(),
+      );
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
+        { payload: { resourceId: 10 } } as AttractapEvent['data'],
+      );
+      const dto = fixture.mockResourceUsageService.endSession.mock.calls.at(-1)[2];
+      expect(dto).not.toHaveProperty('usageId');
+    });
+
     it('sends the final charge with configured precision and the action request ID', async () => {
       fixture.mockResourceUsageService.endSession.mockResolvedValue({
         id: 99,

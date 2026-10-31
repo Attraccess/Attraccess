@@ -10,7 +10,7 @@ import {
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, EntityManager, In } from 'typeorm';
+import { Repository, EntityManager, In, IsNull } from 'typeorm';
 
 import {
   ResourceMeter,
@@ -377,6 +377,11 @@ export class ResourceMeteringService implements OnModuleInit {
           });
         }
         if (!definition.configured) continue;
+        // Interim rule for parallel sessions: the earliest-started running session keeps the meter. A later
+        // overlapping session must not re-initialize it nor fail that session; it is not metered until ATT-1191.
+        if (await this.isMeterHeldByOtherSession(input.resourceId, meter.meterId, [input.usageId, input.supersedes])) {
+          continue;
+        }
         const session = await this.sessions.save({
           id: randomUUID(),
           resourceId: input.resourceId,
@@ -425,6 +430,20 @@ export class ResourceMeteringService implements OnModuleInit {
         );
       throw new BadRequestException(`METER_INITIALIZATION_FAILED: ${this.reason(error)}`);
     }
+  }
+
+  private async isMeterHeldByOtherSession(
+    resourceId: number,
+    meterId: number,
+    ignoredUsageIds: (number | undefined)[],
+  ): Promise<boolean> {
+    const held = await this.sessions.find({
+      where: { resourceId, meterId, status: ResourceMeteringSessionStatus.Active },
+      select: { usageId: true },
+    });
+    const candidates = held.map((session) => session.usageId).filter((id) => !ignoredUsageIds.includes(id));
+    if (!candidates.length) return false;
+    return this.sessions.manager.existsBy(ResourceUsage, { id: In(candidates), endTime: IsNull() });
   }
 
   // ---- meter definition -------------------------------------------------------------------------

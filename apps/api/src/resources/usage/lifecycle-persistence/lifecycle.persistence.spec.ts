@@ -72,7 +72,7 @@ describe('Usage lifecycle persistence around external flows', () => {
       const emitted = jest.spyOn(scope.events, 'emit');
       expect((await scope.usage.getResourceUsageHistory(1)).data.map((row) => row.id)).toEqual([orphan.id]);
       expect(await scope.usage.getActiveSession(1)).toBeNull();
-      expect((await scope.usage.getActiveSessions([1])).get(1)).toBeNull();
+      expect((await scope.usage.getActiveSessions([1])).get(1)).toEqual([]);
       await expect(scope.usage.endSession(1, scope.users[0], {})).rejects.toThrow('No active session found');
 
       await scope.usage.onModuleInit();
@@ -115,7 +115,7 @@ describe('Usage lifecycle persistence around external flows', () => {
       expect((await scope.usage.getResourceUsageHistory(1)).data[0].formSubmissions).toHaveLength(1);
       const started = await scope.usage.startSession(1, scope.users[1], {});
       expect((await scope.usage.getActiveSession(1))?.id).toBe(started.id);
-      expect((await scope.usage.getActiveSessions([1])).get(1)?.id).toBe(started.id);
+      expect((await scope.usage.getActiveSessions([1])).get(1)?.at(-1)?.id).toBe(started.id);
     },
   );
 
@@ -173,7 +173,7 @@ describe('Usage lifecycle persistence around external flows', () => {
       'A usage lifecycle operation is already in progress',
     );
     expect((await scope.usage.getActiveSession(1))?.id).toBe(active.id);
-    expect((await scope.usage.getActiveSessions([1])).get(1)?.id).toBe(active.id);
+    expect((await scope.usage.getActiveSessions([1])).get(1)?.at(-1)?.id).toBe(active.id);
     await scope.source.getRepository(ResourceUsage).delete(candidate.id);
     await scope.usage.recoverInterruptedLifecycles();
     await expect(scope.usage.startSession(1, scope.users[1], {})).rejects.toBeInstanceOf(ResourceInUseError);
@@ -190,11 +190,11 @@ describe('Usage lifecycle persistence around external flows', () => {
     await scope.usage.recoverInterruptedLifecycles();
     expect(await scope.publishedState()).toEqual(before);
     expect((await scope.usage.getActiveSession(1))?.id).toBe(second.id);
-    expect((await scope.usage.getActiveSessions([1])).get(1)?.id).toBe(second.id);
+    expect((await scope.usage.getActiveSessions([1])).get(1)?.at(-1)?.id).toBe(second.id);
     await expect(scope.seedActiveSession()).rejects.toThrow('Resource already has an active usage session');
     await scope.usage.endSession(1, scope.users[0], {});
     expect((await scope.usage.getActiveSession(1))?.id).toBe(first.id);
-    expect((await scope.usage.getActiveSessions([1])).get(1)?.id).toBe(first.id);
+    expect((await scope.usage.getActiveSessions([1])).get(1)?.at(-1)?.id).toBe(first.id);
     expect(await scope.source.query('SELECT * FROM resource_usage_recovery')).toEqual([]);
   });
 
@@ -216,7 +216,7 @@ describe('Usage lifecycle persistence around external flows', () => {
     await entered;
     try {
       expect(await scope.usage.getActiveSession(1)).toBeNull();
-      expect((await scope.usage.getActiveSessions([1])).get(1)).toBeNull();
+      expect((await scope.usage.getActiveSessions([1])).get(1)).toEqual([]);
       expect((await scope.usage.getResourceUsageHistory(1)).total).toBe(0);
       await expect(scope.usage.startSession(1, scope.users[1], { forceTakeOver: true })).rejects.toThrow(
         'A usage lifecycle operation is already in progress',

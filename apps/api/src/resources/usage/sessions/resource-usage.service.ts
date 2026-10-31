@@ -59,7 +59,7 @@ import { ResourceRetrainingService } from '../../retraining/resourceRetraining.s
 
 import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 
-import { activeUsageWhere } from './active-usage';
+import { activeUsageWhere, getSessionCapacity } from './active-usage';
 
 import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.dto';
 
@@ -143,37 +143,77 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     'formSubmissions.user',
   ];
 
+  /**
+   * The caller's own active session when `preferUserId` has one, otherwise the newest.
+   * Identical to the single-session behaviour at limit 1.
+   */
   public async getActiveSession(
     resourceId: number,
     transactionalEntityManager?: EntityManager,
+    preferUserId?: number,
   ): Promise<ResourceUsage | null> {
+    const sessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+    if (sessions.length === 0) return null;
+    return (
+      (preferUserId === undefined ? undefined : sessions.find((session) => session.userId === preferUserId)) ??
+      sessions[sessions.length - 1]
+    );
+  }
+
+  /** All active sessions of one resource, earliest started first. */
+  public async getActiveSessionsForResource(
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceUsage[]> {
     const resourceUsageRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(ResourceUsage)
       : this.resourceUsageRepository;
 
-    return await resourceUsageRepository.findOne({
-      where: {
-        resourceId,
-        ...activeUsageWhere(),
-      },
-      order: { startTime: 'DESC', id: 'DESC' },
+    return await resourceUsageRepository.find({
+      where: { resourceId, ...activeUsageWhere() },
+      order: { startTime: 'ASC', id: 'ASC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
   }
 
-  public async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage | null>> {
-    const map = new Map<number, ResourceUsage | null>(resourceIds.map((id) => [id, null]));
+  public async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage[]>> {
+    const map = new Map<number, ResourceUsage[]>(resourceIds.map((id) => [id, []]));
     if (resourceIds.length === 0) return map;
     const sessions = await this.resourceUsageRepository.find({
       where: { resourceId: In(resourceIds), ...activeUsageWhere() },
-      order: { startTime: 'DESC', id: 'DESC' },
+      order: { startTime: 'ASC', id: 'ASC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
-    for (const session of sessions) {
-      // Legacy duplicates are retained for explicit resolution. Single and bulk reads agree.
-      if (!map.get(session.resourceId)) map.set(session.resourceId, session);
-    }
+    for (const session of sessions) map.get(session.resourceId)?.push(session);
     return map;
+  }
+
+  public async getActiveSessionOverview(
+    resourceId: number,
+    userId: number,
+  ): Promise<{
+    usage: ResourceUsage | null;
+    usages: ResourceUsage[];
+    activeSessionCount: number;
+    maxParallelSessions: number;
+    isFull: boolean;
+  }> {
+    const [usages, resource] = await Promise.all([
+      this.getActiveSessionsForResource(resourceId),
+      this.resourceRepository.findOne({
+        where: { id: resourceId },
+        select: { id: true, type: true, maxParallelSessions: true },
+      }),
+    ]);
+    const usage = usages.find((session) => session.userId === userId) ?? usages[usages.length - 1] ?? null;
+    return {
+      usage,
+      usages,
+      ...getSessionCapacity(
+        { type: resource?.type ?? ResourceType.Machine, maxParallelSessions: resource?.maxParallelSessions ?? 1 },
+        usages.length,
+      ),
+    };
   }
 
   /**

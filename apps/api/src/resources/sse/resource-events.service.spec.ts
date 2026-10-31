@@ -60,7 +60,8 @@ describe('resource initial state and subject cleanup', () => {
           new Promise((r) => {
             resolve = r;
           }),
-        ),
+        )
+        .mockResolvedValue({ id: 1, usages: [{ endTime: null, lifecyclePending: false }] }),
     };
     const service = new ResourceEventsService(repository as unknown as Repository<Resource>);
     const callback = jest.fn();
@@ -95,8 +96,63 @@ describe('events that end or hand over a session', () => {
     service.handleResourceSessionEnded(
       new ResourceUsageSessionEndedEvent({ id: 3, resourceId: 1, userId: 42 } as ResourceUsage, null),
     );
+    await new Promise<void>((done) => setImmediate(done));
     expect(callback).toHaveBeenCalledWith({
-      data: { eventType: ResourceUsageSessionEndedEvent.EVENT_NAME, resourceId: 1, inUse: false, ownerUserId: 42 },
+      data: {
+        eventType: ResourceUsageSessionEndedEvent.EVENT_NAME,
+        resourceId: 1,
+        inUse: false,
+        activeSessionCount: 0,
+        maxParallelSessions: 1,
+        ownerUserId: 42,
+      },
+    });
+    sub.unsubscribe();
+  });
+
+  it('never reports inUse:false while other sessions remain and carries count and limit', async () => {
+    const repository = {
+      findOne: jest.fn(async (query) =>
+        query.relations
+          ? {
+              type: 'machine',
+              maxParallelSessions: 3,
+              usages: [
+                { endTime: null, lifecyclePending: false },
+                { endTime: null, lifecyclePending: false },
+                { endTime: new Date(), lifecyclePending: false },
+                { endTime: null, lifecyclePending: true },
+              ],
+            }
+          : { id: 1 },
+      ),
+    };
+    const service = new ResourceEventsService(repository as unknown as Repository<Resource>);
+    const callback = jest.fn();
+    const sub = (await service.subscribeResource(1)).subscribe(callback);
+    await new Promise<void>((done) => setImmediate(done));
+    callback.mockClear();
+    service.handleResourceSessionEnded(
+      new ResourceUsageSessionEndedEvent({ id: 3, resourceId: 1, userId: 42 } as ResourceUsage, null),
+    );
+    await new Promise<void>((done) => setImmediate(done));
+    expect(callback).toHaveBeenCalledWith({
+      data: expect.objectContaining({ inUse: true, activeSessionCount: 2, maxParallelSessions: 3 }),
+    });
+    sub.unsubscribe();
+  });
+
+  it('reports a session_started event of an already ended usage as ended', async () => {
+    const { service, callback, sub } = await open();
+    const usage = Object.assign(new ResourceUsage(), {
+      endTime: new Date(),
+      resource: Object.assign(new Resource(), { id: 1 }),
+    });
+    service.handleResourceUsage(new ResourceSessionStartedEvent(usage));
+    await new Promise<void>((done) => setImmediate(done));
+    expect(callback.mock.calls[0][0].data).toMatchObject({
+      eventType: ResourceUsageSessionEndedEvent.EVENT_NAME,
+      inUse: false,
     });
     sub.unsubscribe();
   });
@@ -111,11 +167,14 @@ describe('events that end or hand over a session', () => {
         { id: 42, username: 'previous' } as User,
       ),
     );
+    await new Promise<void>((done) => setImmediate(done));
     const { data } = callback.mock.calls[0][0];
     expect(data).toEqual({
       eventType: ResourceUsageSessionTakenOverEvent.EVENT_NAME,
       resourceId: 1,
-      inUse: true,
+      inUse: false,
+      activeSessionCount: 0,
+      maxParallelSessions: 1,
       ownerUserId: 42,
     });
     expect(JSON.stringify(data)).not.toContain('newcomer');

@@ -80,12 +80,12 @@ describe('ResourceUsageService', () => {
 
     it('should return active session when it exists', async () => {
       const mockActiveSession = { id: 1, resourceId: 1, userId: 1, user: { id: 1 } as User } as ResourceUsage;
-      getActiveSessionScope.resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
+      getActiveSessionScope.resourceUsageRepository.find.mockResolvedValue([mockActiveSession]);
 
       const result = await getActiveSessionScope.service.getActiveSession(1);
 
       expect(result).toBe(mockActiveSession);
-      expect(getActiveSessionScope.resourceUsageRepository.findOne).toHaveBeenCalledWith({
+      expect(getActiveSessionScope.resourceUsageRepository.find).toHaveBeenCalledWith({
         where: {
           resourceId: 1,
           endTime: IsNull(),
@@ -93,13 +93,13 @@ describe('ResourceUsageService', () => {
           lifecyclePending: false,
           usageAction: ResourceUsageAction.Usage,
         },
-        order: { startTime: 'DESC', id: 'DESC' },
+        order: { startTime: 'ASC', id: 'ASC' },
         relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
       });
     });
 
     it('should return null when no active session exists', async () => {
-      getActiveSessionScope.resourceUsageRepository.findOne.mockResolvedValue(null);
+      getActiveSessionScope.resourceUsageRepository.find.mockResolvedValue([]);
 
       const result = await getActiveSessionScope.service.getActiveSession(1);
 

@@ -1,9 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDate, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsArray, IsInt, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FormSubmissionRequestDto } from '../../forms/dto';
 
 export class EndUsageSessionDto {
+  @ApiProperty({
+    description:
+      "The usage session to end. Without it, the caller's own session is ended (or the only active session, if there is exactly one).",
+    required: false,
+    type: Number,
+  })
+  @IsInt()
+  @IsOptional()
+  usageId?: number;
+
   @ApiProperty({
     description: 'Additional notes about the completed session',
     required: false,
@@ -14,8 +24,7 @@ export class EndUsageSessionDto {
   notes?: string;
 
   @ApiProperty({
-    description:
-      'The end time of the session. If not provided, current time will be used.',
+    description: 'The end time of the session. If not provided, current time will be used.',
     required: false,
     type: Date,
   })

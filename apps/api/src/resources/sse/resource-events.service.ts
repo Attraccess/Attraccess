@@ -3,7 +3,7 @@ import { Observable, Subject } from 'rxjs';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Resource } from '@attraccess/database-entities';
+import { Resource, ResourceType } from '@attraccess/database-entities';
 import {
   ResourceSessionStartedEvent,
   ResourceUsageSessionEndedEvent,
@@ -63,6 +63,7 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
         this.resourceSubjects.set(resourceId, subject);
       }
       let changed = false;
+      const queuedAtSubscribe = this.queuedEvents.get(resourceId) ?? 0;
       const sub = subject.subscribe({
         next: (event) => {
           if ('inUse' in event.data) changed = true;
@@ -70,10 +71,10 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
         },
         complete: () => subscriber.complete(),
       });
-      void this.getResourceInUseStatus(resourceId)
-        .then((inUse) => {
-          if (!subscriber.closed && !changed) {
-            subscriber.next({ data: { resourceId, inUse, timestamp: new Date().toISOString() } });
+      void this.getResourceSessionStatus(resourceId)
+        .then((status) => {
+          if (!subscriber.closed && !changed && (this.queuedEvents.get(resourceId) ?? 0) === queuedAtSubscribe) {
+            subscriber.next({ data: { resourceId, ...status, timestamp: new Date().toISOString() } });
           }
         })
         .catch((error) => subscriber.error(error));
@@ -86,21 +87,44 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async getResourceInUseStatus(resourceId: number): Promise<boolean> {
-    // Check if resource has an active usage session (no endTime)
+  /** Every payload carries the full slot state so consumers never infer "free" from a single ended session. */
+  private async getResourceSessionStatus(
+    resourceId: number,
+  ): Promise<{ inUse: boolean; activeSessionCount: number; maxParallelSessions: number }> {
     const resource = await this.resourceRepository.findOne({
       where: { id: resourceId },
       relations: ['usages'],
     });
 
-    if (!resource) {
-      return false;
-    }
-
     // Look for active usage sessions (those without an end time)
-    const activeUsage = resource.usages?.find((usage) => usage.endTime === null && !usage.lifecyclePending);
+    const activeSessionCount =
+      resource?.usages?.filter((usage) => usage.endTime === null && !usage.lifecyclePending).length ?? 0;
+    const maxParallelSessions =
+      resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
 
-    return !!activeUsage;
+    return { inUse: activeSessionCount > 0, activeSessionCount, maxParallelSessions };
+  }
+
+  // Slot state is read when the event is handled; handlers of one resource run in order so a slower
+  // read can never overwrite a newer one on the wire.
+  private readonly emitQueues = new Map<number, Promise<void>>();
+
+  // Events queued per resource: an initial read that began earlier must not overwrite a newer queued event.
+  private readonly queuedEvents = new Map<number, number>();
+
+  private emitWithSessionStatus(resourceId: number, data: object): void {
+    this.queuedEvents.set(resourceId, (this.queuedEvents.get(resourceId) ?? 0) + 1);
+    const previous = this.emitQueues.get(resourceId) ?? Promise.resolve();
+    const next = previous
+      .then(async () => {
+        const status = await this.getResourceSessionStatus(resourceId);
+        this.emitToResource(resourceId, { ...data, ...status });
+      })
+      .catch((error) => this.logger.warn(`Failed to emit session state for resource ${resourceId}: ${error.message}`))
+      .finally(() => {
+        if (this.emitQueues.get(resourceId) === next) this.emitQueues.delete(resourceId);
+      });
+    this.emitQueues.set(resourceId, next);
   }
 
   private emitToResource(resourceId: number, data: object): void {
@@ -114,38 +138,36 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
     const {
       usage: { resource },
     } = event;
-    this.emitToResource(resource.id, {
-      ...event,
-      inUse: true,
-      eventType: ResourceSessionStartedEvent.EVENT_NAME,
-    });
-    this.logger.debug(`Emitted ${ResourceSessionStartedEvent.EVENT_NAME} event for resource ${resource.id}`);
+    // This event also fires when a session ends (endTime set); report it as such.
+    const eventType = event.usage.endTime
+      ? ResourceUsageSessionEndedEvent.EVENT_NAME
+      : ResourceSessionStartedEvent.EVENT_NAME;
+    this.emitWithSessionStatus(resource.id, { ...event, eventType });
+    this.logger.debug(`Queued ${eventType} event for resource ${resource.id}`);
   }
 
   @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
   handleResourceSessionEnded(event: ResourceUsageSessionEndedEvent) {
     const resourceId = event.usage.resourceId;
-    this.emitToResource(resourceId, {
+    this.emitWithSessionStatus(resourceId, {
       eventType: ResourceUsageSessionEndedEvent.EVENT_NAME,
       resourceId,
-      inUse: false,
       // Lets the live-feed filter hand this to the session's owner even when they may not see other activity.
       ownerUserId: event.usage.userId,
     });
-    this.logger.debug(`Emitted ${ResourceUsageSessionEndedEvent.EVENT_NAME} event for resource ${resourceId}`);
+    this.logger.debug(`Queued ${ResourceUsageSessionEndedEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
   handleResourceUsageTakenOver(event: ResourceUsageSessionTakenOverEvent) {
     const resourceId = event.resource.id;
-    this.emitToResource(resourceId, {
+    this.emitWithSessionStatus(resourceId, {
       eventType: ResourceUsageSessionTakenOverEvent.EVENT_NAME,
       resourceId,
-      inUse: true,
       // The previous owner learns their session is gone; the new owner's name is never part of the event.
       ownerUserId: event.previousUser?.id,
     });
-    this.logger.debug(`Emitted ${ResourceUsageSessionTakenOverEvent.EVENT_NAME} event for resource ${resourceId}`);
+    this.logger.debug(`Queued ${ResourceUsageSessionTakenOverEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)

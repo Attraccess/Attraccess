@@ -82,6 +82,8 @@ Ressourcenverwalter können für jede Ressource festlegen, wie Einweisungen und 
 | **Beaufsichtigung erlaubt** | Eingewiesene Benutzer dürfen selbst starten. Nicht eingewiesene Benutzer dürfen eine beaufsichtigte Sitzung starten, wenn eine Aufsicht anwesend ist. |
 | **Beaufsichtigung erforderlich** | Jede Sitzung erfordert eine anwesende Aufsicht, auch für eingewiesene Benutzer. |
 
+Bei einer Maschine mit [parallelen Sitzungen](resources/creating-resources.md#max-parallele-sitzungen) ist eine beaufsichtigte Sitzung eine Sitzung (die der beaufsichtigten Person) mit verknüpfter Aufsicht. Die Aufsicht belegt keinen Platz, kann beliebig viele Sitzungen an derselben Maschine beaufsichtigen und nebenbei eine eigene Sitzung laufen lassen. Die beaufsichtigte Person darf an dieser Maschine noch keine Sitzung haben. Ein Leser kann für die Beaufsichtigung vorbereitet werden, solange mindestens ein Platz frei ist.
+
 Beaufsichtigte Sitzungen werden im Nutzungsverlauf mit der Aufsicht gespeichert. Dadurch ist sichtbar, wer die Sitzung beaufsichtigt hat, und beaufsichtigte Trainings- oder Probenutzungen lassen sich von regulären selbstständigen Nutzungen unterscheiden.
 
 ## Automatische Einweisung

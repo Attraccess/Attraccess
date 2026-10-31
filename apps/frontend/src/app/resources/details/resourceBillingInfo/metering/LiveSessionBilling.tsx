@@ -6,6 +6,7 @@ import {
   useResourceMeteringServiceGetResourceMeteringLive,
   useResourcesServiceResourceUsageGetActiveSession,
 } from '@attraccess/react-query-client';
+import { useAuth } from '../../../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { applyBillingFactor, formatDurationMs, toExactCredits } from '@attraccess/shared';
 import de from './de.json';
@@ -26,8 +27,16 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
   const formatValue = useMeterValueFormatter();
 
   const { data: active } = useResourcesServiceResourceUsageGetActiveSession({ resourceId }, undefined);
+  const { user } = useAuth();
+  // With parallel sessions `usage` may be someone else's (when I have none), so only show my own then.
   // A redacted session (no user) only tells the viewer the resource is in use; its time and cost are not theirs to see.
-  const usage = active?.usage?.user ? active.usage : null;
+  const usages = active?.usages;
+  const usage =
+    (active?.maxParallelSessions ?? 1) > 1
+      ? (usages?.find((u) => u.userId === user?.id && u.user) ?? null)
+      : active?.usage?.user
+        ? active.usage
+        : null;
   const { data: live } = useResourceMeteringServiceGetResourceMeteringLive({ resourceId }, undefined, {
     enabled: !!usage,
     refetchInterval: 10_000,

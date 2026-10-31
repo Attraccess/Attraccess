@@ -12,6 +12,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   useResourceMeteringServiceGetResourceMeteringLive: vi.fn(),
   useResourcesServiceResourceUsageGetActiveSession: vi.fn(),
 }));
+vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (async () => {
@@ -84,6 +85,19 @@ describe('LiveSessionBilling', () => {
       undefined,
       expect.objectContaining({ enabled: false }),
     );
+  });
+
+  it('shows only my own session on a machine with parallel sessions', () => {
+    mock(null, null);
+    vi.mocked(useResourcesServiceResourceUsageGetActiveSession).mockReturnValue({
+      data: {
+        usage: { id: 5, userId: 2, startTime: '2026-09-28T10:00:00Z' },
+        usages: [{ id: 5, userId: 2, startTime: '2026-09-28T10:00:00Z' }],
+        maxParallelSessions: 3,
+      },
+    } as ReturnType<typeof useResourcesServiceResourceUsageGetActiveSession>);
+    const { container } = render(<LiveSessionBilling {...props} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('shows the live meter value, the exact energy cost and an estimate of the whole bill', () => {

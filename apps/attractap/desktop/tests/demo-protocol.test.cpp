@@ -127,6 +127,50 @@ int main(int argc, char **argv)
     assert(resourceList["data"]["payload"]["readerName"] == "Demo Device");
     assert(resourceList["data"]["payload"]["resources"][0]["name"] == "CNC Router");
     assert(resourceList["data"]["payload"]["authenticatedUsername"] == "Literal Müller");
+
+    // ATT-1189: the demo printer allows three people at once, the CNC stays single-session.
+    assert(DemoStore::addCard("A1A1A1A1", DemoStore::UserRole::INTRODUCED, "Ann"));
+    assert(DemoStore::addCard("B2B2B2B2", DemoStore::UserRole::INTRODUCED, "Ben"));
+    assert(DemoStore::addCard("C3C3C3C3", DemoStore::UserRole::INTRODUCED, "Cid"));
+    assert(DemoStore::addCard("D4D4D4D4", DemoStore::UserRole::ADMIN, "Dee"));
+    const auto tap = [&](const char *uid) {
+        exchange((std::string(R"({"data":{"type":"REQUEST_CARD_AUTHENTICATION_DATA","payload":{"uid":")") + uid + R"(","resourceId":2}}})").c_str());
+    };
+    const auto printer = [&]() { return resourceList["data"]["payload"]["resources"][1]; };
+    const auto startPrinter = [&]() {
+        exchange(R"({"data":{"type":"START_RESOURCE_USAGE_SESSION","payload":{"resourceId":2,"requestId":5}}})");
+    };
+    assert(resourceList["data"]["payload"]["resources"][0]["maxParallelSessions"] == 1);
+    assert(printer()["maxParallelSessions"] == 3);
+    tap("A1A1A1A1"); startPrinter();
+    assert(printer()["activeSessionCount"] == 1 && printer()["canStart"] == false);
+    assert(printer()["ownUsageSession"]["user"]["username"] == "Ann");
+    startPrinter(); // already has one
+    const auto annId = printer()["ownUsageSession"]["id"].as<uint32_t>();
+    tap("B2B2B2B2"); startPrinter();
+    assert(printer()["activeSessionCount"] == 2 && printer()["canStart"] == false);
+    assert(printer()["activeUsageSession"]["user"]["username"] == "Ben");
+    tap("C3C3C3C3"); assert(printer()["canStart"] == true && printer()["ownUsageSession"].isNull());
+    startPrinter();
+    assert(printer()["activeUsageSessions"].size() == 3);
+    tap("D4D4D4D4");
+    assert(printer()["canStart"] == false && printer()["activeSessionCount"] == 3);
+    startPrinter(); // full: refused, list pushed again
+    assert(printer()["activeSessionCount"] == 3);
+    // Non-managers cannot end someone else's session; managers end exactly the chosen one.
+    tap("B2B2B2B2");
+    exchange((std::string(R"({"data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2,"usageId":)") + std::to_string(annId) + "}}}").c_str());
+    assert(received["data"]["payload"]["error"].is<const char *>() && printer()["activeSessionCount"] == 3);
+    tap("D4D4D4D4");
+    exchange((std::string(R"({"data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2,"usageId":)") + std::to_string(annId) + "}}}").c_str());
+    assert(printer()["activeSessionCount"] == 2 && printer()["canStart"] == true);
+    for (auto session : printer()["activeUsageSessions"].as<JsonArray>()) assert(session["id"].as<uint32_t>() != annId);
+    // Without usageId a person ends only their own session.
+    tap("C3C3C3C3");
+    exchange(R"({"data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
+    assert(printer()["activeSessionCount"] == 1);
+    assert(printer()["activeUsageSession"]["user"]["username"] == "Ben");
+    State::setDefaultLanguage("de");
     Display::setDeviceName("Operator Gerät");
     State::setDefaultLanguage("de"); Display::loop(); lv_timer_handler();
     State::setDefaultLanguage("en"); Display::loop(); lv_timer_handler();

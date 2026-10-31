@@ -69,6 +69,19 @@ Stopping from the list, details or after submitting a required end form produces
 
 The device currently uses German labels, including **Bis bald!**. Future English equivalents are **Thanks, {name}!**, **Duration**, **Charged**, and **See you soon!**.
 
+## Shared machines
+
+Some machines allow several people to work at the same time (see [Using Resources](end-user/using-resources.md#use-a-shared-machine)). On the touch reader:
+
+- The list and details show **In use k/N** with a **Start** action while slots are free, and **Full** when all slots are taken.
+- If you have a session on the machine, it shows **In use by you** with **Stop**. Live stats on the details screen are for your own session.
+- Managers and introducers get a session picker on the details screen to end a specific other session.
+- The lock screen shows whether the machine is in use or full.
+
+Machines with a limit of 1 behave as described above; takeover and force-stop are unchanged.
+
+On Attractap Lite (headless) readers, a short tap of your card starts your session and a long tap stops your own session. The LEDs signal an error if the machine is full or you already have a session.
+
 ## Complete a required form
 
 Your organization may ask for information before a machine starts or stops, such as a condition check or material used.
@@ -116,6 +129,9 @@ After signing out, you can scan your card again to continue. Any running machine
 | Your card does not sign you in     | Try again and keep the card in place until sign-in finishes. If it still fails, ask your administrator to check that the card is registered to your account. |
 | A start, stop or door action fails | Read the message and check the resource's current status before trying again. If the problem continues, contact the resource maintainer or resource manager.                          |
 | The reader loses its connection    | Wait for the connection to return, then sign in again. A lost connection does not end running machine usage.                                                 |
+
+> [!NOTE]
+> Reader firmware and server ship together. The server updates readers automatically to its bundled firmware version (see [Firmware Updates](attractap/firmware-updates.md)).
 
 ## Related guides
 

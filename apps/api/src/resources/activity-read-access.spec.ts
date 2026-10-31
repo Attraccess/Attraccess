@@ -118,6 +118,10 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
   const usageService = {
     canControllResource: jest.fn(async () => controllable),
     getActiveSession: jest.fn(async (resourceId: number) => ({ ...usage(), resourceId })),
+    getActiveSessionOverview: jest.fn(async (resourceId: number) => {
+      const session = { ...usage(), resourceId };
+      return { usage: session, usages: [session], activeSessionCount: 1, maxParallelSessions: 1, isFull: true };
+    }),
     // Mirrors the real service's gate: own or full access opens it, anonymous gets the redacted view, else 404.
     getSessionDetails: jest.fn(
       async (

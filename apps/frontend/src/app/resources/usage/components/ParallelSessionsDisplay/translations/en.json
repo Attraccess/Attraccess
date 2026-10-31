@@ -1,0 +1,18 @@
+{
+  "inUse": "In use ({{count}}/{{max}})",
+  "full": "Full ({{count}}/{{max}})",
+  "otherSessions": "Other active sessions",
+  "unknownUser": "Unknown User",
+  "sessionStarted": "Started",
+  "supervisedBy": "Supervised by",
+  "contact": {
+    "button": "Contact",
+    "error": "Could not contact user",
+    "errorDescription": "Failed to open a conversation with this user. Please try again."
+  },
+  "endSession": {
+    "button": "End session",
+    "successful": "Session ended",
+    "successfulDescription": "You have ended the session of the other user."
+  }
+}

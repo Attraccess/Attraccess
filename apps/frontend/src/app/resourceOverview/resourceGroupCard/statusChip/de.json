@@ -1,6 +1,8 @@
 {
   "status": {
     "inUse": "In Benutzung",
+    "inUseCount": "In Benutzung {{count}}/{{max}}",
+    "full": "Voll ({{count}}/{{max}})",
     "available": "Verfügbar",
     "maintenance": "In Wartung"
   }

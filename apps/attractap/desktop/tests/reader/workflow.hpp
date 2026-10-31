@@ -145,6 +145,7 @@ struct ReaderWorkflow
     void testMassIntroduction();
     void testIdentityAndPendingAuthentication();
     void testSessionSummary();
+    void testParallelSessions();
     void testWallClock();
     void testTimeouts();
     void testFirmwareUpdate(bool reset);

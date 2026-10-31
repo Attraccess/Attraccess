@@ -2,6 +2,7 @@ import {
   BillingTransaction,
   BillingTransactionItem,
   EmailTemplateType,
+  Resource,
   ResourceFlowEdge,
   ResourceFlowNode,
   ResourceMeter,
@@ -232,6 +233,32 @@ describe('Flow-defined metering', () => {
       expect((await genericMetersScope.metering.getStatus(1)).meters).toHaveLength(2);
       expect(nodes).toHaveBeenCalledTimes(1);
       expect(edges).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the meter with the earliest running session when a second person starts (parallel sessions)', async () => {
+      await genericMetersScope.seedMeter();
+      await genericMetersScope.metering.setRate(1, 1, 30);
+      await genericMetersScope.source.getRepository(Resource).update(1, { maxParallelSessions: 2 });
+      const onStart = jest.fn(genericMetersScope.onStart);
+      genericMetersScope.onStart = onStart;
+      const sessions = genericMetersScope.source.getRepository(ResourceMeteringSession);
+
+      const first = await genericMetersScope.usage.startSession(1, genericMetersScope.users[0], {} as never);
+      const second = await genericMetersScope.usage.startSession(1, genericMetersScope.users[1], {} as never);
+
+      // The later overlapping session neither re-initializes the meter nor fails the first one.
+      expect(onStart).toHaveBeenCalledTimes(1);
+      const held = await sessions.find();
+      expect(held).toHaveLength(1);
+      expect(held[0]).toMatchObject({ usageId: first.id, status: ResourceMeteringSessionStatus.Active });
+      expect(await genericMetersScope.metering.listMeters(1)).toEqual([
+        expect.objectContaining({ session: expect.objectContaining({ usageId: first.id }) }),
+      ]);
+
+      await genericMetersScope.usage.endSession(1, genericMetersScope.users[0], {} as never);
+      // The remaining session is never charged the meter consumption.
+      await genericMetersScope.usage.endSession(1, genericMetersScope.users[1], {} as never);
+      expect(await sessions.countBy({ usageId: second.id })).toBe(0);
     });
 
     it('allows resource usage when a tracking-only start fails', async () => {

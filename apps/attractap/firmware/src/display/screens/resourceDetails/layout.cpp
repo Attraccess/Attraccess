@@ -122,6 +122,13 @@ void ResourceDetailsScreen::createResourceHeader()
     lv_obj_set_style_text_color(this->resourceDescription, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->resourceDescription, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+   this->occupancyLabel = lv_label_create(resouceDetails);
+   lv_obj_set_width(this->occupancyLabel, lv_pct(100));
+   lv_obj_set_height(this->occupancyLabel, LV_SIZE_CONTENT);
+   lv_obj_remove_flag(this->occupancyLabel, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_text_font(this->occupancyLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_flag(this->occupancyLabel, LV_OBJ_FLAG_HIDDEN);
+
 }
 
 void ResourceDetailsScreen::createSessionControls()
@@ -220,6 +227,16 @@ void ResourceDetailsScreen::createSessionControls()
    lv_obj_set_align(this->stopSessionButtonLabel, LV_ALIGN_CENTER);
    FirmwareI18n::setLabel(this->stopSessionButtonLabel, FirmwareI18n::Message::EndSession);
 
+   // Managers pick one other session to end when a machine runs several in parallel.
+   this->otherSessionsContainer = lv_obj_create(this->sessionControls);
+   lv_obj_remove_style_all(this->otherSessionsContainer);
+   lv_obj_set_width(this->otherSessionsContainer, lv_pct(100));
+   lv_obj_set_height(this->otherSessionsContainer, LV_SIZE_CONTENT);
+   lv_obj_set_flex_flow(this->otherSessionsContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_style_pad_row(this->otherSessionsContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_remove_flag(this->otherSessionsContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(this->otherSessionsContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_add_flag(this->otherSessionsContainer, LV_OBJ_FLAG_HIDDEN);
 
 }
 

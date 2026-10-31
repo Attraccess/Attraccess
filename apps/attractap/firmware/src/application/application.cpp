@@ -192,6 +192,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
+  this->pendingActionUsageId = 0;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
   this->pendingUiAction.clear();

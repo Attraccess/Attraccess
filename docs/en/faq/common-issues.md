@@ -43,6 +43,8 @@ This page lists frequently encountered problems and their solutions.
 | Not introduced | You need a safety introduction before you can use the resource. Ask an authorized introducer for the resource. |
 | Resource under maintenance | The resource may be temporarily unavailable for maintenance. Check the resource status on the detail page. |
 | Resource in use | Someone else may be using the resource. Wait until their session ends. |
+| "This machine is full (N/N sessions in use)" | The machine allows several parallel sessions and all slots are taken. Wait until someone finishes, or ask a resource manager to raise **Max parallel sessions**. Takeover is not available on machines with more than one parallel session. |
+| "You already have an active session on this machine" | You can only have one active session per machine. Stop your existing session first (on the detail page, or at the reader). |
 
 ## Forgot Password
 

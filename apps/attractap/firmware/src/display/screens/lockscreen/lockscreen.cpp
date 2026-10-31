@@ -5,6 +5,7 @@
 #include "../../theme.hpp"
 #include "../../shared/headerButton.hpp"
 #include "../../shared/wallClockText.hpp"
+#include "../../shared/sessionOccupancy.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 #include <string>
 
@@ -219,11 +220,23 @@ void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool is
     }
     this->hasActiveUsage = hasActiveUsage;
     this->isUnderMaintenance = isUnderMaintenance;
+    this->multiSession = false;
 
     this->updateUsageInfo();
     // Resource details are applied before navigating to this cached screen.
     // Refresh now so its first frame does not wait for the next loop tick.
     this->updateWallClock();
+}
+
+void Lockscreen::setUsageInfo(const API::ResourceBrief &resource)
+{
+    this->setUsageInfo(resource.hasActiveUsage, resource.activeUser, resource.isUnderMaintenance);
+    if (resource.isMultiSession())
+    {
+        this->multiSession = true;
+        this->occupancy = resource;
+        this->updateUsageInfo();
+    }
 }
 
 void Lockscreen::updateUsageInfo()
@@ -239,7 +252,15 @@ void Lockscreen::updateUsageInfo()
     FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
 
     // Status priority mirrors the web resource list: in use > maintenance > available.
-    if (this->hasActiveUsage)
+    const auto occupancyText = this->multiSession ? SessionOccupancy::caption(this->occupancy, false) : FirmwareI18n::Text();
+    if (!occupancyText.empty())
+    {
+        FirmwareI18n::setLabel(this->usageInfoLabel, occupancyText);
+        lv_obj_set_style_text_color(this->usageInfoLabel,
+                                    this->occupancy.isFull() ? DisplayTheme::danger() : DisplayTheme::warning(),
+                                    LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    else if (!this->multiSession && this->hasActiveUsage)
     {
         const auto usageText = FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(this->username) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */});
         FirmwareI18n::setLabel(this->usageInfoLabel, usageText);

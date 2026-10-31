@@ -5,6 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { ActiveSessionDisplay } from '../ActiveSessionDisplay';
 import { OtherUserSessionDisplay } from '../OtherUserSessionDisplay';
+import { ParallelSessionsDisplay } from '../ParallelSessionsDisplay';
 import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
 import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
@@ -82,6 +83,22 @@ export function ResourceUsageSession({
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
+  const maxParallelSessions = activeSessionResponse?.maxParallelSessions ?? resource.maxParallelSessions ?? 1;
+  const isParallel = maxParallelSessions > 1;
+  const activeSessions = useMemo(
+    () => activeSessionResponse?.usages ?? (activeSessionResponse?.usage ? [activeSessionResponse.usage] : []),
+    [activeSessionResponse],
+  );
+  const mySession = useMemo(
+    () => activeSessions.find((usage) => !!user && usage.userId === user.id),
+    [activeSessions, user],
+  );
+  const otherSessions = useMemo(
+    () => activeSessions.filter((usage) => usage !== mySession),
+    [activeSessions, mySession],
+  );
+  const activeSessionCount = activeSessionResponse?.activeSessionCount ?? activeSessions.length;
+
   const isLoading = isLoadingSession || isLoadingIntroStatus || isLoadingIntroducers;
 
   const isIntroducer = useMemo(() => {
@@ -102,12 +119,60 @@ export function ResourceUsageSession({
     includeActive: true,
   });
 
+  const renderStartArea = () => {
+    if (!canStartSession && !supervisionEnabled) {
+      return <IntroductionRequiredDisplay resourceId={resourceId} />;
+    }
+
+    if (activeMaintenances?.data?.length && activeMaintenances.data.length > 0) {
+      return (
+        <>
+          {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
+          <MaintenanceInProgressDisplay resourceId={resourceId} />
+        </>
+      );
+    }
+
+    return (
+      <>
+        {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
+        <StartSessionControls
+          resourceId={resourceId}
+          insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+          requiresSupervision={!canStartSession}
+        />
+      </>
+    );
+  };
+
   const renderContent = () => {
     if (isLoading) {
       return (
         <div className="flex justify-center py-4">
           <Spinner color="accent" />
         </div>
+      );
+    }
+
+    if (isParallel) {
+      const isFull = activeSessionCount >= maxParallelSessions;
+      return (
+        <>
+          {mySession && (
+            <ActiveSessionDisplay resourceId={resourceId} usageId={mySession.id} startTime={mySession.startTime} />
+          )}
+          {(otherSessions.length > 0 || isFull) && (
+            <ParallelSessionsDisplay
+              resourceId={resourceId}
+              usages={otherSessions}
+              activeSessionCount={activeSessionCount}
+              maxParallelSessions={maxParallelSessions}
+            />
+          )}
+          {mySession || isFull
+            ? !canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />
+            : renderStartArea()}
+        </>
       );
     }
 
@@ -133,29 +198,7 @@ export function ResourceUsageSession({
       }
     }
 
-    if (!canStartSession && !supervisionEnabled) {
-      return <IntroductionRequiredDisplay resourceId={resourceId} />;
-    }
-
-    if (activeMaintenances?.data?.length && activeMaintenances.data.length > 0) {
-      return (
-        <>
-          {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
-          <MaintenanceInProgressDisplay resourceId={resourceId} />
-        </>
-      );
-    }
-
-    return (
-      <>
-        {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
-        <StartSessionControls
-          resourceId={resourceId}
-          insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-          requiresSupervision={!canStartSession}
-        />
-      </>
-    );
+    return renderStartArea();
   };
 
   return (

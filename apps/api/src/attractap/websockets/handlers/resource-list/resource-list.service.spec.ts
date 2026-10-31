@@ -228,7 +228,7 @@ describe('ResourceListService', () => {
       const startTime = new Date('2026-06-04T10:00:00.000Z');
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
-        new Map([[10, { id: 99, user: { username: 'active-user' }, startTime }]]),
+        new Map([[10, [{ id: 99, user: { username: 'active-user' }, startTime }]]]),
       );
       fixture.resourceMaintenanceService.getActiveMaintenanceResourceIds.mockResolvedValue(new Set([10]));
       fixture.resourceFlowsService.getNodesForResources.mockResolvedValue(
@@ -271,12 +271,24 @@ describe('ResourceListService', () => {
                   isUnderMaintenance: true,
                   isHealthy: true,
                   healthReason: '',
+                  maxParallelSessions: 1,
+                  activeSessionCount: 1,
+                  canStart: false,
+                  ownUsageSession: null,
                   activeUsageSession: {
                     id: 99,
                     user: { username: 'active-user' },
                     startTime: startTime.toISOString(),
                     startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
                   },
+                  activeUsageSessions: [
+                    {
+                      id: 99,
+                      user: { username: 'active-user' },
+                      startTime: startTime.toISOString(),
+                      startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
+                    },
+                  ],
                   flowButtons: [{ id: 'node-1', label: 'Start' }],
                 },
               ],
@@ -360,7 +372,7 @@ describe('ResourceListService', () => {
       const summer = new Date('2026-07-01T10:00:00.000Z');
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
-        new Map([[10, { user: { username: 'active-user' }, startTime: summer }]]),
+        new Map([[10, [{ user: { username: 'active-user' }, startTime: summer }]]]),
       );
 
       const socket = fixture.createMockSocket();
@@ -372,9 +384,55 @@ describe('ResourceListService', () => {
       expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset());
     });
 
+    it('lists all sessions with count and limit and personalises canStart and the own session', async () => {
+      const startTime = new Date('2026-06-04T10:00:00.000Z');
+      const reader = fixture.createReaderFixture();
+      reader.resources[0].maxParallelSessions = 3;
+      fixture.attractapService.findReaderById.mockResolvedValue(reader);
+      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([
+          [
+            10,
+            [
+              { id: 1, userId: 5, user: { username: 'early' }, startTime },
+              { id: 2, userId: 7, user: { username: 'me' }, startTime, supervisorUser: { username: 'boss' } },
+            ],
+          ],
+        ]),
+      );
+      const socket = fixture.createMockSocket();
+      await fixture.service.sendResourceListToSocket(socket);
+      const anonymous = ((socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent).data.payload as any;
+      expect(anonymous.resources[0]).toMatchObject({
+        maxParallelSessions: 3,
+        activeSessionCount: 2,
+        canStart: true,
+        ownUsageSession: null,
+        activeUsageSession: { id: 2 },
+      });
+      expect(anonymous.resources[0].activeUsageSessions.map((s: { id: number }) => s.id)).toEqual([1, 2]);
+      expect(anonymous.resources[0].activeUsageSessions[1].supervisorUsername).toBe('boss');
+    });
+
+    it('reports a full machine as not startable', async () => {
+      const startTime = new Date('2026-06-04T10:00:00.000Z');
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([[10, [{ id: 1, userId: 5, user: { username: 'early' }, startTime }]]]),
+      );
+      const socket = fixture.createMockSocket();
+      await fixture.service.sendResourceListToSocket(socket);
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      expect((sent.data.payload as any).resources[0]).toMatchObject({
+        maxParallelSessions: 1,
+        activeSessionCount: 1,
+        canStart: false,
+      });
+    });
+
     it('emits activeUsageSession=null when there is no active session', async () => {
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
-      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(new Map([[10, null]]));
+      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(new Map([[10, []]]));
 
       const socket = fixture.createMockSocket();
 

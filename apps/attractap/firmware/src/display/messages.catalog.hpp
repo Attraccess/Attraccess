@@ -269,6 +269,13 @@ enum class Message {
     PairingRemovedAskingAgain,
     ServerCouldNotBeVerified,
     SecureConnectionFailed,
+    InUseCount,
+    ResourceFull,
+    ErrorResourceInUse,
+    ErrorResourceFull,
+    ErrorAlreadyHasActiveSession,
+    EndNamedSession,
+    EndOtherSessionsTitle,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -560,6 +567,13 @@ inline constexpr Entry catalog[] = {
     {Message::PairingRemovedAskingAgain, "Das Lesegerät fordert gleich eine neue Freigabe an", "The reader asks for a new approval shortly"},
     {Message::ServerCouldNotBeVerified, "Server konnte nicht überprüft werden", "Server could not be verified"},
     {Message::SecureConnectionFailed, "Sichere Verbindung fehlgeschlagen. Server oder Proxy prüfen.", "Secure connection failed. Check the server or proxy."},
+    {Message::InUseCount, "In Verwendung {0}/{1}", "In use {0}/{1}"},
+    {Message::ResourceFull, "Voll", "Full"},
+    {Message::ErrorResourceInUse, "Die Ressource wird gerade von jemand anderem verwendet.", "The resource is currently in use by someone else."},
+    {Message::ErrorResourceFull, "Alle Plätze dieser Ressource sind belegt.", "All places on this resource are taken."},
+    {Message::ErrorAlreadyHasActiveSession, "Du hast bereits eine aktive Sitzung auf dieser Ressource.", "You already have an active session on this resource."},
+    {Message::EndNamedSession, "Sitzung von {0} beenden", "End session of {0}"},
+    {Message::EndOtherSessionsTitle, "Fremde Sitzung beenden:", "End another session:"},
 };
 
 } // namespace FirmwareI18n

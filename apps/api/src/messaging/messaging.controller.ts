@@ -11,7 +11,7 @@ import {
   Req,
   Sse,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Message, MessageReferenceType } from '@attraccess/database-entities';
 import { Observable } from 'rxjs';
@@ -68,18 +68,25 @@ export class MessagingController {
   })
   @ApiResponse({ status: 201, description: 'The conversation with the resource holder', type: ContactResponseDto })
   @ApiResponse({ status: 403, description: 'Forbidden - The user may not see who is using this resource' })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    type: Number,
+    description: 'Whose session to contact when several are active',
+  })
   @ApiResponse({ status: 404, description: 'No active session for this resource' })
   @ApiResponse({ status: 429, description: 'Contact rate limit exceeded' })
   async contactResourceHolder(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
+    @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
   ): Promise<ContactResponseDto> {
     // The conversation names the holder, so it needs the same access as seeing who uses the machine.
     // Checked before the lookup so free and in-use machines answer alike.
     if ((await this.activityVisibility.resolve(req.user, resourceId)) !== 'full') {
       throw new ForbiddenException('You cannot see who is using this resource');
     }
-    const holder = await this.messagingService.resolveResourceHolder(resourceId);
+    const holder = await this.messagingService.resolveResourceHolder(resourceId, userId);
     if (!holder) {
       throw new NotFoundException(`No active session found for resource with ID ${resourceId}`);
     }
@@ -98,7 +105,10 @@ export class MessagingController {
 
   @Get('conversations')
   @Auth()
-  @ApiOperation({ summary: 'List the authenticated user inbox conversations', operationId: 'messagingListConversations' })
+  @ApiOperation({
+    summary: 'List the authenticated user inbox conversations',
+    operationId: 'messagingListConversations',
+  })
   @ApiResponse({ status: 200, description: 'The inbox conversations', type: [ConversationListItemDto] })
   async listConversations(@Req() req: AuthenticatedRequest): Promise<ConversationListItemDto[]> {
     return this.messagingService.listConversations(req.user.id);
@@ -163,5 +173,4 @@ export class MessagingController {
         : undefined,
     );
   }
-
 }

@@ -30,6 +30,37 @@ describe('ResourceOperatingAttributionService', () => {
     });
   });
 
+  describe('parallel sessions (interim rule)', () => {
+    it('attributes each operating moment to exactly one session, the earliest started', () => {
+      const result = fixture.service.derive(
+        [fixture.operating(1, '10:00:00', '11:00:00')],
+        [fixture.usage(2, '10:10:00', '10:40:00'), fixture.usage(3, '10:20:00', '10:50:00')],
+        fixture.asOf,
+      );
+
+      const byUsage = (usageId: number) =>
+        result.attributions.filter((entry) => entry.usageId === usageId).reduce((sum, e) => sum + e.durationMs, 0);
+      expect(byUsage(2)).toBe(30 * 60_000);
+      expect(byUsage(3)).toBe(10 * 60_000);
+      expect(result.attributedOperatingDurationMs).toBe(40 * 60_000);
+      expect(byUsage(2) + byUsage(3)).toBe(result.attributedOperatingDurationMs);
+    });
+
+    it('charges the persisted duration of a later session without the earlier overlapping one', async () => {
+      const earlier = fixture.usage(2, '10:00:00', null);
+      const later = fixture.usage(3, '10:20:00', '10:50:00');
+      fixture.intervalRepository.find.mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]);
+      const manager = {
+        getRepository: (entity: unknown) => ({
+          find: async () =>
+            entity === ResourceOperatingInterval ? [fixture.operating(1, '10:00:00', '11:00:00')] : [earlier],
+        }),
+      };
+
+      await expect(fixture.service.getForUsage(later, manager as never)).resolves.toBe(0);
+    });
+  });
+
   describe('getDurationsForWindows', () => {
     it('clips independent service cycles and unions overlapping intervals without requiring attribution', async () => {
       fixture.intervalRepository.find.mockResolvedValue([

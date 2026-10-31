@@ -23,7 +23,15 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       return { payload: input };
     }
 
-    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, ctx.transactionManager);
+    // With parallel sessions, end the session that triggered this run; other runs keep ending the newest one.
+    const candidateId = 'usageId' in input ? input.usageId : 'id' in input ? input.id : undefined;
+    const activeSessions = await this.resourceUsageService.getActiveSessionsForResource(
+      node.resourceId,
+      ctx.transactionManager,
+    );
+    const activeUsage =
+      (typeof candidateId === 'number' ? activeSessions.find((session) => session.id === candidateId) : undefined) ??
+      activeSessions[activeSessions.length - 1];
 
     if (!activeUsage) {
       throw new NoUsageSessionError();
@@ -36,7 +44,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
     await this.resourceUsageService.endSession(
       node.resourceId,
       activeUsage.user,
-      { notes: finalNotes },
+      { notes: finalNotes, usageId: activeUsage.id },
       {
         skipFormSubmissions: true,
         skipNoteNotification: true,

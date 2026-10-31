@@ -69,7 +69,7 @@ export function registerResourceListServiceFixture() {
     attractapService = { findReaderById: jest.fn() };
     resourceUsageService = {
       canControllResource: jest.fn().mockResolvedValue(false),
-      getActiveSessions: jest.fn().mockResolvedValue(new Map([[10, null]])),
+      getActiveSessions: jest.fn().mockResolvedValue(new Map([[10, []]])),
     };
     resourceMaintenanceService = {
       getActiveMaintenanceResourceIds: jest.fn().mockResolvedValue(new Set()),

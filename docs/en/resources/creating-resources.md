@@ -14,11 +14,27 @@ You need the **Manage Resources** permission to create new resources.
 | **Type** | Yes | Machine or Door |
 | **Description** | No | Detailed description |
 | **Image** | No | Photo of the resource (JPG, PNG) |
-| **Allow Takeover** | No | Next user can take over session without the previous user ending it |
+| **Allow Takeover** | No | Next user can take over session without the previous user ending it. Only available when **Max parallel sessions** is 1 |
+| **Max parallel sessions** | No | Machines only: how many people may use the machine at the same time (1-1000, default 1). Doors ignore this setting |
 
 4. Click **Save**
 
 <!-- TODO: Add screenshot of creation form -->
+
+### Max Parallel Sessions
+
+By default, a machine can be used by one person at a time. If a machine can safely be used by several people simultaneously (for example a workbench or a shared tool station), raise **Max parallel sessions** on the **Machine** (behaviour) tab of the resource settings, next to **Allow Takeover**.
+
+- With the limit at **1**, everything works exactly as before.
+- With a limit of **N**, up to N different people can each have their own active session at the same time. Each person can only have one active session per machine.
+- When all slots are in use, further starts are refused with "This machine is full".
+- **Allow Takeover** only applies when the limit is 1. On a machine with a higher limit, takeover is not available.
+- Introduction, permission, [supervision mode](resources/introductions.md), forms, balance, maintenance and health checks are applied per person, exactly as before.
+
+You can lower the limit at any time. Running sessions are never ended automatically; new starts are blocked until fewer sessions than the limit are active. If the new limit is below the number of currently active sessions, the settings page shows a hint.
+
+> [!WARNING]
+> [Flows](flows/overview.md) and billing are not yet aware of how many sessions are running. Flows run for every session start and stop, so a flow that switches power off when a session ends cuts the power for everybody on the machine. Meters and running time are charged to a single session only. Read [Shared machines](resources/usage-tracking.md#shared-machines-parallel-sessions) before enabling parallel sessions on a machine with power control or metered billing.
 
 ## Editing a Resource
 

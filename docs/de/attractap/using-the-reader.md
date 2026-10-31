@@ -69,6 +69,19 @@ Das Beenden aus der Liste, aus den Details oder nach dem Absenden eines Pflichtf
 
 Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**. Vorgesehene englische Entsprechungen: **Thanks, {name}!**, **Duration**, **Charged**, **See you soon!**.
 
+## Gemeinsam genutzte Maschinen
+
+Manche Maschinen erlauben es, dass mehrere Personen gleichzeitig arbeiten (siehe [Ressourcen nutzen](end-user/using-resources.md#gemeinsam-genutzte-maschine-verwenden)). Am Touchleser gilt:
+
+- Liste und Details zeigen **In Benutzung k/N** mit einer Aktion **Start**, solange Plätze frei sind, und **Voll**, wenn alle Plätze belegt sind.
+- Haben Sie eine Sitzung an der Maschine, steht dort **Von Ihnen genutzt** mit **Stop**. Die Live-Statistiken auf dem Detailbildschirm gelten für Ihre eigene Sitzung.
+- Ressourcenverwalter und Einweiser erhalten auf dem Detailbildschirm eine Sitzungsauswahl, um eine bestimmte andere Sitzung zu beenden.
+- Der Sperrbildschirm zeigt, ob die Maschine in Benutzung oder voll ist.
+
+Maschinen mit einem Limit von 1 verhalten sich wie oben beschrieben; Übernahme und erzwungenes Beenden bleiben unverändert.
+
+An Attractap-Lite-Lesern (ohne Display) startet ein kurzes Auflegen Ihrer Karte Ihre Sitzung, ein langes Auflegen beendet Ihre eigene Sitzung. Die LEDs signalisieren einen Fehler, wenn die Maschine voll ist oder Sie bereits eine Sitzung haben.
+
 ## Ein erforderliches Formular ausfüllen
 
 Ihre Organisation kann vor dem Start oder Ende einer Nutzung Angaben abfragen, zum Beispiel zum Zustand der Maschine oder zum verwendeten Material.
@@ -116,6 +129,9 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 | Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihre Administration zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
 | Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                               |
 | Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                              |
+
+> [!NOTE]
+> Leser-Firmware und Server werden gemeinsam ausgeliefert. Der Server aktualisiert die Leser automatisch auf die mitgelieferte Firmware-Version (siehe [Firmware-Updates](attractap/firmware-updates.md)).
 
 ## Weiterführende Anleitungen
 

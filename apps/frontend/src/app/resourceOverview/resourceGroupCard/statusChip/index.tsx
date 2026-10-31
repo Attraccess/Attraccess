@@ -29,9 +29,8 @@ export function StatusChip(props: Readonly<Props>) {
     includeActive: true,
   });
 
-  const isInUse = useMemo(() => {
-    return !!session?.usage;
-  }, [session]);
+  const maxSessions = session?.maxParallelSessions ?? 1;
+  const sessionCount = session?.activeSessionCount ?? (session?.usage ? 1 : 0);
 
   const isUnderMaintenance = useMemo(() => {
     return (activeMaintenances?.data?.length ?? 0) > 0;
@@ -51,8 +50,14 @@ export function StatusChip(props: Readonly<Props>) {
   }
 
   // In-use takes priority over maintenance to mirror the resource details view.
-  if (isInUse) {
-    return <Chip color="danger">{t('status.inUse')}</Chip>;
+  if (sessionCount > 0) {
+    if (maxSessions <= 1) {
+      return <Chip color="danger">{t('status.inUse')}</Chip>;
+    }
+    if (sessionCount >= maxSessions) {
+      return <Chip color="danger">{t('status.full', { count: sessionCount, max: maxSessions })}</Chip>;
+    }
+    return <Chip color="warning">{t('status.inUseCount', { count: sessionCount, max: maxSessions })}</Chip>;
   }
 
   if (isUnderMaintenance) {

@@ -13,7 +13,10 @@ inline ResourceListAction resourceListAction(const API::ResourceBrief &resource,
     if ((resource.isUnderMaintenance || !resource.isHealthy) && !resource.canManageMaintenance) return ResourceListAction::None;
     const bool canUse = resource.hasIntroduction || maintainer;
     if (resource.type == 1) return canUse ? ResourceListAction::OpenDoor : ResourceListAction::None;
-    if (resource.hasActiveUsage) {
+    if (resource.isMultiSession()) {
+        // Several people may use the machine: no takeover, a start needs a free slot and no session of one's own.
+        if (!resource.canStart) return ResourceListAction::None;
+    } else if (resource.hasActiveUsage) {
         // Taking over or stopping another user's usage stays explicit in details.
         return canUse && resource.allowTakeOver ? ResourceListAction::Takeover : ResourceListAction::None;
     }

@@ -28,6 +28,8 @@ public:
 
     void setResourceName(const char *resourceName);
     void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance);
+    // Machines with several parallel sessions show "In use k/N" or "Full" instead of one name.
+    void setUsageInfo(const API::ResourceBrief &resource);
 
 private:
     ActionOverlay overlay;
@@ -49,6 +51,8 @@ private:
     char username[API::MAX_USERNAME_LEN];
     bool hasActiveUsage;
     bool isUnderMaintenance;
+    bool multiSession = false;
+    API::ResourceBrief occupancy{};
 
     void updateUsageInfo();
     void initWallClock();

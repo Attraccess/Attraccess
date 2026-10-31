@@ -238,6 +238,11 @@ void testWallClock(Renderer &renderer);
 void testAuthenticatedList(Renderer &renderer);
 void testUsageStatsExpiry(Renderer &renderer);
 void testIntroducerDetails(Renderer &renderer);
+void testParallelSessionPolicy();
+void testParallelSessionList(Renderer &renderer);
+void testParallelSessionDetails(Renderer &renderer);
+void testSingleSessionDetailsUnchanged();
+void testParallelSessionLockscreen(Renderer &renderer);
 
 void testDemoFixtureLocales(Renderer &renderer);
 void testDemoResourceListLocales(Renderer &renderer);

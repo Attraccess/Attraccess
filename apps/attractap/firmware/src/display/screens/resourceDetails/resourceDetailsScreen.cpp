@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../shared/sessionOccupancy.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
@@ -158,6 +159,8 @@ void ResourceDetailsScreen::destroy()
    this->stopSessionButton = nullptr;
    this->stopSessionButtonLabel = nullptr;
    this->stopOtherUserNote = nullptr;
+   this->occupancyLabel = nullptr;
+   this->otherSessionsContainer = nullptr;
    this->doorControls = nullptr;
    this->flowButtonsContainer = nullptr;
    this->formsModalPanel = nullptr;
@@ -266,7 +269,21 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       FirmwareI18n::setDynamicLabel(this->currentUser, resource.activeUser) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
    }
 
-   lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !resource.hasActiveUsage);
+   const bool multi = resource.isMultiSession();
+   // With parallel sessions the panel describes the user's own session only; others appear in the occupancy caption.
+   lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !(multi ? resource.hasOwnUsage : resource.hasActiveUsage));
+   if (this->occupancyLabel)
+   {
+      const auto caption = multi ? SessionOccupancy::caption(resource, resource.hasOwnUsage) : FirmwareI18n::Text();
+      lv_obj_set_flag(this->occupancyLabel, LV_OBJ_FLAG_HIDDEN, caption.empty());
+      if (!caption.empty())
+      {
+         FirmwareI18n::setLabel(this->occupancyLabel, caption);
+         lv_obj_set_style_text_color(this->occupancyLabel,
+                                     resource.isFull() ? DisplayTheme::danger() : DisplayTheme::warning(),
+                                     LV_PART_MAIN | LV_STATE_DEFAULT);
+      }
+   }
    // ponytail: always hide here; refreshAccessState() reveals it only to the session owner
    lv_obj_add_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN);
 
@@ -283,7 +300,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       break;
    }
 
-   bool hideProjectSelection = resource.hasActiveUsage || resourceType == RESOURCE_TYPE_DOOR;
+   bool hideProjectSelection = (multi ? !resource.canStart : resource.hasActiveUsage) || resourceType == RESOURCE_TYPE_DOOR;
    if (this->projectSelectionRow)
    {
       if (hideProjectSelection)
@@ -374,8 +391,9 @@ void ResourceDetailsScreen::refreshAccessState()
 
    bool ownsActiveUsage = this->resourceCacheValid && this->resourceCache.hasActiveUsage &&
                           strcmp(this->resourceCache.activeUser, user.username.c_str()) == 0;
+   const bool multi = this->resourceCacheValid && this->resourceCache.isMultiSession();
    bool supervisedStartAvailable = user.requiresSupervisor && this->resourceCacheValid &&
-                                   !this->resourceCache.hasActiveUsage;
+                                   (multi ? this->resourceCache.canStart : !this->resourceCache.hasActiveUsage);
    // Keep the introduction guidance visible alongside any available session action.
    if (this->noIntroductionPanel)
    {
@@ -406,7 +424,13 @@ void ResourceDetailsScreen::refreshAccessState()
          bool showStop = false;
          bool isTakeover = false;
 
-         if (!this->resourceCache.hasActiveUsage)
+         if (multi)
+         {
+            // Parallel sessions: start needs a free slot and no session of one's own; there is no takeover.
+            showStart = this->resourceCache.canStart;
+            showStop = ownsActiveUsage;
+         }
+         else if (!this->resourceCache.hasActiveUsage)
          {
             // No active session: show start button
             showStart = true;
@@ -463,9 +487,68 @@ void ResourceDetailsScreen::refreshAccessState()
       }
    }
 
+   this->rebuildOtherSessions(multi && (user.isIntroducer || user.canManageResource));
+
    // Flow node buttons are only relevant to the person who owns the active session.
    if (this->flowButtonsContainer)
    {
       lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !ownsActiveUsage);
+   }
+}
+
+void ResourceDetailsScreen::rebuildOtherSessions(bool visible)
+{
+   if (!this->otherSessionsContainer)
+   {
+      return;
+   }
+   // The picker lists every session that is not the viewer's own, so each button force-stops exactly one.
+   std::vector<const API::ActiveSession *> others;
+   if (visible && this->resourceCacheValid)
+   {
+      for (const auto &session : this->resourceCache.activeSessions)
+      {
+         if (session.id != this->resourceCache.ownUsageId)
+         {
+            others.push_back(&session);
+         }
+      }
+   }
+   lv_obj_set_flag(this->otherSessionsContainer, LV_OBJ_FLAG_HIDDEN, others.empty());
+   // Rebuilding on every refresh would drop a pending inline spinner; only rebuild on change.
+   std::vector<uint32_t> ids;
+   for (const auto *session : others) ids.push_back(session->id);
+   if (ids == this->otherSessionIds && lv_obj_get_child_count(this->otherSessionsContainer) == ids.size() + (ids.empty() ? 0 : 1))
+   {
+      return;
+   }
+   this->otherSessionIds = ids;
+   lv_obj_clean(this->otherSessionsContainer);
+   if (others.empty())
+   {
+      return;
+   }
+   lv_obj_t *title = lv_label_create(this->otherSessionsContainer);
+   FirmwareI18n::setLabel(title, FirmwareI18n::Message::EndOtherSessionsTitle);
+   lv_obj_set_style_text_color(title, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   for (const auto *session : others)
+   {
+      lv_obj_t *button = lv_button_create(this->otherSessionsContainer);
+      lv_obj_set_height(button, 50);
+      lv_obj_set_width(button, lv_pct(100));
+      lv_obj_add_flag(button, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+      lv_obj_remove_flag(button, LV_OBJ_FLAG_SCROLLABLE);
+      DisplayTheme::button(button, DisplayTheme::dangerSoft(), DisplayTheme::danger());
+      ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION, {}, session->id};
+      lv_obj_add_event_cb(button, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, evt);
+      lv_obj_add_event_cb(button, &ResourceDetailsScreen::onContainerDelete, LV_EVENT_DELETE, evt);
+      lv_obj_t *label = lv_label_create(button);
+      lv_obj_set_width(label, lv_pct(100));
+      lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+      lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_align(label, LV_ALIGN_CENTER);
+      lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+      FirmwareI18n::setLabel(label, FirmwareI18n::Text::format(FirmwareI18n::Message::EndNamedSession, {FirmwareI18n::Text::literal(session->username) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */}));
    }
 }

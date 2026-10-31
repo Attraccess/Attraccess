@@ -21,7 +21,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   ) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
-    const candidateUsageId = 'id' in input ? input.id : undefined;
+    const candidateUsageId = 'usageId' in input ? input.usageId : 'id' in input ? input.id : undefined;
     const usageId =
       typeof candidateUsageId === 'number' && Number.isSafeInteger(candidateUsageId) && candidateUsageId > 0
         ? candidateUsageId

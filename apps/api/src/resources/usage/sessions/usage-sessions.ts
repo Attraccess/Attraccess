@@ -39,6 +39,12 @@ import { type ResourceUsageService } from './resource-usage.service';
 
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 
+import { ResourceFullError } from '../errors/resource-full.error';
+
+import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
+
+import { countOccupiedSlots, pickSessionToEnd } from './active-usage';
+
 import { UsageAuthorization } from '../authorization/usage-authorization';
 
 export abstract class UsageSessions extends UsageAuthorization {
@@ -62,10 +68,17 @@ export abstract class UsageSessions extends UsageAuthorization {
     const prepared = await runSerializedTransaction(
       this.resourceUsageRepository.manager,
       async (transactionalEntityManager) => {
-        await this.assertLifecycleAvailable(transactionalEntityManager, resourceId);
-        activeSession = await this.getActiveSession(resourceId, transactionalEntityManager);
-        if (!activeSession) {
-          throw new BadRequestException('No active session found');
+        const sharedMachine = (await this.getSessionLimit(transactionalEntityManager, resourceId)) > 1;
+        await this.assertLifecycleAvailable(transactionalEntityManager, resourceId, sharedMachine);
+        const activeSessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+        activeSession = pickSessionToEnd(activeSessions, user, dto.usageId);
+        if (
+          sharedMachine &&
+          (await transactionalEntityManager.findOne(ResourceUsageLifecycleAttempt, {
+            where: { previousUsageId: activeSession.id },
+          }))
+        ) {
+          throw new ConflictException('This session is already being ended');
         }
 
         // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
@@ -398,7 +411,9 @@ export abstract class UsageSessions extends UsageAuthorization {
     attemptId: string,
   ) {
     return runSerializedTransaction(this.resourceUsageRepository.manager, async (transactionalEntityManager) => {
-      await this.assertLifecycleAvailable(transactionalEntityManager, resourceId);
+      const sessionLimit = await this.getSessionLimit(transactionalEntityManager, resourceId);
+      const sharedMachine = sessionLimit > 1;
+      await this.assertLifecycleAvailable(transactionalEntityManager, resourceId, sharedMachine);
       // Maintenance/health are enforced here; the control gate is applied below so the supervised
       // path can bypass the introduction requirement when a qualified supervisor is present.
       const resource = await this.getResource(
@@ -430,7 +445,22 @@ export abstract class UsageSessions extends UsageAuthorization {
         throw new BadRequestException('Resource is not a machine');
       }
 
-      const existingActiveSession = await this.getActiveSession(resourceId, transactionalEntityManager);
+      let existingActiveSession: ResourceUsage | null = null;
+      if (sharedMachine) {
+        // Capacity is decided inside this serialized transaction: published sessions and other
+        // people's pending starts occupy a slot, so simultaneous starts can never exceed the limit.
+        const ownSession = await transactionalEntityManager.findOne(ResourceUsage, {
+          where: { resourceId, userId: user.id, usageAction: ResourceUsageAction.Usage, endTime: IsNull() },
+        });
+        if (ownSession) throw new AlreadyHasActiveSessionError();
+        const occupied = await countOccupiedSlots(transactionalEntityManager, resourceId);
+        if (occupied >= sessionLimit) throw new ResourceFullError(occupied, sessionLimit);
+      } else {
+        const activeSessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+        // A limit lowered to 1 can leave several sessions running; takeover needs exactly one to replace.
+        existingActiveSession = activeSessions.length === 1 ? activeSessions[0] : null;
+        if (activeSessions.length > 1) throw new ResourceInUseError();
+      }
       if (existingActiveSession) {
         this.logger.debug(
           `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
@@ -523,7 +553,7 @@ export abstract class UsageSessions extends UsageAuthorization {
 
       let formSubmissions: FormSubmission[] = [];
       if (resource.type === ResourceType.Machine) {
-        const action = dto.forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
+        const action = dto.forceTakeOver && !sharedMachine ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
         formSubmissions = await this.resourceFormsService.prepareRequiredSubmissions({
           resourceId,
           action,

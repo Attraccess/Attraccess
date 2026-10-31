@@ -11,6 +11,14 @@
     "title": "Ressource bereits in Verwendung",
     "description": "Die Ressource ist derzeit von einem anderen Benutzer in Verwendung und kann solange nicht von ihnen gestartet werden."
   },
+  "ResourceFullError": {
+    "title": "Maschine ist voll",
+    "description": "Alle parallelen Sitzungsplätze dieser Maschine sind belegt. Bitte versuche es erneut, sobald jemand fertig ist."
+  },
+  "AlreadyHasActiveSessionError": {
+    "title": "Sitzung bereits aktiv",
+    "description": "Du hast bereits eine aktive Sitzung auf dieser Maschine."
+  },
   "ResourceUnhealthyException": {
     "title": "Ressource nicht betriebsbereit",
     "description": "Die Ressource meldet derzeit einen fehlerhaften Zustand und kann nicht verwendet werden, bis sie sich erholt."

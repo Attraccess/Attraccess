@@ -27,6 +27,20 @@ If you are introduced to the resource, you can:
 
 Depending on configuration, you may need to fill in a [form](forms/overview.md) when starting, taking over or ending a session.
 
+#### Machines with parallel sessions
+
+If the machine allows more than one [parallel session](resources/creating-resources.md#max-parallel-sessions), the usage area shows:
+
+- **Your own session** with a **Stop** button
+- **Other active sessions** as a list with user, start time and supervisor (if any). Resource managers, maintainers, introducers and the supervisor of a session see an **End session** button for each entry to end that person's session
+- **Start controls** while slots are free and you do not have a session yet
+- **Full (N/N)** when all slots are in use
+
+Everybody starts and stops their own session. Stopping without picking an entry from the list always ends your own session. Running and maintenance state only block new starts; running sessions continue and can be stopped normally. The view updates live without reloading.
+
+> [!WARNING]
+> On a machine with parallel sessions, flows run for every session start and stop, and meters and running time are charged to a single session only. See [Shared machines](resources/usage-tracking.md#shared-machines-parallel-sessions).
+
 ### Usage History
 
 Chronological list of all usage sessions showing:
