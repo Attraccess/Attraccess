@@ -69,9 +69,10 @@ let
 in {
   imports = [
     ./dashboard-module.nix
+    # The CI hardware tests relay on the first port and the next one up.
     (lib.mkChangedOptionModule [ "services" "attractap-lab" "readerApiRelay" "port" ]
       [ "services" "attractap-lab" "readerApiRelay" "ports" ]
-      (config: [ config.services.attractap-lab.readerApiRelay.port ]))
+      (config: let port = config.services.attractap-lab.readerApiRelay.port; in [ port (port + 1) ]))
   ];
   options.services.attractap-lab = {
     enable = mkEnableOption "the shared Attractap hardware lab";
