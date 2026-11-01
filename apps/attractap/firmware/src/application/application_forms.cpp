@@ -42,7 +42,8 @@ void Application::handleFormsRequest(
     Display::transitionToScreen(&Display::resourceDetailsScreen);
   }
   Display::resourceDetailsScreen.hideActionProgress();
-  Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
+  Display::formsScreen.showForm(this->pendingFormRequest);
+  Display::transitionToScreen(&Display::formsScreen);
   this->requestCurrentFormField();
 }
 
@@ -79,7 +80,7 @@ void Application::onActionResult(const std::string &eventType) {
     this->hasPendingFormRequest = false;
     this->hasPendingServerFormFlow = false;
     this->formFlowSubmitted = false;
-    Display::resourceDetailsScreen.hideFormsModal();
+    this->leaveForms();
   }
 }
 
@@ -144,7 +145,7 @@ void Application::clearFormPageCache() {
 void Application::renderFormFieldPage(
     const API::ResourceUsageFormFieldsPage &page) {
   bool canGoBack = this->globalFormFieldNumber() > 1;
-  Display::resourceDetailsScreen.renderFormField(
+  Display::formsScreen.renderFormField(
       page, canGoBack, this->isLastFormField(), this->globalFormFieldNumber(),
       this->totalFormFields());
 }
@@ -319,7 +320,7 @@ void Application::handleFormPageResult(
     this->advanceFormCursor();
     this->requestCurrentFormField();
   } else {
-    Display::resourceDetailsScreen.showFormPageErrors(result);
+    Display::formsScreen.showFormPageErrors(result);
   }
 }
 
@@ -333,7 +334,7 @@ void Application::handleFormPageBack() {
 void Application::finishFormFlow() {
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = true;
-  Display::resourceDetailsScreen.hideFormsModal();
+  this->leaveForms();
   this->pendingUiStartedAt = millis();
   this->showReaderActionProgress(FirmwareI18n::Message::SubmittingForm);
 
@@ -383,7 +384,7 @@ void Application::handleFormsCancel() {
   this->formCursorOffset = 0;
   this->clearFormPageCache();
   this->awaitingFieldRender = false;
-  Display::resourceDetailsScreen.hideFormsModal();
+  this->leaveForms();
   if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.hideActionProgress();
   this->finishReaderAction(false);
   if (!this->waitingForResourceRefresh) this->endActionPause();

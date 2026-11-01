@@ -585,7 +585,7 @@ describe('desktop simulator against an isolated real API', () => {
             try {
               controller.abort(new Error('Injected supervision request failure'));
               expect((await pending).error).toBeDefined();
-              await desktop().text('Something went wrong. Please try again.');
+              // The error belongs to no button or screen of the reader: it is only logged.
               await desktop().screen('resources');
               const cancelled = await desktop().command('inspect');
               expect(cancelled.labels).not.toContain('Aufsichts-Karte auflegen');

@@ -5,7 +5,7 @@ void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshot
 {
     // Exercise selection -> lockscreen with the simulator's production theme,
     // router and SDL renderer, rather than just inspecting a font asset.
-    constexpr char resourceName[] = "Jappys Dingalüng";
+    constexpr char resourceName[] = "Fräse";
     API::ResourceList resources{};
     resources.count = 1;
     resources.items[0].id = 1;
@@ -56,110 +56,121 @@ void testSessionSummaryLifecycle()
 
 namespace
 {
-    // A notice is the only descendant that holds this caption.
-    lv_obj_t *noticeOf(lv_obj_t *root, const char *title)
+    constexpr char longName[] = "Lasercutter Großformat mit extrem langem Maschinennamen und Zusatz";
+
+    StatusScreen::Config longError()
     {
-        auto *label = findLabel(root, title);
-        return label ? lv_obj_get_parent(label) : nullptr;
+        return StatusScreen::error(FirmwareI18n::Message::SignInFailed,
+                                   FirmwareI18n::Text::literal("Eine sehr lange Fehlermeldung vom Server, die mehrere Zeilen braucht, ohne etwas zu überdecken.") /* i18n-data: Test fixture. */);
     }
 }
 
-void testScreenNotices(SdlDisplay &display, const std::filesystem::path &screenshots)
+void testStatusScreens(SdlDisplay &display, const std::filesystem::path &screenshots)
 {
-    Display::transitionToScreen(&Display::lockscreen);
-    Display::loop();
-    Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-    lv_refr_now(nullptr);
-    assert(display.pollEvents());
-    screenshot(screenshots, "notice-error.png");
-    auto *notice = noticeOf(Display::lockscreen.getScreen(), "Anmeldung fehlgeschlagen");
-    assert(notice && lv_obj_is_visible(notice));
-    // It belongs to the screen, not to the top layer, and floats above the layout.
-    assert(lv_obj_get_screen(notice) == Display::lockscreen.getScreen());
-    assert(!findLabel(lv_layer_top(), "Anmeldung fehlgeschlagen"));
-    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_FLOATING));
-    // Clear of the network badge (top right) and the device footer (bottom).
-    lv_area_t area;
-    lv_obj_update_layout(Display::lockscreen.getScreen());
-    lv_obj_get_coords(notice, &area);
-    assert(area.y1 >= 42 && area.y2 < 440);
-
-    // One at a time: a newer notice replaces the older one.
-    Display::showNotice(ScreenNotice::Kind::Info, FirmwareI18n::Message::SessionTotal, FirmwareI18n::Text::literal("2,90 EUR") /* i18n-data: Test fixture amount. */);
-    assert(!findLabel(Display::lockscreen.getScreen(), "Anmeldung fehlgeschlagen"));
-    assert(findLabel(Display::lockscreen.getScreen(), "2,90 EUR"));
-    lv_refr_now(nullptr);
-    assert(display.pollEvents());
-    screenshot(screenshots, "notice-info.png");
-
-    // Tapping dismisses it.
-    lv_obj_send_event(noticeOf(Display::lockscreen.getScreen(), "Gesamtkosten dieser Sitzung"), LV_EVENT_CLICKED, nullptr);
-    assert(!findLabel(Display::lockscreen.getScreen(), "2,90 EUR"));
-
-    // Routing to the screen that is already showing keeps its notice: it still belongs there.
-    Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-    Display::endNoticeRenderPass();
-    Display::transitionToScreen(&Display::lockscreen);
-    assert(findLabel(Display::lockscreen.getScreen(), "Anmeldung fehlgeschlagen"));
-
-    // A transition removes the notice of the screen that is left.
-    Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-    Display::endNoticeRenderPass(); // A later pass: the notice is not part of the next transition's event.
     Display::transitionToScreen(&Display::resourceListScreen);
-    assert(!findLabel(Display::resourceListScreen.getScreen(), "Anmeldung fehlgeschlagen"));
-    assert(!findLabel(Display::lockscreen.getScreen(), "Anmeldung fehlgeschlagen"));
-
-    // A notice raised by the event behind a transition lands on the destination.
-    Display::showErrorNotice(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
-    Display::transitionToScreen(&Display::lockscreen);
-    assert(findLabel(Display::lockscreen.getScreen(), "Status nicht verfügbar"));
-    assert(!findLabel(Display::resourceListScreen.getScreen(), "Status nicht verfügbar"));
-
-    // Screens may be destroyed while showing one; nothing dangles afterwards.
-    Display::endNoticeRenderPass();
-    Display::transitionToScreen(&Display::initScreen);
-    assert(!findLabel(Display::initScreen.getScreen(), "Status nicht verfügbar"));
     Display::loop();
-    Display::lockscreen.destroy();
-    Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
-    Display::clearNotice();
-    Display::loop();
-
-    // A missing touch panel is reported on the boot screen, which the reader
-    // leaves within seconds: that notice follows the screens until it expires.
-    Display::transitionToScreen(&Display::bootScreen);
-    Display::loop();
-    Display::showTouchUnavailableNotice();
-    Display::endNoticeRenderPass();
-    const auto touchNoticeShown = [](IScreen &screen) {
-        return screen.getScreen() && findLabel(screen.getScreen(), "Berührung nicht verfügbar") != nullptr;
-    };
-    const auto waitMs = [](uint32_t duration) {
-        const uint32_t end = millis() + duration;
-        while (static_cast<int32_t>(end - millis()) > 0) { lv_timer_handler(); SDL_Delay(20); }
-    };
-    assert(touchNoticeShown(Display::bootScreen));
-    waitMs(2000);
-    Display::transitionToScreen(&Display::initScreen);
-    Display::loop();
-    assert(touchNoticeShown(Display::initScreen) && !touchNoticeShown(Display::bootScreen));
+    int shot = 0;
+    for (const char *language : {"de", "en"})
     {
-        // The init screen has no side padding; the notice still keeps off the bezel.
-        lv_obj_t *card = findLabel(Display::initScreen.getScreen(), "Berührung nicht verfügbar");
-        while (lv_obj_get_parent(card) != Display::initScreen.getScreen()) card = lv_obj_get_parent(card);
-        const lv_area_t area = coordsOf(card);
-        assert(area.x1 >= 16 && area.x2 <= 480 - 16);
+        State::setDefaultLanguage(language);
+        Display::loop();
+        const std::vector<std::pair<const char *, StatusScreen::Config>> variants = {
+            {"error", longError()},
+            {"error-short", StatusScreen::error(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard)},
+            {"success", StatusScreen::success(FirmwareI18n::Message::UsageStarted, FirmwareI18n::Text::literal(longName) /* i18n-data: Test fixture. */)},
+            {"billing", StatusScreen::billing(FirmwareI18n::Text::literal("12.345.678.901,23 EUR") /* i18n-data: Test fixture. */, FirmwareI18n::Text::literal(longName) /* i18n-data: Test fixture. */)},
+            {"warning", StatusScreen::warning(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus)},
+            {"warning-no-button", StatusScreen::warning(FirmwareI18n::Message::TouchUnavailable, FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot, false)},
+            {"generic", StatusScreen::generic(FirmwareI18n::Message::GenericError, "RESOURCE_LOCKED_BY_ANOTHER_ADMINISTRATOR_ACCOUNT")},
+        };
+        for (const auto &variant : variants)
+        {
+            Display::showStatus(variant.second);
+            Display::loop();
+            assert(lv_screen_active() == Display::statusScreen.getScreen());
+            expectCleanLayout(variant.first);
+            lv_refr_now(nullptr);
+            assert(display.pollEvents());
+            screenshot(screenshots, (std::string("status-") + variant.first + "-" + language + ".png").c_str());
+            ++shot;
+        }
     }
-    waitMs(3000);
-    Display::transitionToScreen(&Display::lockscreen);
+    State::setDefaultLanguage("de");
     Display::loop();
-    assert(touchNoticeShown(Display::lockscreen) && !touchNoticeShown(Display::initScreen));
-    lv_refr_now(nullptr);
-    assert(display.pollEvents());
-    screenshot(screenshots, "notice-touch-unavailable.png");
-    waitMs(3100); // 8.1 s after it was raised
-    assert(!touchNoticeShown(Display::lockscreen));
+
+    // A status screen is shown over the screen the user was on and returns to it, state intact.
+    Display::transitionToScreen(&Display::resourceListScreen);
+    Display::loop();
+    Display::showStatus(StatusScreen::error(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard));
+    Display::loop();
+    assert(findLabel(lv_screen_active(), "Anmeldung fehlgeschlagen"));
+    assert(!findLabel(lv_layer_top(), "Anmeldung fehlgeschlagen"));
+    assert(Display::resourceListScreen.isLoaded());
+    lv_obj_send_event(lv_obj_get_parent(findLabel(lv_screen_active(), "OK")), LV_EVENT_CLICKED, nullptr);
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+
+    // The success screen has no button: a tap anywhere returns.
+    Display::showStatus(StatusScreen::success(FirmwareI18n::Message::UsageEnded, FirmwareI18n::Text::literal("CNC") /* i18n-data: Test fixture. */));
+    Display::loop();
+    assert(!findLabel(lv_screen_active(), "OK"));
+    lv_obj_send_event(lv_screen_active(), LV_EVENT_CLICKED, nullptr);
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+
+    // Auto-return.
+    auto timed = StatusScreen::success(FirmwareI18n::Message::UsageEnded, FirmwareI18n::Text::literal("CNC") /* i18n-data: Test fixture. */);
+    timed.autoReturnMs = 120;
+    Display::showStatus(std::move(timed));
+    Display::loop();
+    assert(lv_screen_active() == Display::statusScreen.getScreen());
+    SDL_Delay(160);
+    Display::loop();
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+
+    // Anything else that replaces it takes it away and lets the origin unload.
+    Display::showStatus(longError());
+    Display::loop();
     Display::transitionToScreen(&Display::initScreen);
     Display::loop();
-    assert(!touchNoticeShown(Display::initScreen));
+    assert(!findLabel(lv_screen_active(), "Anmeldung fehlgeschlagen"));
+    assert(!Display::statusScreen.isLoaded() && !Display::resourceListScreen.isLoaded());
+    // Nothing returns to a screen that was left on purpose.
+    assert(!Display::returnFromTransient());
+}
+
+void testConfirmScreen(SdlDisplay &display, const std::filesystem::path &screenshots)
+{
+    Display::transitionToScreen(&Display::resourceListScreen);
+    Display::loop();
+    bool confirmed = false;
+    for (const char *language : {"de", "en"})
+    {
+        State::setDefaultLanguage(language);
+        Display::loop();
+        ConfirmScreen::Config config;
+        config.title = FirmwareI18n::Message::PowerOffDevice;
+        config.message = FirmwareI18n::Message::TheReaderWillPowerOffNow;
+        config.confirmLabel = FirmwareI18n::Message::PowerOff;
+        config.onConfirm = [&] { confirmed = true; };
+        Display::showConfirm(std::move(config));
+        Display::loop();
+        assert(lv_screen_active() == Display::confirmScreen.getScreen());
+        expectCleanLayout("confirm");
+        lv_refr_now(nullptr);
+        assert(display.pollEvents());
+        screenshot(screenshots, (std::string("confirm-") + language + ".png").c_str());
+        if (std::string(language) == "de")
+        {
+            // Two equal buttons side by side, nothing confirmed by itself.
+            auto *cancel = lv_obj_get_parent(findLabel(lv_screen_active(), "Abbrechen"));
+            auto *confirm = lv_obj_get_parent(findLabel(lv_screen_active(), "Ausschalten"));
+            assert(lv_obj_get_width(cancel) == lv_obj_get_width(confirm) && !confirmed);
+            lv_obj_send_event(cancel, LV_EVENT_CLICKED, nullptr);
+            assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !confirmed);
+        }
+    }
+    lv_obj_send_event(lv_obj_get_parent(findLabel(lv_screen_active(), "Power off")), LV_EVENT_CLICKED, nullptr);
+    assert(confirmed);
+    State::setDefaultLanguage("de");
+    Display::transitionToScreen(&Display::initScreen);
+    Display::loop();
 }

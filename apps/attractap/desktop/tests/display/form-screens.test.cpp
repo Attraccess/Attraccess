@@ -1,9 +1,11 @@
 #include "fixtures.hpp"
 
-void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshots)
+void testFormScreens(SdlDisplay &display, const std::filesystem::path &screenshots)
 {
-    auto &screen = Display::resourceDetailsScreen;
-    Display::transitionToScreen(&screen);
+    // The forms are a routed screen over the details of the resource they are for.
+    auto &details = Display::resourceDetailsScreen;
+    auto &screen = Display::formsScreen;
+    Display::transitionToScreen(&details);
     Display::loop();
     API::ResourceUsageFormRequest request{};
     request.resourceId = 1;
@@ -30,8 +32,10 @@ void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshot
         submitted = submission.answers[0].stringValue;
     });
     for (const bool edit : {false, true}) {
-        screen.showFormsModal(request);
+        screen.showForm(request);
         screen.renderFormField(page, false, true, 1, 1);
+        Display::transitionToScreen(&screen);
+        assert(lv_screen_active() == screen.getScreen() && details.isLoaded());
         auto *preview = findLabel(lv_screen_active(), displayValue);
         assert(preview);
         lv_obj_send_event(lv_obj_get_parent(preview), LV_EVENT_CLICKED, nullptr);
@@ -39,14 +43,16 @@ void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshot
         auto *keyboard = findWidget(lv_screen_active(), &lv_keyboard_class);
         assert(textarea && keyboard);
         assert(std::strcmp(lv_textarea_get_text(textarea), displayValue) == 0);
-        // The editor's keyboard ends above the device footer.
-        expectClearOfChrome(keyboard);
+        // The editor and its keyboard stay clear of the chrome and of each other.
+        expectCleanLayout("form editor");
         if (edit) lv_textarea_set_text(textarea, "Geändert\nGröße");
         lv_obj_send_event(keyboard, LV_EVENT_READY, nullptr);
         auto *submit = findLabel(lv_screen_active(), "Absenden");
         assert(submit);
         lv_obj_send_event(lv_obj_get_parent(submit), LV_EVENT_CLICKED, nullptr);
         assert(submitted == (edit ? "Geändert\nGröße" : field.value));
+        screen.resetForm();
+        assert(Display::returnFromTransient() && lv_screen_active() == details.getScreen());
     }
     field = API::ResourceUsageFormField{};
     field.id = 1;
@@ -55,15 +61,13 @@ void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshot
     field.options.select.count = 2;
     field.options.select.values[0] = "Size™";
     field.options.select.values[1] = "Größe";
-    screen.showFormsModal(request);
+    screen.showForm(request);
     screen.renderFormField(page, false, true, 1, 1);
+    Display::transitionToScreen(&screen);
+    expectCleanLayout("form select");
     lv_refr_now(nullptr);
     assert(display.pollEvents());
     screenshot(screenshots, "usage-form.png");
-    // The page leaves room for the network badge and the device footer.
-    expectClearOfChrome(lv_obj_get_parent(findLabel(lv_screen_active(), LV_SYMBOL_CLOSE)));
-    expectClearOfChrome(lv_obj_get_parent(findLabel(lv_screen_active(), "Absenden")));
-    expectClearOfChrome(lv_obj_get_parent(findLabel(lv_screen_active(), "Zurück")));
     auto *option = findLabel(lv_screen_active(), "SizeTM");
     auto *otherOption = findLabel(lv_screen_active(), "Größe");
     assert(option && otherOption);
@@ -91,7 +95,6 @@ void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshot
         const lv_area_t lastArea = coordsOf(last);
         const lv_area_t footerArea = coordsOf(lv_obj_get_parent(findLabel(lv_screen_active(), "Absenden")));
         assert(lastArea.y2 < footerArea.y1);
-        expectClearOfChrome(last);
         lv_obj_send_event(last, LV_EVENT_CLICKED, nullptr);
         lv_obj_send_event(lv_obj_get_parent(findLabel(lv_screen_active(), "Absenden")), LV_EVENT_CLICKED, nullptr);
         assert(submitted == "Option 12");
@@ -109,61 +112,69 @@ void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshot
     assert(findLabel(lv_screen_active(), "Holz"));
     assert(!findLabel(lv_screen_active(), "Wood"));
     FirmwareI18n::refreshTree(lv_screen_active(), "de");
-    // The forms view is a direct child of the resource details root (no
-    // top-layer dialog) and is hidden as soon as that screen is left.
-    auto *formsView = findLabel(lv_screen_active(), "Holz");
-    assert(formsView && !findLabel(lv_layer_top(), "Holz"));
-    while (lv_obj_get_parent(formsView) != screen.getScreen()) formsView = lv_obj_get_parent(formsView);
-    assert(!lv_obj_has_flag(formsView, LV_OBJ_FLAG_HIDDEN) && lv_obj_has_flag(formsView, LV_OBJ_FLAG_FLOATING));
+    // Leaving for anything but the origin takes the forms screen and the origin with it.
+    assert(!findLabel(lv_layer_top(), "Holz"));
     Display::transitionToScreen(&Display::initScreen);
-    assert(lv_obj_has_flag(formsView, LV_OBJ_FLAG_HIDDEN));
     Display::loop();
-    assert(!screen.isLoaded());
+    assert(!screen.isLoaded() && !details.isLoaded());
+    screen.setFormPageNextCallback({});
 
-    // The project picker is a page of the details screen in the same way.
-    Display::transitionToScreen(&screen);
+    // The project picker: a screen of its own over the details.
+    auto &picker = Display::projectSelectScreen;
+    Display::transitionToScreen(&details);
     Display::loop();
     API::ProjectsOfUserResponse projects{};
     projects.count = 1;
     projects.total = 1;
     projects.items[0] = {42, "Werkstattprojekt"};
-    screen.setProjects(projects);
-    lv_obj_send_event(lv_obj_get_parent(findLabel(screen.getScreen(), "Projekt wählen")), LV_EVENT_CLICKED, nullptr);
-    lv_obj_update_layout(screen.getScreen());
-    auto *projectsView = findLabel(screen.getScreen(), "Projekt auswählen");
-    assert(projectsView && lv_obj_is_visible(projectsView));
-    while (lv_obj_get_parent(projectsView) != screen.getScreen()) projectsView = lv_obj_get_parent(projectsView);
-    assert(lv_obj_has_flag(projectsView, LV_OBJ_FLAG_FLOATING));
+    picker.setProjects(projects);
+    picker.begin();
+    Display::transitionToScreen(&picker);
+    assert(lv_screen_active() == picker.getScreen() && details.isLoaded());
+    assert(findLabel(picker.getScreen(), "Projekt auswählen") && findLabel(picker.getScreen(), "Werkstattprojekt"));
+    assert(!findLabel(lv_layer_top(), "Werkstattprojekt"));
+    expectCleanLayout("project picker");
     lv_refr_now(nullptr);
     assert(display.pollEvents());
     screenshot(screenshots, "project-picker.png");
-    expectClearOfChrome(lv_obj_get_parent(findLabel(projectsView, LV_SYMBOL_CLOSE)));
-    expectClearOfChrome(lv_obj_get_parent(findLabel(projectsView, "Zurück")));
-    expectClearOfChrome(lv_obj_get_parent(findLabel(projectsView, "Weiter")));
-    // The search editor's keyboard as well.
-    lv_obj_send_event(lv_obj_get_parent(findLabel(projectsView, "Projekte suchen")), LV_EVENT_CLICKED, nullptr);
-    auto *searchKeyboard = findWidget(projectsView, &lv_keyboard_class);
+    // The search editor and its keyboard.
+    lv_obj_send_event(lv_obj_get_parent(findLabel(picker.getScreen(), "Projekte suchen")), LV_EVENT_CLICKED, nullptr);
+    auto *searchKeyboard = findWidget(picker.getScreen(), &lv_keyboard_class);
     assert(searchKeyboard && lv_obj_is_visible(searchKeyboard));
+    expectCleanLayout("project search editor");
     lv_refr_now(nullptr);
     assert(display.pollEvents());
     screenshot(screenshots, "project-search-editor.png");
-    expectClearOfChrome(searchKeyboard);
     lv_obj_send_event(searchKeyboard, LV_EVENT_CANCEL, nullptr);
-    // The projects belong to the session: after it ends, nothing of them is
-    // shown again, even when the next user's first request cannot be sent.
-    assert(findLabel(projectsView, "Werkstattprojekt"));
-    screen.resetProjectsSearch();
-    screen.setProjectsPageRequestCallback([](uint32_t, const std::string &) { return false; });
-    lv_obj_send_event(lv_obj_get_parent(findLabel(screen.getScreen(), "Projekt wählen")), LV_EVENT_CLICKED, nullptr);
-    assert(!lv_obj_has_flag(projectsView, LV_OBJ_FLAG_HIDDEN) && !findLabel(projectsView, "Werkstattprojekt"));
-    screen.setProjectsPageRequestCallback({});
+    // The projects belong to the session: after it ends, nothing of them is shown
+    // again, even when the next user's first request cannot be sent.
+    assert(findLabel(picker.getScreen(), "Werkstattprojekt"));
+    picker.resetProjectsSearch();
+    picker.setProjectsPageRequestCallback([](uint32_t, const std::string &) { return false; });
+    picker.begin();
+    assert(!findLabel(picker.getScreen(), "Werkstattprojekt"));
+    // A failed load is shown in the list area, with a way to try again.
+    picker.showLoadError();
+    assert(findLabel(picker.getScreen(), "Projekte konnten nicht geladen werden"));
+    expectCleanLayout("project load error");
+    lv_refr_now(nullptr);
+    assert(display.pollEvents());
+    screenshot(screenshots, "project-load-error.png");
+    picker.setProjectsPageRequestCallback({});
     Display::transitionToScreen(&Display::initScreen);
-    assert(lv_obj_has_flag(projectsView, LV_OBJ_FLAG_HIDDEN));
     Display::loop();
-    assert(!screen.isLoaded());
-    screen.setFormPageNextCallback({});
-    Display::transitionToScreen(&Display::initScreen);
-    Display::loop();
+    assert(!picker.isLoaded() && !details.isLoaded());
+}
+
+namespace
+{
+    // Presses the keypad key whose caption is `caption`.
+    void pressKey(lv_obj_t *root, const char *caption)
+    {
+        auto *label = findLabel(root, caption);
+        assert(label);
+        lv_obj_send_event(lv_obj_get_parent(label), LV_EVENT_CLICKED, nullptr);
+    }
 }
 
 void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screenshots)
@@ -171,8 +182,21 @@ void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screensho
     uint32_t amount = 0;
     bool cancelled = false;
     auto &topUp = Display::topUpScreen;
+    // The top-up screen is raised over the screen the user was on.
+    Display::transitionToScreen(&Display::resourceListScreen);
+    Display::loop();
     topUp.reset();
     topUp.setCallbacks([&](uint32_t cents) { amount = cents; }, [&] { cancelled = true; });
+    for (const char *language : {"de", "en"})
+    {
+        State::setDefaultLanguage(language);
+        Display::transitionToScreen(&topUp);
+        Display::loop();
+        expectCleanLayout("top-up");
+        Display::transitionToScreen(&Display::resourceListScreen);
+        Display::loop();
+    }
+    State::setDefaultLanguage("de");
     Display::transitionToScreen(&topUp);
     Display::loop();
     lv_obj_update_layout(topUp.getScreen());
@@ -180,64 +204,53 @@ void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screensho
     assert(display.pollEvents());
     screenshot(screenshots, "top-up.png");
     assert(lv_screen_active() == topUp.getScreen());
-    assert(!findLabel(lv_layer_top(), "Aufladen"));
-    auto *input = findWidget(topUp.getScreen(), &lv_textarea_class);
-    auto *keyboard = findWidget(topUp.getScreen(), &lv_keyboard_class);
-    auto *start = findLabel(topUp.getScreen(), "Aufladen");
-    auto *cancel = findLabel(topUp.getScreen(), "Abbrechen");
-    assert(input && keyboard && start && cancel);
-    // The keyboard sits below the field and the buttons, never over them.
-    lv_area_t inputArea, keyboardArea, startArea;
-    lv_obj_get_coords(input, &inputArea);
-    lv_obj_get_coords(keyboard, &keyboardArea);
-    lv_obj_get_coords(lv_obj_get_parent(start), &startArea);
-    assert(inputArea.y2 < keyboardArea.y1 && startArea.y2 < keyboardArea.y1);
-    // Cancel and Top up share a full-width row, Top up taking the larger part.
-    const lv_area_t cancelArea = coordsOf(lv_obj_get_parent(cancel));
-    assert(cancelArea.x1 <= inputArea.x1 + 1 && startArea.x2 >= inputArea.x2 - 1);
-    assert(startArea.x2 - startArea.x1 > cancelArea.x2 - cancelArea.x1);
-    for (auto *object : {input, keyboard, lv_obj_get_parent(start), lv_obj_get_parent(cancel)}) expectClearOfChrome(object);
+    assert(!findLabel(lv_layer_top(), "Aufladen") && Display::resourceListScreen.isLoaded());
+    assert(findWidget(topUp.getScreen(), &lv_keyboard_class) == nullptr); // a keypad in the layout, no keyboard
 
-    // Validation stays inline: nothing is requested for an empty or zero amount.
-    lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
-    auto *error = findLabel(topUp.getScreen(), "Bitte Betrag eingeben.");
-    assert(error && amount == 0);
-    lv_textarea_set_text(input, "0");
-    lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
-    error = findLabel(topUp.getScreen(), "Bitte gültigen Betrag eingeben.");
-    assert(error && amount == 0);
+    // The keypad never moves anything: the row and the keys keep their places while typing.
+    auto *start = lv_obj_get_parent(findLabel(topUp.getScreen(), "Aufladen"));
+    const lv_area_t startBefore = coordsOf(start);
+    const lv_area_t keyBefore = coordsOf(lv_obj_get_parent(findLabel(topUp.getScreen(), "5")));
+
+    // Validation is in place on the button: nothing is requested for an empty amount, size and place
+    // of the button stay, and a tap performs the normal action again.
+    lv_obj_send_event(start, LV_EVENT_CLICKED, nullptr);
+    assert(findLabel(topUp.getScreen(), "Betrag fehlt") && amount == 0);
+    const lv_area_t startDuring = coordsOf(start);
+    assert(startDuring.x1 == startBefore.x1 && startDuring.y1 == startBefore.y1 && startDuring.x2 == startBefore.x2 && startDuring.y2 == startBefore.y2);
     lv_refr_now(nullptr);
     assert(display.pollEvents());
     screenshot(screenshots, "top-up-error.png");
-    // The inline error does not push anything under the keyboard.
-    keyboardArea = coordsOf(keyboard);
-    assert(coordsOf(input).y2 < keyboardArea.y1 && coordsOf(error).y2 < keyboardArea.y1);
-    assert(coordsOf(lv_obj_get_parent(start)).y2 < keyboardArea.y1);
-    lv_font_glyph_dsc_t glyph{};
-    assert(lv_font_get_glyph_dsc(lv_obj_get_style_text_font(error, LV_PART_MAIN), &glyph, 0x00FC, 0) && !glyph.is_placeholder);
+    expectCleanLayout("top-up error");
+    pressKey(topUp.getScreen(), "0");              // A leading zero is ignored,
+    lv_obj_send_event(start, LV_EVENT_CLICKED, nullptr);
+    assert(amount == 0 && findLabel(topUp.getScreen(), "Betrag fehlt"));
+    pressKey(topUp.getScreen(), "1");
+    pressKey(topUp.getScreen(), "2");
+    assert(findLabel(topUp.getScreen(), "12 EUR"));
+    pressKey(topUp.getScreen(), LV_SYMBOL_BACKSPACE);
+    assert(findLabel(topUp.getScreen(), "1 EUR"));
+    for (int i = 0; i < 8; ++i) pressKey(topUp.getScreen(), "9"); // at most six digits
+    assert(findLabel(topUp.getScreen(), "199999 EUR"));
+    const lv_area_t keyAfter = coordsOf(lv_obj_get_parent(findLabel(topUp.getScreen(), "5")));
+    assert(keyAfter.x1 == keyBefore.x1 && keyAfter.y1 == keyBefore.y1);
+    expectCleanLayout("top-up amount");
 
-    // Leading zeros are still zero; the largest field value stays within the cents range.
-    lv_textarea_set_text(input, "000");
-    lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
-    assert(amount == 0);
-    // Only digits are accepted, so signs, separators and letters never reach the amount.
-    lv_textarea_set_text(input, "-5.5x");
-    assert(std::strcmp(lv_textarea_get_text(input), "55") == 0);
-    lv_textarea_set_text(input, "999999");
-    lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
-    assert(amount == 99999900);
-    amount = 0;
-
-    lv_textarea_set_text(input, "5");
-    lv_obj_send_event(lv_obj_get_parent(start), LV_EVENT_CLICKED, nullptr);
+    pressKey(topUp.getScreen(), LV_SYMBOL_BACKSPACE);
+    for (int i = 0; i < 6; ++i) pressKey(topUp.getScreen(), LV_SYMBOL_BACKSPACE);
+    pressKey(topUp.getScreen(), "5");
+    lv_obj_send_event(start, LV_EVENT_CLICKED, nullptr);
     assert(amount == 500 && !cancelled);
-    lv_obj_send_event(lv_obj_get_parent(cancel), LV_EVENT_CLICKED, nullptr);
+    amount = 0;
+    pressKey(topUp.getScreen(), LV_SYMBOL_OK); // The check mark submits too.
+    assert(amount == 500);
+    lv_obj_send_event(lv_obj_get_parent(findLabel(topUp.getScreen(), "Abbrechen")), LV_EVENT_CLICKED, nullptr);
     assert(cancelled);
 
     // A fresh presentation starts empty.
-    lv_textarea_set_text(input, "12");
     topUp.reset();
-    assert(std::strcmp(lv_textarea_get_text(input), "") == 0);
+    assert(findLabel(topUp.getScreen(), "EUR"));
     Display::transitionToScreen(&Display::initScreen);
     Display::loop();
+    assert(!topUp.isLoaded());
 }

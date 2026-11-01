@@ -1,5 +1,5 @@
-#include "../resourceDetailsScreen.hpp"
-#include "../../../fonts/attractap_fonts.hpp"
+#include "formsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -8,22 +8,13 @@
 #include <cstdlib>
 #include "text.hpp"
 
-void ResourceDetailsScreen::disposeFormsModal()
+void FormsScreen::resetFormsState()
 {
-   if (this->formsModalOverlay)
-   {
-      lv_obj_del(this->formsModalOverlay);
-   }
-   this->resetFormsModalState();
-}
-void ResourceDetailsScreen::resetFormsModalState()
-{
-   this->formsModalOverlay = nullptr;
-   this->formsModalPanel = nullptr;
-   this->formsModalContent = nullptr;
-   this->formsModalList = nullptr;
-   this->formsModalErrorLabel = nullptr;
-   this->formsModalProgressLabel = nullptr;
+   this->formsPanel = nullptr;
+   this->formsContent = nullptr;
+   this->formsList = nullptr;
+   this->formsErrorLabel = nullptr;
+   this->formsProgressLabel = nullptr;
    this->formsProgressBar = nullptr;
    this->formsBreadcrumbLabel = nullptr;
    this->formsCancelButton = nullptr;
@@ -39,45 +30,45 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsEditorWidgetIndex = 0;
    this->formsEditorInitialText.clear();
    this->formsBusy = false;
-   this->formsModalMeta = nullptr;
-   this->formsModalPage = nullptr;
+   this->formsMeta = nullptr;
+   this->formsPage = nullptr;
    this->formsCanGoBack = false;
    this->formsIsLastField = false;
    this->formFieldWidgetCount = 0;
 }
-void ResourceDetailsScreen::setFormPageNextCallback(std::function<void(const API::FormPageSubmission &)> callback)
+void FormsScreen::setFormPageNextCallback(std::function<void(const API::FormPageSubmission &)> callback)
 {
    this->formPageNextCallback = callback;
 }
-void ResourceDetailsScreen::setFormPageBackCallback(std::function<void()> callback)
+void FormsScreen::setFormPageBackCallback(std::function<void()> callback)
 {
    this->formPageBackCallback = callback;
 }
-void ResourceDetailsScreen::setFormsCancelCallback(std::function<void()> callback)
+void FormsScreen::setFormsCancelCallback(std::function<void()> callback)
 {
    this->formsCancelCallback = callback;
 }
-void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &meta)
+void FormsScreen::showForm(const API::ResourceUsageFormRequest &meta)
 {
-   this->formsModalMeta = &meta;
-   this->formsModalPage = nullptr;
+   this->formsMeta = &meta;
+   this->formsPage = nullptr;
    this->formFieldWidgetCount = 0;
-   this->ensureFormsModal();
+   this->buildFormsView();
 
-   if (this->formsModalList)
+   if (this->formsList)
    {
-      lv_obj_clean(this->formsModalList);
-      lv_obj_t *loading = lv_label_create(this->formsModalList);
+      lv_obj_clean(this->formsList);
+      lv_obj_t *loading = lv_label_create(this->formsList);
       FirmwareI18n::setLabel(loading, FirmwareI18n::Message::Loading);
       lv_obj_set_style_text_color(loading, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
-   if (this->formsModalErrorLabel)
+   if (this->formsErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
+      FirmwareI18n::setLabel(this->formsErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
-   if (this->formsModalProgressLabel)
+   if (this->formsProgressLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
+      FirmwareI18n::setLabel(this->formsProgressLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
    if (this->formsBackButton)
    {
@@ -85,27 +76,23 @@ void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &
    }
 
    this->closeFormsEditor(false);
-   if (this->formsModalOverlay)
-   {
-      lv_obj_clear_flag(this->formsModalOverlay, LV_OBJ_FLAG_HIDDEN);
-   }
    // Block input while the first field is being fetched from the server.
    this->setFormsBusy(true, "Laden...");
 }
-void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields)
+void FormsScreen::renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields)
 {
-   this->formsModalPage = &page;
+   this->formsPage = &page;
    this->formsCanGoBack = canGoBack;
    this->formsIsLastField = isLast;
-   this->ensureFormsModal();
+   this->buildFormsView();
 
    // Field arrived from the server: release the input block.
    this->setFormsBusy(false);
 
-   if (this->formsModalProgressLabel)
+   if (this->formsProgressLabel)
    {
-      std::string progress = std::to_string(fieldNumber) + " / " + std::to_string(totalFields);
-      FirmwareI18n::setDynamicLabel(this->formsModalProgressLabel, progress.c_str()) /* i18n-data: Supplied number, address, timestamp, duration or numeric progress; the enclosing UI message owns its caption. */;
+      FirmwareI18n::setLabel(this->formsProgressLabel, FirmwareI18n::Text::format(FirmwareI18n::Message::Pagination,
+         {FirmwareI18n::Text::literal(std::to_string(fieldNumber)) /* i18n-data: Page number. */, FirmwareI18n::Text::literal(std::to_string(totalFields)) /* i18n-data: Page count. */}));
    }
 
    if (this->formsProgressBar && totalFields > 0)
@@ -134,7 +121,7 @@ void ResourceDetailsScreen::renderFormField(const API::ResourceUsageFormFieldsPa
 
    this->closeFormsEditor(false);
 }
-void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageResult &result)
+void FormsScreen::showFormPageErrors(const API::ResourceUsageFormPageResult &result)
 {
    // Server rejected the page: release the block so the user can correct input.
    this->setFormsBusy(false);
@@ -154,73 +141,64 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
          unmatched = i;
       }
    }
-   if (this->formsModalErrorLabel)
+   if (this->formsErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, unmatched >= 0 ? FirmwareI18n::formError(result.errors[unmatched].code)
+      FirmwareI18n::setLabel(this->formsErrorLabel, unmatched >= 0 ? FirmwareI18n::formError(result.errors[unmatched].code)
          : shown ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseCorrectYourInput) : FirmwareI18n::formError(""));
    }
 }
-void ResourceDetailsScreen::hideFormsModal()
+void FormsScreen::resetForm()
 {
-   if (this->formsModalOverlay)
-   {
-      lv_obj_add_flag(this->formsModalOverlay, LV_OBJ_FLAG_HIDDEN);
-   }
    this->closeFormsEditor(false);
 }
 
-void ResourceDetailsScreen::ensureFormsModal()
+void FormsScreen::buildFormsView()
 {
-   if (this->formsModalOverlay)
+   if (this->screen)
    {
       return;
    }
 
-   if (!this->screen)
-   {
-      return;
-   }
-   lv_obj_t *overlay = createFullScreenView(this->screen);
-   this->formsModalOverlay = overlay;
-   lv_obj_set_flex_flow(overlay, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(overlay, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_t *root = ScreenChrome::createScreen();
+   this->screen = root;
+   lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-   lv_obj_t *panel = lv_obj_create(overlay);
-   this->formsModalPanel = panel;
+   lv_obj_t *panel = lv_obj_create(root);
+   this->formsPanel = panel;
    lv_obj_remove_style_all(panel);
    lv_obj_set_size(panel, lv_pct(100), lv_pct(100));
-   DisplayTheme::applyScreen(panel);
-   lv_obj_set_style_pad_all(panel, 0, LV_PART_MAIN | LV_STATE_DEFAULT); // the view holds the insets
    lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_remove_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_grow(panel, 1);
 
-   // Header: step counter (left) + dismiss button (right).
+   // Header: "‹ Cancel" left, page indicator right.
    lv_obj_t *header = lv_obj_create(panel);
    lv_obj_remove_style_all(header);
    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_width(header, lv_pct(100));
-   lv_obj_set_height(header, LV_SIZE_CONTENT);
+   lv_obj_set_height(header, 36);
    lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
    lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-   this->formsModalProgressLabel = lv_label_create(header);
-   FirmwareI18n::setLabel(this->formsModalProgressLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
-   lv_obj_set_style_text_color(this->formsModalProgressLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-
    lv_obj_t *cancelBtn = lv_button_create(header);
    this->formsCancelButton = cancelBtn;
-   lv_obj_remove_style_all(cancelBtn);
-   lv_obj_set_size(cancelBtn, 34, 34);
    DisplayTheme::secondaryButton(cancelBtn);
+   lv_obj_set_size(cancelBtn, 150, 36);
+   lv_obj_set_flex_flow(cancelBtn, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(cancelBtn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+   lv_obj_set_style_pad_column(cancelBtn, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *cancelIcon = lv_label_create(cancelBtn);
+   FirmwareI18n::setDynamicLabel(cancelIcon, LV_SYMBOL_LEFT) /* i18n-data: Language-neutral LVGL icon glyph. */;
    lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
-   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE) /* i18n-data: Language-neutral LVGL icon glyph. */);
-   lv_obj_center(cancelLabel);
-   lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
+   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
+   lv_obj_add_event_cb(cancelBtn, &FormsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
 
+   this->formsProgressLabel = lv_label_create(header);
+   FirmwareI18n::setLabel(this->formsProgressLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
+   lv_obj_set_style_text_color(this->formsProgressLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsProgressLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Slim progress bar tracking field N of total.
    this->formsProgressBar = lv_bar_create(panel);
@@ -242,7 +220,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    // overlay), so a field normally fits; only the largest selects overflow, and
    // then the body scrolls vertically.
    lv_obj_t *content = lv_obj_create(panel);
-   this->formsModalContent = content;
+   this->formsContent = content;
    lv_obj_remove_style_all(content);
    lv_obj_set_width(content, lv_pct(100));
    lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
@@ -260,14 +238,14 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
-   this->formsModalErrorLabel = lv_label_create(content);
-   FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
-    lv_obj_set_style_text_color(this->formsModalErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(this->formsModalErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->formsErrorLabel = lv_label_create(content);
+   FirmwareI18n::setLabel(this->formsErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
+    lv_obj_set_style_text_color(this->formsErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->formsErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 
    lv_obj_t *list = lv_obj_create(content);
-   this->formsModalList = list;
+   this->formsList = list;
    lv_obj_remove_style_all(list);
    lv_obj_remove_flag(list, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_width(list, lv_pct(100));
@@ -299,7 +277,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    FirmwareI18n::setLabel(backLabel, FirmwareI18n::Message::Back);
    lv_obj_set_style_text_font(backLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
-   lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
+   lv_obj_add_event_cb(backBtn, &FormsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
    lv_obj_t *nextBtn = lv_button_create(footer);
    this->formsNextButton = nextBtn;
@@ -318,51 +296,50 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_size(this->formsNextSpinner, nextLabelHeight, nextLabelHeight);
    lv_obj_set_align(this->formsNextSpinner, LV_ALIGN_CENTER);
    lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(nextBtn, &ResourceDetailsScreen::onFormsNext, LV_EVENT_CLICKED, this);
+   lv_obj_add_event_cb(nextBtn, &FormsScreen::onFormsNext, LV_EVENT_CLICKED, this);
 
-   this->createFormsEditor(overlay);
+   this->createFormsEditor(root);
 
 }
 
 #include <string.h>
-#include "../resourceDetailsCopy.hpp"
 
-void ResourceDetailsScreen::updateFormBreadcrumb()
+void FormsScreen::updateFormBreadcrumb()
 {
 
    FirmwareI18n::Text pageTitle = FirmwareI18n::Message::PleaseCompleteTheForm;
    std::string resourceName = "";
 
-   if (this->formsModalMeta)
+   if (this->formsMeta)
    {
-      if (this->formsModalMeta->action == API::ResourceUsageFormActionType::START)
+      if (this->formsMeta->action == API::ResourceUsageFormActionType::START)
       {
          pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeStarting;
       }
-      else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::END)
+      else if (this->formsMeta->action == API::ResourceUsageFormActionType::END)
       {
          pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeEnding;
       }
-      else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::TAKEOVER)
+      else if (this->formsMeta->action == API::ResourceUsageFormActionType::TAKEOVER)
       {
          pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeTakingOver;
       }
 
 
-      if (this->formsModalMeta->resourceName.length() > 0)
+      if (this->formsMeta->resourceName.length() > 0)
       {
-         resourceName = this->formsModalMeta->resourceName;
+         resourceName = this->formsMeta->resourceName;
       }
    }
 
    std::string formName = "";
-   if (this->formsModalMeta)
+   if (this->formsMeta)
    {
-      for (uint8_t i = 0; i < this->formsModalMeta->formCount && i < API::MAX_FORMS_PER_REQUEST; ++i)
+      for (uint8_t i = 0; i < this->formsMeta->formCount && i < API::MAX_FORMS_PER_REQUEST; ++i)
       {
-         if (this->formsModalMeta->forms[i].id == this->formsModalPage->formId)
+         if (this->formsMeta->forms[i].id == this->formsPage->formId)
          {
-            formName = this->formsModalMeta->forms[i].name;
+            formName = this->formsMeta->forms[i].name;
             break;
          }
       }
@@ -391,13 +368,13 @@ void ResourceDetailsScreen::updateFormBreadcrumb()
 
 }
 
-void ResourceDetailsScreen::onFormsNext(lv_event_t *e)
+void FormsScreen::onFormsNext(lv_event_t *e)
 {
    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
       return;
    }
-   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   auto *self = static_cast<FormsScreen *>(lv_event_get_user_data(e));
    if (!self)
    {
       return;
@@ -418,13 +395,13 @@ void ResourceDetailsScreen::onFormsNext(lv_event_t *e)
       self->formPageNextCallback(page);
    }
 }
-void ResourceDetailsScreen::onFormsBack(lv_event_t *e)
+void FormsScreen::onFormsBack(lv_event_t *e)
 {
    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
       return;
    }
-   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   auto *self = static_cast<FormsScreen *>(lv_event_get_user_data(e));
    if (!self)
    {
       return;
@@ -444,25 +421,25 @@ void ResourceDetailsScreen::onFormsBack(lv_event_t *e)
       self->formPageBackCallback();
    }
 }
-void ResourceDetailsScreen::onFormsCancel(lv_event_t *e)
+void FormsScreen::onFormsCancel(lv_event_t *e)
 {
    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
       return;
    }
-   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   auto *self = static_cast<FormsScreen *>(lv_event_get_user_data(e));
    if (!self)
    {
       return;
    }
-   self->hideFormsModal();
+   self->resetForm();
    if (self->formsCancelCallback)
    {
       self->formsCancelCallback();
    }
 }
 
-void ResourceDetailsScreen::setFormsBusy(bool busy, const char *)
+void FormsScreen::setFormsBusy(bool busy, const char *)
 {
    this->formsBusy = busy;
    if (busy)
@@ -521,4 +498,40 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *)
          FirmwareI18n::setLabel(this->formsNextLabel, this->formsIsLastField ? FirmwareI18n::Message::Submit : FirmwareI18n::Message::Next);
       }
    }
+}
+
+void FormsScreen::init()
+{
+   this->buildFormsView();
+}
+lv_obj_t *FormsScreen::getScreen()
+{
+   return this->screen;
+}
+void FormsScreen::loop()
+{
+}
+std::string FormsScreen::getName()
+{
+   return "FormsScreen";
+}
+void FormsScreen::onScreenLeave()
+{
+   this->closeFormsEditor(false);
+   this->submitError.clear();
+}
+void FormsScreen::destroy()
+{
+   this->submitError.clear();
+   if (this->screen)
+   {
+      lv_obj_del(this->screen);
+   }
+   this->screen = nullptr;
+   this->resetFormsState();
+}
+void FormsScreen::showSubmitError(const FirmwareI18n::Text &text)
+{
+   this->setFormsBusy(false);
+   this->submitError.show(this->formsNextButton, text);
 }

@@ -164,6 +164,16 @@ void Application::setupNfcCallbacks()
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
+    // A card tapped while "sign-in failed" is up dismisses it and signs in as usual.
+    if (this->statusHeld && !this->unlocked) {
+      lv_lock();
+      if (Display::isActive(&Display::statusScreen) && Display::statusScreen.variant() == StatusScreen::Variant::Error) {
+        this->statusHeld = false;
+        Display::returnFromTransient();
+        this->state = this->resourceIsSelected ? APPLICATION_STATE_LOCKED : APPLICATION_STATE_RESOURCE_LIST;
+      }
+      lv_unlock();
+    }
     if (this->state == APPLICATION_STATE_LOCKED || this->state == APPLICATION_STATE_RESOURCE_LIST)
 #else
     if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)

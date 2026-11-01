@@ -1,5 +1,5 @@
-#include "../resourceDetailsScreen.hpp"
-#include "../../../fonts/attractap_fonts.hpp"
+#include "formsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -11,27 +11,27 @@
 #include "display/demoFormOptions.hpp"
 #endif
 
-void ResourceDetailsScreen::buildCurrentFormField()
+void FormsScreen::buildCurrentFormField()
 {
-   if (!this->formsModalList)
+   if (!this->formsList)
    {
       return;
    }
 
-   lv_obj_clean(this->formsModalList);
+   lv_obj_clean(this->formsList);
    this->formFieldWidgetCount = 0;
-   if (this->formsModalContent)
+   if (this->formsContent)
    {
-      lv_obj_scroll_to_y(this->formsModalContent, 0, LV_ANIM_OFF);
+      lv_obj_scroll_to_y(this->formsContent, 0, LV_ANIM_OFF);
    }
 
 
-   if (this->formsModalErrorLabel)
+   if (this->formsErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
+      FirmwareI18n::setLabel(this->formsErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
 
-   if (!this->formsModalPage || this->formsModalPage->fieldCount == 0)
+   if (!this->formsPage || this->formsPage->fieldCount == 0)
    {
       return;
    }
@@ -40,8 +40,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
    {
       {
-         const API::ResourceUsageFormField &field = this->formsModalPage->fields[0];
-         lv_obj_t *fieldContainer = lv_obj_create(this->formsModalList);
+         const API::ResourceUsageFormField &field = this->formsPage->fields[0];
+         lv_obj_t *fieldContainer = lv_obj_create(this->formsList);
          lv_obj_remove_style_all(fieldContainer);
          lv_obj_remove_flag(fieldContainer, LV_OBJ_FLAG_SCROLLABLE);
          lv_obj_set_width(fieldContainer, lv_pct(100));
@@ -74,7 +74,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
          FormFieldWidget &widget = this->formFieldWidgets[this->formFieldWidgetCount++];
          widget.widgetIndex = this->formFieldWidgetCount - 1;
-         widget.formId = this->formsModalPage->formId;
+         widget.formId = this->formsPage->formId;
          widget.fieldId = field.id;
          widget.type = field.type;
          widget.isRequired = field.isRequired;
@@ -136,7 +136,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             FirmwareI18n::setLabel(editIcon, FirmwareI18n::Text::literal(LV_SYMBOL_EDIT) /* i18n-data: Language-neutral LVGL icon glyph. */);
             lv_obj_set_style_text_color(editIcon, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
-            lv_obj_add_event_cb(preview, &ResourceDetailsScreen::onFieldPreviewClick, LV_EVENT_CLICKED, this);
+            lv_obj_add_event_cb(preview, &FormsScreen::onFieldPreviewClick, LV_EVENT_CLICKED, this);
             this->updateFieldPreview(widget);
          }
 
@@ -147,11 +147,11 @@ void ResourceDetailsScreen::buildCurrentFormField()
       }
    }
 
-   lv_obj_mark_layout_as_dirty(this->formsModalList);
-   lv_obj_update_layout(this->formsModalList);
+   lv_obj_mark_layout_as_dirty(this->formsList);
+   lv_obj_update_layout(this->formsList);
 }
 
-void ResourceDetailsScreen::onSelectOptionClick(lv_event_t *e)
+void FormsScreen::onSelectOptionClick(lv_event_t *e)
 {
    auto *evtData = static_cast<SelectOptionEventData *>(lv_event_get_user_data(e));
    if (!evtData || !evtData->self)
@@ -183,7 +183,7 @@ void ResourceDetailsScreen::onSelectOptionClick(lv_event_t *e)
 
    self->updateSelectButtonStyles(widget);
 }
-void ResourceDetailsScreen::onSelectContainerSizeChanged(lv_event_t *e)
+void FormsScreen::onSelectContainerSizeChanged(lv_event_t *e)
 {
    auto *widget = static_cast<FormFieldWidget *>(lv_event_get_user_data(e));
    if (!widget || !widget->owner)
@@ -192,7 +192,7 @@ void ResourceDetailsScreen::onSelectContainerSizeChanged(lv_event_t *e)
    }
    widget->owner->updateSelectOptionLayout(*widget);
 }
-void ResourceDetailsScreen::updateSelectButtonStyles(FormFieldWidget &widget)
+void FormsScreen::updateSelectButtonStyles(FormFieldWidget &widget)
 {
    if (!widget.input)
    {
@@ -220,7 +220,7 @@ void ResourceDetailsScreen::updateSelectButtonStyles(FormFieldWidget &widget)
       }
    }
 }
-void ResourceDetailsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
+void FormsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
 {
    if (widget.type != API::ResourceUsageFormFieldType::SELECT)
    {
@@ -268,7 +268,7 @@ void ResourceDetailsScreen::updateSelectOptionLayout(FormFieldWidget &widget)
    lv_obj_invalidate(widget.input);
 }
 
-void ResourceDetailsScreen::createSelectField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field)
+void FormsScreen::createSelectField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field)
 {
             // Use a button grid for select options instead of lv_dropdown
             // lv_dropdown creates a popup list that causes memory issues on ESP32
@@ -283,7 +283,7 @@ void ResourceDetailsScreen::createSelectField(lv_obj_t *fieldContainer, FormFiel
 
             widget.input = selectContainer;
             widget.selectedOptionIndex = 0; // 0 = no selection (placeholder)
-            lv_obj_add_event_cb(selectContainer, &ResourceDetailsScreen::onSelectContainerSizeChanged, LV_EVENT_SIZE_CHANGED, &widget);
+            lv_obj_add_event_cb(selectContainer, &FormsScreen::onSelectContainerSizeChanged, LV_EVENT_SIZE_CHANGED, &widget);
 
             if (field.options.select.count == 0)
             {
@@ -310,7 +310,7 @@ void ResourceDetailsScreen::createSelectField(lv_obj_t *fieldContainer, FormFiel
                   const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
 #ifdef DEMO_MODE
                   const auto caption = FirmwareI18n::demoMaterialCaption(
-                      this->formsModalPage->resourceId, this->formsModalPage->formId, field.id,
+                      this->formsPage->resourceId, this->formsPage->formId, field.id,
                       field.options.select.values[optIndex]);
                   if (caption)
                      FirmwareI18n::setLabel(optLabel, *caption);
@@ -332,7 +332,7 @@ void ResourceDetailsScreen::createSelectField(lv_obj_t *fieldContainer, FormFiel
                   evtData.widgetIndex = widget.widgetIndex;
                   evtData.optionIndex = static_cast<uint8_t>(optIndex + 1);
 
-                  lv_obj_add_event_cb(optBtn, &ResourceDetailsScreen::onSelectOptionClick, LV_EVENT_CLICKED, &evtData);
+                  lv_obj_add_event_cb(optBtn, &FormsScreen::onSelectOptionClick, LV_EVENT_CLICKED, &evtData);
                }
                if (field.hasValue && field.value.length() > 0)
                {
@@ -430,15 +430,15 @@ std::string makeLVGLDisplayText(const std::string &input)
    return output;
 }
 
-bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage)
+bool FormsScreen::collectCurrentField(API::FormPageSubmission &outPage)
 {
    this->clearFormFieldErrors();
 
-   if (!this->formsModalPage)
+   if (!this->formsPage)
       return false;
 
-   outPage.formId = this->formsModalPage->formId;
-   outPage.offset = this->formsModalPage->offset;
+   outPage.formId = this->formsPage->formId;
+   outPage.offset = this->formsPage->offset;
    outPage.answerCount = 0;
 
    bool hasErrors = false;
@@ -526,16 +526,16 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
 
    if (hasErrors)
    {
-      if (this->formsModalErrorLabel)
+      if (this->formsErrorLabel)
       {
-         FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Message::PleaseCompleteTheHighlightedFields);
+         FirmwareI18n::setLabel(this->formsErrorLabel, FirmwareI18n::Message::PleaseCompleteTheHighlightedFields);
       }
       return false;
    }
 
    return true;
 }
-ResourceDetailsScreen::FormFieldWidget *ResourceDetailsScreen::findFieldWidget(uint32_t formId, uint32_t fieldId)
+FormsScreen::FormFieldWidget *FormsScreen::findFieldWidget(uint32_t formId, uint32_t fieldId)
 {
    for (uint16_t i = 0; i < this->formFieldWidgetCount; ++i)
    {
@@ -546,7 +546,7 @@ ResourceDetailsScreen::FormFieldWidget *ResourceDetailsScreen::findFieldWidget(u
    }
    return nullptr;
 }
-ResourceDetailsScreen::FormFieldWidget *ResourceDetailsScreen::findFieldWidgetByObject(lv_obj_t *object)
+FormsScreen::FormFieldWidget *FormsScreen::findFieldWidgetByObject(lv_obj_t *object)
 {
    if (!object)
    {
@@ -562,7 +562,7 @@ ResourceDetailsScreen::FormFieldWidget *ResourceDetailsScreen::findFieldWidgetBy
    }
    return nullptr;
 }
-void ResourceDetailsScreen::clearFormFieldErrors()
+void FormsScreen::clearFormFieldErrors()
 {
    for (uint16_t i = 0; i < this->formFieldWidgetCount; ++i)
    {
@@ -571,8 +571,8 @@ void ResourceDetailsScreen::clearFormFieldErrors()
          FirmwareI18n::setLabel(this->formFieldWidgets[i].errorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
       }
    }
-   if (this->formsModalErrorLabel)
+   if (this->formsErrorLabel)
    {
-      FirmwareI18n::setLabel(this->formsModalErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
+      FirmwareI18n::setLabel(this->formsErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
    }
 }

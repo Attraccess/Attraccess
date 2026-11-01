@@ -22,26 +22,27 @@ void ReaderWorkflow::testLocalization()
         server.push("READER_LANGUAGE", std::string("{\"language\":\"") + language + "\"}");
         pump(0); // Exercise API-to-display settling without relying on elapsed time.
     };
-    // Exercise the API parser and application error callback, then refresh the notice.
-    server.push("BILLING_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})");
+    // Exercise the API parser and application error callback, then refresh the status screen.
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_ACTIVE"})");
     pump();
+    assert(lv_screen_active() == Display::statusScreen.getScreen());
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card is inactive")));
     defaultLanguage("de");
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
-    display.capture(output, "i18n-notice-german");
-    Display::clearNotice();
-    server.push("BILLING_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
+    display.capture(output, "i18n-status-german");
+    clearStatus();
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
     defaultLanguage("en");
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card is inactive")));
-    display.capture(output, "i18n-notice-english");
-    Display::clearNotice();
-    server.push("BILLING_TOPUP", R"({"error":"UNKNOWN_READER_ERROR"})"); pump();
+    display.capture(output, "i18n-status-english");
+    clearStatus();
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"UNKNOWN_READER_ERROR"})"); pump();
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Something went wrong. Please try again.")));
     defaultLanguage("de");
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Something went wrong. Please try again.")));
     defaultLanguage("en");
-    Display::clearNotice();
+    clearStatus();
     // A real driver touch sequence opens the maintenance drawer.
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 150, true}; pump();
@@ -53,76 +54,79 @@ void ReaderWorkflow::testLocalization()
     defaultLanguage("en");
     assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Maintenance")));
     display.capture(output, "i18n-drawer-english");
+    // Reboot is confirmed on a full-screen ConfirmScreen over the screen it was asked on.
     click("Reboot", true);
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Reboot device?")));
+    assert(lv_screen_active() == Display::confirmScreen.getScreen());
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Reboot device?")));
     defaultLanguage("de");
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Gerät neu starten?")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Gerät neu starten?")));
     for (const char *caption : {"Gerät neu starten?", "Das Lesegerät wird jetzt neu gestartet."}) {
         lv_font_glyph_dsc_t glyph{};
-        const auto *font = lv_obj_get_style_text_font(requireLabel(lv_layer_top(), caption), LV_PART_MAIN);
+        const auto *font = lv_obj_get_style_text_font(requireLabel(lv_screen_active(), caption), LV_PART_MAIN);
         assert(lv_font_get_glyph_dsc(font, &glyph, 0x00E4, 0) && !glyph.is_placeholder);
     }
     display.capture(output, "i18n-reboot-german");
     defaultLanguage("en");
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Reboot device?")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Reboot device?")));
     display.capture(output, "i18n-reboot-english");
-    click("Cancel", true);
-    assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), "Reboot device?")));
-    assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Maintenance")));
-    // Display-module fixtures keep dialogs open while real API locale messages
-    // drive the normal display loop. Authentication itself is exercised below.
+    click("Cancel");
+    assert(lv_screen_active() != Display::confirmScreen.getScreen());
+    assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), "Maintenance")));
+    // Display-module fixtures keep the project and form screens open while real API locale
+    // messages drive the normal display loop. Authentication itself is exercised below.
     {
-        ResourceDetailsScreen dialogs;
+        ResourceDetailsScreen origin;
         API::ResourceBrief resource{};
         resource.id = 1; resource.isHealthy = true;
         std::strcpy(resource.name, "Maintenance");
-        dialogs.setResourceAndUsageDetails(resource);
-        dialogs.setUserDetails({"Fixture user", true, true, true, false});
-        Display::transitionToScreen(&dialogs);
+        origin.setResourceAndUsageDetails(resource);
+        origin.setUserDetails({"Fixture user", true, true, true, false});
+        Display::transitionToScreen(&origin);
         API::ProjectsOfUserResponse projects{};
         projects.page = 2; projects.limit = 10; projects.total = 50; projects.count = 1;
         projects.items[0] = {42, "Maintenance %s"};
-        dialogs.setProjects(projects);
-        auto *projectButton = lv_obj_get_parent(label(dialogs.getScreen(), "Choose project"));
-        lv_obj_send_event(projectButton, LV_EVENT_CLICKED, nullptr);
-        const auto refreshDialogs = [&](const char *language) {
+        Display::projectSelectScreen.setProjects(projects);
+        Display::projectSelectScreen.begin();
+        Display::transitionToScreen(&Display::projectSelectScreen);
+        const auto refreshScreens = [&](const char *language) {
             server.push("READER_LANGUAGE", std::string("{\"language\":\"") + language + "\"}");
             api.loop(); Display::loop(); lv_timer_handler();
         };
-        refreshDialogs("de");
+        refreshScreens("de");
         assert(label(lv_screen_active(), "Seite 2 von 5"));
         assert(label(lv_screen_active(), "Maintenance %s"));
-        display.capture(output, "i18n-project-dialog-german");
-        refreshDialogs("en");
+        display.capture(output, "i18n-project-screen-german");
+        refreshScreens("en");
         assert(label(lv_screen_active(), "Page 2 of 5"));
         assert(label(lv_screen_active(), "Maintenance %s"));
-        display.capture(output, "i18n-project-dialog-english");
-        auto *closeProject = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_CLOSE));
-        lv_obj_send_event(closeProject, LV_EVENT_CLICKED, nullptr);
+        display.capture(output, "i18n-project-screen-english");
+        lv_obj_send_event(lv_obj_get_parent(label(lv_screen_active(), "Cancel")), LV_EVENT_CLICKED, nullptr);
+        assert(lv_screen_active() == origin.getScreen());
         API::ResourceUsageFormRequest request{};
         request.resourceId = 1; request.action = API::ResourceUsageFormActionType::START;
         request.resourceName = "Maintenance"; request.formCount = 1;
         request.forms[0] = {1, "Notes %s", 1};
-        dialogs.showFormsModal(request);
+        Display::formsScreen.showForm(request);
         API::ResourceUsageFormFieldsPage page{};
         page.formId = 1; page.fieldCount = 1;
         page.fields[0].id = 5; page.fields[0].name = "Maintenance";
         page.fields[0].type = API::ResourceUsageFormFieldType::TEXT;
         page.fields[0].isRequired = true;
-        dialogs.renderFormField(page, false, true, 2, 3);
+        Display::formsScreen.renderFormField(page, false, true, 2, 3);
+        Display::transitionToScreen(&Display::formsScreen);
         auto *submit = lv_obj_get_parent(label(lv_screen_active(), "Submit"));
         lv_obj_send_event(submit, LV_EVENT_CLICKED, nullptr);
-        refreshDialogs("de");
+        refreshScreens("de");
         assert(label(lv_screen_active(), "Pflichtfeld"));
-        display.capture(output, "i18n-form-dialog-german");
-        refreshDialogs("en");
+        display.capture(output, "i18n-form-screen-german");
+        refreshScreens("en");
         assert(label(lv_screen_active(), "Required field"));
         assert(label(lv_screen_active(), "Please complete before starting\nMaintenance - Notes %s"));
-        display.capture(output, "i18n-form-dialog-english");
-        dialogs.hideFormsModal();
+        display.capture(output, "i18n-form-screen-english");
+        Display::formsScreen.resetForm();
         Display::transitionToScreen(&Display::resourceListScreen);
         pump(1100); // Retire the fixture through the production screen router.
-        dialogs.destroy();
+        origin.destroy();
     }
     userLocale = "de"; login();
     assert(State::getActiveLanguage() == "de" && State::getApiState().userAuthenticated);
@@ -195,7 +199,7 @@ void ReaderWorkflow::testLocalization()
     assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
     assert(label(lv_screen_active(), "Sign-in failed"));
     display.capture(output, "i18n-failed-verification-default");
-    Display::clearNotice(); nfc.setPresent(0, false); pump();
+    clearStatus(); nfc.setPresent(0, false); pump();
     server.push("READER_LANGUAGE", R"({"language":"de"})"); pump();
     // API rejection clears the session and keeps the most recent default.
     userLocale = "en"; login();

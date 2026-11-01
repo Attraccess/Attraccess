@@ -2,8 +2,6 @@
 
 #include <functional>
 #include "resourceDetailsTypes.hpp"
-#include "forms/state.hpp"
-#include "resourceDetailsProjectState.hpp"
 #include "resourceDetailsUsageState.hpp"
 
 #include <string>
@@ -13,17 +11,16 @@
 #include "../../theme.hpp"
 #include "../../shared/sessionHeader.hpp"
 #include "../../shared/actionOverlay.hpp"
-#include "../../shared/fullScreenView.hpp"
+#include "../../shared/buttonError.hpp"
 #include "../../../utils.hpp"
 #include "../../../api/api.hpp"
 
-class ResourceDetailsScreen : public ResourceDetailsTypes, public IScreen, protected ResourceDetailsFormState, protected ResourceDetailsProjectState, protected ResourceDetailsUsageState
+class ResourceDetailsScreen : public ResourceDetailsTypes, public IScreen, protected ResourceDetailsUsageState
 {
 public:
 
     ResourceDetailsScreen() : logger("ResourceDetailsScreen"), loginUsernameCache("INITIAL_VALUE")
     {
-        this->projectsCache.count = 0;
     }
     void init();
     void onScreenLeave();
@@ -41,29 +38,19 @@ public:
     void setUserDetails(UserDetails userDetails);
 
     void setButtonClickCallback(std::function<void(ButtonClickEventData)> callback);
-    void setProjectsPageRequestCallback(std::function<bool(uint32_t, const std::string &)> callback);
-    void refreshProjects();
-    void resetProjectsSearch();
     void setProjectSelectionCallback(std::function<void(uint32_t, const std::string &)> callback);
+    // The project button opens the project picker, which the application routes.
+    void setOpenProjectsCallback(std::function<void()> callback);
     void setSelectedProject(uint32_t projectId, const char *projectName);
-    void showFormsModal(const API::ResourceUsageFormRequest &meta);
-    void renderFormField(const API::ResourceUsageFormFieldsPage &page, bool canGoBack, bool isLast, uint32_t fieldNumber, uint32_t totalFields);
-    void showFormPageErrors(const API::ResourceUsageFormPageResult &result);
-    void hideFormsModal();
-    void setFormPageNextCallback(std::function<void(const API::FormPageSubmission &)> callback);
-    void setFormPageBackCallback(std::function<void()> callback);
-    void setFormsCancelCallback(std::function<void()> callback);
 
     // UI helpers for async actions
     void showActionProgress(const FirmwareI18n::Text &text);
     void hideActionProgress();
-
-    void setProjects(const API::ProjectsOfUserResponse &projects);
+    // Shows `text` in place on the button that started the failed action;
+    // false when that button is not on screen.
+    bool showActionError(const FirmwareI18n::Text &text);
 
 private:
-    void updateFormBreadcrumb();
-    void createFormsEditor(lv_obj_t *overlay);
-    void createSelectField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field);
     void createResourceHeader();
     void createSessionDetails();
     void createSessionControls();
@@ -71,6 +58,7 @@ private:
     void createStatusPanels();
     Logger logger;
     lv_obj_t *screen = nullptr;
+    lv_obj_t *body = nullptr; // the scrolling part under the session header
 
     std::string loginUsernameCache;
     SessionHeader sessionHeader;
@@ -110,31 +98,11 @@ private:
     void updateSessionTimeoutIndicator();
 
     std::function<void(ButtonClickEventData)> buttonClickCallback;
-    std::function<bool(uint32_t, const std::string &)> projectsPageRequestCallback;
     std::function<void(uint32_t, const std::string &)> projectSelectionCallback;
     static void onButtonClick(lv_event_t *e);
     static void onContainerDelete(lv_event_t *e);
     static void onProjectsButtonClick(lv_event_t *e);
     static void onClearProjectSelectionClick(lv_event_t *e);
-    static void onProjectsModalClose(lv_event_t *e);
-    static void onProjectListItemClick(lv_event_t *e);
-    static void onProjectListItemDelete(lv_event_t *e);
-    static void onProjectsPrevPage(lv_event_t *e);
-    static void onProjectsNextPage(lv_event_t *e);
-    static void onProjectsSearchFieldClick(lv_event_t *e);
-    static void onProjectsSearchClear(lv_event_t *e);
-    static void onProjectsSearchKeyboardEvent(lv_event_t *e);
-    static void onProjectsSearchEditorCancel(lv_event_t *e);
-    static void onFormsNext(lv_event_t *e);
-    static void onFormsBack(lv_event_t *e);
-    static void onFormsCancel(lv_event_t *e);
-    static void onFieldPreviewClick(lv_event_t *e);
-    static void onFormsEditorKeyboardEvent(lv_event_t *e);
-    static void onFormsEditorCancel(lv_event_t *e);
-    static void onSelectOptionClick(lv_event_t *e);
-    static void onSelectContainerSizeChanged(lv_event_t *e);
-    void updateSelectButtonStyles(FormFieldWidget &widget);
-    void updateSelectOptionLayout(FormFieldWidget &widget);
 
     lv_obj_t *noIntroductionPanel = nullptr;
     lv_obj_t *introducersListLabel = nullptr;
@@ -151,35 +119,18 @@ private:
     lv_obj_t *activeActionSpinner = nullptr;
     bool actionInProgress = false;
 
+    // Project selection state shown on the button; the picker is its own screen.
+    uint32_t selectedProjectId = 0;
+    std::string selectedProjectName;
+    lv_obj_t *projectsButton = nullptr;
+    lv_obj_t *projectsButtonLabel = nullptr;
+    lv_obj_t *clearProjectButton = nullptr;
+    std::function<void()> openProjectsCallback;
+    ButtonError actionError;
+
     void refreshProjectsButtonLabel();
     void updateClearProjectButtonState();
     void clearSelectedProject();
-    void ensureProjectsModal();
-    void showProjectsModal();
-    void hideProjectsModal();
-    void rebuildProjectsList();
-    void showProjectsLoading();
-    void updateProjectsPaginationControls();
-    void requestProjects(uint32_t page);
-    void createProjectsSearchRow(lv_obj_t *panel);
-    void createProjectsSearchEditor(lv_obj_t *overlay);
-    void refreshProjectsSearchField();
-    void openProjectsSearchEditor();
-    void closeProjectsSearchEditor(bool commit);
-    void applyProjectsSearch(const std::string &query);
-    void ensureFormsModal();
-    void buildCurrentFormField();
-    bool collectCurrentField(API::FormPageSubmission &outPage);
-    FormFieldWidget *findFieldWidget(uint32_t formId, uint32_t fieldId);
-    FormFieldWidget *findFieldWidgetByObject(lv_obj_t *object);
-    void clearFormFieldErrors();
-    void setFormsBusy(bool busy, const char *text = nullptr);
-    void openFormsEditor(uint16_t widgetIndex);
-    void closeFormsEditor(bool commit);
-    void updateFieldPreview(FormFieldWidget &widget);
     void applyCachedState();
-    void disposeProjectsModal();
-    void disposeFormsModal();
     void hideActionProgressVisual();
-    void resetFormsModalState();
 };

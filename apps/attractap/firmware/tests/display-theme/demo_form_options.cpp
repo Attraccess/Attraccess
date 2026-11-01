@@ -2,19 +2,13 @@
 
 void testDemoMaterialCaptions(Renderer &renderer)
 {
-    ResourceDetailsScreen details;
-    API::ResourceBrief resource{};
-    resource.id = 1;
-    resource.isHealthy = true;
-    std::strcpy(resource.name, "CNC");
-    details.setResourceAndUsageDetails(resource);
-    details.setUserDetails({"Alex", true, true, true, false});
-    details.init();
-    ScreenGuard guard(details.getScreen(), &details);
+    FormsScreen details;
     API::ResourceUsageFormRequest request{};
     request.resourceId = 1;
     request.formCount = 1;
     request.forms[0] = {10, "CNC", 1};
+    details.showForm(request);
+    ScreenGuard guard(details.getScreen(), &details);
     API::ResourceUsageFormFieldsPage page{};
     page.resourceId = 1;
     page.formId = 10;
@@ -38,7 +32,6 @@ void testDemoMaterialCaptions(Renderer &renderer)
         lv_obj_send_event(lv_obj_get_parent(requireObject(guard.root, &lv_label_class, caption)),
                           LV_EVENT_CLICKED, nullptr);
     };
-    details.showFormsModal(request);
     details.renderFormField(page, false, true, 1, 1);
     auto *wood = requireObject(guard.root, &lv_label_class, "Holz");
     click("Holz");
@@ -83,5 +76,5 @@ void testDemoMaterialCaptions(Renderer &renderer)
     details.renderFormField(page, false, true, 1, 1);
     FirmwareI18n::refreshTree(guard.root, "en");
     requireObject(guard.root, &lv_label_class, "Holz %s");
-    details.hideFormsModal();
+    details.resetForm();
 }

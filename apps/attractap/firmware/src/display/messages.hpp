@@ -63,7 +63,8 @@ inline Text formError(const std::string &code) {
     // in the API log and display the English fallback.
     return Text::literal(messageText(Message::InvalidInput, "en"));
 }
-inline Text readerError(const std::string &code) {
+// The localized text for a reader error code, or an empty Text for codes the reader does not know.
+inline Text knownReaderError(const std::string &code) {
     if (code == "USER_NOT_SET") return Message::NoUserSelected;
     if (code == "INVALID_PARAMS") return Message::ErrorInvalidParams;
     if (code == "CARD_ALREADY_ENROLLED") return Message::ErrorCardAlreadyEnrolled;
@@ -86,6 +87,11 @@ inline Text readerError(const std::string &code) {
     if (code == "CARD_MISMATCH") return Message::ErrorCardMismatch;
     if (code == "NO_MASS_INTRODUCTION_IN_PROGRESS") return Message::ErrorNoMassIntroductionInProgress;
     if (code == "MASS_INTRODUCTION_FAILED") return Message::ErrorMassIntroductionFailed;
+    return Text();
+}
+inline Text readerError(const std::string &code) {
+    const Text known = knownReaderError(code);
+    if (!known.empty()) return known;
     std::fprintf(stderr, "Unknown reader error: %s\n", code.c_str());
     // Unknown server errors have no reliable language; preserve English fallback.
     return Text::literal("Something went wrong. Please try again.");

@@ -52,8 +52,16 @@ uint32_t resourceRefreshRequestId = 0;
 
 #if defined(HAS_LVGL_DISPLAY)
     FirmwareI18n::Text actionCompletionMessage;
-    // The billing total notice already answers the action; the completion notice must not replace it.
+    std::string completedResourceName;
+    // The billing total screen already answers the action; the completion screen must not replace it.
     bool billingSummaryShown = false;
+#endif
+
+#if defined(HAS_LVGL_DISPLAY)
+// A status screen the application raised keeps routing from replacing it for as
+// long as the state it was raised in (routingKey) is unchanged.
+bool statusHeld = false;
+uint32_t statusHoldKey = 0;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

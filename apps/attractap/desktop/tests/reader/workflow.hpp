@@ -92,6 +92,12 @@ struct ReaderWorkflow
         lv_obj_send_event(lv_obj_get_parent(found), LV_EVENT_CLICKED, nullptr);
         pump();
     }
+    // Leaves a status screen the way a user does: its OK button, or the tap that ends the success screen.
+    void clearStatus() {
+        if (!Display::isActive(&Display::statusScreen)) return;
+        if (label(lv_screen_active(), "OK")) click("OK");
+        else { lv_obj_send_event(lv_screen_active(), LV_EVENT_CLICKED, nullptr); pump(); }
+    }
     void list(bool signedIn = true, bool onlyOne = false, bool correlate = true) {
         JsonDocument doc;
         doc["messageId"] = ++listVersion;

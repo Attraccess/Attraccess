@@ -28,8 +28,10 @@ int main(int argc, char **argv)
     screenshot(screenshots, "device.png");
     testLockscreen(display, screenshots);
     testSessionSummaryLifecycle();
-    testScreenNotices(display, screenshots);
-    testFormDrafts(display, screenshots);
+    testScreenLayouts();
+    testStatusScreens(display, screenshots);
+    testConfirmScreen(display, screenshots);
+    testFormScreens(display, screenshots);
     testTopUpScreen(display, screenshots);
     testPowerOffConfirm(display, screenshots);
     testPendingApproval(display, screenshots);

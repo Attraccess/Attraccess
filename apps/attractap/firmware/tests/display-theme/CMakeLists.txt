@@ -66,15 +66,19 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsSession.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjects.cpp"
-    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjectSearch.cpp"
-    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/navigation.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/projectSelect/projectSelectScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/projectSelect/projectSelectSearch.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/forms/navigation.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/status/statusScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/confirm/confirmScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/topUp/topUpScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/shared/buttonError.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsActionFeedback.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/layout.cpp"
-    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/fields.cpp"
-    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/editor.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/forms/fields.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/forms/editor.cpp"
     ${ATTRACTAP_LATIN1_FONTS}
     "${FIRMWARE_DIR}/src/display/shared/powerOff/powerOffButton.cpp"
-    "${FIRMWARE_DIR}/src/display/shared/inlineConfirm/inlineConfirm.cpp"
     "${FIRMWARE_DIR}/src/display/shared/pinInput/pinInputPage.cpp")
 target_include_directories(display-theme-host PRIVATE shims "${FIRMWARE_DIR}/src")
 target_compile_definitions(display-theme-host PRIVATE

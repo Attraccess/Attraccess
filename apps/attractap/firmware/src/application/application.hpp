@@ -90,11 +90,21 @@ private:
     void logoutReader();
     void beginSessionSummary(const API::ActionResult &result);
     void dismissSessionSummary();
-#ifdef HAS_LVGL_DISPLAY
-    // Top-up is a routed screen: open it from the screen the user is on, leave it back to that screen.
+    // Full-screen result over the current screen. `resumeRouting`: leaving it lets the application
+    // route from its state (e.g. to the lockscreen after a logout) instead of returning to the origin.
+    void showStatus(StatusScreen::Config config, bool resumeRouting = false);
+    // An action failed: in place on the button that started it, or a full-screen error when that is gone.
+    std::string resourceNameOf(uint32_t resourceId) const;
+    void showActionFailure(uint32_t resourceId, const std::string &errorCode,
+                           const FirmwareI18n::Text &preferred = FirmwareI18n::Text());
+    uint32_t routingKey() const;
+    // An error the server reported for `eventType`; only errors that belong to something on screen get UI.
+    void handleReaderError(const std::string &eventType, const std::string &code);
+    // Top-up is a routed screen over the origin; the form and project screens likewise.
     void openTopUp();
     void leaveTopUp();
-#endif
+    void leaveForms();
+    void openProjects();
     void finishCardAuthentication(bool success);
 
 #else
