@@ -1,5 +1,6 @@
 #include "display/i18n.hpp"
 #include "pendingApprovalScreen.hpp"
+#include "../../shared/screenChrome.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../theme.hpp"
 #include "../../images/lockscreen_background_image.hpp"
@@ -36,7 +37,8 @@ void PendingApprovalScreen::init()
    // The artwork's bright rings run through the code; dim it so the code stays readable.
    lv_obj_set_style_bg_image_recolor(this->screen, lv_color_black(), LV_PART_MAIN);
    lv_obj_set_style_bg_image_recolor_opa(this->screen, LV_OPA_80, LV_PART_MAIN);
-   lv_obj_set_style_pad_all(this->screen, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Below the network badge and above the device footer, also with a two-line German title.
+   ScreenChrome::applyInsets(this->screen);
 
    this->titleLabel = lv_label_create(this->screen);
    lv_obj_set_width(this->titleLabel, lv_pct(100));

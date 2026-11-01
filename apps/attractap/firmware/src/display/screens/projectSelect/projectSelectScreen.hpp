@@ -30,6 +30,8 @@ public:
     void refreshProjects();
     void resetProjectsSearch();
     void setSelectedProject(uint32_t projectId);
+    // The resource the project is chosen for, shown under the title.
+    void setResourceName(const std::string &name);
     void setProjectsPageRequestCallback(std::function<bool(uint32_t, const std::string &)> callback);
     void setCallbacks(std::function<void(uint32_t, const std::string &)> onSelect, std::function<void()> onCancel);
 
@@ -51,6 +53,8 @@ private:
     bool projectsLoadFailed = false;
     lv_obj_t *projectsListContainer = nullptr;
     lv_obj_t *projectsPaginationLabel = nullptr;
+    lv_obj_t *resourceNameLabel = nullptr;
+    std::string resourceName;
     lv_obj_t *projectsPrevButton = nullptr;
     lv_obj_t *projectsNextButton = nullptr;
     // Committed name filter; pagination stays within its results.

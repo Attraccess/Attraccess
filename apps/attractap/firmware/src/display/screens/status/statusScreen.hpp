@@ -18,12 +18,23 @@ public:
         Success, // usage started / ended: green check, resource name, tap anywhere, 2.5 s
         Billing, // session total: amount, OK, 8 s
         Warning, // status unavailable, no payment possible: "!", OK, 6 s
+        Info,    // a step continues elsewhere (payment terminal): blue check, 6 s
         Generic  // something went wrong: triangle, code chip, Back
+    };
+
+    // Why the screen is up, for whoever has to tell its own screens from others.
+    enum class Purpose
+    {
+        Other,
+        SignInFailed,
+        StatusUnavailable,
+        TouchUnavailable
     };
 
     struct Config
     {
         Variant variant = Variant::Error;
+        Purpose purpose = Purpose::Other;
         FirmwareI18n::Text title;
         FirmwareI18n::Text message; // Success: the resource name
         FirmwareI18n::Text detail;  // Billing: the amount. Generic: the error code
@@ -38,6 +49,7 @@ public:
     static Config success(const FirmwareI18n::Text &title, const FirmwareI18n::Text &resourceName);
     static Config billing(const FirmwareI18n::Text &amount, const FirmwareI18n::Text &resourceName);
     static Config warning(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool button = true);
+    static Config info(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
     static Config generic(const FirmwareI18n::Text &message, const std::string &code);
 
     void init() override;
@@ -50,7 +62,7 @@ public:
 
     // Shows `config`, replacing what the screen currently shows.
     void configure(Config config);
-    Variant variant() const { return config.variant; }
+    Purpose purpose() const { return config.purpose; }
 
 private:
     lv_obj_t *screen = nullptr;
