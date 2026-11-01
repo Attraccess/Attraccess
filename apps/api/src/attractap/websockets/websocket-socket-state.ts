@@ -72,6 +72,24 @@ export enum AttractapEventType {
   MASS_INTRODUCTION_CANCEL = 'MASS_INTRODUCTION_CANCEL',
   /** Server ended the session (expired, cancelled by the introducer). */
   MASS_INTRODUCTION_END = 'MASS_INTRODUCTION_END',
+
+  // Reader UI (ATT-1187). Wire contract, schema v1:
+  //  server -> reader: UI_SLOT_UPDATE, UI_STEP_REQUEST, UI_STEP_CANCEL. The reader acks each with
+  //    ACK_<TYPE> echoing `messageId`, which the server matches on for UI_* types only.
+  //  reader -> server: UI_STEP_RESULT { stepId, action }, UI_RENDER_REPORT, CARD_SESSION_ENDED { cardSessionId }.
+  //  START_RESOURCE_USAGE_SESSION gains optional `stepId` and `choice`; replies may carry
+  //  { error: 'START_BLOCKED', reason: { code, title, body } } or { error: 'STEP_EXPIRED' | 'STEP_UNKNOWN' }.
+  UI_SLOT_UPDATE = 'UI_SLOT_UPDATE',
+  UI_STEP_REQUEST = 'UI_STEP_REQUEST',
+  UI_STEP_RESULT = 'UI_STEP_RESULT',
+  UI_STEP_CANCEL = 'UI_STEP_CANCEL',
+  UI_RENDER_REPORT = 'UI_RENDER_REPORT',
+  CARD_SESSION_ENDED = 'CARD_SESSION_ENDED',
+  // Reserved for phase 7 (custom screens); no handlers, reader messages of these types are dropped.
+  UI_SCREEN_OPEN = 'UI_SCREEN_OPEN',
+  UI_SCREEN_CLOSE = 'UI_SCREEN_CLOSE',
+  UI_SCREEN_DISMISSED = 'UI_SCREEN_DISMISSED',
+  UI_ACTION = 'UI_ACTION',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -206,6 +206,17 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     [AttractapEventType.RESOURCE_USAGE_FORM_FIELDS]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
     [AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT]: (socket, eventData) =>
       this.rejectServerEvent(socket, eventData),
+    // Replaced by the extracted dispatch table in phase 2.
+    [AttractapEventType.UI_SLOT_UPDATE]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.UI_STEP_REQUEST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.UI_STEP_RESULT]: () => undefined,
+    [AttractapEventType.UI_STEP_CANCEL]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
+    [AttractapEventType.UI_RENDER_REPORT]: () => undefined,
+    [AttractapEventType.CARD_SESSION_ENDED]: () => undefined,
+    [AttractapEventType.UI_SCREEN_OPEN]: () => undefined,
+    [AttractapEventType.UI_SCREEN_CLOSE]: () => undefined,
+    [AttractapEventType.UI_SCREEN_DISMISSED]: () => undefined,
+    [AttractapEventType.UI_ACTION]: () => undefined,
   };
 
   public async sendResourceList(readerId: number) {
