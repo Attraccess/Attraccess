@@ -5,6 +5,7 @@ import { AttractapService } from '../../../attractap.service';
 import { AttractapFirmwareService } from '../../../firmware.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AttractapFirmware } from '../../../dtos/firmware.dto';
+import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 
 @Injectable()
@@ -73,7 +74,7 @@ export class AttractapFirmwareHandler {
   }
 
   public async handleFirmwareInfo(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    await this.attractapService.updateReaderFirmware(socket.readerId, data.payload);
+    await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
 
     const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload);
     if (!firmwareIsUpToDate) {
@@ -121,6 +122,19 @@ export class AttractapFirmwareHandler {
       }
       return;
     }
+  }
+
+  /** Capabilities are reader-supplied: store `ui` only when it validates (missing means schemaVersion 0). */
+  private withValidatedUi(payload: AttractapEvent['data']['payload']) {
+    const capabilities = payload?.capabilities;
+    if (!capabilities) return payload;
+    const rawUi = capabilities.ui;
+    const ui = validateReaderUiCapabilities(rawUi);
+    if (rawUi !== undefined && rawUi !== null && ui === null) {
+      this.logger.warn('Ignoring invalid capabilities.ui from reader firmware info');
+    }
+    const resetReason = typeof payload.resetReason === 'string' ? payload.resetReason.slice(0, 32) : null;
+    return { ...payload, capabilities: { ...capabilities, ui, resetReason } };
   }
 
   private async isFirmwareLatest(firmware: AttractapFirmware): Promise<boolean> {

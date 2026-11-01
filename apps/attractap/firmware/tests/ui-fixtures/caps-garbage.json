@@ -1,0 +1,9 @@
+{
+  "name": "caps-garbage",
+  "kind": "capabilities",
+  "verdict": "reject:invalid-shape",
+  "note": "",
+  "payload": {
+    "schemaVersion": "one"
+  }
+}

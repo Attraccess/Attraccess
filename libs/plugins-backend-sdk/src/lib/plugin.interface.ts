@@ -58,6 +58,10 @@ export enum PluginPermission {
   TRIGGER_FLOWS = 'TRIGGER_FLOWS',
   /** Encrypt and decrypt plugin-owned secret material through the host key service. */
   MANAGE_SECRETS = 'MANAGE_SECRETS',
+  /** Contribute reader UI slots and call readerUi.invalidate(). */
+  READER_UI = 'READER_UI',
+  /** Register pre-start and session-end hooks that can confirm or block session starts. */
+  ACCESS_HOOKS = 'ACCESS_HOOKS',
 }
 
 /**
@@ -75,6 +79,9 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.ACCESS_MQTT_SERVERS]: "Read an MQTT server's connection configuration and resolved credentials.",
   [PluginPermission.TRIGGER_FLOWS]: 'Start flows from plugin-declared trigger nodes.',
   [PluginPermission.MANAGE_SECRETS]: 'Encrypt and decrypt plugin-owned secret material through the host key service.',
+  [PluginPermission.READER_UI]: 'Show widgets on Attractap reader screens.',
+  [PluginPermission.ACCESS_HOOKS]:
+    'Ask users for confirmation or block resource session starts through pre-start hooks.',
 };
 
 /**

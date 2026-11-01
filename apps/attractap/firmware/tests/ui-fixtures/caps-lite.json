@@ -1,0 +1,30 @@
+{
+  "name": "caps-lite",
+  "kind": "capabilities",
+  "verdict": "accept",
+  "note": "",
+  "payload": {
+    "schemaVersion": 1,
+    "components": [],
+    "slots": [],
+    "steps": [
+      "card-confirm"
+    ],
+    "maxPayloadBytes": 0,
+    "maxNodes": 0,
+    "maxDepth": 0,
+    "maxLiveNodes": 0,
+    "display": null,
+    "input": {
+      "touch": false,
+      "buttons": 0,
+      "cardHold": true
+    },
+    "feedback": {
+      "leds": true,
+      "beeper": true
+    },
+    "charset": "latin1",
+    "images": false
+  }
+}

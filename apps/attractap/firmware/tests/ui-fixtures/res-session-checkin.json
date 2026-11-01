@@ -1,0 +1,28 @@
+{
+  "name": "res-session-checkin",
+  "kind": "slot-update",
+  "verdict": "accept",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.session",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "row",
+      "c": [
+        {
+          "t": "icon",
+          "name": "clock"
+        },
+        {
+          "t": "text",
+          "text": "Booked until 16:00"
+        }
+      ]
+    }
+  }
+}

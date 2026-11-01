@@ -1,0 +1,29 @@
+{
+  "name": "res-header-free-until",
+  "kind": "slot-update",
+  "verdict": "accept",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.header",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "row",
+      "c": [
+        {
+          "t": "icon",
+          "name": "ok",
+          "tone": "success"
+        },
+        {
+          "t": "text",
+          "text": "Free until 14:00"
+        }
+      ]
+    }
+  }
+}

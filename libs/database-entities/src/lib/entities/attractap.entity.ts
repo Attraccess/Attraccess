@@ -52,6 +52,24 @@ class AttractapCapabilities {
     default: false,
   })
   hasLeds!: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  @ApiProperty({
+    description:
+      'Reader UI capabilities (schema version, components, slots, steps, display, input, feedback). Null means schemaVersion 0 (no plugin UI).',
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  ui!: Record<string, unknown> | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Last reset reason the reader reported (e.g. POWERON, PANIC, TASK_WDT)',
+    example: 'POWERON',
+    nullable: true,
+  })
+  resetReason!: string | null;
 }
 
 export class AttractapFirmwareVersion {

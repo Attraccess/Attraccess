@@ -1,0 +1,44 @@
+{
+  "name": "err-slot-budget",
+  "kind": "slot-update",
+  "verdict": "reject:slot-budget",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.header",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "col",
+      "c": [
+        {
+          "t": "text",
+          "text": "0"
+        },
+        {
+          "t": "text",
+          "text": "1"
+        },
+        {
+          "t": "text",
+          "text": "2"
+        },
+        {
+          "t": "text",
+          "text": "3"
+        },
+        {
+          "t": "text",
+          "text": "4"
+        },
+        {
+          "t": "text",
+          "text": "5"
+        }
+      ]
+    }
+  }
+}

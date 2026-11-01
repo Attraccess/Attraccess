@@ -7,7 +7,12 @@ export function makeStringLVGLReady(input: string): string {
     // Common symbols and punctuation
     [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
     [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
-    [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
+    [/[\u2010-\u2015]/g, '-'], // hyphen, non-breaking hyphen, figure/en/em/horizontal bar -> hyphen
+    [/[\u2009\u200A\u202F\u2002\u2003\u2007\u2008]/g, ' '], // thin/narrow/en/em spaces from Intl output
+    [/\u0142/g, 'l'], // l with stroke does not decompose under NFD
+    [/\u0141/g, 'L'],
+    [/\u0111/g, 'd'],
+    [/\u0110/g, 'D'],
     [/\u2026/g, '...'], // ellipsis
     [/\u2022/g, '-'], // bullet -> hyphen
     [/\u2122/g, 'TM'], // trademark

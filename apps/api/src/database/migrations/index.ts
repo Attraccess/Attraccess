@@ -187,3 +187,4 @@ export * from './1791500000000-user-date-time-locale';
 export * from './1791600000000-sso-permission-sync-ttl';
 export * from './1791700000000-attractap-crash-report-created-at-index';
 export * from './1791800000000-attractap-pairing';
+export * from './1791900000000-attractap-reader-ui-capabilities';
