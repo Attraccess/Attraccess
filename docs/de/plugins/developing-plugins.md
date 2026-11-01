@@ -131,6 +131,8 @@ nennt.
 | `LISTEN_EVENTS` | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen. |
 | `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen. |
+| `READER_UI` | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
+| `ACCESS_HOOKS` | `preStartHook` und `sessionEndHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Eine unbekannte Berechtigung führt dazu, dass das Plugin
@@ -154,6 +156,102 @@ Einige Hinweise zur Grenze:
 > Fordern Sie nur die minimal nötigen Berechtigungen an. Administratoren sehen
 > auf der Plugins-Seite jede angeforderte Berechtigung, bevor sie einem Plugin
 > vertrauen.
+
+## Reader-UI und Start-Hooks
+
+Plugins können kleine Widgets auf Attractap-Readern anzeigen und vor dem Start einer Sitzung eine Bestätigung
+einfügen. Ein Plugin beschreibt nur **Daten** (einen Knotenbaum nach „Reader UI Schema v1“). Auf dem Reader läuft
+kein Plugin-Code; der Host prüft, bereinigt und rendert alles.
+
+| Was | Deklaration | Berechtigung |
+|-----|-------------|--------------|
+| Slot-Widgets | `readerUi` (Provider oder `(context) => provider`) | `READER_UI` |
+| Pre-Start-Hook | `preStartHook` | `ACCESS_HOOKS` |
+| Beratende Frage nach dem Stopp | `sessionEndHook` | `ACCESS_HOOKS` |
+| Neu rendern | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI` |
+
+Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
+unter Quarantäne gestellt. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
+
+### Slots
+
+| Slot-ID | Ort | Knotenbudget |
+|---------|-----|--------------|
+| `resourceList.row.status` | Statuszeile einer Ressourcenzeile | 1 `text` oder `badge`, höchstens 24 Zeichen. Nur sichtbar, wenn kein Kernstatus (in Benutzung, Wartung, nicht verfügbar, Einweisung erforderlich) gilt. |
+| `resource.details.header` | unter der Beschreibung in den Ressourcendetails | 6 Knoten |
+| `resource.details.body` | Hauptbereich der Ressourcendetails | 8 Knoten |
+| `resource.details.session` | solange der Block der aktiven Sitzung sichtbar ist | 6 Knoten |
+
+Komponenten: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
+`countdown`, `spacer`. Slot-Bäume dürfen kein `button` enthalten. Töne: `primary`, `success`, `warning`, `danger`;
+`danger` darf nicht mit dem Symbol `lock` kombiniert werden.
+
+### Grenzen
+
+| Grenze | Wert |
+|--------|------|
+| UI-Nutzlast | 3072 Byte UTF-8 nach der Bereinigung; der Frame höchstens 4096 Byte |
+| Knoten / Tiefe | 32 pro Baum / 5 |
+| Aktive Knoten pro Reader | 64 |
+| Text | 80 Zeichen (2 Zeilen, mit „...“ gekürzt) |
+| Button-/Auswahl-Beschriftung | 31 Byte |
+| Auswahlmöglichkeiten | höchstens 4 |
+| IDs (`key`, Button, Auswahl) | `[a-z0-9_-]{1,24}` |
+| Beiträge | höchstens 8 pro Ressource; Updates höchstens alle 2 s pro Reader und Slot |
+
+Ungültige Beiträge lehnt der Host ab und protokolliert sie mit dem Plugin-Namen; sie erreichen den Reader nie.
+Texte, die einem Kernstatus entsprechen („Wartung“, „Zugriff gewährt“, ...), werden abgelehnt, damit Plugins keine
+Host-Meldungen nachahmen.
+
+### Nur Latin-1
+
+Die Reader-Schriften decken Latin-1 ab. Der Host transliteriert **vor** dem Zählen der Bytes (`ł` wird `l`,
+typografische Anführungszeichen werden `'` und `"`, Striche U+2010-2015 werden `-`, `…` wird `...`, schmale
+Leerzeichen werden ein Leerzeichen, alles andere wird `?`). Ausgaben von `Intl.DateTimeFormat` sind abgedeckt.
+
+### Datenschutz
+
+Öffentliche Slots (Reader ohne angemeldete Person) zeigen keine Namen anderer Personen. Personenbezogene Inhalte
+gehören in benutzerbezogene Slots (`resource.details.session`) und Schritte; der Host entfernt sie, wenn die
+Kartensitzung endet. Bevorzuge „Reserviert“ statt Namen, sonst Vorname und Initial. Öffentliche Slots nutzen die
+Reader-Sprache, benutzerbezogene Inhalte und Schritte die Sprache der angemeldeten Person (`en` oder `de`).
+
+### Pre-Start-Hook
+
+Ein Vertrag für Reader, Web-UI, API-Clients und die Supervision-Freigabe:
+
+- `allow` startet normal. `block` lehnt mit `{ code, title, body }` ab; der Text wird wörtlich angezeigt.
+- `confirm` fragt nach. Reader zeigen einen Bestätigungsschritt, die Web-UI einen Dialog, API-Clients erhalten
+  `409 { code: 'CONFIRMATION_REQUIRED' }` und wiederholen mit `confirmedStepIds`. Dein Hook wird erneut mit
+  `confirmedStepKeys` aufgerufen (nur **deine** Schlüssel). Schritt-IDs sind zufällig, einmalig und laufen ab
+  (Standard 60 s, höchstens 120 s); Plugins sehen sie nie.
+- Bei mehreren Plugins gewinnt jedes `block`; sonst werden die Bestätigungen nacheinander in Host-Reihenfolge gefragt.
+- Der Hook läuft nach der schreibgeschützten Start-Prüfung des Hosts; wer ohnehin abgelehnt würde, sieht keinen Schritt.
+- Eine Übernahme ist ein Start für die neue Person (`action: 'takeover'`). **Stopp und Notaus laufen nie durch Hooks.**
+- **Supervision-Freigabe:** Ein `confirm` blockiert dort standardmäßig mit deinem Grund, weil die beaufsichtigende
+  Person nicht stellvertretend bestätigen kann.
+- Reader ohne Bildschirm (Attractap Lite) folgen der Richtlinie der Ressource: `block` (Standard), `card-confirm`
+  (zweites Auflegen derselben Karte) oder `allow-with-warning`. `PluginConfirmation.noScreenPolicy` setzt deinen
+  Standard; Admins können pro Ressource überschreiben.
+
+### Frage nach dem Stopp
+
+`sessionEndHook` läuft nach dem Ende einer Sitzung und kann `{ decision: 'choose', choice }` mit bis zu 4
+Auswahlmöglichkeiten liefern. Sie ist nur beratend: Die Sitzung ist bereits beendet. Die Frage erscheint nur, wenn
+die Person, die beendet hat, noch die Kartensitzung am Reader hält (nicht nach Übernahme oder Web-/API-Stopp), und
+gilt 15 s (höchstens 30 s). Bei Timeout, Verbindungsverlust oder ohne Bildschirm gilt `defaultOnTimeout`.
+
+### Ausfälle und Vertrauen
+
+- Hooks laufen nach 1,5 s in ein Timeout (höchstens 3 s); eine Exception zählt als Timeout. Standard ist
+  **fail closed** (Start wird blockiert, „vorübergehend nicht verfügbar“).
+- Nach 5 aufeinanderfolgenden Fehlern öffnet ein Circuit Breaker für das Plugin: Die Ausfallrichtlinie gilt, ohne den
+  Hook aufzurufen, nach 60 s folgt ein Probeaufruf, und ein Admin-Alarm entsteht. Admins können zurücksetzen oder
+  pro Plugin und Ressource **fail open** wählen (wird protokolliert).
+- Meldet ein Reader einen Panic-Reset, erhält er keine Plugin-Beiträge, bis ein Admin den Alarm quittiert oder 30
+  Minuten ohne weiteren Panic-Reset vergehen.
+- **Plugins laufen im selben Prozess ohne Sandbox.** Eine synchrone Endlosschleife in einem Hook lässt sich nicht per
+  Timeout stoppen. Die Prüfung schützt Reader und Nutzende vor Fehlern; sie ist keine Sandbox.
 
 ## Typisierte System-Events
 

@@ -216,6 +216,8 @@ naming the missing permission.
 | `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                               |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
 | `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                |
+| `ACCESS_HOOKS`           | The `preStartHook` and `sessionEndHook` — ask for a confirmation or block a session start. See [Reader UI](#reader-ui-and-start-hooks).                                |
 
 ### MQTT subscriptions
 
@@ -311,6 +313,128 @@ esbuild backend/plugin.ts \
 > If you bundle any of the externalized packages, your plugin may load without
 > errors but quietly fail to receive events, share the database, or resolve host
 > services. When in doubt, keep the list above external.
+
+## Reader UI and start hooks
+
+Plugins can show small widgets on Attractap readers and add a confirmation step before a session starts.
+A plugin only describes **data** (a "Reader UI schema v1" node tree). No plugin code runs on the reader; the
+host validates, sanitizes and renders it.
+
+| What                 | Declared as                              | Permission     |
+| -------------------- | ---------------------------------------- | -------------- |
+| Slot widgets         | `readerUi` (provider or `(context) => provider`) | `READER_UI`    |
+| Pre-start hook       | `preStartHook`                           | `ACCESS_HOOKS` |
+| Advisory after-stop  | `sessionEndHook`                         | `ACCESS_HOOKS` |
+| Re-render on change  | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI` |
+
+A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
+See `examples/plugin-reader-ui` for a working example.
+
+### Slots
+
+| Slot id                    | Where                                  | Node budget                                     |
+| -------------------------- | -------------------------------------- | ----------------------------------------------- |
+| `resourceList.row.status`  | status line of a resource list row     | 1 `text` or `badge`, at most 24 characters. Shown only when no core status (in use, maintenance, unavailable, introduction required) applies. |
+| `resource.details.header`  | below the description on resource details | 6 nodes                                      |
+| `resource.details.body`    | resource details body                  | 8 nodes                                         |
+| `resource.details.session` | while the active-session block is shown | 6 nodes                                        |
+
+Components: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
+`countdown`, `spacer`. Slot trees must not contain `button`. Tones are `primary`, `success`, `warning`, `danger`;
+`danger` cannot be combined with the `lock` icon.
+
+```ts
+const readerUi: ReaderUiProvider = {
+  getSlotContributions(ctx) {
+    return [
+      {
+        slotId: 'resource.details.header',
+        key: 'free-until',
+        tree: { t: 'row', c: [{ t: 'icon', name: 'clock' }, { t: 'text', text: 'Free until 14:00' }] },
+        expiresAt: new Date('2026-11-01T14:00:00Z'), // the host calls the provider again then
+        fallback: { text: 'Free until 14:00' },
+      },
+    ];
+  },
+};
+```
+
+### Limits
+
+| Limit                | Value                                         |
+| -------------------- | --------------------------------------------- |
+| UI payload           | 3072 bytes UTF-8 after sanitizing; the frame is at most 4096 bytes |
+| Nodes / depth        | 32 per tree / 5                               |
+| Live nodes per reader | 64                                           |
+| Text                 | 80 characters (2 lines, clipped with "...")   |
+| Button / choice label | 31 bytes                                     |
+| Choices              | at most 4                                     |
+| Ids (`key`, button, choice) | `[a-z0-9_-]{1,24}`                     |
+| Contributions        | at most 8 per resource; updates at most once per 2 s per reader and slot |
+
+The host rejects invalid contributions, logs them with the plugin name and never sends them to the reader.
+Text that equals a core status ("Maintenance", "Access granted", ...) is rejected so a plugin cannot imitate
+host messages.
+
+### Latin-1 only
+
+Reader fonts cover Latin-1. The host transliterates **before** counting bytes (`ł` becomes `l`, curly quotes
+become `'` and `"`, dashes U+2010-2015 become `-`, `…` becomes `...`, thin and narrow spaces become a space,
+anything else becomes `?`). Dates from `Intl.DateTimeFormat` are covered. Preview text with the same rules.
+
+### Privacy
+
+Public slots (signed-out reader) must not show names of other people. User-specific content belongs in
+user-scoped slots (`resource.details.session`) and steps; the host clears them when the card session ends. Prefer
+"Reserved" over names, and first name plus initial when a name is needed. Public slots use the reader language,
+user-scoped content and steps use the signed-in user's language (`context.language`, `en` or `de`).
+
+### Pre-start hook
+
+```ts
+const preStartHook: PreStartHook = async (ctx) => {
+  if (ctx.confirmedStepKeys.includes('tidy-up')) return { decision: 'allow' };
+  return {
+    decision: 'confirm',
+    confirmation: { stepKey: 'tidy-up', title: 'Before you start', body: 'Is the machine clean?' },
+  };
+};
+```
+
+One contract drives readers, the web UI, API clients and supervision approval:
+
+- `allow` starts normally. `block` refuses with `{ code, title, body }`, shown literally to the user.
+- `confirm` asks the user. Readers show a confirm step, the web UI a dialog, API clients get a typed
+  `409 { code: 'CONFIRMATION_REQUIRED' }` and retry with `confirmedStepIds`. Your hook is called again with
+  `confirmedStepKeys` containing only **your** keys and decides again. Step ids are random, single-use and expire
+  (60 s default, 120 s maximum); plugins never see them.
+- With several plugins any `block` wins; otherwise the confirmations are asked one after the other in host order.
+- The hook runs after the host's read-only can-start check, so users who would be refused anyway never see a step.
+- A takeover is a start for the new user (`action: 'takeover'`). **Stop and emergency stop never go through hooks.**
+- **Supervision approval:** a `confirm` there blocks with your reason by default, because the supervisor cannot
+  confirm on the requester's behalf.
+- Readers without a screen (Attractap Lite) follow the resource's no-screen policy: `block` (default),
+  `card-confirm` (a second tap by the same user) or `allow-with-warning`. `PluginConfirmation.noScreenPolicy` sets
+  your default, admins can override it per resource.
+
+### After-stop question
+
+`sessionEndHook` runs after a session ended and may return `{ decision: 'choose', choice }` with up to 4
+choices. It is advisory: the session is already over. The question is only shown if the user who ended the session
+still holds the card session on that reader (not after a takeover or a web/API stop) and lives 15 s (30 s maximum).
+On timeout, disconnect or readers without a screen `defaultOnTimeout` applies.
+
+### Failures and trust
+
+- Hooks time out after 1.5 s (3 s maximum); an exception counts as a timeout. The default is **fail closed**
+  (start is blocked with "temporarily unavailable").
+- After 5 consecutive failures a circuit breaker opens for that plugin: the failure policy is applied without
+  calling the hook, one probe call follows after 60 s, and an admin alert is raised. Admins can reset it, or set
+  **fail open** per plugin and resource (audited).
+- A reader that reports a panic reset gets no plugin contributions until an admin clears the alert or 30 minutes
+  pass without another panic.
+- **Plugins run in-process and unsandboxed.** A synchronous endless loop in a hook cannot be stopped by the timeout.
+  The validation protects readers and users from mistakes; it is not a sandbox.
 
 ## Frontend plugins
 

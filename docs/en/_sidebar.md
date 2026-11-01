@@ -63,6 +63,7 @@
   - [Reader Pairing](attractap/pairing.md)
   - [RFID Cards](attractap/rfid-cards.md)
   - [Firmware Updates](attractap/firmware-updates.md)
+  - [Reader UI](attractap/reader-ui.md)
   - [LED Guide (Lite)](attractap/led-guide.md)
 
 - **Devices**
