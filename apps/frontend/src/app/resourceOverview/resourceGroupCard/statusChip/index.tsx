@@ -55,7 +55,7 @@ export function StatusChip(props: Readonly<Props>) {
       return <Chip color="danger">{t('status.inUse')}</Chip>;
     }
     if (sessionCount >= maxSessions) {
-      return <Chip color="danger">{t('status.full', { count: sessionCount, max: maxSessions })}</Chip>;
+      return <Chip color="danger">{t('status.full')}</Chip>;
     }
     return <Chip color="warning">{t('status.inUseCount', { count: sessionCount, max: maxSessions })}</Chip>;
   }

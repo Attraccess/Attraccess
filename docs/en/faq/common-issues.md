@@ -45,6 +45,7 @@ This page lists frequently encountered problems and their solutions.
 | Resource in use | Someone else may be using the resource. Wait until their session ends. |
 | "Machine is full" | The machine allows several parallel sessions and all slots are taken. Wait until someone finishes, or ask a resource manager to raise **Max parallel sessions**. Takeover is not offered on machines with more than one parallel session. |
 | "Session already active" | You already have an active session on this machine; only one active session per machine is possible. Stop your existing session first (on the detail page, or at the reader). |
+| "No session of your own" | You stopped without picking a session on a shared machine where you have no session; stopping never ends someone else's session there. To end another person's session (resource managers, introducers, maintainers and the session's supervisor), pick it from the list of active sessions on the detail page or on the touch reader. |
 
 ## Forgot Password
 

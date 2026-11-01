@@ -65,7 +65,7 @@ After you successfully stop your own machine session, the reader shows **Danke, 
 
 The summary stays visible for about **3.5 seconds**, then signs you out. Tap anywhere or present a card again to dismiss it sooner. A finger or card already held when the summary opens does not dismiss it. The dismissing card is consumed; remove it and scan again to sign in. Other running machine sessions continue.
 
-Stopping from the list, details or after submitting a required end form produces the same summary. A failed stop does not show it. If you end another person's session as an administrator or introducer, you keep the existing confirmation and remain signed in. Readers using an older server without summary metadata keep the previous confirmation behavior.
+Stopping from the list, details or after submitting a required end form produces the same summary. A failed stop does not show it. If you end another person's session as a resource manager, introducer or maintainer, you keep the existing confirmation and remain signed in. Readers using an older server without summary metadata keep the previous confirmation behavior.
 
 The device currently uses German labels, including **Bis bald!**. Future English equivalents are **Thanks, {name}!**, **Duration**, **Charged**, and **See you soon!**.
 
@@ -75,12 +75,12 @@ Some machines allow several people to work at the same time (see [Using Resource
 
 - The list and details show **In Verwendung k/N** (In use k/N) while some slots are taken. A **Start** action stays available in the list (**Ressource verwenden** in the details) as long as a slot is free and you have no session of your own. When all slots are taken, the machine shows **Voll** (Full).
 - If you have a session on the machine, it shows **Von dir verwendet** (In use by you) with **Stop** in the list and **Sitzung beenden** (End session) in the details. Live stats on the details screen are for your own session.
-- Resource managers and introducers get a list **Fremde Sitzung beenden:** (End another session) on the details screen with one button per other session, to end that specific session.
+- Resource managers, introducers and maintainers get a list **Andere Sitzung beenden:** (End another session:) on the details screen with one button per other session, to end that specific session. The reader lists at most 16 sessions; end further sessions on the [detail page](resources/resource-details.md) in the web interface.
 - The lock screen shows whether the machine is in use (**In Verwendung k/N**) or full (**Voll**).
 
-Machines with a limit of 1 behave as described above; takeover and force-stop are unchanged.
+Machines with a limit of 1 behave as described above; takeover and force-stop are unchanged. If the limit was lowered to 1 while several sessions still run, the reader lists them like on a shared machine, so each one can be stopped.
 
-On Attractap Lite readers (without a display), a short tap of your card starts your session. To stop your own session, hold the card against the reader until the reader signals the long tap (about 1.5 seconds, with a beep and an LED flash), then remove it. A long tap never ends someone else's session. If the machine is full or you already have a session, the reader plays the error beep.
+On Attractap Lite readers (without a display), a short tap of your card starts your session. To stop your own session, hold the card against the reader until the reader signals the long tap (about 1.5 seconds, with a beep and an LED flash), then remove it. On a shared machine, a long tap never ends someone else's session. On a machine with a limit of 1, a long tap by a resource manager, introducer, maintainer or the session's supervisor who has no session there stops the running session, as before. If the machine is full or you already have a session, the reader plays the error beep.
 
 ## Complete a required form
 

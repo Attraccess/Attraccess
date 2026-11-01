@@ -84,7 +84,6 @@ export function ResourceUsageSession({
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
   const maxParallelSessions = activeSessionResponse?.maxParallelSessions ?? resource.maxParallelSessions ?? 1;
-  const isParallel = maxParallelSessions > 1;
   const activeSessions = useMemo(
     () => activeSessionResponse?.usages ?? (activeSessionResponse?.usage ? [activeSessionResponse.usage] : []),
     [activeSessionResponse],
@@ -98,6 +97,8 @@ export function ResourceUsageSession({
     [activeSessions, mySession],
   );
   const activeSessionCount = activeSessionResponse?.activeSessionCount ?? activeSessions.length;
+  // A limit lowered to 1 while several sessions run still lists them all, so each one can be stopped.
+  const isParallel = maxParallelSessions > 1 || activeSessionCount > 1;
 
   const isLoading = isLoadingSession || isLoadingIntroStatus || isLoadingIntroducers;
 

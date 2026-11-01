@@ -235,5 +235,25 @@ describe('ResourceUsageSession routing', () => {
       expect(screen.getByTestId('other-user-session')).toBeInTheDocument();
       expect(screen.queryByTestId('parallel-sessions')).not.toBeInTheDocument();
     });
+
+    it('lists every session when the limit was lowered to 1 while several still run', () => {
+      parallel.value = response([other, { ...other, id: 10, userId: 3 }], 1);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-others', '2');
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-count', '2');
+      expect(screen.queryByTestId('other-user-session')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('start-controls')).not.toBeInTheDocument();
+    });
+
+    it('shows my own session next to the others after the limit was lowered to 1', () => {
+      parallel.value = response([other, mine], 1);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('active-session')).toHaveAttribute('data-usage-id', '8');
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-others', '1');
+    });
   });
 });

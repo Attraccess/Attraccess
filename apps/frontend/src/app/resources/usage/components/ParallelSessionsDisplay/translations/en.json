@@ -1,5 +1,5 @@
 {
-  "inUse": "In use ({{count}}/{{max}})",
+  "inUse": "In use {{count}}/{{max}}",
   "full": "Full ({{count}}/{{max}})",
   "otherSessions": "Other active sessions",
   "unknownUser": "Unknown User",
@@ -8,12 +8,14 @@
   "contact": {
     "button": "Contact",
     "error": "Could not contact user",
-    "errorDescription": "Failed to open a conversation with this user. Please try again."
+    "errorDescription": "Failed to open a conversation with this user. Please try again.",
+    "ariaLabel": "Contact {{name}}"
   },
   "endSession": {
-    "button": "End session",
+    "button": "End Session",
     "confirm": "You are about to end the session of {{name}}.",
-    "successful": "Session ended",
-    "successfulDescription": "You have ended the session of the other user."
+    "successful": "Session Ended",
+    "successfulDescription": "You have ended the session of the other user.",
+    "ariaLabel": "End session of {{name}}"
   }
 }

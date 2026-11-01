@@ -65,7 +65,7 @@ Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **
 
 Die Zusammenfassung bleibt etwa **3,5 Sekunden** sichtbar und meldet Sie danach ab. Tippen Sie auf eine beliebige Stelle oder legen Sie erneut eine Karte auf, um sie früher zu schließen. Ein bereits gehaltener Finger oder eine bereits aufliegende Karte schließt sie nicht. Die Karte zum Schließen wird nicht zur Anmeldung verwendet; nehmen Sie sie weg und legen Sie sie zur Anmeldung erneut auf. Andere laufende Maschinennutzungen bleiben aktiv.
 
-Das Beenden aus der Liste, aus den Details oder nach dem Absenden eines Pflichtformulars zeigt dieselbe Zusammenfassung. Bei einem fehlgeschlagenen Stop erscheint sie nicht. Wenn Sie als Administrator oder Einweiser die Sitzung einer anderen Person beenden, bleibt die bisherige Bestätigung erhalten und Sie bleiben angemeldet. Mit einem älteren Server ohne Zusammenfassungsdaten bleibt die bisherige Bestätigung erhalten.
+Das Beenden aus der Liste, aus den Details oder nach dem Absenden eines Pflichtformulars zeigt dieselbe Zusammenfassung. Bei einem fehlgeschlagenen Stop erscheint sie nicht. Wenn Sie als Ressourcenverwalter, Einweiser oder Wartender die Sitzung einer anderen Person beenden, bleibt die bisherige Bestätigung erhalten und Sie bleiben angemeldet. Mit einem älteren Server ohne Zusammenfassungsdaten bleibt die bisherige Bestätigung erhalten.
 
 Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**. Vorgesehene englische Entsprechungen: **Thanks, {name}!**, **Duration**, **Charged**, **See you soon!**.
 
@@ -75,12 +75,12 @@ Manche Maschinen erlauben es, dass mehrere Personen gleichzeitig arbeiten (siehe
 
 - Liste und Details zeigen **In Verwendung k/N**, solange einige Plätze belegt sind. Die Aktion **Start** bleibt in der Liste (in den Details **Ressource verwenden**) verfügbar, solange ein Platz frei ist und Sie keine eigene Sitzung haben. Sind alle Plätze belegt, zeigt die Maschine **Voll**.
 - Haben Sie eine Sitzung an der Maschine, steht dort **Von dir verwendet** mit **Stop** in der Liste und **Sitzung beenden** in den Details. Die Live-Statistiken auf dem Detailbildschirm gelten für Ihre eigene Sitzung.
-- Ressourcenverwalter und Einweiser erhalten auf dem Detailbildschirm die Liste **Fremde Sitzung beenden:** mit einer Schaltfläche je weiterer Sitzung, um genau diese Sitzung zu beenden.
+- Ressourcenverwalter, Einweiser und Wartende erhalten auf dem Detailbildschirm die Liste **Andere Sitzung beenden:** mit einer Schaltfläche je weiterer Sitzung, um genau diese Sitzung zu beenden. Der Leser listet höchstens 16 Sitzungen auf; weitere Sitzungen beenden Sie auf der [Detailseite](resources/resource-details.md) in der Weboberfläche.
 - Der Sperrbildschirm zeigt, ob die Maschine in Verwendung (**In Verwendung k/N**) oder voll (**Voll**) ist.
 
-Maschinen mit einem Limit von 1 verhalten sich wie oben beschrieben; Übernahme und erzwungenes Beenden bleiben unverändert.
+Maschinen mit einem Limit von 1 verhalten sich wie oben beschrieben; Übernahme und erzwungenes Beenden bleiben unverändert. Wurde das Limit auf 1 gesenkt, während noch mehrere Sitzungen laufen, listet der Leser sie wie an einer gemeinsam genutzten Maschine auf, damit jede beendet werden kann.
 
-An Attractap-Lite-Lesern (ohne Display) startet ein kurzes Auflegen Ihrer Karte Ihre Sitzung. Um Ihre eigene Sitzung zu beenden, halten Sie die Karte an den Leser, bis dieser das lange Auflegen signalisiert (nach etwa 1,5 Sekunden mit einem Signalton und einem LED-Blitz), und nehmen Sie sie dann weg. Ein langes Auflegen beendet nie die Sitzung einer anderen Person. Ist die Maschine voll oder haben Sie bereits eine Sitzung, gibt der Leser den Fehlerton aus.
+An Attractap-Lite-Lesern (ohne Display) startet ein kurzes Auflegen Ihrer Karte Ihre Sitzung. Um Ihre eigene Sitzung zu beenden, halten Sie die Karte an den Leser, bis dieser das lange Auflegen signalisiert (nach etwa 1,5 Sekunden mit einem Signalton und einem LED-Blitz), und nehmen Sie sie dann weg. An einer gemeinsam genutzten Maschine beendet ein langes Auflegen nie die Sitzung einer anderen Person. An einer Maschine mit einem Limit von 1 beendet ein langes Auflegen durch Ressourcenverwalter, Einweiser, Wartende oder die Aufsicht der Sitzung ohne eigene Sitzung dort die laufende Sitzung, wie bisher. Ist die Maschine voll oder haben Sie bereits eine Sitzung, gibt der Leser den Fehlerton aus.
 
 ## Ein erforderliches Formular ausfüllen
 

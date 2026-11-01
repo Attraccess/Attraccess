@@ -22,21 +22,21 @@ The resource detail page shows all information and management functions in one p
 If you are introduced to the resource, you can:
 
 - **Start session** – Begin using the resource
-- **End session** – Complete usage
+- **End Session** – Complete usage
 - **Take over session** – Take over another user's running session (if allowed)
 
 Depending on configuration, you may need to fill in a [form](forms/overview.md) when starting, taking over or ending a session.
 
 #### Machines with parallel sessions
 
-If the machine allows more than one [parallel session](resources/creating-resources.md#max-parallel-sessions), the usage area shows:
+If the machine allows more than one [parallel session](resources/creating-resources.md#max-parallel-sessions), or its limit was lowered while several sessions still run, the usage area shows:
 
 - **Your own session** with an **End Session** button
-- **Other active sessions** as a list with user, start time and supervisor (if any). Resource managers, introducers and the supervisor of a session see an **End session** button for each entry to end that person's session
-- **Start controls** while slots are free and you do not have a session yet
+- **Other active sessions** as a list with user, start time and supervisor (if any). Resource managers, introducers, maintainers and the supervisor of a session see an **End Session** button for each entry to end that person's session
+- **In use k/N** while other people use the machine, with **Start controls** while slots are free and you do not have a session yet
 - **Full (N/N)** when all slots are in use
 
-Everybody starts and stops their own session. Stopping without picking an entry from the list always ends your own session. Running and maintenance state only block new starts; running sessions continue and can be stopped normally. The view updates live without reloading.
+Everybody starts and stops their own session. Stopping without picking an entry from the list ends your own session and never someone else's. Maintenance and health state only block new starts; running sessions continue and can be stopped normally. The view updates live without reloading.
 
 > [!WARNING]
 > On a machine with parallel sessions, flows run for every session start and stop, and meters and running time are charged to a single session only. See [Shared machines](resources/usage-tracking.md#shared-machines-parallel-sessions).

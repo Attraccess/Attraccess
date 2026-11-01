@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { MessageCircle, UserX } from 'lucide-react';
 import { AttraccessUser, Button, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  ApiError,
   FormSubmissionRequestDto,
   ResourceUsage,
-  useAccessControlServiceResourceIntroducersIsIntroducer,
   useMessagingServiceMessagingContactResourceHolder,
   useResourcesServiceResourceUsageEndSession,
 } from '@attraccess/react-query-client';
@@ -14,9 +14,11 @@ import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import { useInvalidateSessionHistory } from '../OtherUserSessionDisplay';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import { useAuth } from '../../../../../hooks/useAuth';
+import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import en from './translations/en.json';
 import de from './translations/de.json';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 
 export interface ParallelSessionsDisplayProps {
   resourceId: number;
@@ -33,21 +35,17 @@ export function ParallelSessionsDisplay({
   activeSessionCount,
   maxParallelSessions,
 }: ParallelSessionsDisplayProps) {
-  const { t } = useTranslations({ en, de });
-  const { hasPermission, user } = useAuth();
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
   const navigate = useNavigate();
-  const { success, error: showError } = useToastMessage();
+  const { success, error: showError, apiError } = useToastMessage();
   const invalidateSessionHistory = useInvalidateSessionHistory(resourceId);
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
   const [usageToEnd, setUsageToEnd] = useState<ResourceUsage | null>(null);
-
-  const { data: permissions } = useAccessControlServiceResourceIntroducersIsIntroducer(
-    { resourceId, userId: user?.id as number, includeGroups: true },
-    undefined,
-    { enabled: !!user?.id },
-  );
-  // Same gating as the limit-1 force-stop; the server makes the final call (it also lets supervisors end their own).
-  const canEndAny = hasPermission('resources.update') || !!permissions?.isIntroducer;
+  const [contactingUserId, setContactingUserId] = useState<number | null>(null);
+  const { canEndSession } = useCanEndOtherSessions(resourceId);
 
   const endSession = useResourcesServiceResourceUsageEndSession({
     onSuccess: () => {
@@ -55,6 +53,9 @@ export function ParallelSessionsDisplay({
       setUsageToEnd(null);
       invalidateSessionHistory();
       success({ title: t('endSession.successful'), description: t('endSession.successfulDescription') });
+    },
+    onError: (err) => {
+      apiError({ error: err as ApiError, t, tExists, baseTranslationKey: 'api' });
     },
   });
 
@@ -65,6 +66,7 @@ export function ParallelSessionsDisplay({
     onError: () => {
       showError({ title: t('contact.error'), description: t('contact.errorDescription') });
     },
+    onSettled: () => setContactingUserId(null),
   });
 
   const confirmEnd = useCallback(
@@ -90,7 +92,7 @@ export function ParallelSessionsDisplay({
   return (
     <>
       <SessionStatusCard
-        accent="warning"
+        accent={isFull ? 'danger' : 'warning'}
         statusLabel={isFull ? t('full', counts) : t('inUse', counts)}
         data-cy="parallel-sessions-card"
         chipDataCy="parallel-sessions-chip"
@@ -100,7 +102,8 @@ export function ParallelSessionsDisplay({
             <p className="text-sm text-muted">{t('otherSessions')}</p>
             <ul className="space-y-3">
               {usages.map((usage) => {
-                const canEnd = canEndAny || (!!user && usage.supervisorUserId === user.id);
+                const canEnd = canEndSession(usage);
+                const name = usage.user?.username ?? t('unknownUser');
                 return (
                   <li
                     key={usage.id}
@@ -127,15 +130,25 @@ export function ParallelSessionsDisplay({
                         <Button
                           variant="ghost"
                           size="sm"
-                          isPending={contactHolder.isPending}
-                          onPress={() => contactHolder.mutate({ resourceId, userId: usage.userId })}
+                          aria-label={t('contact.ariaLabel', { name })}
+                          isPending={contactHolder.isPending && contactingUserId === usage.userId}
+                          isDisabled={contactHolder.isPending}
+                          onPress={() => {
+                            setContactingUserId(usage.userId ?? null);
+                            contactHolder.mutate({ resourceId, userId: usage.userId });
+                          }}
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                           {t('contact.button')}
                         </Button>
                       )}
                       {canEnd && (
-                        <Button variant="danger-soft" size="sm" onPress={() => setUsageToEnd(usage)}>
+                        <Button
+                          variant="danger-soft"
+                          size="sm"
+                          aria-label={t('endSession.ariaLabel', { name })}
+                          onPress={() => setUsageToEnd(usage)}
+                        >
                           <UserX className="w-3.5 h-3.5" />
                           {t('endSession.button')}
                         </Button>

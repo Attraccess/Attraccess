@@ -47,6 +47,10 @@ describe('MachineTab max parallel sessions', () => {
     state.activeSessionCount = 3;
     mount(2);
     expect(screen.getByText('inputs.machine.maxParallelSessions.belowActiveHint 3')).toBeInTheDocument();
+    // Part of the field's description, so screen readers announce it with the input.
+    expect(screen.getByRole('spinbutton')).toHaveAccessibleDescription(
+      /inputs\.machine\.maxParallelSessions\.belowActiveHint 3/,
+    );
   });
 
   it('shows no hint for a sufficient limit and no flow warning at limit 1', () => {

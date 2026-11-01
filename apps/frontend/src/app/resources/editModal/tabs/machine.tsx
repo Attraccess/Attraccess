@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Input, Label, TextField } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, Description, Input, Label, TextField } from '@heroui/react';
 import { useResourcesServiceResourceUsageGetActiveSession } from '@attraccess/react-query-client';
 import { AlertStatusIcon, LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
@@ -20,6 +20,7 @@ export function MachineTab(props: EditorTabProps) {
     { enabled: !!resource?.id },
   );
   const activeSessionCount = activeSessions?.activeSessionCount ?? 0;
+  const isBelowActiveCount = maxParallelSessions < activeSessionCount;
 
   const onMaxParallelSessionsChange = (raw: string) => {
     setDraft(raw);
@@ -50,14 +51,19 @@ export function MachineTab(props: EditorTabProps) {
       >
         <Label>{t('inputs.machine.maxParallelSessions.label')}</Label>
         <Input type="number" min={MIN_PARALLEL_SESSIONS} max={MAX_PARALLEL_SESSIONS} className="w-full" />
-        <span className="text-tiny text-default-400">{t('inputs.machine.maxParallelSessions.description')}</span>
+        {/* One Description, so the field announces the below-active-count hint along with its description. */}
+        <Description>
+          {t('inputs.machine.maxParallelSessions.description')}
+          {isBelowActiveCount && (
+            <>
+              {' '}
+              <span className="block text-warning" data-cy="resource-edit-modal-max-parallel-sessions-hint">
+                {t('inputs.machine.maxParallelSessions.belowActiveHint', { count: activeSessionCount })}
+              </span>
+            </>
+          )}
+        </Description>
       </TextField>
-
-      {maxParallelSessions < activeSessionCount && (
-        <span className="text-tiny text-warning" data-cy="resource-edit-modal-max-parallel-sessions-hint">
-          {t('inputs.machine.maxParallelSessions.belowActiveHint', { count: activeSessionCount })}
-        </span>
-      )}
 
       {maxParallelSessions > 1 && (
         <Alert status="warning" data-cy="resource-edit-modal-max-parallel-sessions-flows-warning">

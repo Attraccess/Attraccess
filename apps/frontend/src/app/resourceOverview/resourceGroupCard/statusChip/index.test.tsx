@@ -15,7 +15,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
     t: (key: string, params?: { count: number; max: number }) => {
       const dict: Record<string, string> = {
         'status.inUseCount': `In use ${params?.count}/${params?.max}`,
-        'status.full': `Full (${params?.count}/${params?.max})`,
+        'status.full': 'Full',
         'status.inUse': 'In Use',
         'status.available': 'Available',
         'status.maintenance': 'In Maintenance',
@@ -105,7 +105,13 @@ describe('StatusChip', () => {
   it('shows Full when all parallel slots are taken', () => {
     sessionData = { usage: { id: 1 }, activeSessionCount: 3, maxParallelSessions: 3 };
     render(<StatusChip resourceId={1} />);
-    expect(screen.getByText('Full (3/3)')).toBeInTheDocument();
+    expect(screen.getByText('Full')).toBeInTheDocument();
+  });
+
+  it('shows Full when more sessions run than the limit allows', () => {
+    sessionData = { usage: { id: 1 }, activeSessionCount: 4, maxParallelSessions: 3 };
+    render(<StatusChip resourceId={1} />);
+    expect(screen.getByText('Full')).toBeInTheDocument();
   });
 
   it('keeps the plain In Use label at limit 1', () => {

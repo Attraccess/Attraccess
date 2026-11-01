@@ -19,6 +19,10 @@
     "title": "Session already active",
     "description": "You already have an active session on this machine."
   },
+  "NoOwnActiveSessionError": {
+    "title": "No session of your own",
+    "description": "You have no active session on this machine."
+  },
   "ResourceUnhealthyException": {
     "title": "Resource unhealthy",
     "description": "The resource is currently reporting an unhealthy state and cannot be used until it recovers."
