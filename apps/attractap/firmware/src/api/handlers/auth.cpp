@@ -152,7 +152,8 @@ void API::sendFirmwareInfo()
 #ifdef BEEPER_PIN
     traits.hasBeeper = true;
 #endif
-    ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"]["ui"].to<JsonObject>(), traits);
+    char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
+    ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"], traits, uiCaps, sizeof uiCaps);
     // Uptime lets the server tell this boot from a mere re-authentication (crash-loop protection).
     event["data"]["payload"]["uptimeMs"] = millis();
     event["data"]["payload"]["resetReason"] = resetReasonName(

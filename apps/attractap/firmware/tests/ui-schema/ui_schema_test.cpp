@@ -100,7 +100,8 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, bool ex
     event["data"]["payload"]["capabilities"]["resourceSelection"] = true;
     event["data"]["payload"]["capabilities"]["cardEnrollment"] = true;
     event["data"]["payload"]["capabilities"]["hasLeds"] = traits.hasLeds;
-    ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"]["ui"].to<JsonObject>(), traits);
+    char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
+    ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"], traits, uiCaps, sizeof uiCaps);
     event["data"]["payload"]["resetReason"] = "CPU_LOCKUP";
     event["data"]["payload"]["uptimeMs"] = 4294967295u;
     char buf[1024];
@@ -235,8 +236,13 @@ int main()
     roundTrip("touch", {true, true, false, true, false, 480, 480}, true);
     roundTrip("lite", {false, false, true, true, true, 0, 0}, false);
     JsonDocument lite;
-    ui::fillCapabilitiesUi(lite.to<JsonObject>(), {false, false, true, true, true, 0, 0});
-    CHECK(lite["steps"].as<JsonArray>().size() == 1 && lite["steps"][0] == "card-confirm", "lite steps");
+    char liteScratch[ui::CAPABILITIES_UI_SCRATCH];
+    ui::fillCapabilitiesUi(lite.to<JsonObject>(), {false, false, true, true, true, 0, 0}, liteScratch, sizeof liteScratch);
+    std::string liteJson;
+    serializeJson(lite, liteJson); // the ui block is raw JSON, so check it after a round trip
+    JsonDocument liteBack;
+    CHECK(!deserializeJson(liteBack, liteJson), "lite parses back");
+    CHECK(liteBack["ui"]["steps"].as<JsonArray>().size() == 1 && liteBack["ui"]["steps"][0] == "card-confirm", "lite steps");
     if (failures) { std::cerr << failures << " failure(s)\n"; return 1; }
     std::cout << "ui-schema ok\n";
     return 0;

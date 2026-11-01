@@ -4,6 +4,7 @@
 // (LED ring, no screen) report no display, no components and no slots.
 
 #include <ArduinoJson.h>
+#include <stdio.h>
 
 #include "ui_schema.hpp"
 
@@ -21,46 +22,35 @@ namespace ui
         int displayHeight;
     };
 
-    inline void fillCapabilitiesUi(JsonObject ui, const VariantTraits &v)
+    // Rendered as text, then spliced in as raw JSON: ArduinoJson's per-field template code cost ~2.5 KB of flash.
+    // `scratch` must outlive the serialization of `caps`; 640 B covers the Touch payload.
+    constexpr size_t CAPABILITIES_UI_SCRATCH = 640;
+
+    inline void fillCapabilitiesUi(JsonObject caps, const VariantTraits &v, char *scratch, size_t n)
     {
-        ui["schemaVersion"] = SCHEMA_VERSION;
-        JsonArray components = ui["components"].to<JsonArray>();
-        JsonArray slots = ui["slots"].to<JsonArray>();
-        JsonArray steps = ui["steps"].to<JsonArray>();
+        char display[64] = "null";
+        char slots[160] = "";
+        const char *components = "";
+        const char *steps = v.cardConfirm ? "\"card-confirm\"" : "";
         if (v.hasDisplay)
         {
-            for (const char *c : {"col", "row", "text", "badge", "icon", "button", "progress", "countdown", "spacer"})
-                components.add(c);
-            for (const char *s : {SLOT_LIST_ROW_STATUS, SLOT_DETAILS_HEADER, SLOT_DETAILS_BODY, SLOT_DETAILS_SESSION})
-                slots.add(s);
-            for (const char *s : {"confirm", "choose", "info"})
-                steps.add(s);
-            ui["maxPayloadBytes"] = static_cast<unsigned>(MAX_PAYLOAD_BYTES);
-            ui["maxNodes"] = MAX_NODES;
-            ui["maxDepth"] = MAX_DEPTH;
-            ui["maxLiveNodes"] = MAX_LIVE_NODES;
-            JsonObject display = ui["display"].to<JsonObject>();
-            display["w"] = v.displayWidth;
-            display["h"] = v.displayHeight;
-            display["touch"] = v.touch;
+            snprintf(display, sizeof display, "{\"w\":%d,\"h\":%d,\"touch\":%s}", v.displayWidth, v.displayHeight,
+                     v.touch ? "true" : "false");
+            snprintf(slots, sizeof slots, "\"%s\",\"%s\",\"%s\",\"%s\"", SLOT_LIST_ROW_STATUS, SLOT_DETAILS_HEADER,
+                     SLOT_DETAILS_BODY, SLOT_DETAILS_SESSION);
+            components = "\"col\",\"row\",\"text\",\"badge\",\"icon\",\"button\",\"progress\",\"countdown\",\"spacer\"";
+            steps = "\"confirm\",\"choose\",\"info\"";
         }
-        else
-        {
-            if (v.cardConfirm) steps.add("card-confirm");
-            ui["maxPayloadBytes"] = 0;
-            ui["maxNodes"] = 0;
-            ui["maxDepth"] = 0;
-            ui["maxLiveNodes"] = 0;
-            ui["display"] = nullptr;
-        }
-        JsonObject input = ui["input"].to<JsonObject>();
-        input["touch"] = v.hasDisplay && v.touch;
-        input["buttons"] = 0;
-        input["cardHold"] = true;
-        JsonObject feedback = ui["feedback"].to<JsonObject>();
-        feedback["leds"] = v.hasLeds;
-        feedback["beeper"] = v.hasBeeper;
-        ui["charset"] = "latin1";
-        ui["images"] = false;
+        const unsigned payload = v.hasDisplay ? static_cast<unsigned>(MAX_PAYLOAD_BYTES) : 0;
+        snprintf(scratch, n,
+                 "{\"schemaVersion\":%d,\"components\":[%s],\"slots\":[%s],\"steps\":[%s],"
+                 "\"maxPayloadBytes\":%u,\"maxNodes\":%d,\"maxDepth\":%d,\"maxLiveNodes\":%d,\"display\":%s,"
+                 "\"input\":{\"touch\":%s,\"buttons\":0,\"cardHold\":true},"
+                 "\"feedback\":{\"leds\":%s,\"beeper\":%s},\"charset\":\"latin1\",\"images\":false}",
+                 SCHEMA_VERSION, components, slots, steps, payload, v.hasDisplay ? MAX_NODES : 0,
+                 v.hasDisplay ? MAX_DEPTH : 0, v.hasDisplay ? MAX_LIVE_NODES : 0, display,
+                 v.hasDisplay && v.touch ? "true" : "false", v.hasLeds ? "true" : "false",
+                 v.hasBeeper ? "true" : "false");
+        caps["ui"] = serialized(scratch);
     }
 }
