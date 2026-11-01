@@ -3,7 +3,7 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/attractap/nfc-emulator",
   "projectType": "application",
-  "tags": ["scope:attractap", "type:firmware"],
+  "tags": ["scope:hardware", "type:firmware"],
   "targets": {
     "build": {
       "executor": "nx:run-commands",

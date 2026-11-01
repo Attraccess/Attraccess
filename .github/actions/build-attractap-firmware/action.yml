@@ -2,6 +2,8 @@ name: 'Build and Test Attractap Firmware'
 description: >
   Test host firmware code and build all active variants once with the cached
   ESP-IDF toolchain and Nx build cache. Image jobs download the output artifacts.
+  Also runs the NFC card emulator's host tests: as a scope:hardware project it
+  is left out of the generic test job.
 
 runs:
   using: 'composite'
@@ -16,4 +18,8 @@ runs:
 
     - name: Test firmware
       run: pnpm nx run attractap-firmware:test
+      shell: bash
+
+    - name: Test NFC card emulator
+      run: pnpm nx run attractap-nfc-emulator:test
       shell: bash

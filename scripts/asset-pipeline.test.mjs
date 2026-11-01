@@ -190,3 +190,21 @@ test('plugin SDK typecheck generates the API client before compiling shared plug
   const selected = createTaskGraph(graph, {}, ['plugins-frontend-sdk'], ['typecheck'], undefined, {});
   assert.ok(selected.dependencies['plugins-frontend-sdk:typecheck'].includes('react-query-client:generate'));
 });
+
+test('ESP-IDF projects are scope:hardware, so toolchain-free CI runs skip them', () => {
+  const files = spawnSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).stdout.split('\0');
+  const espIdf = files
+    .filter((file) => /(^|\/)project\.json$/.test(file))
+    .map((file) => JSON.parse(fs.readFileSync(file, 'utf8')))
+    .filter((project) => /\bidf\.(sh|py)\b|build_firmwares\.py/.test(JSON.stringify(project.targets ?? {})));
+  assert.ok(espIdf.some((project) => project.name === 'attractap-nfc-emulator'));
+  for (const project of espIdf) {
+    assert.ok(project.tags?.includes('scope:hardware'), `${project.name} needs ESP-IDF, so it must be scope:hardware`);
+  }
+  // scope:hardware also leaves the emulator out of the core test job; its host tests run with the firmware's.
+  assert.ok(
+    action('build-attractap-firmware').runs.steps.some(
+      (step) => step.run === 'pnpm nx run attractap-nfc-emulator:test',
+    ),
+  );
+});
