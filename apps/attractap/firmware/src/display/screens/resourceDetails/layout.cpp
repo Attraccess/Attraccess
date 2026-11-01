@@ -23,6 +23,7 @@ void ResourceDetailsScreen::createDoorControls()
    lv_obj_add_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
 
    lv_obj_t *lockDoorButton = lv_button_create(this->doorControls);
+   this->lockDoorButton = lockDoorButton;
    lv_obj_set_height(lockDoorButton, 50);
    lv_obj_set_width(lockDoorButton, lv_pct(30));
    lv_obj_set_align(lockDoorButton, LV_ALIGN_CENTER);
@@ -38,6 +39,7 @@ void ResourceDetailsScreen::createDoorControls()
    FirmwareI18n::setLabel(labelForLockDoorButton, FirmwareI18n::Message::Lock);
 
    lv_obj_t *unlockDoorButton = lv_button_create(this->doorControls);
+   this->unlockDoorButton = unlockDoorButton;
    lv_obj_set_height(unlockDoorButton, 50);
    lv_obj_set_width(unlockDoorButton, lv_pct(30));
    lv_obj_set_align(unlockDoorButton, LV_ALIGN_CENTER);
@@ -53,6 +55,7 @@ void ResourceDetailsScreen::createDoorControls()
    FirmwareI18n::setLabel(labelForUnlockDoorButton, FirmwareI18n::Message::Unlock);
 
    lv_obj_t *unlatchDoorButton = lv_button_create(this->doorControls);
+   this->unlatchDoorButton = unlatchDoorButton;
    lv_obj_set_height(unlatchDoorButton, 50);
    lv_obj_set_width(unlatchDoorButton, lv_pct(30));
    lv_obj_set_align(unlatchDoorButton, LV_ALIGN_CENTER);

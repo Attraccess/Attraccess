@@ -5,6 +5,8 @@
 #include "resourceDetailsUsageState.hpp"
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
@@ -46,8 +48,12 @@ public:
     // UI helpers for async actions
     void showActionProgress(const FirmwareI18n::Text &text);
     void hideActionProgress();
-    // Shows `text` in place on the button that started the failed action;
-    // false when that button is not on screen.
+    // Shows `text` in place on the button that started the failed action (start, stop,
+    // a door or a flow button); false when that button is not on screen. While the
+    // status refresh that follows a failure covers the screen the error waits, and
+    // its 4 s start once it is visible. It survives the refresh rebuilding the flow
+    // buttons, and is dropped when the button now means something else (start became
+    // "Take over", a stop now ends another user's session) or the screen is left.
     bool showActionError(const FirmwareI18n::Text &text);
 
 private:
@@ -90,6 +96,7 @@ private:
     lv_obj_t *doorControls = nullptr;
 
     lv_obj_t *flowButtonsContainer = nullptr;
+    std::vector<std::pair<std::string, lv_obj_t *>> flowButtons;
 
     void updateUsageStatsDisplay();
     void updateElapsedTimeDisplay();
@@ -113,11 +120,25 @@ private:
     std::string buildIntroducersText(const API::ResourceBrief &resource);
     void refreshAccessState();
 
-    // The action that initiated the current request shows its progress inline.
-    lv_obj_t *activeActionButton = nullptr;
-    lv_obj_t *activeActionLabel = nullptr;
-    lv_obj_t *activeActionSpinner = nullptr;
     bool actionInProgress = false;
+
+    // The button that started the last action, by role: it outlives refreshes that rebuild buttons.
+    button_click_type_t lastActionType = BUTTON_CLICK_TYPE_BACK;
+    std::string lastActionFlowId;
+    int lastActionRole = 0;
+    // The failure shown, or waiting to be shown, on that button.
+    bool actionErrorPending = false;
+    FirmwareI18n::Text actionErrorText;
+    uint32_t actionErrorDeadline = 0; // 0 until the error is visible
+    lv_obj_t *lockDoorButton = nullptr;
+    lv_obj_t *unlockDoorButton = nullptr;
+    lv_obj_t *unlatchDoorButton = nullptr;
+    bool startIsTakeover = false;
+    bool stopIsForeign = false;
+    lv_obj_t *buttonFor(button_click_type_t type, const std::string &flowId) const;
+    int roleOf(button_click_type_t type) const;
+    void applyActionError();
+    void dropActionError();
 
     // Project selection state shown on the button; the picker is its own screen.
     uint32_t selectedProjectId = 0;
