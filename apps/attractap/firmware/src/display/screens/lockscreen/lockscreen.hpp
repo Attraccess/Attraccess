@@ -51,8 +51,10 @@ private:
     char username[API::MAX_USERNAME_LEN];
     bool hasActiveUsage;
     bool isUnderMaintenance;
+    // Parallel sessions: only the counts the occupancy caption needs.
     bool multiSession = false;
-    API::ResourceBrief occupancy{};
+    uint16_t occupancyActiveCount = 0;
+    uint16_t occupancyLimit = 1;
 
     void updateUsageInfo();
     void initWallClock();

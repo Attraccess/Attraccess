@@ -34,9 +34,13 @@ int main(int argc, char **argv)
     JsonDocument received;
     JsonDocument authenticated;
     JsonDocument resourceList;
+    JsonDocument startReply;
+    JsonDocument stopReply;
     transport.setMessageCallbackRaw([&](const char *message, size_t length) {
         assert(deserializeJson(received, message, length) == DeserializationError::Ok);
         if (received["data"]["type"] == "RESOURCE_LIST") resourceList.set(received);
+        if (received["data"]["type"] == "START_RESOURCE_USAGE_SESSION") startReply.set(received);
+        if (received["data"]["type"] == "STOP_RESOURCE_USAGE_SESSION") stopReply.set(received);
         if (received["data"]["type"] == "READER_AUTHENTICATED") {
             authenticated.set(received);
             State::setDefaultLanguage(received["data"]["payload"]["language"].as<std::string>());
@@ -138,14 +142,27 @@ int main(int argc, char **argv)
     };
     const auto printer = [&]() { return resourceList["data"]["payload"]["resources"][1]; };
     const auto startPrinter = [&]() {
+        startReply.clear();
         exchange(R"({"data":{"type":"START_RESOURCE_USAGE_SESSION","payload":{"resourceId":2,"requestId":5}}})");
     };
+    const auto startError = [&]() { return std::string(startReply["data"]["payload"]["error"] | ""); };
+    const auto stopPrinter = [&](uint32_t usageId) {
+        stopReply.clear();
+        std::string payload = R"({"resourceId":2)";
+        if (usageId) payload += ",\"usageId\":" + std::to_string(usageId);
+        exchange((R"({"data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":)" + payload + "}}}").c_str());
+    };
+    const auto stopError = [&]() { return std::string(stopReply["data"]["payload"]["error"] | ""); };
     assert(resourceList["data"]["payload"]["resources"][0]["maxParallelSessions"] == 1);
     assert(printer()["maxParallelSessions"] == 3);
     tap("A1A1A1A1"); startPrinter();
+    assert(startReply["data"]["payload"]["success"] == true);
     assert(printer()["activeSessionCount"] == 1 && printer()["canStart"] == false);
     assert(printer()["ownUsageSession"]["user"]["username"] == "Ann");
+    assert(printer()["canEndOtherSessions"] == false);
     startPrinter(); // already has one
+    assert(startError() == "AlreadyHasActiveSessionError");
+    assert(printer()["activeSessionCount"] == 1);
     const auto annId = printer()["ownUsageSession"]["id"].as<uint32_t>();
     tap("B2B2B2B2"); startPrinter();
     assert(printer()["activeSessionCount"] == 2 && printer()["canStart"] == false);
@@ -155,19 +172,27 @@ int main(int argc, char **argv)
     assert(printer()["activeUsageSessions"].size() == 3);
     tap("D4D4D4D4");
     assert(printer()["canStart"] == false && printer()["activeSessionCount"] == 3);
+    assert(printer()["canEndOtherSessions"] == true);
     startPrinter(); // full: refused, list pushed again
-    assert(printer()["activeSessionCount"] == 3);
+    assert(startError() == "ResourceFullError");
+    assert(resourceList["data"]["type"] == "RESOURCE_LIST" && printer()["activeSessionCount"] == 3);
+    // On a shared machine a stop without usageId never ends someone else's session.
+    stopPrinter(0);
+    assert(stopError() == "NoOwnActiveSessionError" && printer()["activeSessionCount"] == 3);
     // Non-managers cannot end someone else's session; managers end exactly the chosen one.
     tap("B2B2B2B2");
-    exchange((std::string(R"({"data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2,"usageId":)") + std::to_string(annId) + "}}}").c_str());
-    assert(received["data"]["payload"]["error"].is<const char *>() && printer()["activeSessionCount"] == 3);
+    assert(printer()["canEndOtherSessions"] == false);
+    stopPrinter(annId);
+    assert(!stopError().empty() && printer()["activeSessionCount"] == 3);
     tap("D4D4D4D4");
-    exchange((std::string(R"({"data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2,"usageId":)") + std::to_string(annId) + "}}}").c_str());
+    stopPrinter(annId);
+    assert(stopReply["data"]["payload"]["success"] == true && stopReply["data"]["payload"]["endedOwnSession"] == false);
     assert(printer()["activeSessionCount"] == 2 && printer()["canStart"] == true);
     for (auto session : printer()["activeUsageSessions"].as<JsonArray>()) assert(session["id"].as<uint32_t>() != annId);
     // Without usageId a person ends only their own session.
     tap("C3C3C3C3");
-    exchange(R"({"data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"resourceId":2}}})");
+    stopPrinter(0);
+    assert(stopReply["data"]["payload"]["endedOwnSession"] == true);
     assert(printer()["activeSessionCount"] == 1);
     assert(printer()["activeUsageSession"]["user"]["username"] == "Ben");
     State::setDefaultLanguage("de");

@@ -242,6 +242,7 @@ void API::onResourceList(JsonObject data)
         dst.hasIntroduction = resource["hasIntroduction"] | false;
         dst.isIntroducer = resource["isIntroducer"] | false;
         dst.canManageResource = resource["canManageResource"] | false;
+        dst.canEndOtherSessions = resource["canEndOtherSessions"] | false;
         dst.requiresSupervisor = resource["requiresSupervisor"] | false;
 
         const char *name = resource["name"].as<const char *>();
@@ -263,7 +264,11 @@ void API::onResourceList(JsonObject data)
         const char *healthReason = resource["healthReason"].as<const char *>();
         strlcpy(dst.healthReason, healthReason ? healthReason : "", sizeof(dst.healthReason));
 
-        JsonObject aus = resource["activeUsageSession"].as<JsonObject>();
+        // The card holder's own session wins, so the session panel and ownership always describe it.
+        JsonObject own = resource["ownUsageSession"].as<JsonObject>();
+        const bool hasOwn = !own.isNull() && own["id"].is<uint32_t>() &&
+                            own["user"]["username"].is<const char *>() && own["startTime"].is<const char *>();
+        JsonObject aus = hasOwn ? own : resource["activeUsageSession"].as<JsonObject>();
         if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
         {
             dst.hasActiveUsage = true;
@@ -278,6 +283,7 @@ void API::onResourceList(JsonObject data)
         else
         {
             dst.hasActiveUsage = false;
+            dst.activeUsageId = 0;
             dst.activeUser[0] = '\0';
             dst.activeStartEpoch = 0;
             dst.activeStartUtcOffsetMinutes = 0;
@@ -289,8 +295,7 @@ void API::onResourceList(JsonObject data)
         const int activeCount = resource["activeSessionCount"] | (dst.hasActiveUsage ? 1 : 0);
         dst.activeSessionCount = activeCount < 0 ? 0 : (activeCount > 1000 ? 1000 : activeCount);
         dst.canStart = resource["canStart"] | !dst.isFull();
-        JsonObject own = resource["ownUsageSession"].as<JsonObject>();
-        dst.hasOwnUsage = !own.isNull() && own["id"].is<uint32_t>();
+        dst.hasOwnUsage = hasOwn;
         dst.ownUsageId = dst.hasOwnUsage ? own["id"].as<uint32_t>() : 0;
         dst.activeSessions.clear();
         for (JsonObject session : resource["activeUsageSessions"].as<JsonArray>())

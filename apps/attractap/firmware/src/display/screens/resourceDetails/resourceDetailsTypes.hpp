@@ -30,6 +30,9 @@ struct UserDetails
         bool hasIntroduction;
         bool isIntroducer;
         bool requiresSupervisor;
+        bool canEndOtherSessions = false;
+        // The resource list was personalised for this card, so its own-session info is authoritative.
+        bool listPersonalized = false;
     };
 
 struct ButtonClickEventData

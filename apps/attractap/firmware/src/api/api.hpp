@@ -58,6 +58,8 @@ struct ResourceBrief
         bool hasIntroduction = false;
         bool isIntroducer = false;
         bool canManageResource = false;
+        // Per card: may end another person's session here (resources.update or the server's maintain rule).
+        bool canEndOtherSessions = false;
         bool requiresSupervisor = false;
         char name[MAX_RESOURCE_NAME_LEN];
         std::string description;
@@ -73,8 +75,16 @@ struct ResourceBrief
         uint32_t ownUsageId = 0;
         // Every active session (bounded) so managers can end a chosen one.
         std::vector<ActiveSession> activeSessions;
-        bool isMultiSession() const { return type == 0 && maxParallelSessions > 1; }
+        // Parallel UI: a limit lowered to 1 while several sessions run still lists them so each can be stopped.
+        bool isMultiSession() const { return type == 0 && (maxParallelSessions > 1 || activeSessionCount > 1); }
         bool isFull() const { return activeSessionCount >= maxParallelSessions; }
+        // Whether `username` holds a session here; only a list personalised for them knows it for sure.
+        bool isOwnedBy(const std::string &username, bool personalized) const
+        {
+            if (username.empty()) return false;
+            if (personalized) return hasOwnUsage;
+            return hasActiveUsage && username == activeUser;
+        }
         bool isUnderMaintenance;
         bool isHealthy;
         char healthReason[MAX_HEALTH_REASON_LEN];

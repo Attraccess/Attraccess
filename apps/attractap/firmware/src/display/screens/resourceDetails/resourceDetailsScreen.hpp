@@ -105,6 +105,10 @@ private:
     lv_obj_t *otherSessionsContainer = nullptr;
     void rebuildOtherSessions(bool visible);
     std::vector<uint32_t> otherSessionIds;
+    // Limit 1 force-stop: the usageId of the foreign session shown; 0 while the button stops one's own.
+    uint32_t stopSessionUsageId = 0;
+    bool ownsActiveUsage() const;
+    void updateOccupancy();
     lv_obj_t *doorControls = nullptr;
 
     lv_obj_t *flowButtonsContainer = nullptr;

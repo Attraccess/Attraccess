@@ -272,7 +272,7 @@ void Application::pollUsageStats() {
       if (this->resourceList.items[i].id == this->selectedResourceId) resource = &this->resourceList.items[i];
   }
   if (!resource || !resource->hasActiveUsage || !resource->activeUsageId ||
-      this->cardAuthenticationData.username != resource->activeUser) {
+      !resource->isOwnedBy(this->cardAuthenticationData.username, resource->accessKnown)) {
     this->usageStatsResourceId = 0;
     this->usageStatsUsageId = 0;
     return;

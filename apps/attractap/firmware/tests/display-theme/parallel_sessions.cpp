@@ -1,4 +1,5 @@
 #include "render_harness.hpp"
+#include "display/shared/sessionOccupancy.hpp"
 
 namespace {
 API::ResourceBrief machine(const char *name, uint16_t limit, uint16_t active)
@@ -61,6 +62,29 @@ void testParallelSessionPolicy()
     expect(resourceListAction(single, "Alex") == ResourceListAction::Takeover, "Limit 1 keeps takeover");
     single.allowTakeOver = false;
     expect(resourceListAction(single, "Alex") == ResourceListAction::None, "Limit 1 keeps blocking foreign sessions");
+    expect(!single.isMultiSession(), "Limit 1 with one session keeps the single-session UI");
+
+    // A limit lowered to 1 while two sessions run keeps the parallel UI: no takeover, no start.
+    auto lowered = machine("Lowered", 1, 2);
+    addSession(lowered, 5, "Robin", false);
+    addSession(lowered, 6, "Sam", false);
+    lowered.canStart = false;
+    lowered.allowTakeOver = true;
+    expect(lowered.isMultiSession(), "Lowered limit with two sessions uses the parallel UI");
+    expect(SessionOccupancy::level(lowered) == SessionOccupancy::Level::Full, "Over-capacity reads as full");
+    expect(resourceListAction(lowered, "Alex") == ResourceListAction::None, "Lowered limit offers no takeover or start");
+    lowered.type = 1;
+    expect(!lowered.isMultiSession(), "Doors never use the parallel UI");
+
+    // A personalised list decides ownership by its own-session info, not by the shown name.
+    auto named = machine("Named", 3, 1);
+    addSession(named, 5, "Alex", false);
+    expect(!named.hasOwnUsage && resourceListAction(named, "Alex") != ResourceListAction::Stop,
+           "A matching name without an own session is not ownership");
+    expect(named.isOwnedBy("Alex", false), "Unpersonalised lists fall back to the shown name");
+    named.hasOwnUsage = true;
+    named.ownUsageId = 5;
+    expect(resourceListAction(named, "Alex") == ResourceListAction::Stop, "The own session offers Stop");
 }
 
 void testParallelSessionList(Renderer &renderer)
@@ -190,7 +214,93 @@ void testSingleSessionDetailsUnchanged()
     expect(!findObject(guard.root, &lv_label_class, "In Verwendung 1/1"), "Limit 1 shows no k/N occupancy");
     expect(hidden(requireObject(guard.root, &lv_label_class, "Ressource verwenden")), "Limit 1 hides Start while foreign session runs");
     lv_obj_send_event(lv_obj_get_parent(forceStop), LV_EVENT_CLICKED, nullptr);
-    expect(clicked.usageId == 0, "Limit 1 force-stop sends no usageId");
+    expect(clicked.usageId == 5, "Limit 1 force-stop names the session on screen");
+    details.hideActionProgress();
+
+    // Own session at limit 1 stops without a usageId.
+    API::ResourceBrief own = machine("Mill", 1, 1);
+    addSession(own, 6, "Alex", true);
+    own.canStart = false;
+    details.setUserDetails({"Alex", true, true, true, false, false, true});
+    details.setResourceAndUsageDetails(own);
+    settle();
+    auto *stopOwn = requireObject(guard.root, &lv_label_class, "Sitzung beenden");
+    expect(!hidden(stopOwn), "Limit 1 owner sees Stop");
+    lv_obj_send_event(lv_obj_get_parent(stopOwn), LV_EVENT_CLICKED, nullptr);
+    expect(clicked.usageId == 0, "Limit 1 own stop sends no usageId");
+}
+
+void testLoweredLimitDetails(Renderer &renderer)
+{
+    // The limit was lowered to 1 while Robin and Sam were both using the machine.
+    API::ResourceBrief resource = machine("Mill", 1, 2);
+    addSession(resource, 5, "Robin", false);
+    addSession(resource, 6, "Sam", false);
+    resource.canStart = false;
+    resource.allowTakeOver = true;
+    ResourceDetailsScreen details;
+    ResourceDetailsScreen::ButtonClickEventData clicked{};
+    unsigned clicks = 0;
+    details.setButtonClickCallback([&](ResourceDetailsScreen::ButtonClickEventData event) { clicked = event; ++clicks; });
+    details.setResourceAndUsageDetails(resource);
+    details.setUserDetails({"Alex", true, true, true, false, false, true});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    settle();
+    requireObject(guard.root, &lv_label_class, "Voll");
+    expect(hidden(requireObject(guard.root, &lv_label_class, "Ressource verwenden")), "No start or takeover over capacity");
+    expect(!findObject(guard.root, &lv_label_class, "Fremde Sitzung beenden") ||
+               hidden(findObject(guard.root, &lv_label_class, "Fremde Sitzung beenden")),
+           "No single force-stop that could hit the wrong session");
+    requireObject(guard.root, &lv_label_class, "Andere Sitzung beenden:");
+    requireObject(guard.root, &lv_label_class, "Sitzung von Robin beenden");
+    auto *endSam = requireObject(guard.root, &lv_label_class, "Sitzung von Sam beenden");
+    renderer.capture("parallel-sessions-lowered-limit");
+    lv_obj_send_event(lv_obj_get_parent(endSam), LV_EVENT_CLICKED, nullptr);
+    expect(clicks == 1 && clicked.buttonClickType == ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION && clicked.usageId == 6,
+           "Each session can be ended by its usageId");
+}
+
+void testPickerForCanEndOtherSessions()
+{
+    API::ResourceBrief resource = machine("Printer", 3, 2);
+    addSession(resource, 7, "Robin", false);
+    addSession(resource, 8, "Sam", false);
+    ResourceDetailsScreen details;
+    details.setResourceAndUsageDetails(resource);
+    // Neither introducer nor resource manager, but the server lets this card end other sessions.
+    details.setUserDetails({"Alex", false, true, false, false, true, true});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    settle();
+    expect(!hidden(requireObject(guard.root, &lv_label_class, "Sitzung von Robin beenden")),
+           "canEndOtherSessions alone shows the picker");
+    details.setUserDetails({"Alex", false, true, false, false, false, true});
+    settle();
+    expect(!findObject(guard.root, &lv_label_class, "Sitzung von Robin beenden") ||
+               hidden(findObject(guard.root, &lv_label_class, "Sitzung von Robin beenden")),
+           "Without the permission there is no picker");
+}
+
+void testDetailsOwnershipFromOwnSession()
+{
+    // A personalised list without an own session: a matching shown name is not ownership.
+    API::ResourceBrief resource = machine("Printer", 3, 1);
+    addSession(resource, 7, "Alex", false);
+    ResourceDetailsScreen details;
+    details.setResourceAndUsageDetails(resource);
+    details.setUserDetails({"Alex", false, true, false, false, false, true});
+    details.init();
+    ScreenGuard guard(details.getScreen(), &details);
+    settle();
+    requireObject(guard.root, &lv_label_class, "In Verwendung 1/3");
+    expect(hidden(requireObject(guard.root, &lv_label_class, "Sitzung beenden")), "No Stop without an own session");
+    resource.hasOwnUsage = true;
+    resource.ownUsageId = 7;
+    details.setResourceAndUsageDetails(resource);
+    settle();
+    requireObject(guard.root, &lv_label_class, "Von dir verwendet");
+    expect(!hidden(requireObject(guard.root, &lv_label_class, "Sitzung beenden")), "The own session shows Stop");
 }
 
 void testParallelSessionLockscreen(Renderer &renderer)

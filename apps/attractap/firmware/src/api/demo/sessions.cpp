@@ -104,11 +104,17 @@ void DemoWebsocket::handleStopSession(uint32_t resourceId, uint32_t usageId)
             target = std::find_if(sessions->begin(), sessions->end(), [usageId](const DemoSession &s) { return s.id == usageId; });
         else
         {
-            // Without usageId the card holder's own session ends; a lone foreign
-            // session may still be force-stopped (limit-1 behaviour).
+            // Without usageId the card holder's own session ends; only a single-session
+            // machine running exactly one session falls back to it (limit-1 force-stop).
             target = std::find_if(sessions->begin(), sessions->end(), [this](const DemoSession &s) { return isOwnSession(s); });
-            if (target == sessions->end() && sessions->size() == 1)
+            if (target == sessions->end() && maxParallelSessionsFor(resourceId) <= 1 && sessions->size() == 1)
                 target = sessions->begin();
+            else if (target == sessions->end() && !sessions->empty())
+            {
+                respondActionError("STOP_RESOURCE_USAGE_SESSION", "NoOwnActiveSessionError");
+                respondResourceList();
+                return;
+            }
         }
     }
     if (!sessions || target == sessions->end())

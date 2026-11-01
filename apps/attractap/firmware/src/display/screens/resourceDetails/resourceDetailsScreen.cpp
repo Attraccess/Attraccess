@@ -82,7 +82,13 @@ void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
                                           ? lv_obj_get_child(evt->self->activeActionButton, 1)
                                           : nullptr;
    }
-   evt->self->buttonClickCallback(*evt);
+   ButtonClickEventData data = *evt;
+   if (data.buttonClickType == BUTTON_CLICK_TYPE_STOP_SESSION && data.usageId == 0 &&
+       evt->self->activeActionButton == evt->self->stopSessionButton)
+   {
+      data.usageId = evt->self->stopSessionUsageId;
+   }
+   evt->self->buttonClickCallback(data);
 }
 void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
 {
@@ -270,20 +276,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
    }
 
    const bool multi = resource.isMultiSession();
-   // With parallel sessions the panel describes the user's own session only; others appear in the occupancy caption.
-   lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !(multi ? resource.hasOwnUsage : resource.hasActiveUsage));
-   if (this->occupancyLabel)
-   {
-      const auto caption = multi ? SessionOccupancy::caption(resource, resource.hasOwnUsage) : FirmwareI18n::Text();
-      lv_obj_set_flag(this->occupancyLabel, LV_OBJ_FLAG_HIDDEN, caption.empty());
-      if (!caption.empty())
-      {
-         FirmwareI18n::setLabel(this->occupancyLabel, caption);
-         lv_obj_set_style_text_color(this->occupancyLabel,
-                                     resource.isFull() ? DisplayTheme::danger() : DisplayTheme::warning(),
-                                     LV_PART_MAIN | LV_STATE_DEFAULT);
-      }
-   }
+   this->updateOccupancy();
    // ponytail: always hide here; refreshAccessState() reveals it only to the session owner
    lv_obj_add_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN);
 
@@ -362,8 +355,39 @@ std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief
    }
    return list;
 }
+bool ResourceDetailsScreen::ownsActiveUsage() const
+{
+   return this->resourceCacheValid && this->userDetailsInitialized &&
+          this->resourceCache.isOwnedBy(this->userDetailsCache.username, this->userDetailsCache.listPersonalized);
+}
+
+void ResourceDetailsScreen::updateOccupancy()
+{
+   if (!this->resourceCacheValid || !this->sessionDetailsContainer)
+   {
+      return;
+   }
+   const API::ResourceBrief &resource = this->resourceCache;
+   const bool multi = resource.isMultiSession();
+   const bool owns = this->ownsActiveUsage();
+   // With parallel sessions the panel describes the user's own session only; others appear in the occupancy caption.
+   lv_obj_set_flag(this->sessionDetailsContainer, LV_OBJ_FLAG_HIDDEN, !(multi ? owns : resource.hasActiveUsage));
+   if (this->occupancyLabel)
+   {
+      const auto caption = multi ? SessionOccupancy::caption(resource, owns) : FirmwareI18n::Text();
+      lv_obj_set_flag(this->occupancyLabel, LV_OBJ_FLAG_HIDDEN, caption.empty());
+      if (!caption.empty())
+      {
+         FirmwareI18n::setLabel(this->occupancyLabel, caption);
+         lv_obj_set_style_text_color(this->occupancyLabel, SessionOccupancy::color(SessionOccupancy::level(resource)),
+                                     LV_PART_MAIN | LV_STATE_DEFAULT);
+      }
+   }
+}
+
 void ResourceDetailsScreen::refreshAccessState()
 {
+   this->updateOccupancy();
    bool underMaintenance = this->resourceCacheValid && this->resourceCache.isUnderMaintenance;
    bool isUnhealthy = this->resourceCacheValid && !this->resourceCache.isHealthy;
 
@@ -389,8 +413,7 @@ void ResourceDetailsScreen::refreshAccessState()
    // Resource is blocked when it is under maintenance or reporting an unhealthy state.
    bool blocked = underMaintenance || isUnhealthy;
 
-   bool ownsActiveUsage = this->resourceCacheValid && this->resourceCache.hasActiveUsage &&
-                          strcmp(this->resourceCache.activeUser, user.username.c_str()) == 0;
+   const bool ownsActiveUsage = this->ownsActiveUsage();
    const bool multi = this->resourceCacheValid && this->resourceCache.isMultiSession();
    bool supervisedStartAvailable = user.requiresSupervisor && this->resourceCacheValid &&
                                    (multi ? this->resourceCache.canStart : !this->resourceCache.hasActiveUsage);
@@ -463,6 +486,8 @@ void ResourceDetailsScreen::refreshAccessState()
          // - own session: solid danger red, full prominence, plain label, no note
          // - foreign session: soft danger surface, warning label + amber note
          bool isForeignStop = showStop && !ownsActiveUsage;
+         // A force-stop names the session on screen, so it cannot end one that started in the meantime.
+         this->stopSessionUsageId = isForeignStop ? this->resourceCache.activeUsageId : 0;
          if (this->stopOtherUserNote)
          {
             lv_obj_set_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN, !isForeignStop);
@@ -487,7 +512,7 @@ void ResourceDetailsScreen::refreshAccessState()
       }
    }
 
-   this->rebuildOtherSessions(multi && (user.isIntroducer || user.canManageResource));
+   this->rebuildOtherSessions(multi && (user.isIntroducer || user.canManageResource || user.canEndOtherSessions));
 
    // Flow node buttons are only relevant to the person who owns the active session.
    if (this->flowButtonsContainer)

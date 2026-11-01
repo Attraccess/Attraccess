@@ -276,6 +276,7 @@ enum class Message {
     ErrorAlreadyHasActiveSession,
     EndNamedSession,
     EndOtherSessionsTitle,
+    ErrorNoOwnActiveSession,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -570,10 +571,11 @@ inline constexpr Entry catalog[] = {
     {Message::InUseCount, "In Verwendung {0}/{1}", "In use {0}/{1}"},
     {Message::ResourceFull, "Voll", "Full"},
     {Message::ErrorResourceInUse, "Die Ressource wird gerade von jemand anderem verwendet.", "The resource is currently in use by someone else."},
-    {Message::ErrorResourceFull, "Alle Plätze dieser Ressource sind belegt.", "All places on this resource are taken."},
-    {Message::ErrorAlreadyHasActiveSession, "Du hast bereits eine aktive Sitzung auf dieser Ressource.", "You already have an active session on this resource."},
+    {Message::ErrorResourceFull, "Diese Maschine ist voll. Bitte versuchen Sie es erneut, wenn jemand fertig ist.", "This machine is full. Try again when someone has finished."},
+    {Message::ErrorAlreadyHasActiveSession, "Sie haben bereits eine aktive Sitzung an dieser Maschine.", "You already have an active session on this machine."},
     {Message::EndNamedSession, "Sitzung von {0} beenden", "End session of {0}"},
-    {Message::EndOtherSessionsTitle, "Fremde Sitzung beenden:", "End another session:"},
+    {Message::EndOtherSessionsTitle, "Andere Sitzung beenden:", "End another session:"},
+    {Message::ErrorNoOwnActiveSession, "Sie haben keine aktive Sitzung an dieser Maschine.", "You have no active session on this machine."},
 };
 
 } // namespace FirmwareI18n

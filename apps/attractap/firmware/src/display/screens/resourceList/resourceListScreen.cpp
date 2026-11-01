@@ -111,10 +111,11 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
     FirmwareI18n::Text status = FirmwareI18n::Text::literal(resource.description) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
     const bool multi = resource.isMultiSession();
-    const bool ownsUsage = signedIn && resource.hasActiveUsage && username == resource.activeUser;
+    const bool accessMatches = username == cachedResourceList.authenticatedUsername;
+    const bool ownsUsage = signedIn && resource.isOwnedBy(username, accessMatches && resource.accessKnown);
     const auto occupancy = multi ? SessionOccupancy::caption(resource, ownsUsage) : FirmwareI18n::Text();
     if (!occupancy.empty()) status = occupancy;
-    else if (!multi && resource.hasActiveUsage) status = signedIn && username == resource.activeUser
+    else if (!multi && resource.hasActiveUsage) status = ownsUsage
         ? FirmwareI18n::Text(FirmwareI18n::Message::InUseByYou)
         : FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(resource.activeUser) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */});
     else if (resource.isUnderMaintenance) status = FirmwareI18n::Message::Maintenance;
@@ -127,12 +128,13 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     if (!signedIn) {
         lv_obj_set_style_border_side(details, LV_BORDER_SIDE_RIGHT, 0);
         lv_obj_set_style_border_width(details, 20, 0);
-        const bool occupied = multi ? resource.isFull() : resource.hasActiveUsage;
-        const bool partlyBusy = multi && resource.activeSessionCount > 0;
-        lv_obj_set_style_border_color(details, occupied ? DisplayTheme::danger() : resource.isUnderMaintenance || !resource.isHealthy || partlyBusy ? DisplayTheme::warning() : DisplayTheme::success(), 0);
+        // A single-session machine in use reads like a full one.
+        using SessionOccupancy::Level;
+        const Level level = multi ? SessionOccupancy::level(resource) : resource.hasActiveUsage ? Level::Full : Level::Free;
+        const bool blocked = resource.isUnderMaintenance || !resource.isHealthy;
+        lv_obj_set_style_border_color(details, level == Level::Free && blocked ? DisplayTheme::warning() : SessionOccupancy::color(level), 0);
         return;
     }
-    const bool accessMatches = username == cachedResourceList.authenticatedUsername;
     const auto action = accessMatches ? resourceListAction(resource, username) : ResourceListAction::None;
     FirmwareI18n::Text caption = FirmwareI18n::Message::Introduction;
     auto color = DisplayTheme::warning();

@@ -225,7 +225,9 @@ void Application::updateSelectedResourceDetails() {
       personalized ? resource.canManageResource : legacy && this->cardAuthenticationData.canManageResource,
       personalized ? resource.hasIntroduction : legacy && this->cardAuthenticationData.hasIntroduction,
       personalized ? resource.isIntroducer : legacy && this->cardAuthenticationData.isIntroducer,
-      personalized ? resource.requiresSupervisor : legacy && this->cardAuthenticationData.requiresSupervisor});
+      personalized ? resource.requiresSupervisor : legacy && this->cardAuthenticationData.requiresSupervisor,
+      personalized && resource.canEndOtherSessions,
+      personalized});
     return;
   }
   // The selected resource was removed while the user was looking at it.
@@ -292,9 +294,10 @@ void Application::handleResourceDetailsButtonClick(
       if (this->resourceList.items[i].id == this->selectedResourceId) {
         const auto &res = this->resourceList.items[i];
         // Takeover only exists on single-session machines; parallel machines just use a free slot.
+        const bool personalized = res.accessKnown &&
+                                  this->cardAuthenticationData.username == this->resourceList.authenticatedUsername;
         isTakeover = !res.isMultiSession() && res.hasActiveUsage && res.allowTakeOver &&
-                     strcmp(res.activeUser,
-                            this->cardAuthenticationData.username.c_str()) != 0;
+                     !res.isOwnedBy(this->cardAuthenticationData.username, personalized);
         break;
       }
     }

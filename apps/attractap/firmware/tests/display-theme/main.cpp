@@ -251,6 +251,9 @@ int main(int argc, char **argv)
         test("screen/parallel-sessions-list", [&] { testParallelSessionList(renderer); });
         test("screen/parallel-sessions-details", [&] { testParallelSessionDetails(renderer); });
         test("screen/parallel-sessions-single-unchanged", [&] { testSingleSessionDetailsUnchanged(); });
+        test("screen/parallel-sessions-lowered-limit", [&] { testLoweredLimitDetails(renderer); });
+        test("screen/parallel-sessions-can-end-other-sessions", [&] { testPickerForCanEndOtherSessions(); });
+        test("screen/parallel-sessions-ownership", [&] { testDetailsOwnershipFromOwnSession(); });
         test("screen/parallel-sessions-lockscreen", [&] { testParallelSessionLockscreen(renderer); });
         test("screen/usage-stats-expiry", [&] { testUsageStatsExpiry(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });

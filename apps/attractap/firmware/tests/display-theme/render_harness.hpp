@@ -242,6 +242,9 @@ void testParallelSessionPolicy();
 void testParallelSessionList(Renderer &renderer);
 void testParallelSessionDetails(Renderer &renderer);
 void testSingleSessionDetailsUnchanged();
+void testLoweredLimitDetails(Renderer &renderer);
+void testPickerForCanEndOtherSessions();
+void testDetailsOwnershipFromOwnSession();
 void testParallelSessionLockscreen(Renderer &renderer);
 
 void testDemoFixtureLocales(Renderer &renderer);

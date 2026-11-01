@@ -234,7 +234,8 @@ void Lockscreen::setUsageInfo(const API::ResourceBrief &resource)
     if (resource.isMultiSession())
     {
         this->multiSession = true;
-        this->occupancy = resource;
+        this->occupancyActiveCount = resource.activeSessionCount;
+        this->occupancyLimit = resource.maxParallelSessions;
         this->updateUsageInfo();
     }
 }
@@ -252,12 +253,14 @@ void Lockscreen::updateUsageInfo()
     FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
 
     // Status priority mirrors the web resource list: in use > maintenance > available.
-    const auto occupancyText = this->multiSession ? SessionOccupancy::caption(this->occupancy, false) : FirmwareI18n::Text();
+    const auto occupancyText = this->multiSession
+                                   ? SessionOccupancy::caption(this->occupancyActiveCount, this->occupancyLimit, false)
+                                   : FirmwareI18n::Text();
     if (!occupancyText.empty())
     {
         FirmwareI18n::setLabel(this->usageInfoLabel, occupancyText);
         lv_obj_set_style_text_color(this->usageInfoLabel,
-                                    this->occupancy.isFull() ? DisplayTheme::danger() : DisplayTheme::warning(),
+                                    SessionOccupancy::color(SessionOccupancy::level(this->occupancyActiveCount, this->occupancyLimit)),
                                     LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else if (!this->multiSession && this->hasActiveUsage)

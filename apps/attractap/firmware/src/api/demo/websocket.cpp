@@ -249,6 +249,8 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
             obj["hasIntroduction"] = _currentHasIntroduction;
             obj["canManageResource"] = _currentCanManage;
             obj["isIntroducer"] = _currentCanManage;
+            // Mirrors handleStopSession: only managers may end another person's session.
+            obj["canEndOtherSessions"] = _currentCanManage;
             obj["canManageMaintenance"] = _currentCanManage;
             obj["requiresSupervisor"] = false;
         }
