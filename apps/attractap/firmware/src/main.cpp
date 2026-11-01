@@ -16,6 +16,15 @@
 #include "logger/logger.hpp"
 #include "platform.hpp"
 #include "utils.hpp"
+#ifdef ATTRACTAP_UI_SELFTEST
+#include "selftest/ui_selftest.hpp"
+#endif
+#ifdef LOG_MEMORY_DEBUG
+#include "esp_heap_caps.h"
+#ifdef HAS_LVGL_DISPLAY
+#include <lvgl.h>
+#endif
+#endif
 
 // Default I2C pins when a variant does not set PIN_NFC_I2C_* explicitly
 // (was Wire.begin(SDA, SCL) with the board's Arduino defaults).
@@ -55,6 +64,24 @@ static void logLoopStackUsage()
     Logger logger("Stack");
     logger.debugf("main task high watermark: %u words (~%u bytes)",
                   watermarkWords, watermarkWords * sizeof(StackType_t));
+    // The UI tasks and the LVGL pool (ATT-1187): LvglTask draws, the main task dispatches inbound messages on
+    // paired readers, rl_tls runs the TLS session.
+    for (const char *name : {"LvglTask", "rl_tls"})
+    {
+        TaskHandle_t handle = xTaskGetHandle(name);
+        if (handle)
+            logger.debugf("%s high watermark: ~%u bytes free", name,
+                          (unsigned)(uxTaskGetStackHighWaterMark(handle) * sizeof(StackType_t)));
+    }
+#ifdef HAS_LVGL_DISPLAY
+    lv_lock();
+    lv_mem_monitor_t pool;
+    lv_mem_monitor(&pool);
+    lv_unlock();
+    logger.debugf("lv pool: total %u free %u biggest %u max_used %u frag %u%%", (unsigned)pool.total_size,
+                  (unsigned)pool.free_size, (unsigned)pool.free_biggest_size, (unsigned)pool.max_used,
+                  (unsigned)pool.frag_pct);
+#endif
 }
 #endif
 
@@ -103,6 +130,9 @@ extern "C" void app_main(void)
 
     mainLogger.info("Attractap starting...");
     application.setup();
+#ifdef ATTRACTAP_UI_SELFTEST
+    UiSelftest::start(api);
+#endif
 
     // The main task is the old Arduino loopTask: 16 KB stack, pinned to core 1
     // (CONFIG_ESP_MAIN_TASK_STACK_SIZE / CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1).

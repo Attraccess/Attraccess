@@ -50,9 +50,30 @@ void API::setFirmwareUpdateMetaCallback(std::function<bool(std::string available
     this->firmwareUpdateMetaCallback = callback;
 }
 
+#ifdef ATTRACTAP_UI_SELFTEST
+void API::testInject(const char *json, size_t len)
+{
+    std::lock_guard<std::mutex> guard(testInjectMutex);
+    testInjectQueue.emplace_back(json, len);
+}
+#endif
+
 void API::loop()
 {
     this->transport.loop();
+#ifdef ATTRACTAP_UI_SELFTEST
+    for (;;)
+    {
+        std::string next;
+        {
+            std::lock_guard<std::mutex> guard(testInjectMutex);
+            if (testInjectQueue.empty()) break;
+            next = std::move(testInjectQueue.front());
+            testInjectQueue.pop_front();
+        }
+        this->processIncomingMessage(next.c_str(), next.size());
+    }
+#endif
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable

@@ -2,6 +2,9 @@
 
 #include <string>
 #include <vector>
+#ifdef ATTRACTAP_UI_SELFTEST
+#include <deque>
+#endif
 #include <cstdint>
 #include <cstddef>
 #include "../display/ui/ui_step.hpp"
@@ -473,6 +476,10 @@ public:
     const std::string &currentCardSessionId() const { return cardSessionId; }
     // Tells the server the card session is over (sign-out or timeout) and forgets it.
     void endCardSession();
+#ifdef ATTRACTAP_UI_SELFTEST
+    // Self-test build only: queues a server message that API::loop() (the inbound-dispatch task) processes.
+    void testInject(const char *json, size_t len);
+#endif
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);
@@ -534,6 +541,10 @@ private:
     void onMassIntroductionEnd(JsonObject data);
 
     uint32_t authenticationCount = 0;
+#ifdef ATTRACTAP_UI_SELFTEST
+    std::mutex testInjectMutex;
+    std::deque<std::string> testInjectQueue;
+#endif
 
     void sendAck(const char *type, uint32_t messageId = 0);
     void sendMessage(const char *type);

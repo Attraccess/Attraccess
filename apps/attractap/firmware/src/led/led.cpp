@@ -417,6 +417,10 @@ void LedController::runCircularAnimation()
         runEnrollmentPending();
         break;
 
+    case LED_STATE_CONFIRM_WAIT:
+        runConfirmWait();
+        break;
+
     case LED_STATE_FIRMWARE_UPDATE:
         break;
     }
@@ -477,6 +481,10 @@ void LedController::runLinearAnimation()
 
     case LED_STATE_ENROLLMENT_PENDING:
         runEnrollmentPending();
+        break;
+
+    case LED_STATE_CONFIRM_WAIT:
+        runConfirmWait();
         break;
 
     case LED_STATE_FIRMWARE_UPDATE:

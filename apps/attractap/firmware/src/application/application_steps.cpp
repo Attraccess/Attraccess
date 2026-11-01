@@ -3,6 +3,7 @@
 // FEATURE: application-ui-steps
 
 #include "application.hpp"
+#include "../platform.hpp"
 
 #include <atomic>
 #include <memory>
