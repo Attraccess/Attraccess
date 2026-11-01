@@ -48,6 +48,8 @@ export interface UiContributionRecord {
   sent: boolean;
   /** Built while a card session was live, so it may show user-specific content. */
   userScoped: boolean;
+  /** The card session a user-scoped record was sent under. */
+  cardSessionId?: string;
 }
 
 /** Minimal limiter surface, so this file does not depend on the limiter implementation. */

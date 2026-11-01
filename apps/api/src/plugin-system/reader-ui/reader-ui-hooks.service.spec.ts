@@ -242,6 +242,55 @@ describe('ReaderUiHooksService', () => {
     });
   });
 
+  describe('block with an invalid reason', () => {
+    const invalidBlocks: Array<[string, PreStartResult]> = [
+      ['a spoofing title', { decision: 'block', reason: { code: 'X', title: 'Maintenance', body: 'b' } }],
+      ['a missing reason', { decision: 'block' } as never],
+      ...['CONFIRMATION_REQUIRED', 'CONFIRMATION_UNAVAILABLE', 'HOOK_UNAVAILABLE', 'STEP_EXPIRED', 'STEP_UNKNOWN'].map(
+        (code): [string, PreStartResult] => [
+          `the host code ${code}`,
+          { decision: 'block', reason: { code, title: 'Reserved', body: 'Not now' } },
+        ],
+      ),
+    ];
+
+    it.each(invalidBlocks)('still blocks under fail-open (%s), with the host reason', async (_name, result) => {
+      const { service, audit } = setup({ p: () => result }, 'fail-open');
+      await expect(service.runPreStart({ ...run(), language: 'de' })).resolves.toEqual({
+        decision: 'block',
+        plugin: 'p',
+        reason: { code: 'HOOK_UNAVAILABLE', title: 'Vorübergehend nicht startbar', body: expect.any(String) },
+      });
+      expect(audit.recordAttractap).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ui.hook_decision',
+          details: expect.objectContaining({ decision: 'block', reasonCode: 'invalid-result' }),
+        }),
+      );
+      expect(audit.recordAttractap).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'ui.fail_open_used' }));
+    });
+
+    it('counts neither as a breaker failure nor as a success', async () => {
+      let mode: 'throw' | 'invalid-block' = 'throw';
+      let calls = 0;
+      const { service, alerts } = setup({
+        p: () => {
+          calls += 1;
+          if (mode === 'throw') throw new Error('down');
+          return { decision: 'block', reason: { code: 'HOOK_UNAVAILABLE', title: 'Reserved', body: 'b' } };
+        },
+      });
+      for (let i = 0; i < 4; i += 1) await service.runPreStart(run());
+      mode = 'invalid-block';
+      for (let i = 0; i < 10; i += 1) await service.runPreStart(run());
+      expect(alerts.raise).not.toHaveBeenCalled(); // not failures
+      mode = 'throw';
+      await service.runPreStart(run());
+      expect(alerts.raise).toHaveBeenCalledWith('breaker-open', expect.any(String), { plugin: 'p' }); // no reset
+      expect(calls).toBe(15);
+    });
+  });
+
   describe('circuit breaker', () => {
     it('opens after 5 failures, stops calling the hook, raises an alert and probes after 60 s', async () => {
       let calls = 0;

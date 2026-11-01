@@ -6,6 +6,8 @@
 #include "../../display/ui/ui_text.hpp"
 #include "../../platform.hpp"
 
+#include <cstring>
+
 #ifdef HAS_LVGL_DISPLAY
 #include "../../display/ui/ui_slots.hpp"
 #endif
@@ -86,7 +88,8 @@ void API::sendUiStepResult(const char *stepId, const char *action)
     JsonObject payload = doc.to<JsonObject>();
     payload["stepId"] = stepId;
     payload["action"] = action;
-    if (!cardSessionId.empty()) payload["cardSessionId"] = cardSessionId;
+    CardSessionIdBuf cardSession;
+    if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession;
     this->sendMessage("UI_STEP_RESULT", payload);
 }
 
@@ -129,12 +132,40 @@ void API::clearUiSlots()
 
 void API::endCardSession()
 {
-    if (cardSessionId.empty()) return;
+    CardSessionIdBuf cardSession;
+    if (!takeCardSessionId(cardSession)) return;
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
-    payload["cardSessionId"] = cardSessionId;
+    payload["cardSessionId"] = cardSession;
     this->sendMessage("CARD_SESSION_ENDED", payload);
-    cardSessionId.clear();
+}
+
+// Fixed-size copies only: no allocation or logging inside the critical section.
+void ApiUiState::setCardSessionId(const char *id)
+{
+    CardSessionIdBuf next = {};
+    const size_t len = id ? strnlen(id, CARD_SESSION_ID_MAX + 1) : 0;
+    if (len <= CARD_SESSION_ID_MAX && len > 0) memcpy(next, id, len);
+    portENTER_CRITICAL(&uiReplyLock);
+    memcpy(cardSessionId, next, sizeof next);
+    portEXIT_CRITICAL(&uiReplyLock);
+}
+
+bool ApiUiState::copyCardSessionId(CardSessionIdBuf &out)
+{
+    portENTER_CRITICAL(&uiReplyLock);
+    memcpy(out, cardSessionId, sizeof out);
+    portEXIT_CRITICAL(&uiReplyLock);
+    return out[0] != '\0';
+}
+
+bool ApiUiState::takeCardSessionId(CardSessionIdBuf &out)
+{
+    portENTER_CRITICAL(&uiReplyLock);
+    memcpy(out, cardSessionId, sizeof out);
+    cardSessionId[0] = '\0';
+    portEXIT_CRITICAL(&uiReplyLock);
+    return out[0] != '\0';
 }
 
 // UI reply pacing (see ApiUiState): the inbound-dispatch task queues, the main task drains, uiReplyLock guards both.

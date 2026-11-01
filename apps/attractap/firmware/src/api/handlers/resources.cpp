@@ -68,7 +68,8 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, boo
         payload["stepId"] = stepId;
         if (choice && *choice) payload["choice"] = choice;
     }
-    if (!cardSessionId.empty()) payload["cardSessionId"] = cardSessionId;
+    CardSessionIdBuf cardSession;
+    if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession;
     this->sendResourceAction("START_RESOURCE_USAGE_SESSION", payload);
 }
 
@@ -78,7 +79,8 @@ void API::stopResourceUsageSession(uint32_t resourceId)
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
-    if (!cardSessionId.empty()) payload["cardSessionId"] = cardSessionId; // keeps the server's card session alive
+    CardSessionIdBuf cardSession;
+    if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession; // keeps the server's card session alive
     this->sendResourceAction("STOP_RESOURCE_USAGE_SESSION", payload);
 }
 

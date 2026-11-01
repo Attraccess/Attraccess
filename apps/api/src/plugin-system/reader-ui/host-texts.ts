@@ -5,6 +5,18 @@ export type ReaderUiLanguage = 'en' | 'de';
 /** Reasons the host itself gives when a start cannot go ahead. Shown as written on readers and the web. */
 export type HostReasonCode = 'HOOK_UNAVAILABLE' | 'CONFIRMATION_UNAVAILABLE' | 'STEP_EXPIRED' | 'STEP_UNKNOWN';
 
+/**
+ * Block codes only the host may send. Readers and the web treat them as host decisions (Lite plays its own
+ * pattern on CONFIRMATION_REQUIRED), so a plugin block reason using one is invalid.
+ */
+export const HOST_RESERVED_BLOCK_CODES: readonly string[] = [
+  'CONFIRMATION_REQUIRED',
+  'CONFIRMATION_UNAVAILABLE',
+  'HOOK_UNAVAILABLE',
+  'STEP_EXPIRED',
+  'STEP_UNKNOWN',
+];
+
 const TEXTS: Record<HostReasonCode, Record<ReaderUiLanguage, { title: string; body: string }>> = {
   HOOK_UNAVAILABLE: {
     en: {
@@ -31,7 +43,10 @@ const TEXTS: Record<HostReasonCode, Record<ReaderUiLanguage, { title: string; bo
     de: { title: 'Bestätigung abgelaufen', body: 'Die Bestätigung hat zu lange gedauert. Bitte starte erneut.' },
   },
   STEP_UNKNOWN: {
-    en: { title: 'Confirmation no longer valid', body: 'This confirmation was already used or replaced. Please start again.' },
+    en: {
+      title: 'Confirmation no longer valid',
+      body: 'This confirmation was already used or replaced. Please start again.',
+    },
     de: {
       title: 'Bestätigung nicht mehr gültig',
       body: 'Diese Bestätigung wurde schon verwendet oder ersetzt. Bitte starte erneut.',

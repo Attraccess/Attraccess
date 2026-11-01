@@ -10,6 +10,11 @@ class HookFailure extends Error {
   }
 }
 
+/** A usable result that counts neither as a success nor as a failure for the breaker. */
+export class NeutralResult<T> {
+  constructor(readonly value: T) {}
+}
+
 export interface HookRunnerOptions {
   timeoutMs: number;
   breakerThreshold: number;
@@ -18,7 +23,7 @@ export interface HookRunnerOptions {
 
 /**
  * Calls plugin code with a timeout behind one circuit breaker per key. A result that fails validation counts
- * as a failure, like a timeout or an exception. Never throws.
+ * as a failure, like a timeout or an exception; a `NeutralResult` leaves the breaker as it is. Never throws.
  */
 export class HookRunner {
   private readonly breakers = new Map<string, CircuitBreaker>();
@@ -36,13 +41,18 @@ export class HookRunner {
   async run<R, T>(
     key: string,
     call: () => R | Promise<R>,
-    validate: (raw: R) => T | null,
+    validate: (raw: R) => T | NeutralResult<T> | null,
   ): Promise<{ result: HookCall<T>; transition: BreakerTransition; error?: unknown }> {
     const breaker = this.breaker(key);
-    if (breaker.next(Date.now()) === 'open') return { result: { kind: 'failure', code: 'breaker-open' }, transition: null };
+    if (breaker.next(Date.now()) === 'open')
+      return { result: { kind: 'failure', code: 'breaker-open' }, transition: null };
     try {
       const value = validate(await this.withTimeout(call));
       if (value === null) throw new HookFailure('invalid-result');
+      if (value instanceof NeutralResult) {
+        breaker.release();
+        return { result: { kind: 'ok', value: value.value }, transition: null };
+      }
       return { result: { kind: 'ok', value }, transition: breaker.success() ? 'closed' : null };
     } catch (error) {
       const code = error instanceof HookFailure ? error.code : 'exception';

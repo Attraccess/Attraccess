@@ -99,7 +99,10 @@ export const READER_UI_TIMING = {
   slotUpdateMinIntervalMs: 2000,
 } as const;
 
-/** Strings that only the host may show (core status). Compared case-insensitively on trimmed text. */
+/**
+ * Strings that only the host may show (core status). Plugin text is rejected when it equals one after lower-casing,
+ * collapsing whitespace and stripping non-letters at both ends.
+ */
 export const READER_UI_RESERVED_STATUS_STRINGS: readonly string[] = [
   'maintenance',
   'under maintenance',

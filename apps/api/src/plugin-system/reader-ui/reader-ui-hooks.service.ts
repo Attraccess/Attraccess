@@ -17,8 +17,8 @@ import {
   validatePluginChoice,
   validatePluginConfirmation,
 } from '../../resources/forms/reader-ui.validation';
-import { HookRunner, type BreakerTransition } from './hook-runner';
-import { hostReason, type ReaderUiLanguage } from './host-texts';
+import { HookRunner, NeutralResult, type BreakerTransition } from './hook-runner';
+import { HOST_RESERVED_BLOCK_CODES, hostReason, type ReaderUiLanguage } from './host-texts';
 import { ReaderUiAlertsService } from './reader-ui-alerts.service';
 import { ReaderUiSettingsService } from './reader-ui-settings.service';
 import { ReaderUiRegistry } from './reader-ui.registry';
@@ -54,6 +54,9 @@ export interface SessionEndQuestion {
   /** `choice.onAnswer` is host-guarded: it runs at most once, with the hook timeout, and never rejects. */
   result: { decision: 'choose'; choice: PluginChoice };
 }
+
+/** `auditCode` overrides the audited reason code; it never leaves this service. */
+type NormalizedOutcome = PreStartOutcome & { auditCode?: string };
 
 /** Session-end hooks are advisory, so their failures must never open the pre-start breaker. */
 const sessionEndKey = (plugin: string) => `${plugin}#session-end`;
@@ -122,8 +125,8 @@ export class ReaderUiHooksService {
         await this.record(run, plugin, 'ui.hook_decision', 'block', result.code);
         return { decision: 'block', plugin, reason: hostReason('HOOK_UNAVAILABLE', run.language) };
       }
-      const outcome = result.value;
-      await this.record(run, plugin, 'ui.hook_decision', outcome.decision, decisionCode(outcome));
+      const { auditCode, ...outcome } = result.value;
+      await this.record(run, plugin, 'ui.hook_decision', outcome.decision, auditCode ?? decisionCode(outcome));
       if (outcome.decision === 'block') return outcome;
       if (outcome.decision === 'confirm') firstConfirm ??= outcome;
     }
@@ -207,13 +210,22 @@ export class ReaderUiHooksService {
       .catch(() => undefined);
   }
 
-  /** null = invalid result, which the runner counts as a hook failure. */
-  private normalize(plugin: string, raw: PreStartResult, run: PreStartRun): PreStartOutcome | null {
+  /**
+   * null = invalid result, which the runner counts as a hook failure. A block with an invalid reason still
+   * blocks (the plugin clearly said no, so fail-open must not turn it into an allow), with the host reason.
+   */
+  private normalize(
+    plugin: string,
+    raw: PreStartResult,
+    run: PreStartRun,
+  ): NormalizedOutcome | NeutralResult<NormalizedOutcome> | null {
     if (!raw || typeof raw !== 'object') return null;
     if (raw.decision === 'allow') return { decision: 'allow' };
     if (raw.decision === 'block') {
       const reason = validBlockReason(raw.reason);
-      return reason ? { decision: 'block', plugin, reason } : null;
+      if (reason) return { decision: 'block', plugin, reason };
+      const hostBlock = hostReason('HOOK_UNAVAILABLE', run.language);
+      return new NeutralResult({ decision: 'block', plugin, reason: hostBlock, auditCode: 'invalid-result' });
     }
     if (raw.decision === 'confirm') {
       const confirmation = validatePluginConfirmation(raw.confirmation);
@@ -258,7 +270,10 @@ function decisionCode(outcome: PreStartOutcome): string {
 }
 
 function validBlockReason(reason: PluginBlockReason | undefined): PluginBlockReason | null {
-  const code = typeof reason?.code === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(reason.code);
+  const code =
+    typeof reason?.code === 'string' &&
+    /^[A-Za-z0-9_.-]{1,40}$/.test(reason.code) &&
+    !HOST_RESERVED_BLOCK_CODES.includes(reason.code);
   const title = cleanPluginText(reason?.title, READER_UI_LIMITS.maxTextChars);
   const body = cleanPluginText(reason?.body, READER_UI_LIMITS.maxTextChars * 2);
   if (!code || !title.ok || !body.ok) return null;

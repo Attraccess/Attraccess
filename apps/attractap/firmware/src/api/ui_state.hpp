@@ -21,7 +21,6 @@ protected:
     std::function<void(const ui::StepRequest &)> uiStepRequestCallback;
     std::function<void(const std::string &stepId)> uiStepCancelCallback;
     std::function<void()> uiSlotsChangedCallback;
-    std::string cardSessionId;
     ui::StepRequest uiStepScratch;
     void *uiSlotScratch = nullptr; // ui::SlotRecord in PSRAM, display readers only
 
@@ -49,6 +48,15 @@ protected:
     static constexpr uint8_t UI_REPLY_BURST = 4;      // sent immediately per window, the rest paced
     static constexpr uint32_t UI_REPLY_WINDOW_MS = 100;
     portMUX_TYPE uiReplyLock = portMUX_INITIALIZER_UNLOCKED; // guards everything below
+
+    // Card session id: set on the inbound-dispatch task (CARD_AUTHENTICATION_DATA), read on LvglTask (START, STOP,
+    // UI_STEP_RESULT, CARD_SESSION_ENDED). Only touched through these helpers, which copy it under uiReplyLock.
+    static constexpr size_t CARD_SESSION_ID_MAX = 24; // server ids are 16 base64url chars
+    using CardSessionIdBuf = char[CARD_SESSION_ID_MAX + 1];
+    CardSessionIdBuf cardSessionId = {};
+    void setCardSessionId(const char *id); // null or empty clears; an id longer than the maximum clears too
+    bool copyCardSessionId(CardSessionIdBuf &out); // false (and `out` empty) when there is none
+    bool takeCardSessionId(CardSessionIdBuf &out); // copies and clears in one step
     DeferredUiAck uiAcks[UI_ACK_QUEUE_MAX];
     UiRenderReport uiReports[UI_REPORT_QUEUE_MAX];
     uint8_t uiAckHead = 0;

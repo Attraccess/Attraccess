@@ -63,7 +63,11 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     response.error = error;
     response.username = username;
     response.cardSessionId = payload["cardSessionId"].is<const char *>() ? payload["cardSessionId"].as<std::string>() : std::string("");
-    if (error.empty() && !response.cardSessionId.empty()) this->cardSessionId = response.cardSessionId;
+    if (error.empty() && !response.cardSessionId.empty())
+    {
+        if (response.cardSessionId.size() > CARD_SESSION_ID_MAX) logger.warn("Ignoring an over-long card session id");
+        this->setCardSessionId(response.cardSessionId.c_str());
+    }
     response.language = payload["language"].is<const char *>() ? payload["language"].as<std::string>() : "en";
     // The server supplies a canonical fallback for older readers. New readers
     // retain its fallback status so live default changes also affect this session.

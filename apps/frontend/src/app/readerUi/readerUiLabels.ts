@@ -9,6 +9,8 @@ const HOST_REASONS = new Set([
   'too-many-contributions',
   'provider-error',
   'node-budget',
+  // A provider answer that is no list, or a null entry in it.
+  'invalid',
 ]);
 
 /** `invalid-<validator reason>` and `reader-<reader drop reason>` carry a technical detail after the prefix. */

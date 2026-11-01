@@ -19,8 +19,13 @@ interface WebStep extends WebStepBinding {
   satisfied: Record<string, string[]>;
 }
 
-/** Hard cap on open web/API confirmations, oldest dropped first. */
+/** Open confirmations per principal (user + API token), that principal's oldest dropped first. */
+export const MAX_OPEN_WEB_STEPS_PER_PRINCIPAL = 20;
+
+/** Last-resort cap on all open web/API confirmations, oldest dropped first. */
 export const MAX_OPEN_WEB_STEPS = 1000;
+
+const samePrincipal = (a: WebStepBinding, b: WebStepBinding) => a.userId === b.userId && a.apiTokenId === b.apiTokenId;
 
 const sameBinding = (a: WebStepBinding, b: WebStepBinding) =>
   a.userId === b.userId &&
@@ -47,6 +52,7 @@ export class WebStartStepStore {
 
   issue(binding: WebStepBinding, plugin: string, stepKey: string, ttlSec: number, satisfied: Record<string, string[]>) {
     this.sweep(binding);
+    this.capPrincipal(binding);
     const ttl = Math.min(Math.max(Number.isFinite(ttlSec) ? ttlSec : 60, 10), READER_UI_TIMING.stepMaxTtlSec);
     const stepId = randomBytes(16).toString('base64url');
     const expiresAtMs = Date.now() + ttl * 1000;
@@ -84,6 +90,15 @@ export class WebStartStepStore {
       }
     }
     return satisfied;
+  }
+
+  /** Makes room for one more step of this principal, so one user cannot push out everybody else's steps. */
+  private capPrincipal(binding: WebStepBinding): void {
+    const own = [...this.steps].filter(([, step]) => samePrincipal(step, binding));
+    for (const [id, step] of own.slice(0, Math.max(own.length - MAX_OPEN_WEB_STEPS_PER_PRINCIPAL + 1, 0))) {
+      this.steps.delete(id);
+      this.record('ui.step_cancelled', step, 'cancelled', 'evicted');
+    }
   }
 
   /** Drops expired steps and the open step of the same binding. */

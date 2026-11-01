@@ -95,6 +95,8 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
       });
       console.error('Failed to takeover session:', err);
     },
+    // The plugin confirmation or block notice replaces the notes modal.
+    onPluginNotice: () => setIsTakeoverNotesModalOpen(false),
   });
 
   const { start: startTakeover } = startSession;

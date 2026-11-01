@@ -5,6 +5,24 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { useQrCodeAction } from './useQrCodeAction';
 const state = vi.hoisted(() => ({
+  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+    type Callbacks = {
+      onSuccess?: (data: unknown, v: unknown) => void;
+      onError?: (error: unknown, v: unknown) => void;
+    };
+    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+    return {
+      onSuccess: (data: unknown, _variables?: unknown) => {
+        hook?.onSuccess?.(data, variables);
+        call?.onSuccess?.(data, variables);
+      },
+      onError: (error: unknown) => {
+        hook?.onError?.(error, variables);
+        call?.onError?.(error, variables);
+      },
+    };
+  },
   navigate: vi.fn(),
   start: vi.fn(),
   end: vi.fn(),
@@ -33,10 +51,10 @@ vi.mock('../../../components/toastProvider', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
-  // The shared start hook passes its callbacks per call.
-  useResourcesServiceResourceUsageStartSession: () => ({
-    mutate: (variables: unknown, callbacks: (typeof state.callbacks)[string]) => {
-      state.callbacks.start = callbacks;
+  // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
+  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+    mutate: (variables: unknown, callbacks: unknown) => {
+      state.callbacks.start = state.bothCallbacks(options, callbacks, variables);
       state.start(variables);
     },
     isPending: false,

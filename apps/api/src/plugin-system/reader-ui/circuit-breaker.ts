@@ -48,6 +48,11 @@ export class CircuitBreaker {
     return false;
   }
 
+  /** Ends a probe without a verdict, so the next call may probe again. */
+  release(): void {
+    this.probing = false;
+  }
+
   reset(): void {
     this.success();
   }

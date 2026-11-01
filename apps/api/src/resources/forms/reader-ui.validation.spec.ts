@@ -98,8 +98,9 @@ describe('core status spoofing', () => {
     '✓ Access granted',
     'ACCESS GRANTED!',
     '  in   use  ',
-    'In use (A)',
-    'In use by Anna',
+    'in\u00a0use',
+    'in\u2003\u2003use',
+    'MAINTENANCE!',
     'Maintenance.',
     '*** Wartung ***',
     'Zugriff gewährt',
@@ -107,7 +108,19 @@ describe('core status spoofing', () => {
     expect(slotText(text)).toEqual({ ok: false, reason: 'core-string-spoof' });
   });
 
-  it.each(['Free until 14:00', 'Reserved 14:00', 'Useful tip', 'Inuse', 'Booked until 16:00'])('accepts %j', (text) => {
+  it.each([
+    'Free until 14:00',
+    'Reserved 14:00',
+    'Useful tip',
+    'Inuse',
+    'Booked until 16:00',
+    'Maintenance scheduled at 14:00',
+    'Available until 14:00',
+    'In use by reservation',
+    'In use (A)',
+    'Verfügbar ab 15:00',
+    'Wartung in 10 min',
+  ])('accepts %j', (text) => {
     expect(isCoreStatusString(text)).toBe(false);
     expect(slotText(text).ok).toBe(true);
   });
@@ -148,7 +161,11 @@ describe('validateStepRequest', () => {
   });
 
   it('rejects a spoofing action label', () => {
-    const step = base({ kind: 'confirm', choices: undefined, actions: [{ id: 'ok', role: 'ok', label: 'Maintenance' }] });
+    const step = base({
+      kind: 'confirm',
+      choices: undefined,
+      actions: [{ id: 'ok', role: 'ok', label: 'Maintenance' }],
+    });
     expect(validateStepRequest(step)).toEqual({ ok: false, reason: 'core-string-spoof' });
   });
 });

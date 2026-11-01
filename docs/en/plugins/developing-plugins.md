@@ -470,9 +470,13 @@ const sessionEndHook: SessionEndHook = async (ctx) => ({
 
 ### Failures and trust
 
-- Hooks time out after 1.5 s (3 s maximum). A timeout, an exception and an invalid result (for example a missing
-  `reason` on `block`) all count as a hook failure. The default is **fail closed**: the start is blocked with
-  "Temporarily unavailable".
+- Hooks time out after 1.5 s (3 s maximum). A timeout, an exception and an invalid result (for example a
+  confirmation with a bad step key) all count as a hook failure. The default is **fail closed**: the start is
+  blocked with "Temporarily unavailable".
+- A `block` whose `reason` is invalid (missing, spoofing a core status, or using a host code such as
+  `CONFIRMATION_REQUIRED`, `CONFIRMATION_UNAVAILABLE`, `HOOK_UNAVAILABLE`, `STEP_EXPIRED` or `STEP_UNKNOWN`) still
+  blocks, even under fail open, with "Temporarily unavailable". It is audited and does not count towards the
+  circuit breaker.
 - After 5 consecutive failures a circuit breaker opens for that plugin: the failure policy is applied without
   calling the hook, after 60 s the next call goes through as a probe and closes the breaker when it succeeds, and
   an admin alert is raised. Session-end hooks have their own breaker. Admins can clear the alert early, or choose

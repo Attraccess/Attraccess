@@ -24,7 +24,7 @@ void API::updateSateInfo()
     {
         // Offline the init screen shows; no plugin content may linger or start anything.
         this->clearUiSlots();
-        this->cardSessionId.clear();
+        this->setCardSessionId(nullptr);
         if (this->uiStepCancelCallback) this->uiStepCancelCallback("");
         State::setApiState(false, "");
     }

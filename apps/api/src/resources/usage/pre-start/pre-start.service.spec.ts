@@ -2,7 +2,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { PreStartService } from './pre-start.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
-import { MAX_OPEN_WEB_STEPS, WebStartStepStore } from './web-start-step.store';
+import { MAX_OPEN_WEB_STEPS, MAX_OPEN_WEB_STEPS_PER_PRINCIPAL, WebStartStepStore } from './web-start-step.store';
 import { projectAttractapAuditEvent } from '../../../audit/policies/attractap';
 
 const user = { id: 7 } as any;
@@ -203,6 +203,25 @@ describe('PreStartService', () => {
         store.issue({ userId, resourceId: 3, action: 'start', origin: 'web' }, 'p', 'k', 60, {});
       }
       expect(store.size).toBe(MAX_OPEN_WEB_STEPS);
+    });
+
+    it("caps open confirmations per principal without evicting other users' steps", () => {
+      const { store } = setup();
+      const binding = (userId: number, projectId?: number, apiTokenId?: number) =>
+        ({ userId, apiTokenId, resourceId: 3, action: 'start', projectId, origin: 'web' }) as const;
+      const other = store.issue(binding(2), 'p', 'k', 60, {}).stepId;
+      const viaToken = store.issue(binding(1, undefined, 11), 'p', 'k', 60, {}).stepId;
+      const ids = [];
+      for (let projectId = 1; projectId <= MAX_OPEN_WEB_STEPS_PER_PRINCIPAL + 5; projectId += 1) {
+        ids.push(store.issue(binding(1, projectId), 'p', 'k', 60, {}).stepId);
+      }
+      expect(store.size).toBe(MAX_OPEN_WEB_STEPS_PER_PRINCIPAL + 2);
+      expect(store.consume([other], binding(2))).toEqual({ p: ['k'] });
+      expect(store.consume([viaToken], binding(1, undefined, 11))).toEqual({ p: ['k'] });
+      expect(store.consume([ids[ids.length - 1]], binding(1, MAX_OPEN_WEB_STEPS_PER_PRINCIPAL + 5))).toEqual({
+        p: ['k'],
+      });
+      expect(() => store.consume([ids[0]], binding(1, 1))).toThrow(BadRequestException); // oldest of user 1 went
     });
 
     it('audits issued, answered and expired web/API steps with their origin', async () => {

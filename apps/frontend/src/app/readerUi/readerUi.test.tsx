@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReaderUiAlerts } from './ReaderUiAlerts';
 import { ReaderUiReaderPanel } from './ReaderUiReaderPanel';
 import { ResourceReaderUiSettings } from './ResourceReaderUiSettings';
+import { reasonLabel } from './readerUiLabels';
 
 const api = vi.hoisted(() => ({
   clear: vi.fn(),
@@ -165,5 +166,14 @@ describe('reader UI admin', () => {
     render(<ResourceReaderUiSettings resourceId={3} />);
     expect(screen.getByText('resource.loadError')).toBeInTheDocument();
     expect(screen.getByText('resource.retry')).toBeInTheDocument();
+  });
+});
+
+describe('reasonLabel', () => {
+  it('translates host codes, keeps the detail of prefixed ones and shows unknown ones as is', () => {
+    expect(reasonLabel('invalid')).toEqual({ key: 'reader.reason.invalid' });
+    expect(reasonLabel('invalid-text-too-long')).toEqual({ key: 'reader.reason.invalid', detail: 'text-too-long' });
+    expect(reasonLabel('reader-oom')).toEqual({ key: 'reader.reason.reader', detail: 'oom' });
+    expect(reasonLabel('something-new')).toEqual({ detail: 'something-new' });
   });
 });

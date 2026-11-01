@@ -522,7 +522,52 @@ describe('UiSlotService', () => {
       expect(lastSent(socket, 'UI_SLOT_UPDATE').tree.text).toBe('Your booking');
       cardSessions.end(socket, socket.state.cardSession.id, 'reader'); // well within the 2 s window
       await jest.advanceTimersByTimeAsync(0);
-      expect(shapes(socket)).toEqual(['state@1:Reserved', 'state@2:Your booking', 'state@3:Reserved']);
+      // Removed before the providers are asked, then the public content follows.
+      expect(shapes(socket)).toEqual(['state@1:Reserved', 'state@2:Your booking', 'state@3:null', 'state@4:Reserved']);
+    });
+
+    it('removes the previous user content before awaiting slow providers', async () => {
+      let release: () => void = () => undefined;
+      let slow = false;
+      const { service, socket, cardSessions } = setup((ctx) => {
+        if (!slow) return [header(ctx.userId ? 'Your booking' : 'Reserved')];
+        return new Promise<any[]>((resolve) => (release = () => resolve([header('Reserved')])));
+      });
+      await service.onFirmwareInfo(socket, TOUCH_UI);
+      jest.advanceTimersByTime(2100);
+      cardSessions.issue(socket, 7, 'en');
+      await jest.advanceTimersByTimeAsync(0);
+      slow = true;
+      cardSessions.end(socket, socket.state.cardSession.id, 'reader');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(shapes(socket)).toEqual(['state@1:Reserved', 'state@2:Your booking', 'state@3:null']); // not yet answered
+      release();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(shapes(socket).at(-1)).toBe('state@4:Reserved');
+    });
+
+    it("drops a pass's results when the card session changed while the providers ran", async () => {
+      const releases: Array<() => void> = [];
+      const { service, socket, cardSessions } = setup(
+        (ctx) =>
+          new Promise<any[]>((resolve) =>
+            releases.push(() => resolve([header(ctx.userId ? `User ${ctx.userId}` : 'Public')])),
+          ),
+      );
+      const initial = service.onFirmwareInfo(socket, TOUCH_UI);
+      await jest.advanceTimersByTimeAsync(0);
+      releases.shift()?.();
+      await initial;
+      jest.advanceTimersByTime(2100);
+      cardSessions.issue(socket, 7, 'en'); // pass for user 7 starts and waits for the provider
+      await jest.advanceTimersByTimeAsync(0);
+      cardSessions.issue(socket, 8, 'en'); // user 8 taps while it waits
+      await jest.advanceTimersByTimeAsync(0);
+      releases.shift()?.(); // user 7 content arrives late
+      await jest.advanceTimersByTimeAsync(0);
+      releases.shift()?.(); // the rerun for user 8
+      await jest.advanceTimersByTimeAsync(0);
+      expect(shapes(socket)).toEqual(['state@1:Public', 'state@2:User 8']);
     });
 
     it('removes user-only content at sign-out at once', async () => {

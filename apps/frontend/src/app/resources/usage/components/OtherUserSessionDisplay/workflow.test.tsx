@@ -6,6 +6,24 @@ import { ApiError } from '@attraccess/react-query-client';
 import { OtherUserSessionDisplay } from './index';
 import type { SessionNotesModal } from '../SessionNotesModal';
 const state = vi.hoisted(() => ({
+  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+    type Callbacks = {
+      onSuccess?: (data: unknown, v: unknown) => void;
+      onError?: (error: unknown, v: unknown) => void;
+    };
+    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+    return {
+      onSuccess: (data: unknown, _variables?: unknown) => {
+        hook?.onSuccess?.(data, variables);
+        call?.onSuccess?.(data, variables);
+      },
+      onError: (error: unknown) => {
+        hook?.onError?.(error, variables);
+        call?.onError?.(error, variables);
+      },
+    };
+  },
   session: {
     userId: 2,
     startTime: '2026-09-01T12:00:00Z',
@@ -41,10 +59,10 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useResourcesServiceResourceUsageCanControl: () => ({ data: { canControl: state.canControl } }),
   useAccessControlServiceResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
   useResourcesServiceGetOneResourceById: () => ({ data: { allowTakeOver: state.allowTakeover } }),
-  // Start callbacks are passed per call (the shared start hook handles plugin confirmations there).
-  useResourcesServiceResourceUsageStartSession: () => ({
-    mutate: (variables: unknown, callbacks: (typeof state.callbacks)[string]) => {
-      state.callbacks.start = callbacks;
+  // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
+  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+    mutate: (variables: unknown, callbacks: unknown) => {
+      state.callbacks.start = state.bothCallbacks(options, callbacks, variables);
       state.start(variables);
     },
     isPending: false,
@@ -240,4 +258,24 @@ it('shows the plugin reason when a takeover is blocked', async () => {
   const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
   act(() => state.callbacks.start.onError?.(startError(403, { code: 'START_BLOCKED', reason })));
   expect(state.error).toHaveBeenCalledExactlyOnceWith({ title: 'Reserved', description: 'Booked until 14:00' });
+});
+
+it('closes the takeover notes modal when the plugin confirmation or block notice appears', async () => {
+  mount();
+  const openNotes = async () => {
+    fireEvent.click(document.querySelectorAll('button[aria-haspopup="true"]')[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Takeover with Notes' }));
+    fireEvent.click(screen.getByText('Confirm notes'));
+    await waitFor(() => expect(state.start).toHaveBeenCalled());
+  };
+  await openNotes();
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
+  act(() => state.callbacks.start.onError?.(startError(403, { code: 'START_BLOCKED', reason })));
+  expect(screen.queryByText('Confirm notes')).toBeNull();
+  await openNotes();
+  const confirmation = { title: 'Reserved from 14:00', body: 'Take over anyway?' };
+  act(() =>
+    state.callbacks.start.onError?.(startError(409, { code: 'CONFIRMATION_REQUIRED', stepId: 's1', confirmation })),
+  );
+  expect(screen.queryByText('Confirm notes')).toBeNull();
 });

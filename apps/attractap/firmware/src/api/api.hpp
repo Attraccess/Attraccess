@@ -463,7 +463,6 @@ public:
     void sendUiStepResult(const char *stepId, const char *action);
     void reportUiSkip(JsonObjectConst payload, const char *reason); // UI_SLOT_UPDATE contribution skipped, paced
     void clearUiSlots(); // drops all plugin slot content (disconnect, reconnect)
-    const std::string &currentCardSessionId() const { return cardSessionId; }
     void endCardSession(); // tells the server the card session is over (sign-out or timeout)
 #ifdef ATTRACTAP_UI_SELFTEST
     void testInject(const char *json, size_t len); // self-test build: processed by API::loop()

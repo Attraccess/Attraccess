@@ -33,4 +33,13 @@ describe('CircuitBreaker', () => {
     breaker.reset();
     expect(breaker.isOpen).toBe(false);
   });
+
+  it('release ends a probe without a verdict: still open, and the next call probes again', () => {
+    const breaker = new CircuitBreaker(1, 1000);
+    breaker.failure(0);
+    expect(breaker.next(1000)).toBe('probe');
+    breaker.release();
+    expect(breaker.isOpen).toBe(true);
+    expect(breaker.next(1001)).toBe('probe');
+  });
 });

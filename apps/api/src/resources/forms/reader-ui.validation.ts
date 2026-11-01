@@ -56,21 +56,21 @@ export function sanitizeUiText(text: string): string {
   return makeStringLVGLReady(text.replace(/[\r\n\t]+/g, ' '));
 }
 
-/** Lower case, whitespace (incl. NBSP) collapsed, non-letters stripped at both ends. */
+/** Lower case, all whitespace (incl. NBSP and other Unicode spaces) collapsed, ends stripped of non-letters. */
 function normalizeStatusText(text: string): string {
   return text
     .toLowerCase()
-    .replace(/\s+/g, ' ') // \s covers NBSP and the other Unicode spaces
+    .replace(/[\s\p{Zs}\u200b-\u200d\u2060]+/gu, ' ')
     .replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
 }
 
-/** Equal to a reserved core status string, or starting with one as a whole word ("In use (A)"). */
+/**
+ * Equal to a reserved core status string after normalization ("Access granted ✓", "MAINTENANCE!").
+ * Longer texts that only start with a status word ("Available until 14:00") are fine.
+ */
 export function isCoreStatusString(text: string): boolean {
   const normalized = normalizeStatusText(text);
-  return READER_UI_RESERVED_STATUS_STRINGS.some(
-    (reserved) =>
-      normalized === reserved || (normalized.startsWith(reserved) && !/\p{L}/u.test(normalized[reserved.length])),
-  );
+  return READER_UI_RESERVED_STATUS_STRINGS.includes(normalized);
 }
 
 function checkText(text: unknown, max: number, tooLong: ReaderUiRejectReason): string {
@@ -335,12 +335,7 @@ export function validatePluginConfirmation(raw: unknown): ReaderUiValidation<Plu
       confirmLabel: optionalLabel(c['confirmLabel']),
       cancelLabel: optionalLabel(c['cancelLabel']),
       countdownTo: countdownDate(c['countdownTo']),
-      expiresInSec: ttlSec(
-        c['expiresInSec'],
-        10,
-        READER_UI_TIMING.stepMaxTtlSec,
-        READER_UI_TIMING.stepDefaultTtlSec,
-      ),
+      expiresInSec: ttlSec(c['expiresInSec'], 10, READER_UI_TIMING.stepMaxTtlSec, READER_UI_TIMING.stepDefaultTtlSec),
       noScreenPolicy: checkEnum(c['noScreenPolicy'], NO_SCREEN_POLICIES),
     }) as PluginConfirmation;
   });

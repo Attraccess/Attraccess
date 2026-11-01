@@ -5,7 +5,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode, requestForms, toastError } = vi.hoisted(() => ({
+const { startMutate, supervisionMode, requestForms, toastError, bothCallbacks } = vi.hoisted(() => ({
+  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+    type Callbacks = {
+      onSuccess?: (data: unknown, v: unknown) => void;
+      onError?: (error: unknown, v: unknown) => void;
+    };
+    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+    return {
+      onSuccess: (data: unknown, _variables?: unknown) => {
+        hook?.onSuccess?.(data, variables);
+        call?.onSuccess?.(data, variables);
+      },
+      onError: (error: unknown) => {
+        hook?.onError?.(error, variables);
+        call?.onError?.(error, variables);
+      },
+    };
+  },
   startMutate: vi.fn(),
   toastError: vi.fn(),
   requestForms: vi.fn().mockResolvedValue([]),
@@ -54,7 +72,12 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useResourcesServiceGetOneResourceById: () => ({
     data: { id: 1, type: 'machine', supervisionMode: supervisionMode.value },
   }),
-  useResourcesServiceResourceUsageStartSession: () => ({ mutate: startMutate, isPending: false }),
+  // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
+  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+    mutate: (variables: unknown, callbacks: unknown) =>
+      startMutate(variables, bothCallbacks(options, callbacks, variables)),
+    isPending: false,
+  }),
   useResourcesServiceUnlockDoor: () => ({ mutate: vi.fn(), isPending: false }),
   useResourcesServiceLockDoor: () => ({ mutate: vi.fn(), isPending: false }),
   useResourcesServiceUnlatchDoor: () => ({ mutate: vi.fn(), isPending: false }),

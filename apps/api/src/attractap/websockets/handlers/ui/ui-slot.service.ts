@@ -33,6 +33,8 @@ interface Pass {
   /** Sign-in/out: user-scoped content is replaced or removed without waiting for the rate limit. */
   privacy: boolean;
   blockedFor: number;
+  /** Card session when the pass started; user-scoped records sent by this pass belong to it. */
+  cardSessionId: string | undefined;
 }
 
 /** Pushes plugin slot contributions to a reader and keeps its view of them in step (UI_SLOT_UPDATE). */
@@ -200,9 +202,18 @@ export class UiSlotService {
   }
 
   private async syncOnce(socket: AuthenticatedWebSocket, state: UiSlotsState): Promise<void> {
-    const pass: Pass = { socket, state, now: 0, privacy: state.privacyFlush, blockedFor: 0 };
+    const cardSessionId = this.cardSessions.current(socket)?.id;
+    const pass: Pass = { socket, state, now: Date.now(), privacy: state.privacyFlush, blockedFor: 0, cardSessionId };
     state.privacyFlush = false;
+    // Another user's content must not stay on screen while the providers run (up to their timeout).
+    if (pass.privacy) this.retireForeignUserContent(pass);
     const { desired, keep } = await this.desired(socket, state);
+    if (this.cardSessions.current(socket)?.id !== cardSessionId) {
+      // Signed in/out during the await: these results may belong to the previous user. A new pass runs.
+      state.privacyFlush = true;
+      state.resync = true;
+      return;
+    }
     pass.now = Date.now();
     for (const [ckey, record] of [...state.contributions]) {
       if (desired.has(ckey)) continue;
@@ -217,6 +228,13 @@ export class UiSlotService {
         void this.sync(socket);
       }, pass.blockedFor + 5);
       state.flushTimer.unref?.();
+    }
+  }
+
+  /** Removes user-scoped records sent under another card session than the current one. */
+  private retireForeignUserContent(pass: Pass): void {
+    for (const [ckey, record] of [...pass.state.contributions]) {
+      if (record.userScoped && record.cardSessionId !== pass.cardSessionId) this.retire(pass, ckey, record);
     }
   }
 
@@ -295,6 +313,7 @@ export class UiSlotService {
     // The first contribution of a slot is part of the initial sync; only updates to it are rate limited.
     if (!this.mayUpdate(pass, have, want.record)) return;
     const next: UiContributionRecord = { ...want.record, revision: 0, sent: true };
+    if (next.userScoped) next.cardSessionId = pass.cardSessionId;
     next.revision = this.send(pass, next, want.tree);
     state.contributions.set(ckey, next);
     this.armExpiry(pass.socket, state, ckey, next.expiresAtMs);
