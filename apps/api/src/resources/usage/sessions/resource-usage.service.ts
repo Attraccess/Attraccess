@@ -397,6 +397,9 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
       where: { id: usageId },
       relations: ['resource', 'user'],
     });
+    // An ended usage session is announced by ResourceUsageSessionEndedEvent (or the take-over event), never as a
+    // start. Door actions are stored already ended and still fire this event.
+    if (usage?.usageAction === ResourceUsageAction.Usage && usage.endTime) return;
     await this.eventEmitter.emitAsync(ResourceSessionStartedEvent.EVENT_NAME, new ResourceSessionStartedEvent(usage));
   }
 
@@ -419,25 +422,22 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
       })
       .catch(() => undefined);
 
-    // Emit event after the transaction committed to ensure readers can observe DB state
-    try {
-      if (endedUsageIdToEmit) {
-        await this.emitUsageEvent(endedUsageIdToEmit);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to emit usage event after endSession commit`, (error as Error).stack);
-    }
-
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
 
-    if (updatedUsage?.user?.id && (updatedUsage.user.id !== user.id || skipNoteNotification)) {
-      this.eventEmitter.emit(
-        ResourceUsageSessionEndedEvent.EVENT_NAME,
-        new ResourceUsageSessionEndedEvent(
-          updatedUsage,
-          skipNoteNotification ? null : { id: user.id, username: user.username },
-        ),
-      );
+    // Emitted after the transaction committed so listeners observe DB state. Every end fires it exactly once
+    // (live feed, reader resource lists, maintenance evaluation); the notification listener skips self-ends.
+    if (endedUsageIdToEmit && updatedUsage) {
+      try {
+        this.eventEmitter.emit(
+          ResourceUsageSessionEndedEvent.EVENT_NAME,
+          new ResourceUsageSessionEndedEvent(
+            updatedUsage,
+            skipNoteNotification ? null : { id: user.id, username: user.username },
+          ),
+        );
+      } catch (error) {
+        this.logger.error(`Failed to emit session ended event after endSession commit`, (error as Error).stack);
+      }
     }
 
     // Counter signal for supervised-usage auto-promotion (ATT-488): every completed supervised session

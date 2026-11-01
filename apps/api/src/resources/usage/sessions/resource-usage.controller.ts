@@ -227,7 +227,8 @@ export class ResourceUsageController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid input data or no active session',
+    description:
+      'Bad Request - Invalid input data, no active session, or NoOwnActiveSessionError (no usageId and the caller has no own session on a shared machine)',
   })
   @ApiResponse({
     status: 401,

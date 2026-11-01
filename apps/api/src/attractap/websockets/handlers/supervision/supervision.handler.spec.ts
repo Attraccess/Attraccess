@@ -71,6 +71,20 @@ describe('AttractapSupervisionHandler', () => {
       await expect(fixture.arm()).resolves.toBeDefined();
     });
 
+    it('refuses when every slot of a machine with parallel sessions is taken', async () => {
+      const socket = fixture.makeSocket();
+      fixture.websocketService.sockets.set('a', socket);
+      fixture.attractapService.findReaderById.mockResolvedValueOnce({
+        id: fixture.READER_ID,
+        firmware: { capabilities: { cardEnrollment: true } },
+        resources: [{ id: 5, type: 'machine', maxParallelSessions: 2 }],
+      });
+      fixture.resourceUsageService.getActiveSessionsForResource.mockResolvedValueOnce([{ id: 5 }, { id: 6 }]);
+
+      await expect(fixture.arm()).rejects.toThrow('The selected reader has a session in progress');
+      expect(socket.state.supervisionFlow ?? null).toBeNull();
+    });
+
     it('refuses an offline reader', async () => {
       await expect(fixture.arm()).rejects.toBeInstanceOf(BadRequestException);
     });

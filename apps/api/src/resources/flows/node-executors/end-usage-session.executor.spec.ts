@@ -197,25 +197,60 @@ describe('EndUsageSessionExecutor', () => {
     expect(result).toEqual({ payload: { foo: 'bar' } });
   });
 
-  it('ends the session that triggered the run when several sessions are active', async () => {
-    const early = { id: 5, user: { id: 1 } };
-    const late = { id: 6, user: { id: 2 } };
-    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([early, late] as never);
-    resourceUsageService.endSession.mockResolvedValue(undefined as never);
+  describe('on a machine shared by several people', () => {
+    const shared = { type: 'machine', maxParallelSessions: 3 };
+    const early = { id: 5, user: { id: 1 }, resource: shared };
+    const late = { id: 6, user: { id: 2 }, resource: shared };
+    beforeEach(() => {
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([early, late] as never);
+      resourceUsageService.endSession.mockResolvedValue(undefined as never);
+    });
 
-    await executor.execute(createNode({ data: { notes: '' } as never }), { id: 5 }, ctx);
+    it('ends the session that triggered the run', async () => {
+      await executor.execute(createNode({ data: { notes: '' } as never }), { id: 5 }, ctx);
 
-    expect(resourceUsageService.endSession).toHaveBeenCalledWith(
-      1,
-      early.user,
-      { notes: '', usageId: 5 },
-      expect.anything(),
-    );
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        early.user,
+        { notes: '', usageId: 5 },
+        expect.anything(),
+      );
+    });
+
+    it('prefers usageId (button press) over a generic id in the payload', async () => {
+      await executor.execute(createNode({ data: { notes: '' } as never }), { usageId: 5, id: 6 }, ctx);
+
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        early.user,
+        { notes: '', usageId: 5 },
+        expect.anything(),
+      );
+    });
+
+    it('ends nobody when the triggering session already ended (e.g. after a wait)', async () => {
+      await expect(
+        executor.execute(createNode({ data: { notes: '' } as never }), { usageId: 4 }, ctx),
+      ).rejects.toBeInstanceOf(NoUsageSessionError);
+      expect(resourceUsageService.endSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps ending the newest session when the run names no session', async () => {
+      await executor.execute(createNode({ data: { notes: '' } as never }), { foo: 'bar' }, ctx);
+
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        late.user,
+        { notes: '', usageId: 6 },
+        expect.anything(),
+      );
+    });
   });
 
-  it('falls back to the newest session when the payload names no active session', async () => {
-    const early = { id: 5, user: { id: 1 } };
-    const late = { id: 6, user: { id: 2 } };
+  it('falls back to the newest session on a single-session machine when the payload names no active session', async () => {
+    const machine = { type: 'machine', maxParallelSessions: 1 };
+    const early = { id: 5, user: { id: 1 }, resource: machine };
+    const late = { id: 6, user: { id: 2 }, resource: machine };
     resourceUsageService.getActiveSessionsForResource.mockResolvedValue([early, late] as never);
     resourceUsageService.endSession.mockResolvedValue(undefined as never);
 

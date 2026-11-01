@@ -384,7 +384,7 @@ describe('ResourceListService', () => {
       expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset());
     });
 
-    it('lists all sessions with count and limit and personalises canStart and the own session', async () => {
+    it('lists all sessions with count and limit for a reader without a card holder', async () => {
       const startTime = new Date('2026-06-04T10:00:00.000Z');
       const reader = fixture.createReaderFixture();
       reader.resources[0].maxParallelSessions = 3;
@@ -412,6 +412,85 @@ describe('ResourceListService', () => {
       });
       expect(anonymous.resources[0].activeUsageSessions.map((s: { id: number }) => s.id)).toEqual([1, 2]);
       expect(anonymous.resources[0].activeUsageSessions[1].supervisorUsername).toBe('boss');
+      expect(anonymous.resources[0]).not.toHaveProperty('canEndOtherSessions');
+    });
+
+    it('personalises canStart, the own session (listed first) and canEndOtherSessions per card holder', async () => {
+      const startTime = new Date('2026-06-04T10:00:00.000Z');
+      const reader = fixture.createReaderFixture();
+      reader.resources[0].maxParallelSessions = 4;
+      fixture.attractapService.findReaderById.mockResolvedValue(reader);
+      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([
+          [
+            10,
+            [
+              { id: 1, userId: 5, user: { username: 'early' }, startTime },
+              { id: 2, userId: 7, user: { username: 'owner' }, startTime },
+              { id: 3, userId: 8, user: { username: 'late' }, startTime },
+            ],
+          ],
+        ]),
+      );
+      // User 9 maintains the machine; user 6 manages resources; owner 7 and stranger 4 have neither.
+      fixture.resourceIntroducersService.canMaintain.mockImplementation(async (_resourceId, userId) => userId === 9);
+      (fixture.service as any).rbacService.getEffectivePermissions.mockImplementation(async (userId: number) =>
+        userId === 6 ? new Set(['resources.update']) : new Set(),
+      );
+      const sockets = [7, 4, 9, 6].map((userId) =>
+        fixture.createMockSocket({ id: `s${userId}`, state: { lastAuthenticatedUserId: userId } }),
+      );
+      for (const socket of sockets) fixture.websocketService.sockets.set(socket.id, socket);
+      await fixture.service.sendResourceList(42);
+      const [owner, stranger, maintainer, manager] = sockets.map(
+        (socket) => (socket.sendMessage as jest.Mock).mock.calls[0][0].data.payload.resources[0],
+      );
+      const ids = (resource: any) => resource.activeUsageSessions.map((s: { id: number }) => s.id);
+
+      expect(owner).toMatchObject({
+        canStart: false,
+        ownUsageSession: { id: 2, user: { username: 'owner' } },
+        activeUsageSession: { id: 2 },
+        canEndOtherSessions: false,
+      });
+      expect(ids(owner)).toEqual([2, 1, 3]);
+      expect(stranger).toMatchObject({ canStart: true, ownUsageSession: null, canEndOtherSessions: false });
+      expect(ids(stranger)).toEqual([1, 2, 3]);
+      expect(maintainer).toMatchObject({ canStart: true, isIntroducer: false, canEndOtherSessions: true });
+      expect(manager).toMatchObject({ canStart: true, canManageResource: true, canEndOtherSessions: true });
+      // resources.update already decides; no introducer lookup is needed for the manager.
+      expect(fixture.resourceIntroducersService.canMaintain).not.toHaveBeenCalledWith(10, 6, true);
+    });
+
+    it('caps the listed sessions at 16 with the own session first while counting all of them', async () => {
+      const startTime = new Date('2026-06-04T10:00:00.000Z');
+      const reader = fixture.createReaderFixture();
+      reader.resources[0].maxParallelSessions = 50;
+      fixture.attractapService.findReaderById.mockResolvedValue(reader);
+      const sessions = Array.from({ length: 20 }, (_, index) => ({
+        id: index + 1,
+        userId: 100 + index,
+        user: { username: `user-${index}` },
+        startTime,
+      }));
+      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(new Map([[10, sessions]]));
+      const guest = fixture.createMockSocket({ id: 'guest' });
+      const lastStarter = fixture.createMockSocket({ id: 'last', state: { lastAuthenticatedUserId: 119 } });
+      fixture.websocketService.sockets.set(guest.id, guest);
+      fixture.websocketService.sockets.set(lastStarter.id, lastStarter);
+      await fixture.service.sendResourceList(42);
+      const resource = (socket: any) => socket.sendMessage.mock.calls[0][0].data.payload.resources[0];
+
+      expect(resource(guest).activeSessionCount).toBe(20);
+      expect(resource(guest).activeUsageSessions.map((s: { id: number }) => s.id)).toEqual(
+        Array.from({ length: 16 }, (_, index) => index + 1),
+      );
+      expect(resource(lastStarter).activeSessionCount).toBe(20);
+      expect(resource(lastStarter).activeUsageSessions).toHaveLength(16);
+      expect(resource(lastStarter).activeUsageSessions[0]).toMatchObject({ id: 20, user: { username: 'user-19' } });
+      expect(Object.keys(resource(lastStarter).activeUsageSessions[1]).sort()).toEqual(
+        ['id', 'startTime', 'startTimeUtcOffsetMinutes', 'user'].sort(),
+      );
     });
 
     it('reports a full machine as not startable', async () => {

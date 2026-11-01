@@ -14,7 +14,7 @@ import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.even
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceService } from './maintenance.service';
 
-// emitUsageEvent() fires ResourceSessionStartedEvent on session end too, with endTime set.
+// Usage event for the onResourceUsage debounce tests; the handler only reads the resource id.
 const usageEndedEvent = (usage: Record<string, unknown>) => new ResourceSessionStartedEvent(usage as never);
 
 const createQueryBuilderMock = () => ({

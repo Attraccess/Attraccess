@@ -14,7 +14,7 @@ import { NodeExecutionContext } from './node-executor.interface';
 
 describe('BillingSetAdditionalItemsExecutor', () => {
   let executor: BillingSetAdditionalItemsExecutor;
-  let resourceUsageService: { getActiveSession: jest.Mock; stageLifecycleBillingItem: jest.Mock };
+  let resourceUsageService: { getActiveSessionsForResource: jest.Mock; stageLifecycleBillingItem: jest.Mock };
   let manager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock };
   let repoManager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock; transaction: jest.Mock };
   let billingItemRepository: Repository<BillingTransactionItem>;
@@ -43,7 +43,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
     resourceUsageService = {
-      getActiveSession: jest.fn().mockResolvedValue({ id: 'ru-1' }),
+      getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 'ru-1' }]),
       stageLifecycleBillingItem: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -79,10 +79,10 @@ describe('BillingSetAdditionalItemsExecutor', () => {
   });
 
   it('throws NoUsageSessionError when there is no active session', async () => {
-    resourceUsageService.getActiveSession.mockResolvedValue(null);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([]);
 
     await expect(executor.execute(createNode(baseData), {}, ctx)).rejects.toBeInstanceOf(NoUsageSessionError);
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, ctx.transactionManager);
+    expect(resourceUsageService.getActiveSessionsForResource).toHaveBeenCalledWith(1, ctx.transactionManager);
     expect(manager.findOne).not.toHaveBeenCalled();
   });
 
@@ -127,7 +127,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
   it.each([12, undefined])('stages lifecycle billing for usage %s without touching active billing', async (id) => {
     ctx.lifecycleAttemptId = 'lifecycle-attempt';
-    resourceUsageService.getActiveSession.mockResolvedValue(null);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([]);
     (ctx.compileTemplate as jest.Mock).mockReturnValue('meter-1');
 
     const result = await executor.execute(createNode(baseData), { id, quantity: '4', externalReference: 'meter' }, ctx);
@@ -137,7 +137,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
       quantity: 4,
       externalReference: 'meter-1',
     });
-    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    expect(resourceUsageService.getActiveSessionsForResource).not.toHaveBeenCalled();
     expect(manager.findOne).not.toHaveBeenCalled();
     expect(manager.save).not.toHaveBeenCalled();
     expect(result).toEqual({ payload: { ...baseData, quantity: 4, externalReference: 'meter-1' } });
@@ -161,7 +161,6 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await executor.execute(createNode(baseData), { id: 12 }, ctx);
 
-    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
       where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
     });
@@ -172,7 +171,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await executor.execute(createNode(baseData), { id: -1 }, ctx);
 
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, ctx.transactionManager);
+    expect(resourceUsageService.getActiveSessionsForResource).toHaveBeenCalledWith(1, ctx.transactionManager);
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
       where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
     });
@@ -263,7 +262,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await executor.execute(createNode(baseData), {}, ctx);
 
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, repoManager);
+    expect(resourceUsageService.getActiveSessionsForResource).toHaveBeenCalledWith(1, repoManager);
     expect(repoManager.save).toHaveBeenCalledWith(
       BillingTransactionItem,
       expect.objectContaining({ billingTransactionId: 42, quantity: 2 }),
@@ -274,5 +273,33 @@ describe('BillingSetAdditionalItemsExecutor', () => {
   it('throws when node data fails schema validation', async () => {
     await expect(executor.execute(createNode({ name: '', unitPrice: 5, quantity: 2 }), {}, ctx)).rejects.toThrow();
     expect(manager.findOne).not.toHaveBeenCalled();
+  });
+
+  describe('on a machine shared by several people', () => {
+    const shared = { type: 'machine', maxParallelSessions: 3 };
+    beforeEach(() => {
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([
+        { id: 5, resource: shared },
+        { id: 6, resource: shared },
+      ]);
+    });
+
+    it('bills the triggering session named by usageId, preferring it over a generic id', async () => {
+      manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+
+      await executor.execute(createNode(baseData), { usageId: 5, id: 6 }, ctx);
+
+      expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
+        where: { resourceUsageId: 5, resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
+      });
+    });
+
+    it('bills nobody when the triggering session already ended', async () => {
+      await expect(executor.execute(createNode(baseData), { usageId: 4 }, ctx)).rejects.toBeInstanceOf(
+        NoUsageSessionError,
+      );
+      expect(manager.findOne).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
+    });
   });
 });

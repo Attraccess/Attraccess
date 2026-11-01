@@ -153,7 +153,8 @@ const schemas = [
       billingItems: { type: 'simple-json' },
       createdAt: { type: 'datetime', createDate: true },
     },
-    indices: [{ columns: ['resourceId'] }],
+    // Named like production so the parallel-sessions migration can replace it.
+    indices: [{ name: 'IDX_resource_usage_lifecycle_attempt_resource', columns: ['resourceId'] }],
   }),
   new EntitySchema<ResourceOperatingInterval>({
     name: 'ResourceOperatingInterval',

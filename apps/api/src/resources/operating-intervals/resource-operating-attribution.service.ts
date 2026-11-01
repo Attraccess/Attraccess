@@ -194,33 +194,25 @@ export class ResourceOperatingAttributionService {
 
   /**
    * Gives each time span to the earliest-started session covering it (ties by id). Sessions that never
-   * overlap an earlier one are returned untouched; others are split into the spans they own.
+   * overlap an earlier one are returned untouched; others keep only the part after every earlier session.
+   * Linear after sorting: every earlier range starts no later, so together they cover one span up to the
+   * furthest end seen so far, and a later range can only keep what lies beyond that frontier.
    */
   protected withoutOverlaps(usageRanges: UsageRange[]): UsageRange[] {
+    if (usageRanges.length < 2) return usageRanges;
     const ordered = [...usageRanges].sort(
       (left, right) =>
         left.usage.startTime.getTime() - right.usage.startTime.getTime() || left.usage.id - right.usage.id,
     );
     const result: UsageRange[] = [];
-    const earlier: TimeRange[] = [];
+    let frontier: Date | null = null;
     for (const entry of ordered) {
-      let spans: TimeRange[] = [entry.range];
-      for (const taken of earlier) {
-        spans = spans.flatMap((span) => this.subtract(span, taken));
-        if (spans.length === 0) break;
-      }
-      result.push(...spans.map((range) => (range === entry.range ? entry : { usage: entry.usage, range })));
-      earlier.push(entry.range);
+      const { startTime, endTime } = entry.range;
+      if (frontier === null || startTime >= frontier) result.push(entry);
+      else if (endTime > frontier) result.push({ usage: entry.usage, range: { startTime: frontier, endTime } });
+      if (frontier === null || endTime > frontier) frontier = endTime;
     }
-    return usageRanges.length < 2 ? usageRanges : result;
-  }
-
-  protected subtract(span: TimeRange, taken: TimeRange): TimeRange[] {
-    if (span.endTime <= taken.startTime || taken.endTime <= span.startTime) return [span];
-    const remainder: TimeRange[] = [];
-    if (span.startTime < taken.startTime) remainder.push({ startTime: span.startTime, endTime: taken.startTime });
-    if (taken.endTime < span.endTime) remainder.push({ startTime: taken.endTime, endTime: span.endTime });
-    return remainder;
+    return result;
   }
 
   protected toRange(
@@ -415,8 +407,20 @@ export class ResourceOperatingAttributionService {
         },
       ],
     });
-    const summary = this.derive(intervals, [usage, ...overlapping], usage.endTime, usage.startTime);
-    if (overlapping.length === 0) return (summary.attributedOperatingDurationMs ?? 0) / 60_000;
+    if (overlapping.length === 0) {
+      const { attributedOperatingDurationMs } = this.derive(intervals, [usage], usage.endTime, usage.startTime);
+      return (attributedOperatingDurationMs ?? 0) / 60_000;
+    }
+    // An earlier session whose end is still in progress only owns the time up to its requested end.
+    const summary = this.derive(
+      intervals,
+      [usage, ...overlapping],
+      usage.endTime,
+      usage.startTime,
+      undefined,
+      undefined,
+      await this.getPendingSessionEnds([usage.resourceId], manager),
+    );
     const own = summary.attributions.filter((attribution) => attribution.usageId === usage.id);
     return this.unionDuration(own) / 60_000;
   }

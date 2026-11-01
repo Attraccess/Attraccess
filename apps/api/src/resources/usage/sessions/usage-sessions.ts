@@ -68,10 +68,11 @@ export abstract class UsageSessions extends UsageAuthorization {
     const prepared = await runSerializedTransaction(
       this.resourceUsageRepository.manager,
       async (transactionalEntityManager) => {
-        const sharedMachine = (await this.getSessionLimit(transactionalEntityManager, resourceId)) > 1;
+        const sessionLimit = await this.getSessionLimit(transactionalEntityManager, resourceId);
+        const sharedMachine = sessionLimit > 1;
         await this.assertLifecycleAvailable(transactionalEntityManager, resourceId, sharedMachine);
         const activeSessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
-        activeSession = pickSessionToEnd(activeSessions, user, dto.usageId);
+        activeSession = pickSessionToEnd(activeSessions, user, dto.usageId, sessionLimit);
         if (
           sharedMachine &&
           (await transactionalEntityManager.findOne(ResourceUsageLifecycleAttempt, {
@@ -247,9 +248,7 @@ export abstract class UsageSessions extends UsageAuthorization {
 
     // Emit events after the transaction committed to ensure readers can observe DB state
     try {
-      if (endedUsageIdToEmit) {
-        await this.emitUsageEvent(endedUsageIdToEmit);
-      }
+      // The taken-over session is announced by the take-over event above, never as a start.
       if (newSession?.id) {
         await this.emitUsageEvent(newSession.id);
       } else if (startedUsageIdToEmit) {

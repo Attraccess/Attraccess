@@ -20,7 +20,6 @@ import {
   ResourceMeteringSession,
   ResourceFlowNodeType,
   ResourceMeteringOperationKind,
-  ResourceUsageLifecycleAttempt,
   ResourceMeteringSessionStatus,
   ResourceUsage,
 } from '@attraccess/database-entities';
@@ -42,6 +41,10 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { type FinalCollection, type MeterFinal, MeteringSettlement } from './metering-settlement';
 
 import { MeteringCatalog } from './metering-catalog';
+
+import { findMeterHolder, getMeteringSessionLimit, isMeterLifecycleBusy } from './meter-holder';
+
+import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 
 export type { MeterProblem } from './metering-definition';
 
@@ -207,9 +210,9 @@ export class ResourceMeteringService implements OnModuleInit {
             definition.collect.interimIntervalMinutes * 60_000
         )
           continue;
-        if (await this.sessions.manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: meter.resourceId }))
-          continue;
-        const session = (await this.catalog.findActiveSessions(meter.resourceId)).find((s) => s.meterId === meter.id);
+        const holder = await findMeterHolder(this.sessions.manager, meter.resourceId, meter.id);
+        if (await isMeterLifecycleBusy(this.sessions.manager, meter.resourceId, holder)) continue;
+        const session = holder.session;
         this.interimAttempts.set(key, { at: Date.now(), running: true });
         try {
           await this.runOperation(
@@ -368,6 +371,7 @@ export class ResourceMeteringService implements OnModuleInit {
         creditsPerUnit: m.creditsPerUnit,
       }));
     const initializedMeters = new Set<number>();
+    const shared = (await getMeteringSessionLimit(this.sessions.manager, input.resourceId)) > 1;
     try {
       for (const meter of meters) {
         const definition = await this.getDefinition(input.resourceId, meter.meterId);
@@ -377,12 +381,7 @@ export class ResourceMeteringService implements OnModuleInit {
           });
         }
         if (!definition.configured) continue;
-        // Interim rule for parallel sessions: the earliest-started running session keeps the meter. A later
-        // overlapping session must not re-initialize it nor fail that session; it is not metered until ATT-1191.
-        if (await this.isMeterHeldByOtherSession(input.resourceId, meter.meterId, [input.usageId, input.supersedes])) {
-          continue;
-        }
-        const session = await this.sessions.save({
+        const values = {
           id: randomUUID(),
           resourceId: input.resourceId,
           usageId: input.usageId,
@@ -390,9 +389,13 @@ export class ResourceMeteringService implements OnModuleInit {
           meterName: meter.name,
           status: ResourceMeteringSessionStatus.Active,
           creditsPerUnit: meter.creditsPerUnit,
-          collectionMode: definition.incrementOnly ? 'increment' : 'requested',
+          collectionMode: definition.incrementOnly ? ('increment' as const) : ('requested' as const),
           latestValue: definition.incrementOnly ? '0' : null,
-        });
+        };
+        const session = shared
+          ? await this.claimSharedMeter(values, input.supersedes)
+          : await this.sessions.save(values);
+        if (!session) continue;
         if (!definition.incrementOnly) {
           // Once initialization is issued, the device may reset even without a reply.
           // Increment-only meters dispatch no start branch and retain their outgoing evidence.
@@ -432,18 +435,28 @@ export class ResourceMeteringService implements OnModuleInit {
     }
   }
 
-  private async isMeterHeldByOtherSession(
-    resourceId: number,
-    meterId: number,
-    ignoredUsageIds: (number | undefined)[],
-  ): Promise<boolean> {
-    const held = await this.sessions.find({
-      where: { resourceId, meterId, status: ResourceMeteringSessionStatus.Active },
-      select: { usageId: true },
+  /**
+   * Interim rule for parallel sessions (ATT-1191): whoever starts while a meter is free claims it, and keeps it
+   * until their session ends. A later overlapping session neither re-initializes the meter nor fails the
+   * holder; it is not metered. Check and claim are one serialized transaction, so simultaneous starts cannot
+   * both claim the meter. The device operation runs afterwards, outside the lock.
+   */
+  protected claimSharedMeter(
+    values: Pick<ResourceMeteringSession, 'resourceId' | 'usageId' | 'meterId'> & Partial<ResourceMeteringSession>,
+    supersedes?: number,
+  ): Promise<ResourceMeteringSession | null> {
+    return runSerializedTransaction(this.sessions.manager, async (manager) => {
+      const held = await manager.find(ResourceMeteringSession, {
+        where: { resourceId: values.resourceId, meterId: values.meterId, status: ResourceMeteringSessionStatus.Active },
+        select: { id: true, usageId: true },
+      });
+      const others = held
+        .map((session) => session.usageId)
+        .filter((usageId) => usageId !== values.usageId && usageId !== supersedes);
+      // Pending starts count too: their meter session is created before they are published.
+      if (others.length && (await manager.existsBy(ResourceUsage, { id: In(others), endTime: IsNull() }))) return null;
+      return manager.save(ResourceMeteringSession, values);
     });
-    const candidates = held.map((session) => session.usageId).filter((id) => !ignoredUsageIds.includes(id));
-    if (!candidates.length) return false;
-    return this.sessions.manager.existsBy(ResourceUsage, { id: In(candidates), endTime: IsNull() });
   }
 
   // ---- meter definition -------------------------------------------------------------------------

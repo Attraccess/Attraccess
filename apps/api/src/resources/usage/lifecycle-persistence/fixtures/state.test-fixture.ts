@@ -15,6 +15,7 @@ import { ResourceUsageService } from '../../sessions/resource-usage.service';
 import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
 import { ExternalEffectFailureError } from '../../../flows/errors/external-effect-failure.error';
 import { ResourceUsageIntegrity1790100000000 } from '../../../../database/migrations/1790100000000-resource-usage-integrity';
+import { ParallelMachineSessions1791900000000 } from '../../../../database/migrations/1791900000000-parallel-machine-sessions';
 import { schemas } from './schemas.test-fixture';
 export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
   let directory: string;
@@ -41,6 +42,7 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
 
   let maintenance: { hasActiveMaintenance: jest.Mock; canManageMaintenance: jest.Mock };
   let health: { isResourceUnhealthy: jest.Mock };
+  let introducers: { canMaintain: jest.Mock; isIntroducer: jest.Mock };
 
   const draftItem = {
     name: 'Energy',
@@ -83,11 +85,21 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     };
   }
 
+  /** Applies the production integrity migrations in order: the single-session guards, then their per-person successors. */
   async function migrateIntegrity() {
     const runner = source.createQueryRunner();
     try {
       await runner.startTransaction();
       await new ResourceUsageIntegrity1790100000000().up(runner);
+      // The synchronized test schema already has the column the parallel-sessions migration adds.
+      const limits: { id: number; maxParallelSessions: number }[] = await runner.query(
+        'SELECT id, maxParallelSessions FROM resource',
+      );
+      await runner.query('ALTER TABLE "resource" DROP COLUMN "maxParallelSessions"');
+      await new ParallelMachineSessions1791900000000().up(runner);
+      for (const { id, maxParallelSessions } of limits) {
+        await runner.query('UPDATE resource SET maxParallelSessions = ? WHERE id = ?', [maxParallelSessions, id]);
+      }
       await runner.commitTransaction();
     } catch (error) {
       await runner.rollbackTransaction();
@@ -214,6 +226,12 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     },
     set health(value: typeof health) {
       health = value;
+    },
+    get introducers() {
+      return introducers;
+    },
+    set introducers(value: typeof introducers) {
+      introducers = value;
     },
     get directory() {
       return directory;

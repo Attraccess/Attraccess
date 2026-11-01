@@ -25,6 +25,9 @@ async function legacySchema(runner: QueryRunner) {
   );
 }
 
+// Several real SQLite migrations per case; coverage runs on loaded CI machines exceed Jest's 5 s default.
+jest.setTimeout(30_000);
+
 describe('parallel machine sessions migration', () => {
   it('defaults existing machines to 1 and swaps single-session guards for per-person ones', async () => {
     const source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
@@ -59,6 +62,16 @@ describe('parallel machine sessions migration', () => {
       await runner.query(
         'UPDATE resource_usage SET isFinalized = 1, lifecyclePending = 0 WHERE userId = 3 AND endTime IS NULL AND lifecyclePending = 1',
       );
+      // Publishing a reservation is refused for a person who already has a published session.
+      await runner.query('INSERT INTO resource_usage (resourceId, userId, lifecyclePending) VALUES (1, 2, 1)');
+      await expect(
+        runner.query(
+          'UPDATE resource_usage SET isFinalized = 1, lifecyclePending = 0 WHERE userId = 2 AND lifecyclePending = 1',
+        ),
+      ).rejects.toThrow('User already has an active usage session');
+      expect(
+        await runner.query('SELECT COUNT(*) AS c FROM resource_usage WHERE userId = 2 AND lifecyclePending = 1'),
+      ).toEqual([{ c: 1 }]);
 
       // Several lifecycles per resource, but never two for the same session.
       const attempt =

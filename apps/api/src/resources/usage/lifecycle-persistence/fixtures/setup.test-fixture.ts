@@ -8,6 +8,7 @@ import {
   ResourceOperatingInterval,
   ResourceType,
   ResourceUsage,
+  ResourceUsageLifecycleAttempt,
   SupervisionMode,
   User,
 } from '@attraccess/database-entities';
@@ -86,12 +87,16 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     canManageMaintenance: jest.fn().mockResolvedValue(false),
   };
   scope.health = { isResourceUnhealthy: jest.fn().mockResolvedValue(false) };
+  scope.introducers = {
+    canMaintain: jest.fn().mockResolvedValue(false),
+    isIntroducer: jest.fn().mockResolvedValue(false),
+  };
   scope.usage = new ResourceUsageService(
     scope.source.getRepository(Resource),
     scope.source.getRepository(ResourceUsage),
     scope.source.getRepository(User),
     {} as never,
-    {} as never,
+    scope.introducers as never,
     {} as never,
     {} as never,
     {} as never,
@@ -101,6 +106,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     new ResourceOperatingAttributionService(
       scope.source.getRepository(ResourceOperatingInterval),
       scope.source.getRepository(ResourceUsage),
+      scope.source.getRepository(ResourceUsageLifecycleAttempt),
     ),
     scope.flow as never,
     {} as never,

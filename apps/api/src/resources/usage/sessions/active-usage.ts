@@ -1,6 +1,7 @@
 import { Resource, ResourceType, ResourceUsage, ResourceUsageAction, User } from '@attraccess/database-entities';
 import { BadRequestException } from '@nestjs/common';
 import { EntityManager, FindOptionsWhere, IsNull } from 'typeorm';
+import { NoOwnActiveSessionError } from '../errors/no-own-active-session.error';
 
 const publishedState = { usageAction: ResourceUsageAction.Usage, isFinalized: true, lifecyclePending: false };
 
@@ -63,10 +64,15 @@ export function countOccupiedSlots(manager: EntityManager, resourceId: number): 
 }
 
 /**
- * Without a usageId the caller's own session is ended, never somebody else's newest one. A single
- * remaining session may still be ended by an authorized user (force-stop at limit 1).
+ * Without a usageId the caller's own session is ended, never somebody else's. Only on a machine with an
+ * effective limit of 1 may a single remaining session be ended without naming it (force-stop as before).
  */
-export function pickSessionToEnd(sessions: ResourceUsage[], user: User, usageId?: number): ResourceUsage {
+export function pickSessionToEnd(
+  sessions: ResourceUsage[],
+  user: User,
+  usageId: number | undefined,
+  sessionLimit: number,
+): ResourceUsage {
   if (usageId !== undefined) {
     const target = sessions.find((session) => session.id === usageId);
     if (!target) throw new BadRequestException('No active session found');
@@ -76,8 +82,8 @@ export function pickSessionToEnd(sessions: ResourceUsage[], user: User, usageId?
   // Newest first, so legacy duplicates of one person keep ending the newest one.
   const own = [...sessions].reverse().find((session) => session.userId === user.id);
   if (own) return own;
-  if (sessions.length === 1) return sessions[0];
-  throw new BadRequestException('Several sessions are active on this machine; specify the usageId to end');
+  if (sessionLimit <= 1 && sessions.length === 1) return sessions[0];
+  throw new NoOwnActiveSessionError();
 }
 
 /** Slot usage for display and gating. Doors always behave like a limit of 1. */

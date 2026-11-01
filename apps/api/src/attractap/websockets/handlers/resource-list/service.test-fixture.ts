@@ -19,7 +19,7 @@ export function registerResourceListServiceFixture() {
 
   let resourceFlowsService: { getNodesForResources: jest.Mock };
 
-  let resourceIntroducersService: { getManyForResources: jest.Mock };
+  let resourceIntroducersService: { getManyForResources: jest.Mock; canMaintain: jest.Mock };
 
   function createMockSocket(overrides: Partial<any> = {}): any {
     return {
@@ -79,6 +79,7 @@ export function registerResourceListServiceFixture() {
     resourceFlowsService = { getNodesForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceIntroducersService = {
       getManyForResources: jest.fn().mockResolvedValue(new Map([[10, [{ user: { username: 'introducer-a' } }]]])),
+      canMaintain: jest.fn().mockResolvedValue(false),
     };
 
     (service as any).usersService = { findOne: jest.fn(async ({ id }) => ({ id, username: `user-${id}` })) };

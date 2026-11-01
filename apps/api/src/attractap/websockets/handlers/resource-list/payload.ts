@@ -39,6 +39,15 @@ function toReaderSession(session: ResourceUsage) {
 
 type ReaderSession = ReturnType<typeof toReaderSession>;
 
+/** Readers list at most this many sessions (firmware MAX_LISTED_SESSIONS); activeSessionCount stays exact. */
+export const MAX_LISTED_READER_SESSIONS = 16;
+
+/** The card holder's own session first, then the others earliest first, capped for the reader's memory. */
+function listedReaderSessions(sessions: ResourceUsage[], own?: ResourceUsage): ReaderSession[] {
+  const ordered = own ? [own, ...sessions.filter((session) => session !== own)] : sessions;
+  return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map(toReaderSession);
+}
+
 export async function sendResourceListToSockets(
   context: ResourceListServiceResourceListPayloadContext,
   sockets: AuthenticatedWebSocket[],
@@ -104,7 +113,7 @@ export async function sendResourceListToSockets(
         canStart: !capacity.isFull,
         activeUsageSession: activeUsageSession ? toReaderSession(activeUsageSession) : null,
         ownUsageSession: null as ReaderSession | null,
-        activeUsageSessions: activeSessions.map(toReaderSession),
+        activeUsageSessions: listedReaderSessions(activeSessions),
         flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
       };
     }),
@@ -125,18 +134,27 @@ export async function sendResourceListToSockets(
       resources.map(async (resource, index) => {
         const hasIntroduction = await context.resourceUsageService.canControllResource(resource.id, user);
         const base = resourceListPayload.resources[index];
-        const own = (activeSessionMap.get(resource.id) ?? []).find((session) => session.userId === userId);
+        const activeSessions = activeSessionMap.get(resource.id) ?? [];
+        const own = activeSessions.find((session) => session.userId === userId);
         const ownUsageSession = own ? toReaderSession(own) : null;
+        const canManageResource = permissions.has('resources.update');
         return {
           ...base,
           // At limit 1 this is today's single session; with several sessions the caller's own comes first.
           activeUsageSession: ownUsageSession ?? base.activeUsageSession,
           ownUsageSession,
+          activeUsageSessions: own ? listedReaderSessions(activeSessions, own) : base.activeUsageSessions,
           canStart: base.canStart && !own,
           hasIntroduction,
           canManageMaintenance: maintenanceManagedResourceIds.has(resource.id),
           isIntroducer: (introducersByResourceId.get(resource.id) ?? []).some((role) => role.userId === userId),
-          canManageResource: permissions.has('resources.update'),
+          canManageResource,
+          // Same rule endSession applies to ending somebody else's chosen session. Only looked up while
+          // someone else's session runs, so idle resources cost no extra query per card.
+          canEndOtherSessions:
+            canManageResource ||
+            (activeSessions.some((session) => session.userId !== userId) &&
+              (await context.resourceIntroducersService.canMaintain(resource.id, userId, true))),
           requiresSupervisor:
             resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
             (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction),

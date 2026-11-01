@@ -3,6 +3,7 @@ import { ResourceUsageService } from '../../usage/sessions/resource-usage.servic
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { resolveTriggeringUsage } from './triggering-usage';
 
 export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
@@ -23,15 +24,13 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       return { payload: input };
     }
 
-    // With parallel sessions, end the session that triggered this run; other runs keep ending the newest one.
-    const candidateId = 'usageId' in input ? input.usageId : 'id' in input ? input.id : undefined;
-    const activeSessions = await this.resourceUsageService.getActiveSessionsForResource(
+    // End the session that triggered this run; never somebody else's when that one is already gone.
+    const { session: activeUsage } = await resolveTriggeringUsage(
+      this.resourceUsageService,
       node.resourceId,
+      input,
       ctx.transactionManager,
     );
-    const activeUsage =
-      (typeof candidateId === 'number' ? activeSessions.find((session) => session.id === candidateId) : undefined) ??
-      activeSessions[activeSessions.length - 1];
 
     if (!activeUsage) {
       throw new NoUsageSessionError();
