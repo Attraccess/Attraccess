@@ -4,8 +4,8 @@
     "description": "How plugin widgets and start confirmations behave on Attractap readers",
     "noScreenPolicy": {
       "label": "Readers without a screen",
-      "description": "What a reader without a display does when a plugin asks for confirmation.",
-      "default": "Plugin default (block)",
+      "description": "Applies to readers that can't show the confirmation: Lite readers, readers with older firmware and readers suspended after a crash. \"Start with a warning\" starts there without a confirmation.",
+      "default": "Plugin default",
       "block": "Block the start",
       "card-confirm": "Confirm with a second card tap",
       "allow-with-warning": "Start with a warning"
@@ -18,17 +18,23 @@
       "fail-closed": "Block the start (recommended)",
       "fail-open": "Allow the start"
     },
-    "failOpenWarning": "Fail open lets people start while the plugin's check is unavailable. This choice is audited.",
+    "failOpenWarning": "\"Allow the start\" lets people start while the plugin's check is unavailable. This choice is audited.",
     "save": "Save",
     "saved": "Reader display settings saved",
-    "saveError": "Could not save reader display settings"
+    "saveError": "Could not save reader display settings",
+    "loadError": "Could not load the reader display settings",
+    "retry": "Try again"
   },
   "reader": {
     "widgets": "Show plugin widgets on this reader",
     "widgetsDescription": "Widgets appear only when this and the resource setting are on.",
     "contributions": "Plugin contributions",
     "noContributions": "No plugin contributions for this reader.",
-    "status": { "rendered": "Rendered", "degraded": "Degraded", "skipped": "Skipped" },
+    "status": {
+      "rendered": "Rendered",
+      "degraded": "Degraded",
+      "skipped": "Skipped"
+    },
     "reason": {
       "old-firmware": "reader firmware has no plugin UI",
       "no-screen": "reader has no screen",
@@ -37,17 +43,38 @@
       "unsupported": "reader cannot show this",
       "expired": "already expired",
       "too-many-contributions": "too many contributions for this resource",
-      "provider-error": "plugin failed to answer"
+      "provider-error": "plugin failed to answer",
+      "node-budget": "too many widget elements on this reader",
+      "invalid": "invalid content",
+      "reader": "dropped by the reader"
+    },
+    "savedImmediately": "Changes on this tab are saved immediately.",
+    "saved": "Reader display setting saved",
+    "saveError": "Could not save the reader display setting",
+    "resourceFallback": "Resource #{{id}}",
+    "slot": {
+      "listRow": "Resource list",
+      "detailsHeader": "Details header",
+      "detailsBody": "Details body",
+      "detailsSession": "Active session",
+      "allWidgets": "All widgets"
     }
   },
   "alerts": {
-    "title": "Reader UI alerts",
+    "title": "Reader display alerts",
     "none": "No open alerts.",
     "clear": "Clear",
     "kind": {
       "breaker-open": "Plugin hook disabled after repeated failures",
       "load-failure": "Plugin with access hooks failed to load",
       "crash-loop": "Reader suspended after a crash"
+    },
+    "clearError": "Could not clear the alert",
+    "readerFallback": "Reader #{{id}}",
+    "description": {
+      "breaker-open": "{{plugin}}: starts follow the plugin's failure policy. After 60 seconds the next start tries the hook again and the alert ends when it answers; Clear resets it now.",
+      "load-failure": "{{plugin}} did not load, so its start hooks are not applied.",
+      "crash-loop": "{{reader}}: plugin widgets are suspended. They return after 30 minutes without another crash, or now with Clear."
     }
   }
 }

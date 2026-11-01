@@ -27,11 +27,12 @@ export interface StartBlockedReason {
   body: string;
 }
 
+/** A confirmation is never an error notice, so `danger` maps to `warning` (no danger action button). */
 const TONE_STATUS: Record<NonNullable<StartConfirmation['tone']>, StatusDialogStatus> = {
   primary: 'info',
   success: 'success',
   warning: 'warning',
-  danger: 'error',
+  danger: 'warning',
 };
 
 const en = { start: 'Start', remaining: 'Time remaining: {{time}}' };
@@ -70,7 +71,7 @@ export function formatRemaining(ms: number): string {
 
 interface Pending<TBody> {
   confirmation: StartConfirmation;
-  stepIds: string[];
+  stepId: string;
   requestBody: TBody;
 }
 
@@ -87,8 +88,8 @@ function useNow(active: boolean): number {
 
 /**
  * Handles the typed 409 CONFIRMATION_REQUIRED of a session start: shows the plugin's confirmation, and on
- * confirm calls `retry` with the collected `confirmedStepIds`. Several plugins chain: every new 409 of the
- * same attempt keeps the step ids confirmed so far.
+ * confirm calls `retry` with `confirmedStepIds: [stepId]`. Several plugins chain: step ids are single-use and
+ * the server carries earlier confirmations inside the newest step, so only the latest id is sent.
  */
 export function useStartConfirmation<TBody extends { confirmedStepIds?: Array<string> }>(
   retry: (requestBody: TBody) => void,
@@ -105,7 +106,7 @@ export function useStartConfirmation<TBody extends { confirmedStepIds?: Array<st
     if (!required) return false;
     setPending({
       confirmation: required.confirmation,
-      stepIds: [...(requestBody.confirmedStepIds ?? []), required.stepId],
+      stepId: required.stepId,
       requestBody,
     });
     return true;
@@ -114,7 +115,7 @@ export function useStartConfirmation<TBody extends { confirmedStepIds?: Array<st
   const confirm = useCallback(() => {
     if (!pending) return;
     setPending(null);
-    retry({ ...pending.requestBody, confirmedStepIds: pending.stepIds });
+    retry({ ...pending.requestBody, confirmedStepIds: [pending.stepId] });
   }, [pending, retry]);
 
   const expired = pending?.confirmation.expiresAtMs !== undefined && now >= pending.confirmation.expiresAtMs;

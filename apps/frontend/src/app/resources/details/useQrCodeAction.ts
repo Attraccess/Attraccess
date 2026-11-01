@@ -2,7 +2,6 @@ import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef } from 'react';
 import { QrCodeAction } from './qrcode/action';
 import {
-  useResourcesServiceResourceUsageStartSession,
   useResourcesServiceResourceUsageEndSession,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
   UseResourcesServiceResourceUsageGetHistoryKeyFn,
@@ -10,6 +9,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
+import { useStartSessionWithConfirmation } from '../usage/hooks/useStartSessionWithConfirmation';
 import de from './useQrCodeAction.de.json';
 import en from './useQrCodeAction.en.json';
 import { useNavigate } from 'react-router-dom';
@@ -39,8 +39,9 @@ export function useQrCodeAction(props: Props) {
     },
   });
 
-  const { mutate: startResourceMutate } = useResourcesServiceResourceUsageStartSession({
-    onSuccess: (_data, variables) => {
+  // QR starts follow the same plugin confirmation and block handling as the start button.
+  const { start: startResourceMutate, dialog: confirmationDialog } = useStartSessionWithConfirmation(resourceId, {
+    onSuccess: (requestBody) => {
       queryClient.invalidateQueries({
         queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
       });
@@ -57,17 +58,17 @@ export function useQrCodeAction(props: Props) {
       });
 
       toast.success({
-        title: variables.requestBody.forceTakeOver
+        title: requestBody.forceTakeOver
           ? t('actions.startAndTakeover.success.title')
           : t('actions.start.success.title'),
-        description: variables.requestBody.forceTakeOver
+        description: requestBody.forceTakeOver
           ? t('actions.startAndTakeover.success.description')
           : t('actions.start.success.description'),
       });
     },
     onError: (err) => {
       toast.apiError({
-        error: err as ApiError,
+        error: err,
         t,
         tExists,
         baseTranslationKey: 'api',
@@ -110,14 +111,11 @@ export function useQrCodeAction(props: Props) {
   const startResource = useCallback(
     (forceTakeOver: boolean) => {
       startResourceMutate({
-        resourceId,
-        requestBody: {
-          notes: '-- by QR-Code --',
-          forceTakeOver,
-        },
+        notes: '-- by QR-Code --',
+        forceTakeOver,
       });
     },
-    [startResourceMutate, resourceId],
+    [startResourceMutate],
   );
 
   const stopResource = useCallback(() => {
@@ -156,4 +154,6 @@ export function useQrCodeAction(props: Props) {
         break;
     }
   }, [urlSearchParams, startResource, stopResource, navigate, resourceId]);
+
+  return { confirmationDialog };
 }

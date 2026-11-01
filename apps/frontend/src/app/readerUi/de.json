@@ -4,31 +4,37 @@
     "description": "Wie Plugin-Widgets und Startbestätigungen auf Attractap-Readern funktionieren",
     "noScreenPolicy": {
       "label": "Reader ohne Bildschirm",
-      "description": "Was ein Reader ohne Display tut, wenn ein Plugin eine Bestätigung verlangt.",
-      "default": "Plugin-Standard (blockieren)",
+      "description": "Gilt für Reader, die die Bestätigung nicht anzeigen können: Lite-Reader, Reader mit älterer Firmware und Reader, die nach einem Absturz gesperrt sind. „Mit Warnung starten“ startet dort ohne Bestätigung.",
+      "default": "Plugin-Standard",
       "block": "Start blockieren",
       "card-confirm": "Mit zweitem Auflegen der Karte bestätigen",
       "allow-with-warning": "Mit Warnung starten"
     },
     "plugins": "Plugins",
-    "noPlugins": "Noch kein Plugin trägt zu Readern bei.",
+    "noPlugins": "Kein installiertes Plugin nutzt Reader-Widgets oder Startbestätigungen.",
     "widgets": "Widgets auf Readern anzeigen",
     "failurePolicy": {
       "label": "Wenn das Plugin ausfällt",
       "fail-closed": "Start blockieren (empfohlen)",
       "fail-open": "Start erlauben"
     },
-    "failOpenWarning": "Fail open erlaubt den Start, während die Prüfung des Plugins nicht verfügbar ist. Diese Auswahl wird protokolliert.",
+    "failOpenWarning": "„Start erlauben“ lässt Starts zu, während die Prüfung des Plugins nicht verfügbar ist. Diese Auswahl wird protokolliert.",
     "save": "Speichern",
     "saved": "Einstellungen der Reader-Anzeige gespeichert",
-    "saveError": "Einstellungen der Reader-Anzeige konnten nicht gespeichert werden"
+    "saveError": "Einstellungen der Reader-Anzeige konnten nicht gespeichert werden",
+    "loadError": "Die Einstellungen der Reader-Anzeige konnten nicht geladen werden",
+    "retry": "Erneut versuchen"
   },
   "reader": {
     "widgets": "Plugin-Widgets auf diesem Reader anzeigen",
     "widgetsDescription": "Widgets erscheinen nur, wenn diese und die Ressourceneinstellung aktiv sind.",
     "contributions": "Plugin-Beiträge",
     "noContributions": "Keine Plugin-Beiträge für diesen Reader.",
-    "status": { "rendered": "Angezeigt", "degraded": "Eingeschränkt", "skipped": "Übersprungen" },
+    "status": {
+      "rendered": "Angezeigt",
+      "degraded": "Eingeschränkt",
+      "skipped": "Übersprungen"
+    },
     "reason": {
       "old-firmware": "Reader-Firmware ohne Plugin-UI",
       "no-screen": "Reader ohne Bildschirm",
@@ -37,17 +43,38 @@
       "unsupported": "Reader kann das nicht anzeigen",
       "expired": "bereits abgelaufen",
       "too-many-contributions": "zu viele Beiträge für diese Ressource",
-      "provider-error": "Plugin hat nicht geantwortet"
+      "provider-error": "Plugin hat nicht geantwortet",
+      "node-budget": "zu viele Widget-Elemente auf diesem Reader",
+      "invalid": "ungültiger Inhalt",
+      "reader": "vom Reader verworfen"
+    },
+    "savedImmediately": "Änderungen in diesem Tab werden sofort gespeichert.",
+    "saved": "Einstellung der Reader-Anzeige gespeichert",
+    "saveError": "Die Einstellung der Reader-Anzeige konnte nicht gespeichert werden",
+    "resourceFallback": "Ressource #{{id}}",
+    "slot": {
+      "listRow": "Ressourcenliste",
+      "detailsHeader": "Details-Kopf",
+      "detailsBody": "Details-Inhalt",
+      "detailsSession": "Aktive Sitzung",
+      "allWidgets": "Alle Widgets"
     }
   },
   "alerts": {
-    "title": "Reader-UI-Alarme",
+    "title": "Alarme der Reader-Anzeige",
     "none": "Keine offenen Alarme.",
     "clear": "Quittieren",
     "kind": {
       "breaker-open": "Plugin-Hook nach wiederholten Fehlern deaktiviert",
       "load-failure": "Plugin mit Zugriffs-Hooks konnte nicht geladen werden",
       "crash-loop": "Reader nach Absturz gesperrt"
+    },
+    "clearError": "Der Alarm konnte nicht quittiert werden",
+    "readerFallback": "Reader #{{id}}",
+    "description": {
+      "breaker-open": "{{plugin}}: Starts folgen der Ausfallrichtlinie des Plugins. Nach 60 Sekunden versucht der nächste Start den Hook erneut; antwortet er, endet der Alarm. „Quittieren“ setzt ihn sofort zurück.",
+      "load-failure": "{{plugin}} wurde nicht geladen, seine Start-Hooks werden daher nicht angewendet.",
+      "crash-loop": "{{reader}}: Plugin-Widgets sind ausgesetzt. Sie kehren nach 30 Minuten ohne weiteren Absturz zurück oder sofort mit „Quittieren“."
     }
   }
 }

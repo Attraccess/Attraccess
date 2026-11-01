@@ -177,7 +177,7 @@ export function AttractapEditor(props: Readonly<Props>) {
               </TabPanel>
               {reader && (
                 <TabPanel id="readerUi" className="pt-4">
-                  <ReaderUiReaderPanel readerId={reader.id} />
+                  <ReaderUiReaderPanel readerId={reader.id} resources={reader.resources} />
                 </TabPanel>
               )}
               {reader && (

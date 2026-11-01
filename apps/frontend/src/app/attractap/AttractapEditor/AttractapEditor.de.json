@@ -15,7 +15,7 @@
   "tabs": {
     "general": "Allgemein",
     "resources": "Ressourcen",
-    "readerUi": "Plugin-Widgets",
+    "readerUi": "Reader-Anzeige",
     "security": "Kopplung"
   }
 }

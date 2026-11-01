@@ -63,7 +63,7 @@
   - [Reader koppeln](attractap/pairing.md)
   - [RFID-Karten](attractap/rfid-cards.md)
   - [Firmware-Updates](attractap/firmware-updates.md)
-  - [Reader-UI](attractap/reader-ui.md)
+  - [Reader-Anzeige](attractap/reader-ui.md)
 
 - **MQTT & IoT**
   - [Überblick](mqtt/overview.md)

@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode, requestForms } = vi.hoisted(() => ({
+const { startMutate, supervisionMode, requestForms, toastError } = vi.hoisted(() => ({
   startMutate: vi.fn(),
+  toastError: vi.fn(),
   requestForms: vi.fn().mockResolvedValue([]),
   supervisionMode: { value: 'introduction_required' },
 }));
@@ -19,7 +20,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('../../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn() }),
+  useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn(), error: toastError }),
 }));
 
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
@@ -138,10 +139,10 @@ it.each([
   await act(() => callbacks.onError(error));
   expect(startMutate).toHaveBeenCalledTimes(retry ? 2 : 1);
   if (retry)
-    expect(startMutate).toHaveBeenLastCalledWith({
-      resourceId: 1,
-      requestBody: { projectId: undefined, formSubmissions: submissions },
-    });
+    expect(startMutate).toHaveBeenLastCalledWith(
+      { resourceId: 1, requestBody: { projectId: undefined, formSubmissions: submissions } },
+      expect.any(Object),
+    );
 });
 it('does not retry ordinary errors or a cancelled form resubmission', async () => {
   startMutate.mockClear();
@@ -194,4 +195,21 @@ it('asks for a plugin confirmation on 409 CONFIRMATION_REQUIRED and retries with
   await userEvent.click(document.querySelector('[data-cy="start-confirmation-confirm"]') as HTMLElement);
   expect(startMutate).toHaveBeenCalledTimes(2);
   expect(startMutate.mock.calls[1][0].requestBody).toMatchObject({ confirmedStepIds: ['step-1'] });
+});
+
+it('shows the plugin reason on 403 START_BLOCKED instead of a generic error', async () => {
+  startMutate.mockClear();
+  toastError.mockClear();
+  render(<StartSessionControls resourceId={1} />);
+  await userEvent.click(screen.getByText('start'));
+  const callbacks = startMutate.mock.calls[0][1];
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
+  const error = new ApiError(
+    { method: 'POST', url: '/start' },
+    { url: '/start', ok: false, status: 403, statusText: 'Forbidden', body: { code: 'START_BLOCKED', reason } },
+    'Forbidden',
+  );
+  await act(() => callbacks.onError(error));
+  expect(toastError).toHaveBeenCalledWith({ title: 'Reserved', description: 'Booked until 14:00' });
+  expect(startMutate).toHaveBeenCalledOnce();
 });

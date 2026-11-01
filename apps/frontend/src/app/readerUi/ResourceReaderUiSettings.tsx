@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Spinner } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Spinner } from '@heroui/react';
 import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Select } from '../../components/select';
 import { useToastMessage } from '../../components/toastProvider';
@@ -19,16 +19,43 @@ const FAILURE_POLICIES: HookFailurePolicy[] = ['fail-closed', 'fail-open'];
 
 export function ResourceReaderUiSettings({ resourceId }: Readonly<{ resourceId: number }>) {
   const { t } = useTranslations({ en, de });
-  const toast = useToastMessage();
-  const { data, isLoading } = useResourceReaderUiSettings(resourceId);
+  const { data, isLoading, isError, refetch } = useResourceReaderUiSettings(resourceId);
   const [draft, setDraft] = useState<Settings | null>(null);
-  const save = useSaveResourceReaderUiSettings(resourceId);
 
   useEffect(() => {
     if (data) setDraft(data);
   }, [data]);
 
-  if (isLoading || !draft) return <Spinner />;
+  if (isError && !draft)
+    return (
+      <Alert status="danger" data-cy="reader-ui-settings-load-error">
+        <Alert.Indicator />
+        <AlertContent>
+          <AlertTitle>{t('resource.loadError')}</AlertTitle>
+          <AlertDescription>
+            <Button size="sm" variant="secondary" onPress={() => void refetch()} className="mt-2">
+              {t('resource.retry')}
+            </Button>
+          </AlertDescription>
+        </AlertContent>
+      </Alert>
+    );
+  if (isLoading || !draft || !data) return <Spinner />;
+
+  return <SettingsForm resourceId={resourceId} saved={data} draft={draft} setDraft={setDraft} />;
+}
+
+function SettingsForm({
+  resourceId,
+  saved,
+  draft,
+  setDraft,
+}: Readonly<{ resourceId: number; saved: Settings; draft: Settings; setDraft: (settings: Settings) => void }>) {
+  const { t } = useTranslations({ en, de });
+  const toast = useToastMessage();
+  const save = useSaveResourceReaderUiSettings(resourceId);
+  // Like the neighbouring settings sections, Save is only enabled once something changed.
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
   const updatePlugin = (plugin: string, change: Partial<Settings['plugins'][number]>) =>
     setDraft({ ...draft, plugins: draft.plugins.map((p) => (p.plugin === plugin ? { ...p, ...change } : p)) });
@@ -75,7 +102,13 @@ export function ResourceReaderUiSettings({ resourceId }: Readonly<{ resourceId: 
       ))}
 
       <div className="flex justify-end">
-        <Button variant="primary" onPress={onSave} isPending={save.isPending} data-cy="reader-ui-settings-save">
+        <Button
+          variant="primary"
+          onPress={onSave}
+          isPending={save.isPending}
+          isDisabled={!dirty}
+          data-cy="reader-ui-settings-save"
+        >
           {t('resource.save')}
         </Button>
       </div>

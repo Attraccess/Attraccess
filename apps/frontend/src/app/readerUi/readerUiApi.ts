@@ -50,8 +50,8 @@ export function useSaveReaderReaderUiSettings(readerId: number | undefined) {
   });
   return {
     ...mutation,
-    mutate: (settings: { widgetsEnabled: boolean }) =>
-      mutation.mutate({ readerId: readerId as number, requestBody: settings }),
+    mutate: (settings: { widgetsEnabled: boolean }, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ readerId: readerId as number, requestBody: settings }, options),
   };
 }
 
@@ -60,13 +60,15 @@ export const useReaderUiContributions = (readerId: number | undefined) =>
     enabled: readerId !== undefined,
   });
 
-export const useReaderUiAlerts = () =>
-  useAttractapServiceGetReaderUiAlerts(undefined, { refetchInterval: 30_000 });
+export const useReaderUiAlerts = () => useAttractapServiceGetReaderUiAlerts(undefined, { refetchInterval: 30_000 });
 
 export function useClearReaderUiAlert() {
   const queryClient = useQueryClient();
   const mutation = useAttractapServiceClearReaderUiAlert({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetReaderUiAlertsKeyFn() }),
   });
-  return { ...mutation, mutate: (alertId: number) => mutation.mutate({ alertId }) };
+  return {
+    ...mutation,
+    mutate: (alertId: number, options?: Parameters<typeof mutation.mutate>[1]) => mutation.mutate({ alertId }, options),
+  };
 }

@@ -3,10 +3,9 @@ import { InsufficientBalanceModal } from './insufficientBalanceModal/index';
 import { DoorControls } from './DoorControls';
 import { MachineStartControls } from './MachineStartControls';
 import { SupervisedStartModal } from '../SupervisedStartModal/index';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   StartUsageSessionDto,
-  useResourcesServiceResourceUsageStartSession,
   useResourcesServiceUnlockDoor,
   useResourcesServiceUnlatchDoor,
   useResourcesServiceLockDoor,
@@ -18,7 +17,7 @@ import {
   ResourceType,
   SupervisionMode,
 } from '@attraccess/react-query-client';
-import { getConfirmationRequired, getStartBlockedReason, useStartConfirmation } from '../../hooks/useStartConfirmation';
+import { useStartSessionWithConfirmation } from '../../hooks/useStartSessionWithConfirmation';
 import { ResourceFormAction } from '../../../details/forms/types';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -135,17 +134,16 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
   model: ReturnType<typeof useStartSessionControlsStateInputs>,
 ) {
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(model.resourceId);
+  const notifyStartSuccess = model.onStartSuccess;
   const onStartSuccess = useCallback(() => {
     clearFormsDraft();
-    model.onStartSuccess();
-  }, [clearFormsDraft, model.onStartSuccess]);
-  const { mutate: startUsageSessionMutate, isPending: startUsageSessionIsPending } =
-    useResourcesServiceResourceUsageStartSession({
-      onSuccess: onStartSuccess,
-      onError: (error) => {
-        model.onStartError(error as ApiError);
-      },
-    });
+    notifyStartSuccess();
+  }, [clearFormsDraft, notifyStartSuccess]);
+  const startSession = useStartSessionWithConfirmation(model.resourceId, {
+    onSuccess: onStartSuccess,
+    onError: (error) => model.onStartError(error),
+  });
+  const { start: startSessionWithConfirmation, isPending: startUsageSessionIsPending } = startSession;
 
   const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
     onSuccess: onStartSuccess,
@@ -201,51 +199,27 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
     [requestForms],
   );
 
-  const submitRef = useRef<(action: ResourceFormAction, requestBody: StartUsageSessionDto) => void>(() => undefined);
-  const actionRef = useRef<ResourceFormAction>('start');
-  const confirmation = useStartConfirmation<StartUsageSessionDto>((requestBody) =>
-    submitRef.current(actionRef.current, requestBody),
-  );
-  const { handleStartError: handleConfirmationRequired } = confirmation;
-
   const submitStartSessionWithRetry = useCallback(
     (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
-      actionRef.current = action;
-      startUsageSessionMutate(
-        { resourceId: model.resourceId, requestBody },
-        {
-          onError: async (error) => {
-            if (handleConfirmationRequired(error, requestBody)) {
-              return;
-            }
-            if (!isFormsMissingError(error)) {
-              return;
-            }
+      startSessionWithConfirmation(requestBody, async (error) => {
+        if (!isFormsMissingError(error)) {
+          return;
+        }
 
-            const retrySubmissions = await gatherFormSubmissions(action);
-            if (!retrySubmissions) {
-              return;
-            }
+        const retrySubmissions = await gatherFormSubmissions(action);
+        if (!retrySubmissions) {
+          return;
+        }
 
-            startUsageSessionMutate({
-              resourceId: model.resourceId,
-              requestBody: {
-                ...requestBody,
-                formSubmissions: retrySubmissions,
-              },
-            });
-          },
-        },
-      );
+        startSessionWithConfirmation({ ...requestBody, formSubmissions: retrySubmissions });
+      });
     },
-    [handleConfirmationRequired, gatherFormSubmissions, isFormsMissingError, model.resourceId, startUsageSessionMutate],
+    [gatherFormSubmissions, isFormsMissingError, startSessionWithConfirmation],
   );
-  submitRef.current = submitStartSessionWithRetry;
   return {
-    confirmationDialog: confirmation.dialog,
+    confirmationDialog: startSession.dialog,
     ...model,
     onStartSuccess,
-    startUsageSessionMutate,
     startUsageSessionIsPending,
     unlockDoorMutate,
     unlockDoorIsPending,
@@ -341,16 +315,6 @@ export function useStartSessionControlsStateInputs(
   const onStartError = useCallback(
     (error: ApiError) => {
       if (!resource) {
-        return;
-      }
-
-      // A confirmation is asked in a dialog, a block shows the plugin's literal reason.
-      if (getConfirmationRequired(error)) {
-        return;
-      }
-      const blocked = getStartBlockedReason(error);
-      if (blocked) {
-        toast.error({ title: blocked.title, description: blocked.body });
         return;
       }
 

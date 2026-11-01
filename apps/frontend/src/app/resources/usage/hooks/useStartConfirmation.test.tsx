@@ -49,7 +49,7 @@ describe('useStartConfirmation', () => {
     expect(result.current.dialog).toBeNull();
   });
 
-  it('confirms, retries with the step id and chains a second confirmation', async () => {
+  it('confirms, retries with the step id and chains a second confirmation with only the newest id', async () => {
     const retry = vi.fn();
     const { result, rerender } = renderHook(() =>
       useStartConfirmation<{ notes?: string; confirmedStepIds?: string[] }>(retry),
@@ -65,7 +65,21 @@ describe('useStartConfirmation', () => {
     act(() => void result.current.handleStartError(required('step-b', 'Second'), { confirmedStepIds: ['step-a'] }));
     render(<div>{result.current.dialog}</div>);
     await userEvent.click(screen.getByText('Start'));
-    expect(retry).toHaveBeenLastCalledWith({ confirmedStepIds: ['step-a', 'step-b'] });
+    // Step ids are single-use and the server keeps step-a inside step-b, so re-sending step-a would fail.
+    expect(retry).toHaveBeenLastCalledWith({ confirmedStepIds: ['step-b'] });
+  });
+
+  it('shows a danger confirmation as a warning without a danger action', async () => {
+    const { result } = renderHook(() => useStartConfirmation(vi.fn()));
+    const error = apiError(409, {
+      code: 'CONFIRMATION_REQUIRED',
+      stepId: 'a',
+      confirmation: { title: 'Careful', body: 'Start anyway?', tone: 'danger' },
+    });
+    act(() => void result.current.handleStartError(error, {}));
+    render(<div>{result.current.dialog}</div>);
+    const action = document.querySelector('[data-cy="start-confirmation-confirm"]') as HTMLElement;
+    expect(action.className).not.toMatch(/danger/);
   });
 
   it('cancel closes without retrying', async () => {

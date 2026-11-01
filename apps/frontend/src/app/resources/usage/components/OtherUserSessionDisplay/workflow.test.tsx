@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ApiError } from '@attraccess/react-query-client';
 import { OtherUserSessionDisplay } from './index';
 import type { SessionNotesModal } from '../SessionNotesModal';
 const state = vi.hoisted(() => ({
@@ -34,15 +35,20 @@ vi.mock('../../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
-vi.mock('@attraccess/react-query-client', () => ({
+vi.mock('@attraccess/react-query-client', async (original) => ({
+  ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
   useResourcesServiceResourceUsageGetActiveSession: () => ({ data: { usage: state.session } }),
   useResourcesServiceResourceUsageCanControl: () => ({ data: { canControl: state.canControl } }),
   useAccessControlServiceResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
   useResourcesServiceGetOneResourceById: () => ({ data: { allowTakeOver: state.allowTakeover } }),
-  useResourcesServiceResourceUsageStartSession: (options: (typeof state.callbacks)[string]) => {
-    state.callbacks.start = options;
-    return { mutate: state.start, isPending: false };
-  },
+  // Start callbacks are passed per call (the shared start hook handles plugin confirmations there).
+  useResourcesServiceResourceUsageStartSession: () => ({
+    mutate: (variables: unknown, callbacks: (typeof state.callbacks)[string]) => {
+      state.callbacks.start = callbacks;
+      state.start(variables);
+    },
+    isPending: false,
+  }),
   useResourcesServiceResourceUsageEndSession: (options: (typeof state.callbacks)[string]) => {
     state.callbacks.end = options;
     return { mutate: state.end, isPending: false };
@@ -166,6 +172,9 @@ it('keeps cancelled forms from starting or stopping sessions and reports failed 
   await waitFor(() => expect(state.forms).toHaveBeenCalledTimes(2));
   expect(state.start).not.toHaveBeenCalled();
   expect(state.end).not.toHaveBeenCalled();
+  state.forms.mockResolvedValue([]);
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await waitFor(() => expect(state.start).toHaveBeenCalledOnce());
   act(() => state.callbacks.start.onError?.(new Error('Forbidden')));
   act(() => state.callbacks.contact.onError?.(new Error('Unavailable')));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Takeover Failed' }));
@@ -203,4 +212,32 @@ it('shows a redacted session as in use without a holder to contact', () => {
   expect(screen.getByText('In use')).toBeTruthy();
   expect(screen.getByText('Unknown User')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Contact current user' })).toBeNull();
+});
+
+const startError = (status: number, body: unknown) =>
+  new ApiError({ method: 'POST', url: '/start' }, { url: '/start', ok: false, status, statusText: 'x', body }, 'x');
+
+it('asks a plugin confirmation on takeover and retries with the step id', async () => {
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await waitFor(() => expect(state.start).toHaveBeenCalledOnce());
+  const confirmation = { title: 'Reserved from 14:00', body: 'Take over anyway?', confirmLabel: 'Take over' };
+  act(() =>
+    state.callbacks.start.onError?.(startError(409, { code: 'CONFIRMATION_REQUIRED', stepId: 's1', confirmation })),
+  );
+  expect(state.error).not.toHaveBeenCalled();
+  fireEvent.click(await screen.findByRole('button', { name: 'Take over' }));
+  expect(state.start).toHaveBeenLastCalledWith({
+    resourceId: 7,
+    requestBody: expect.objectContaining({ forceTakeOver: true, confirmedStepIds: ['s1'] }),
+  });
+});
+
+it('shows the plugin reason when a takeover is blocked', async () => {
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await waitFor(() => expect(state.start).toHaveBeenCalledOnce());
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
+  act(() => state.callbacks.start.onError?.(startError(403, { code: 'START_BLOCKED', reason })));
+  expect(state.error).toHaveBeenCalledExactlyOnceWith({ title: 'Reserved', description: 'Booked until 14:00' });
 });
