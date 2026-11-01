@@ -233,6 +233,7 @@ bool Application::processCardFlowState()
       this->externalState = interrupt;
     } else {
       // The post-stop question holds the summary (auto-dismiss, touch, sign-out) until answered or expired.
+      this->tickUiStep();
       if (!this->uiStepOpen && (this->sessionSummaryDismissRequested || (this->sessionSummaryVisible &&
           millis() - this->sessionSummaryShownAt >= 3500))) this->dismissSessionSummary();
       else return true;
@@ -491,7 +492,7 @@ void Application::renderResourceState()
 
 #ifdef HAS_WS2812_LED
   // Card-confirm window over: nothing starts (fail closed).
-  if (this->liteStepOpen && this->liteStep.remainingMs(millis()) <= 0) this->closeLiteStep();
+  if (this->liteStep.expired(millis())) this->closeLiteStep();
 #endif
   // Process unlocked card actions for non-display mode
   if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
@@ -530,15 +531,9 @@ void Application::renderResourceState()
 #ifdef HAS_WS2812_LED
         // Second short tap of the same user while the confirm window runs: start with the step id.
         // Another user's tap never confirms it; the step is dropped and that user starts normally.
-        if (this->liteStepOpen && this->liteStepUser == this->cardAuthenticationData.username &&
-            this->liteStep.remainingMs(millis()) > 0) {
-          const std::string stepId = this->liteStep.stepId;
-          this->closeLiteStep();
-          this->api.startResourceUsageSession(this->selectedResourceId, 0, false, stepId.c_str());
-        } else {
-          this->closeLiteStep();
-          this->api.startResourceUsageSession(this->selectedResourceId);
-        }
+        const std::string stepId = this->liteStep.takeForTap(this->cardAuthenticationData.username, millis());
+        this->led.endConfirmWait();
+        this->api.startResourceUsageSession(this->selectedResourceId, 0, false, stepId.empty() ? nullptr : stepId.c_str());
 #else
         this->api.startResourceUsageSession(this->selectedResourceId);
 #endif

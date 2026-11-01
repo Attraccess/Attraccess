@@ -50,8 +50,9 @@ void ResourceDetailsScreen::init()
    this->createStatusPanels();
    this->createUiSlotContainer(UiSlotKind::Body);
 
-   this->applyCachedState();
+   // Slots first, deferred: applyCachedState() then finds them current and does not build them a second time.
    this->refreshUiSlots(true);
+   this->applyCachedState();
    if (this->actionInProgress) this->showActionProgress(this->actionTitle);
 }
 void ResourceDetailsScreen::loop()
@@ -140,6 +141,7 @@ void ResourceDetailsScreen::destroy()
    }
 
    this->uiBuildGeneration++;
+   this->uiBuilt = false;
    this->screen = nullptr;
    sessionHeader.detach();
    actionOverlay.detach();

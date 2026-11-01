@@ -45,6 +45,11 @@ namespace ui
         // Nodes of all details slots (list-row badges count against the pool reserve instead).
         int liveNodes() const;
         bool has(uint32_t resourceId, SlotId slot) const;
+        // Change counter: every applied update gets a new SlotRecord::stamp; removals bump it too.
+        uint32_t stamp() const;
+        // True when the details slots of `resourceId` may differ from what the cache held at `since` (any details
+        // removal counts, list-row changes do not).
+        bool detailsChangedSince(uint32_t resourceId, uint32_t since) const;
 
         // Remaining milliseconds until `toMs` (server clock), using millis() deltas only.
         static int64_t remainingMs(const SlotRecord &rec, int64_t toMs, uint32_t nowMillis);
@@ -52,7 +57,10 @@ namespace ui
     private:
         struct Entry { SlotRecord *rec = nullptr; };
         int liveNodesLocked() const;
+        void dropLocked(Entry &e);
         Entry entries_[MAX_ENTRIES];
+        uint32_t stamp_ = 0;
+        uint32_t detailsRemovedStamp_ = 0;
         mutable std::mutex mutex_;
     };
 

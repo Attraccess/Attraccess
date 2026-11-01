@@ -78,6 +78,7 @@ void API::stopResourceUsageSession(uint32_t resourceId)
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
+    if (!cardSessionId.empty()) payload["cardSessionId"] = cardSessionId; // keeps the server's card session alive
     this->sendResourceAction("STOP_RESOURCE_USAGE_SESSION", payload);
 }
 

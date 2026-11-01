@@ -53,4 +53,34 @@ namespace ui
                  v.hasBeeper ? "true" : "false");
         caps["ui"] = serialized(scratch);
     }
+
+    struct FirmwareIdentity
+    {
+        const char *name;
+        const char *variant;
+        const char *version;
+        const char *resetReason;
+        uint32_t uptimeMs;
+    };
+
+    // The whole READER_FIRMWARE_INFO event; `scratch` (CAPABILITIES_UI_SCRATCH) must outlive its serialization.
+    inline void buildFirmwareInfo(JsonDocument &event, const FirmwareIdentity &id, const VariantTraits &v,
+                                  char *scratch, size_t n)
+    {
+        event["event"] = "EVENT";
+        JsonObject data = event["data"].to<JsonObject>();
+        data["type"] = "READER_FIRMWARE_INFO";
+        JsonObject p = data["payload"].to<JsonObject>();
+        p["name"] = id.name;
+        p["variant"] = id.variant;
+        p["version"] = id.version;
+        JsonObject caps = p["capabilities"].to<JsonObject>();
+        caps["resourceSelection"] = v.hasDisplay;
+        caps["cardEnrollment"] = v.hasDisplay;
+        caps["hasLeds"] = v.hasLeds;
+        fillCapabilitiesUi(caps, v, scratch, n);
+        // Uptime lets the server tell this boot from a mere re-authentication (crash-loop protection).
+        p["uptimeMs"] = id.uptimeMs;
+        p["resetReason"] = id.resetReason;
+    }
 }

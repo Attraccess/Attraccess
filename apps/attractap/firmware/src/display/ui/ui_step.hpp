@@ -24,6 +24,7 @@ namespace ui
     {
         uint32_t requestId = 0; // 0: post-stop question, no START to retry
         std::string stepId;
+        bool dropped = false; // failed validation: only stepId and requestId are set, the step is refused
         StepKind kind = StepKind::Confirm;
         uint32_t resourceId = 0;
         int64_t serverNowMs = 0;

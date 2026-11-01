@@ -1,6 +1,9 @@
 #pragma once
 #include "../dependencies.hpp"
 #include "session.hpp"
+#if defined(HAS_WS2812_LED) && !defined(HAS_LVGL_DISPLAY)
+#include "../lite_step.hpp"
+#endif
 
 struct ApplicationFormsState : protected ApplicationSessionState
 {
@@ -129,8 +132,6 @@ std::string lastUiStepId;
 
 // Lite card-confirm: a second short tap by the same user confirms (no screen, LED ring drains).
 #if defined(HAS_WS2812_LED) && !defined(HAS_LVGL_DISPLAY)
-volatile bool liteStepOpen = false;
-ui::StepRequest liteStep;
-std::string liteStepUser;
+LiteStep liteStep;
 #endif
 };

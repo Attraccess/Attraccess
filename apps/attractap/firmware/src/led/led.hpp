@@ -88,7 +88,6 @@ private:
 
     static constexpr uint32_t ANIM_INTERVAL_MS = 50;
     static constexpr uint32_t TRIGGER_DURATION_MS = 400;
-    static constexpr uint32_t TRIGGER_ERROR_FLASH_MS = 100;
 
     static constexpr uint8_t IDLE_BRIGHTNESS_MIN = 8;
     static constexpr uint8_t IDLE_BRIGHTNESS_MAX = 38;

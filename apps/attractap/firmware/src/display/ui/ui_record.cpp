@@ -302,6 +302,8 @@ namespace ui
         if (out.slot == SlotId::Unknown) return Verdict::UnknownSlot;
         out.resourceId = field(payload, "resourceId").as<uint32_t>();
         out.revision = field(payload, "revision").as<uint32_t>();
+        out.ownerHash = 2166136261u;
+        for (const char *c = owner; *c; c++) out.ownerHash = (out.ownerHash ^ static_cast<uint8_t>(*c)) * 16777619u;
         out.serverNowMs = field(payload, "serverNowMs").as<int64_t>();
         out.expiresAtMs = field(payload, "expiresAtMs").is<int64_t>() ? field(payload, "expiresAtMs").as<int64_t>() : 0;
         strncpy(out.key, key, MAX_ID_CHARS);

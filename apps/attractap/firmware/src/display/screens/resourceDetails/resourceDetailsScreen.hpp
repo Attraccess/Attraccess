@@ -60,9 +60,11 @@ public:
 
     void setProjects(const API::ProjectsOfUserResponse &projects);
     // Rebuilds the plugin slot containers (header, body, session) from the slot cache. Needs lv_lock().
+    // No-op unless this resource's details slots or the session block's visibility changed since the last build.
     // `defer` builds one plugin contribution per lv_async_call, so a full screen entry never holds the LVGL lock
     // for long (measured: 8 nodes ~15 ms, a full set of slots > 25 ms).
     void refreshUiSlots(bool defer = false);
+    void invalidateUiSlots() { this->uiBuilt = false; } // the next refreshUiSlots() rebuilds (self-test timing)
     uint32_t uiBuildMaxStepUs = 0;
     void buildUiSlotStep(uint32_t generation, uint8_t slotIndex, uint16_t item); // async chain, see refreshUiSlots
 
@@ -73,6 +75,10 @@ private:
     enum class UiSlotKind { Header, Body, Session };
     void createUiSlotContainer(UiSlotKind kind);
     uint32_t uiBuildGeneration = 0;
+    bool uiBuilt = false; // what the containers show: slot cache stamp, resource and session visibility
+    bool uiBuiltActive = false;
+    uint32_t uiBuiltId = 0;
+    uint32_t uiBuiltStamp = 0;
     lv_obj_t *uiSlotHeader = nullptr;
     lv_obj_t *uiSlotBody = nullptr;
     lv_obj_t *uiSlotSession = nullptr;

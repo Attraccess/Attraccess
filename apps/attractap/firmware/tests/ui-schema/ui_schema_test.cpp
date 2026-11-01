@@ -89,40 +89,48 @@ static void runRemovalAndFields()
           "removal");
 }
 
-static void roundTrip(const char *name, const ui::VariantTraits &traits, bool expectDisplay)
+static JsonDocument loadFixture(const char *name)
+{
+    std::ifstream in(std::string(UI_FIXTURE_DIR) + "/" + name);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    JsonDocument doc;
+    CHECK(!deserializeJson(doc, ss.str()), name << ": fixture parses");
+    return doc;
+}
+
+// The event API::sendFirmwareInfo sends, built by the same function, against the shared capability fixtures.
+static void roundTrip(const char *name, const ui::VariantTraits &traits, const char *fixture)
 {
     JsonDocument event;
-    event["event"] = "EVENT";
-    event["data"]["type"] = "READER_FIRMWARE_INFO";
-    event["data"]["payload"]["name"] = "attractap_touch_v2";
-    event["data"]["payload"]["variant"] = "wifi";
-    event["data"]["payload"]["version"] = "1.9.0";
-    event["data"]["payload"]["capabilities"]["resourceSelection"] = true;
-    event["data"]["payload"]["capabilities"]["cardEnrollment"] = true;
-    event["data"]["payload"]["capabilities"]["hasLeds"] = traits.hasLeds;
     char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
-    ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"], traits, uiCaps, sizeof uiCaps);
-    event["data"]["payload"]["resetReason"] = "CPU_LOCKUP";
-    event["data"]["payload"]["uptimeMs"] = 4294967295u;
-    char buf[1024];
+    ui::buildFirmwareInfo(event, {"attractap_touch_v2", "attractap-touch-v2", "1.9.0", "CPU_LOCKUP", 4294967295u},
+                          traits, uiCaps, sizeof uiCaps);
+    char buf[1024]; // JSON_OUTBUF_AUTH
     const size_t n = serializeJson(event, buf, sizeof buf);
     CHECK(n > 0 && n < sizeof buf && n == measureJson(event), name << ": serialized completely in 1024 B (" << n << ")");
     JsonDocument back;
     CHECK(!deserializeJson(back, buf, n), name << ": parses back");
-    JsonObject uiObj = back["data"]["payload"]["capabilities"]["ui"];
-    CHECK(uiObj["schemaVersion"] == 1 && back["data"]["payload"]["resetReason"] == "CPU_LOCKUP", name << ": fields");
-    CHECK(uiObj["display"].isNull() != expectDisplay, name << ": display");
-    CHECK(uiObj["components"].as<JsonArray>().size() == (expectDisplay ? 9u : 0u), name << ": components");
-    CHECK(uiObj["slots"].as<JsonArray>().size() == (expectDisplay ? 4u : 0u), name << ": slots");
+    JsonObject payload = back["data"]["payload"];
+    CHECK(back["data"]["type"] == "READER_FIRMWARE_INFO" && payload["resetReason"] == "CPU_LOCKUP" &&
+              payload["uptimeMs"] == 4294967295u && payload["version"] == "1.9.0",
+          name << ": fields");
+    CHECK(payload["capabilities"]["resourceSelection"] == traits.hasDisplay &&
+              payload["capabilities"]["cardEnrollment"] == traits.hasDisplay &&
+              payload["capabilities"]["hasLeds"] == traits.hasLeds,
+          name << ": core capabilities");
+    JsonDocument expected = loadFixture(fixture);
+    CHECK(payload["capabilities"]["ui"] == expected["payload"], name << ": capabilities.ui equals " << fixture);
 }
 
-static ui::SlotRecord makeUpdate(uint32_t rev, const char *key, const char *slot, int children, int64_t expiresAt = 0)
+static ui::SlotRecord makeUpdate(uint32_t rev, const char *key, const char *slot, int children, int64_t expiresAt = 0,
+                                 const char *owner = "p", uint32_t resourceId = 1)
 {
     JsonDocument doc;
-    doc["resourceId"] = 1;
+    doc["resourceId"] = resourceId;
     doc["slot"] = slot;
     doc["revision"] = rev;
-    doc["owner"] = "p";
+    doc["owner"] = owner;
     doc["key"] = key;
     doc["serverNowMs"] = 1000;
     if (expiresAt) doc["expiresAtMs"] = expiresAt;
@@ -169,6 +177,24 @@ static void runSteps()
     CHECK(ui::parseStepRequest(doc.as<JsonObjectConst>(), 100, step) && step.kind == ui::StepKind::CardConfirm &&
               step.requestId == 5 && step.remainingMs(100) == 30000,
           "card-confirm step parses with its window");
+    // TTL caps: a huge expiresAtMs neither keeps the step open forever nor overflows the maths.
+    deserializeJson(doc, R"({"requestId":5,"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"confirm","resourceId":1,
+        "serverNowMs":1000,"expiresAtMs":9223372036854775807,"title":"x"})");
+    CHECK(ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step) && step.remainingMs(0) == 125000,
+          "pre-start step capped at 120 s + 5 s grace (" << step.remainingMs(0) << ")");
+    deserializeJson(doc, R"({"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"info","resourceId":1,
+        "serverNowMs":1000,"expiresAtMs":601000,"title":"x"})");
+    CHECK(ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step) && step.remainingMs(0) == 30000,
+          "post-stop question capped at 30 s");
+    deserializeJson(doc, R"({"requestId":5,"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"confirm","resourceId":1,
+        "serverNowMs":-9223372036854775807,"expiresAtMs":9223372036854775807,"title":"x"})");
+    CHECK(!ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step), "negative server time dropped");
+    // A dropped step keeps its ids, so the reader can release the START the server holds.
+    deserializeJson(doc, R"({"requestId":9,"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"bogus","resourceId":1,
+        "serverNowMs":1,"expiresAtMs":9,"title":"x"})");
+    CHECK(!ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step) && step.stepId == "k3J9vQ2mXc8LrT0aW5yZbQ" &&
+              step.requestId == 9,
+          "dropped step keeps stepId and requestId");
 }
 
 static void runCountdownFormat()
@@ -225,24 +251,71 @@ static void runCache()
     CHECK(cache.apply(badge, 0) == ui::ApplyResult::Applied, "list row slot not counted as live node");
 }
 
+static ui::SlotRecord makeBadge(uint32_t rev, uint32_t resourceId)
+{
+    JsonDocument doc;
+    doc["resourceId"] = resourceId;
+    doc["slot"] = "resourceList.row.status";
+    doc["revision"] = rev;
+    doc["owner"] = "p";
+    doc["key"] = "row";
+    doc["serverNowMs"] = 1;
+    doc["tree"]["t"] = "badge";
+    doc["tree"]["text"] = "Reserved";
+    static ui::SlotRecord out;
+    CHECK(ui::parseSlotUpdate(doc.as<JsonObjectConst>(), measureJson(doc), out) == ui::Verdict::Accept, "badge parses");
+    return out;
+}
+
+static void runOwnersAndStamps()
+{
+    ui::SlotCache cache;
+    const char *body = "resource.details.body";
+    // Two plugins may use the same key in the same slot: separate contributions, separate revisions.
+    CHECK(cache.apply(makeUpdate(3, "k", body, 1, 0, "alpha"), 0) == ui::ApplyResult::Applied, "alpha applied");
+    CHECK(cache.apply(makeUpdate(1, "k", body, 1, 0, "beta"), 0) == ui::ApplyResult::Applied,
+          "beta revision 1 is not stale against alpha revision 3");
+    CHECK(cache.count() == 2, "both owners kept");
+    ui::SlotRecord removal = makeUpdate(2, "k", body, 1, 0, "beta");
+    removal.removal = true;
+    CHECK(cache.apply(removal, 0) == ui::ApplyResult::Removed && cache.count() == 1, "beta removes only its own");
+
+    // Stamps: the details screen rebuilds only when its own resource's details slots changed.
+    const uint32_t built = cache.stamp();
+    CHECK(!cache.detailsChangedSince(1, built), "nothing changed");
+    CHECK(cache.apply(makeBadge(1, 1), 0) == ui::ApplyResult::Applied && !cache.detailsChangedSince(1, built),
+          "a list-row badge is no details change");
+    cache.apply(makeUpdate(1, "k", body, 1, 0, "p", 2), 0);
+    CHECK(!cache.detailsChangedSince(1, built), "another resource's details are no change");
+    cache.apply(makeUpdate(4, "k", body, 2, 0, "alpha"), 0);
+    CHECK(cache.detailsChangedSince(1, built), "own details update is a change");
+    const uint32_t rebuilt = cache.stamp();
+    CHECK(cache.clearSlot(ui::SlotId::DetailsSession) == 0 && !cache.detailsChangedSince(1, rebuilt), "no-op clear");
+    cache.clear();
+    CHECK(cache.detailsChangedSince(1, rebuilt), "clear is a change");
+    // Same revision after a reconnect still gets a new stamp (list rows compare stamps, not revisions).
+    ui::SlotRecord a = makeBadge(1, 1);
+    cache.apply(a, 0);
+    uint32_t first = 0, second = 0;
+    cache.forEach(1, ui::SlotId::ListRowStatus, [&](const ui::SlotRecord &r) { first = r.stamp; });
+    cache.clear();
+    cache.apply(a, 0);
+    cache.forEach(1, ui::SlotId::ListRowStatus, [&](const ui::SlotRecord &r) { second = r.stamp; });
+    CHECK(first != 0 && second > first, "re-applied revision 1 gets a new stamp");
+}
+
 int main()
 {
     runSteps();
     runCountdownFormat();
     runCache();
+    runOwnersAndStamps();
     runFixtures();
     runLatin1();
     runRemovalAndFields();
-    roundTrip("touch", {true, true, false, true, false, 480, 480}, true);
-    roundTrip("lite", {false, false, true, true, true, 0, 0}, false);
-    JsonDocument lite;
-    char liteScratch[ui::CAPABILITIES_UI_SCRATCH];
-    ui::fillCapabilitiesUi(lite.to<JsonObject>(), {false, false, true, true, true, 0, 0}, liteScratch, sizeof liteScratch);
-    std::string liteJson;
-    serializeJson(lite, liteJson); // the ui block is raw JSON, so check it after a round trip
-    JsonDocument liteBack;
-    CHECK(!deserializeJson(liteBack, liteJson), "lite parses back");
-    CHECK(liteBack["ui"]["steps"].as<JsonArray>().size() == 1 && liteBack["ui"]["steps"][0] == "card-confirm", "lite steps");
+    // Touch V2: display, touch, beeper, no LED ring. Lite: LED ring and beeper, card-confirm.
+    roundTrip("touch", {true, true, false, true, false, 480, 480}, "caps-touch.json");
+    roundTrip("lite", {false, false, true, true, true, 0, 0}, "caps-lite.json");
     if (failures) { std::cerr << failures << " failure(s)\n"; return 1; }
     std::cout << "ui-schema ok\n";
     return 0;

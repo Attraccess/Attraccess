@@ -36,13 +36,22 @@ namespace ui
         return true;
     }
 
-    // Validates a step payload; false means the step is dropped (and never shown).
+    // Longest a step may stay open on the reader: the server's maximum plus its answer grace (pre-start), or the
+    // post-stop maximum. A larger expiresAtMs would keep the step open, exempt from the action watchdog.
+    constexpr int64_t STEP_MAX_OPEN_MS = (STEP_MAX_TTL_SEC + 5) * 1000LL;
+    constexpr int64_t POST_STOP_MAX_OPEN_MS = POST_STOP_MAX_TTL_SEC * 1000LL;
+
+    // Validates a step payload; false means the step is dropped (and never shown). A valid stepId and requestId
+    // are kept in `out` even then, so the caller can tell the server it was dropped.
     inline bool parseStepRequest(JsonObjectConst p, uint32_t nowMillis, StepRequest &out)
     {
         out = StepRequest{};
         const char *stepId = cstr(field(p, "stepId"), nullptr);
         if (!validStepId(stepId)) return false;
         out.stepId = stepId;
+        int64_t requestId = 0;
+        if (int64Of(field(p, "requestId"), requestId) && requestId > 0 && requestId <= UINT32_MAX)
+            out.requestId = static_cast<uint32_t>(requestId);
         const char *kind = cstr(field(p, "kind"));
         if (!strcmp(kind, "confirm")) out.kind = StepKind::Confirm;
         else if (!strcmp(kind, "choose")) out.kind = StepKind::Choose;
@@ -53,12 +62,12 @@ namespace ui
         if (!int64Of(field(p, "resourceId"), resourceId) || resourceId < 0 || resourceId > UINT32_MAX) return false;
         if (!int64Of(field(p, "serverNowMs"), out.serverNowMs) || !int64Of(field(p, "expiresAtMs"), out.expiresAtMs))
             return false;
-        int64_t requestId = 0;
-        if (int64Of(field(p, "requestId"), requestId) && requestId > 0 && requestId <= UINT32_MAX)
-            out.requestId = static_cast<uint32_t>(requestId);
         out.resourceId = static_cast<uint32_t>(resourceId);
         out.receivedAtMillis = nowMillis;
-        if (out.expiresAtMs <= out.serverNowMs) return false;
+        // Server time is epoch ms: with serverNowMs >= 0 no difference to a positive timestamp can overflow.
+        if (out.serverNowMs < 0 || out.expiresAtMs <= out.serverNowMs) return false;
+        const int64_t maxOpenMs = out.requestId ? STEP_MAX_OPEN_MS : POST_STOP_MAX_OPEN_MS;
+        if (out.expiresAtMs - out.serverNowMs > maxOpenMs) out.expiresAtMs = out.serverNowMs + maxOpenMs;
         if (!int64Of(field(p, "countdownToMs"), out.countdownToMs)) out.countdownToMs = 0;
         const char *tone = cstr(field(p, "tone"));
         out.tone = !strcmp(tone, "primary") ? 1 : !strcmp(tone, "success") ? 2 : !strcmp(tone, "warning") ? 3

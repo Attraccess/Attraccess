@@ -44,7 +44,7 @@ private:
     std::function<void(const API::ResourceBrief &, ResourceListAction)> actionCallback;
     std::function<void()> logoutCallback;
     // Plugin status line per row (resourceList.row.status); the description label stays underneath.
-    struct RowStatus { uint32_t id = 0; lv_obj_t *details = nullptr, *description = nullptr, *plugin = nullptr; bool core = true; uint32_t revision = 0; };
+    struct RowStatus { uint32_t id = 0; lv_obj_t *details = nullptr, *description = nullptr, *plugin = nullptr; bool core = true; uint32_t stamp = 0; };
     RowStatus rowStatus[API::MAX_RESOURCES];
     uint16_t rowStatusCount = 0;
     void patchRowStatus(RowStatus &row);

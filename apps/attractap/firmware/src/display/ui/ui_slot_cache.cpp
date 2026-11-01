@@ -47,7 +47,14 @@ namespace ui
 
     static bool sameContribution(const SlotRecord &a, const SlotRecord &b)
     {
-        return a.resourceId == b.resourceId && a.slot == b.slot && strcmp(a.key, b.key) == 0;
+        return a.resourceId == b.resourceId && a.slot == b.slot && a.ownerHash == b.ownerHash && strcmp(a.key, b.key) == 0;
+    }
+
+    void SlotCache::dropLocked(Entry &e)
+    {
+        if (e.rec->slot != SlotId::ListRowStatus) detailsRemovedStamp_ = ++stamp_;
+        freeRecord(e.rec);
+        e.rec = nullptr;
     }
 
     int SlotCache::liveNodesLocked() const
@@ -72,8 +79,7 @@ namespace ui
         if (update.removal)
         {
             if (!existing) return ApplyResult::NoSuchEntry;
-            freeRecord(existing->rec);
-            existing->rec = nullptr;
+            dropLocked(*existing);
             return ApplyResult::Removed;
         }
         const int current = existing && existing->rec->slot != SlotId::ListRowStatus ? existing->rec->nodeCount : 0;
@@ -88,6 +94,7 @@ namespace ui
         }
         memcpy(target->rec, &update, sizeof(SlotRecord));
         target->rec->receivedAtMillis = nowMillis;
+        target->rec->stamp = ++stamp_;
         return ApplyResult::Applied;
     }
 
@@ -95,10 +102,7 @@ namespace ui
     {
         std::lock_guard<std::mutex> guard(mutex_);
         for (Entry &e : entries_)
-        {
-            freeRecord(e.rec);
-            e.rec = nullptr;
-        }
+            if (e.rec) dropLocked(e);
     }
 
     int64_t SlotCache::remainingMs(const SlotRecord &rec, int64_t toMs, uint32_t nowMillis)
@@ -115,8 +119,7 @@ namespace ui
         {
             if (e.rec && e.rec->expiresAtMs != 0 && remainingMs(*e.rec, e.rec->expiresAtMs, nowMillis) <= 0)
             {
-                freeRecord(e.rec);
-                e.rec = nullptr;
+                dropLocked(e);
                 dropped++;
             }
         }
@@ -131,8 +134,7 @@ namespace ui
         {
             if (e.rec && e.rec->slot == slot)
             {
-                freeRecord(e.rec);
-                e.rec = nullptr;
+                dropLocked(e);
                 dropped++;
             }
         }
@@ -158,6 +160,22 @@ namespace ui
         std::lock_guard<std::mutex> guard(mutex_);
         for (const Entry &e : entries_)
             if (e.rec && e.rec->resourceId == resourceId && e.rec->slot == slot) return true;
+        return false;
+    }
+
+    uint32_t SlotCache::stamp() const
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        return stamp_;
+    }
+
+    bool SlotCache::detailsChangedSince(uint32_t resourceId, uint32_t since) const
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        if (detailsRemovedStamp_ > since) return true;
+        for (const Entry &e : entries_)
+            if (e.rec && e.rec->resourceId == resourceId && e.rec->slot != SlotId::ListRowStatus && e.rec->stamp > since)
+                return true;
         return false;
     }
 }

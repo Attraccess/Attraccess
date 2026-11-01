@@ -132,6 +132,7 @@ private:
 
     // Plugin steps (ATT-1187), application_steps.cpp
     void handleUiStepRequest(const ui::StepRequest &step);
+    void rejectUiStep(const ui::StepRequest &step);
     void handleUiStepAction(const std::string &stepId, const std::string &action, bool isChoice);
     void handleUiStepCancel(const std::string &stepId);
     void closeUiStep();

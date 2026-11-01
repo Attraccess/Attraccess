@@ -6,6 +6,7 @@
 #include "../../clock/wall_clock.hpp"
 #include "../../platform.hpp"
 #include "../../display/ui/ui_capabilities.hpp"
+#include "../diagnostics/reset-reason.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_system.h"
 #endif
@@ -14,31 +15,6 @@
 #include <limits>
 #include <string>
 
-// Same names as READER_CRASH_REPORT so the server can classify panic-class resets.
-#ifdef ESP_PLATFORM
-static const char *resetReasonName(esp_reset_reason_t reason)
-{
-    switch (reason)
-    {
-    case ESP_RST_POWERON: return "POWERON";
-    case ESP_RST_EXT: return "EXT";
-    case ESP_RST_SW: return "SW";
-    case ESP_RST_PANIC: return "PANIC";
-    case ESP_RST_INT_WDT: return "INT_WDT";
-    case ESP_RST_TASK_WDT: return "TASK_WDT";
-    case ESP_RST_WDT: return "WDT";
-    case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
-    case ESP_RST_BROWNOUT: return "BROWNOUT";
-    case ESP_RST_SDIO: return "SDIO";
-#ifdef ESP_RST_CPU_LOCKUP
-    case ESP_RST_CPU_LOCKUP: return "CPU_LOCKUP";
-#endif
-    default: return "UNKNOWN";
-    }
-}
-#else
-static const char *resetReasonName(int) { return "POWERON"; } // the simulator always starts cold
-#endif
 
 void API::onUnauthorized(JsonObject data)
 {
@@ -113,31 +89,6 @@ void API::sendFirmwareInfo()
 {
     this->logger.info("Requested firmware info");
 
-    JsonDocument event;
-    event["event"] = "EVENT";
-    event["data"]["type"] = "READER_FIRMWARE_INFO";
-    event["data"]["payload"]["name"] = FIRMWARE_NAME;
-    event["data"]["payload"]["variant"] = FIRMWARE_VARIANT;
-    event["data"]["payload"]["version"] = FIRMWARE_VERSION;
-    event["data"]["payload"]["capabilities"]["resourceSelection"] =
-#ifdef HAS_LVGL_DISPLAY
-        true;
-#else
-        false;
-#endif
-    event["data"]["payload"]["capabilities"]["cardEnrollment"] =
-#ifdef HAS_LVGL_DISPLAY
-        true;
-#else
-        false;
-#endif
-    event["data"]["payload"]["capabilities"]["hasLeds"] =
-#ifdef HAS_WS2812_LED
-        true;
-#else
-        false;
-#endif
-
     ui::VariantTraits traits{};
 #ifdef HAS_LVGL_DISPLAY
     traits.hasDisplay = true;
@@ -149,20 +100,18 @@ void API::sendFirmwareInfo()
     traits.hasLeds = true;
     traits.cardConfirm = true;
 #endif
-#ifdef BEEPER_PIN
+#if defined(BEEPER_PIN) || defined(HAS_IO_EXPANDER) // touch readers drive the beeper through the IO expander
     traits.hasBeeper = true;
 #endif
-    char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
-    ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"], traits, uiCaps, sizeof uiCaps);
-    // Uptime lets the server tell this boot from a mere re-authentication (crash-loop protection).
-    event["data"]["payload"]["uptimeMs"] = millis();
-    event["data"]["payload"]["resetReason"] = resetReasonName(
 #ifdef ESP_PLATFORM
-        esp_reset_reason()
+    const char *resetReason = crashResetReasonToString((uint8_t)esp_reset_reason());
 #else
-        0
+    const char *resetReason = "POWERON"; // the simulator always starts cold
 #endif
-    );
+    JsonDocument event;
+    char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
+    ui::buildFirmwareInfo(event, {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION, resetReason, millis()}, traits,
+                          uiCaps, sizeof uiCaps);
 
     // The ui block makes this message ~730 B; 256 B would be truncated silently.
     char json[JSON_OUTBUF_AUTH];

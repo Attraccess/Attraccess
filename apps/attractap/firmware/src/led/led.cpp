@@ -117,11 +117,14 @@ void LedController::runConfirmWait()
     LedFeedback::render(_strip, action, elapsed);
 }
 
-// Reserved / warning share the pure renderer; returns true while the trigger is still running.
+// Success, error, reserved and warning use the host-tested renderer; returns true while the trigger still runs.
 bool LedController::runFeedbackTrigger(uint32_t elapsed)
 {
-    const LedFeedback::Action action = LedFeedback::actionFor(
-        _trigger == TRIGGER_RESERVED ? LedFeedback::Pattern::Reserved : LedFeedback::Pattern::Warning);
+    const LedFeedback::Pattern pattern = _trigger == TRIGGER_SUCCESS ? LedFeedback::Pattern::Ok
+                                         : _trigger == TRIGGER_ERROR ? LedFeedback::Pattern::Blocked
+                                         : _trigger == TRIGGER_RESERVED ? LedFeedback::Pattern::Reserved
+                                                                        : LedFeedback::Pattern::Warning;
+    const LedFeedback::Action action = LedFeedback::actionFor(pattern);
     if (LedFeedback::finished(action, elapsed))
     {
         if (_trigger == TRIGGER_RESERVED && _blockedAfterReserved)
@@ -159,37 +162,6 @@ void LedController::loop()
 
         switch (_trigger)
         {
-        case TRIGGER_SUCCESS:
-            if (elapsed < TRIGGER_DURATION_MS)
-            {
-                setAll(_strip.Color(0, 255, 0));
-            }
-            else
-            {
-                _trigger = TRIGGER_NONE;
-                _state = _stateBeforeTrigger;
-            }
-            break;
-
-        case TRIGGER_ERROR:
-        {
-            uint32_t flashPhase = elapsed / TRIGGER_ERROR_FLASH_MS;
-            if (flashPhase >= 6)
-            {
-                _trigger = TRIGGER_NONE;
-                _state = _stateBeforeTrigger;
-            }
-            else if (flashPhase % 2 == 0)
-            {
-                setAll(_strip.Color(255, 0, 0));
-            }
-            else
-            {
-                setAll(0);
-            }
-            break;
-        }
-
         case TRIGGER_INDICATE:
             if (elapsed < TRIGGER_DURATION_MS)
             {
@@ -210,6 +182,8 @@ void LedController::loop()
             }
             break;
 
+        case TRIGGER_SUCCESS:
+        case TRIGGER_ERROR:
         case TRIGGER_RESERVED:
         case TRIGGER_WARNING:
             if (!runFeedbackTrigger(elapsed))

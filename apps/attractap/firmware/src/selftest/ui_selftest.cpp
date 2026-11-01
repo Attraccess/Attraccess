@@ -123,6 +123,7 @@ namespace UiSelftest
             lv_lock();
             logger.infof("UI_DETAILS_STEP_MAX us=%u", (unsigned)Display::resourceDetailsScreen.uiBuildMaxStepUs);
             const int64_t t2 = esp_timer_get_time();
+            Display::resourceDetailsScreen.invalidateUiSlots();
             Display::resourceDetailsScreen.refreshUiSlots();
             logger.infof("UI_DETAILS_REFRESH_SYNC us=%d", (int)(esp_timer_get_time() - t2));
             lv_unlock();

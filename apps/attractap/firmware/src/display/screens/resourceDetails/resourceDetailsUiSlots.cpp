@@ -127,6 +127,14 @@ void ResourceDetailsScreen::refreshUiSlots(bool defer)
     ui::slotCache().expire(now);
     ui::startCountdownTimer();
     const uint32_t id = this->resourceCache.id;
+    const bool active = this->resourceCache.hasActiveUsage;
+    if (this->uiBuilt && id == this->uiBuiltId && active == this->uiBuiltActive &&
+        !ui::slotCache().detailsChangedSince(id, this->uiBuiltStamp))
+        return;
+    this->uiBuilt = true;
+    this->uiBuiltId = id;
+    this->uiBuiltActive = active;
+    this->uiBuiltStamp = ui::slotCache().stamp();
     this->uiBuildGeneration++;
     if (defer)
     {
@@ -143,5 +151,5 @@ void ResourceDetailsScreen::refreshUiSlots(bool defer)
     fillSlot(this->uiSlotHeader, id, ui::SlotId::DetailsHeader, true, now);
     fillSlot(this->uiSlotBody, id, ui::SlotId::DetailsBody, true, now);
     // The session block only exists while somebody is using the resource.
-    fillSlot(this->uiSlotSession, id, ui::SlotId::DetailsSession, this->resourceCache.hasActiveUsage, now);
+    fillSlot(this->uiSlotSession, id, ui::SlotId::DetailsSession, active, now);
 }

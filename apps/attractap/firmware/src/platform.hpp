@@ -24,12 +24,20 @@ inline std::atomic<uint32_t> &hostMillisSkew()
     return skew;
 }
 inline void hostAdvanceMillis(uint32_t ms) { hostMillisSkew() += ms; }
+// Frozen: millis() (and so LVGL's tick) moves only with hostAdvanceMillis(), and delay() advances it instead of
+// sleeping. Lets a simulator test run on a test clock with no real waits.
+inline std::atomic<bool> &hostMillisFrozen()
+{
+    static std::atomic<bool> frozen{false};
+    return frozen;
+}
 #endif
 
 inline uint32_t millis()
 {
 #ifdef ATTRACTAP_HOST
     static const auto startedAt = std::chrono::steady_clock::now();
+    if (hostMillisFrozen()) return hostMillisSkew().load();
     return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - startedAt).count()) + hostMillisSkew().load();
 #else
@@ -37,10 +45,21 @@ inline uint32_t millis()
 #endif
 }
 
+#ifdef ATTRACTAP_HOST
+// Switches the simulator to the test clock, continuing from the current time.
+inline void hostFreezeMillis()
+{
+    if (hostMillisFrozen()) return;
+    hostMillisSkew() = millis();
+    hostMillisFrozen() = true;
+}
+#endif
+
 static inline void delay(uint32_t ms)
 {
 #ifdef ATTRACTAP_HOST
-    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+    if (hostMillisFrozen()) hostAdvanceMillis(ms);
+    else std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 #else
     vTaskDelay(pdMS_TO_TICKS(ms));
 #endif

@@ -461,7 +461,7 @@ public:
     void setUiStepCancelCallback(std::function<void(const std::string &)> callback) { uiStepCancelCallback = callback; }
     void setUiSlotsChangedCallback(std::function<void()> callback) { uiSlotsChangedCallback = callback; }
     void sendUiStepResult(const char *stepId, const char *action);
-    void sendUiRenderReport(uint32_t resourceId, const char *slot, const char *key, bool rendered, const char *reason);
+    void reportUiSkip(JsonObjectConst payload, const char *reason); // UI_SLOT_UPDATE contribution skipped, paced
     void clearUiSlots(); // drops all plugin slot content (disconnect, reconnect)
     const std::string &currentCardSessionId() const { return cardSessionId; }
     void endCardSession(); // tells the server the card session is over (sign-out or timeout)
@@ -530,7 +530,8 @@ private:
 
     uint32_t authenticationCount = 0;
 
-    void sendAck(const char *type, uint32_t messageId = 0);
+    void sendAck(const char *type, uint32_t messageId = 0, bool paced = true); // UI_* acks are paced (ApiUiState)
+    void sendUiRenderReport(const UiRenderReport &report);
     void sendMessage(const char *type);
     bool sendMessage(const char *type, JsonObject payload, uint32_t messageId = 0);
     void readBlockReason(JsonVariantConst reason, ActionResult &out);

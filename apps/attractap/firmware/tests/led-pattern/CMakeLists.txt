@@ -13,3 +13,8 @@ target_compile_features(led_feedback_test PRIVATE cxx_std_17)
 target_compile_options(led_feedback_test PRIVATE -Wall -Wextra -Wpedantic)
 target_include_directories(led_feedback_test PRIVATE ../../src/led)
 add_test(NAME led_feedback_test COMMAND led_feedback_test)
+
+add_executable(lite_step_test lite_step_test.cpp)
+target_compile_features(lite_step_test PRIVATE cxx_std_17)
+target_compile_options(lite_step_test PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME lite_step_test COMMAND lite_step_test)

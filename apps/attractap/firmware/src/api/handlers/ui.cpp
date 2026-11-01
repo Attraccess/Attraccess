@@ -33,32 +33,28 @@ void API::onUiSlotUpdate(JsonObject data)
         return;
     }
     ui::SlotRecord &rec = *static_cast<ui::SlotRecord *>(uiSlotScratch);
-    const uint32_t resourceId = payload["resourceId"] | 0u;
-    const char *slot = ui::cstr(ui::field(payload, "slot"), "");
-    const char *key = ui::cstr(ui::field(payload, "key"), "");
     const ui::Verdict verdict = ui::parseSlotUpdate(payload, measureJson(payload), rec);
     if (verdict != ui::Verdict::Accept)
     {
         // Only this contribution is dropped; everything else keeps rendering.
         logger.error((std::string("Dropping UI slot update: ") + ui::verdictName(verdict)).c_str());
-        sendUiRenderReport(resourceId, slot, key, false, ui::verdictName(verdict));
+        reportUiSkip(payload, ui::verdictName(verdict));
         return;
     }
+    // Stale and unknown removals are still acked by the generic path; only skips are reported.
     switch (ui::slotCache().apply(rec, millis()))
     {
     case ui::ApplyResult::Applied:
     case ui::ApplyResult::Removed:
-        sendUiRenderReport(resourceId, slot, key, !rec.removal, rec.removal ? "removed" : nullptr);
         if (uiSlotsChangedCallback) uiSlotsChangedCallback();
         break;
-    case ui::ApplyResult::Stale:
-    case ui::ApplyResult::NoSuchEntry:
-        break; // still acked by the generic path
     case ui::ApplyResult::CapacityFull:
-        sendUiRenderReport(resourceId, slot, key, false, "capacity");
+        reportUiSkip(payload, "capacity");
         break;
     case ui::ApplyResult::LiveNodesExceeded:
-        sendUiRenderReport(resourceId, slot, key, false, "live-nodes");
+        reportUiSkip(payload, "live-nodes");
+        break;
+    default:
         break;
     }
 #else
@@ -72,7 +68,8 @@ void API::onUiStepRequest(JsonObject data)
     if (!ui::parseStepRequest(data["payload"].as<JsonObjectConst>(), millis(), uiStepScratch))
     {
         logger.error("Dropping invalid UI step request");
-        return;
+        if (uiStepScratch.stepId.empty()) return;
+        uiStepScratch.dropped = true; // the application tells the server and ends a START it holds
     }
     uiStepRequestCallback(uiStepScratch);
 }
@@ -93,21 +90,37 @@ void API::sendUiStepResult(const char *stepId, const char *action)
     this->sendMessage("UI_STEP_RESULT", payload);
 }
 
-void API::sendUiRenderReport(uint32_t resourceId, const char *slot, const char *key, bool rendered, const char *reason)
+void API::reportUiSkip(JsonObjectConst payload, const char *reason)
+{
+    UiRenderReport report{};
+    report.resourceId = ui::field(payload, "resourceId").as<uint32_t>();
+    report.revision = ui::field(payload, "revision").as<uint32_t>();
+    snprintf(report.owner, sizeof report.owner, "%s", ui::cstr(ui::field(payload, "owner")));
+    snprintf(report.slot, sizeof report.slot, "%s", ui::cstr(ui::field(payload, "slot")));
+    snprintf(report.key, sizeof report.key, "%s", ui::cstr(ui::field(payload, "key")));
+    snprintf(report.reason, sizeof report.reason, "%s", reason);
+    if (!deferUiReply(nullptr, 0, &report)) sendUiRenderReport(report);
+}
+
+void API::sendUiRenderReport(const UiRenderReport &report)
 {
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
-    payload["resourceId"] = resourceId;
-    payload["slot"] = slot;
-    payload["key"] = key;
-    payload["status"] = rendered ? "rendered" : "skipped";
-    if (reason) payload["reason"] = reason;
+    payload["resourceId"] = report.resourceId;
+    payload["slot"] = report.slot;
+    payload["owner"] = report.owner;
+    payload["key"] = report.key;
+    payload["revision"] = report.revision;
+    payload["status"] = "skipped";
+    payload["reason"] = report.reason;
     this->sendMessage("UI_RENDER_REPORT", payload);
 }
 
 void API::clearUiSlots()
 {
-    uiReplyCount = 0; // answers to the previous connection are pointless
+    portENTER_CRITICAL(&uiReplyLock);
+    uiAckCount = uiReportCount = 0; // answers to the previous connection are pointless
+    portEXIT_CRITICAL(&uiReplyLock);
 #ifdef HAS_LVGL_DISPLAY
     ui::slotCache().clear();
     if (uiSlotsChangedCallback) uiSlotsChangedCallback();
@@ -122,4 +135,70 @@ void API::endCardSession()
     payload["cardSessionId"] = cardSessionId;
     this->sendMessage("CARD_SESSION_ENDED", payload);
     cardSessionId.clear();
+}
+
+// UI reply pacing (see ApiUiState): the inbound-dispatch task queues, the main task drains, uiReplyLock guards both.
+bool ApiUiState::deferUiReply(const char *ackType, uint32_t messageId, const UiRenderReport *report)
+{
+    const uint32_t nowMs = millis();
+    bool queued = true;
+    portENTER_CRITICAL(&uiReplyLock);
+    if (nowMs - uiReplyWindowStartMs >= UI_REPLY_WINDOW_MS)
+    {
+        uiReplyWindowStartMs = nowMs;
+        uiReplyWindowCount = 0;
+    }
+    if (uiAckCount == 0 && uiReportCount == 0 && uiReplyWindowCount < UI_REPLY_BURST)
+    {
+        uiReplyWindowCount++;
+        uiReplyLastMs = nowMs;
+        queued = false;
+    }
+    else if (report)
+    {
+        // A full report queue drops the new report; acks have their own queue.
+        if (uiReportCount < UI_REPORT_QUEUE_MAX)
+            uiReports[(uiReportHead + uiReportCount++) % UI_REPORT_QUEUE_MAX] = *report;
+    }
+    else
+    {
+        if (uiAckCount == UI_ACK_QUEUE_MAX)
+        {
+            uiAckHead = (uiAckHead + 1) % UI_ACK_QUEUE_MAX; // drop the oldest: the server resends unacked updates
+            uiAckCount--;
+        }
+        DeferredUiAck &ack = uiAcks[(uiAckHead + uiAckCount++) % UI_ACK_QUEUE_MAX];
+        strncpy(ack.type, ackType, sizeof ack.type - 1);
+        ack.type[sizeof ack.type - 1] = '\0';
+        ack.messageId = messageId;
+    }
+    portEXIT_CRITICAL(&uiReplyLock);
+    return queued;
+}
+
+int ApiUiState::takeDueUiReply(DeferredUiAck &ack, UiRenderReport &report)
+{
+    int due = 0;
+    const uint32_t nowMs = millis();
+    portENTER_CRITICAL(&uiReplyLock);
+    if (nowMs - uiReplyLastMs >= UI_REPLY_SPACING_MS)
+    {
+        if (uiAckCount > 0)
+        {
+            ack = uiAcks[uiAckHead];
+            uiAckHead = (uiAckHead + 1) % UI_ACK_QUEUE_MAX;
+            uiAckCount--;
+            due = 1;
+        }
+        else if (uiReportCount > 0)
+        {
+            report = uiReports[uiReportHead];
+            uiReportHead = (uiReportHead + 1) % UI_REPORT_QUEUE_MAX;
+            uiReportCount--;
+            due = 2;
+        }
+        if (due) uiReplyLastMs = nowMs;
+    }
+    portEXIT_CRITICAL(&uiReplyLock);
+    return due;
 }

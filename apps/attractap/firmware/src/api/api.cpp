@@ -74,19 +74,11 @@ void API::loop()
         this->processIncomingMessage(next.c_str(), next.size());
     }
 #endif
-    if (uiReplyCount > 0 && millis() - uiReplyLastMs >= UI_REPLY_SPACING_MS)
-    {
-        const DeferredUiReply reply = uiReplies[uiReplyHead];
-        uiReplyHead = (uiReplyHead + 1) % UI_REPLY_QUEUE_MAX;
-        uiReplyCount--;
-        uiReplyFlushing = true;
-        if (reply.isReport)
-            this->sendUiRenderReport(reply.resourceId, reply.slot, reply.key, reply.rendered, reply.reason[0] ? reply.reason : nullptr);
-        else
-            this->sendAck(reply.ackType, reply.messageId);
-        uiReplyFlushing = false;
-        uiReplyLastMs = millis();
-    }
+    DeferredUiAck ack;
+    UiRenderReport report;
+    const int due = this->takeDueUiReply(ack, report);
+    if (due == 1) this->sendAck(ack.type, ack.messageId, false);
+    else if (due == 2) this->sendUiRenderReport(report);
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable
@@ -113,8 +105,9 @@ void API::setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> 
     this->insufficientBalanceCallback = callback;
 }
 
-void API::sendAck(const char *type, uint32_t messageId)
+void API::sendAck(const char *type, uint32_t messageId, bool paced)
 {
+    if (paced && strncmp(type, "UI_", 3) == 0 && this->deferUiReply(type, messageId, nullptr)) return;
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     // UI_* acks echo the server's messageId so it can match them per contribution.
@@ -130,43 +123,6 @@ void API::sendMessage(const char *type)
 
 bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
 {
-    if (!uiReplyFlushing && (strncmp(type, "ACK_UI_", 7) == 0 || strcmp(type, "UI_RENDER_REPORT") == 0))
-    {
-        const uint32_t nowMs = millis();
-        if (nowMs - uiReplyWindowStartMs >= UI_REPLY_WINDOW_MS)
-        {
-            uiReplyWindowStartMs = nowMs;
-            uiReplyWindowCount = 0;
-        }
-        if (uiReplyCount > 0 || uiReplyWindowCount >= UI_REPLY_BURST)
-        {
-            if (uiReplyCount >= UI_REPLY_QUEUE_MAX)
-            {
-                uiReplyHead = (uiReplyHead + 1) % UI_REPLY_QUEUE_MAX; // drop the oldest
-                uiReplyCount--;
-            }
-            DeferredUiReply reply{};
-            reply.messageId = messageId;
-            reply.isReport = strcmp(type, "UI_RENDER_REPORT") == 0;
-            if (reply.isReport)
-            {
-                reply.resourceId = payload["resourceId"] | 0u;
-                reply.rendered = strcmp(payload["status"] | "", "rendered") == 0;
-                snprintf(reply.slot, sizeof(reply.slot), "%s", payload["slot"] | "");
-                snprintf(reply.key, sizeof(reply.key), "%s", payload["key"] | "");
-                snprintf(reply.reason, sizeof(reply.reason), "%s", payload["reason"] | "");
-            }
-            else
-            {
-                snprintf(reply.ackType, sizeof(reply.ackType), "%s", type + 4);
-            }
-            uiReplies[(uiReplyHead + uiReplyCount) % UI_REPLY_QUEUE_MAX] = reply;
-            uiReplyCount++;
-            return true;
-        }
-        uiReplyWindowCount++;
-        uiReplyLastMs = nowMs;
-    }
     JsonDocument event;
     event["event"] = "EVENT";
     event["data"]["type"] = type;

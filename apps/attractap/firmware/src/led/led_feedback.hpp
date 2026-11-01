@@ -90,4 +90,27 @@ namespace LedFeedback
         for (uint16_t i = 0; i < n; i++) strip.setPixelColor(i, pixelColor(action, elapsedMs, i, n));
         strip.show();
     }
+
+    // Plays `pattern` on an LED controller and a beeper: the only way the patterns above reach the hardware.
+    // `thenBlocked`: the blocked flash follows the reserved pattern.
+    template <typename Leds, typename Beeper>
+    void play(Leds &leds, Beeper &beeper, Pattern pattern, uint32_t confirmWindowMs = 0, bool thenBlocked = false)
+    {
+        const Action action = actionFor(pattern, confirmWindowMs);
+        switch (action.effect)
+        {
+        case Effect::ErrorFlash: leds.triggerError(); break;
+        case Effect::SuccessFlash: leds.triggerSuccess(); break;
+        case Effect::AmberHalfRing: leds.triggerReserved(thenBlocked); break;
+        case Effect::AmberRingDrain: leds.beginConfirmWait(action.durationMs); break;
+        case Effect::AmberBlink: leds.triggerWarning(); break;
+        }
+        switch (action.beep)
+        {
+        case Beep::Error: beeper.errorBeep(); break;
+        case Beep::Success: beeper.successBeep(); break;
+        case Beep::Single: beeper.singleBeep(); break;
+        case Beep::None: break;
+        }
+    }
 }

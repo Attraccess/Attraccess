@@ -69,10 +69,12 @@ namespace ui
         uint16_t poolUsed;
         uint32_t resourceId;
         uint32_t revision;
+        uint32_t ownerHash; // FNV-1a of the owning plugin: two plugins may use the same key
         char key[MAX_ID_CHARS + 1];
         int64_t serverNowMs;
         int64_t expiresAtMs; // 0 = none
         uint32_t receivedAtMillis;
+        uint32_t stamp; // set by SlotCache::apply, unique per applied update
         Node nodes[MAX_NODES];
         char pool[POOL_BYTES];
 

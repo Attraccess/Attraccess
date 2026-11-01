@@ -256,19 +256,19 @@ void ResourceListScreen::destroy() {
 
 void ResourceListScreen::patchRowStatus(RowStatus &row) {
     if (row.core || !row.details) return;
-    uint32_t revision = 0;
+    uint32_t stamp = 0;
     const uint32_t now = millis();
     lv_obj_t *built = nullptr;
     ui::slotCache().forEach(row.id, ui::SlotId::ListRowStatus, [&](const ui::SlotRecord &rec) {
         if (built) return; // one text or badge per row
-        revision = rec.revision;
-        if (row.plugin && revision == row.revision) { built = row.plugin; return; }
+        stamp = rec.stamp; // unique per applied update, also across owners, keys and reconnects
+        if (row.plugin && stamp == row.stamp) { built = row.plugin; return; }
         built = ui::buildRecord(row.details, rec, now, false);
     });
     if (built && built == row.plugin) return; // unchanged: only the row that changed is touched
     if (row.plugin) lv_obj_delete(row.plugin);
     row.plugin = built;
-    row.revision = revision;
+    row.stamp = stamp;
     if (built) lv_obj_align(built, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_obj_set_flag(row.description, LV_OBJ_FLAG_HIDDEN, built != nullptr);
 }
