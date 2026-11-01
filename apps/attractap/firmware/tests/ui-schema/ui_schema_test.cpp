@@ -162,6 +162,12 @@ static void runSteps()
     deserializeJson(doc, R"({"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"confirm","resourceId":1,"serverNowMs":9,
         "expiresAtMs":9,"title":"x"})");
     CHECK(!ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step), "already expired step dropped");
+    // Lite card-confirm as the server sends it: no choices, no actions, the timer is the only ask.
+    deserializeJson(doc, R"({"requestId":5,"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"card-confirm","resourceId":1,
+        "serverNowMs":1000,"expiresAtMs":31000,"title":"Reserved","body":"Tap again to start"})");
+    CHECK(ui::parseStepRequest(doc.as<JsonObjectConst>(), 100, step) && step.kind == ui::StepKind::CardConfirm &&
+              step.requestId == 5 && step.remainingMs(100) == 30000,
+          "card-confirm step parses with its window");
 }
 
 static void runCountdownFormat()
