@@ -12,6 +12,7 @@ import {
   READER_UI_TONES,
   type ReaderUiCapabilities,
   type ReaderUiSlotId,
+  type ReaderUiTone,
   type ReaderUiWireNode,
 } from '@attraccess/plugins-backend-sdk';
 import { makeStringLVGLReady } from '../../attractap/websockets/websocket-lvgl';
@@ -91,78 +92,93 @@ function compact<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }
 
+type NodeRecord = Record<string, unknown>;
+type NodeBuilder = (n: NodeRecord, tone: ReaderUiTone | undefined, depth: number, state: WalkState) => ReaderUiWireNode;
+
+const optionalBool = (value: unknown): boolean | undefined => (typeof value === 'boolean' ? value : undefined);
+
+const buildContainer =
+  (t: 'col' | 'row'): NodeBuilder =>
+  (n, tone, depth, state) => {
+    const rawChildren = n['c'];
+    if (rawChildren !== undefined && !Array.isArray(rawChildren)) throw new Reject('invalid-shape');
+    const c = (rawChildren as unknown[] | undefined)?.map((child) => walk(child, depth + 1, state));
+    return compact({
+      t,
+      c,
+      gap: checkInt(n['gap'], 0, 32),
+      pad: checkInt(n['pad'], 0, 32),
+      fill: optionalBool(n['fill']),
+      tone,
+    }) as ReaderUiWireNode;
+  };
+
+const buildIcon: NodeBuilder = (n, tone) => {
+  const name = checkEnum(n['name'], READER_UI_ICONS, false);
+  if (name === 'lock' && tone === 'danger') throw new Reject('danger-lock');
+  return compact({ t: 'icon', name, tone }) as ReaderUiWireNode;
+};
+
+const buildButton: NodeBuilder = (n, _tone, _depth, state) => {
+  if (!state.allowButtons) throw new Reject('button-in-slot');
+  const id = n['id'];
+  if (typeof id !== 'string' || !ID_RE.test(id)) throw new Reject('bad-id');
+  return compact({
+    t: 'button',
+    id,
+    text: checkText(n['text'], READER_UI_LIMITS.maxLabelBytes, 'label-too-long'),
+    variant: checkEnum(n['variant'], ['primary', 'secondary'] as const),
+  }) as ReaderUiWireNode;
+};
+
+const buildProgress: NodeBuilder = (n, tone) => {
+  const value = n['value'];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+    throw new Reject('invalid-shape');
+  }
+  return compact({ t: 'progress', value, tone }) as ReaderUiWireNode;
+};
+
+const buildCountdown: NodeBuilder = (n, tone) => {
+  const toMs = n['toMs'];
+  if (typeof toMs !== 'number' || !Number.isSafeInteger(toMs) || toMs < 0) throw new Reject('invalid-shape');
+  return compact({ t: 'countdown', toMs, tone }) as ReaderUiWireNode;
+};
+
+const NODE_BUILDERS: Record<string, NodeBuilder> = {
+  col: buildContainer('col'),
+  row: buildContainer('row'),
+  text: (n) =>
+    compact({
+      t: 'text',
+      text: checkText(n['text'], READER_UI_LIMITS.maxTextChars, 'text-too-long'),
+      style: checkEnum(n['style'], READER_UI_TEXT_STYLES),
+      fill: optionalBool(n['fill']),
+    }) as ReaderUiWireNode,
+  badge: (n, tone) =>
+    compact({
+      t: 'badge',
+      text: checkText(n['text'], READER_UI_LIMITS.maxListRowChars, 'text-too-long'),
+      tone,
+    }) as ReaderUiWireNode,
+  icon: buildIcon,
+  button: buildButton,
+  progress: buildProgress,
+  countdown: buildCountdown,
+  spacer: (n) => compact({ t: 'spacer', h: checkInt(n['h'], 0, 64) }) as ReaderUiWireNode,
+};
+
 function walk(raw: unknown, depth: number, state: WalkState): ReaderUiWireNode {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Reject('invalid-shape');
   if (depth > READER_UI_LIMITS.maxDepth) throw new Reject('too-deep');
   state.nodes += 1;
   if (state.nodes > READER_UI_LIMITS.maxNodes) throw new Reject('too-many-nodes');
 
-  const n = raw as Record<string, unknown>;
+  const n = raw as NodeRecord;
   const t = n['t'];
-  if (typeof t !== 'string' || !(READER_UI_COMPONENTS as readonly string[]).includes(t)) {
-    throw new Reject('unknown-component');
-  }
-  const tone = checkEnum(n['tone'], READER_UI_TONES);
-
-  switch (t) {
-    case 'col':
-    case 'row': {
-      const rawChildren = n['c'];
-      if (rawChildren !== undefined && !Array.isArray(rawChildren)) throw new Reject('invalid-shape');
-      const c = (rawChildren as unknown[] | undefined)?.map((child) => walk(child, depth + 1, state));
-      return compact({
-        t,
-        c,
-        gap: checkInt(n['gap'], 0, 32),
-        pad: checkInt(n['pad'], 0, 32),
-        fill: typeof n['fill'] === 'boolean' ? n['fill'] : undefined,
-        tone,
-      }) as ReaderUiWireNode;
-    }
-    case 'text':
-      return compact({
-        t,
-        text: checkText(n['text'], READER_UI_LIMITS.maxTextChars, 'text-too-long'),
-        style: checkEnum(n['style'], READER_UI_TEXT_STYLES),
-        fill: typeof n['fill'] === 'boolean' ? n['fill'] : undefined,
-      }) as ReaderUiWireNode;
-    case 'badge':
-      return compact({
-        t,
-        text: checkText(n['text'], READER_UI_LIMITS.maxListRowChars, 'text-too-long'),
-        tone,
-      }) as ReaderUiWireNode;
-    case 'icon': {
-      const name = checkEnum(n['name'], READER_UI_ICONS, false);
-      if (name === 'lock' && tone === 'danger') throw new Reject('danger-lock');
-      return compact({ t, name, tone }) as ReaderUiWireNode;
-    }
-    case 'button': {
-      if (!state.allowButtons) throw new Reject('button-in-slot');
-      const id = n['id'];
-      if (typeof id !== 'string' || !ID_RE.test(id)) throw new Reject('bad-id');
-      return compact({
-        t,
-        id,
-        text: checkText(n['text'], READER_UI_LIMITS.maxLabelBytes, 'label-too-long'),
-        variant: checkEnum(n['variant'], ['primary', 'secondary'] as const),
-      }) as ReaderUiWireNode;
-    }
-    case 'progress': {
-      const value = n['value'];
-      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
-        throw new Reject('invalid-shape');
-      }
-      return compact({ t, value, tone }) as ReaderUiWireNode;
-    }
-    case 'countdown': {
-      const toMs = n['toMs'];
-      if (typeof toMs !== 'number' || !Number.isSafeInteger(toMs) || toMs < 0) throw new Reject('invalid-shape');
-      return compact({ t, toMs, tone }) as ReaderUiWireNode;
-    }
-    default:
-      return compact({ t: 'spacer', h: checkInt(n['h'], 0, 64) }) as ReaderUiWireNode;
-  }
+  const build = typeof t === 'string' && Object.hasOwn(NODE_BUILDERS, t) ? NODE_BUILDERS[t] : undefined;
+  if (!build) throw new Reject('unknown-component');
+  return build(n, checkEnum(n['tone'], READER_UI_TONES), depth, state);
 }
 
 function run<T>(fn: () => T): ReaderUiValidation<T> {
