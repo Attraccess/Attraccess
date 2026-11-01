@@ -1,0 +1,7 @@
+{
+  "name": "plugin-reader-ui-example",
+  "version": "1.0.0",
+  "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
+  "attraccessVersion": { "min": "1.0.0" },
+  "permissions": ["READER_UI", "ACCESS_HOOKS"]
+}
