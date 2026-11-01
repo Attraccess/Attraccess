@@ -11,6 +11,7 @@
 
 #include "ui_capabilities.hpp"
 #include "ui_record.hpp"
+#include "ui_slot_cache.hpp"
 
 namespace fs = std::filesystem;
 static int failures = 0;
@@ -112,8 +113,71 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, bool ex
     CHECK(uiObj["slots"].as<JsonArray>().size() == (expectDisplay ? 4u : 0u), name << ": slots");
 }
 
+static ui::SlotRecord makeUpdate(uint32_t rev, const char *key, const char *slot, int children, int64_t expiresAt = 0)
+{
+    JsonDocument doc;
+    doc["resourceId"] = 1;
+    doc["slot"] = slot;
+    doc["revision"] = rev;
+    doc["owner"] = "p";
+    doc["key"] = key;
+    doc["serverNowMs"] = 1000;
+    if (expiresAt) doc["expiresAtMs"] = expiresAt;
+    JsonObject tree = doc["tree"].to<JsonObject>();
+    tree["t"] = "col";
+    JsonArray c = tree["c"].to<JsonArray>();
+    for (int i = 0; i < children; i++) c.add<JsonObject>()["t"] = "spacer";
+    static ui::SlotRecord out;
+    ui::Verdict v = ui::parseSlotUpdate(doc.as<JsonObjectConst>(), measureJson(doc), out);
+    CHECK(v == ui::Verdict::Accept, "makeUpdate " << ui::verdictName(v));
+    return out;
+}
+
+static void runCache()
+{
+    ui::SlotCache cache;
+    const char *body = "resource.details.body";
+    CHECK(cache.apply(makeUpdate(1, "a", body, 3), 100) == ui::ApplyResult::Applied, "apply");
+    CHECK(cache.apply(makeUpdate(1, "a", body, 3), 100) == ui::ApplyResult::Stale, "same revision is stale");
+    CHECK(cache.apply(makeUpdate(0, "a", body, 3), 100) == ui::ApplyResult::Stale, "older revision is stale");
+    CHECK(cache.apply(makeUpdate(2, "a", body, 4), 100) == ui::ApplyResult::Applied && cache.count() == 1, "replace");
+    CHECK(cache.liveNodes() == 5, "live nodes");
+    // Reconnect: everything goes, revision 1 is accepted again.
+    cache.clear();
+    CHECK(cache.count() == 0 && cache.apply(makeUpdate(1, "a", body, 3), 200) == ui::ApplyResult::Applied,
+          "revision 1 accepted after reconnect");
+    // Expiry uses millis() deltas against serverNowMs, not wall clock.
+    cache.clear();
+    cache.apply(makeUpdate(1, "e", body, 1, 6000), 1000);
+    CHECK(cache.expire(1000 + 4999) == 0 && cache.count() == 1, "not expired yet");
+    CHECK(cache.expire(1000 + 5000) == 1 && cache.count() == 0, "expired at expiresAtMs");
+    {
+        ui::SlotRecord r = makeUpdate(1, "e", body, 1);
+        r.receivedAtMillis = 1000;
+        CHECK(ui::SlotCache::remainingMs(r, 4000, 1000 + 500) == 2500, "countdown remaining");
+    }
+    // Live node cap of 64 counts details slots, not list-row badges.
+    cache.clear();
+    const char *session = "resource.details.session";
+    int accepted = 0;
+    for (int i = 0; i < 12; i++)
+    {
+        char key[8];
+        snprintf(key, sizeof key, "k%d", i);
+        if (cache.apply(makeUpdate(1, key, i % 2 ? body : session, 5), 0) == ui::ApplyResult::Applied) accepted++;
+    }
+    CHECK(accepted == 10 && cache.liveNodes() == 60, "64 live node cap (" << accepted << ")");
+    JsonDocument rowDoc;
+    deserializeJson(rowDoc, R"({"resourceId":1,"slot":"resourceList.row.status","revision":1,"owner":"p","key":"row",
+        "serverNowMs":1,"tree":{"t":"badge","text":"Reserved"}})");
+    ui::SlotRecord badge;
+    CHECK(ui::parseSlotUpdate(rowDoc.as<JsonObjectConst>(), measureJson(rowDoc), badge) == ui::Verdict::Accept, "badge");
+    CHECK(cache.apply(badge, 0) == ui::ApplyResult::Applied, "list row slot not counted as live node");
+}
+
 int main()
 {
+    runCache();
     runFixtures();
     runLatin1();
     runRemovalAndFields();
