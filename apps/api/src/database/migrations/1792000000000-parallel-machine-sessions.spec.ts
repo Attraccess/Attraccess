@@ -1,5 +1,5 @@
 import { DataSource, QueryRunner } from 'typeorm';
-import { ParallelMachineSessions1791900000000 } from './1791900000000-parallel-machine-sessions';
+import { ParallelMachineSessions1792000000000 } from './1792000000000-parallel-machine-sessions';
 
 async function legacySchema(runner: QueryRunner) {
   await runner.query('CREATE TABLE resource (id integer PRIMARY KEY, name text)');
@@ -40,7 +40,7 @@ describe('parallel machine sessions migration', () => {
         runner.query('INSERT INTO resource_usage (resourceId, userId, isFinalized) VALUES (1, 2, 1)'),
       ).rejects.toThrow('Resource already has an active usage session');
 
-      const migration = new ParallelMachineSessions1791900000000();
+      const migration = new ParallelMachineSessions1792000000000();
       await migration.up(runner);
 
       // The session that was running before the upgrade survives untouched.

@@ -15,7 +15,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { dataSourceConfig } from '../../../database/datasource';
 import { ResourceUsageIntegrity1790100000000 } from '../../../database/migrations/1790100000000-resource-usage-integrity';
-import { ParallelMachineSessions1791900000000 } from '../../../database/migrations/1791900000000-parallel-machine-sessions';
+import { ParallelMachineSessions1792000000000 } from '../../../database/migrations/1792000000000-parallel-machine-sessions';
 import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
 import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
@@ -260,7 +260,7 @@ describe('Usage lifecycle persistence around external flows', () => {
     const journal = await scope.source.query('SELECT * FROM resource_usage_recovery');
     const runner = scope.source.createQueryRunner();
     try {
-      await new ParallelMachineSessions1791900000000().down(runner);
+      await new ParallelMachineSessions1792000000000().down(runner);
       await new ResourceUsageIntegrity1790100000000().down(runner);
     } finally {
       await runner.release();

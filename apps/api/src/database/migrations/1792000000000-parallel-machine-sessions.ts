@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 const published = (alias: string) =>
   `${alias}.endTime IS NULL AND ${alias}.usageAction = 'usage' AND ${alias}.isFinalized = 1 AND ${alias}.lifecyclePending = 0`;
 
-export class ParallelMachineSessions1791900000000 implements MigrationInterface {
-  name = 'ParallelMachineSessions1791900000000';
+export class ParallelMachineSessions1792000000000 implements MigrationInterface {
+  name = 'ParallelMachineSessions1792000000000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "resource" ADD COLUMN "maxParallelSessions" integer NOT NULL DEFAULT 1`);

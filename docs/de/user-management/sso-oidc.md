@@ -38,6 +38,10 @@ Alle URL-Felder werden automatisch ausgefüllt.
 | **Client ID** | Client-Kennung | `attraccess` |
 | **Client Secret** | Client-Geheimnis | (wird verschlüsselt gespeichert) |
 
+### E-Mail-Verifizierung
+
+Sendet der Identity Provider `email_verified=false` (Boolean oder String), wird die E-Mail-Adresse nicht verwendet, um ein bestehendes Konto zuzuordnen oder zu verknüpfen. Es wird ein neues Konto mit nicht verifizierter E-Mail-Adresse erstellt. Gehört die E-Mail-Adresse bereits zu einem anderen Konto, wird die Anmeldung mit `SSO_EMAIL_NOT_VERIFIED` abgelehnt. Fehlt der Claim, wird die E-Mail wie bisher als vertrauenswürdig behandelt.
+
 ### Scopes
 
 Optional können Sie zusätzliche OIDC-Scopes angeben (kommagetrennt). Standard-Scopes werden automatisch angefordert.

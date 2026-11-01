@@ -19,13 +19,19 @@ from attractap_lab.drivers import (
 )
 from attractap_lab.enrollment import approve, latest_code
 from attractap_lab.reader_screen import ReaderTestHooks
-from attractap_lab.workflow import claim, send_reader_wifi
+from attractap_lab.workflow import claim, flash_reader, send_reader_wifi
 
 from support import Api, ReaderConsole
 
 ENVIRONMENT = Path(__file__).parents[1] / "example-emulator-env.yaml"
 PIN = os.environ.get("READER_PIN", "4711")
 CARD_UIDS = ("08a11ce1", "08b0b001", "08ca0101")
+# The firmware variant under test; run.sh defaults it to the place name without its -<n>.
+READER_VARIANT = os.environ.get("READER_VARIANT", "")
+# Variants whose reader powers up only after a press of its power button, which
+# the place's NFC emulator presses (README "Readers with a power button"). Other
+# readers stay on while USB powers them; their emulator has nothing on GPIO4.
+POWER_BUTTON_VARIANTS = {"attractap-touch"}
 
 
 @pytest.fixture(scope="session")
@@ -138,15 +144,17 @@ def approve_pairing(console, url, token, timeout=180, since=0, **options):
 
 
 @pytest.fixture(scope="session")
-def reader(target, api, admin, artifacts):
+def reader(target, emulator, api, admin, artifacts):
     """A freshly flashed reader on the lab Wi-Fi, paired with the test API.
 
     The janitor erases readers between sessions, so the reader starts unpaired
     and is approved with the admin session of the API this run started.
     """
-    flash = target.get_driver(ESPToolDriver)
-    flash.flash(os.environ["READER_IMAGE"])
-    target.deactivate(flash)
+    # An idle Touch V1 is off: flash_reader turns it on with its power button,
+    # which the emulator presses now that it runs this run's firmware, and keeps
+    # it on through the flash. Readers that are on, like a Touch V2, are left alone.
+    flash_reader(target, os.environ["READER_IMAGE"])
+    flash = target.get_driver(ESPToolDriver, activate=False)
     driver = target.get_driver("SerialDriver", activate=False)
     open_console(target, driver)
     console = ReaderConsole(driver, artifacts / "reader-serial.log")

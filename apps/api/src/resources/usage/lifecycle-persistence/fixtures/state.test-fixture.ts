@@ -15,7 +15,7 @@ import { ResourceUsageService } from '../../sessions/resource-usage.service';
 import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
 import { ExternalEffectFailureError } from '../../../flows/errors/external-effect-failure.error';
 import { ResourceUsageIntegrity1790100000000 } from '../../../../database/migrations/1790100000000-resource-usage-integrity';
-import { ParallelMachineSessions1791900000000 } from '../../../../database/migrations/1791900000000-parallel-machine-sessions';
+import { ParallelMachineSessions1792000000000 } from '../../../../database/migrations/1792000000000-parallel-machine-sessions';
 import { schemas } from './schemas.test-fixture';
 export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
   let directory: string;
@@ -96,7 +96,7 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
         'SELECT id, maxParallelSessions FROM resource',
       );
       await runner.query('ALTER TABLE "resource" DROP COLUMN "maxParallelSessions"');
-      await new ParallelMachineSessions1791900000000().up(runner);
+      await new ParallelMachineSessions1792000000000().up(runner);
       for (const { id, maxParallelSessions } of limits) {
         await runner.query('UPDATE resource SET maxParallelSessions = ? WHERE id = ?', [maxParallelSessions, id]);
       }
