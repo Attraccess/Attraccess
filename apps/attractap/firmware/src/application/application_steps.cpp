@@ -24,6 +24,11 @@ void Application::setupUiCallbacks()
     }, nullptr);
   });
 
+  ui::setSlotsExpiredCallback([] {
+    Display::resourceDetailsScreen.refreshUiSlots();
+    Display::resourceListScreen.refreshUiSlots();
+  });
+
   this->api.setUiStepRequestCallback([this](const ui::StepRequest &step) {
     auto *copy = new ui::StepRequest(step);
     struct Payload { Application *self; ui::StepRequest *step; };

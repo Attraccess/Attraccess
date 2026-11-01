@@ -215,6 +215,7 @@ add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES} 
 target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
+add_test(NAME attractap-reader-ui-tests COMMAND attractap-reader-workflow-tests --ui)
 add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
 add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)

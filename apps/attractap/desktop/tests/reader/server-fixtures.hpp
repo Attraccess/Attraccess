@@ -37,8 +37,10 @@ public:
     void disableConnectionAttempts() override {}
     void forceReconnect(const char *) override {}
     void resetCertificateTrust() override {}
-    void push(const char *type, const std::string &payload) {
-        incoming.push(std::string("{\"event\":\"EVENT\",\"data\":{\"type\":\"") + type + "\",\"payload\":" + payload + "}}");
+    void push(const char *type, const std::string &payload, uint32_t messageId = 0) {
+        incoming.push(std::string("{\"event\":\"EVENT\",\"data\":{\"type\":\"") + type + "\"" +
+                      (messageId ? ",\"messageId\":" + std::to_string(messageId) : std::string()) +
+                      ",\"payload\":" + payload + "}}");
     }
     size_t count(const char *type) const {
         size_t result = 0;

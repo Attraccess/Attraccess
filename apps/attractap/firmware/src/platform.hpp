@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #ifdef ATTRACTAP_HOST
+#include <atomic>
 #include <chrono>
 #include <thread>
 #else
@@ -15,12 +16,22 @@
 #include "freertos/task.h"
 #endif
 
+#ifdef ATTRACTAP_HOST
+// Simulator tests jump time forward instead of waiting (step watchdog, expiry); hardware never uses this.
+inline std::atomic<uint32_t> &hostMillisSkew()
+{
+    static std::atomic<uint32_t> skew{0};
+    return skew;
+}
+inline void hostAdvanceMillis(uint32_t ms) { hostMillisSkew() += ms; }
+#endif
+
 inline uint32_t millis()
 {
 #ifdef ATTRACTAP_HOST
     static const auto startedAt = std::chrono::steady_clock::now();
     return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - startedAt).count());
+        std::chrono::steady_clock::now() - startedAt).count()) + hostMillisSkew().load();
 #else
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
 #endif

@@ -4,9 +4,11 @@
 #include <string.h>
 
 #include "../fonts/attractap_fonts.hpp"
+#include "../../platform.hpp"
 #include "../i18n.hpp"
 #include "../theme.hpp"
 #include "ui_slot_cache.hpp"
+#include "ui_slots.hpp"
 
 namespace ui
 {
@@ -217,6 +219,7 @@ namespace ui
     {
         lv_mem_monitor_t mon;
         lv_mem_monitor(&mon);
+        if (mon.total_size == 0) return true; // libc allocator (host builds): no bounded pool to protect
         return mon.free_size >= POOL_FLOOR_BYTES + static_cast<uint32_t>(nodes) * NODE_COST_BYTES;
     }
 
@@ -288,6 +291,11 @@ namespace ui
     void startCountdownTimer()
     {
         if (g_timer) return;
-        g_timer = lv_timer_create([](lv_timer_t *) { tickCountdowns(lv_tick_get()); }, 1000, nullptr);
+        g_timer = lv_timer_create([](lv_timer_t *) {
+            const uint32_t now = millis();
+            // Expiry is local (millis deltas against serverNowMs): no message is needed to clear a slot.
+            if (slotCache().expire(now) > 0) notifySlotsExpired();
+            tickCountdowns(now);
+        }, 1000, nullptr);
     }
 }

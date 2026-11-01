@@ -147,5 +147,6 @@ struct ReaderWorkflow
     void testSessionSummary();
     void testWallClock();
     void testTimeouts();
+    void testUiPlugins();
     void testFirmwareUpdate(bool reset);
 };
