@@ -23,7 +23,7 @@ void InitScreen::init()
    lv_obj_set_width(logo, LV_SIZE_CONTENT);
    lv_obj_set_height(logo, LV_SIZE_CONTENT);
    lv_obj_set_x(logo, 0);
-   lv_obj_set_y(logo, -160);
+   lv_obj_set_y(logo, -148); // The logo stays clear of the network badge.
    lv_obj_set_align(logo, LV_ALIGN_CENTER);
    lv_obj_add_flag(logo, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(logo, LV_OBJ_FLAG_SCROLLABLE);
