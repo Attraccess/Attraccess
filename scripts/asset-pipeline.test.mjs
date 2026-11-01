@@ -18,10 +18,13 @@ for (const file of [
   'libs/companion-ws-client/project.json',
   'apps/attractap/firmware/project.json',
   'apps/plugins/wago/project.json',
+  'libs/plugins-frontend-sdk/project.json',
   'libs/react-query-client/project.json',
 ]) {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   data.root = path.dirname(file);
+  // Targets inferred by Nx plugins (the SDK's typecheck) only add dependsOn here; the graph needs an executor.
+  for (const target of Object.values(data.targets ?? {})) target.executor ??= 'nx:run-commands';
   nodes[data.name] = { name: data.name, type: data.projectType === 'library' ? 'lib' : 'app', data };
 }
 const graph = {
@@ -180,4 +183,28 @@ test('WAGO frontend typechecks generate the API client before compiling shared p
   for (const target of ['typecheck-frontend-tests', 'test-typecheck-frontend-gate']) {
     assert.ok(selected.dependencies[`plugin-wago:${target}`].includes('react-query-client:generate'));
   }
+});
+
+// The SDK drops its graph edge to plugins-frontend-ui (see its project.json), so nothing else orders this.
+test('plugin SDK typecheck generates the API client before compiling shared plugin UI', () => {
+  const selected = createTaskGraph(graph, {}, ['plugins-frontend-sdk'], ['typecheck'], undefined, {});
+  assert.ok(selected.dependencies['plugins-frontend-sdk:typecheck'].includes('react-query-client:generate'));
+});
+
+test('ESP-IDF projects are scope:hardware, so toolchain-free CI runs skip them', () => {
+  const files = spawnSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).stdout.split('\0');
+  const espIdf = files
+    .filter((file) => /(^|\/)project\.json$/.test(file))
+    .map((file) => JSON.parse(fs.readFileSync(file, 'utf8')))
+    .filter((project) => /\bidf\.(sh|py)\b|build_firmwares\.py/.test(JSON.stringify(project.targets ?? {})));
+  assert.ok(espIdf.some((project) => project.name === 'attractap-nfc-emulator'));
+  for (const project of espIdf) {
+    assert.ok(project.tags?.includes('scope:hardware'), `${project.name} needs ESP-IDF, so it must be scope:hardware`);
+  }
+  // scope:hardware also leaves the emulator out of the core test job; its host tests run with the firmware's.
+  assert.ok(
+    action('build-attractap-firmware').runs.steps.some(
+      (step) => step.run === 'pnpm nx run attractap-nfc-emulator:test',
+    ),
+  );
 });

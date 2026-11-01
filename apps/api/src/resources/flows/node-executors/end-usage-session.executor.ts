@@ -3,6 +3,7 @@ import { ResourceUsageService } from '../../usage/sessions/resource-usage.servic
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { resolveTriggeringUsage } from './triggering-usage';
 
 export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
@@ -23,7 +24,13 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       return { payload: input };
     }
 
-    const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, ctx.transactionManager);
+    // End the session that triggered this run; never somebody else's when that one is already gone.
+    const { session: activeUsage } = await resolveTriggeringUsage(
+      this.resourceUsageService,
+      node.resourceId,
+      input,
+      ctx.transactionManager,
+    );
 
     if (!activeUsage) {
       throw new NoUsageSessionError();
@@ -36,7 +43,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
     await this.resourceUsageService.endSession(
       node.resourceId,
       activeUsage.user,
-      { notes: finalNotes },
+      { notes: finalNotes, usageId: activeUsage.id },
       {
         skipFormSubmissions: true,
         skipNoteNotification: true,

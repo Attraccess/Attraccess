@@ -3,11 +3,12 @@
 import { HTMLAttributes, ReactNode } from 'react';
 import { Card, CardContent, Chip, cn } from '@heroui/react';
 
-type SessionAccent = 'success' | 'warning';
+type SessionAccent = 'success' | 'warning' | 'danger';
 
 const accentClasses: Record<SessionAccent, string> = {
   success: 'border-l-success bg-success/5',
   warning: 'border-l-warning bg-warning/5',
+  danger: 'border-l-danger bg-danger/5',
 };
 
 interface SessionStatusCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'title'> {

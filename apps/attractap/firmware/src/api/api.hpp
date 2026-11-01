@@ -9,6 +9,7 @@
 struct ApiResources
 {
     static constexpr size_t MAX_RESOURCES = 10;
+    static constexpr size_t MAX_LISTED_SESSIONS = 16;
 
     static constexpr size_t MAX_RESOURCE_NAME_LEN = 64;
 
@@ -41,6 +42,12 @@ struct FlowButton
         char label[MAX_FLOW_BUTTON_LABEL_LEN];
     };
 
+struct ActiveSession
+    {
+        uint32_t id = 0;
+        char username[MAX_USERNAME_LEN] = {};
+    };
+
 struct ResourceBrief
     {
         uint32_t id;
@@ -52,11 +59,33 @@ struct ResourceBrief
         bool hasIntroduction = false;
         bool isIntroducer = false;
         bool canManageResource = false;
+        // Per card: may end another person's session here (resources.update or the server's maintain rule).
+        bool canEndOtherSessions = false;
         bool requiresSupervisor = false;
         char name[MAX_RESOURCE_NAME_LEN];
         std::string description;
         bool hasActiveUsage;
         uint32_t activeUsageId = 0;
+        // Parallel sessions (ATT-1189). Defaults describe a classic single-session machine.
+        uint16_t maxParallelSessions = 1;
+        uint16_t activeSessionCount = 0;
+        // Per card: a slot is free and the authenticated user has no session of their own.
+        bool canStart = true;
+        // The authenticated user's own session; activeUser/activeUsageId point at it when present.
+        bool hasOwnUsage = false;
+        uint32_t ownUsageId = 0;
+        // Every active session (bounded) so managers can end a chosen one.
+        std::vector<ActiveSession> activeSessions;
+        // Parallel UI: a limit lowered to 1 while several sessions run still lists them so each can be stopped.
+        bool isMultiSession() const { return type == 0 && (maxParallelSessions > 1 || activeSessionCount > 1); }
+        bool isFull() const { return activeSessionCount >= maxParallelSessions; }
+        // Whether `username` holds a session here; only a list personalised for them knows it for sure.
+        bool isOwnedBy(const std::string &username, bool personalized) const
+        {
+            if (username.empty()) return false;
+            if (personalized) return hasOwnUsage;
+            return hasActiveUsage && username == activeUser;
+        }
         bool isUnderMaintenance;
         bool isHealthy;
         char healthReason[MAX_HEALTH_REASON_LEN];
@@ -467,7 +496,8 @@ public:
 #ifdef ATTRACTAP_UI_SELFTEST
     void testInject(const char *json, size_t len); // self-test build: processed by API::loop()
 #endif
-    void stopResourceUsageSession(uint32_t resourceId);
+    // usageId 0 ends the card holder's own session; otherwise force-stops that session.
+    void stopResourceUsageSession(uint32_t resourceId, uint32_t usageId = 0);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);
     void cancelForm(uint32_t resourceId, ResourceUsageFormActionType action);

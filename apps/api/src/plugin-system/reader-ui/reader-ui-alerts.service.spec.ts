@@ -82,4 +82,19 @@ describe('ReaderUiAlertsService', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ kind: 'breaker-open', plugin: 'p' }));
     await expect(service.clear(alert.id, { id: 1 })).resolves.toBeNull();
   });
+
+  it('keeps the original crash-loop deadline across a restart and drops an alert that already lapsed', async () => {
+    const { service, rows } = setup();
+    const now = Date.now();
+    rows.push(
+      { id: 1, kind: 'crash-loop', readerId: 5, plugin: null, clearedAt: null, createdAt: new Date(now - 20 * 60_000) },
+      { id: 2, kind: 'crash-loop', readerId: 6, plugin: null, clearedAt: null, createdAt: new Date(now - 40 * 60_000) },
+    );
+    await service.onModuleInit();
+    expect(service.isReaderSuspended(5)).toBe(true);
+    expect(service.isReaderSuspended(6)).toBe(false);
+    expect(rows[1].clearedAt).not.toBeNull();
+    jest.advanceTimersByTime(11 * 60_000);
+    expect(service.isReaderSuspended(5)).toBe(false);
+  });
 });

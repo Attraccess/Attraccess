@@ -25,7 +25,7 @@
     "errorDescription": "Failed to takeover the resource. Please try again or contact support."
   },
   "stopOtherUserSession": {
-    "available": "As an introducer / administrator, you can end the session of the other user.",
+    "available": "You are allowed to end the session of the other user.",
     "button": "Stop Other User Session",
     "optionsMenu": {
       "label": "Alternative stop other user session options",

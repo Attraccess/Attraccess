@@ -23,6 +23,7 @@ const schemas = [
       name: { type: String },
       type: { type: String },
       allowTakeOver: { type: Boolean, default: true },
+      maxParallelSessions: { type: Number, default: 1 },
       supervisionMode: { type: String },
     },
   }),
@@ -152,7 +153,8 @@ const schemas = [
       billingItems: { type: 'simple-json' },
       createdAt: { type: 'datetime', createDate: true },
     },
-    indices: [{ columns: ['resourceId'], unique: true }],
+    // Named like production so the parallel-sessions migration can replace it.
+    indices: [{ name: 'IDX_resource_usage_lifecycle_attempt_resource', columns: ['resourceId'] }],
   }),
   new EntitySchema<ResourceOperatingInterval>({
     name: 'ResourceOperatingInterval',

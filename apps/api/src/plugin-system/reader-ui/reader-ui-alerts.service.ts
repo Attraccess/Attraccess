@@ -28,7 +28,13 @@ export class ReaderUiAlertsService implements OnModuleInit {
     try {
       const open = await this.listOpen();
       for (const alert of open) {
-        if (alert.kind === 'crash-loop' && alert.readerId) this.suspend(alert.readerId);
+        if (alert.kind !== 'crash-loop' || !alert.readerId) continue;
+        // Keep the original deadline: a restart must not extend the suspension.
+        if (Date.now() - alert.createdAt.getTime() >= READER_UI_TIMING.crashLoopSuspendMs) {
+          await this.clear(alert.id, undefined);
+        } else {
+          this.suspend(alert.readerId, alert.createdAt.getTime());
+        }
       }
       await this.refreshGauge();
     } catch (error) {
@@ -108,11 +114,11 @@ export class ReaderUiAlertsService implements OnModuleInit {
     if (this.suspendedReaders.has(readerId)) this.suspend(readerId);
   }
 
-  private suspend(readerId: number): void {
-    this.suspendedReaders.set(readerId, Date.now());
+  private suspend(readerId: number, since = Date.now()): void {
+    this.suspendedReaders.set(readerId, since);
     const previous = this.suspendTimers.get(readerId);
     if (previous) clearTimeout(previous);
-    const timer = setTimeout(() => this.isReaderSuspended(readerId), READER_UI_TIMING.crashLoopSuspendMs + 1000);
+    const timer = setTimeout(() => this.isReaderSuspended(readerId), READER_UI_TIMING.crashLoopSuspendMs - (Date.now() - since) + 1000);
     timer.unref?.();
     this.suspendTimers.set(readerId, timer);
   }

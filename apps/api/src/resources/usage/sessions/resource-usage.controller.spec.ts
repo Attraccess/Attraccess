@@ -85,3 +85,72 @@ describe('usage history visibility', () => {
     );
   });
 });
+
+describe('active sessions of a machine with parallel sessions', () => {
+  const mine = { id: 1, resourceId: 5, userId: 1, user: { username: 'me' } };
+  const theirs = { id: 2, resourceId: 5, userId: 2, user: { username: 'other' } };
+  const build = async (access: 'full' | 'anonymous' | 'none', usages = [mine, theirs]) => {
+    const overview = {
+      usage: usages.find((usage) => usage.userId === 1) ?? usages[usages.length - 1] ?? null,
+      usages,
+      activeSessionCount: usages.length,
+      maxParallelSessions: 3,
+      isFull: false,
+    };
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ResourceUsageController],
+      providers: [
+        ...gateProviders,
+        {
+          provide: ResourceUsageService,
+          useValue: { getActiveSessionOverview: jest.fn().mockResolvedValue(overview) },
+        },
+        {
+          provide: ResourceActivityVisibilityService,
+          useValue: Object.assign(new ResourceActivityVisibilityService({} as never, {} as never, {} as never), {
+            resolve: jest.fn().mockResolvedValue(access),
+          }),
+        },
+      ],
+    }).compile();
+    return moduleRef.get(ResourceUsageController);
+  };
+  const request = { user: { id: 1 } } as AuthenticatedRequest;
+
+  it('returns all sessions with count and limit, and the caller own session as usage', async () => {
+    const result = await (await build('full')).getActiveSession(5, request);
+    expect(result).toMatchObject({ usage: { id: 1 }, activeSessionCount: 2, maxParallelSessions: 3, isFull: false });
+    expect(result.usages.map((usage) => usage.id)).toEqual([1, 2]);
+  });
+
+  it('redacts other people sessions for anonymous viewers but keeps the own one', async () => {
+    const result = await (await build('anonymous')).getActiveSession(5, request);
+    expect(result.usages[0]).toMatchObject({ id: 1, user: { username: 'me' } });
+    expect(result.usages[1]).not.toHaveProperty('user');
+  });
+
+  it('shows a viewer without activity access only their own session and refuses otherwise', async () => {
+    const own = await (await build('none')).getActiveSession(5, request);
+    expect(own.usages.map((usage) => usage.id)).toEqual([1]);
+    await expect((await build('none', [theirs])).getActiveSession(5, request)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+});
+
+it("runs the session-end default for the ended session's owner when a manager ends it", async () => {
+  const applyDefault = jest.fn();
+  const endSession = jest.fn().mockResolvedValue({ id: 9, userId: 2 });
+  const moduleRef = await Test.createTestingModule({
+    controllers: [ResourceUsageController],
+    providers: [
+      { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
+      { provide: SessionEndNotifier, useValue: { applyDefault } },
+      { provide: ResourceUsageService, useValue: { endSession } },
+      { provide: ResourceActivityVisibilityService, useValue: {} },
+    ],
+  }).compile();
+  const request = { user: { id: 1, locale: 'en', authenticationMethod: 'session' } } as unknown as AuthenticatedRequest;
+  await moduleRef.get(ResourceUsageController).endSession(5, {} as never, request);
+  expect(applyDefault).toHaveBeenCalledWith({ resourceId: 5, userId: 2, sessionId: 9 }, 'web', 'en');
+});

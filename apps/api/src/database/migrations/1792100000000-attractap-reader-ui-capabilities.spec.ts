@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AttractapReaderUiCapabilities1792000000000 } from './1792000000000-attractap-reader-ui-capabilities';
+import { AttractapReaderUiCapabilities1792100000000 } from './1792100000000-attractap-reader-ui-capabilities';
 
 describe('AttractapReaderUiCapabilities migration', () => {
   it('adds the columns, tolerates a rerun and keeps reader rows on rollback', async () => {
@@ -9,7 +9,7 @@ describe('AttractapReaderUiCapabilities migration', () => {
       await runner.query(`CREATE TABLE "attractap" (id integer PRIMARY KEY, name text NOT NULL)`);
       await runner.query(`INSERT INTO "attractap" (id, name) VALUES (1, 'press')`);
 
-      const migration = new AttractapReaderUiCapabilities1792000000000();
+      const migration = new AttractapReaderUiCapabilities1792100000000();
       await migration.up(runner);
       await migration.up(runner); // already applied under the earlier migration name
 

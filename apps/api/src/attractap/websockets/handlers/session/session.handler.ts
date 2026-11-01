@@ -43,6 +43,8 @@ import { ResourceFormAction } from '@attraccess/database-entities';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
+import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
+import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
 
 @Injectable()
 export class AttractapSessionHandler {
@@ -101,7 +103,7 @@ export class AttractapSessionHandler {
       return;
 
     try {
-      const usage = await this.resourceUsageService.getActiveSession(resourceId);
+      const usage = await this.resourceUsageService.getActiveSession(resourceId, undefined, userId);
       // Live session readings belong to the current user, just like the active-session web UI.
       if (!usage || usage.userId !== userId) {
         await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, { resourceId, usage: null });
@@ -371,7 +373,11 @@ export class AttractapSessionHandler {
         ...(gate.warning ? { warning: true } : {}),
       });
     } catch (error) {
-      if (error instanceof ResourceInUseError) {
+      if (
+        error instanceof ResourceInUseError ||
+        error instanceof ResourceFullError ||
+        error instanceof AlreadyHasActiveSessionError
+      ) {
         // Resolve the pending action before refreshing an occupied row.
         await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message });
         await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
@@ -391,8 +397,10 @@ export class AttractapSessionHandler {
   }
 
   public async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId } = data.payload as {
+    const { resourceId, usageId } = data.payload as {
       resourceId: number;
+      /** Force-stop of a chosen session of someone else; without it the card holder's own session ends. */
+      usageId?: number;
     };
     this.resumeCardSession(socket, data);
 
@@ -427,7 +435,7 @@ export class AttractapSessionHandler {
       const usage = await this.resourceUsageService.endSession(
         resourceId,
         user,
-        { formSubmissions },
+        { formSubmissions, ...(Number.isInteger(usageId) ? { usageId } : {}) },
         {
           auditOrigin: { actorId: user.id, authenticationMethod: null },
         },

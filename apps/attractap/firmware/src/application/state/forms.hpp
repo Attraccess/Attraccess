@@ -27,6 +27,7 @@ uint32_t pendingActionResourceId = 0;
 
 #if defined(HAS_LVGL_DISPLAY)
 uint32_t pendingActionProjectId = 0;
+uint32_t pendingActionUsageId = 0; // force-stop of a chosen other session; 0 ends the card holder's own
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

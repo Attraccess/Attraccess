@@ -19,7 +19,7 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
 describe('EndUsageSessionExecutor', () => {
   let executor: EndUsageSessionExecutor;
   let resourceUsageService: jest.Mocked<
-    Pick<ResourceUsageService, 'endLifecycleCandidate' | 'getActiveSession' | 'endSession'>
+    Pick<ResourceUsageService, 'endLifecycleCandidate' | 'getActiveSessionsForResource' | 'endSession'>
   >;
   let ctx: NodeExecutionContext;
   let compileTemplate: jest.Mock;
@@ -32,7 +32,7 @@ describe('EndUsageSessionExecutor', () => {
 
     resourceUsageService = {
       endLifecycleCandidate: jest.fn(),
-      getActiveSession: jest.fn(),
+      getActiveSessionsForResource: jest.fn(),
       endSession: jest.fn(),
     };
 
@@ -55,13 +55,13 @@ describe('EndUsageSessionExecutor', () => {
     const txManager = {} as never;
     ctx.transactionManager = txManager;
     const user = { id: 7 };
-    resourceUsageService.getActiveSession.mockResolvedValue({ user } as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ user }] as never);
     resourceUsageService.endSession.mockResolvedValue(undefined as never);
 
     const node = createNode({ resourceId: 42 });
     await executor.execute(node, {}, ctx);
 
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(42, txManager);
+    expect(resourceUsageService.getActiveSessionsForResource).toHaveBeenCalledWith(42, txManager);
   });
 
   it('runs the stopped flow before cancelling a tentative session in a usage lifecycle flow', async () => {
@@ -78,7 +78,7 @@ describe('EndUsageSessionExecutor', () => {
     });
 
     expect(resourceUsageService.endLifecycleCandidate).toHaveBeenCalledWith('attempt-id', 42, 'Stopped by {{source}}');
-    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    expect(resourceUsageService.getActiveSessionsForResource).not.toHaveBeenCalled();
     expect(resourceUsageService.endSession).not.toHaveBeenCalled();
   });
 
@@ -92,14 +92,14 @@ describe('EndUsageSessionExecutor', () => {
   });
 
   it('throws NoUsageSessionError when there is no active session', async () => {
-    resourceUsageService.getActiveSession.mockResolvedValue(null as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([] as never);
 
     await expect(executor.execute(createNode({}), {}, ctx)).rejects.toBeInstanceOf(NoUsageSessionError);
     expect(resourceUsageService.endSession).not.toHaveBeenCalled();
   });
 
   it('throws FlowExecutionError when the active session has no owner user', async () => {
-    resourceUsageService.getActiveSession.mockResolvedValue({ user: null } as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ user: null }] as never);
 
     await expect(executor.execute(createNode({}), {}, ctx)).rejects.toBeInstanceOf(FlowExecutionError);
     await expect(executor.execute(createNode({}), {}, ctx)).rejects.toThrow(
@@ -110,7 +110,7 @@ describe('EndUsageSessionExecutor', () => {
 
   it('compiles the notes template and ends the session with the compiled result', async () => {
     const user = { id: 7 };
-    resourceUsageService.getActiveSession.mockResolvedValue({ user } as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ user }] as never);
     resourceUsageService.endSession.mockResolvedValue(undefined as never);
     compileTemplate.mockImplementation(() => 'compiled notes');
 
@@ -130,7 +130,7 @@ describe('EndUsageSessionExecutor', () => {
 
   it('falls back to the raw notes when the compiled template is only whitespace', async () => {
     const user = { id: 9 };
-    resourceUsageService.getActiveSession.mockResolvedValue({ user } as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ user }] as never);
     resourceUsageService.endSession.mockResolvedValue(undefined as never);
     compileTemplate.mockImplementation(() => '   ');
 
@@ -147,7 +147,7 @@ describe('EndUsageSessionExecutor', () => {
 
   it('passes empty notes when no notes are configured and does not compile', async () => {
     const user = { id: 3 };
-    resourceUsageService.getActiveSession.mockResolvedValue({ user } as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ user }] as never);
     resourceUsageService.endSession.mockResolvedValue(undefined as never);
 
     const node = createNode({ data: {} as never });
@@ -164,7 +164,7 @@ describe('EndUsageSessionExecutor', () => {
 
   it('passes empty notes when the configured notes string is empty and does not compile', async () => {
     const user = { id: 3 };
-    resourceUsageService.getActiveSession.mockResolvedValue({ user } as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ user }] as never);
     resourceUsageService.endSession.mockResolvedValue(undefined as never);
 
     const node = createNode({ data: { notes: '' } as never });
@@ -181,7 +181,7 @@ describe('EndUsageSessionExecutor', () => {
 
   it('handles undefined node.data by parsing an empty object', async () => {
     const user = { id: 3 };
-    resourceUsageService.getActiveSession.mockResolvedValue({ user } as never);
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ user }] as never);
     resourceUsageService.endSession.mockResolvedValue(undefined as never);
 
     const node = createNode({ data: undefined as never });
@@ -195,5 +195,72 @@ describe('EndUsageSessionExecutor', () => {
       { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
     expect(result).toEqual({ payload: { foo: 'bar' } });
+  });
+
+  describe('on a machine shared by several people', () => {
+    const shared = { type: 'machine', maxParallelSessions: 3 };
+    const early = { id: 5, user: { id: 1 }, resource: shared };
+    const late = { id: 6, user: { id: 2 }, resource: shared };
+    beforeEach(() => {
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([early, late] as never);
+      resourceUsageService.endSession.mockResolvedValue(undefined as never);
+    });
+
+    it('ends the session that triggered the run', async () => {
+      await executor.execute(createNode({ data: { notes: '' } as never }), { id: 5 }, ctx);
+
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        early.user,
+        { notes: '', usageId: 5 },
+        expect.anything(),
+      );
+    });
+
+    it('prefers usageId (button press) over a generic id in the payload', async () => {
+      await executor.execute(createNode({ data: { notes: '' } as never }), { usageId: 5, id: 6 }, ctx);
+
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        early.user,
+        { notes: '', usageId: 5 },
+        expect.anything(),
+      );
+    });
+
+    it('ends nobody when the triggering session already ended (e.g. after a wait)', async () => {
+      await expect(
+        executor.execute(createNode({ data: { notes: '' } as never }), { usageId: 4 }, ctx),
+      ).rejects.toBeInstanceOf(NoUsageSessionError);
+      expect(resourceUsageService.endSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps ending the newest session when the run names no session', async () => {
+      await executor.execute(createNode({ data: { notes: '' } as never }), { foo: 'bar' }, ctx);
+
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        late.user,
+        { notes: '', usageId: 6 },
+        expect.anything(),
+      );
+    });
+  });
+
+  it('falls back to the newest session on a single-session machine when the payload names no active session', async () => {
+    const machine = { type: 'machine', maxParallelSessions: 1 };
+    const early = { id: 5, user: { id: 1 }, resource: machine };
+    const late = { id: 6, user: { id: 2 }, resource: machine };
+    resourceUsageService.getActiveSessionsForResource.mockResolvedValue([early, late] as never);
+    resourceUsageService.endSession.mockResolvedValue(undefined as never);
+
+    await executor.execute(createNode({ data: { notes: '' } as never }), { id: 999 }, ctx);
+
+    expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+      1,
+      late.user,
+      { notes: '', usageId: 6 },
+      expect.anything(),
+    );
   });
 });

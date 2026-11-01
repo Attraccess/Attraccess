@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 #include <queue>
+#include <vector>
 #include <map>
 #include <ctime>
 #include <ArduinoJson.h>
@@ -45,13 +46,18 @@ private:
     std::queue<std::string> _inbound;
 
     // ---- In-memory demo "server" state (survives until reboot) ----
+    // Several people may use one machine (ATT-1189); the per-resource limit mirrors maxParallelSessions.
     struct DemoSession
     {
-        bool active = false;
+        uint32_t id = 0;
         std::string user; // display name of the owner
         time_t startEpoch = 0;
     };
-    DemoSession _sessions[DemoStore::RESOURCE_COUNT];
+    std::vector<DemoSession> _sessions[DemoStore::RESOURCE_COUNT];
+    uint32_t _nextSessionId = 1;
+    static uint16_t maxParallelSessionsFor(uint32_t resourceId);
+    bool isOwnSession(const DemoSession &session) const { return session.user == _currentUser; }
+    void addSessionJson(JsonObject target, const DemoSession &session) const;
 
     // Context of the most recently authenticated card, so START/STOP can be
     // attributed to "the current user".
@@ -77,7 +83,8 @@ private:
 
     void respondProjects(uint32_t page, const std::string &search);
     void handleStartSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver);
-    void handleStopSession(uint32_t resourceId);
+    void handleStopSession(uint32_t resourceId, uint32_t usageId);
+    void respondActionError(const std::string &type, const char *error);
     void respondFormRequest(uint32_t resourceId);
     void respondFormFields(uint32_t resourceId, const char *action, uint32_t formId, uint32_t offset);
     void respondFormPageResult(JsonObjectConst data);

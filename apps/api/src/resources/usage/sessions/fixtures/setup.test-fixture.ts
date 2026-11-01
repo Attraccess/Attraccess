@@ -163,7 +163,14 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
         scope.lifecycleAttempts.delete(typeof criteria === 'string' ? criteria : criteria.id);
       return { affected: 1 };
     }),
-    find: jest.fn(async () => [...scope.lifecycleAttempts.values()]),
+    find: jest.fn(async (entity?: unknown, opts?: unknown) => {
+      // Active sessions are listed through the same ordered findOne mocks as the former single lookup.
+      if (entity === ResourceUsage) {
+        const session = await scope.resourceUsageRepository.findOne(opts as never);
+        return session ? [session] : [];
+      }
+      return [...scope.lifecycleAttempts.values()];
+    }),
     findOneOrFail: jest.fn((entity, opts) => scope.resourceUsageRepository.findOne(opts)),
     transaction: jest.fn(async (cb: (em: typeof scope.transactionalEntityManager) => Promise<unknown>) =>
       cb(scope.transactionalEntityManager),
@@ -174,7 +181,13 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
         return { findOne: scope.resourceRepository.findOne } as unknown as Repository<Resource>;
       }
       if (entity === ResourceUsage) {
-        return { findOne: scope.resourceUsageRepository.findOne } as unknown as Repository<ResourceUsage>;
+        return {
+          findOne: scope.resourceUsageRepository.findOne,
+          find: async (opts: never) => {
+            const session = await scope.resourceUsageRepository.findOne(opts);
+            return session ? [session] : [];
+          },
+        } as unknown as Repository<ResourceUsage>;
       }
       if (entity === User) {
         return { findOne: scope.userRepository.findOne } as unknown as Repository<User>;
@@ -197,6 +210,8 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
         return scope.resourceUsageRepository.findOne(opts as never);
       }
       if (entity === Resource) {
+        // The session-limit lookup is a projection; keep it out of the ordered resource mocks (limit 1).
+        if ((opts as { select?: unknown }).select) return { id: 1, type: 'machine', maxParallelSessions: 1 };
         return scope.resourceRepository.findOne(opts as never);
       }
       return null;

@@ -9,7 +9,7 @@ import { Injectable } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, EntityManager, In, IsNull, LessThan, MoreThan } from 'typeorm';
+import { Repository, EntityManager, In, IsNull, LessThan, MoreThan, Not } from 'typeorm';
 
 export const ATTRIBUTION_LOOKBACK_MS = 31 * 24 * 60 * 60_000;
 
@@ -104,12 +104,15 @@ export class ResourceOperatingAttributionService {
       .filter((usage) => usage.usageAction === ResourceUsageAction.Usage && !usage.lifecyclePending)
       .map((usage) => ({ usage, range: this.toUsageRange(usage, asOf, windowStart, pendingSessionEnds) }))
       .filter((entry): entry is UsageRange => entry.range !== null);
+    // Interim rule for parallel sessions (ATT-1191 splits fairly): every operating moment is attributed to
+    // exactly one session, the earliest-started one. Without overlapping sessions this changes nothing.
+    const attributableUsageRanges = this.withoutOverlaps(usageRanges);
     const events: SweepEvent[] = [
       ...operatingRanges.flatMap((range) => [
         { type: 'operatingStart' as const, range },
         { type: 'operatingEnd' as const, range },
       ]),
-      ...usageRanges.flatMap((range) => [
+      ...attributableUsageRanges.flatMap((range) => [
         { type: 'usageStart' as const, range },
         { type: 'usageEnd' as const, range },
       ]),
@@ -187,6 +190,29 @@ export class ResourceOperatingAttributionService {
       isProvisional: liveValuesMayChange && isProvisional,
       attributions,
     };
+  }
+
+  /**
+   * Gives each time span to the earliest-started session covering it (ties by id). Sessions that never
+   * overlap an earlier one are returned untouched; others keep only the part after every earlier session.
+   * Linear after sorting: every earlier range starts no later, so together they cover one span up to the
+   * furthest end seen so far, and a later range can only keep what lies beyond that frontier.
+   */
+  protected withoutOverlaps(usageRanges: UsageRange[]): UsageRange[] {
+    if (usageRanges.length < 2) return usageRanges;
+    const ordered = [...usageRanges].sort(
+      (left, right) =>
+        left.usage.startTime.getTime() - right.usage.startTime.getTime() || left.usage.id - right.usage.id,
+    );
+    const result: UsageRange[] = [];
+    let frontier: Date | null = null;
+    for (const entry of ordered) {
+      const { startTime, endTime } = entry.range;
+      if (frontier === null || startTime >= frontier) result.push(entry);
+      else if (endTime > frontier) result.push({ usage: entry.usage, range: { startTime: frontier, endTime } });
+      if (frontier === null || endTime > frontier) frontier = endTime;
+    }
+    return result;
   }
 
   protected toRange(
@@ -360,8 +386,43 @@ export class ResourceOperatingAttributionService {
       ],
       order: { startTime: 'ASC' },
     });
-    const { attributedOperatingDurationMs } = this.derive(intervals, [usage], usage.endTime, usage.startTime);
-    return (attributedOperatingDurationMs ?? 0) / 60_000;
+    // Other sessions running alongside take precedence when they started earlier (parallel sessions).
+    const overlapping = await manager.getRepository(ResourceUsage).find({
+      where: [
+        {
+          resourceId: usage.resourceId,
+          usageAction: ResourceUsageAction.Usage,
+          lifecyclePending: false,
+          id: Not(usage.id),
+          startTime: LessThan(usage.endTime),
+          endTime: IsNull(),
+        },
+        {
+          resourceId: usage.resourceId,
+          usageAction: ResourceUsageAction.Usage,
+          lifecyclePending: false,
+          id: Not(usage.id),
+          startTime: LessThan(usage.endTime),
+          endTime: MoreThan(usage.startTime),
+        },
+      ],
+    });
+    if (overlapping.length === 0) {
+      const { attributedOperatingDurationMs } = this.derive(intervals, [usage], usage.endTime, usage.startTime);
+      return (attributedOperatingDurationMs ?? 0) / 60_000;
+    }
+    // An earlier session whose end is still in progress only owns the time up to its requested end.
+    const summary = this.derive(
+      intervals,
+      [usage, ...overlapping],
+      usage.endTime,
+      usage.startTime,
+      undefined,
+      undefined,
+      await this.getPendingSessionEnds([usage.resourceId], manager),
+    );
+    const own = summary.attributions.filter((attribution) => attribution.usageId === usage.id);
+    return this.unionDuration(own) / 60_000;
   }
 
   protected async getPendingSessionEnds(resourceIds: number[], manager?: EntityManager): Promise<Map<number, Date>> {

@@ -522,6 +522,10 @@ void Application::renderResourceState()
         this->api.unlockDoor(this->selectedResourceId);
       }
     } else {
+      // Parallel sessions (ATT-1189): a short tap starts the card holder's own session, a long tap
+      // ends only their own (no usageId, never someone else's). A full machine or an existing own
+      // session comes back as a server error, which the generic error callback signals with the
+      // error beep.
       if (this->cardPresentationWasLong) {
 #ifdef HAS_WS2812_LED
         this->closeLiteStep(); // a long hold ends things, it never confirms

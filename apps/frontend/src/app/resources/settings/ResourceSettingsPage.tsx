@@ -36,6 +36,7 @@ export function fromResource(resource: Resource): FormData {
     name: resource.name,
     description: resource.description ?? '',
     allowTakeOver: resource.allowTakeOver ?? false,
+    maxParallelSessions: resource.maxParallelSessions ?? 1,
     type: resource.type ?? ResourceType.MACHINE,
     separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch ?? false,
     retrainingMaxAgeDays: resource.retrainingMaxAgeDays ?? null,

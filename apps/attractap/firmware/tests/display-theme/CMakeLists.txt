@@ -48,6 +48,7 @@ add_executable(display-theme-host
     background_and_list.cpp
     wall_clock.cpp
     resource_details.cpp
+    parallel_sessions.cpp
     demo_form_options.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"

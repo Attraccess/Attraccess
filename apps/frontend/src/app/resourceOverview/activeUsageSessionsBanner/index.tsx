@@ -18,8 +18,10 @@ import {
   useResourcesServiceGetAllResourcesKey,
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
   ApiError,
+  ResourcesService,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
+import { useAuth } from '../../../hooks/useAuth';
 import { getTranslationKeyForApiError } from '../../../utils/apiError';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -51,6 +53,7 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
   });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
+  const { user } = useAuth();
 
   // Fetch just the total count (1 item per page is sufficient)
   const { data, isLoading, isFetching, refetch } = useResourcesServiceGetAllResources({
@@ -146,7 +149,18 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
       const results = await Promise.allSettled(
         cachedResources.map(async (r) => {
           try {
-            await endSession({ resourceId: r.id, requestBody: {} });
+            // End my own session by its id: on a shared machine the resource may hold several sessions.
+            if (!user) throw new Error('Not signed in');
+            const active = await ResourcesService.resourceUsageGetActiveSession({ resourceId: r.id });
+            const ownSession = active.usages.find((usage) => usage.userId === user.id);
+            // No session of mine is left there (it ended meanwhile): nothing to end.
+            if (ownSession) {
+              await endSession({ resourceId: r.id, requestBody: { usageId: ownSession.id } });
+            } else {
+              queryClient.invalidateQueries({
+                queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: r.id }),
+              });
+            }
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'done' }));
             setEndErrors((prev) => {
               if (!(r.id in prev)) return prev;
@@ -188,7 +202,7 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
       setIsEndingAll(false);
       refetch();
     }
-  }, [cachedResources, endSession, isEndingAll, isLoadingResources, queryClient, refetch, t, tExists, toast]);
+  }, [cachedResources, endSession, isEndingAll, isLoadingResources, queryClient, refetch, t, tExists, toast, user]);
   return {
     t,
     isLoading,

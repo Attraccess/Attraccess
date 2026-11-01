@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AttractapReaderUiCapabilities1792000000000 implements MigrationInterface {
-  name = 'AttractapReaderUiCapabilities1792000000000';
+export class AttractapReaderUiCapabilities1792100000000 implements MigrationInterface {
+  name = 'AttractapReaderUiCapabilities1792100000000';
 
   // Skips columns that exist: dev databases may have run this migration under its earlier 1791900000000 name.
   public async up(queryRunner: QueryRunner): Promise<void> {

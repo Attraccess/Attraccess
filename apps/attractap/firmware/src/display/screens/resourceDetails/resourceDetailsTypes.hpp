@@ -30,6 +30,9 @@ struct UserDetails
         bool hasIntroduction;
         bool isIntroducer;
         bool requiresSupervisor;
+        bool canEndOtherSessions = false;
+        // The resource list was personalised for this card, so its own-session info is authoritative.
+        bool listPersonalized = false;
     };
 
 struct ButtonClickEventData
@@ -37,5 +40,6 @@ struct ButtonClickEventData
         ResourceDetailsScreen *self;
         button_click_type_t buttonClickType;
         char flowButtonId[API::MAX_FLOW_BUTTON_ID_LEN]; // valid when buttonClickType == BUTTON_CLICK_TYPE_FLOW_BUTTON
+        uint32_t usageId = 0; // BUTTON_CLICK_TYPE_STOP_SESSION: 0 ends the card holder's own session, else force-stops this one
     };
 };

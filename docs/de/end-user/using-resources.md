@@ -19,7 +19,7 @@ Klicken Sie auf eine Ressource, um die Detailseite zu öffnen. Hier sehen Sie:
 
 - **Beschreibung** – Was die Ressource ist und wie sie genutzt wird
 - **Dokumentation** – Bedienungsanleitung oder Links zu externer Dokumentation
-- **Status** – Ob die Ressource verfügbar, in Benutzung oder in Wartung ist
+- **Status** – Ob die Ressource verfügbar, in Benutzung (bei gemeinsam genutzten Maschinen **In Benutzung k/N**), voll oder in Wartung ist
 - **Einweisungsstatus** – Ob Sie für diese Ressource eingewiesen wurden
 
 <!-- TODO: Screenshot der Ressourcen-Detailseite -->
@@ -79,6 +79,18 @@ Wenn Sie die Ressource nicht mehr benötigen:
 
 > [!WARNING]
 > Beenden Sie Ihre Nutzungssitzung immer, wenn Sie fertig sind. Eine offene Sitzung kann andere Benutzer daran hindern, die Ressource zu starten.
+
+## Gemeinsam genutzte Maschine verwenden
+
+Manche Maschinen erlauben es, dass mehrere Personen gleichzeitig arbeiten. An einer solchen Maschine gilt:
+
+- Jede Person hat ihre eigene Sitzung. Sie können pro Maschine nur eine aktive Sitzung haben; ein erneuter Start zeigt **Sitzung bereits aktiv**.
+- Der Status zeigt **In Benutzung k/N**, solange einige Plätze belegt sind (Sie können weiterhin starten), und **Voll**, wenn alle Plätze belegt sind. Dann wird ein Start mit **Maschine ist voll** abgelehnt. Warten Sie, bis jemand fertig ist.
+- Auf der Detailseite sehen Sie Ihre eigene Sitzung mit **Sitzung beenden** und eine Liste der anderen aktiven Sitzungen. Als Ressourcenverwalter, Einweiser oder Wartender sowie als Aufsicht einer Sitzung können Sie die Sitzung einer anderen Person in dieser Liste mit **Sitzung beenden** beenden.
+- Beenden ohne Auswahl einer Sitzung beendet Ihre eigene Sitzung. An einer gemeinsam genutzten Maschine beendet es nie die Sitzung einer anderen Person; haben Sie dort keine Sitzung, wird nichts beendet und Sie sehen **Keine eigene Sitzung** (ein Lite-Leser gibt den Fehlerton aus).
+- Die Ansicht aktualisiert sich live, ohne neu zu laden.
+
+Befindet sich eine Maschine in Wartung oder ist als defekt gemeldet, können Sie keine neue Sitzung starten. Laufende Sitzungen laufen jedoch weiter und können normal beendet werden.
 
 ## Sitzung mit einem Projekt verknüpfen
 

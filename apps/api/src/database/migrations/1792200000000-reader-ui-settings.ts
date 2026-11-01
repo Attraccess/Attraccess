@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class ReaderUiSettings1792100000000 implements MigrationInterface {
-  name = 'ReaderUiSettings1792100000000';
+export class ReaderUiSettings1792200000000 implements MigrationInterface {
+  name = 'ReaderUiSettings1792200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

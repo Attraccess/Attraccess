@@ -27,6 +27,7 @@ int main(int argc, char **argv)
     workflow.testIdentityAndPendingAuthentication();
     workflow.testLocalization();
     workflow.testSessionSummary();
+    workflow.testParallelSessions();
     workflow.testWallClock();
     if (timeouts) workflow.testTimeouts();
     std::filesystem::remove_all(workflow.storage);

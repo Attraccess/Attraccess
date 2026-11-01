@@ -42,7 +42,7 @@ void ResourceDetailsScreen::updateUsageStatsDisplay()
 {
    if (!this->usageStatsContainer) return;
    const bool visible = this->resourceCacheValid && this->resourceCache.hasActiveUsage &&
-       this->resourceCache.activeUsageId && this->loginUsernameCache == this->resourceCache.activeUser;
+       this->resourceCache.activeUsageId && this->ownsActiveUsage();
    lv_obj_set_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN, !visible);
    if (!visible) return;
    const bool fresh = this->usageStatsValid && millis() - this->usageStatsReceivedAt < 25000;

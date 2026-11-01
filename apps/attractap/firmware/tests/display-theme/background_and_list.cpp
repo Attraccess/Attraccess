@@ -106,6 +106,7 @@ void testAuthenticatedList(Renderer &renderer)
         resource.hasIntroduction = true;
     }
     resources.items[1].hasActiveUsage = true;
+    resources.items[1].hasOwnUsage = true; // the list is personalised for Alex: their own session
     std::strcpy(resources.items[1].activeUser, "Alex Example");
     resources.items[2].type = 1;
     resources.items[3].hasIntroduction = false;
@@ -165,13 +166,16 @@ void testAuthenticatedList(Renderer &renderer)
     list.hideActionProgress();
     requireObject(guard.root, &lv_label_class, "30 s");
     resources.items[0].hasActiveUsage = true;
+    resources.items[0].hasOwnUsage = true;
     std::strcpy(resources.items[0].activeUser, "Alex Example");
     list.setResourceList(resources);
     list.showSuccessToast(FirmwareI18n::Message::UsageStarted);
     renderer.capture("att-880-action-complete");
     resources.items[0].hasActiveUsage = false;
+    resources.items[0].hasOwnUsage = false;
     resources.items[0].requiresSupervisor = true;
     resources.items[1].isUnderMaintenance = true;
+    resources.items[1].hasOwnUsage = false;
     std::strcpy(resources.items[1].activeUser, "Robin");
     resources.items[2].isHealthy = false;
     list.setResourceList(resources);
@@ -198,10 +202,10 @@ void testAuthenticatedList(Renderer &renderer)
     resource.canManageMaintenance = true;
     expect(resourceListAction(resource, "Alex") == ResourceListAction::Start, "Maintenance permission follows backend policy");
     resource.canManageMaintenance = false; resource.hasIntroduction = false;
-    resource.hasActiveUsage = true; std::strcpy(resource.activeUser, "Alex");
+    resource.hasActiveUsage = true; resource.hasOwnUsage = true; std::strcpy(resource.activeUser, "Alex");
     expect(resourceListAction(resource, "Alex") == ResourceListAction::Stop, "Owner can stop despite revoked access/maintenance");
     resource.isUnderMaintenance = false; resource.hasIntroduction = true; resource.allowTakeOver = true;
-    std::strcpy(resource.activeUser, "Robin");
+    resource.hasOwnUsage = false; std::strcpy(resource.activeUser, "Robin");
     expect(resourceListAction(resource, "Alex") == ResourceListAction::Takeover, "Foreign session requires explicit takeover");
     resource.allowTakeOver = false;
     expect(resourceListAction(resource, "Alex") == ResourceListAction::None, "Foreign usage is never a quick stop");

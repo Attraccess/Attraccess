@@ -22,6 +22,7 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
+import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStartSessionWithConfirmation } from '../../hooks/useStartSessionWithConfirmation';
 
@@ -70,11 +71,12 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
   );
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { canEndSession } = useCanEndOtherSessions(resourceId);
 
   const canUpdateResources = hasPermission('resources.update');
   const canStartSession = canUpdateResources || access?.canControl || permissions?.isIntroducer;
   const canTakeover = resource?.allowTakeOver && canStartSession;
-  const canStopOtherUserSession = permissions?.isIntroducer || canUpdateResources;
+  const canStopOtherUserSession = canEndSession(activeSession);
 
   // A takeover is a start for the new user, so it gets the plugin confirmation and block handling too.
   const startSession = useStartSessionWithConfirmation(resourceId, {
@@ -125,8 +127,9 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
   });
 
   const handleContactHolder = useCallback(() => {
-    contactHolder.mutate({ resourceId });
-  }, [contactHolder, resourceId]);
+    // Name the shown holder, so the message never goes to someone who started after the shown session ended.
+    contactHolder.mutate({ resourceId, userId: activeSession?.userId });
+  }, [activeSession?.userId, contactHolder, resourceId]);
 
   const runTakeover = useCallback(
     async (body: { notes?: string }) => {
@@ -147,6 +150,10 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
   const runStopOtherSession = useCallback(
     async (body: { notes?: string }) => {
+      // Target the shown session by id: if it ended meanwhile, the server refuses instead of stopping whoever
+      // started next.
+      const usageId = activeSession?.id;
+      if (usageId === undefined) return;
       let formSubmissions: FormSubmissionRequestDto[] = [];
       try {
         formSubmissions = await requestForms('end');
@@ -159,10 +166,10 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
       stopSession.mutate({
         resourceId,
-        requestBody: { ...body, formSubmissions },
+        requestBody: { ...body, usageId, formSubmissions },
       });
     },
-    [requestForms, resourceId, stopSession],
+    [activeSession?.id, requestForms, resourceId, stopSession],
   );
 
   const handleStopOtherUserSessionWithNotes = async (notes: string) => {
@@ -321,7 +328,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t('stopOtherUserSession.available')}</p>
             <ButtonGroup className="w-full">
-              <Button variant="danger" isPending={startSession.isPending} onPress={handleImmediateStopOtherUserSession}>
+              <Button variant="danger" isPending={stopSession.isPending} onPress={handleImmediateStopOtherUserSession}>
                 <UserX className="w-4 h-4" />
                 {t('stopOtherUserSession.button')}
               </Button>
