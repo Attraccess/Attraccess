@@ -178,7 +178,7 @@ void testAuthenticatedList(Renderer &renderer)
     lv_obj_get_coords(startButton, &errorArea);
     expect(errorArea.x1 == buttonArea.x1 && errorArea.y1 == buttonArea.y1 && errorArea.x2 == buttonArea.x2 && errorArea.y2 == buttonArea.y2,
            "The error state keeps the button's geometry");
-    requireObject(guard.root, &lv_label_class, "! Fehler - erneut tippen");
+    requireObject(guard.root, &lv_label_class, LV_SYMBOL_WARNING " Fehlgeschlagen – erneut tippen");
     renderer.capture("att-880-action-complete");
     resources.items[0].hasActiveUsage = false;
     resources.items[0].requiresSupervisor = true;

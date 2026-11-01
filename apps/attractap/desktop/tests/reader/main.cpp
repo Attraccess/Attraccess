@@ -21,6 +21,9 @@ int main(int argc, char **argv)
     workflow.testLocalization();
     workflow.testSessionSummary();
     workflow.testScreenOwnedUi();
+    workflow.testButtonErrors();
+    workflow.testFormErrors();
+    workflow.testTransientRouting();
     workflow.testWallClock();
     if (timeouts) workflow.testTimeouts();
     std::filesystem::remove_all(workflow.storage);

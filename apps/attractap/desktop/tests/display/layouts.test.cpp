@@ -1,5 +1,8 @@
 #include "fixtures.hpp"
 
+#include <algorithm>
+#include <map>
+
 // Every screen, in both languages and in its different states, with long German texts and long
 // names: nothing visible may overlap anything else, touch the chrome or leave the display.
 // (The reader workflow tests apply the same check to every frame they capture.)
@@ -42,11 +45,24 @@ namespace
     }
 }
 
-void testScreenLayouts()
+void testScreenLayouts(SdlDisplay &display, const std::filesystem::path &screenshots)
 {
     for (const char *language : {"de", "en"})
     {
         State::setDefaultLanguage(language);
+        // Checked, and with a screenshot directory written to the gallery as well.
+        std::map<std::string, int> taken;
+        const auto check = [&](const std::string &what) {
+            expectCleanLayout(what.c_str());
+            if (screenshots.empty()) return;
+            std::string name = what;
+            for (char &c : name) c = c == ' ' || c == '(' || c == ')' ? '-' : c;
+            name.erase(std::remove(name.end() - 1, name.end(), '-'), name.end());
+            const int index = ++taken[name];
+            lv_refr_now(nullptr);
+            assert(display.pollEvents());
+            screenshotScreen(screenshots / "gallery" / language, name + (index > 1 ? "-" + std::to_string(index) : "") + ".png");
+        };
 
         // Resource list, signed out and signed in.
         for (const bool signedIn : {false, true})
@@ -55,7 +71,7 @@ void testScreenLayouts()
             Display::resourceListScreen.setAuthenticatedUser(signedIn ? "Alex" : "");
             Display::transitionToScreen(&Display::resourceListScreen);
             Display::loop();
-            expectCleanLayout(signedIn ? "resource list (signed in)" : "resource list");
+            check(signedIn ? "resource list (signed in)" : "resource list");
         }
         Display::resourceListScreen.setAuthenticatedUser("");
 
@@ -66,7 +82,7 @@ void testScreenLayouts()
             Display::lockscreen.setUsageInfo(std::get<0>(usage), std::get<1>(usage), std::get<2>(usage));
             Display::transitionToScreen(&Display::lockscreen);
             Display::loop();
-            expectCleanLayout("lockscreen");
+            check("lockscreen");
         }
 
         // Resource details in every usage state.
@@ -94,7 +110,7 @@ void testScreenLayouts()
             details.setUserDetails({"Alex", true, brief.hasIntroduction, false, false});
             Display::transitionToScreen(&details);
             Display::loop();
-            expectCleanLayout(variant.name);
+            check(variant.name);
             Display::transitionToScreen(&Display::initScreen);
             Display::loop();
         }
@@ -108,7 +124,7 @@ void testScreenLayouts()
             Display::enrollmentScreen.setStatus(status);
             if (status == EnrollmentScreen::STATUS_ERROR) Display::enrollmentScreen.setStatusMessage(FirmwareI18n::readerError("CARD_ALREADY_ENROLLED"));
             Display::loop();
-            expectCleanLayout("enrollment");
+            check("enrollment");
         }
         for (const auto status : {ResetScreen::STATUS_WAITING, ResetScreen::STATUS_WRITING, ResetScreen::STATUS_SUCCESS, ResetScreen::STATUS_ERROR})
         {
@@ -118,22 +134,22 @@ void testScreenLayouts()
             Display::resetScreen.setStatus(status);
             if (status == ResetScreen::STATUS_ERROR) Display::resetScreen.setStatusMessage(FirmwareI18n::readerError("CARD_NOT_FOUND"));
             Display::loop();
-            expectCleanLayout("card reset");
+            check("card reset");
         }
 
         Display::transitionToScreen(&Display::noResourcesScreen);
         Display::loop();
-        expectCleanLayout("no resources");
+        check("no resources");
 
         Display::firmwareUpdateScreen.setAvailableVersion("1.9.0-beta.12345");
         Display::firmwareUpdateScreen.setProgress(42);
         Display::transitionToScreen(&Display::firmwareUpdateScreen);
         Display::loop();
-        expectCleanLayout("firmware update");
+        check("firmware update");
 
         Display::transitionToScreen(&Display::initScreen);
         Display::loop();
-        expectCleanLayout("init");
+        check("init");
     }
     State::setDefaultLanguage("de");
 }

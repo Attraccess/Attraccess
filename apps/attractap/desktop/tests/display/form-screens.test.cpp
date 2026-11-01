@@ -215,7 +215,7 @@ void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screensho
     // Validation is in place on the button: nothing is requested for an empty amount, size and place
     // of the button stay, and a tap performs the normal action again.
     lv_obj_send_event(start, LV_EVENT_CLICKED, nullptr);
-    assert(findLabel(topUp.getScreen(), "Betrag fehlt") && amount == 0);
+    assert(findLabel(topUp.getScreen(), warned("Betrag fehlt").c_str()) && amount == 0);
     const lv_area_t startDuring = coordsOf(start);
     assert(startDuring.x1 == startBefore.x1 && startDuring.y1 == startBefore.y1 && startDuring.x2 == startBefore.x2 && startDuring.y2 == startBefore.y2);
     lv_refr_now(nullptr);
@@ -224,14 +224,14 @@ void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screensho
     expectCleanLayout("top-up error");
     pressKey(topUp.getScreen(), "0");              // A leading zero is ignored,
     lv_obj_send_event(start, LV_EVENT_CLICKED, nullptr);
-    assert(amount == 0 && findLabel(topUp.getScreen(), "Betrag fehlt"));
+    assert(amount == 0 && findLabel(topUp.getScreen(), warned("Betrag fehlt").c_str()));
     pressKey(topUp.getScreen(), "1");
     pressKey(topUp.getScreen(), "2");
-    assert(findLabel(topUp.getScreen(), "12 EUR"));
+    assert(findLabel(topUp.getScreen(), "12 \xE2\x82\xAC"));
     pressKey(topUp.getScreen(), LV_SYMBOL_BACKSPACE);
-    assert(findLabel(topUp.getScreen(), "1 EUR"));
+    assert(findLabel(topUp.getScreen(), "1 \xE2\x82\xAC"));
     for (int i = 0; i < 8; ++i) pressKey(topUp.getScreen(), "9"); // at most six digits
-    assert(findLabel(topUp.getScreen(), "199999 EUR"));
+    assert(findLabel(topUp.getScreen(), "199999 \xE2\x82\xAC"));
     const lv_area_t keyAfter = coordsOf(lv_obj_get_parent(findLabel(topUp.getScreen(), "5")));
     assert(keyAfter.x1 == keyBefore.x1 && keyAfter.y1 == keyBefore.y1);
     expectCleanLayout("top-up amount");
@@ -249,7 +249,7 @@ void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screensho
 
     // A fresh presentation starts empty.
     topUp.reset();
-    assert(findLabel(topUp.getScreen(), "EUR"));
+    assert(findLabel(topUp.getScreen(), "\xE2\x82\xAC"));
     Display::transitionToScreen(&Display::initScreen);
     Display::loop();
     assert(!topUp.isLoaded());

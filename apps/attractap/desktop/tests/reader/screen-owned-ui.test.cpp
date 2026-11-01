@@ -1,102 +1,13 @@
 #include "workflow.hpp"
 
-// Results, confirmations, top-up, usage forms and the project picker are screens of their own;
-// errors that belong to a button show in place on it. Whatever changes the screen takes them away.
-namespace
-{
-    lv_area_t areaOf(lv_obj_t *object)
-    {
-        lv_obj_update_layout(lv_obj_get_screen(object));
-        lv_area_t area;
-        lv_obj_get_coords(object, &area);
-        return area;
-    }
-
-    bool sameArea(const lv_area_t &a, const lv_area_t &b)
-    {
-        return a.x1 == b.x1 && a.y1 == b.y1 && a.x2 == b.x2 && a.y2 == b.y2;
-    }
-
-    // The button that carries `text`: its own caption, or the error skin lying over it.
-    lv_obj_t *buttonOf(lv_obj_t *root, const char *text)
-    {
-        lv_obj_t *found = label(root, text);
-        while (found && !lv_obj_check_type(found, &lv_button_class)) found = lv_obj_get_parent(found);
-        return found;
-    }
-}
-
+// Results, confirmations, top-up, usage forms and the project picker are screens of their own.
+// Whatever changes the screen takes them away. (Errors in place on a button: button-errors and
+// form-errors.)
 void ReaderWorkflow::testScreenOwnedUi()
 {
     supervised = false; active = false;
     login();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    const auto failStart = [&](const std::string &body) {
-        const auto id = server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>();
-        server.push("START_RESOURCE_USAGE_SESSION", "{\"requestId\":" + std::to_string(id) + "," + body + "}");
-        pump();
-        list(); // The refresh that follows every failed action.
-    };
-    const std::string denied = R"("success":false,"error":"Denied by test")";
-
-    // An action that fails shows in place on its button: nothing moves, a tap retries, it fades.
-    {
-        auto *start = buttonOf(lv_screen_active(), "Start");
-        const lv_area_t before = areaOf(start);
-        click("Start");
-        const auto requests = server.count("START_RESOURCE_USAGE_SESSION");
-        failStart(denied);
-        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-        auto *shown = buttonOf(lv_screen_active(), "! Fehler - erneut tippen");
-        assert(shown && lv_obj_is_visible(label(lv_screen_active(), "! Fehler - erneut tippen")));
-        assert(sameArea(areaOf(shown), before));
-        display.capture(output, "button-error-list");
-        click("Start"); // The button is still the button: this is the retry.
-        assert(server.count("START_RESOURCE_USAGE_SESSION") == requests + 1);
-        assert(!label(lv_screen_active(), "! Fehler - erneut tippen"));
-        failStart(denied);
-        pump(4300);
-        assert(!label(lv_screen_active(), "! Fehler - erneut tippen") && sameArea(areaOf(buttonOf(lv_screen_active(), "Start")), before));
-        // A known reader error is shown instead of the generic text.
-        click("Start");
-        failStart(R"("success":false,"error":"CARD_NOT_ACTIVE")");
-        assert(label(lv_screen_active(), "Karte ist nicht aktiv"));
-        // Leaving the screen takes it away.
-        click("Abmelden");
-        list(false);
-        assert(!label(lv_screen_active(), "Karte ist nicht aktiv"));
-        login();
-    }
-
-    // The same on the details screen.
-    click("Lasercutter");
-    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
-    {
-        auto *start = buttonOf(lv_screen_active(), "Ressource verwenden");
-        const lv_area_t before = areaOf(start);
-        click("Ressource verwenden");
-        failStart(denied);
-        auto *shown = buttonOf(lv_screen_active(), "! Fehler - erneut tippen");
-        assert(shown && sameArea(areaOf(shown), before));
-        display.capture(output, "button-error-details");
-        click(LV_SYMBOL_LEFT); // Leaving takes it away.
-        click("Lasercutter");
-        assert(!label(lv_screen_active(), "! Fehler - erneut tippen"));
-        click(LV_SYMBOL_LEFT);
-    }
-
-    // The button is gone when the error arrives: a full-screen error with the code.
-    click("Start");
-    server.push("RESOURCE_USAGE_FORM_REQUEST", R"({"resourceId":1,"action":"start","forms":[{"id":8,"name":"Check","fieldCount":1}]})"); pump();
-    assert(lv_screen_active() == Display::formsScreen.getScreen());
-    failStart(denied);
-    assert(lv_screen_active() == Display::statusScreen.getScreen());
-    assert(label(lv_screen_active(), "Etwas ist schiefgelaufen") && label(lv_screen_active(), "Code: Denied by test"));
-    display.capture(output, "generic-error");
-    click("Zurück");
-    assert(lv_screen_active() != Display::statusScreen.getScreen());
-    list();
-
     // A result that belongs to no button is only logged.
     const auto screenBefore = lv_screen_active();
     server.push("RESOURCE_LIST", R"({"error":"INTERNAL_ERROR"})"); pump();
@@ -124,9 +35,8 @@ void ReaderWorkflow::testScreenOwnedUi()
 
     // Insufficient balance with a payment terminal: the top-up screen over the screen it came from.
     const auto balanceFailure = [&](bool sumUp) {
-        const auto id = server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>();
-        server.push("START_RESOURCE_USAGE_SESSION", "{\"requestId\":" + std::to_string(id) +
-                    R"(,"success":false,"error":"INSUFFICIENT_BALANCE","sumUpEnabled":)" + (sumUp ? "true}" : "false}"));
+        server.push("START_RESOURCE_USAGE_SESSION", "{\"requestId\":" + std::to_string(requestIdOf("START_RESOURCE_USAGE_SESSION")) +
+                    R"(,"error":"INSUFFICIENT_BALANCE","sumUpEnabled":)" + (sumUp ? "true}" : "false}"));
         pump(); list();
     };
     click("Start");
@@ -145,12 +55,12 @@ void ReaderWorkflow::testScreenOwnedUi()
     assert(lv_screen_active() == Display::topUpScreen.getScreen());
     click("7"); click("Aufladen");
     assert(server.last("BILLING_REQUEST_TOPUP")["data"]["payload"]["amountCents"].as<uint32_t>() == 700);
-    assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Bitte am Zahlungsterminal fortfahren ..."));
+    assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Bitte am Zahlungsterminal fortfahren."));
     pump(6300);
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
     // The server refuses the request: back to the amount, the reason in place on "Aufladen".
     server.push("BILLING_REQUEST_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
-    assert(lv_screen_active() == Display::topUpScreen.getScreen() && label(lv_screen_active(), "Karte ist nicht aktiv"));
+    assert(lv_screen_active() == Display::topUpScreen.getScreen() && label(lv_screen_active(), warned("Karte ist nicht aktiv").c_str()));
     click("Abbrechen");
     click(LV_SYMBOL_LEFT);
     // The refusal usually arrives while "continue at the payment terminal" is still showing.
@@ -185,16 +95,6 @@ void ReaderWorkflow::testScreenOwnedUi()
     server.push("RESOURCE_USAGE_FORM_REQUEST", R"({"resourceId":1,"action":"end","forms":[{"id":8,"name":"Check","fieldCount":1}]})"); pump();
     server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"totalFieldCount":1,"fields":[{"id":9,"name":"Sichtprüfung","type":"text","isRequired":true,"value":"OK"}]})"); pump();
     assert(lv_screen_active() == Display::formsScreen.getScreen());
-    // A page the server cannot take: in place on "Absenden".
-    {
-        auto *submit = buttonOf(lv_screen_active(), "Absenden");
-        const lv_area_t before = areaOf(submit);
-        click("Absenden");
-        server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"error":"Denied by test"})"); pump();
-        auto *shown = buttonOf(lv_screen_active(), "! Fehler - erneut tippen");
-        assert(shown && sameArea(areaOf(shown), before));
-        display.capture(output, "button-error-form");
-    }
     disconnect();
     assert(!Display::formsScreen.isLoaded());
     active = false; list();
@@ -234,11 +134,6 @@ void ReaderWorkflow::testScreenOwnedUi()
     click(LV_SYMBOL_LEFT);
 
     // The maintenance drawer asks for the reboot on a screen of its own, over the current one.
-    const auto openDrawer = [&] {
-        display.touch = {240, 10, true}; pump();
-        display.touch = {240, 150, true}; pump();
-        display.touch.pressed = false; pump();
-    };
     openDrawer();
     assert(lv_obj_is_visible(requireLabel(lv_layer_top(), "Wartung")));
     click("Neustart", true);
