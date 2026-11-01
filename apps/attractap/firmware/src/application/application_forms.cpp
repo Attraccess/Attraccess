@@ -304,6 +304,7 @@ void Application::handleFormPageNext(const API::FormPageSubmission &page) {
   if (!this->hasPendingFormRequest) {
     return;
   }
+  this->formPageSubmitPending = true;
   this->api.submitFormPage(this->pendingFormRequest.resourceId,
                            this->pendingFormRequest.action, page);
 }
@@ -313,6 +314,7 @@ void Application::handleFormPageResult(
   if (!this->hasPendingFormRequest) {
     return;
   }
+  this->formPageSubmitPending = false;
   if (result.valid) {
     // The submitted field's draft value changed server-side; drop its cached copy
     // so navigating back re-fetches the persisted answer instead of a stale one.
@@ -333,6 +335,7 @@ void Application::handleFormPageBack() {
 
 void Application::finishFormFlow() {
   this->hasPendingFormRequest = false;
+  this->formPageSubmitPending = false;
   this->formFlowSubmitted = true;
   this->leaveForms();
   this->pendingUiStartedAt = millis();
@@ -384,9 +387,12 @@ void Application::handleFormsCancel() {
   this->formCursorOffset = 0;
   this->clearFormPageCache();
   this->awaitingFieldRender = false;
-  this->leaveForms();
-  if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.hideActionProgress();
+  // Finishing first: an action started on the list goes back to the list, not the details.
   this->finishReaderAction(false);
-  if (!this->waitingForResourceRefresh) this->endActionPause();
+  this->leaveForms();
+  if (!this->waitingForResourceRefresh) {
+    Display::resourceDetailsScreen.hideActionProgress();
+    this->endActionPause();
+  }
 }
 #endif

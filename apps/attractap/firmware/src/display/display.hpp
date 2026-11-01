@@ -108,6 +108,8 @@ public:
     static bool transientActive();
     // Back to the origin; false when there is none (the caller resumes routing).
     static bool returnFromTransient();
+    // The screen a transient screen was raised over, or nullptr.
+    static const IScreen *transientOrigin() { return transientActive() ? parkedOrigin : nullptr; }
     static void showStatus(StatusScreen::Config config);
     static void showConfirm(ConfirmScreen::Config config);
 
@@ -127,7 +129,10 @@ public:
 
 private:
     static void setupFramebuffer();
-    static bool touchWarningPending;
+    static constexpr uint32_t TouchWarningMs = 6000;
+    static uint32_t touchWarningRemainingMs;
+    static uint32_t touchWarningShownAt;
+    static void updateTouchWarning();
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.
@@ -193,6 +198,7 @@ private:
     static lv_obj_t *drawerGrabber;
     static lv_obj_t *drawerPanel;
     static bool drawerOpen;
+    static bool rebootConfirmShown;
     static std::function<void()> onOpenSettingsCallback;
     static std::function<bool()> drawerAvailableCallback;
     static bool gestureCandidate;

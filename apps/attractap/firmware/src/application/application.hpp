@@ -93,15 +93,25 @@ private:
     // Full-screen result over the current screen. `resumeRouting`: leaving it lets the application
     // route from its state (e.g. to the lockscreen after a logout) instead of returning to the origin.
     void showStatus(StatusScreen::Config config, bool resumeRouting = false);
-    // An action failed: in place on the button that started it, or a full-screen error when that is gone.
     std::string resourceNameOf(uint32_t resourceId) const;
+    // An action failed: in place on the button that started it, or a full-screen error when that is gone.
     void showActionFailure(uint32_t resourceId, const std::string &errorCode,
-                           const FirmwareI18n::Text &preferred = FirmwareI18n::Text());
-    uint32_t routingKey() const;
+                           const FirmwareI18n::Text &preferred = FirmwareI18n::Text(), bool returnToList = false);
+    // "Sign-in failed" with `message`; a card tapped meanwhile dismisses it (dismissSignedOutStatus).
+    void showSignInFailed(const FirmwareI18n::Text &message);
+    // A refused action: top-up, "insufficient balance" or showActionFailure.
+    void reportActionFailure(const API::ActionResult &result, uint32_t resourceId, bool returnToList);
+    // The server refused a usage form request (its fields or a page).
+    void handleFormFlowError(const API::ActionResult &result);
+    RoutingKey routingKey() const;
+    // A card tapped while "sign-in failed" or "status unavailable" is up: back to the signed-out
+    // screen the state dictates, so the tap signs in as usual.
+    bool dismissSignedOutStatus();
     // An error the server reported for `eventType`; only errors that belong to something on screen get UI.
     void handleReaderError(const std::string &eventType, const std::string &code);
     // Top-up is a routed screen over the origin; the form and project screens likewise.
-    void openTopUp();
+    // `keepAmount`: a refused request comes back with the amount that was typed.
+    void openTopUp(bool keepAmount = false);
     void leaveTopUp();
     void leaveForms();
     void openProjects();

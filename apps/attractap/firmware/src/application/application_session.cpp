@@ -184,6 +184,9 @@ void Application::resetSessionOnDisconnect() {
   this->waitingForResourceRefresh = false;
   this->actionCompletionMessage.clear();
   Display::formsScreen.resetForm();
+  this->billingSummaryShown = false;
+  this->topUpPending = false;
+  this->formPageSubmitPending = false;
   this->resetPauseAccounting();
 
   this->pendingActionType = PENDING_ACTION_NONE;
@@ -411,96 +414,17 @@ void Application::endActionPause() {
 }
 
 
-uint32_t Application::routingKey() const {
-  return (static_cast<uint32_t>(this->state) << 24) ^ (this->unlocked ? (1u << 23) : 0u) ^
-         (this->resourceIsSelected ? (1u << 22) : 0u) ^ (this->selectedResourceId & 0x3FFFFFu);
-}
-
-void Application::showStatus(StatusScreen::Config config, bool resumeRouting) {
-  config.onDismiss = [this, resumeRouting] {
-    this->statusHeld = false;
-    if (resumeRouting || !Display::returnFromTransient()) this->state = APPLICATION_STATE_INIT;
-  };
-  this->statusHeld = true;
-  this->statusHoldKey = this->routingKey();
-  Display::showStatus(std::move(config));
-}
-
-std::string Application::resourceNameOf(uint32_t resourceId) const {
-  for (uint16_t i = 0; i < this->resourceList.count; ++i)
-    if (this->resourceList.items[i].id == resourceId) return this->resourceList.items[i].name;
-  return std::string();
-}
-
-void Application::showActionFailure(uint32_t resourceId, const std::string &errorCode, const FirmwareI18n::Text &preferred) {
-  // The raw server error is for the log; the screen only shows text the reader can localize.
-  this->logger.errorf("Action failed: %s", errorCode.c_str());
-  FirmwareI18n::Text text = preferred.empty() ? FirmwareI18n::knownReaderError(errorCode) : preferred;
-  if (text.empty()) text = FirmwareI18n::Message::ActionFailedTapToRetry;
-  bool shown = false;
-  if (Display::isActive(&Display::resourceDetailsScreen)) shown = Display::resourceDetailsScreen.showActionError(text);
-  else if (Display::isActive(&Display::resourceListScreen)) shown = Display::resourceListScreen.showActionError(resourceId, text);
-  if (!shown) {
-    const FirmwareI18n::Text known = FirmwareI18n::knownReaderError(errorCode);
-    this->showStatus(StatusScreen::generic(known.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseTryAgain) : known, errorCode));
-  }
-}
-
-void Application::handleReaderError(const std::string &eventType, const std::string &code) {
-  const FirmwareI18n::Text known = FirmwareI18n::knownReaderError(code);
-  const FirmwareI18n::Text retry = known.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::ActionFailedTapToRetry) : known;
-  if (eventType == "CARD_AUTHENTICATION_DATA") {
-    this->beeper.errorBeep();
-    if (this->cardAuthenticationPending) this->finishCardAuthentication(false);
-    this->nfc.enableCardDetection();
-    this->showStatus(StatusScreen::error(FirmwareI18n::Message::SignInFailed, FirmwareI18n::readerError(code)));
-  } else if (eventType == "RESOURCE_USAGE_FORM_PAGE_RESULT") {
-    // The server could not take the page: stay on the form, in place on Next/Submit.
-    if (Display::isActive(&Display::formsScreen)) {
-      this->beeper.errorBeep();
-      Display::formsScreen.showSubmitError(retry);
-    }
-  } else if (eventType == "RESOURCE_USAGE_FORM_REQUEST" || eventType == "RESOURCE_USAGE_FORM_FIELDS") {
-    // The form never opened (or broke): back to the button that started the action.
-    this->beeper.errorBeep();
-    const uint32_t resourceId = this->pendingUiResourceId;
-    this->finishReaderAction(false);
-    this->handleFormsCancel();
-    this->showActionFailure(resourceId, code);
-  } else if (eventType == "BILLING_REQUEST_TOPUP") {
-    // The top-up request was refused: back to the amount, with the reason on "Top up".
-    if (this->unlocked) {
-      this->beeper.errorBeep();
-      this->openTopUp();
-      Display::topUpScreen.showError(retry);
-    }
-  } else if (eventType == "PROJECTS_OF_USER") {
-    Display::projectSelectScreen.showLoadError();
-  } else if (eventType.rfind("ENROLL_NEW_CARD", 0) == 0) {
-    if (Display::isActive(&Display::enrollmentScreen)) {
-      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-      Display::enrollmentScreen.setStatusMessage(FirmwareI18n::readerError(code));
-    }
-  } else if (eventType == "RESET_NFC_CARD") {
-    if (Display::isActive(&Display::resetScreen)) {
-      Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
-      Display::resetScreen.setStatusMessage(FirmwareI18n::readerError(code));
-    }
-  }
-  // Anything else is background traffic (resource list refreshes, language, firmware notices):
-  // the API has logged it, and nobody is waiting on it.
-}
-
-void Application::openTopUp() {
+void Application::openTopUp(bool keepAmount) {
   // A late balance error for a session that already ended has nobody to top up.
   if (!this->unlocked || this->state == APPLICATION_STATE_TOP_UP) return;
-  Display::topUpScreen.reset();
+  if (!keepAmount) Display::topUpScreen.reset();
   Display::topUpScreen.setCallbacks(
       [this](uint32_t amountCents) {
         if (this->state != APPLICATION_STATE_TOP_UP || !this->unlocked) return;
         this->leaveTopUp();
         this->api.requestBillingTopup(amountCents);
-        this->showStatus(StatusScreen::warning(FirmwareI18n::Message::PleaseContinueAtThePaymentTerminal, FirmwareI18n::Text(), false));
+        this->topUpPending = true;
+        this->showStatus(StatusScreen::info(FirmwareI18n::Message::TopUpStarted, FirmwareI18n::Message::PleaseContinueAtThePaymentTerminal));
       },
       [this]() { this->leaveTopUp(); });
   this->state = APPLICATION_STATE_TOP_UP;
@@ -519,15 +443,24 @@ void Application::leaveTopUp() {
   }
 }
 
-// Back from the form screen to the details it was raised over. When the action was started from
-// the list the selection is already cleared and routing takes the reader back to the list.
+// Back from the form screen: to the details it was raised over, or to the list when the action
+// was started there (the selection is already cleared then).
 void Application::leaveForms() {
   Display::formsScreen.resetForm();
-  if (Display::isActive(&Display::formsScreen) && this->resourceIsSelected) Display::returnFromTransient();
+  this->formPageSubmitPending = false;
+  if (!Display::isActive(&Display::formsScreen)) return;
+  if (this->resourceIsSelected) {
+    Display::returnFromTransient();
+    return;
+  }
+  this->state = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;
+  Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
+  Display::transitionToScreen(&Display::resourceListScreen);
 }
 
 void Application::openProjects() {
   Display::projectSelectScreen.setSelectedProject(this->selectedProjectId);
+  Display::projectSelectScreen.setResourceName(this->resourceNameOf(this->selectedResourceId));
   Display::projectSelectScreen.begin();
   Display::transitionToScreen(&Display::projectSelectScreen);
 }
