@@ -4,6 +4,18 @@ import { useReaderReaderUiSettings, useReaderUiContributions, useSaveReaderReade
 import en from './en.json';
 import de from './de.json';
 
+/** Reasons the host itself gives; anything else (a validator message, a reader drop) is shown as sent. */
+const HOST_REASONS = new Set([
+  'old-firmware',
+  'no-screen',
+  'crash-loop-suspended',
+  'widgets-disabled',
+  'unsupported',
+  'expired',
+  'too-many-contributions',
+  'provider-error',
+]);
+
 /** Per-reader plugin widget toggle, contribution status and alerts for the reader editor. */
 export function ReaderUiReaderPanel({ readerId }: Readonly<{ readerId: number }>) {
   const { t } = useTranslations({ en, de });
@@ -35,7 +47,7 @@ export function ReaderUiReaderPanel({ readerId }: Readonly<{ readerId: number }>
             </span>
             <span data-cy={`reader-ui-status-${c.status}`}>
               {t(`reader.status.${c.status}`)}
-              {c.reason ? `: ${c.reason}` : ''}
+              {c.reason ? `: ${HOST_REASONS.has(c.reason) ? t(`reader.reason.${c.reason}`) : c.reason}` : ''}
             </span>
           </div>
         ))}

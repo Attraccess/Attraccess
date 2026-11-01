@@ -28,7 +28,17 @@
     "widgetsDescription": "Widgets erscheinen nur, wenn diese und die Ressourceneinstellung aktiv sind.",
     "contributions": "Plugin-Beiträge",
     "noContributions": "Keine Plugin-Beiträge für diesen Reader.",
-    "status": { "rendered": "Angezeigt", "degraded": "Eingeschränkt", "skipped": "Übersprungen" }
+    "status": { "rendered": "Angezeigt", "degraded": "Eingeschränkt", "skipped": "Übersprungen" },
+    "reason": {
+      "old-firmware": "Reader-Firmware ohne Plugin-UI",
+      "no-screen": "Reader ohne Bildschirm",
+      "crash-loop-suspended": "Reader nach Absturz gesperrt",
+      "widgets-disabled": "Widgets sind ausgeschaltet",
+      "unsupported": "Reader kann das nicht anzeigen",
+      "expired": "bereits abgelaufen",
+      "too-many-contributions": "zu viele Beiträge für diese Ressource",
+      "provider-error": "Plugin hat nicht geantwortet"
+    }
   },
   "alerts": {
     "title": "Reader-UI-Alarme",

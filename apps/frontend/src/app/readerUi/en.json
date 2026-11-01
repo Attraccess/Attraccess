@@ -28,7 +28,17 @@
     "widgetsDescription": "Widgets appear only when this and the resource setting are on.",
     "contributions": "Plugin contributions",
     "noContributions": "No plugin contributions for this reader.",
-    "status": { "rendered": "Rendered", "degraded": "Degraded", "skipped": "Skipped" }
+    "status": { "rendered": "Rendered", "degraded": "Degraded", "skipped": "Skipped" },
+    "reason": {
+      "old-firmware": "reader firmware has no plugin UI",
+      "no-screen": "reader has no screen",
+      "crash-loop-suspended": "reader suspended after a crash",
+      "widgets-disabled": "widgets are switched off",
+      "unsupported": "reader cannot show this",
+      "expired": "already expired",
+      "too-many-contributions": "too many contributions for this resource",
+      "provider-error": "plugin failed to answer"
+    }
   },
   "alerts": {
     "title": "Reader UI alerts",

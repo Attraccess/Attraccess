@@ -9,6 +9,7 @@ import {
   type ReaderUiCapabilities,
 } from '@attraccess/plugins-backend-sdk';
 import { AttractapService } from '../../../attractap.service';
+import { ReaderUpdatedEvent } from '../../../events';
 import { validateReaderUiCapabilities, validateSlotUpdate } from '../../../../resources/forms/reader-ui.validation';
 import { ReaderUiAlertsService } from '../../../../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiSettingsService } from '../../../../plugin-system/reader-ui/reader-ui-settings.service';
@@ -104,6 +105,12 @@ export class UiSlotService {
     }
   }
 
+  /** Attaching or detaching resources changes which rows the reader shows, so its slot content must follow. */
+  @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
+  onReaderUpdated(event: ReaderUpdatedEvent): void {
+    this.syncReader(event.reader.id);
+  }
+
   syncReader(readerId: number | undefined): void {
     for (const socket of this.websocketService.sockets.values()) {
       if (readerId === undefined || socket.readerId === readerId) void this.sync(socket);
@@ -147,10 +154,18 @@ export class UiSlotService {
     const caps = state.capabilities;
     const readerId = socket.readerId as number;
     const desired = new Map<string, Desired>();
-    if (caps && caps.schemaVersion >= 1 && caps.components.length > 0 && !this.alerts.isReaderSuspended(readerId)) {
+    const providers = this.registry.providers();
+    if (providers.length > 0) {
+      const skipReason = this.readerSkipReason(caps, readerId);
       const reader = await this.attractapService.findReaderById(readerId);
       for (const resource of reader?.resources ?? []) {
-        await this.collect(socket, caps, readerId, resource.id, desired);
+        if (skipReason || !caps) {
+          // Nothing is sent, but the admin view says why this reader shows no plugin content.
+          for (const { plugin } of providers)
+            this.skip(desired, plugin, resource.id, 'reader', skipReason ?? 'old-firmware');
+        } else {
+          await this.collect(socket, caps, readerId, resource.id, desired);
+        }
       }
     }
     this.applyNodeBudget(desired);
@@ -199,6 +214,13 @@ export class UiSlotService {
     }
   }
 
+  /** Why a whole reader gets no plugin content, or null when it can show some. */
+  private readerSkipReason(caps: ReaderUiCapabilities | null, readerId: number): string | null {
+    if (!caps || caps.schemaVersion < 1) return 'old-firmware';
+    if (caps.components.length === 0) return 'no-screen';
+    return this.alerts.isReaderSuspended(readerId) ? 'crash-loop-suspended' : null;
+  }
+
   private async collect(
     socket: AuthenticatedWebSocket,
     caps: ReaderUiCapabilities,
@@ -210,7 +232,10 @@ export class UiSlotService {
     const language = card?.language ?? this.websocketService.readerLanguage ?? 'en';
     let perResource = 0;
     for (const { plugin, provider } of this.registry.providers()) {
-      if (!(await this.settings.widgetsEnabled(resourceId, plugin, readerId))) continue;
+      if (!(await this.settings.widgetsEnabled(resourceId, plugin, readerId))) {
+        this.skip(desired, plugin, resourceId, 'widgets', 'widgets-disabled');
+        continue;
+      }
       let list: ReaderSlotContribution[];
       try {
         list = await Promise.race([

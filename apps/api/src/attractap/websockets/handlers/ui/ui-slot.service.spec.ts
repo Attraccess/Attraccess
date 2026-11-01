@@ -94,6 +94,22 @@ describe('UiSlotService', () => {
     expect(updates(socket).at(-1).payload).toMatchObject({ revision: 3, tree: null });
   });
 
+  it('re-syncs only the updated reader when its resources change', async () => {
+    let current = [header('A')];
+    const { service, socket } = setup(() => current);
+    await service.onFirmwareInfo(socket, TOUCH_UI);
+    current = [header('B')];
+    await jest.advanceTimersByTimeAsync(2100);
+
+    service.onReaderUpdated({ reader: { id: socket.readerId + 1 } } as never);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(updates(socket)).toHaveLength(1);
+
+    service.onReaderUpdated({ reader: { id: socket.readerId } } as never);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(updates(socket).at(-1).payload).toMatchObject({ revision: 2, tree: { text: 'B' } });
+  });
+
   it('resets revisions on a new firmware info (READER_AUTHENTICATED boundary)', async () => {
     const { service, socket } = setup(() => [header('A')]);
     await service.onFirmwareInfo(socket, TOUCH_UI);
@@ -216,6 +232,29 @@ describe('UiSlotService', () => {
     const off = setup(() => [header('x')], { widgets: false });
     await off.service.onFirmwareInfo(off.socket, TOUCH_UI);
     expect(updates(off.socket)).toHaveLength(0);
+  });
+
+  it('tells the admin view why a reader shows no plugin content, without sending anything', async () => {
+    const status = (t: ReturnType<typeof setup>) => {
+      t.socket.readerId = 5;
+      return t.service.contributionsOf(5).map((c) => `${c.plugin}#${c.resourceId}:${c.status}:${c.reason}`);
+    };
+    const suspended = setup(() => [header('x')], { suspended: true });
+    await suspended.service.onFirmwareInfo(suspended.socket, TOUCH_UI);
+    expect(status(suspended)).toEqual(['reservations#12:skipped:crash-loop-suspended']);
+
+    const off = setup(() => [header('x')], { widgets: false });
+    await off.service.onFirmwareInfo(off.socket, TOUCH_UI);
+    expect(status(off)).toEqual(['reservations#12:skipped:widgets-disabled']);
+
+    const old = setup(() => [header('x')]);
+    await old.service.onFirmwareInfo(old.socket, undefined);
+    expect(status(old)).toEqual(['reservations#12:skipped:old-firmware']);
+
+    const lite = setup(() => [header('x')]);
+    await lite.service.onFirmwareInfo(lite.socket, { ...TOUCH_UI, components: [], slots: [], display: null });
+    expect(status(lite)).toEqual(['reservations#12:skipped:no-screen']);
+    for (const t of [suspended, off, old, lite]) expect(updates(t.socket)).toHaveLength(0);
   });
 
   it('builds public slots without a user and rebuilds with the user while a card session is live', async () => {
