@@ -249,7 +249,7 @@ add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-
 add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
 add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
-# About 145 s on a developer machine; leave room for loaded CI runners.
+# About 160 s on a developer machine; leave room for loaded CI runners.
 set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 300)
 
 # A reader without credentials: pairing channel, pending screen with and without QR, approval.
@@ -260,8 +260,8 @@ add_test(NAME attractap-reader-pairing-tests COMMAND attractap-reader-pairing-te
 set_tests_properties(attractap-reader-pairing-tests PROPERTIES TIMEOUT 60)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
-# Includes the bilingual reader journey plus twelve real 30-second expiry windows (about 9 minutes).
-set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 1200)
+# Twelve real 30-second expiry windows without the journey (about 6.5 minutes).
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 780)
 
 # Exercise the production beeper without playing sound on the developer's machine.
 set_property(TEST

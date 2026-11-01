@@ -10,6 +10,14 @@ int main(int argc, char **argv)
         std::filesystem::remove_all(workflow.storage);
         return 0;
     }
+    if (timeouts) {
+        // The expiry windows set up what they need; the journey runs in the main suite.
+        workflow.boot();
+        workflow.testTimeouts();
+        std::filesystem::remove_all(workflow.storage);
+        std::cout << "PASS reader timeouts\n";
+        return 0;
+    }
     workflow.testListAndAuthentication();
     workflow.testSessionStart();
     workflow.testUsageStats();
@@ -25,7 +33,6 @@ int main(int argc, char **argv)
     workflow.testFormErrors();
     workflow.testTransientRouting();
     workflow.testWallClock();
-    if (timeouts) workflow.testTimeouts();
     std::filesystem::remove_all(workflow.storage);
     std::cout << "PASS ATT-880 production application journeys\n";
 }

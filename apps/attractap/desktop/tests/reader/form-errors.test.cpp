@@ -43,6 +43,9 @@ void ReaderWorkflow::testFormErrors()
     server.push("RESOURCE_USAGE_FORM_REQUEST", formRequest("start", 2)); pump();
     server.push("RESOURCE_USAGE_FORM_FIELDS", formFields("start", 0, 2)); pump();
     assert(lv_screen_active() == Display::formsScreen.getScreen());
+    // An error for an older request id is not this form's: the form stays as it is.
+    server.push("START_RESOURCE_USAGE_SESSION", R"({"requestId":1,"error":"RESOURCE_LOCKED"})"); pump();
+    assert(lv_screen_active() == Display::formsScreen.getScreen() && !label(lv_screen_active(), genericError.c_str()));
     {
         auto *next = buttonOf(lv_screen_active(), "Weiter");
         const lv_area_t before = areaOf(next);
