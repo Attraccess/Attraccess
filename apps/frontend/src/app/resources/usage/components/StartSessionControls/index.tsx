@@ -3,7 +3,7 @@ import { InsufficientBalanceModal } from './insufficientBalanceModal/index';
 import { DoorControls } from './DoorControls';
 import { MachineStartControls } from './MachineStartControls';
 import { SupervisedStartModal } from '../SupervisedStartModal/index';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   StartUsageSessionDto,
   useResourcesServiceResourceUsageStartSession,
@@ -18,6 +18,7 @@ import {
   ResourceType,
   SupervisionMode,
 } from '@attraccess/react-query-client';
+import { getConfirmationRequired, getStartBlockedReason, useStartConfirmation } from '../../hooks/useStartConfirmation';
 import { ResourceFormAction } from '../../../details/forms/types';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -111,6 +112,7 @@ export function useStartSessionControlsStateOutput(
     selectedProjectId: model.selectedProjectId,
     setSelectedProjectId: model.setSelectedProjectId,
     formsModal: model.formsModal,
+    confirmationDialog: model.confirmationDialog,
     handleStartSession,
     handleOpenStartSessionModal,
     handleLockDoor,
@@ -199,12 +201,22 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
     [requestForms],
   );
 
+  const submitRef = useRef<(action: ResourceFormAction, requestBody: StartUsageSessionDto) => void>(() => undefined);
+  const actionRef = useRef<ResourceFormAction>('start');
+  const confirmation = useStartConfirmation<StartUsageSessionDto>((requestBody) =>
+    submitRef.current(actionRef.current, requestBody),
+  );
+
   const submitStartSessionWithRetry = useCallback(
     (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
+      actionRef.current = action;
       startUsageSessionMutate(
         { resourceId: model.resourceId, requestBody },
         {
           onError: async (error) => {
+            if (confirmation.handleStartError(error, requestBody)) {
+              return;
+            }
             if (!isFormsMissingError(error)) {
               return;
             }
@@ -225,9 +237,17 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
         },
       );
     },
-    [gatherFormSubmissions, isFormsMissingError, model.resourceId, startUsageSessionMutate],
+    [
+      confirmation.handleStartError,
+      gatherFormSubmissions,
+      isFormsMissingError,
+      model.resourceId,
+      startUsageSessionMutate,
+    ],
   );
+  submitRef.current = submitStartSessionWithRetry;
   return {
+    confirmationDialog: confirmation.dialog,
     ...model,
     onStartSuccess,
     startUsageSessionMutate,
@@ -329,6 +349,16 @@ export function useStartSessionControlsStateInputs(
         return;
       }
 
+      // A confirmation is asked in a dialog, a block shows the plugin's literal reason.
+      if (getConfirmationRequired(error)) {
+        return;
+      }
+      const blocked = getStartBlockedReason(error);
+      if (blocked) {
+        toast.error({ title: blocked.title, description: blocked.body });
+        return;
+      }
+
       const { errorMessage } = getTranslationKeyForApiError({
         error,
         t,
@@ -410,6 +440,7 @@ export function StartSessionControls(
     selectedProjectId,
     setSelectedProjectId,
     formsModal,
+    confirmationDialog,
     handleStartSession,
     handleOpenStartSessionModal,
     handleLockDoor,
@@ -471,6 +502,7 @@ export function StartSessionControls(
         />
       )}
       {formsModal}
+      {confirmationDialog}
     </div>
   );
 }

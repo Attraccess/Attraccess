@@ -164,3 +164,34 @@ it('does not retry ordinary errors or a cancelled form resubmission', async () =
   );
   expect(startMutate).toHaveBeenCalledOnce();
 });
+
+it('asks for a plugin confirmation on 409 CONFIRMATION_REQUIRED and retries with the step id', async () => {
+  startMutate.mockClear();
+  requestForms.mockReset().mockResolvedValue([]);
+  supervisionMode.value = 'introduction_required';
+  render(<StartSessionControls resourceId={1} />);
+  await userEvent.click(screen.getByText('start'));
+  const callbacks = startMutate.mock.calls[0][1];
+  const error = new ApiError(
+    { method: 'POST', url: '/start' },
+    {
+      url: '/start',
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      body: {
+        code: 'CONFIRMATION_REQUIRED',
+        stepId: 'step-1',
+        confirmation: { title: 'Reserved from 14:00', body: 'Start anyway?' },
+      },
+    },
+    'Conflict',
+  );
+  await act(() => callbacks.onError(error));
+  expect(screen.getByText('Reserved from 14:00')).toBeInTheDocument();
+  expect(startMutate).toHaveBeenCalledOnce();
+
+  await userEvent.click(document.querySelector('[data-cy="start-confirmation-confirm"]') as HTMLElement);
+  expect(startMutate).toHaveBeenCalledTimes(2);
+  expect(startMutate.mock.calls[1][0].requestBody).toMatchObject({ confirmedStepIds: ['step-1'] });
+});
