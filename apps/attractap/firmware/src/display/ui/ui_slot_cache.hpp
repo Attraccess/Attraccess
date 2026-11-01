@@ -56,6 +56,9 @@ namespace ui
         mutable std::mutex mutex_;
     };
 
+    // m:ss, or h:mm:ss from 60 minutes up; negative values clamp to 0:00.
+    int formatCountdown(int64_t remainingMs, char *out, size_t cap);
+
     SlotRecord *allocRecord();
     void freeRecord(SlotRecord *rec);
 }

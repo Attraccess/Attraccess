@@ -1,5 +1,6 @@
 #include "ui_slot_cache.hpp"
 
+#include <cstdio>
 #include <cstring>
 #include <new>
 
@@ -28,6 +29,18 @@ namespace ui
 #else
         delete rec;
 #endif
+    }
+
+    int formatCountdown(int64_t remainingMs, char *out, size_t cap)
+    {
+        if (remainingMs < 0) remainingMs = 0;
+        // Round up so the label never shows 0:00 while time is left.
+        const int64_t totalSec = (remainingMs + 999) / 1000;
+        const int64_t h = totalSec / 3600;
+        const int64_t m = (totalSec / 60) % 60;
+        const int64_t sec = totalSec % 60;
+        if (totalSec >= 3600) return snprintf(out, cap, "%d:%02d:%02d", (int)h, (int)m, (int)sec);
+        return snprintf(out, cap, "%d:%02d", (int)(totalSec / 60), (int)sec);
     }
 
     SlotCache::~SlotCache() { clear(); }

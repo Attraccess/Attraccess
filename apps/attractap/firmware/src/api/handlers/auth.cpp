@@ -5,13 +5,16 @@
 #include "../api.hpp"
 #include "../../clock/wall_clock.hpp"
 #include "../../display/ui/ui_capabilities.hpp"
+#ifdef ESP_PLATFORM
 #include "esp_system.h"
+#endif
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <string>
 
 // Same names as READER_CRASH_REPORT so the server can classify panic-class resets.
+#ifdef ESP_PLATFORM
 static const char *resetReasonName(esp_reset_reason_t reason)
 {
     switch (reason)
@@ -32,6 +35,9 @@ static const char *resetReasonName(esp_reset_reason_t reason)
     default: return "UNKNOWN";
     }
 }
+#else
+static const char *resetReasonName(int) { return "POWERON"; } // the simulator always starts cold
+#endif
 
 void API::onUnauthorized(JsonObject data)
 {
@@ -146,7 +152,13 @@ void API::sendFirmwareInfo()
     traits.hasBeeper = true;
 #endif
     ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"]["ui"].to<JsonObject>(), traits);
-    event["data"]["payload"]["resetReason"] = resetReasonName(esp_reset_reason());
+    event["data"]["payload"]["resetReason"] = resetReasonName(
+#ifdef ESP_PLATFORM
+        esp_reset_reason()
+#else
+        0
+#endif
+    );
 
     // The ui block makes this message ~730 B; 256 B would be truncated silently.
     char json[JSON_OUTBUF_AUTH];
