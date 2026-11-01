@@ -286,5 +286,16 @@ describe('PluginSandboxService', () => {
       const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.MANAGE_SECRETS]);
       expect(granted.secrets.decrypt(granted.secrets.encrypt('secret'))).toBe('secret');
     });
+
+    it('gates readerUi.invalidate behind READER_UI', () => {
+      const base = { ...buildBaseContext(events), readerUi: { invalidate: jest.fn() } };
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.readerUi.invalidate({ resourceId: 1 })).toThrow(PluginPermissionError);
+      expect(() => denied.readerUi.invalidate({ resourceId: 1 })).toThrow(/READER_UI/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.READER_UI]);
+      granted.readerUi.invalidate({ resourceId: 1 });
+      expect(base.readerUi.invalidate).toHaveBeenCalledWith({ resourceId: 1 });
+    });
   });
 });

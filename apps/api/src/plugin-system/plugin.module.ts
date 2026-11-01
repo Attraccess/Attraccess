@@ -53,6 +53,13 @@ import { PluginEventsService } from './plugin-events.service';
 
 import { registerPluginFlowNodes } from './flows/node-registry';
 
+import { collectReaderUiContributions } from './runtime/reader-ui-load';
+import {
+  invalidateReaderUi,
+  queueReaderUiContributions,
+  queueReaderUiLoadFailure,
+  ReaderUiWiring,
+} from './runtime/reader-ui-wiring';
 import { loadPluginEntryExports } from './runtime/module-loader';
 
 import { PluginMqttService } from './plugin-mqtt.service';
@@ -173,6 +180,11 @@ export class PluginModule {
       } catch (error) {
         this.logger.error(`Error loading plugin ${manifest.name}`, error);
         PluginService.quarantinePlugin(manifest, error as Error);
+        queueReaderUiLoadFailure(
+          manifest.name,
+          (manifest.permissions ?? []).includes(PluginPermission.ACCESS_HOOKS),
+          error as Error,
+        );
       }
     }
 
@@ -187,6 +199,7 @@ export class PluginModule {
         NpmPluginService,
         PluginClassificationService,
         PluginLiveUpdatesService,
+        ReaderUiWiring,
       ],
       exports: [PluginEventsService],
       controllers: [PluginController],
@@ -237,6 +250,15 @@ export class PluginModule {
         `Registered audit domain(s) ${pluginAuditDomains.map((declaration) => declaration.domain).join(', ')} from plugin ${manifest.name}`,
       );
     }
+
+    // Reader UI provider and access hooks. A permission mismatch throws and quarantines the plugin.
+    const readerUiContributions = collectReaderUiContributions(
+      manifest.name,
+      manifest.permissions ?? [],
+      exported as PluginBackendModule,
+      context,
+    );
+    if (readerUiContributions) queueReaderUiContributions(manifest.name, readerUiContributions);
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
@@ -323,6 +345,7 @@ export class PluginModule {
           .get<PluginAuditHostProvider>(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false }),
       ),
       manifest: PluginService.toManifestInfo(manifest),
+      readerUi: { invalidate: (scope) => invalidateReaderUi(manifest.name, scope) },
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {
         subscribe(serverId, topicFilter, handler) {
