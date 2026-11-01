@@ -4,10 +4,34 @@
 
 #include "../api.hpp"
 #include "../../clock/wall_clock.hpp"
+#include "../../display/ui/ui_capabilities.hpp"
+#include "esp_system.h"
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <string>
+
+// Same names as READER_CRASH_REPORT so the server can classify panic-class resets.
+static const char *resetReasonName(esp_reset_reason_t reason)
+{
+    switch (reason)
+    {
+    case ESP_RST_POWERON: return "POWERON";
+    case ESP_RST_EXT: return "EXT";
+    case ESP_RST_SW: return "SW";
+    case ESP_RST_PANIC: return "PANIC";
+    case ESP_RST_INT_WDT: return "INT_WDT";
+    case ESP_RST_TASK_WDT: return "TASK_WDT";
+    case ESP_RST_WDT: return "WDT";
+    case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+    case ESP_RST_BROWNOUT: return "BROWNOUT";
+    case ESP_RST_SDIO: return "SDIO";
+#ifdef ESP_RST_CPU_LOCKUP
+    case ESP_RST_CPU_LOCKUP: return "CPU_LOCKUP";
+#endif
+    default: return "UNKNOWN";
+    }
+}
 
 void API::onUnauthorized(JsonObject data)
 {
@@ -107,9 +131,27 @@ void API::sendFirmwareInfo()
         false;
 #endif
 
-    char json[JSON_OUTBUF_SMALL];
+    ui::VariantTraits traits{};
+#ifdef HAS_LVGL_DISPLAY
+    traits.hasDisplay = true;
+    traits.touch = true;
+    traits.displayWidth = 480;
+    traits.displayHeight = 480;
+#endif
+#ifdef HAS_WS2812_LED
+    traits.hasLeds = true;
+    traits.cardConfirm = true;
+#endif
+#ifdef BEEPER_PIN
+    traits.hasBeeper = true;
+#endif
+    ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"]["ui"].to<JsonObject>(), traits);
+    event["data"]["payload"]["resetReason"] = resetReasonName(esp_reset_reason());
+
+    // The ui block makes this message ~730 B; 256 B would be truncated silently.
+    char json[JSON_OUTBUF_AUTH];
     size_t n = serializeJson(event, json, sizeof(json));
-    if (n == 0)
+    if (n == 0 || n >= sizeof(json))
     {
         this->logger.error("Failed to serialize firmware info");
         return;
