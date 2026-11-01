@@ -126,6 +126,30 @@ test('deliverable workflows avoid overlapping automatic PR builds and require do
   );
 });
 
+test('the NFC card emulator builds and tests only where ESP-IDF is installed', () => {
+  const { tags } = JSON.parse(fs.readFileSync('apps/attractap/nfc-emulator/project.json', 'utf8'));
+  // These repo-wide builds run without ESP-IDF, so their excludes must catch the emulator.
+  for (const [name, job] of [
+    ['docker-nightly-latest', 'build'],
+    ['release', 'build'],
+    ['create-release', 'release'],
+  ]) {
+    const build = workflow(name).jobs[job].steps.find((step) =>
+      /nx run-many (-t |--target=)build /.test(step.run ?? ''),
+    );
+    const excluded = build.run.match(/--exclude=(\S+)/)[1].split(',');
+    assert.ok(
+      tags.some((tag) => excluded.includes(`tag:${tag}`)),
+      `${name}: ${build.run}`,
+    );
+  }
+  const runs = action('build-attractap-firmware').runs.steps.map((step) => step.run ?? '');
+  assert.ok(
+    runs.some((run) => run.includes('esp-idf/export.sh') && run.includes('pnpm nx run attractap-nfc-emulator:build')),
+  );
+  assert.ok(runs.includes('pnpm nx run attractap-nfc-emulator:test'));
+});
+
 test('manual builds use the dispatch ref without accepting a separate checkout ref', () => {
   const { jobs, on: events } = workflow('balena-manual');
   assert.equal(events.workflow_dispatch.inputs.branch, undefined);

@@ -2,6 +2,7 @@ name: 'Build and Test Attractap Firmware'
 description: >
   Test host firmware code and build all active variants once with the cached
   ESP-IDF toolchain and Nx build cache. Image jobs download the output artifacts.
+  Also builds and tests the NFC card emulator, the other ESP-IDF project.
 
 runs:
   using: 'composite'
@@ -16,4 +17,16 @@ runs:
 
     - name: Test firmware
       run: pnpm nx run attractap-firmware:test
+      shell: bash
+
+    # Its idf.sh needs idf.py on PATH, unlike the reader build script, which
+    # finds ESP-IDF itself.
+    - name: Build NFC card emulator
+      run: |
+        . "$HOME/esp/esp-idf/export.sh" >/dev/null
+        pnpm nx run attractap-nfc-emulator:build
+      shell: bash
+
+    - name: Test NFC card emulator
+      run: pnpm nx run attractap-nfc-emulator:test
       shell: bash
