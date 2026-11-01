@@ -83,7 +83,6 @@ export const FindOneOptionsSchema = z
     id: z.number(),
     username: z.string().min(1),
     email: z.string().email(),
-    externalIdentifier: z.string().optional(),
   })
   .partial()
   .refine((data) => Object.values(data).filter((val) => val !== undefined).length > 0, {
@@ -109,10 +108,6 @@ export abstract class UserAccounts {
 
     if (validatedOptions.email !== undefined) {
       whereCondition.email = validatedOptions.email;
-    }
-
-    if (validatedOptions.externalIdentifier !== undefined) {
-      whereCondition.externalIdentifier = validatedOptions.externalIdentifier;
     }
 
     const userRepo = manager ? manager.getRepository(User) : this.userRepository;
