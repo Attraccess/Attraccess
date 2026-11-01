@@ -4,6 +4,7 @@
 
 #include "../api.hpp"
 #include "../../clock/wall_clock.hpp"
+#include "../../platform.hpp"
 #include "../../display/ui/ui_capabilities.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_system.h"
@@ -152,6 +153,8 @@ void API::sendFirmwareInfo()
     traits.hasBeeper = true;
 #endif
     ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"]["ui"].to<JsonObject>(), traits);
+    // Uptime lets the server tell this boot from a mere re-authentication (crash-loop protection).
+    event["data"]["payload"]["uptimeMs"] = millis();
     event["data"]["payload"]["resetReason"] = resetReasonName(
 #ifdef ESP_PLATFORM
         esp_reset_reason()

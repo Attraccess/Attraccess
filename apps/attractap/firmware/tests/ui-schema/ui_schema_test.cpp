@@ -12,6 +12,7 @@
 #include "ui_capabilities.hpp"
 #include "ui_record.hpp"
 #include "ui_slot_cache.hpp"
+#include "ui_step.hpp"
 
 namespace fs = std::filesystem;
 static int failures = 0;
@@ -101,6 +102,7 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, bool ex
     event["data"]["payload"]["capabilities"]["hasLeds"] = traits.hasLeds;
     ui::fillCapabilitiesUi(event["data"]["payload"]["capabilities"]["ui"].to<JsonObject>(), traits);
     event["data"]["payload"]["resetReason"] = "CPU_LOCKUP";
+    event["data"]["payload"]["uptimeMs"] = 4294967295u;
     char buf[1024];
     const size_t n = serializeJson(event, buf, sizeof buf);
     CHECK(n > 0 && n < sizeof buf && n == measureJson(event), name << ": serialized completely in 1024 B (" << n << ")");
@@ -131,6 +133,47 @@ static ui::SlotRecord makeUpdate(uint32_t rev, const char *key, const char *slot
     ui::Verdict v = ui::parseSlotUpdate(doc.as<JsonObjectConst>(), measureJson(doc), out);
     CHECK(v == ui::Verdict::Accept, "makeUpdate " << ui::verdictName(v));
     return out;
+}
+
+static void runSteps()
+{
+    JsonDocument doc;
+    ui::StepRequest step;
+    deserializeJson(doc, R"({"requestId":77,"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"confirm","resourceId":12,
+        "serverNowMs":1000,"expiresAtMs":61000,"title":"Reserved from 14:00","body":"You have 40 min.",
+        "tone":"warning","countdownToMs":2401000,
+        "actions":[{"id":"cancel","role":"cancel"},{"id":"confirm","role":"confirm","label":"Start"}]})");
+    CHECK(ui::parseStepRequest(doc.as<JsonObjectConst>(), 500, step), "confirm step parses");
+    CHECK(step.requestId == 77 && step.kind == ui::StepKind::Confirm && step.confirmLabel == "Start" &&
+              step.cancelLabel.empty() && step.tone == 3,
+          "confirm fields");
+    CHECK(step.remainingMs(500 + 10000) == 50000, "step remaining uses millis deltas");
+    deserializeJson(doc, R"({"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"choose","resourceId":1,"serverNowMs":1,
+        "expiresAtMs":15001,"title":"Free the rest?","body":"","choices":[{"id":"keep","label":"Keep"},
+        {"id":"free","label":"Free the rest"}]})");
+    CHECK(ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step) && step.requestId == 0 && step.choiceCount == 2,
+          "post-stop choose has requestId 0");
+    deserializeJson(doc, R"({"stepId":"short","kind":"confirm","resourceId":1,"serverNowMs":1,"expiresAtMs":9,"title":"x"})");
+    CHECK(!ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step), "bad step id dropped");
+    deserializeJson(doc, R"({"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"choose","resourceId":1,"serverNowMs":1,
+        "expiresAtMs":9,"title":"x","choices":[{"id":"a","label":"1"},{"id":"b","label":"2"},{"id":"c","label":"3"},
+        {"id":"d","label":"4"},{"id":"e","label":"5"}]})");
+    CHECK(!ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step), "more than 4 choices dropped");
+    deserializeJson(doc, R"({"stepId":"k3J9vQ2mXc8LrT0aW5yZbQ","kind":"confirm","resourceId":1,"serverNowMs":9,
+        "expiresAtMs":9,"title":"x"})");
+    CHECK(!ui::parseStepRequest(doc.as<JsonObjectConst>(), 0, step), "already expired step dropped");
+}
+
+static void runCountdownFormat()
+{
+    char b[16];
+    ui::formatCountdown(0, b, sizeof b); CHECK(std::string(b) == "0:00", "0 -> " << b);
+    ui::formatCountdown(-5, b, sizeof b); CHECK(std::string(b) == "0:00", "negative");
+    ui::formatCountdown(61000, b, sizeof b); CHECK(std::string(b) == "1:01", b);
+    ui::formatCountdown(59001, b, sizeof b); CHECK(std::string(b) == "1:00", "rounds up");
+    ui::formatCountdown(3599000, b, sizeof b); CHECK(std::string(b) == "59:59", b);
+    ui::formatCountdown(3600000, b, sizeof b); CHECK(std::string(b) == "1:00:00", b);
+    ui::formatCountdown(3725000, b, sizeof b); CHECK(std::string(b) == "1:02:05", b);
 }
 
 static void runCache()
@@ -177,6 +220,8 @@ static void runCache()
 
 int main()
 {
+    runSteps();
+    runCountdownFormat();
     runCache();
     runFixtures();
     runLatin1();

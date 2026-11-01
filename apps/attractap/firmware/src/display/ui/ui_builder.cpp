@@ -45,7 +45,7 @@ namespace ui
                 char text[12];
                 formatCountdown((toMs - serverNowMs) - static_cast<int64_t>(nowMillis - receivedAtMillis), text,
                                 sizeof text);
-                strncpy(c.last, text, sizeof c.last - 1);
+                snprintf(c.last, sizeof c.last, "%s", text);
                 FirmwareI18n::setDynamicLabel(label, text) /* i18n-data: Countdown digits; no prose. */;
                 return;
             }
@@ -275,7 +275,7 @@ namespace ui
             formatCountdown(remaining, text, sizeof text);
             if (strcmp(text, c.last) != 0)
             {
-                strncpy(c.last, text, sizeof c.last - 1);
+                snprintf(c.last, sizeof c.last, "%s", text);
                 FirmwareI18n::setDynamicLabel(c.label, text) /* i18n-data: Countdown digits; no prose. */;
             }
         }

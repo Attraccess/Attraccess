@@ -2,9 +2,6 @@
 
 #include <string>
 #include <vector>
-#ifdef ATTRACTAP_UI_SELFTEST
-#include <deque>
-#endif
 #include <cstdint>
 #include <cstddef>
 #include "../display/ui/ui_step.hpp"
@@ -314,8 +311,9 @@ struct SupervisionStartCommand
 #include <mutex>
 #include <ArduinoJson.h>
 #include "mass_introduction_types.hpp"
+#include "ui_state.hpp"
 
-struct ApiState : public ApiCards, public ApiMassIntroduction
+struct ApiState : public ApiCards, public ApiMassIntroduction, public ApiUiState
 {
 protected:
     bool loopIsEnabled = false;
@@ -331,13 +329,6 @@ protected:
     std::function<void(const MassIntroductionResult &)> massIntroductionResultCallback;
     std::function<void(const MassIntroductionEnd &)> massIntroductionEndCallback;
     std::function<void(std::string)> deviceNameCallback;
-    // Reader UI (ATT-1187). Step callbacks run on the inbound-dispatch task; the application hands over.
-    std::function<void(const ui::StepRequest &)> uiStepRequestCallback;
-    std::function<void(const std::string &stepId)> uiStepCancelCallback;
-    std::function<void()> uiSlotsChangedCallback;
-    std::string cardSessionId;
-    ui::StepRequest uiStepScratch;
-    void *uiSlotScratch = nullptr; // ui::SlotRecord in PSRAM, display readers only
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
     // Written by the LVGL task's page requests, read when responses arrive.
     // Recursive: the response callback may issue the next request.
@@ -465,20 +456,17 @@ public:
     void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false,
                                    const char *stepId = nullptr, const char *choice = nullptr);
 
-    // --- Reader UI (ATT-1187) ----------------------------------------------------------------
+    // Reader UI (ATT-1187)
     void setUiStepRequestCallback(std::function<void(const ui::StepRequest &)> callback) { uiStepRequestCallback = callback; }
     void setUiStepCancelCallback(std::function<void(const std::string &)> callback) { uiStepCancelCallback = callback; }
     void setUiSlotsChangedCallback(std::function<void()> callback) { uiSlotsChangedCallback = callback; }
     void sendUiStepResult(const char *stepId, const char *action);
     void sendUiRenderReport(uint32_t resourceId, const char *slot, const char *key, bool rendered, const char *reason);
-    // Drops all plugin slot content (disconnect, reconnect, sign-out of a card session).
-    void clearUiSlots();
+    void clearUiSlots(); // drops all plugin slot content (disconnect, reconnect)
     const std::string &currentCardSessionId() const { return cardSessionId; }
-    // Tells the server the card session is over (sign-out or timeout) and forgets it.
-    void endCardSession();
+    void endCardSession(); // tells the server the card session is over (sign-out or timeout)
 #ifdef ATTRACTAP_UI_SELFTEST
-    // Self-test build only: queues a server message that API::loop() (the inbound-dispatch task) processes.
-    void testInject(const char *json, size_t len);
+    void testInject(const char *json, size_t len); // self-test build: processed by API::loop()
 #endif
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
@@ -541,10 +529,6 @@ private:
     void onMassIntroductionEnd(JsonObject data);
 
     uint32_t authenticationCount = 0;
-#ifdef ATTRACTAP_UI_SELFTEST
-    std::mutex testInjectMutex;
-    std::deque<std::string> testInjectQueue;
-#endif
 
     void sendAck(const char *type, uint32_t messageId = 0);
     void sendMessage(const char *type);
