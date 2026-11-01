@@ -18,6 +18,7 @@ for (const file of [
   'libs/companion-ws-client/project.json',
   'apps/attractap/firmware/project.json',
   'apps/plugins/wago/project.json',
+  'libs/plugins-frontend-sdk/project.json',
   'libs/react-query-client/project.json',
 ]) {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -180,4 +181,21 @@ test('WAGO frontend typechecks generate the API client before compiling shared p
   for (const target of ['typecheck-frontend-tests', 'test-typecheck-frontend-gate']) {
     assert.ok(selected.dependencies[`plugin-wago:${target}`].includes('react-query-client:generate'));
   }
+});
+
+test('frontend SDK typecheck generates the API client that the shared plugin UI re-exports', () => {
+  // The SDK has no project edge to plugins-frontend-ui, so ^generate cannot reach the client.
+  // project.json only declares the dependency; @nx/vite infers the executor.
+  const sdk = nodes['plugins-frontend-sdk'];
+  const typecheck = { executor: 'nx:run-commands', ...sdk.data.targets.typecheck };
+  const inferred = { ...sdk, data: { ...sdk.data, targets: { ...sdk.data.targets, typecheck } } };
+  const selected = createTaskGraph(
+    { ...graph, nodes: { ...nodes, [sdk.name]: inferred } },
+    {},
+    [sdk.name],
+    ['typecheck'],
+    undefined,
+    {},
+  );
+  assert.ok(selected.dependencies['plugins-frontend-sdk:typecheck'].includes('react-query-client:generate'));
 });
