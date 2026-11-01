@@ -36,7 +36,8 @@ const readerUi: ReaderUiProvider = {
 
 function preStartHook(ctx: PreStartContext): PreStartResult {
   if (ctx.confirmedStepKeys.includes(CONFIRM_STEP_KEY)) return { decision: 'allow' };
-  const text = TEXT.en;
+  // The host passes the card user's language on readers and the user's preferred language elsewhere.
+  const text = TEXT[ctx.language] ?? TEXT.en;
   return {
     decision: 'confirm',
     confirmation: {

@@ -44,20 +44,39 @@ export interface UiContributionRecord {
   status: 'rendered' | 'degraded' | 'skipped';
   reason?: string;
   expiresAtMs?: number;
+  /** The last message for this contribution carried a tree, so the reader may still show it. */
+  sent: boolean;
+  /** Built while a card session was live, so it may show user-specific content. */
+  userScoped: boolean;
+}
+
+/** Minimal limiter surface, so this file does not depend on the limiter implementation. */
+export interface UiSlotLimiter {
+  take(key: string, now: number): number;
 }
 
 export interface UiSlotsState {
-  /** Fresh per authentication, so rate-limit windows of an earlier connection do not carry over. */
-  epoch: string;
   capabilities: ReaderUiCapabilities | null;
   /** Latest message id per contribution key, so a newer revision supersedes a pending retry. */
   inflight: Map<string, number>;
+  /** Last revision per contribution key for the whole connection: a re-add continues, never restarts at 1. */
+  revisions: Map<string, number>;
   contributions: Map<string, UiContributionRecord>;
+  /** Resource ids of the reader, null until loaded. Refreshed when the reader is updated. */
+  resourceIds: number[] | null;
+  /** `plugin|resourceId` of provider calls that have not settled yet (even after their timeout). */
+  pendingProviders: Set<string>;
+  /** Rate limit windows of this connection only. */
+  limiter: UiSlotLimiter;
   timers: Map<string, NodeJS.Timeout>;
   flushTimer: NodeJS.Timeout | null;
+  /** Coalesces plugin invalidations into one sync. */
+  invalidateTimer: NodeJS.Timeout | null;
   syncing: boolean;
   /** Set while a sync is running and another was requested. */
   resync: boolean;
+  /** The next sync replaces or removes user-scoped content without waiting for the rate limit (sign-in/out). */
+  privacyFlush: boolean;
 }
 
 export function contributionKey(resourceId: number, slot: string, plugin: string, key: string): string {

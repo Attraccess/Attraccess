@@ -58,7 +58,7 @@ describe('ReaderUiAlertsService', () => {
     const { service } = setup();
     const alert = await service.raise('crash-loop', 'PANIC', { readerId: 5 });
     expect(service.isReaderSuspended(5)).toBe(true);
-    await service.clear(alert.id, 1);
+    await service.clear(alert.id, { id: 1 });
     expect(service.isReaderSuspended(5)).toBe(false);
   });
 
@@ -78,8 +78,8 @@ describe('ReaderUiAlertsService', () => {
     const listener = jest.fn();
     service.onCleared(listener);
     const alert = await service.raise('breaker-open', 'down', { plugin: 'p' });
-    await service.clear(alert.id, 1);
+    await service.clear(alert.id, { id: 1 });
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ kind: 'breaker-open', plugin: 'p' }));
-    await expect(service.clear(alert.id, 1)).resolves.toBeNull();
+    await expect(service.clear(alert.id, { id: 1 })).resolves.toBeNull();
   });
 });

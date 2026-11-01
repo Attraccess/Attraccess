@@ -1,16 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { randomBytes } from 'crypto';
 import { OnEvent } from '@nestjs/event-emitter';
-import {
-  READER_UI_LIMITS,
-  READER_UI_SLOTS,
-  READER_UI_TIMING,
-  type ReaderSlotContribution,
-  type ReaderUiCapabilities,
-} from '@attraccess/plugins-backend-sdk';
+import { READER_UI_SLOTS, READER_UI_TIMING, type ReaderUiCapabilities } from '@attraccess/plugins-backend-sdk';
 import { AttractapService } from '../../../attractap.service';
 import { ReaderUpdatedEvent } from '../../../events';
-import { validateReaderUiCapabilities, validateSlotUpdate } from '../../../../resources/forms/reader-ui.validation';
+import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
 import { ReaderUiAlertsService } from '../../../../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiSettingsService } from '../../../../plugin-system/reader-ui/reader-ui-settings.service';
 import {
@@ -18,30 +11,36 @@ import {
   ReaderUiRegistry,
   type ReaderUiInvalidation,
 } from '../../../../plugin-system/reader-ui/reader-ui.registry';
+import { SettingsService } from '../../../../settings/settings.service';
 import { AttractapEvent, AttractapEventType, type AuthenticatedWebSocket } from '../../websocket.types';
 import { WebsocketService } from '../../websocket.service';
 import { CardSessionService } from './card-session.service';
 import { UiSlotRateLimiter } from './ui-rate-limiter';
-import { countNodes, fallbackTree, readerCanRender, toWireTree, treeHash } from './ui-slot-builder';
+import { collectContributions, pendingKey, skipProvider, type Collected, type Desired } from './ui-slot-contributions';
 import { contributionKey, type UiContributionRecord, type UiSlotsState } from './ui-socket-state';
 
-interface Desired {
-  ckey: string;
-  record: Omit<UiContributionRecord, 'revision'>;
-  tree: unknown | null;
-}
+/** Plugin invalidations within this window become one sync per reader. */
+export const UI_INVALIDATE_DEBOUNCE_MS = 100;
+/** Hash of a record the reader cleared on its own: the next sync sends it again. */
+const FORGOTTEN = 'forgotten';
+const REPORT_STATUSES = ['skipped', 'dropped'];
 
-const DETAILS_SLOTS: string[] = [
-  READER_UI_SLOTS.RESOURCE_DETAILS_HEADER,
-  READER_UI_SLOTS.RESOURCE_DETAILS_BODY,
-  READER_UI_SLOTS.RESOURCE_DETAILS_SESSION,
-];
+/** Per pass of `syncOnce`. */
+interface Pass {
+  socket: AuthenticatedWebSocket;
+  state: UiSlotsState;
+  now: number;
+  /** Sign-in/out: user-scoped content is replaced or removed without waiting for the rate limit. */
+  privacy: boolean;
+  blockedFor: number;
+}
 
 /** Pushes plugin slot contributions to a reader and keeps its view of them in step (UI_SLOT_UPDATE). */
 @Injectable()
 export class UiSlotService {
   private readonly logger = new Logger(UiSlotService.name);
-  private readonly limiter = new UiSlotRateLimiter(READER_UI_TIMING.slotUpdateMinIntervalMs);
+  /** Public slots use the reader language (D18); null until read or changed. */
+  private defaultLanguage: 'en' | 'de' | null = null;
 
   constructor(
     private readonly registry: ReaderUiRegistry,
@@ -50,9 +49,13 @@ export class UiSlotService {
     private readonly attractapService: AttractapService,
     private readonly websocketService: WebsocketService,
     private readonly cardSessions: CardSessionService,
+    private readonly settingsService: SettingsService,
   ) {
-    cardSessions.onStarted((socket) => void this.sync(socket));
-    cardSessions.onEnded((socket) => void this.sync(socket));
+    cardSessions.onStarted((socket) => this.privacySync(socket));
+    cardSessions.onEnded((socket) => {
+      this.forgetSessionSlot(socket);
+      this.privacySync(socket);
+    });
     alerts.onCleared((alert) => {
       if (alert.kind === 'crash-loop') this.syncReader(alert.readerId ?? undefined);
     });
@@ -71,22 +74,28 @@ export class UiSlotService {
     state.timers.forEach((timer) => clearTimeout(timer));
     state.timers.clear();
     if (state.flushTimer) clearTimeout(state.flushTimer);
+    if (state.invalidateTimer) clearTimeout(state.invalidateTimer);
     state.flushTimer = null;
+    state.invalidateTimer = null;
     state.inflight.clear();
   }
 
-  /** UI_RENDER_REPORT: the reader says what it did with a contribution. */
+  /**
+   * UI_RENDER_REPORT: the reader dropped a contribution. Firmware sends
+   * `{resourceId, slot, owner, key, revision, status: 'skipped', reason}`; older drafts used `status: 'dropped'`.
+   */
   renderReport(socket: AuthenticatedWebSocket, payload: Record<string, unknown>): void {
-    const state = socket.state.uiSlots;
-    if (!state || typeof payload?.owner !== 'string') return;
+    const state = socket.state?.uiSlots;
+    if (!state || typeof payload?.owner !== 'string' || !REPORT_STATUSES.includes(String(payload.status))) return;
     const record = state.contributions.get(
       contributionKey(Number(payload.resourceId), String(payload.slot), payload.owner, String(payload.key)),
     );
     if (!record || payload.revision !== record.revision) return;
-    if (payload.status === 'dropped') {
-      record.status = 'skipped';
-      record.reason = `reader-${String(payload.reason ?? 'dropped').slice(0, 32)}`;
-    }
+    const reason = String(payload.reason ?? 'dropped')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .slice(0, 32);
+    record.status = 'skipped';
+    record.reason = `reader-${reason || 'dropped'}`;
   }
 
   contributionsOf(readerId: number) {
@@ -96,19 +105,40 @@ export class UiSlotService {
     );
   }
 
+  /** `scope.readerId` / `scope.resourceId` narrow the readers; bursts become one sync per reader. */
   @OnEvent(READER_UI_INVALIDATE_EVENT)
   onInvalidate(event: ReaderUiInvalidation): void {
+    const { readerId, resourceId } = event.scope ?? {};
     for (const socket of this.websocketService.sockets.values()) {
-      if (socket.readerId == null || !socket.state.uiSlots?.capabilities) continue;
-      if (event.scope.readerId !== undefined && event.scope.readerId !== socket.readerId) continue;
-      void this.sync(socket);
+      const state = socket.state?.uiSlots;
+      if (socket.readerId == null || !state?.capabilities) continue;
+      if (readerId !== undefined && readerId !== socket.readerId) continue;
+      if (resourceId !== undefined && state.resourceIds && !state.resourceIds.includes(resourceId)) continue;
+      if (state.invalidateTimer) continue;
+      state.invalidateTimer = setTimeout(() => {
+        state.invalidateTimer = null;
+        void this.sync(socket);
+      }, UI_INVALIDATE_DEBOUNCE_MS);
+      state.invalidateTimer.unref?.();
     }
   }
 
   /** Attaching or detaching resources changes which rows the reader shows, so its slot content must follow. */
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
   onReaderUpdated(event: ReaderUpdatedEvent): void {
+    const resourceIds = event.reader.resources?.map((resource) => resource.id) ?? null;
+    for (const socket of this.websocketService.sockets.values()) {
+      const state = socket.state?.uiSlots;
+      if (state && socket.readerId === event.reader.id) state.resourceIds = resourceIds;
+    }
     this.syncReader(event.reader.id);
+  }
+
+  /** Public slots follow the default language. */
+  @OnEvent('settings.default-language')
+  onDefaultLanguage(language: 'en' | 'de'): void {
+    this.defaultLanguage = language;
+    this.syncReader(undefined);
   }
 
   syncReader(readerId: number | undefined): void {
@@ -118,7 +148,7 @@ export class UiSlotService {
   }
 
   async sync(socket: AuthenticatedWebSocket): Promise<void> {
-    const state = socket.state.uiSlots;
+    const state = socket.state?.uiSlots;
     if (!state || socket.readerId == null) return;
     if (state.syncing) {
       state.resync = true;
@@ -137,81 +167,100 @@ export class UiSlotService {
     }
   }
 
+  private privacySync(socket: AuthenticatedWebSocket): void {
+    const state = socket.state?.uiSlots;
+    if (!state) return;
+    state.privacyFlush = true;
+    void this.sync(socket);
+  }
+
+  /** The reader clears its session slot on sign-out; whatever it should show there afterwards is sent again. */
+  private forgetSessionSlot(socket: AuthenticatedWebSocket): void {
+    for (const record of socket.state?.uiSlots?.contributions.values() ?? []) {
+      if (record.slot === READER_UI_SLOTS.RESOURCE_DETAILS_SESSION) record.hash = FORGOTTEN;
+    }
+  }
+
   private freshState(capabilities: ReaderUiCapabilities | null): UiSlotsState {
     return {
-      epoch: randomBytes(4).toString('hex'),
       capabilities,
       inflight: new Map(),
+      revisions: new Map(),
       contributions: new Map(),
+      resourceIds: null,
+      pendingProviders: new Set(),
+      limiter: new UiSlotRateLimiter(READER_UI_TIMING.slotUpdateMinIntervalMs),
       timers: new Map(),
       flushTimer: null,
+      invalidateTimer: null,
       syncing: false,
       resync: false,
+      privacyFlush: false,
     };
   }
 
   private async syncOnce(socket: AuthenticatedWebSocket, state: UiSlotsState): Promise<void> {
-    const caps = state.capabilities;
-    const readerId = socket.readerId as number;
-    const desired = new Map<string, Desired>();
-    const providers = this.registry.providers();
-    if (providers.length > 0) {
-      const skipReason = this.readerSkipReason(caps, readerId);
-      const reader = await this.attractapService.findReaderById(readerId);
-      for (const resource of reader?.resources ?? []) {
-        if (skipReason || !caps) {
-          // Nothing is sent, but the admin view says why this reader shows no plugin content.
-          for (const { plugin } of providers)
-            this.skip(desired, plugin, resource.id, 'reader', skipReason ?? 'old-firmware');
-        } else {
-          await this.collect(socket, caps, readerId, resource.id, desired);
-        }
-      }
-    }
-    this.applyNodeBudget(desired);
-    const now = Date.now();
-    let blockedFor = 0;
+    const pass: Pass = { socket, state, now: 0, privacy: state.privacyFlush, blockedFor: 0 };
+    state.privacyFlush = false;
+    const { desired, keep } = await this.desired(socket, state);
+    pass.now = Date.now();
     for (const [ckey, record] of [...state.contributions]) {
       if (desired.has(ckey)) continue;
-      if (record.status === 'skipped' && record.revision === 0) {
-        state.contributions.delete(ckey);
-        continue;
-      }
-      const wait = this.limiter.take(`${state.epoch}|${record.resourceId}|${record.slot}`, now);
-      if (wait > 0) {
-        blockedFor = Math.max(blockedFor, wait);
-        continue;
-      }
-      this.send(socket, state, record, record.revision + 1, null);
-      state.contributions.delete(ckey);
-      this.clearTimer(state, ckey);
+      // A busy provider keeps its content, except user content at sign-in/out.
+      const kept = keep.has(pendingKey(record.plugin, record.resourceId)) && !(pass.privacy && record.userScoped);
+      if (!kept) this.retire(pass, ckey, record);
     }
-    for (const [ckey, want] of desired) {
-      const have = state.contributions.get(ckey);
-      if (have && have.hash === want.record.hash && have.status === want.record.status) continue;
-      if (want.tree === null) {
-        state.contributions.set(ckey, { ...want.record, revision: have?.revision ?? 0 });
-        continue;
-      }
-      // The first contribution of a slot is part of the initial sync; only updates to it are rate limited.
-      const wait = this.limiter.take(`${state.epoch}|${want.record.resourceId}|${want.record.slot}`, now);
-      if (wait > 0 && have) {
-        blockedFor = Math.max(blockedFor, wait);
-        continue;
-      }
-      const revision = (have?.revision ?? 0) + 1;
-      const next = { ...want.record, revision };
-      state.contributions.set(ckey, next);
-      this.send(socket, state, next, revision, want.tree);
-      this.armExpiry(socket, state, ckey, next.expiresAtMs);
-    }
-    if (blockedFor > 0 && !state.flushTimer) {
+    for (const [ckey, want] of desired) this.apply(pass, ckey, want);
+    if (pass.blockedFor > 0 && !state.flushTimer) {
       state.flushTimer = setTimeout(() => {
         state.flushTimer = null;
         void this.sync(socket);
-      }, blockedFor + 5);
+      }, pass.blockedFor + 5);
       state.flushTimer.unref?.();
     }
+  }
+
+  private async desired(socket: AuthenticatedWebSocket, state: UiSlotsState): Promise<Collected> {
+    const empty: Collected = { desired: new Map(), keep: new Set() };
+    const providers = this.registry.providers();
+    if (providers.length === 0) return empty;
+    const readerId = socket.readerId as number;
+    const caps = state.capabilities;
+    const resourceIds = await this.resourceIdsOf(readerId, state);
+    const skipReason = this.readerSkipReason(caps, readerId);
+    if (skipReason || !caps) {
+      // Nothing is sent, but the admin view says why this reader shows no plugin content.
+      for (const resourceId of resourceIds)
+        for (const { plugin } of providers)
+          skipProvider(empty.desired, plugin, resourceId, 'reader', skipReason ?? 'old-firmware');
+      return empty;
+    }
+    const widgets = await this.settings.widgetToggles(readerId, resourceIds);
+    const card = this.cardSessions.current(socket);
+    return collectContributions({
+      caps,
+      readerId,
+      resourceIds,
+      providers,
+      userId: card?.userId,
+      language: card?.language ?? (await this.publicLanguage()),
+      enabled: (resourceId, plugin) => widgets.readerEnabled && !widgets.disabled.has(`${resourceId}|${plugin}`),
+      pending: state.pendingProviders,
+      warn: (message) => this.logger.warn(message),
+    });
+  }
+
+  private async resourceIdsOf(readerId: number, state: UiSlotsState): Promise<number[]> {
+    if (state.resourceIds) return state.resourceIds;
+    const loaded = (await this.attractapService.findReaderById(readerId))?.resources?.map((r) => r.id) ?? [];
+    // A reader update during the read already stored newer ids.
+    state.resourceIds ??= loaded;
+    return state.resourceIds;
+  }
+
+  private async publicLanguage(): Promise<'en' | 'de'> {
+    if (!this.defaultLanguage) this.defaultLanguage = await this.settingsService.getDefaultLanguage();
+    return this.defaultLanguage;
   }
 
   /** Why a whole reader gets no plugin content, or null when it can show some. */
@@ -221,126 +270,59 @@ export class UiSlotService {
     return this.alerts.isReaderSuspended(readerId) ? 'crash-loop-suspended' : null;
   }
 
-  private async collect(
-    socket: AuthenticatedWebSocket,
-    caps: ReaderUiCapabilities,
-    readerId: number,
-    resourceId: number,
-    desired: Map<string, Desired>,
-  ): Promise<void> {
-    const card = this.cardSessions.current(socket);
-    const language = card?.language ?? this.websocketService.readerLanguage ?? 'en';
-    let perResource = 0;
-    for (const { plugin, provider } of this.registry.providers()) {
-      if (!(await this.settings.widgetsEnabled(resourceId, plugin, readerId))) {
-        this.skip(desired, plugin, resourceId, 'widgets', 'widgets-disabled');
-        continue;
-      }
-      let list: ReaderSlotContribution[];
-      try {
-        list = await Promise.race([
-          Promise.resolve(
-            provider.getSlotContributions({ readerId, resourceId, userId: card?.userId, capabilities: caps, language }),
-          ),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500).unref?.()),
-        ]);
-      } catch (error) {
-        this.logger.warn(`Plugin ${plugin} slot provider failed: ${(error as Error).message}`);
-        this.skip(desired, plugin, resourceId, 'provider', 'provider-error');
-        continue;
-      }
-      for (const contribution of list ?? []) {
-        perResource += 1;
-        this.prepare(
-          desired,
-          caps,
-          plugin,
-          resourceId,
-          contribution,
-          perResource > READER_UI_LIMITS.maxSlotContributionsPerResource,
-        );
-      }
+  /** A contribution the provider no longer returns: remove it from the reader if it may still show it. */
+  private retire(pass: Pass, ckey: string, record: UiContributionRecord): void {
+    if (record.sent) {
+      if (!this.mayUpdate(pass, record, record)) return;
+      this.send(pass, record, null);
     }
+    pass.state.contributions.delete(ckey);
+    this.clearTimer(pass.state, ckey);
   }
 
-  private prepare(
-    desired: Map<string, Desired>,
-    caps: ReaderUiCapabilities,
-    plugin: string,
-    resourceId: number,
-    c: ReaderSlotContribution,
-    overLimit: boolean,
-  ): void {
-    const base = { plugin, resourceId, slot: String(c.slotId), key: String(c.key) };
-    const ckey = contributionKey(resourceId, base.slot, plugin, base.key);
-    const skip = (reason: string): void => {
-      desired.set(ckey, { ckey, tree: null, record: { ...base, hash: reason, nodes: 0, status: 'skipped', reason } });
-    };
-    const expiresAtMs = c.expiresAt ? new Date(c.expiresAt).getTime() : undefined;
-    if (overLimit) return skip('too-many-contributions');
-    if (expiresAtMs !== undefined && expiresAtMs <= Date.now()) return skip('expired');
-    let tree: unknown = toWireTree(c.tree);
-    let status: 'rendered' | 'degraded' = 'rendered';
-    if (!readerCanRender(caps, base.slot, c)) {
-      if (!c.fallback || !caps.slots.includes(base.slot)) return skip('unsupported');
-      tree = fallbackTree(base.slot, c.fallback);
-      status = 'degraded';
+  private apply(pass: Pass, ckey: string, want: Desired): void {
+    const { state } = pass;
+    const have = state.contributions.get(ckey);
+    if (have && have.hash === want.record.hash && have.status === want.record.status) return;
+    if (want.tree === null) {
+      // Skipped now (expired, invalid, over budget...): content the reader shows must go.
+      if (have?.sent && !this.mayUpdate(pass, have, have)) return;
+      const revision = have?.sent ? this.send(pass, have, null) : (state.revisions.get(ckey) ?? 0);
+      state.contributions.set(ckey, { ...want.record, revision, sent: false });
+      this.clearTimer(state, ckey);
+      return;
     }
-    const checked = validateSlotUpdate({
-      resourceId,
-      slot: base.slot,
-      revision: 1,
-      owner: plugin.slice(0, 64),
-      key: base.key,
-      serverNowMs: Date.now(),
-      ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
-      tree,
-    });
-    if ('reason' in checked) {
-      this.logger.warn(`Rejected a ${base.slot} contribution of plugin ${plugin}: ${checked.reason}`);
-      return skip(`invalid-${checked.reason}`);
-    }
-    const wireTree = checked.value.payload['tree'];
-    desired.set(ckey, {
-      ckey,
-      tree: wireTree,
-      record: { ...base, hash: treeHash(wireTree, expiresAtMs), nodes: countNodes(wireTree), status, expiresAtMs },
-    });
+    // The first contribution of a slot is part of the initial sync; only updates to it are rate limited.
+    if (!this.mayUpdate(pass, have, want.record)) return;
+    const next: UiContributionRecord = { ...want.record, revision: 0, sent: true };
+    next.revision = this.send(pass, next, want.tree);
+    state.contributions.set(ckey, next);
+    this.armExpiry(pass.socket, state, ckey, next.expiresAtMs);
   }
 
-  private skip(desired: Map<string, Desired>, plugin: string, resourceId: number, key: string, reason: string) {
-    const ckey = contributionKey(resourceId, 'provider', plugin, key);
-    desired.set(ckey, {
-      ckey,
-      tree: null,
-      record: { plugin, resourceId, slot: 'provider', key, hash: reason, nodes: 0, status: 'skipped', reason },
-    });
+  /** Rate limit per resource and slot. A first send always passes; sign-in/out bypasses it for user content. */
+  private mayUpdate(
+    pass: Pass,
+    have: UiContributionRecord | undefined,
+    target: { resourceId: number; slot: string },
+  ): boolean {
+    if (pass.privacy && have && (have.userScoped || have.hash === FORGOTTEN)) return true;
+    const wait = pass.state.limiter.take(`${target.resourceId}|${target.slot}`, pass.now);
+    if (wait === 0 || !have) return true;
+    pass.blockedFor = Math.max(pass.blockedFor, wait);
+    return false;
   }
 
-  /** At most `maxLiveNodes` plugin nodes in resource-details slots per reader; the rest is skipped. */
-  private applyNodeBudget(desired: Map<string, Desired>): void {
-    let live = 0;
-    for (const want of desired.values()) {
-      if (want.tree === null || !DETAILS_SLOTS.includes(want.record.slot)) continue;
-      live += want.record.nodes;
-      if (live > READER_UI_LIMITS.maxLiveNodes) {
-        want.tree = null;
-        want.record.status = 'skipped';
-        want.record.reason = 'node-budget';
-        want.record.hash = 'node-budget';
-      }
-    }
-  }
-
+  /** Sends the next revision of a contribution and returns it. */
   private send(
-    socket: AuthenticatedWebSocket,
-    state: UiSlotsState,
-    record: Omit<UiContributionRecord, 'revision'> & { revision?: number },
-    revision: number,
+    pass: Pass,
+    record: Pick<UiContributionRecord, 'resourceId' | 'slot' | 'plugin' | 'key' | 'expiresAtMs'>,
     tree: unknown | null,
-  ): void {
+  ): number {
     const ckey = contributionKey(record.resourceId, record.slot, record.plugin, record.key);
-    state.inflight.set(ckey, revision);
+    const revision = (pass.state.revisions.get(ckey) ?? 0) + 1;
+    pass.state.revisions.set(ckey, revision);
+    pass.state.inflight.set(ckey, revision);
     const payload = {
       resourceId: record.resourceId,
       slot: record.slot,
@@ -351,7 +333,8 @@ export class UiSlotService {
       ...(record.expiresAtMs === undefined || tree === null ? {} : { expiresAtMs: record.expiresAtMs }),
       tree,
     };
-    void socket.sendMessage(new AttractapEvent(AttractapEventType.UI_SLOT_UPDATE, payload)).catch(() => undefined);
+    void pass.socket.sendMessage(new AttractapEvent(AttractapEventType.UI_SLOT_UPDATE, payload)).catch(() => undefined);
+    return revision;
   }
 
   private armExpiry(socket: AuthenticatedWebSocket, state: UiSlotsState, ckey: string, expiresAtMs?: number): void {

@@ -200,6 +200,8 @@ export interface PreStartContext {
   origin: PreStartOrigin;
   /** Only this plugin's step keys, checked by the host. */
   confirmedStepKeys: string[];
+  /** Language for texts: the card user's on a reader, the user's preferred language elsewhere. */
+  language: 'en' | 'de';
   now: Date;
 }
 
@@ -236,6 +238,8 @@ export interface SessionEndContext {
   userId: number;
   sessionId: number;
   origin: 'web' | 'api' | 'reader';
+  /** Language for texts: the card user's on a reader, the user's preferred language elsewhere. */
+  language: 'en' | 'de';
   now: Date;
 }
 
@@ -247,6 +251,9 @@ export interface PluginChoice {
   choices: { id: string; label: string }[];
   /** Applied on timeout, disconnect, cancel and readers without a screen. */
   defaultOnTimeout: string;
+  /** How long the reader shows the question. Default 15, host clamps to [5, 30]. */
+  expiresInSec?: number;
+  /** Called once with the answer or the default; runs with the hook timeout, errors are logged. */
   onAnswer(choiceId: string): void | Promise<void>;
 }
 

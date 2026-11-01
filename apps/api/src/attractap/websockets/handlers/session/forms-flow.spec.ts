@@ -12,6 +12,7 @@ import {
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { ReaderStartGate } from './reader-start-gate.service';
+import { CardSessionService } from '../ui/card-session.service';
 import { AttractapSessionHandler } from './session.handler';
 import { ResourceActionGuard } from '../resource-action.guard';
 import { AttractapService } from '../../../attractap.service';
@@ -103,6 +104,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
           provide: ReaderStartGate,
           useValue: { run: jest.fn().mockResolvedValue({ kind: 'proceed' }), afterStop: jest.fn() },
         },
+        { provide: CardSessionService, useValue: new CardSessionService() },
         { provide: ResourceMeteringService, useValue: {} },
         { provide: ResourceOperatingAttributionService, useValue: {} },
       ],

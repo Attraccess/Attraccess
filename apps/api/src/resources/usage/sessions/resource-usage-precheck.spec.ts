@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Resource, ResourceType, SupervisionMode, User } from '@attraccess/database-entities';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
@@ -22,6 +22,7 @@ describe('ResourceUsageService.precheckStart', () => {
     canControllResource: jest.Mock;
     validateSupervisedStart: jest.Mock;
     getActiveSession: jest.Mock;
+    assertLifecycleAvailable: jest.Mock;
   };
   let internals: Internals;
 
@@ -37,6 +38,9 @@ describe('ResourceUsageService.precheckStart', () => {
         .spyOn(service as never, 'validateSupervisedStart')
         .mockResolvedValue(undefined as never) as never,
       getActiveSession: jest.spyOn(service as never, 'getActiveSession').mockResolvedValue(null as never) as never,
+      assertLifecycleAvailable: jest
+        .spyOn(service as never, 'assertLifecycleAvailable')
+        .mockResolvedValue(undefined as never) as never,
     };
   });
 
@@ -48,6 +52,12 @@ describe('ResourceUsageService.precheckStart', () => {
       checkMaintenance: true,
       checkControlPermission: false,
     });
+  });
+
+  it('refuses while another lifecycle operation is in progress, like the real start', async () => {
+    internals.assertLifecycleAvailable.mockRejectedValue(new ConflictException('in progress'));
+    await expect(scope.service.precheckStart(3, user, {})).rejects.toBeInstanceOf(ConflictException);
+    expect(internals.getResource).not.toHaveBeenCalled();
   });
 
   it('refuses a user who has not completed the introduction', async () => {

@@ -33,7 +33,7 @@ function setup(
   );
   const socket = makeSocket();
   services.cardSessions.issue(socket, 7, 'en');
-  return { gate, services, preStart, sessionEnd, socket, uiAudit };
+  return { gate, services, preStart, sessionEnd, socket, uiAudit, attractap };
 }
 
 const input = (extra: Record<string, unknown> = {}) => ({ user, resourceId: 12, requestId: 77, ...extra });
@@ -85,22 +85,80 @@ describe('ReaderStartGate', () => {
     );
   });
 
-  it.each(['STEP_UNKNOWN'])('rejects a stale or replayed stepId with %s', async (error) => {
+  it('answers a stale or replayed stepId with a localized START_BLOCKED reason STEP_UNKNOWN', async () => {
     const { gate, socket } = setup(TOUCH, confirmOutcome());
     await gate.run(socket, input());
     const stepId = lastSent(socket, 'UI_STEP_REQUEST').stepId;
     await gate.run(socket, input({ stepId }));
-    await expect(gate.run(socket, input({ stepId }))).resolves.toEqual({ kind: 'reply', payload: { error } });
+    await expect(gate.run(socket, input({ stepId }))).resolves.toEqual({
+      kind: 'reply',
+      payload: {
+        error: 'START_BLOCKED',
+        reason: { code: 'STEP_UNKNOWN', title: 'Confirmation no longer valid', body: expect.any(String) },
+      },
+    });
   });
 
-  it('reports STEP_EXPIRED for an expired step', async () => {
-    const { gate, socket } = setup(TOUCH, confirmOutcome());
+  it('answers an expired step with START_BLOCKED reason STEP_EXPIRED in the card language', async () => {
+    const { gate, socket, services } = setup(TOUCH, confirmOutcome());
+    services.cardSessions.issue(socket, 7, 'de');
     await gate.run(socket, input());
     const stepId = lastSent(socket, 'UI_STEP_REQUEST').stepId;
     jest.setSystemTime(Date.now() + 66_000);
     await expect(gate.run(socket, input({ stepId }))).resolves.toEqual({
       kind: 'reply',
-      payload: { error: 'STEP_EXPIRED' },
+      payload: {
+        error: 'START_BLOCKED',
+        reason: { code: 'STEP_EXPIRED', title: 'Bestätigung abgelaufen', body: expect.any(String) },
+      },
+    });
+  });
+
+  it('passes the card session language and id to the hooks', async () => {
+    const { gate, socket, services, preStart } = setup(TOUCH, { decision: 'allow' });
+    const card = services.cardSessions.issue(socket, 7, 'de');
+    await gate.run(socket, input());
+    expect(preStart.evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({ language: 'de', cardSessionId: card.id, origin: 'reader' }),
+    );
+  });
+
+  describe('a screen reader that cannot show the confirmation', () => {
+    it.each(['allow-with-warning', 'card-confirm', 'block'])(
+      'never falls through to the no-screen policy (%s) and blocks with CONFIRMATION_UNAVAILABLE',
+      async (override) => {
+        const { gate, socket, services, uiAudit } = setup(TOUCH, confirmOutcome(), { override });
+        services.cardSessions.end(socket, null, 'reader'); // no card session: issueStart fails
+        const result = await gate.run(socket, input());
+        expect(result).toEqual({
+          kind: 'reply',
+          payload: { error: 'START_BLOCKED', reason: expect.objectContaining({ code: 'CONFIRMATION_UNAVAILABLE' }) },
+        });
+        expect(uiAudit.record).toHaveBeenCalledWith(
+          'ui.hook_decision',
+          expect.objectContaining({ decision: 'block', reasonCode: 'CONFIRMATION_UNAVAILABLE', origin: 'reader' }),
+        );
+        expect(uiAudit.record).not.toHaveBeenCalledWith('ui.no_screen_policy_applied', expect.anything());
+      },
+    );
+  });
+
+  describe('capabilities', () => {
+    it('uses the capabilities validated on READER_FIRMWARE_INFO without a database lookup', async () => {
+      const { gate, socket, attractap } = setup(LITE, confirmOutcome());
+      socket.state.uiSlots = { capabilities: TOUCH };
+      await expect(gate.run(socket, input())).resolves.toEqual({ kind: 'held' });
+      expect(attractap.findReaderById).not.toHaveBeenCalled();
+    });
+
+    it('treats a reader that reported no ui as schemaVersion 0', async () => {
+      const { gate, socket, attractap } = setup(TOUCH, confirmOutcome());
+      socket.state.uiSlots = { capabilities: null };
+      await expect(gate.run(socket, input())).resolves.toMatchObject({
+        kind: 'reply',
+        payload: { error: 'START_BLOCKED', reason: { code: 'CONFIRMATION_REQUIRED' } },
+      });
+      expect(attractap.findReaderById).not.toHaveBeenCalled();
     });
   });
 
@@ -183,13 +241,37 @@ describe('ReaderStartGate', () => {
       };
     };
 
-    it('shows the question to the holder on a screen reader', async () => {
-      const { gate, socket, sessionEnd } = setup(TOUCH, { decision: 'allow' });
+    it('shows the question to the holder on a screen reader, asked in the card language', async () => {
+      const { gate, socket, sessionEnd, services } = setup(TOUCH, { decision: 'allow' });
+      services.cardSessions.issue(socket, 7, 'de');
       const { asked, onAnswer } = makeAsked();
       sessionEnd.ask.mockResolvedValue(asked);
       await gate.afterStop(socket, info);
+      expect(sessionEnd.ask).toHaveBeenCalledWith(info, 'de');
       expect(lastSent(socket, 'UI_STEP_REQUEST')).toMatchObject({ kind: 'choose', requestId: 0 });
       expect(onAnswer).not.toHaveBeenCalled();
+    });
+
+    it('keeps the question open for its expiresInSec (clamped) and closes it on the reader when it expires', async () => {
+      const { gate, socket, sessionEnd } = setup(TOUCH, { decision: 'allow' });
+      const { asked, onAnswer } = makeAsked();
+      (asked.result.choice as any).expiresInSec = 25;
+      sessionEnd.ask.mockResolvedValue(asked);
+      await gate.afterStop(socket, info);
+      const sent = lastSent(socket, 'UI_STEP_REQUEST');
+      expect(sent.expiresAtMs - sent.serverNowMs).toBe(25_000);
+      jest.advanceTimersByTime(25_000 + 5_000 + 1);
+      expect(lastSent(socket, 'UI_STEP_CANCEL')).toEqual({ stepId: sent.stepId });
+      await jest.advanceTimersByTimeAsync(0);
+      expect(onAnswer).toHaveBeenCalledWith('keep');
+    });
+
+    it('survives a plugin answer callback that throws', async () => {
+      const { gate, socket, sessionEnd } = setup(LITE, { decision: 'allow' });
+      const { asked } = makeAsked();
+      (asked.result.choice as any).onAnswer = jest.fn().mockRejectedValue(new Error('boom'));
+      sessionEnd.ask.mockResolvedValue(asked);
+      await expect(gate.afterStop(socket, info)).resolves.toBeUndefined();
     });
 
     it('applies the default on a reader without choose support', async () => {

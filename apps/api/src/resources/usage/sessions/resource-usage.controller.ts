@@ -6,7 +6,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Optional,
   Param,
   ParseIntPipe,
   Post,
@@ -42,8 +41,8 @@ export class ResourceUsageController {
   constructor(
     protected readonly resourceUsageService: ResourceUsageService,
     protected readonly activityVisibility: ResourceActivityVisibilityService,
-    @Optional() protected readonly preStart?: PreStartService,
-    @Optional() protected readonly sessionEnd?: SessionEndNotifier,
+    protected readonly preStart: PreStartService,
+    protected readonly sessionEnd: SessionEndNotifier,
   ) {}
 
   @Post('lock')
@@ -224,7 +223,7 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    await this.preStart?.gateHttp(resourceId, req.user, dto, {
+    await this.preStart.gateHttp(resourceId, req.user, dto, {
       origin: req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
       ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
     });
@@ -270,9 +269,10 @@ export class ResourceUsageController {
       },
     });
     if (ended?.userId === req.user.id) {
-      void this.sessionEnd?.applyDefault(
+      void this.sessionEnd.applyDefault(
         { resourceId, userId: req.user.id, sessionId: ended.id },
         req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+        req.user.locale,
       );
     }
     return ended;

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { ReaderUiAlert, ReaderUiAlertKind } from '@attraccess/database-entities';
 import { AuditService } from '../../audit/audit.service';
+import { auditActorFields, type AuditActor } from './audit-actor';
 import { MetricsService } from '../../metrics/metrics.service';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 
@@ -66,14 +67,19 @@ export class ReaderUiAlertsService implements OnModuleInit {
     return alert;
   }
 
-  async clear(id: number, userId: number | undefined): Promise<ReaderUiAlert | null> {
-    const alert = await this.repository.findOne({ where: { id, clearedAt: IsNull() } });
+  findOpen(id: number): Promise<ReaderUiAlert | null> {
+    return this.repository.findOne({ where: { id, clearedAt: IsNull() } });
+  }
+
+  /** `actor` is the admin who cleared it; none when the host clears it itself (e.g. a breaker closed). */
+  async clear(id: number, actor: AuditActor | undefined): Promise<ReaderUiAlert | null> {
+    const alert = await this.findOpen(id);
     if (!alert) return null;
     alert.clearedAt = new Date();
-    alert.clearedByUserId = userId ?? null;
+    alert.clearedByUserId = actor?.id ?? null;
     await this.repository.save(alert);
     if (alert.kind === 'crash-loop' && alert.readerId) this.unsuspend(alert.readerId);
-    await this.record(alert, 'cleared', userId);
+    await this.record(alert, 'cleared', actor);
     await this.refreshGauge();
     this.listeners.forEach((listener) => listener(alert));
     return alert;
@@ -125,13 +131,12 @@ export class ReaderUiAlertsService implements OnModuleInit {
     }
   }
 
-  private async record(alert: ReaderUiAlert, state: 'created' | 'cleared', userId: number | undefined) {
+  private async record(alert: ReaderUiAlert, state: 'created' | 'cleared', actor: AuditActor | undefined) {
     await this.audit
       .recordAttractap({
         action: 'ui.alert_changed',
         subjectType: 'attractap.ui-alert',
-        actorId: userId ?? null,
-        authenticationMethod: userId ? 'session' : null,
+        ...(actor ? auditActorFields(actor) : { actorId: null, authenticationMethod: null }),
         subjectId: alert.id,
         details: {
           kind: alert.kind,

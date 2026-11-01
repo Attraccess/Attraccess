@@ -63,4 +63,23 @@ describe('AttractapUiHandler crash-loop protection', () => {
     expect(slots.cleanup).toHaveBeenCalled();
     expect(socket.state.cardSession).toBeNull();
   });
+
+  it('keeps the card session alive when UI_STEP_RESULT carries its id, before recording the answer', () => {
+    jest.useFakeTimers();
+    try {
+      const { handler, steps, cardSessions } = setup();
+      const socket = makeSocket();
+      const session = cardSessions.issue(socket, 7, 'en');
+      jest.advanceTimersByTime(36_000);
+      expect(cardSessions.current(socket)).toBeNull();
+      handler.handleStepResult(socket, {
+        type: 'UI_STEP_RESULT',
+        payload: { stepId: 's', action: 'cancel', cardSessionId: session.id },
+      } as any);
+      expect(cardSessions.current(socket)?.id).toBe(session.id);
+      expect(steps.handleResult).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

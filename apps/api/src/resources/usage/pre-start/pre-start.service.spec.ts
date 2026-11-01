@@ -2,7 +2,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { PreStartService } from './pre-start.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
-import { WebStartStepStore } from './web-start-step.store';
+import { MAX_OPEN_WEB_STEPS, WebStartStepStore } from './web-start-step.store';
+import { projectAttractapAuditEvent } from '../../../audit/policies/attractap';
 
 const user = { id: 7 } as any;
 const confirmOutcome = {
@@ -14,9 +15,11 @@ const confirmOutcome = {
 function setup(outcome: any = { decision: 'allow' }, precheck: jest.Mock = jest.fn().mockResolvedValue(undefined)) {
   const hooks = { hasPreStartHooks: () => true, runPreStart: jest.fn().mockResolvedValue(outcome) };
   const usage = { precheckStart: precheck };
-  const store = new WebStartStepStore();
-  const service = new PreStartService(usage as never, hooks as never, store);
-  return { service, hooks, usage, store };
+  const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+  const store = new WebStartStepStore(audit as never);
+  const settings = { resolveLanguage: jest.fn(async (locale?: string) => (locale === 'de' ? 'de' : 'en')) };
+  const service = new PreStartService(usage as never, hooks as never, store, settings as never);
+  return { service, hooks, usage, store, audit, settings };
 }
 
 const web = { origin: 'web' as const };
@@ -36,13 +39,21 @@ describe('PreStartService', () => {
     expect(usage.precheckStart).not.toHaveBeenCalled();
   });
 
-  it('runs the can-start precheck before the hooks and skips plugin steps for a refused user', async () => {
-    const { service, hooks } = setup(
-      confirmOutcome,
-      jest.fn().mockRejectedValue(new BadRequestException('no introduction')),
-    );
-    await expect(service.gateHttp(3, user, {}, web)).resolves.toBeUndefined();
+  it('runs the can-start precheck before the hooks and throws its refusal, so no plugin step is shown', async () => {
+    const refusal = new BadRequestException('no introduction');
+    const { service, hooks } = setup(confirmOutcome, jest.fn().mockRejectedValue(refusal));
+    await expect(service.gateHttp(3, user, {}, web)).rejects.toBe(refusal);
     expect(hooks.runPreStart).not.toHaveBeenCalled();
+  });
+
+  it('passes the given language, else the user preference', async () => {
+    const { service, hooks } = setup({ decision: 'allow' });
+    await service.evaluate({ resourceId: 3, user, origin: 'reader', language: 'de' });
+    expect(hooks.runPreStart.mock.calls.at(-1)?.[0].language).toBe('de');
+    await service.gateHttp(3, { id: 7, locale: 'de' } as any, {}, web);
+    expect(hooks.runPreStart.mock.calls.at(-1)?.[0].language).toBe('de');
+    await service.gateHttp(3, { id: 7, locale: 'fr' } as any, {}, web);
+    expect(hooks.runPreStart.mock.calls.at(-1)?.[0].language).toBe('en');
   });
 
   it('allows', async () => {
@@ -167,6 +178,62 @@ describe('PreStartService', () => {
       const { service, usage } = setup({ decision: 'allow' });
       await service.gateSupervision(3, user, {}, 99);
       expect(usage.precheckStart).toHaveBeenCalledWith(3, user, expect.anything(), 99);
+    });
+  });
+
+  describe('web step store', () => {
+    it('keeps one open confirmation per binding: a newer 409 replaces the older id', async () => {
+      const { service, hooks, store } = setup(confirmOutcome);
+      const first = (await catchError(service.gateHttp(3, user, {}, web))).getResponse().stepId;
+      const second = (await catchError(service.gateHttp(3, user, {}, web))).getResponse().stepId;
+      expect(store.size).toBe(1);
+      hooks.runPreStart.mockResolvedValue({ decision: 'allow' });
+      const stale = await catchError(service.gateHttp(3, user, { confirmedStepIds: [first] }, web));
+      expect(stale.getResponse()).toMatchObject({ code: 'STEP_UNKNOWN' });
+      const fresh = setup(confirmOutcome);
+      const id = (await catchError(fresh.service.gateHttp(3, user, {}, web))).getResponse().stepId;
+      fresh.hooks.runPreStart.mockResolvedValue({ decision: 'allow' });
+      await expect(fresh.service.gateHttp(3, user, { confirmedStepIds: [id] }, web)).resolves.toBeUndefined();
+      expect(second).not.toBe(first);
+    });
+
+    it('caps the number of open confirmations', () => {
+      const { store } = setup();
+      for (let userId = 1; userId <= MAX_OPEN_WEB_STEPS + 5; userId += 1) {
+        store.issue({ userId, resourceId: 3, action: 'start', origin: 'web' }, 'p', 'k', 60, {});
+      }
+      expect(store.size).toBe(MAX_OPEN_WEB_STEPS);
+    });
+
+    it('audits issued, answered and expired web/API steps with their origin', async () => {
+      jest.useFakeTimers();
+      try {
+        const { service, hooks, audit } = setup(confirmOutcome);
+        const api = { origin: 'api' as const, apiTokenId: 11 };
+        const id = (await catchError(service.gateHttp(3, user, {}, api))).getResponse().stepId;
+        hooks.runPreStart.mockResolvedValue({ decision: 'allow' });
+        await service.gateHttp(3, user, { confirmedStepIds: [id] }, api);
+        hooks.runPreStart.mockResolvedValue(confirmOutcome);
+        const late = (await catchError(service.gateHttp(3, user, {}, web))).getResponse().stepId;
+        jest.advanceTimersByTime(36_000);
+        await catchError(service.gateHttp(3, user, { confirmedStepIds: [late] }, web));
+        const actions = audit.recordAttractap.mock.calls.map(([event]) => [
+          event.action,
+          event.details.origin,
+          event.authenticationMethod,
+        ]);
+        expect(actions).toEqual([
+          ['ui.step_issued', 'api', 'api-token'],
+          ['ui.step_answered', 'api', 'api-token'],
+          ['ui.step_issued', 'web', 'session'],
+          ['ui.step_expired', 'web', 'session'],
+        ]);
+        for (const [event] of audit.recordAttractap.mock.calls) {
+          expect(projectAttractapAuditEvent(event)).not.toBeNull();
+        }
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });

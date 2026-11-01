@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,
@@ -8,6 +8,7 @@ import {
 } from '@attraccess/database-entities';
 import type { HookFailurePolicy, NoScreenPolicy } from '@attraccess/plugins-backend-sdk';
 import { AuditService } from '../../audit/audit.service';
+import { auditActorFields, type AuditActor } from './audit-actor';
 import { ReaderUiRegistry } from './reader-ui.registry';
 
 export interface ResourceReaderUiSettings {
@@ -44,20 +45,20 @@ export class ReaderUiSettingsService {
     };
   }
 
-  async setResource(resourceId: number, next: ResourceReaderUiSettings, actorId: number): Promise<void> {
+  async setResource(resourceId: number, next: ResourceReaderUiSettings, actor: AuditActor): Promise<void> {
     const loaded = new Set(this.registry.pluginNames());
     const unknown = next.plugins.filter((entry) => !loaded.has(entry.plugin)).map((entry) => entry.plugin);
     if (unknown.length) throw new BadRequestException(`Unknown plugin: ${unknown.join(', ')}`);
     const before = await this.getResource(resourceId);
     await this.resources.save({ resourceId, noScreenPolicy: next.noScreenPolicy });
     if (before.noScreenPolicy !== next.noScreenPolicy) {
-      await this.log(actorId, { setting: 'noScreenPolicy', resourceId, value: next.noScreenPolicy ?? 'default' });
+      await this.log(actor, { setting: 'noScreenPolicy', resourceId, value: next.noScreenPolicy ?? 'default' });
     }
     for (const entry of next.plugins) {
       const prev = before.plugins.find((p) => p.plugin === entry.plugin);
       await this.plugins.save({ resourceId, ...entry });
       if ((prev?.widgetsEnabled ?? true) !== entry.widgetsEnabled) {
-        await this.log(actorId, {
+        await this.log(actor, {
           setting: 'widgetsEnabled',
           resourceId,
           plugin: entry.plugin,
@@ -65,7 +66,7 @@ export class ReaderUiSettingsService {
         });
       }
       if ((prev?.hookFailurePolicy ?? 'fail-closed') !== entry.hookFailurePolicy) {
-        await this.log(actorId, {
+        await this.log(actor, {
           setting: 'hookFailurePolicy',
           resourceId,
           plugin: entry.plugin,
@@ -80,9 +81,9 @@ export class ReaderUiSettingsService {
     return { widgetsEnabled: row?.widgetsEnabled ?? true };
   }
 
-  async setReader(readerId: number, widgetsEnabled: boolean, actorId: number): Promise<void> {
+  async setReader(readerId: number, widgetsEnabled: boolean, actor: AuditActor): Promise<void> {
     await this.readers.save({ readerId, widgetsEnabled });
-    await this.log(actorId, { setting: 'readerWidgetsEnabled', readerId, value: widgetsEnabled });
+    await this.log(actor, { setting: 'readerWidgetsEnabled', readerId, value: widgetsEnabled });
   }
 
   async noScreenPolicyOverride(resourceId: number): Promise<NoScreenPolicy | null> {
@@ -102,8 +103,28 @@ export class ReaderUiSettingsService {
     return (pluginRow?.widgetsEnabled ?? true) && (readerRow?.widgetsEnabled ?? true);
   }
 
+  /**
+   * Widget toggles for one slot sync in two queries: the reader toggle and the (resource, plugin) pairs
+   * switched off, as `resourceId|plugin`.
+   */
+  async widgetToggles(
+    readerId: number,
+    resourceIds: number[],
+  ): Promise<{ readerEnabled: boolean; disabled: Set<string> }> {
+    const [readerRow, off] = await Promise.all([
+      this.readers.findOne({ where: { readerId } }),
+      resourceIds.length === 0
+        ? Promise.resolve([])
+        : this.plugins.find({ where: { resourceId: In(resourceIds), widgetsEnabled: false } }),
+    ]);
+    return {
+      readerEnabled: readerRow?.widgetsEnabled ?? true,
+      disabled: new Set(off.map((row) => `${row.resourceId}|${row.plugin}`)),
+    };
+  }
+
   private async log(
-    actorId: number,
+    actor: AuditActor,
     details: { setting: string; resourceId?: number; readerId?: number; plugin?: string; value: string | boolean },
   ) {
     const subjectId = details.resourceId ?? details.readerId ?? 0;
@@ -111,8 +132,7 @@ export class ReaderUiSettingsService {
       .recordAttractap({
         action: 'ui.setting_changed',
         subjectType: details.resourceId ? 'resource' : 'attractap.reader',
-        actorId,
-        authenticationMethod: 'session',
+        ...auditActorFields(actor),
         subjectId,
         details,
       })

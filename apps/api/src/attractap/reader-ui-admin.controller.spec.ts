@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ReaderUiAdminController } from './reader-ui-admin.controller';
 
 function setup() {
@@ -9,7 +9,7 @@ function setup() {
     getReader: jest.fn().mockResolvedValue({ widgetsEnabled: false }),
     setReader: jest.fn().mockResolvedValue(undefined),
   };
-  const alerts = { listOpen: jest.fn().mockResolvedValue([{ id: 1 }]), clear: jest.fn() };
+  const alerts = { listOpen: jest.fn().mockResolvedValue([{ id: 1 }]), clear: jest.fn(), findOpen: jest.fn() };
   const slots = { syncReader: jest.fn(), contributionsOf: jest.fn().mockReturnValue([{ plugin: 'p' }]) };
   const resources = { getResourceById: jest.fn().mockResolvedValue({ id: 3 }) };
   const readers = { findReaderById: jest.fn().mockResolvedValue({ id: 8 }) };
@@ -20,7 +20,9 @@ function setup() {
     resources as never,
     readers as never,
   );
-  const req = { user: { id: 4 } } as any;
+  const req = {
+    user: { id: 4, authenticationMethod: 'session', effectivePermissions: new Set(['resources.update']) },
+  } as any;
   return { controller, settings, alerts, slots, resources, readers, req };
 }
 
@@ -29,7 +31,7 @@ describe('ReaderUiAdminController', () => {
     const { controller, settings, slots, req } = setup();
     const dto = { noScreenPolicy: 'block' as const, plugins: [] };
     await controller.updateResourceSettings(3, dto, req);
-    expect(settings.setResource).toHaveBeenCalledWith(3, dto, 4);
+    expect(settings.setResource).toHaveBeenCalledWith(3, dto, req.user);
     expect(slots.syncReader).toHaveBeenCalledWith(undefined);
     expect(await controller.getResourceSettings(3)).toEqual({ noScreenPolicy: null, plugins: [] });
   });
@@ -37,7 +39,7 @@ describe('ReaderUiAdminController', () => {
   it('saves the reader toggle and resyncs only that reader', async () => {
     const { controller, settings, slots, req } = setup();
     expect(await controller.updateReaderSettings(8, { widgetsEnabled: false }, req)).toEqual({ widgetsEnabled: false });
-    expect(settings.setReader).toHaveBeenCalledWith(8, false, 4);
+    expect(settings.setReader).toHaveBeenCalledWith(8, false, req.user);
     expect(slots.syncReader).toHaveBeenCalledWith(8);
   });
 
@@ -62,12 +64,33 @@ describe('ReaderUiAdminController', () => {
     expect(await controller.getAlerts()).toEqual([{ id: 1 }]);
   });
 
-  it('clears an alert and answers 404 when it is gone', async () => {
+  it('clears a reader crash-loop alert with resources.update and answers 404 when it is gone', async () => {
     const { controller, alerts, req } = setup();
+    alerts.findOpen.mockResolvedValueOnce({ id: 5, kind: 'crash-loop', readerId: 8 });
     alerts.clear.mockResolvedValueOnce({ id: 5 });
     expect(await controller.clearAlert(5, req)).toEqual({ id: 5 });
-    expect(alerts.clear).toHaveBeenCalledWith(5, 4);
-    alerts.clear.mockResolvedValueOnce(null);
+    expect(alerts.clear).toHaveBeenCalledWith(5, req.user);
+    alerts.findOpen.mockResolvedValueOnce(null);
     await expect(controller.clearAlert(6, req)).rejects.toThrow(NotFoundException);
+  });
+
+  it.each(['breaker-open', 'load-failure'])(
+    'needs system.plugins.manage to clear a plugin-scoped %s alert (it resets the plugin globally)',
+    async (kind) => {
+      const { controller, alerts, req } = setup();
+      alerts.findOpen.mockResolvedValue({ id: 7, kind, plugin: 'p' });
+      await expect(controller.clearAlert(7, req)).rejects.toThrow(ForbiddenException);
+      expect(alerts.clear).not.toHaveBeenCalled();
+      const admin = { user: { ...req.user, effectivePermissions: new Set(['system.plugins.manage']) } } as any;
+      alerts.clear.mockResolvedValueOnce({ id: 7 });
+      await expect(controller.clearAlert(7, admin)).resolves.toEqual({ id: 7 });
+    },
+  );
+
+  it('does not let plugin managers clear reader crash-loop alerts', async () => {
+    const { controller, alerts, req } = setup();
+    alerts.findOpen.mockResolvedValue({ id: 5, kind: 'crash-loop', readerId: 8 });
+    const pluginAdmin = { user: { ...req.user, effectivePermissions: new Set(['system.plugins.manage']) } } as any;
+    await expect(controller.clearAlert(5, pluginAdmin)).rejects.toThrow(ForbiddenException);
   });
 });

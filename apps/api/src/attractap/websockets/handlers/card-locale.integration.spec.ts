@@ -8,6 +8,7 @@ import { SettingsService } from '../../../settings/settings.service';
 import { AttractapService } from '../../attractap.service';
 import { AuthenticatedWebSocket, AttractapEventType } from '../websocket.types';
 import { AttractapCardHandler } from './card/card.handler';
+import { CardSessionService } from './ui/card-session.service';
 
 describe('persisted web UI locale at card authentication', () => {
   let source: DataSource;
@@ -67,6 +68,7 @@ describe('persisted web UI locale at card authentication', () => {
       resourceIntroducersService: { isIntroducer: async () => false },
       rbacService: { getEffectivePermissions: async () => new Set<string>() },
       resourceListService: { sendResourceListToSocket: async () => undefined },
+      cardSessions: new CardSessionService(),
     });
     const sendMessage = jest.fn().mockResolvedValue(true);
     const socket = { readerId: 42, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;

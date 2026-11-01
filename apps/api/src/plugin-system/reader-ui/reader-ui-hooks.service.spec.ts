@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { PreStartHook, PreStartResult } from '@attraccess/plugins-backend-sdk';
 import { ReaderUiHooksService, type PreStartRun } from './reader-ui-hooks.service';
 
@@ -8,10 +9,16 @@ const confirm = (stepKey: string): PreStartResult => ({
 });
 const block: PreStartResult = { decision: 'block', reason: { code: 'RESERVED', title: 'Reserved', body: 'Not now' } };
 
-function setup(hooks: Record<string, PreStartHook>, policy: 'fail-closed' | 'fail-open' = 'fail-closed') {
+const config = (app: Record<string, unknown> = {}) => ({ get: () => app }) as never;
+
+function setup(
+  hooks: Record<string, PreStartHook>,
+  policy: 'fail-closed' | 'fail-open' = 'fail-closed',
+  sessionEndHooks: Record<string, () => unknown> = {},
+) {
   const registry = {
     preStartHooks: () => Object.entries(hooks).map(([plugin, hook]) => ({ plugin, hook })),
-    sessionEndHooks: () => [],
+    sessionEndHooks: () => Object.entries(sessionEndHooks).map(([plugin, hook]) => ({ plugin, hook })),
   };
   const settings = { failurePolicy: jest.fn().mockResolvedValue(policy) };
   const cleared: Array<(a: { kind: string; plugin: string }) => void> = [];
@@ -21,7 +28,13 @@ function setup(hooks: Record<string, PreStartHook>, policy: 'fail-closed' | 'fai
     clearWhere: jest.fn().mockResolvedValue(undefined),
   };
   const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
-  const service = new ReaderUiHooksService(registry as never, settings as never, alerts as never, audit as never);
+  const service = new ReaderUiHooksService(
+    registry as never,
+    settings as never,
+    alerts as never,
+    audit as never,
+    config(),
+  );
   return { service, alerts, audit, settings, cleared };
 }
 
@@ -30,6 +43,7 @@ const run = (satisfied: PreStartRun['satisfied'] = new Map()): PreStartRun => ({
   userId: 7,
   action: 'start',
   origin: 'reader',
+  language: 'en',
   readerId: 5,
   cardSessionId: 'cs1',
   satisfied,
@@ -103,11 +117,38 @@ describe('ReaderUiHooksService', () => {
     });
   });
 
-  it('never exceeds the 3 s cap even when configured higher', () => {
-    process.env.READER_UI_HOOK_TIMEOUT_MS = '9000';
-    const { service } = setup({});
-    expect(service.timeoutMs).toBe(3000);
-    delete process.env.READER_UI_HOOK_TIMEOUT_MS;
+  it('takes timeout and breaker threshold from the app config, never exceeding the 3 s cap', async () => {
+    const make = (app: Record<string, unknown>, hook: PreStartHook = () => allow) =>
+      new ReaderUiHooksService(
+        { preStartHooks: () => [{ plugin: 'p', hook }], sessionEndHooks: () => [] } as never,
+        { failurePolicy: jest.fn().mockResolvedValue('fail-closed') } as never,
+        { onCleared: jest.fn(), raise: jest.fn().mockResolvedValue({}), clearWhere: jest.fn() } as never,
+        { recordAttractap: jest.fn().mockResolvedValue(undefined) } as never,
+        config(app),
+      );
+    expect(make({ READER_UI_HOOK_TIMEOUT_MS: 9000 }).timeoutMs).toBe(3000);
+    expect(make({ READER_UI_HOOK_TIMEOUT_MS: 800 }).timeoutMs).toBe(800);
+    expect(make({}).timeoutMs).toBe(1500);
+    let calls = 0;
+    const service = make({ READER_UI_BREAKER_THRESHOLD: 2 }, () => {
+      calls += 1;
+      throw new Error('down');
+    });
+    for (let i = 0; i < 3; i += 1) await service.runPreStart(run());
+    expect(calls).toBe(2);
+  });
+
+  it('passes the language and answers a failure with the host text in that language', async () => {
+    const seen: string[] = [];
+    const { service } = setup({
+      p: (ctx) => {
+        seen.push(ctx.language);
+        throw new Error('x');
+      },
+    });
+    const outcome = await service.runPreStart({ ...run(), language: 'de' });
+    expect(seen).toEqual(['de']);
+    expect(outcome).toMatchObject({ reason: { code: 'HOOK_UNAVAILABLE', title: 'Vorübergehend nicht startbar' } });
   });
 
   it('allows and audits a failing hook when the admin chose fail-open', async () => {
@@ -137,6 +178,58 @@ describe('ReaderUiHooksService', () => {
   it('treats an invalid hook result as a failure', async () => {
     const { service } = setup({ odd: () => ({ decision: 'maybe' }) as never });
     await expect(service.runPreStart(run())).resolves.toMatchObject({ decision: 'block' });
+  });
+
+  it('runs an invalid result through the failure policy: fail-open is honoured and audited', async () => {
+    const { service, audit } = setup({ odd: () => ({ decision: 'maybe' }) as never }, 'fail-open');
+    await expect(service.runPreStart(run())).resolves.toEqual({ decision: 'allow' });
+    expect(audit.recordAttractap).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'ui.fail_open_used',
+        details: expect.objectContaining({ reasonCode: 'invalid-result' }),
+      }),
+    );
+  });
+
+  it('counts invalid results towards the circuit breaker', async () => {
+    let calls = 0;
+    const { service, alerts } = setup({
+      odd: () => {
+        calls += 1;
+        return { decision: 'maybe' } as never;
+      },
+    });
+    for (let i = 0; i < 6; i += 1) await service.runPreStart(run());
+    expect(calls).toBe(5);
+    expect(alerts.raise).toHaveBeenCalledWith('breaker-open', expect.any(String), { plugin: 'odd' });
+  });
+
+  it.each([
+    ['a bad tone', { tone: 'neon' }],
+    ['a NaN expiry', { expiresInSec: Number.NaN }],
+    ['an unknown no-screen policy', { noScreenPolicy: 'sometimes' }],
+    ['an invalid countdown', { countdownTo: new Date('nope') }],
+    ['a bad step key', { stepKey: 'Not Valid!' }],
+    ['a too long label', { confirmLabel: 'x'.repeat(40) }],
+    ['a spoofing label', { cancelLabel: 'In use' }],
+  ])('treats a confirmation with %s as a hook failure', async (_name, extra) => {
+    const { service } = setup({
+      p: () => ({ decision: 'confirm', confirmation: { ...(confirm('k') as any).confirmation, ...extra } }),
+    });
+    await expect(service.runPreStart(run())).resolves.toMatchObject({
+      decision: 'block',
+      reason: { code: 'HOOK_UNAVAILABLE' },
+    });
+  });
+
+  it('clamps the confirmation expiry to [10, 120] s', async () => {
+    const outcome = async (expiresInSec: number) =>
+      (await setup({
+        p: () => ({ decision: 'confirm', confirmation: { ...(confirm('k') as any).confirmation, expiresInSec } }),
+      }).service.runPreStart(run())) as any;
+    expect((await outcome(1)).confirmation.expiresInSec).toBe(10);
+    expect((await outcome(9999)).confirmation.expiresInSec).toBe(120);
+    expect((await outcome(45)).confirmation.expiresInSec).toBe(45);
   });
 
   it('rejects text that spoofs core status strings', async () => {
@@ -195,7 +288,7 @@ describe('ReaderUiHooksService', () => {
 });
 
 describe('ReaderUiHooksService.runSessionEnd', () => {
-  const ctx = { resourceId: 3, userId: 7, sessionId: 11, origin: 'reader' as const };
+  const ctx = { resourceId: 3, userId: 7, sessionId: 11, origin: 'reader' as const, language: 'en' as const };
   const choice = (overrides: Record<string, unknown> = {}) => ({
     decision: 'choose' as const,
     choice: {
@@ -224,7 +317,7 @@ describe('ReaderUiHooksService.runSessionEnd', () => {
       clearWhere: jest.fn().mockResolvedValue(undefined),
     };
     const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
-    return new ReaderUiHooksService(registry as never, settings as never, alerts as never, audit as never);
+    return new ReaderUiHooksService(registry as never, settings as never, alerts as never, audit as never, config());
   }
 
   beforeEach(() => jest.useFakeTimers());
@@ -270,5 +363,59 @@ describe('ReaderUiHooksService.runSessionEnd', () => {
   it('uses the second plugin when the first returns an invalid choice', async () => {
     const service = setupEnd({ a: () => choice({ choices: [] }), b: () => choice() });
     await expect(service.runSessionEnd(ctx)).resolves.toMatchObject({ plugin: 'b' });
+  });
+
+  it('asks every plugin, shows the first question and applies the default for the others', async () => {
+    const first = choice();
+    const second = choice({ defaultOnTimeout: 'free' });
+    const service = setupEnd({ a: () => first, b: () => second });
+    const asked = await service.runSessionEnd(ctx);
+    expect(asked).toMatchObject({ plugin: 'a' });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(second.choice.onAnswer).toHaveBeenCalledWith('free');
+    expect(first.choice.onAnswer).not.toHaveBeenCalled();
+  });
+
+  it('guards onAnswer: at most once, bounded by the hook timeout, never rejecting', async () => {
+    const throwing = choice({ onAnswer: jest.fn().mockRejectedValue(new Error('boom')) });
+    const asked = await setupEnd({ a: () => throwing }).runSessionEnd(ctx);
+    await expect(asked?.result.choice.onAnswer('keep')).resolves.toBeUndefined();
+    await asked?.result.choice.onAnswer('free');
+    expect(throwing.choice.onAnswer).toHaveBeenCalledTimes(1);
+
+    const hanging = choice({ onAnswer: jest.fn(() => new Promise(() => undefined)) });
+    const slow = await setupEnd({ a: () => hanging }).runSessionEnd(ctx);
+    const pending = slow?.result.choice.onAnswer('keep');
+    await jest.advanceTimersByTimeAsync(1501);
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it('clamps the question expiry to 30 s and defaults it to 15 s', async () => {
+    const long = await setupEnd({ a: () => choice({ expiresInSec: 600 }) }).runSessionEnd(ctx);
+    expect(long?.result.choice.expiresInSec).toBe(30);
+    const plain = await setupEnd({ a: () => choice() }).runSessionEnd(ctx);
+    expect(plain?.result.choice.expiresInSec).toBe(15);
+  });
+
+  it('never lets a failing advisory hook open the pre-start breaker', async () => {
+    let preStartCalls = 0;
+    const { service, alerts } = setup(
+      {
+        p: () => {
+          preStartCalls += 1;
+          return allow;
+        },
+      },
+      'fail-closed',
+      {
+        p: () => {
+          throw new Error('down');
+        },
+      },
+    );
+    for (let i = 0; i < 8; i += 1) await service.runSessionEnd(ctx);
+    await expect(service.runPreStart(run())).resolves.toEqual({ decision: 'allow' });
+    expect(preStartCalls).toBe(1);
+    expect(alerts.raise).not.toHaveBeenCalled();
   });
 });

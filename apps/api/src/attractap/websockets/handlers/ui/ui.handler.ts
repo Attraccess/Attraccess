@@ -49,7 +49,10 @@ export class AttractapUiHandler {
   }
 
   public handleStepResult(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) {
-    this.steps.handleResult(socket, eventData.payload ?? {});
+    const payload = eventData.payload ?? {};
+    // The reader is still signed in while it answers, so the card session must not run out underneath.
+    this.cardSessions.resume(socket, payload.cardSessionId, socket.state?.lastAuthenticatedUserId);
+    this.steps.handleResult(socket, payload);
   }
 
   public handleRenderReport(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) {
@@ -68,9 +71,7 @@ export class AttractapUiHandler {
   /** Socket closed: steps are discarded and timers released. */
   public cleanup(socket: AuthenticatedWebSocket) {
     this.steps.discardAll(socket);
-    const card = socket.state?.cardSession;
-    if (card?.expiryTimer) clearTimeout(card.expiryTimer);
-    if (socket.state) socket.state.cardSession = null;
+    if (socket.state) this.cardSessions.end(socket, null, 'disconnect');
     this.slots.cleanup(socket);
   }
 }

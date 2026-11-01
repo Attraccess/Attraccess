@@ -14,6 +14,8 @@ export interface UiAuditDetails {
   cardSessionId?: string;
   origin?: 'reader';
   policy?: 'block' | 'card-confirm' | 'allow-with-warning';
+  /** Card-confirm cancelled by another user's tap: who tapped (`userId` stays the step owner). */
+  tappedUserId?: number;
 }
 
 /** Host audit entries for reader steps, in the core `attractap` domain. Never throws. */

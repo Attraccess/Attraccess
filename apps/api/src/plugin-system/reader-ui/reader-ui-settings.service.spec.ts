@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { projectAttractapAuditEvent } from '../../audit/policies/attractap';
 import { ReaderUiSettingsService } from './reader-ui-settings.service';
 
 function repo<T extends Record<string, any>>(keys: string[]) {
@@ -57,7 +58,7 @@ describe('ReaderUiSettingsService', () => {
       service.setResource(
         1,
         { noScreenPolicy: null, plugins: [{ plugin: 'gone', widgetsEnabled: false, hookFailurePolicy: 'fail-open' }] },
-        9,
+        { id: 9 },
       ),
     ).rejects.toThrow('Unknown plugin: gone');
     expect(audit.recordAttractap).not.toHaveBeenCalled();
@@ -69,7 +70,7 @@ describe('ReaderUiSettingsService', () => {
     await service.setResource(
       1,
       { noScreenPolicy: null, plugins: [{ plugin: 'res', widgetsEnabled: true, hookFailurePolicy: 'fail-open' }] },
-      9,
+      { id: 9 },
     );
     expect(audit.recordAttractap).toHaveBeenCalledTimes(1);
     expect(audit.recordAttractap).toHaveBeenCalledWith(
@@ -85,7 +86,7 @@ describe('ReaderUiSettingsService', () => {
       noScreenPolicy: 'card-confirm' as const,
       plugins: [{ plugin: 'res', widgetsEnabled: false, hookFailurePolicy: 'fail-open' as const }],
     };
-    await service.setResource(1, next, 9);
+    await service.setResource(1, next, { id: 9 });
     expect(await service.getResource(1)).toEqual(next);
     expect(await service.noScreenPolicyOverride(1)).toBe('card-confirm');
     expect(await service.failurePolicy(1, 'res')).toBe('fail-open');
@@ -98,7 +99,7 @@ describe('ReaderUiSettingsService', () => {
       }),
     );
     audit.recordAttractap.mockClear();
-    await service.setResource(1, next, 9);
+    await service.setResource(1, next, { id: 9 });
     expect(audit.recordAttractap).not.toHaveBeenCalled();
   });
 
@@ -107,10 +108,10 @@ describe('ReaderUiSettingsService', () => {
     await service.setResource(
       1,
       { noScreenPolicy: null, plugins: [{ plugin: 'res', widgetsEnabled: true, hookFailurePolicy: 'fail-closed' }] },
-      9,
+      { id: 9 },
     );
     expect(await service.widgetsEnabled(1, 'res', 2)).toBe(true);
-    await service.setReader(2, false, 9);
+    await service.setReader(2, false, { id: 9 });
     expect(await service.widgetsEnabled(1, 'res', 2)).toBe(false);
     expect(await service.widgetsEnabled(1, 'res', 3)).toBe(true);
     expect(audit.recordAttractap).toHaveBeenCalledWith(
@@ -121,6 +122,17 @@ describe('ReaderUiSettingsService', () => {
   it('does not fail the save when auditing fails', async () => {
     const { service, audit } = setup();
     audit.recordAttractap.mockRejectedValue(new Error('down'));
-    await expect(service.setReader(2, false, 9)).resolves.toBeUndefined();
+    await expect(service.setReader(2, false, { id: 9 })).resolves.toBeUndefined();
+  });
+
+  it('records the real principal: an API token change is audited as api-token with its id', async () => {
+    const { service, audit } = setup();
+    await service.setReader(2, false, { id: 9, authenticationMethod: 'api-token', apiTokenId: 31 });
+    const [event] = audit.recordAttractap.mock.calls.at(-1);
+    expect(event).toMatchObject({ actorId: 9, authenticationMethod: 'api-token', apiTokenId: 31 });
+    expect(projectAttractapAuditEvent(event)).not.toBeNull();
+    await service.setReader(2, true, { id: 9, authenticationMethod: 'session' });
+    expect(audit.recordAttractap.mock.calls.at(-1)[0]).toMatchObject({ authenticationMethod: 'session' });
+    expect(audit.recordAttractap.mock.calls.at(-1)[0]).not.toHaveProperty('apiTokenId');
   });
 });

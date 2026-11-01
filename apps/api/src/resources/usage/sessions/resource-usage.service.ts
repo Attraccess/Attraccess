@@ -450,6 +450,7 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     dto: { forceTakeOver?: boolean },
     supervisorUserId: number | null = null,
   ): Promise<void> {
+    await this.assertLifecycleAvailable(this.resourceUsageRepository.manager, resourceId);
     const resource = await this.getResource(resourceId, user, {
       checkMaintenance: true,
       checkControlPermission: false,

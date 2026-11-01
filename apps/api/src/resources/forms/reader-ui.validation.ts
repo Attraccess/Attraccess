@@ -8,13 +8,17 @@ import {
   READER_UI_SLOT_NODE_BUDGET,
   READER_UI_STEP_KINDS,
   READER_UI_TEXT_STYLES,
+  READER_UI_TIMING,
   READER_UI_TONES,
+  NO_SCREEN_POLICIES,
+  type PluginChoice,
+  type PluginConfirmation,
   type ReaderUiCapabilities,
   type ReaderUiSlotId,
   type ReaderUiTone,
   type ReaderUiWireNode,
 } from '@attraccess/plugins-backend-sdk';
-import { makeStringLVGLReady } from '../../attractap/websockets/websocket-lvgl';
+import { makeStringLVGLReady } from '../../common/text/latin1';
 
 export type ReaderUiRejectReason =
   | 'invalid-shape'
@@ -52,12 +56,21 @@ export function sanitizeUiText(text: string): string {
   return makeStringLVGLReady(text.replace(/[\r\n\t]+/g, ' '));
 }
 
-function isCoreStatusString(text: string): boolean {
-  const normalized = text
-    .trim()
+/** Lower case, whitespace (incl. NBSP) collapsed, non-letters stripped at both ends. */
+function normalizeStatusText(text: string): string {
+  return text
     .toLowerCase()
-    .replace(/[.!:]+$/, '');
-  return READER_UI_RESERVED_STATUS_STRINGS.includes(normalized);
+    .replace(/\s+/g, ' ') // \s covers NBSP and the other Unicode spaces
+    .replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
+}
+
+/** Equal to a reserved core status string, or starting with one as a whole word ("In use (A)"). */
+export function isCoreStatusString(text: string): boolean {
+  const normalized = normalizeStatusText(text);
+  return READER_UI_RESERVED_STATUS_STRINGS.some(
+    (reserved) =>
+      normalized === reserved || (normalized.startsWith(reserved) && !/\p{L}/u.test(normalized[reserved.length])),
+  );
 }
 
 function checkText(text: unknown, max: number, tooLong: ReaderUiRejectReason): string {
@@ -255,34 +268,106 @@ const stepEnvelope = z.object({
   choices: z.array(z.object({ id: z.string(), label: z.string() })).optional(),
 });
 
+// Shared by the wire step check and the plugin result checks, so the two can never disagree.
+const stepTitle = (value: unknown) => checkText(value, READER_UI_LIMITS.maxTextChars, 'text-too-long');
+const stepBody = (value: unknown) => checkText(value, READER_UI_LIMITS.maxTextChars * 2, 'text-too-long');
+const optionalLabel = (value: unknown) => {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new Reject('invalid-shape');
+  return checkLabel(value);
+};
+
+function stepChoices(raw: unknown): { id: string; label: string }[] {
+  if (!Array.isArray(raw)) throw new Reject('invalid-shape');
+  if (raw.length === 0 || raw.length > READER_UI_LIMITS.maxChoices) throw new Reject('too-many-choices');
+  return raw.map((choice: { id?: unknown; label?: unknown } | null) => {
+    if (typeof choice?.id !== 'string' || !ID_RE.test(choice.id)) throw new Reject('bad-id');
+    if (typeof choice.label !== 'string') throw new Reject('invalid-shape');
+    return { id: choice.id, label: checkLabel(choice.label) };
+  });
+}
+
 /** Validates and sanitizes a `UI_STEP_REQUEST` payload. */
 export function validateStepRequest(raw: unknown): ReaderUiValidation<Record<string, unknown>> {
   return run(() => {
     const parsed = stepEnvelope.safeParse(raw);
     if (!parsed.success) throw new Reject('invalid-shape');
     const step = parsed.data;
-    const out: Record<string, unknown> = {
-      ...step,
-      title: checkText(step.title, READER_UI_LIMITS.maxTextChars, 'text-too-long'),
-      body: checkText(step.body, READER_UI_LIMITS.maxTextChars * 2, 'text-too-long'),
-    };
-    if (step.actions) {
-      out['actions'] = step.actions.map((a) =>
-        compact({ ...a, label: a.label === undefined ? undefined : checkLabel(a.label) }),
-      );
-    }
-    if (step.kind === 'choose') {
-      const choices = step.choices ?? [];
-      if (choices.length === 0 || choices.length > READER_UI_LIMITS.maxChoices) throw new Reject('too-many-choices');
-      out['choices'] = choices.map((choice) => {
-        if (!ID_RE.test(choice.id)) throw new Reject('bad-id');
-        return { id: choice.id, label: checkLabel(choice.label) };
-      });
-    } else if (step.choices) {
-      throw new Reject('invalid-shape');
-    }
+    const out: Record<string, unknown> = { ...step, title: stepTitle(step.title), body: stepBody(step.body) };
+    if (step.actions) out['actions'] = step.actions.map((a) => compact({ ...a, label: optionalLabel(a.label) }));
+    if (step.kind === 'choose') out['choices'] = stepChoices(step.choices ?? []);
+    else if (step.choices) throw new Reject('invalid-shape');
     if (utf8Bytes(out) > READER_UI_LIMITS.maxPayloadBytes) throw new Reject('payload-too-large');
     return out;
+  });
+}
+
+function stepKey(value: unknown): string {
+  if (typeof value !== 'string' || !ID_RE.test(value)) throw new Reject('bad-id');
+  return value;
+}
+
+/** Finite seconds clamped to [min, max]; a missing value takes the default. */
+function ttlSec(value: unknown, min: number, max: number, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Reject('invalid-shape');
+  return Math.min(Math.max(value, min), max);
+}
+
+function countdownDate(value: unknown): Date | undefined {
+  if (value === undefined) return undefined;
+  if (!(value instanceof Date) || !Number.isFinite(value.getTime()) || value.getTime() < 0) {
+    throw new Reject('invalid-shape');
+  }
+  return value;
+}
+
+/** Validates and sanitizes a plugin's pre-start confirmation; `expiresInSec` comes back clamped to [10, 120]. */
+export function validatePluginConfirmation(raw: unknown): ReaderUiValidation<PluginConfirmation> {
+  return run(() => {
+    if (typeof raw !== 'object' || raw === null) throw new Reject('invalid-shape');
+    const c = raw as Record<string, unknown>;
+    return compact({
+      stepKey: stepKey(c['stepKey']),
+      title: stepTitle(c['title']),
+      body: stepBody(c['body']),
+      tone: checkEnum(c['tone'], READER_UI_TONES),
+      confirmLabel: optionalLabel(c['confirmLabel']),
+      cancelLabel: optionalLabel(c['cancelLabel']),
+      countdownTo: countdownDate(c['countdownTo']),
+      expiresInSec: ttlSec(
+        c['expiresInSec'],
+        10,
+        READER_UI_TIMING.stepMaxTtlSec,
+        READER_UI_TIMING.stepDefaultTtlSec,
+      ),
+      noScreenPolicy: checkEnum(c['noScreenPolicy'], NO_SCREEN_POLICIES),
+    }) as PluginConfirmation;
+  });
+}
+
+/** Validates and sanitizes a plugin's post-stop question; `expiresInSec` comes back clamped to [5, 30]. */
+export function validatePluginChoice(raw: unknown): ReaderUiValidation<PluginChoice> {
+  return run(() => {
+    if (typeof raw !== 'object' || raw === null) throw new Reject('invalid-shape');
+    const c = raw as Record<string, unknown>;
+    if (typeof c['onAnswer'] !== 'function') throw new Reject('invalid-shape');
+    const choices = stepChoices(c['choices']);
+    if (!choices.some((choice) => choice.id === c['defaultOnTimeout'])) throw new Reject('bad-id');
+    return {
+      stepKey: stepKey(c['stepKey']),
+      title: stepTitle(c['title']),
+      body: stepBody(c['body']),
+      choices,
+      defaultOnTimeout: c['defaultOnTimeout'] as string,
+      expiresInSec: ttlSec(
+        c['expiresInSec'],
+        5,
+        READER_UI_TIMING.postStopMaxTtlSec,
+        READER_UI_TIMING.postStopDefaultTtlSec,
+      ),
+      onAnswer: c['onAnswer'] as PluginChoice['onAnswer'],
+    };
   });
 }
 

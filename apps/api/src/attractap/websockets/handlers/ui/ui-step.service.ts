@@ -2,16 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { ResourceFormAction } from '@attraccess/database-entities';
 import {
-  READER_UI_LIMITS,
   READER_UI_TIMING,
   type PluginChoice,
   type PluginConfirmation,
 } from '@attraccess/plugins-backend-sdk';
-import {
-  cleanPluginLabel,
-  cleanPluginText,
-  validateStepRequest,
-} from '../../../../resources/forms/reader-ui.validation';
+import { validateStepRequest } from '../../../../resources/forms/reader-ui.validation';
 import { AttractapEvent, AttractapEventType, type AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { CardSessionService } from './card-session.service';
@@ -38,6 +33,11 @@ export interface IssueStartStep extends StartStepBinding {
 function clampTtlSec(requested: number | undefined): number {
   const wanted = Number.isFinite(requested) ? (requested as number) : READER_UI_TIMING.stepDefaultTtlSec;
   return Math.min(Math.max(wanted, 10), READER_UI_TIMING.stepMaxTtlSec);
+}
+
+function clampPostStopTtlSec(requested: number | undefined): number {
+  const wanted = Number.isFinite(requested) ? (requested as number) : READER_UI_TIMING.postStopDefaultTtlSec;
+  return Math.min(Math.max(wanted, 5), READER_UI_TIMING.postStopMaxTtlSec);
 }
 
 /**
@@ -116,11 +116,7 @@ export class UiStepService {
   ): boolean {
     const card = this.cardSessions.current(socket);
     if (!card || card.userId !== spec.userId || socket.readerId == null) return false;
-    const title = cleanPluginText(spec.choice.title, READER_UI_LIMITS.maxTextChars);
-    const body = cleanPluginText(spec.choice.body, READER_UI_LIMITS.maxTextChars * 2);
-    const labels = spec.choice.choices.map((c) => ({ id: c.id, label: cleanPluginLabel(c.label) }));
-    if (!title.ok || !body.ok || labels.some((l) => !l.label.ok)) return false;
-    const ttlSec = READER_UI_TIMING.postStopDefaultTtlSec;
+    const ttlSec = clampPostStopTtlSec(spec.choice.expiresInSec);
     const step = this.create(socket, card, {
       kind: 'post-stop',
       plugin: spec.plugin,
@@ -133,6 +129,7 @@ export class UiStepService {
       ttlSec,
     });
     const now = Date.now();
+    // `send` validates and sanitizes title, body and labels; an invalid question is dropped.
     const sent = this.send(socket, {
       requestId: 0,
       stepId: step.stepId,
@@ -140,9 +137,9 @@ export class UiStepService {
       resourceId: spec.resourceId,
       serverNowMs: now,
       expiresAtMs: now + ttlSec * 1000,
-      title: title.value,
-      body: body.value,
-      choices: labels.map((l) => ({ id: l.id, label: l.label.ok ? l.label.value : '' })),
+      title: spec.choice.title,
+      body: spec.choice.body,
+      choices: spec.choice.choices.map((c) => ({ id: c.id, label: c.label })),
     });
     if (!sent) {
       this.drop(socket, step);
@@ -241,7 +238,10 @@ export class UiStepService {
       if (step.cardSessionId === session.id) continue;
       if (step.kind === 'card-confirm' && step.userId === session.userId) continue;
       if (step.kind === 'card-confirm') {
-        void this.audit.record('ui.card_confirm_cancelled', this.details(step, 'cancelled', 'other-user'));
+        void this.audit.record('ui.card_confirm_cancelled', {
+          ...this.details(step, 'cancelled', 'other-user'),
+          tappedUserId: session.userId,
+        });
       }
       this.cancel(socket, step, 'cancelled', true, 'card-session-replaced');
     }
@@ -276,7 +276,11 @@ export class UiStepService {
       deadline: now + ttlSec * 1000 + READER_UI_TIMING.stepGraceSec * 1000,
       timer: null,
     };
-    step.timer = setTimeout(() => this.cancel(socket, step, 'expired', false), step.deadline - now);
+    // A post-stop question is closed on the reader too, in case its own expiry tick does not run.
+    step.timer = setTimeout(
+      () => this.cancel(socket, step, 'expired', step.kind === 'post-stop'),
+      step.deadline - now,
+    );
     step.timer.unref?.();
     (socket.state.uiSteps ??= new Map()).set(step.stepId, step);
     return step;
@@ -289,11 +293,12 @@ export class UiStepService {
     this.cardSessions.rearm(socket);
   }
 
+  /** `onAnswer` comes host-guarded from the hook runner (timeout, at most once); this is a second net. */
   private applyChoice(step: UiStepState, choiceId: string): void {
     if (!step.choice) return;
     Promise.resolve()
       .then(() => step.choice?.onAnswer(choiceId))
-      .catch((error) => this.logger.warn(`Plugin ${step.plugin} onAnswer failed: ${(error as Error).message}`));
+      .catch((error) => this.logger.warn(`Plugin ${step.plugin} onAnswer failed: ${(error as Error)?.message}`));
   }
 
   private send(socket: AuthenticatedWebSocket, payload: Record<string, unknown>): boolean {

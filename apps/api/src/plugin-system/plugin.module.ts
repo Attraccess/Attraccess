@@ -259,12 +259,17 @@ export class PluginModule {
       exported as PluginBackendModule,
       context,
     );
-    if (readerUiContributions) queueReaderUiContributions(manifest.name, readerUiContributions);
+    // Queued only once the module was built: a plugin quarantined by a throwing register() or credential
+    // provider must not keep its hooks and widgets.
+    const queueReaderUi = () => {
+      if (readerUiContributions) queueReaderUiContributions(manifest.name, readerUiContributions);
+    };
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
         `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`,
       );
+      queueReaderUi();
       return exported as DynamicModule;
     }
 
@@ -274,6 +279,7 @@ export class PluginModule {
       MqttCredentialProvisioningService.register(credentialProvider(context));
       this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
     }
+    queueReaderUi();
     return {
       ...pluginModule,
       providers: [

@@ -1,16 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   READER_UI_LIMITS,
   READER_UI_TIMING,
   type PluginBlockReason,
+  type PluginChoice,
   type PluginConfirmation,
   type PreStartOrigin,
   type PreStartResult,
   type SessionEndResult,
 } from '@attraccess/plugins-backend-sdk';
 import { AuditService } from '../../audit/audit.service';
-import { cleanPluginLabel, cleanPluginText } from '../../resources/forms/reader-ui.validation';
-import { CircuitBreaker } from './circuit-breaker';
+import type { AppConfigType } from '../../config/app.config';
+import {
+  cleanPluginText,
+  validatePluginChoice,
+  validatePluginConfirmation,
+} from '../../resources/forms/reader-ui.validation';
+import { HookRunner, type BreakerTransition } from './hook-runner';
+import { hostReason, type ReaderUiLanguage } from './host-texts';
 import { ReaderUiAlertsService } from './reader-ui-alerts.service';
 import { ReaderUiSettingsService } from './reader-ui-settings.service';
 import { ReaderUiRegistry } from './reader-ui.registry';
@@ -21,10 +29,19 @@ export interface PreStartRun {
   action: 'start' | 'takeover';
   projectId?: number;
   origin: PreStartOrigin;
+  language: ReaderUiLanguage;
   readerId?: number;
   cardSessionId?: string;
   /** plugin -> stepKeys confirmed in this start attempt. */
   satisfied: Map<string, Set<string>>;
+}
+
+export interface SessionEndRun {
+  resourceId: number;
+  userId: number;
+  sessionId: number;
+  origin: 'web' | 'api' | 'reader';
+  language: ReaderUiLanguage;
 }
 
 export type PreStartOutcome =
@@ -32,37 +49,39 @@ export type PreStartOutcome =
   | { decision: 'block'; plugin: string; reason: PluginBlockReason }
   | { decision: 'confirm'; plugin: string; confirmation: PluginConfirmation };
 
-export const HOOK_UNAVAILABLE: PluginBlockReason = {
-  code: 'HOOK_UNAVAILABLE',
-  title: 'Temporarily unavailable',
-  body: 'This resource cannot be started right now. Please try again later.',
-};
-
-class HookFailure extends Error {
-  constructor(public readonly code: 'timeout' | 'exception' | 'invalid-result') {
-    super(code);
-  }
+export interface SessionEndQuestion {
+  plugin: string;
+  /** `choice.onAnswer` is host-guarded: it runs at most once, with the hook timeout, and never rejects. */
+  result: { decision: 'choose'; choice: PluginChoice };
 }
 
-function envInt(name: string, fallback: number): number {
-  const value = Number(process.env[name]);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
+/** Session-end hooks are advisory, so their failures must never open the pre-start breaker. */
+const sessionEndKey = (plugin: string) => `${plugin}#session-end`;
 
 /** Runs plugin hooks with timeout, circuit breaker, failure policy and host audit. */
 @Injectable()
 export class ReaderUiHooksService {
   private readonly logger = new Logger(ReaderUiHooksService.name);
-  private readonly breakers = new Map<string, CircuitBreaker>();
+  private readonly runner: HookRunner;
 
   constructor(
     private readonly registry: ReaderUiRegistry,
     private readonly settings: ReaderUiSettingsService,
     private readonly alerts: ReaderUiAlertsService,
     private readonly audit: AuditService,
+    config: ConfigService,
   ) {
+    const app = config.get<AppConfigType>('app');
+    this.runner = new HookRunner({
+      timeoutMs: Math.min(
+        app?.READER_UI_HOOK_TIMEOUT_MS ?? READER_UI_TIMING.hookDefaultTimeoutMs,
+        READER_UI_TIMING.hookMaxTimeoutMs,
+      ),
+      breakerThreshold: app?.READER_UI_BREAKER_THRESHOLD ?? READER_UI_TIMING.breakerThreshold,
+      breakerProbeAfterMs: READER_UI_TIMING.breakerProbeAfterMs,
+    });
     this.alerts.onCleared((alert) => {
-      if (alert.kind === 'breaker-open' && alert.plugin) this.breakers.get(alert.plugin)?.reset();
+      if (alert.kind === 'breaker-open' && alert.plugin) this.resetBreakers(alert.plugin);
     });
   }
 
@@ -71,125 +90,99 @@ export class ReaderUiHooksService {
   }
 
   get timeoutMs(): number {
-    return Math.min(
-      envInt('READER_UI_HOOK_TIMEOUT_MS', READER_UI_TIMING.hookDefaultTimeoutMs),
-      READER_UI_TIMING.hookMaxTimeoutMs,
-    );
+    return this.runner.timeoutMs;
   }
 
   async runPreStart(run: PreStartRun): Promise<PreStartOutcome> {
     let firstConfirm: PreStartOutcome | null = null;
     for (const { plugin, hook } of this.registry.preStartHooks()) {
       const confirmedStepKeys = [...(run.satisfied.get(plugin) ?? [])];
-      const result = await this.guarded(plugin, run, () =>
-        hook({
-          resourceId: run.resourceId,
-          userId: run.userId,
-          action: run.action,
-          projectId: run.projectId,
-          origin: run.origin,
-          confirmedStepKeys,
-          now: new Date(),
-        }),
+      const { result, transition, error } = await this.runner.run(
+        plugin,
+        () =>
+          hook({
+            resourceId: run.resourceId,
+            userId: run.userId,
+            action: run.action,
+            projectId: run.projectId,
+            origin: run.origin,
+            confirmedStepKeys,
+            language: run.language,
+            now: new Date(),
+          }),
+        (raw) => this.normalize(plugin, raw, run),
       );
+      await this.breakerChanged(plugin, transition, run);
       if (result.kind === 'failure') {
-        const policy = await this.settings.failurePolicy(run.resourceId, plugin);
-        if (policy === 'fail-open') {
+        this.logger.warn(`Pre-start hook of plugin ${plugin} failed (${result.code}): ${(error as Error)?.message}`);
+        if ((await this.settings.failurePolicy(run.resourceId, plugin)) === 'fail-open') {
           await this.record(run, plugin, 'ui.fail_open_used', 'allow', result.code);
           continue;
         }
         await this.record(run, plugin, 'ui.hook_decision', 'block', result.code);
-        return { decision: 'block', plugin, reason: HOOK_UNAVAILABLE };
+        return { decision: 'block', plugin, reason: hostReason('HOOK_UNAVAILABLE', run.language) };
       }
-      const outcome = this.normalize(plugin, result.value, run);
-      if (outcome === null) {
-        await this.record(run, plugin, 'ui.hook_decision', 'block', 'invalid-result');
-        return { decision: 'block', plugin, reason: HOOK_UNAVAILABLE };
-      }
-      await this.record(
-        run,
-        plugin,
-        'ui.hook_decision',
-        outcome.decision,
-        outcome.decision === 'block' ? outcome.reason.code : outcome.decision === 'confirm' ? 'confirm' : 'allow',
-      );
+      const outcome = result.value;
+      await this.record(run, plugin, 'ui.hook_decision', outcome.decision, decisionCode(outcome));
       if (outcome.decision === 'block') return outcome;
       if (outcome.decision === 'confirm') firstConfirm ??= outcome;
     }
     return firstConfirm ?? { decision: 'allow' };
   }
 
-  /** Advisory only: failures and invalid results simply mean "no question". */
-  async runSessionEnd(ctx: {
-    resourceId: number;
-    userId: number;
-    sessionId: number;
-    origin: 'web' | 'api' | 'reader';
-  }): Promise<{ plugin: string; result: Extract<SessionEndResult, { decision: 'choose' }> } | null> {
+  /**
+   * Advisory only. Every plugin's hook runs; the first valid question is returned, the other plugins get
+   * their default right away. Failures and invalid results simply mean "no question" from that plugin.
+   */
+  async runSessionEnd(ctx: SessionEndRun): Promise<SessionEndQuestion | null> {
+    let first: SessionEndQuestion | null = null;
     for (const { plugin, hook } of this.registry.sessionEndHooks()) {
-      const run: PreStartRun = { ...ctx, action: 'start', satisfied: new Map() };
-      const result = await this.guarded(plugin, run, () => hook({ ...ctx, now: new Date() }));
-      if (result.kind === 'failure' || result.value?.decision !== 'choose') continue;
-      const choice = result.value.choice;
-      const valid =
-        choice &&
-        Array.isArray(choice.choices) &&
-        choice.choices.length > 0 &&
-        choice.choices.length <= READER_UI_LIMITS.maxChoices &&
-        choice.choices.some((c) => c.id === choice.defaultOnTimeout);
-      if (valid) return { plugin, result: result.value };
+      const { result, error } = await this.runner.run(
+        sessionEndKey(plugin),
+        () => hook({ ...ctx, now: new Date() }),
+        (raw) => normalizeSessionEnd(raw),
+      );
+      if (result.kind === 'failure') {
+        this.logger.warn(`Session-end hook of plugin ${plugin} failed (${result.code}): ${(error as Error)?.message}`);
+        continue;
+      }
+      if (result.value === 'none') continue;
+      const choice = this.guardChoice(plugin, result.value);
+      if (first) void choice.onAnswer(choice.defaultOnTimeout);
+      else first = { plugin, result: { decision: 'choose', choice } };
     }
-    return null;
+    return first;
   }
 
   async resetBreaker(plugin: string): Promise<void> {
-    this.breakers.get(plugin)?.reset();
+    this.resetBreakers(plugin);
     await this.alerts.clearWhere('breaker-open', { plugin });
   }
 
-  private breaker(plugin: string): CircuitBreaker {
-    let breaker = this.breakers.get(plugin);
-    if (!breaker) {
-      breaker = new CircuitBreaker(
-        envInt('READER_UI_BREAKER_THRESHOLD', READER_UI_TIMING.breakerThreshold),
-        READER_UI_TIMING.breakerProbeAfterMs,
-      );
-      this.breakers.set(plugin, breaker);
-    }
-    return breaker;
+  private resetBreakers(plugin: string): void {
+    this.runner.reset(plugin);
+    this.runner.reset(sessionEndKey(plugin));
   }
 
-  private async guarded<T>(
-    plugin: string,
-    run: PreStartRun,
-    call: () => T | Promise<T>,
-  ): Promise<{ kind: 'ok'; value: T } | { kind: 'failure'; code: 'timeout' | 'exception' | 'breaker-open' }> {
-    const breaker = this.breaker(plugin);
-    if (breaker.next(Date.now()) === 'open') return { kind: 'failure', code: 'breaker-open' };
-    try {
-      const value = await this.withTimeout(call);
-      if (breaker.success()) await this.breakerChanged(plugin, 'closed', run);
-      return { kind: 'ok', value };
-    } catch (error) {
-      const code = error instanceof HookFailure ? error.code : 'exception';
-      this.logger.warn(`Hook of plugin ${plugin} failed (${code}): ${(error as Error)?.message}`);
-      if (breaker.failure(Date.now())) await this.breakerChanged(plugin, 'open', run);
-      return { kind: 'failure', code: code === 'timeout' ? 'timeout' : 'exception' };
-    }
+  /** The plugin's answer callback, at most once, with the hook timeout, never rejecting. */
+  private guardChoice(plugin: string, choice: PluginChoice): PluginChoice {
+    let answered = false;
+    const original = choice.onAnswer;
+    return {
+      ...choice,
+      onAnswer: async (choiceId: string) => {
+        if (answered) return;
+        answered = true;
+        await this.runner
+          .withTimeout(() => original.call(choice, choiceId))
+          .catch((e) => this.logger.warn(`Plugin ${plugin} onAnswer failed: ${(e as Error)?.message ?? e}`));
+      },
+    };
   }
 
-  private withTimeout<T>(call: () => T | Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new HookFailure('timeout')), this.timeoutMs);
-      Promise.resolve()
-        .then(call)
-        .then(resolve, reject)
-        .finally(() => clearTimeout(timer));
-    });
-  }
-
-  private async breakerChanged(plugin: string, state: 'open' | 'closed', run: PreStartRun) {
-    if (state === 'open') {
+  private async breakerChanged(plugin: string, transition: BreakerTransition, run: PreStartRun) {
+    if (!transition) return;
+    if (transition === 'open') {
       await this.alerts
         .raise('breaker-open', `Hooks of plugin ${plugin} keep failing; the host applies the failure policy`, {
           plugin,
@@ -205,41 +198,28 @@ export class ReaderUiHooksService {
         actorId: null,
         authenticationMethod: null,
         subjectId: run.resourceId,
-        details: { plugin, state, reasonCode: state === 'open' ? 'consecutive-failures' : 'recovered' },
+        details: {
+          plugin,
+          state: transition,
+          reasonCode: transition === 'open' ? 'consecutive-failures' : 'recovered',
+        },
       })
       .catch(() => undefined);
   }
 
+  /** null = invalid result, which the runner counts as a hook failure. */
   private normalize(plugin: string, raw: PreStartResult, run: PreStartRun): PreStartOutcome | null {
     if (!raw || typeof raw !== 'object') return null;
     if (raw.decision === 'allow') return { decision: 'allow' };
     if (raw.decision === 'block') {
-      const code = typeof raw.reason?.code === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(raw.reason.code);
-      const title = cleanPluginText(raw.reason?.title, READER_UI_LIMITS.maxTextChars);
-      const body = cleanPluginText(raw.reason?.body, READER_UI_LIMITS.maxTextChars * 2);
-      if (!code || !title.ok || !body.ok) return null;
-      return { decision: 'block', plugin, reason: { code: raw.reason.code, title: title.value, body: body.value } };
+      const reason = validBlockReason(raw.reason);
+      return reason ? { decision: 'block', plugin, reason } : null;
     }
     if (raw.decision === 'confirm') {
-      const c = raw.confirmation;
-      const title = cleanPluginText(c?.title, READER_UI_LIMITS.maxTextChars);
-      const body = cleanPluginText(c?.body, READER_UI_LIMITS.maxTextChars * 2);
-      if (!c || !READER_UI_LIMITS.idPattern.test(String(c.stepKey)) || !title.ok || !body.ok) return null;
-      if (run.satisfied.get(plugin)?.has(c.stepKey)) return { decision: 'allow' };
-      const confirmLabel = c.confirmLabel === undefined ? undefined : cleanPluginLabel(c.confirmLabel);
-      const cancelLabel = c.cancelLabel === undefined ? undefined : cleanPluginLabel(c.cancelLabel);
-      if ((confirmLabel && !confirmLabel.ok) || (cancelLabel && !cancelLabel.ok)) return null;
-      return {
-        decision: 'confirm',
-        plugin,
-        confirmation: {
-          ...c,
-          title: title.value,
-          body: body.value,
-          ...(confirmLabel?.ok ? { confirmLabel: confirmLabel.value } : {}),
-          ...(cancelLabel?.ok ? { cancelLabel: cancelLabel.value } : {}),
-        },
-      };
+      const confirmation = validatePluginConfirmation(raw.confirmation);
+      if (!confirmation.ok) return null;
+      if (run.satisfied.get(plugin)?.has(confirmation.value.stepKey)) return { decision: 'allow' };
+      return { decision: 'confirm', plugin, confirmation: confirmation.value };
     }
     return null;
   }
@@ -271,4 +251,23 @@ export class ReaderUiHooksService {
       })
       .catch(() => undefined);
   }
+}
+
+function decisionCode(outcome: PreStartOutcome): string {
+  return outcome.decision === 'block' ? outcome.reason.code : outcome.decision;
+}
+
+function validBlockReason(reason: PluginBlockReason | undefined): PluginBlockReason | null {
+  const code = typeof reason?.code === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(reason.code);
+  const title = cleanPluginText(reason?.title, READER_UI_LIMITS.maxTextChars);
+  const body = cleanPluginText(reason?.body, READER_UI_LIMITS.maxTextChars * 2);
+  if (!code || !title.ok || !body.ok) return null;
+  return { code: reason.code, title: title.value, body: body.value };
+}
+
+function normalizeSessionEnd(raw: SessionEndResult): PluginChoice | 'none' | null {
+  if (raw?.decision === 'none') return 'none';
+  if (raw?.decision !== 'choose') return null;
+  const choice = validatePluginChoice(raw.choice);
+  return choice.ok ? choice.value : null;
 }

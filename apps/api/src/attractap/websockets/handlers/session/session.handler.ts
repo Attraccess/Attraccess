@@ -30,6 +30,8 @@ import { AttractapFormsHandler } from '../forms/forms.handler';
 
 import { ReaderStartGate } from './reader-start-gate.service';
 
+import { CardSessionService } from '../ui/card-session.service';
+
 import { ResourceActionGuard } from '../resource-action.guard';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
@@ -72,6 +74,9 @@ export class AttractapSessionHandler {
 
   @Inject(ReaderStartGate)
   protected startGate: ReaderStartGate;
+
+  @Inject(CardSessionService)
+  protected cardSessions: CardSessionService;
 
   @Inject(SupervisionService)
   protected supervisionService: SupervisionService;
@@ -281,6 +286,11 @@ export class AttractapSessionHandler {
     }
   }
 
+  /** START/STOP carry the reader's card session id: the reader is still signed in, keep the session alive. */
+  protected resumeCardSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    this.cardSessions.resume(socket, data.payload?.cardSessionId, socket.state.lastAuthenticatedUserId);
+  }
+
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId, projectId, forceTakeOver, stepId } = data.payload as {
       resourceId: number;
@@ -288,6 +298,7 @@ export class AttractapSessionHandler {
       forceTakeOver?: boolean;
       stepId?: string;
     };
+    this.resumeCardSession(socket, data);
 
     if (
       !(await this.resourceActionGuard.validateResourceAction(
@@ -323,23 +334,23 @@ export class AttractapSessionHandler {
     const supervisorUserId =
       flow && flow.resourceId === resourceId ? (flow.approvedSupervisorUserId ?? undefined) : undefined;
 
-    // Plugin pre-start hooks (ATT-1187): allow, ask for a confirmation step, or block. Never gates stop.
-    const gate = await this.startGate.run(socket, {
-      user,
-      resourceId,
-      projectId,
-      forceTakeOver,
-      requestId: data.payload?.requestId,
-      stepId,
-      supervisorUserId,
-    });
-    if (gate.kind === 'held') return;
-    if (gate.kind === 'reply') {
-      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, gate.payload);
-      return;
-    }
-
     try {
+      // Plugin pre-start hooks (ATT-1187): allow, ask for a confirmation step, or block. Never gates stop.
+      // Its can-start precheck throws the same refusals as startSession, answered below.
+      const gate = await this.startGate.run(socket, {
+        user,
+        resourceId,
+        projectId,
+        forceTakeOver,
+        requestId: data.payload?.requestId,
+        stepId,
+        supervisorUserId,
+      });
+      if (gate.kind === 'held') return;
+      if (gate.kind === 'reply') {
+        await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, gate.payload);
+        return;
+      }
       await this.resourceUsageService.startSession(
         resourceId,
         user,
@@ -383,6 +394,7 @@ export class AttractapSessionHandler {
     const { resourceId } = data.payload as {
       resourceId: number;
     };
+    this.resumeCardSession(socket, data);
 
     if (
       !(await this.resourceActionGuard.validateResourceAction(

@@ -7,7 +7,8 @@ import type { CardSessionState } from './ui-socket-state';
 export const UNLOCKED_TIMEOUT_MS = 30_000;
 export const CARD_SESSION_GRACE_MS = 5_000;
 
-export type CardSessionEndReason = 'reader' | 'expired' | 'replaced' | 'disconnect';
+/** `reader`: CARD_SESSION_ENDED; `expired`: server timer; `disconnect`: socket closed (listeners are not told). */
+export type CardSessionEndReason = 'reader' | 'expired' | 'disconnect';
 type StartedListener = (
   socket: AuthenticatedWebSocket,
   session: CardSessionState,
@@ -16,13 +17,17 @@ type StartedListener = (
 type EndedListener = (socket: AuthenticatedWebSocket, session: CardSessionState, reason: CardSessionEndReason) => void;
 
 /**
- * Tracks the card authentication behind reader actions (ATT-1187). The reader never told the server when it
- * signed a user out, so the server also expires a card session itself, unless a step is still open.
+ * Tracks the card authentication behind reader actions (ATT-1187). The reader restarts its sign-in timeout on
+ * every touch and pauses it during forms, so reader messages that carry the card session id keep it alive
+ * (`resume`). The server also expires a card session itself, unless a step is still open.
  */
 @Injectable()
 export class CardSessionService {
   private readonly started: StartedListener[] = [];
   private readonly ended: EndedListener[] = [];
+  /** The last session the server timer expired, revivable by its own reader while nothing newer exists. */
+  private readonly expired = new WeakMap<AuthenticatedWebSocket, CardSessionState>();
+  private readonly deadlines = new WeakMap<CardSessionState, number>();
 
   onStarted(listener: StartedListener): void {
     this.started.push(listener);
@@ -43,6 +48,7 @@ export class CardSessionService {
   issue(socket: AuthenticatedWebSocket, userId: number, language: 'en' | 'de'): CardSessionState {
     const previous = socket.state.cardSession ?? null;
     if (previous?.expiryTimer) clearTimeout(previous.expiryTimer);
+    this.expired.delete(socket);
     const session: CardSessionState = {
       id: randomBytes(12).toString('base64url'),
       userId,
@@ -56,24 +62,55 @@ export class CardSessionService {
     return session;
   }
 
+  /**
+   * A reader message carried this card session id: the reader is still signed in, so the timer restarts.
+   * If the server timer already expired it, the same session comes back, but only for the same user and only
+   * while no newer card session was issued and the reader did not end it.
+   */
+  resume(socket: AuthenticatedWebSocket, cardSessionId: unknown, userId: number | null | undefined): boolean {
+    if (typeof cardSessionId !== 'string' || userId == null) return false;
+    const live = socket.state.cardSession;
+    if (live) {
+      if (live.id !== cardSessionId || live.userId !== userId) return false;
+      this.arm(socket, live, UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS);
+      return true;
+    }
+    const expired = this.expired.get(socket);
+    if (!expired || expired.id !== cardSessionId || expired.userId !== userId) return false;
+    this.expired.delete(socket);
+    socket.state.cardSession = expired;
+    this.arm(socket, expired, UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS);
+    this.started.forEach((listener) => listener(socket, expired, null));
+    return true;
+  }
+
   /** Reader reported "card session ended", the server timer fired, or the socket closed. */
   end(socket: AuthenticatedWebSocket, cardSessionId: string | null, reason: CardSessionEndReason): boolean {
-    const session = socket.state.cardSession;
+    if (reason !== 'expired' && (cardSessionId === null || this.expired.get(socket)?.id === cardSessionId)) {
+      this.expired.delete(socket);
+    }
+    const session = socket.state?.cardSession;
     if (!session || (cardSessionId !== null && session.id !== cardSessionId)) return false;
     if (session.expiryTimer) clearTimeout(session.expiryTimer);
+    session.expiryTimer = null;
     socket.state.cardSession = null;
+    if (reason === 'disconnect') return true;
+    if (reason === 'expired') this.expired.set(socket, session);
     this.ended.forEach((listener) => listener(socket, session, reason));
     return true;
   }
 
-  /** Called when a step closes: the card session may now run out. */
+  /** Called when a step closes: the card session may now run out, but never sooner than already planned. */
   rearm(socket: AuthenticatedWebSocket): void {
     const session = socket.state.cardSession;
-    if (session) this.arm(socket, session, CARD_SESSION_GRACE_MS * 2);
+    if (!session) return;
+    const remaining = (this.deadlines.get(session) ?? 0) - Date.now();
+    this.arm(socket, session, Math.max(remaining, CARD_SESSION_GRACE_MS * 2));
   }
 
   private arm(socket: AuthenticatedWebSocket, session: CardSessionState, afterMs: number): void {
     if (session.expiryTimer) clearTimeout(session.expiryTimer);
+    this.deadlines.set(session, Date.now() + afterMs);
     session.expiryTimer = setTimeout(() => {
       if (socket.state.cardSession?.id !== session.id) return;
       if (socket.state.uiSteps && socket.state.uiSteps.size > 0) {

@@ -21,6 +21,9 @@ import { SessionService } from '../users-and-auth/auth/session.service';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { EnrollmentLimitsService } from '../device-enrollment/enrollment-limits.service';
 import { ReaderUiSettingsService } from '../plugin-system/reader-ui/reader-ui-settings.service';
+import { ReaderUiRegistry } from '../plugin-system/reader-ui/reader-ui.registry';
+import { UiSlotService } from '../attractap/websockets/handlers/ui/ui-slot.service';
+import { LicenseService } from '../license/license.service';
 import { bootstrap } from '../main.bootstrap';
 import { DesktopFixture, buildProbe, waitFor } from './desktop-simulator.fixture';
 import { withDesktopCleanup } from './desktop-simulator-cleanup';
@@ -243,7 +246,9 @@ describe('reader UI against an isolated real API and the desktop simulator', () 
       payload: { requestId: step.requestId + 1000, resourceId: resource.id, stepId: step.stepId },
     } as AttractapEvent['data']);
     const reply = replies.find((message) => message.data.type === AttractapEventType.START_RESOURCE_USAGE_SESSION);
-    expect(['STEP_EXPIRED', 'STEP_UNKNOWN']).toContain((reply?.data.payload as { error?: string }).error);
+    const payload = reply?.data.payload as { error?: string; reason?: { code?: string } };
+    expect(payload.error).toBe('START_BLOCKED');
+    expect(['STEP_EXPIRED', 'STEP_UNKNOWN']).toContain(payload.reason?.code);
     expect(await usages()).toBe(0);
   }, 120_000);
 
@@ -316,7 +321,7 @@ describe('reader UI against an isolated real API and the desktop simulator', () 
         });
         await app
           .get(ReaderUiSettingsService)
-          .setResource(resource.id, { noScreenPolicy: policy, plugins: [] }, admin.id);
+          .setResource(resource.id, { noScreenPolicy: policy, plugins: [] }, { id: admin.id });
         useHook({ preStartHook: () => CONFIRM });
         recordSent();
         await desktop().click('Ressource verwenden');
@@ -339,37 +344,47 @@ describe('reader UI against an isolated real API and the desktop simulator', () 
   );
 
   it('does not bring back a slot that expired while the reader was disconnected', async () => {
-    let expiresAt = 0;
-    await signedIn('reader-ui-slot-expiry', async () => {
-      expiresAt = Date.now() + 6_000;
-      useHook({
-        readerUi: {
-          getSlotContributions: () =>
-            Date.now() < expiresAt
-              ? [
-                  {
-                    slotId: 'resourceList.row.status',
-                    key: 'free',
-                    tree: { t: 'badge', text: 'Frei bis 14:00' },
-                    expiresAt: new Date(expiresAt),
-                  },
-                ]
-              : [],
-        },
-      });
+    await signedIn('reader-ui-slot-expiry');
+    const readerConnected = () =>
+      [...app.get(WebsocketService).sockets.values()].some((item) => item.readerId === reader.id);
+    // The provider keeps returning the contribution after expiresAt: only server-side expiry can hide it.
+    const expiresAt = new Date(Date.now() + 8_000);
+    useHook({
+      readerUi: {
+        getSlotContributions: () => [
+          { slotId: 'resourceList.row.status', key: 'free', tree: { t: 'badge', text: 'Frei bis 14:00' }, expiresAt },
+        ],
+      },
     });
-    await desktop().command('reconnect');
-    await new Promise((resolve) => setTimeout(resolve, 7_000)); // server time passes the expiry
     recordSent();
-    await desktop().command('reconnect');
+    app.get(ReaderUiRegistry).invalidate('test-hooks', { readerId: reader.id });
     await waitFor(
-      () => !!reader && [...app.get(WebsocketService).sockets.values()].some((item) => item.readerId === reader.id),
-      'reconnect',
+      () => sentOf(AttractapEventType.UI_SLOT_UPDATE).some((m) => (m.data.payload as { tree: unknown }).tree !== null),
+      'the slot shown before the expiry',
     );
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    const shown = sentOf(AttractapEventType.UI_SLOT_UPDATE).filter(
-      (message) => (message.data.payload as { tree: unknown }).tree !== null,
+
+    // Keep the reader offline across the expiry: reconnects fail the license check until it is restored.
+    const offline = jest.spyOn(app.get(LicenseService), 'verifyLicense').mockRejectedValue(new Error('offline'));
+    const slotSends = jest.spyOn(UiSlotService.prototype as unknown as { send: () => number }, 'send');
+    try {
+      await app.get(AttractapGateway).disconnectReader(reader.id);
+      await waitFor(() => !readerConnected(), 'the reader to go offline');
+      await new Promise((resolve) => setTimeout(resolve, expiresAt.getTime() - Date.now() + 1_000));
+      expect(readerConnected()).toBe(false);
+    } finally {
+      offline.mockRestore();
+    }
+    await waitFor(readerConnected, 'reconnect', 60_000);
+    await waitFor(
+      () =>
+        app
+          .get(UiSlotService)
+          .contributionsOf(reader.id)
+          .some((c) => c.reason === 'expired'),
+      'the slot sync after reconnecting',
     );
+    const shown = slotSends.mock.calls.filter((call) => (call as unknown[])[2] !== null);
+    slotSends.mockRestore();
     expect(shown).toHaveLength(0);
-  }, 120_000);
+  }, 180_000);
 });

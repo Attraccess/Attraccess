@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { type User } from '@attraccess/database-entities';
 import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
+import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
 import { ReaderUiHooksService, type PreStartOutcome } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
+import { SettingsService } from '../../../settings/settings.service';
 import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
 import { WebStartStepStore } from './web-start-step.store';
@@ -16,6 +18,8 @@ export interface PreStartInput {
   supervisorUserId?: number | null;
   readerId?: number;
   cardSessionId?: string;
+  /** The card session's language on readers; otherwise the user's preferred language is resolved. */
+  language?: ReaderUiLanguage;
   /** plugin -> step keys already confirmed in this start attempt. */
   satisfied?: Record<string, string[]>;
 }
@@ -23,16 +27,16 @@ export interface PreStartInput {
 /**
  * The one pre-start gate for reader, web, API and supervision starts (ATT-1187). It runs the read-only
  * can-start precheck first, so a user who would be refused anyway never sees a plugin question, then the hooks.
+ * A precheck refusal is thrown as is: the caller answers it like the same refusal from `startSession`.
  * Stop and emergency stop never come through here.
  */
 @Injectable()
 export class PreStartService {
-  private readonly logger = new Logger(PreStartService.name);
-
   constructor(
     private readonly usage: ResourceUsageService,
     private readonly hooks: ReaderUiHooksService,
     private readonly webSteps: WebStartStepStore,
+    private readonly settings: SettingsService,
   ) {}
 
   hasHooks(): boolean {
@@ -41,19 +45,15 @@ export class PreStartService {
 
   async evaluate(input: PreStartInput): Promise<PreStartOutcome> {
     if (!this.hooks.hasPreStartHooks()) return { decision: 'allow' };
-    try {
-      await this.usage.precheckStart(input.resourceId, input.user, input, input.supervisorUserId ?? null);
-    } catch (error) {
-      // The real start raises the same refusal with the normal error handling.
-      this.logger.debug(`Pre-start hooks skipped, precheck refused: ${(error as Error).message}`);
-      return { decision: 'allow' };
-    }
+    // Rethrown, not skipped: a resource that frees up before the start must not start without a hook decision.
+    await this.usage.precheckStart(input.resourceId, input.user, input, input.supervisorUserId ?? null);
     return this.hooks.runPreStart({
       resourceId: input.resourceId,
       userId: input.user.id,
       action: input.forceTakeOver ? 'takeover' : 'start',
       projectId: input.projectId,
       origin: input.origin,
+      language: input.language ?? (await this.settings.resolveLanguage(input.user.locale)),
       readerId: input.readerId,
       cardSessionId: input.cardSessionId,
       satisfied: new Map(Object.entries(input.satisfied ?? {}).map(([plugin, keys]) => [plugin, new Set(keys)])),

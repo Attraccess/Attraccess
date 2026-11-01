@@ -1,6 +1,17 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Put, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthAny, AuthenticatedRequest, type SystemPermission } from '@attraccess/plugins-backend-sdk';
 import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { ResourcesService } from '../resources/resources.service';
@@ -58,7 +69,7 @@ export class ReaderUiAdminController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceReaderUiSettingsDto> {
     await this.requireResource(resourceId);
-    await this.settings.setResource(resourceId, dto, req.user.id);
+    await this.settings.setResource(resourceId, dto, req.user);
     this.slots.syncReader(undefined);
     return this.settings.getResource(resourceId);
   }
@@ -82,7 +93,7 @@ export class ReaderUiAdminController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ReaderReaderUiSettingsDto> {
     await this.requireReader(readerId);
-    await this.settings.setReader(readerId, dto.widgetsEnabled, req.user.id);
+    await this.settings.setReader(readerId, dto.widgetsEnabled, req.user);
     this.slots.syncReader(readerId);
     return this.settings.getReader(readerId);
   }
@@ -100,7 +111,7 @@ export class ReaderUiAdminController {
   }
 
   @Get('reader-ui/alerts')
-  @Auth('resources.update')
+  @AuthAny('resources.update', 'system.plugins.manage')
   @ApiOperation({ summary: 'Open reader UI alerts', operationId: 'getReaderUiAlerts' })
   @ApiResponse({ status: 200, type: [ReaderUiAlertDto] })
   getAlerts(): Promise<ReaderUiAlertDto[]> {
@@ -108,17 +119,24 @@ export class ReaderUiAdminController {
   }
 
   @Post('reader-ui/alerts/:alertId/clear')
-  @Auth('resources.update')
+  @AuthAny('resources.update', 'system.plugins.manage')
   @ApiOperation({
-    summary: 'Clear a reader UI alert (resets a circuit breaker or a crash-loop suspension)',
+    summary:
+      'Clear a reader UI alert. Plugin alerts (open breaker, load failure) reset the plugin globally and need ' +
+      'system.plugins.manage; a reader crash-loop alert needs resources.update.',
     operationId: 'clearReaderUiAlert',
   })
   @ApiResponse({ status: 200, type: ReaderUiAlertDto })
+  @ApiResponse({ status: 403, description: 'Missing the permission this alert kind needs' })
   async clearAlert(
     @Param('alertId', ParseIntPipe) alertId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ReaderUiAlertDto> {
-    const cleared = await this.alerts.clear(alertId, req.user.id);
+    const alert = await this.alerts.findOpen(alertId);
+    if (!alert) throw new NotFoundException('Alert not found or already cleared');
+    const needed: SystemPermission = alert.kind === 'crash-loop' ? 'resources.update' : 'system.plugins.manage';
+    if (!req.user.effectivePermissions?.has(needed)) throw new ForbiddenException('Insufficient permissions');
+    const cleared = await this.alerts.clear(alertId, req.user);
     if (!cleared) throw new NotFoundException('Alert not found or already cleared');
     return cleared;
   }

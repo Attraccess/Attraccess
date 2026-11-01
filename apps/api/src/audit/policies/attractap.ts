@@ -72,16 +72,19 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
     'decision',
     'reasonCode',
     'cardSessionId',
+    'origin',
     'policy',
   ]),
   'ui.card_confirm_cancelled': new Set([
     'plugin',
     'readerId',
     'userId',
+    'tappedUserId',
     'resourceId',
     'decision',
     'reasonCode',
     'cardSessionId',
+    'origin',
   ]),
   'ui.fail_open_used': new Set([
     'plugin',
@@ -120,8 +123,14 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   count: positive,
   mode: oneOf('new', 'pair', 'takeover'),
   method: oneOf('code', 'led-pattern', 'flasher'),
-  plugin: (value) => typeof value === 'string' && /^[A-Za-z0-9._@/-]{1,100}$/.test(value),
+  // Manifest names are free strings (npm names incl. `@scope/name`); only control characters are refused.
+  plugin: (value) =>
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 214 &&
+    ![...value].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f),
   userId: positive,
+  tappedUserId: positive,
   resourceId: positive,
   decision: oneOf('allow', 'confirm', 'block', 'answered', 'cancelled', 'expired', 'default', 'failure'),
   reasonCode: (value) => typeof value === 'string' && /^[A-Za-z0-9_.-]{1,40}$/.test(value),

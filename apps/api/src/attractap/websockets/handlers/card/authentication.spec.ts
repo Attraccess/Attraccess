@@ -208,6 +208,7 @@ describe('AttractapCardHandler', () => {
               key: handleCardAuthenticationRequestScope.activeCard.key,
               username: handleCardAuthenticationRequestScope.activeCard.user.username,
               language: 'en',
+              cardSessionId: socket.state.cardSession.id,
               languageFallback: true,
               canManageResource: true,
               hasIntroduction: true,
@@ -218,6 +219,18 @@ describe('AttractapCardHandler', () => {
           }),
         }),
       );
+      // Every tap issues a fresh card session for this user; steps and user-scoped slots bind to it.
+      expect(socket.state.cardSession).toMatchObject({
+        id: expect.stringMatching(/^[A-Za-z0-9_-]{16}$/),
+        userId: handleCardAuthenticationRequestScope.activeCard.user.id,
+        language: 'en',
+      });
+      const first = socket.state.cardSession.id;
+      handleCardAuthenticationRequestScope.attractapService.getNFCCardByUID.mockResolvedValueOnce(
+        handleCardAuthenticationRequestScope.activeCard,
+      );
+      await handleCardAuthenticationRequestScope.handler.handleCardAuthenticationRequest(socket, data);
+      expect(socket.state.cardSession.id).not.toBe(first);
     });
 
     it('flags requiresSupervisor for a SUPERVISION_REQUIRED resource even when introduced', async () => {

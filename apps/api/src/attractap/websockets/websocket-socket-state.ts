@@ -77,9 +77,11 @@ export enum AttractapEventType {
   // Reader UI (ATT-1187). Wire contract, schema v1:
   //  server -> reader: UI_SLOT_UPDATE, UI_STEP_REQUEST, UI_STEP_CANCEL. The reader acks each with
   //    ACK_<TYPE> echoing `messageId`, which the server matches on for UI_* types only.
-  //  reader -> server: UI_STEP_RESULT { stepId, action }, UI_RENDER_REPORT, CARD_SESSION_ENDED { cardSessionId }.
-  //  START_RESOURCE_USAGE_SESSION gains optional `stepId` and `choice`; replies may carry
-  //  { error: 'START_BLOCKED', reason: { code, title, body } } or { error: 'STEP_EXPIRED' | 'STEP_UNKNOWN' }.
+  //  reader -> server: UI_STEP_RESULT { stepId, action, cardSessionId }, UI_RENDER_REPORT,
+  //    CARD_SESSION_ENDED { cardSessionId }.
+  //  START_RESOURCE_USAGE_SESSION gains optional `stepId`, `choice` and `cardSessionId`; replies may carry
+  //  { error: 'START_BLOCKED', reason: { code, title, body } }. Host codes in `reason.code`: HOOK_UNAVAILABLE,
+  //  CONFIRMATION_UNAVAILABLE, CONFIRMATION_REQUIRED, STEP_EXPIRED, STEP_UNKNOWN.
   UI_SLOT_UPDATE = 'UI_SLOT_UPDATE',
   UI_STEP_REQUEST = 'UI_STEP_REQUEST',
   UI_STEP_RESULT = 'UI_STEP_RESULT',

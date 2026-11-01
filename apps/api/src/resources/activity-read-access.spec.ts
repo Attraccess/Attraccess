@@ -28,6 +28,8 @@ import { ResourceEventsService } from './sse/resource-events.service';
 import { ResourceUsageController } from './usage/sessions/resource-usage.controller';
 import { ResourceUsageService } from './usage/sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
+import { PreStartService } from './usage/pre-start/pre-start.service';
+import { SessionEndNotifier } from './usage/pre-start/session-end-notifier.service';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
@@ -203,6 +205,8 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         },
         { provide: LiveTopicsService, useValue: { register: jest.fn() } },
         { provide: FlowLogRecorderService, useValue: {} },
+        { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
+        { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

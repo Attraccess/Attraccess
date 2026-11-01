@@ -4,12 +4,21 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsageController } from './resource-usage.controller';
 import { ResourceUsageService } from './resource-usage.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
+import { PreStartService } from '../pre-start/pre-start.service';
+import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
+
+// Both are required: a wiring mistake must fail module compilation, not silently skip the gate.
+const gateProviders = [
+  { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
+  { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+];
 
 it('passes the authenticated user and both IDs to the usage details lookup', async () => {
   const getSessionDetails = jest.fn().mockResolvedValue({ id: 8 });
   const moduleRef = await Test.createTestingModule({
     controllers: [ResourceUsageController],
     providers: [
+      ...gateProviders,
       { provide: ResourceUsageService, useValue: { getSessionDetails } },
       {
         provide: ResourceActivityVisibilityService,
@@ -34,6 +43,7 @@ describe('usage history visibility', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        ...gateProviders,
         { provide: ResourceUsageService, useValue: { getResourceUsageHistory } },
         {
           provide: ResourceActivityVisibilityService,

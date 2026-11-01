@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { existsSync, statSync, openSync, readSync } from 'fs';
 import { join } from 'path';
 import { AttractapService } from '../../../attractap.service';
@@ -23,8 +23,7 @@ export class AttractapFirmwareHandler {
   private metricsService: MetricsService;
 
   @Inject(AttractapUiHandler)
-  @Optional()
-  private uiHandler?: AttractapUiHandler;
+  private uiHandler: AttractapUiHandler;
 
   public async handleFirmwareChunkRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     try {
@@ -80,8 +79,8 @@ export class AttractapFirmwareHandler {
 
   public async handleFirmwareInfo(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
-    // Initial full slot sync and crash-loop protection; a failure here must not stop the OTA check below.
-    await this.uiHandler?.onFirmwareInfo(socket, data.payload).catch((error) => {
+    // Initial full slot sync and crash-loop protection, in the background: it must not stop or delay the OTA check.
+    void this.uiHandler.onFirmwareInfo(socket, data.payload).catch((error) => {
       this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
     });
 
