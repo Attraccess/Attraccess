@@ -66,6 +66,10 @@ void Display::updateDrawerAvailability()
 {
     if (!Display::isActive(&Display::confirmScreen))
         Display::rebootConfirmShown = false;
+    // A full-screen flow that opened under an open drawer (a late top-up refusal, say) closes
+    // it: a reboot question asked from there would park the flow the application waits on.
+    if (Display::transientActive() && !Display::rebootConfirmShown)
+        Display::closeDrawer();
     if (Display::isDrawerAvailable())
         return;
     Display::closeDrawer();
@@ -201,7 +205,7 @@ void Display::closeDrawer()
 
 void Display::requestReboot()
 {
-    if (!Display::isDrawerAvailable())
+    if (!Display::isDrawerAvailable() || Display::transientActive())
         return;
     ConfirmScreen::Config config;
     config.title = FirmwareI18n::Message::RebootDevice;

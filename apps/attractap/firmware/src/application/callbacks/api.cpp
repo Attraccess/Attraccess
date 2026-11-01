@@ -203,7 +203,7 @@ void Application::setupActionCallbacks()
       const auto &result = payload->result;
       // While a usage form is open the server refuses its fields or pages as a START error
       // without a request id, also in stop flows: that is the form failing, not the action.
-      if (self->unlocked && self->hasPendingFormRequest && !result.success &&
+      if (self->unlocked && self->hasPendingFormRequest && !result.success && self->api.isCurrentResourceAction(result.requestId) &&
           (result.type == "START_RESOURCE_USAGE_SESSION" || result.type == "STOP_RESOURCE_USAGE_SESSION")) {
         self->handleFormFlowError(result);
         delete payload;

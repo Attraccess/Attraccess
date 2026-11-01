@@ -125,7 +125,7 @@ private:
     // The button that started the last action, by role: it outlives refreshes that rebuild buttons.
     button_click_type_t lastActionType = BUTTON_CLICK_TYPE_BACK;
     std::string lastActionFlowId;
-    int lastActionRole = 0;
+    std::string lastActionRole;
     // The failure shown, or waiting to be shown, on that button.
     bool actionErrorPending = false;
     FirmwareI18n::Text actionErrorText;
@@ -136,7 +136,7 @@ private:
     bool startIsTakeover = false;
     bool stopIsForeign = false;
     lv_obj_t *buttonFor(button_click_type_t type, const std::string &flowId) const;
-    int roleOf(button_click_type_t type) const;
+    std::string roleOf(button_click_type_t type) const;
     void applyActionError();
     void dropActionError();
 
