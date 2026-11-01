@@ -27,7 +27,7 @@ A confirmation cannot be shown on a Lite reader. The resource's **no-screen poli
 | `card-confirm`       | Amber ring that drains over the confirmation window and one beep. A second short tap by the **same user** starts the session; another user's tap cancels. |
 | `allow-with-warning` | The session starts with a warning pattern.                                                                                                                |
 
-The plugin sets its default; admins can override it per resource under **Resource settings → Reader UI**.
+The plugin sets its default; admins can override it per resource under **Resource settings → Reader display**.
 Plugins cannot set raw LEDs or sounds.
 
 ## Admin settings

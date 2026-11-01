@@ -206,6 +206,7 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
   const confirmation = useStartConfirmation<StartUsageSessionDto>((requestBody) =>
     submitRef.current(actionRef.current, requestBody),
   );
+  const { handleStartError: handleConfirmationRequired } = confirmation;
 
   const submitStartSessionWithRetry = useCallback(
     (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
@@ -214,7 +215,7 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
         { resourceId: model.resourceId, requestBody },
         {
           onError: async (error) => {
-            if (confirmation.handleStartError(error, requestBody)) {
+            if (handleConfirmationRequired(error, requestBody)) {
               return;
             }
             if (!isFormsMissingError(error)) {
@@ -237,13 +238,7 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
         },
       );
     },
-    [
-      confirmation.handleStartError,
-      gatherFormSubmissions,
-      isFormsMissingError,
-      model.resourceId,
-      startUsageSessionMutate,
-    ],
+    [handleConfirmationRequired, gatherFormSubmissions, isFormsMissingError, model.resourceId, startUsageSessionMutate],
   );
   submitRef.current = submitStartSessionWithRetry;
   return {

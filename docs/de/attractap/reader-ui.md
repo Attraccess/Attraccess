@@ -28,7 +28,7 @@ Ressource entscheidet:
 | `card-confirm`       | Bernsteinfarbener Ring, der sich über das Bestätigungsfenster leert, und ein Piepton. Ein zweites kurzes Auflegen **derselben Person** startet die Sitzung; die Karte einer anderen Person bricht ab. |
 | `allow-with-warning` | Die Sitzung startet mit einem Warnmuster.                                                                                                                                                             |
 
-Das Plugin legt den Standard fest; Admins überschreiben ihn pro Ressource unter **Ressourceneinstellungen → Reader-UI**.
+Das Plugin legt den Standard fest; Admins überschreiben ihn pro Ressource unter **Ressourceneinstellungen → Reader-Anzeige**.
 Plugins können weder LEDs noch Töne direkt ansteuern.
 
 ## Admin-Einstellungen
